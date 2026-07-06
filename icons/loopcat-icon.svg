@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="LoopCAT">
+  <rect width="512" height="512" rx="96" fill="#202936"/>
+  <path fill="#ffffff" d="M136 122h74v216h126v62H136z"/>
+  <path fill="#5cc8a7" d="M326 122c-60 0-108 48-108 108s48 108 108 108c35 0 66-16 86-42l-50-38c-8 11-21 18-36 18-25 0-46-21-46-46s21-46 46-46c15 0 28 7 36 18l50-38c-20-26-51-42-86-42z"/>
+</svg>

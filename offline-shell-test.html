@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>LoopCAT Offline Shell Test</title>
+    <link rel="icon" href="data:,">
+  </head>
+  <body>
+    <pre id="results">Running...</pre>
+    <script>
+      (async () => {
+        const out = [];
+        const assert = (condition, label) => {
+          if (!condition) throw new Error(label);
+          out.push(`PASS ${label}`);
+        };
+        const waitForController = async () => {
+          if (navigator.serviceWorker.controller) return;
+          await new Promise((resolve) => {
+            navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
+          });
+        };
+        try {
+          assert("serviceWorker" in navigator, "service worker is available on local release origin");
+          assert("caches" in window, "cache storage is available for offline shell");
+          const existingRegistrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(existingRegistrations.map((registration) => registration.unregister()));
+          const existingCaches = await caches.keys();
+          await Promise.all(existingCaches.filter((name) => name.startsWith("loopcat-offline-")).map((name) => caches.delete(name)));
+          await caches.delete("other-local-tool-cache-probe");
+          const otherToolCache = await caches.open("other-local-tool-cache-probe");
+          await otherToolCache.put("./other-local-tool-cache-probe", new Response("keep"));
+          await otherToolCache.put("./index.html", new Response("<!doctype html><title>Wrong cached shell</title>", { headers: { "Content-Type": "text/html" } }));
+          await otherToolCache.put("./app.js", new Response("window.__wrongLoopCatCache = true;", { headers: { "Content-Type": "application/javascript" } }));
+
+          const registration = await navigator.serviceWorker.register("./service-worker.js");
+          await navigator.serviceWorker.ready;
+          await waitForController();
+          assert(Boolean(registration.active || navigator.serviceWorker.controller), "offline service worker activates");
+
+          const cacheNames = await caches.keys();
+          const cacheName = cacheNames.find((name) => name.startsWith("loopcat-offline-"));
+          assert(Boolean(cacheName), "offline shell cache is created");
+          assert(cacheNames.includes("other-local-tool-cache-probe"), "offline shell activation preserves unrelated origin caches");
+          await caches.delete("other-local-tool-cache-probe");
+          const cache = await caches.open(cacheName);
+          assert(Boolean(await cache.match("./index.html")), "offline shell caches index page");
+          assert(Boolean(await cache.match("./app.js")), "offline shell caches application coordinator");
+          assert(!(await cache.match("./test-runner.html")), "offline shell does not pre-cache test pages");
+          const serviceWorkerSource = await (await fetch("./service-worker.js")).text();
+          const coreAssetsMatch = /const CORE_ASSETS = \[([\s\S]*?)\];/.exec(serviceWorkerSource);
+          assert(Boolean(coreAssetsMatch), "offline shell exposes core asset list");
+          const coreAssets = Array.from(coreAssetsMatch[1].matchAll(/"([^"]+)"/g)).map((match) => match[1]);
+          for (const asset of coreAssets) {
+            assert(Boolean(await cache.match(asset)), `offline shell caches core asset ${asset}`);
+          }
+          assert(coreAssets.length >= 20, "offline shell caches every core app asset");
+          const appJsText = await (await fetch("./app.js")).text();
+          assert(!appJsText.includes("__wrongLoopCatCache"), "offline shell serves core assets from the LoopCAT cache instead of unrelated caches");
+
+          const frame = document.createElement("iframe");
+          frame.hidden = true;
+          frame.src = "./offline-navigation-check";
+          document.body.append(frame);
+          await new Promise((resolve, reject) => {
+            frame.addEventListener("load", resolve, { once: true });
+            frame.addEventListener("error", () => reject(new Error("Offline navigation fallback frame failed to load.")), { once: true });
+            setTimeout(() => reject(new Error("Timed out waiting for offline navigation fallback.")), 10000);
+          });
+          assert(frame.contentDocument?.title === "LoopCAT", "offline navigation fallback serves cached app shell");
+          assert(!(await cache.match("./offline-navigation-check")), "offline navigation fallback does not cache missing routes");
+
+          const appResponse = await fetch("./app.js?release-cache-probe=1");
+          assert(appResponse.ok, "online core asset request with query succeeds");
+          assert(!(await cache.match("./app.js?release-cache-probe=1")), "offline shell does not cache query variants as separate assets");
+
+          const resultText = `OFFLINE SHELL TEST PASS\n${out.join("\n")}`;
+          document.querySelector("#results").textContent = resultText;
+          window.parent?.postMessage({ type: "loopcat-test-result", name: "Offline shell", text: resultText }, "*");
+        } catch (error) {
+          const resultText = `OFFLINE SHELL TEST FAIL\n${error.stack || error.message}`;
+          document.querySelector("#results").textContent = resultText;
+          window.parent?.postMessage({ type: "loopcat-test-result", name: "Offline shell", text: resultText }, "*");
+        }
+      })();
+    </script>
+  </body>
+</html>

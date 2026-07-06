@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>LoopCAT Smoke Test</title>
+  </head>
+  <body>
+    <pre id="results">Running...</pre>
+    <script src="./storage.js"></script>
+    <script src="./workspace-storage.js"></script>
+    <script src="./docx.js"></script>
+    <script src="./tm.js"></script>
+    <script src="./termbase.js"></script>
+    <script src="./tmx.js"></script>
+    <script src="./tbx.js"></script>
+    <script src="./xliff.js"></script>
+    <script src="./qa.js"></script>
+    <script src="./validation.js"></script>
+    <script src="./analysis.js"></script>
+    <script src="./ai.js"></script>
+    <script src="./worker-client.js"></script>
+    <script src="./project.js"></script>
+    <script src="./localization.js"></script>
+    <script>
+      (async () => {
+        document.querySelector("#results").textContent = "Scripts started";
+        const results = [];
+        const assert = (condition, label) => {
+          if (!condition) throw new Error(label);
+          results.push(`PASS ${label}`);
+        };
+        const writeZipUint16 = (bytes, offset, value) => {
+          bytes[offset] = value & 0xff;
+          bytes[offset + 1] = (value >>> 8) & 0xff;
+        };
+        const writeZipUint32 = (bytes, offset, value) => {
+          bytes[offset] = value & 0xff;
+          bytes[offset + 1] = (value >>> 8) & 0xff;
+          bytes[offset + 2] = (value >>> 16) & 0xff;
+          bytes[offset + 3] = (value >>> 24) & 0xff;
+        };
+        const concatZipParts = (parts) => {
+          const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+          let offset = 0;
+          parts.forEach((part) => {
+            out.set(part, offset);
+            offset += part.length;
+          });
+          return out;
+        };
+        const storedZip = (entries) => {
+          const encoder = new TextEncoder();
+          const localParts = [];
+          const centralParts = [];
+          let offset = 0;
+          Object.entries(entries).forEach(([name, value]) => {
+            const nameBytes = encoder.encode(name);
+            const data = value instanceof Uint8Array ? value : encoder.encode(String(value));
+            const local = new Uint8Array(30 + nameBytes.length);
+            writeZipUint32(local, 0, 0x04034b50);
+            writeZipUint16(local, 4, 20);
+            writeZipUint16(local, 8, 0);
+            writeZipUint32(local, 18, data.length);
+            writeZipUint32(local, 22, data.length);
+            writeZipUint16(local, 26, nameBytes.length);
+            local.set(nameBytes, 30);
+            localParts.push(local, data);
+
+            const central = new Uint8Array(46 + nameBytes.length);
+            writeZipUint32(central, 0, 0x02014b50);
+            writeZipUint16(central, 4, 20);
+            writeZipUint16(central, 6, 20);
+            writeZipUint16(central, 10, 0);
+            writeZipUint32(central, 20, data.length);
+            writeZipUint32(central, 24, data.length);
+            writeZipUint16(central, 28, nameBytes.length);
+            writeZipUint32(central, 42, offset);
+            central.set(nameBytes, 46);
+            centralParts.push(central);
+            offset += local.length + data.length;
+          });
+          const centralDirectory = concatZipParts(centralParts);
+          const eocd = new Uint8Array(22);
+          writeZipUint32(eocd, 0, 0x06054b50);
+          writeZipUint16(eocd, 8, centralParts.length);
+          writeZipUint16(eocd, 10, centralParts.length);
+          writeZipUint32(eocd, 12, centralDirectory.length);
+          writeZipUint32(eocd, 16, offset);
+          return concatZipParts([...localParts, centralDirectory, eocd]);
+        };
+        const workbookFixture = (values) => {
+          const shared = values.map((value) => `<si><t>${String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")}</t></si>`).join("");
+          const cells = values.map((_, index) => {
+            const row = Math.floor(index / 4) + 1;
+            const col = ["A", "B", "C", "D"][index % 4];
+            return `<c r="${col}${row}" t="s"><v>${index}</v></c>`;
+          });
+          return storedZip({
+            "[Content_Types].xml": `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>`,
+            "xl/workbook.xml": `<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Terms" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+            "xl/_rels/workbook.xml.rels": `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`,
+            "xl/sharedStrings.xml": `<?xml version="1.0" encoding="UTF-8"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${values.length}" uniqueCount="${values.length}">${shared}</sst>`,
+            "xl/worksheets/sheet1.xml": `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">${cells.slice(0, 4).join("")}</row><row r="2">${cells.slice(4, 8).join("")}</row></sheetData></worksheet>`
+          });
+        };
+        const fakeOversizedDocxBytes = () => {
+          const nameBytes = new TextEncoder().encode("word/document.xml");
+          const oversized = 151 * 1024 * 1024;
+          const local = new Uint8Array(30 + nameBytes.length);
+          writeZipUint32(local, 0, 0x04034b50);
+          writeZipUint16(local, 4, 20);
+          writeZipUint16(local, 8, 8);
+          writeZipUint32(local, 22, oversized);
+          writeZipUint16(local, 26, nameBytes.length);
+          local.set(nameBytes, 30);
+          const central = new Uint8Array(46 + nameBytes.length);
+          writeZipUint32(central, 0, 0x02014b50);
+          writeZipUint16(central, 4, 20);
+          writeZipUint16(central, 6, 20);
+          writeZipUint16(central, 10, 8);
+          writeZipUint32(central, 24, oversized);
+          writeZipUint16(central, 28, nameBytes.length);
+          central.set(nameBytes, 46);
+          const eocd = new Uint8Array(22);
+          writeZipUint32(eocd, 0, 0x06054b50);
+          writeZipUint16(eocd, 8, 1);
+          writeZipUint16(eocd, 10, 1);
+          writeZipUint32(eocd, 12, central.length);
+          writeZipUint32(eocd, 16, local.length);
+          return concatZipParts([local, central, eocd]);
+        };
+        const b64 = "UEsDBBQAAAAIANGDnVyKqQaC/AAAAL0BAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbH2QTU7DMBSE95G4g+UtShxYIITidMHPEliUAzzZL4mF/+TnlvZsLDgSV8BpoUiIdmnNfDPP8/n+0S02zrI1JjLBS37RtJyhV0EbP0r+snyorzmjDF6DDR4l3yLxRV91y21EYgX2JPmUc7wRgtSEDqgJEX1RhpAc5PJMo4igXmFEcdm2V0IFn9HnOs8ZvK8Y6+5wgJXN7H5TlP0tCS1xdrv3znWSQ4zWKMhFF2uv/xTV3yVNIXcemkyk82Lg4ljJLB7v+EWfykTJaGTPkPIjuGIUbyFpoYNauQI3p5P+uTYMg1F44Oe0mIJCorK9s81BcWD8zy86sRu+P6u+AFBLAwQUAAAACADRg51cEzBxk+UAAABZAQAAEQAAAHdvcmRcZG9jdW1lbnQueG1sbU9LTsMwEN1X4g4j7xsHFghVSbpAQhygHMDE0yaq7bFmpoSejQVH4grYFWUD0uhpvu+9+fr47LbvMcAbssyUenPbtAYwjeTndOjNy+5p/WBA1CXvAiXszRnFbIdVt2w8jaeISaEwJNksvZlU88ZaGSeMThrKmMpsTxydlpIPdiH2mWlEkSIQg71r23sb3ZzMUChfyZ8v3LlWXEGHZwyBoFwG38BumgVKOFAUhauHprN1tSJfMP+heaSYT4q8dkVbFD0ouyTBafkclCgITBjyb5tYquoR9q6s878S9sdzTa5ehpvVN1BLAwQUAAAACADRg51c/g3tSbwAAAAzAQAACwAAAF9yZWxzXC5yZWxzjc85DsIwEAXQPhJ3sKYnTigQQnHSIKS0KBzAsieLiBfZZsnZKDgSV8AFBUEUlLO90X/eH0V1UyO5oPOD0QzyNAOCWhg56I7BsdkvN0B84Fry0WhkMKGHqkyKA448xBvfD9aTiGjPoA/Bbin1okfFfWos6jhpjVM8xNJ11HJx4h3SVZatqfs0oEwImbGklgxcLXMgzWTxH9607SBwZ8RZoQ4/vnxtRJm7DgODq3GSync7jSzQmJLOYpaL5AVQSwECFAAUAAAACADRg51ciqkGgvwAAAC9AQAAEwAAAAAAAAAAAAAAAAAAAAAAW0NvbnRlbnRfVHlwZXNdLnhtbFBLAQIUABQAAAAIANGDnVwTMHGT5QAAAFkBAAARAAAAAAAAAAAAAAAAAC0BAAB3b3JkXGRvY3VtZW50LnhtbFBLAQIUABQAAAAIANGDnVz+De1JvAAAADMBAAALAAAAAAAAAAAAAAAAAEECAABfcmVsc1wucmVsc1BLBQYAAAAAAwADALkAAAAmAwAAAAA=";
+        const bytes = Uint8Array.from(atob(b64), (char) => char.charCodeAt(0));
+        const file = new File([bytes], "sample.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+
+        const project = await window.CatHan.project.createProject({
+          name: `Smoke ${Date.now()}`,
+          sourceLang: "en",
+          targetLang: "tr",
+          tmName: "Smoke TM",
+          termBaseName: "Smoke TB"
+        });
+        assert(project.id && project.name.startsWith("Smoke"), "project creation");
+
+        const extracted = await window.CatHan.docx.extractDocxSegments(file);
+        assert(extracted.segments.length >= 2, "DOCX import and segmentation");
+        let oversizedDocxRejected = false;
+        try {
+          await window.CatHan.docx.extractDocxSegments(new File([fakeOversizedDocxBytes()], "oversized.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+        } catch (error) {
+          oversizedDocxRejected = error.message.includes("too large after decompression");
+        }
+        assert(oversizedDocxRejected, "DOCX import rejects oversized decompressed package");
+
+        const segments = await window.CatHan.project.replaceProjectSegments(project.id, extracted.segments);
+        segments[0].target = "Merhaba dünya.";
+        segments[0].status = "confirmed";
+        await window.CatHan.project.saveSegment(segments[0]);
+        const reloadedSegments = await window.CatHan.project.getProjectSegments(project.id);
+        assert(reloadedSegments[0].target === "Merhaba dünya.", "segment edit autosave persistence");
+
+        await window.CatHan.tm.saveTmEntry({
+          source: segments[0].source,
+          target: segments[0].target,
+          sourceLang: "en",
+          targetLang: "tr",
+          projectName: project.name,
+          tmName: "Smoke TM"
+        });
+        const matches = await window.CatHan.tm.findTmMatches({
+          source: "Hello world.",
+          sourceLang: "en",
+          targetLang: "tr",
+          tmName: "Smoke TM"
+        });
+        assert(matches.length && matches[0].score >= 80, "TM save and fuzzy match");
+
+        await window.CatHan.tm.saveTmEntry({
+          source: segments[0].source,
+          target: "Selam dunya.",
+          sourceLang: "en",
+          targetLang: "tr",
+          projectName: project.name,
+          tmName: "Smoke Reference TM"
+        });
+        const multiMatches = await window.CatHan.tm.findTmMatches({
+          source: "Hello world.",
+          sourceLang: "en",
+          targetLang: "tr",
+          tmNames: ["Smoke TM", "Smoke Reference TM"]
+        });
+        assert(new Set(multiMatches.map((match) => match.tmName)).size >= 2, "multiple TM matching");
+        const indexProbe = await window.CatHan.tm.saveTmEntry({
+          source: "Indexed candidate probe.",
+          target: "Dizinli aday denemesi.",
+          sourceLang: "en",
+          targetLang: "tr",
+          projectName: project.name,
+          tmName: "Smoke TM"
+        });
+        const indexedProbeMatches = await window.CatHan.tm.findTmMatches({
+          source: "Indexed candidate probe.",
+          sourceLang: "en",
+          targetLang: "tr",
+          tmName: "Smoke TM"
+        });
+        const indexRows = await window.CatHan.storage.getAllByIndex("tmTokenIndex", "tmEntryId", indexProbe.id);
+        assert(indexedProbeMatches.some((match) => match.id === indexProbe.id) && indexRows.some((row) => row.token === "indexed"), "persistent TM token index lookup");
+        assert(
+          "INSTALL".toLocaleLowerCase("tr") !== "install" &&
+            window.CatHan.tm.normalizeText("INSTALL INDEX TOKEN") === "install index token",
+          "TM normalization is stable under Turkish locale casing"
+        );
+        const localeProbe = await window.CatHan.tm.saveTmEntry({
+          source: "INSTALL INDEX TOKEN.",
+          target: "Dizin terimi kur.",
+          sourceLang: "en",
+          targetLang: "tr",
+          projectName: project.name,
+          tmName: "Smoke TM"
+        });
+        const localeProbeMatches = await window.CatHan.tm.findTmMatches({
+          source: "install index token.",
+          sourceLang: "en",
+          targetLang: "tr",
+          tmName: "Smoke TM"
+        });
+        const localeProbeIndexRows = await window.CatHan.storage.getAllByIndex("tmTokenIndex", "tmEntryId", localeProbe.id);
+        assert(localeProbeMatches.some((match) => match.id === localeProbe.id) && localeProbeIndexRows.some((row) => row.token === "install"), "TM token index lookup is locale-stable for English source text");
+        await window.CatHan.tm.deleteTmEntry(indexProbe.id);
+        await window.CatHan.tm.deleteTmEntry(localeProbe.id);
+        const deletedIndexRows = await window.CatHan.storage.getAllByIndex("tmTokenIndex", "tmEntryId", indexProbe.id);
+        const deletedLocaleIndexRows = await window.CatHan.storage.getAllByIndex("tmTokenIndex", "tmEntryId", localeProbe.id);
+        assert(deletedIndexRows.length === 0 && deletedLocaleIndexRows.length === 0, "persistent TM token index cleanup");
+        const workerMatches = await window.CatHan.workerClient.findTmMatches({
+          entries: multiMatches,
+          options: { source: "Hello world.", sourceLang: "en", targetLang: "tr", tmNames: ["Smoke TM", "Smoke Reference TM"] },
+          fallback: () => Promise.resolve(window.CatHan.tm.scoreTmEntries(multiMatches, { source: "Hello world.", sourceLang: "en", targetLang: "tr", tmNames: ["Smoke TM", "Smoke Reference TM"] }))
+        });
+        assert(workerMatches.length >= 1 && workerMatches[0].score >= 80, "worker-backed TM matching fallback");
+        const localeStableWorkerMatches = await window.CatHan.workerClient.findTmMatches({
+          entries: [{
+            id: "worker-locale-install",
+            source: "install index token",
+            target: "dizin terimi kur",
+            sourceLang: "en",
+            targetLang: "tr",
+            languagePair: "en::tr",
+            tmName: "Smoke TM",
+            updatedAt: new Date().toISOString()
+          }],
+          options: { source: "INSTALL INDEX TOKEN", sourceLang: "en", targetLang: "tr", tmName: "Smoke TM" },
+          fallback: () => Promise.resolve(window.CatHan.tm.scoreTmEntries([{
+            id: "worker-locale-install",
+            source: "install index token",
+            target: "dizin terimi kur",
+            sourceLang: "en",
+            targetLang: "tr",
+            languagePair: "en::tr",
+            tmName: "Smoke TM",
+            updatedAt: new Date().toISOString()
+          }], { source: "INSTALL INDEX TOKEN", sourceLang: "en", targetLang: "tr", tmName: "Smoke TM" }))
+        });
+        assert(
+          "INSTALL".toLocaleLowerCase("tr") !== "install" && localeStableWorkerMatches.some((match) => match.id === "worker-locale-install"),
+          "worker TM normalization is stable under Turkish locale casing"
+        );
+
+        const tmx = window.CatHan.tmx.buildTmx(matches, { sourceLang: "en", targetLang: "tr" });
+        const importedTmx = window.CatHan.tmx.parseTmx(tmx, { sourceLang: "en", targetLang: "tr", tmName: "Smoke TM" });
+        assert(importedTmx.length >= 1, "TMX export/import");
+        const sensitiveTmx = window.CatHan.tmx.buildTmx([{
+          source: "TMX source text stays intact.",
+          target: "TMX hedef metni korunur.",
+          sourceLang: "en",
+          targetLang: "tr",
+          projectName: "Bearer smoke-tmx-origin-token-that-must-not-export"
+        }], { sourceLang: "en", targetLang: "tr" });
+        assert(
+          sensitiveTmx.includes("TMX source text stays intact.") &&
+            !sensitiveTmx.includes("smoke-tmx-origin-token-that-must-not-export") &&
+            sensitiveTmx.includes("[redacted secret]"),
+          "TMX export redacts credential-looking origin metadata"
+        );
+        const importedSensitiveOriginTmx = window.CatHan.tmx.parseTmx(tmx, {
+          sourceLang: "en",
+          targetLang: "tr",
+          tmName: "Smoke TM",
+          projectName: "Bearer smoke-tmx-origin-token-that-must-not-import"
+        });
+        assert(
+          importedSensitiveOriginTmx.length >= 1 &&
+            !JSON.stringify(importedSensitiveOriginTmx).includes("smoke-tmx-origin-token-that-must-not-import") &&
+            importedSensitiveOriginTmx[0].projectName.includes("[redacted secret]"),
+          "TMX import redacts credential-looking origin metadata"
+        );
+
+        await window.CatHan.termbase.saveTerm({
+          sourceTerm: "translation",
+          targetTerm: "çeviri",
+          sourceLang: "en",
+          targetLang: "tr",
+          notes: "Smoke term",
+          termBaseName: "Smoke TB"
+        });
+        const terms = await window.CatHan.termbase.findTerms({
+          source: "Computer-assisted translation tools help translators work faster.",
+          sourceLang: "en",
+          targetLang: "tr",
+          termBaseName: "Smoke TB"
+        });
+        assert(terms.length === 1, "termbase creation and suggestions");
+        await window.CatHan.termbase.saveTerm({
+          sourceTerm: "Computer-assisted",
+          targetTerm: "Bilgisayar destekli",
+          sourceLang: "en",
+          targetLang: "tr",
+          notes: "Reference term",
+          termBaseName: "Smoke Reference TB"
+        });
+        const multiTerms = await window.CatHan.termbase.findTerms({
+          source: "Computer-assisted translation tools help translators work faster.",
+          sourceLang: "en",
+          targetLang: "tr",
+          termBaseNames: ["Smoke TB", "Smoke Reference TB"]
+        });
+        assert(new Set(multiTerms.map((term) => term.termBaseName)).size >= 2, "multiple termbase suggestions");
+        const highlighted = window.CatHan.termbase.termRanges("Computer-assisted translation tools help translators work faster.", terms);
+        assert(highlighted.length === 1 && highlighted[0].text === "translation" && !window.CatHan.termbase.termRanges("A translationist example.", terms).length, "termbase source highlight ranges");
+        const phraseHighlight = window.CatHan.termbase.termRanges("Computer-assisted translation tools.", [{ sourceTerm: "computer assisted translation", targetTerm: "bilgisayar destekli ceviri" }]);
+        assert(phraseHighlight.length === 1 && phraseHighlight[0].text === "Computer-assisted translation", "multi-word termbase highlight ranges");
+        const qaIssues = window.CatHan.qa.runQaChecks(
+          [{ id: "qa-1", source: "Computer-assisted translation tools.", target: "Bilgisayar destekli ceviri araclari.", status: "draft" }],
+          terms
+        );
+        assert(qaIssues.some((issue) => issue.type === "term" && issue.severity === "warning" && issue.fixHint) && !qaIssues.some((issue) => issue.type === "punctuation"), "QA term and punctuation checks");
+        const forbiddenTerm = await window.CatHan.termbase.saveTerm({
+          sourceTerm: "translation",
+          targetTerm: "makine cevirisi",
+          sourceLang: "en",
+          targetLang: "tr",
+          notes: "Forbidden in this project",
+          termBaseName: "Smoke TB",
+          isForbidden: true
+        });
+        const forbiddenQaIssues = window.CatHan.qa.runQaChecks(
+          [{ id: "qa-forbidden-term", source: "Computer-assisted translation tools.", target: "Bilgisayar destekli makine cevirisi araclari.", status: "draft" }],
+          [forbiddenTerm]
+        );
+        assert(forbiddenQaIssues.some((issue) => issue.type === "forbidden-term" && issue.severity === "error" && issue.message.includes("makine cevirisi")), "QA rejects forbidden target terms");
+        const duplicateTagQaIssues = window.CatHan.qa.runQaChecks(
+          [{
+            id: "qa-duplicate-tags",
+            source: "<b>One</b> and <b>two</b>",
+            target: "<b>Bir</b> ve iki",
+            status: "draft",
+            tags: [{ text: "<b>", type: "tag" }, { text: "</b>", type: "tag" }, { text: "<b>", type: "tag" }, { text: "</b>", type: "tag" }]
+          }],
+          []
+        );
+        assert(duplicateTagQaIssues.some((issue) => issue.type === "tag" && issue.message.includes("<b>")), "QA counts duplicate protected tags");
+        const workerQaIssues = await window.CatHan.workerClient.runQaChecks({
+          segments: [{ id: "qa-worker-1", source: "Value <b>one</b> 42.", target: "Deger 41.", status: "draft", tags: [{ text: "<b>", type: "tag" }, { text: "</b>", type: "tag" }] }],
+          terms: [],
+          fallback: () => Promise.resolve(window.CatHan.qa.runQaChecks([{ id: "qa-worker-1", source: "Value <b>one</b> 42.", target: "Deger 41.", status: "draft", tags: [{ text: "<b>", type: "tag" }, { text: "</b>", type: "tag" }] }], [], {
+            missingTags: (segment) => segment.tags.filter((tag) => !String(segment.target || "").includes(tag.text))
+          }))
+        });
+        assert(workerQaIssues.some((issue) => issue.type === "tag") && workerQaIssues.some((issue) => issue.type === "number"), "worker-backed QA fallback");
+        const workerForbiddenQaIssues = await window.CatHan.workerClient.runQaChecks({
+          segments: [{ id: "qa-worker-forbidden", source: "Computer-assisted translation tools.", target: "Bilgisayar destekli makine cevirisi araclari.", status: "draft" }],
+          terms: [forbiddenTerm],
+          fallback: () => Promise.resolve(window.CatHan.qa.runQaChecks([{ id: "qa-worker-forbidden", source: "Computer-assisted translation tools.", target: "Bilgisayar destekli makine cevirisi araclari.", status: "draft" }], [forbiddenTerm]))
+        });
+        assert(workerForbiddenQaIssues.some((issue) => issue.type === "forbidden-term"), "worker-backed QA flags forbidden terms");
+
+        reloadedSegments[0].comments = [{ id: "comment-smoke", body: "Needs client preference check.", state: "open", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }];
+        reloadedSegments[0].reviewState = "needs-review";
+        reloadedSegments[0].reviewNote = "Reviewer should check terminology.";
+        await window.CatHan.project.saveSegment(reloadedSegments[0]);
+        const analysis = window.CatHan.analysis.analyzeProject(project, reloadedSegments, matches);
+        assert(analysis.totals.needsReview === 1 && analysis.totals.comments === 2 && analysis.leverage.exact >= 1, "project analysis review and leverage counts");
+        const reviewDocx = window.CatHan.docx.buildBilingualDocx(project, reloadedSegments, {
+          qaChecks: [{
+            id: "qa-bilingual-1",
+            segmentId: reloadedSegments[0].id,
+            severity: "error",
+            type: "tag",
+            message: "Missing protected placeholder <b>."
+          }]
+        });
+        const reviewImport = await window.CatHan.docx.extractDocxSegments(new File([reviewDocx], "review.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+        const reviewText = reviewImport.segments.map((segment) => segment.text).join(" | ");
+        assert(
+          reviewText.includes("Segments:") &&
+            reviewText.includes("QA by severity:") &&
+            reviewText.includes("error:") &&
+            reviewText.includes("Reviewer notes and QA") &&
+            reviewText.includes("Review:") &&
+            reviewText.includes("needs-review") &&
+            reviewText.includes("Note:") &&
+            reviewText.includes("Reviewer should check terminology.") &&
+            reviewText.includes("Comment 1 (open):") &&
+            reviewText.includes("Needs client preference check.") &&
+            reviewText.includes("QA error tag:") &&
+            reviewText.includes("Missing protected placeholder <b>."),
+          "bilingual DOCX export includes QA summary and reviewer notes"
+        );
+
+        const originalFetch = window.fetch;
+        window.fetch = async () => ({
+          ok: true,
+          json: async () => ({ id: "smoke-openai-response", output_text: "OpenAI smoke target." })
+        });
+        try {
+          const suggestion = await window.CatHan.ai.openAiSuggestion({
+            apiKey: "sk-smoke-local-stub",
+            segment: reloadedSegments[0],
+            tmMatches: matches,
+            terms,
+            project: { ...project, aiSettings: { enabled: true, sendSourceToAi: true, provider: "OpenAI", model: "smoke-test" } }
+          });
+          assert(suggestion.suggestedTarget === "OpenAI smoke target." && suggestion.explanation.length && suggestion.status === "review", "OpenAI suggestion with explanation");
+        } finally {
+          window.fetch = originalFetch;
+        }
+
+        let contextFilteredRequest = "";
+        window.fetch = async (_url, request) => {
+          contextFilteredRequest = String(request?.body || "");
+          return {
+            ok: true,
+            json: async () => ({ id: "smoke-openai-filtered-context", output_text: "OpenAI filtered-context target." })
+          };
+        };
+        try {
+          const filteredContextSuggestion = await window.CatHan.ai.openAiSuggestion({
+            apiKey: "sk-smoke-local-stub",
+            segment: reloadedSegments[0],
+            tmMatches: matches,
+            terms,
+            project: {
+              ...project,
+              aiSettings: {
+                enabled: true,
+                sendSourceToAi: true,
+                provider: "OpenAI",
+                model: "smoke-test",
+                useTmContext: false,
+                useTermbaseContext: false
+              }
+            }
+          });
+          assert(
+            filteredContextSuggestion.explanation.includes("No TM context was included.") &&
+              filteredContextSuggestion.explanation.includes("No termbase context was included.") &&
+              !contextFilteredRequest.includes("Translation memory context") &&
+              !contextFilteredRequest.includes("Termbase context") &&
+              !contextFilteredRequest.includes("Computer-assisted translation") &&
+              !contextFilteredRequest.includes("bilgisayar destekli ceviri"),
+            "OpenAI helper obeys disabled local context toggles"
+          );
+        } finally {
+          window.fetch = originalFetch;
+        }
+
+        const smokeDocumentId = reloadedSegments[0].documentId;
+        const packageReport = window.CatHan.validation.validateProjectPackage({
+          app: "LoopCAT",
+          type: "project-package",
+          version: 1,
+          schemaVersion: 3,
+          exportedAt: "2026-05-07T00:00:00.000Z",
+          packageMetadata: {
+            format: "loopcat-project-package",
+            packageVersion: 1,
+            contractVersion: "loopcat-package-v1",
+            generator: "LoopCAT smoke test",
+            storageMode: "browser-cache"
+          },
+          project: { ...project, documents: [{ id: smokeDocumentId, name: "sample.docx", type: "docx" }], resourceLinks: [{ type: "tm", name: "Smoke TM" }] },
+          segments: reloadedSegments
+        });
+        assert(packageReport.ok && packageReport.warnings.some((warning) => warning.includes("DOCX reconstruction")), "project package validation warnings");
+        const workspaceStatus = await window.CatHan.workspaceStorage.getStatus();
+        assert(workspaceStatus.mode === "browser-cache" && typeof workspaceStatus.supported === "boolean", "workspace storage fallback status");
+
+        const tbx = window.CatHan.tbx.buildTbx(terms, { sourceLang: "en", targetLang: "tr" });
+        const importedTbx = window.CatHan.tbx.parseTbx(tbx, { sourceLang: "en", targetLang: "tr", termBaseName: "Smoke TB" });
+        assert(importedTbx.length === 1, "TBX export/import");
+        assert(importedTbx[0]?.notes === "Smoke term", "TBX export/import preserves termbase notes");
+        const sensitiveTbx = window.CatHan.tbx.buildTbx([
+          { id: "sensitive-term", sourceTerm: "secret note", targetTerm: "gizli not", notes: "Bearer smoke-term-note-token-that-must-not-export" }
+        ], { sourceLang: "en", targetLang: "tr" });
+        assert(
+          !sensitiveTbx.includes("smoke-term-note-token-that-must-not-export") &&
+            sensitiveTbx.includes("[redacted secret]"),
+          "TBX export redacts credential-looking termbase notes"
+        );
+        const importedSensitiveTbx = window.CatHan.tbx.parseTbx(sensitiveTbx, { sourceLang: "en", targetLang: "tr", termBaseName: "Smoke TB" });
+        assert(importedSensitiveTbx[0]?.notes === "[redacted secret]", "TBX export/import preserves redacted termbase notes");
+        const rawSensitiveTbx = `<?xml version="1.0" encoding="UTF-8"?><tbx><text><body><termEntry id="raw-sensitive-term"><langSet xml:lang="en"><tig><term>raw sensitive note</term></tig></langSet><langSet xml:lang="tr"><tig><term>ham gizli not</term></tig></langSet><descrip type="context">Bearer raw-tbx-note-token-that-must-not-import</descrip></termEntry></body></text></tbx>`;
+        const importedRawSensitiveTbx = window.CatHan.tbx.parseTbx(rawSensitiveTbx, { sourceLang: "en", targetLang: "tr", termBaseName: "Smoke TB" });
+        assert(
+          importedRawSensitiveTbx[0]?.notes === "[redacted secret]",
+          "TBX import redacts credential-looking termbase notes"
+        );
+        const forbiddenTbx = window.CatHan.tbx.buildTbx([forbiddenTerm], { sourceLang: "en", targetLang: "tr" });
+        const importedForbiddenTbx = window.CatHan.tbx.parseTbx(forbiddenTbx, { sourceLang: "en", targetLang: "tr", termBaseName: "Smoke TB" });
+        assert(importedForbiddenTbx[0]?.isForbidden === true, "TBX export/import preserves forbidden terms");
+        const parsedCsvTerms = window.CatHan.termbase.parseTermList(
+          [
+            "source,target,notes,forbidden",
+            "\"source, with comma\",hedef,Quoted CSV note,no",
+            "machine translation,makine cevirisi,Forbidden project term Bearer csv-term-note-token-that-must-not-import,yes"
+          ].join("\n"),
+          { sourceLang: "en", targetLang: "tr", termBaseName: "Smoke TB", fileName: "terms.csv" }
+        );
+        assert(parsedCsvTerms.length === 2 && parsedCsvTerms[0].sourceTerm === "source, with comma" && parsedCsvTerms[1].isForbidden === true, "CSV term list import parses headers and forbidden terms");
+        assert(parsedCsvTerms[1].notes.includes("[redacted secret]") && !parsedCsvTerms[1].notes.includes("csv-term-note-token-that-must-not-import"), "CSV term list import redacts credential-looking notes");
+        const parsedTsvTerms = window.CatHan.termbase.parseTermList(
+          "source\ttarget\tnotes\npost-editing\tsonradan duzenleme\tTSV note",
+          { sourceLang: "en", targetLang: "tr", termBaseName: "Smoke TB", fileName: "terms.tsv" }
+        );
+        assert(parsedTsvTerms.length === 1 && parsedTsvTerms[0].targetTerm === "sonradan duzenleme", "TSV term list import parses tab-delimited terms");
+        const parsedXlsxTerms = await window.CatHan.termbase.parseTermWorkbook(
+          workbookFixture(["source", "target", "notes", "forbidden", "spreadsheet term", "tablo terimi", "Workbook note Bearer workbook-term-note-token-that-must-not-import", "yes"]),
+          { sourceLang: "en", targetLang: "tr", termBaseName: "Smoke TB" }
+        );
+        assert(parsedXlsxTerms.length === 1 && parsedXlsxTerms[0].sourceTerm === "spreadsheet term" && parsedXlsxTerms[0].isForbidden === true, "XLSX term list import parses first worksheet terms");
+        assert(parsedXlsxTerms[0].notes.includes("[redacted secret]") && !parsedXlsxTerms[0].notes.includes("workbook-term-note-token-that-must-not-import"), "XLSX term list import redacts credential-looking notes");
+
+        const xliffText = `<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+  <file original="inline.html" source-language="en" target-language="tr" datatype="html">
+    <body>
+      <trans-unit id="u1">
+        <source>Hello <g id="b" ctype="x-bold">world</g><ph id="br">&lt;br/&gt;</ph></source>
+        <target state="translated">Merhaba <g id="b" ctype="x-bold">dunya</g><ph id="br">&lt;br/&gt;</ph></target>
+        <note>Existing reviewer note</note>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>`;
+        const xliffParsed = window.CatHan.xliff.parseXliffText(xliffText, "inline.xlf");
+        assert(xliffParsed.segments.length === 1 && xliffParsed.segments[0].text.includes("<b>world</b>") && xliffParsed.segments[0].target.includes("<b>dunya</b>") && xliffParsed.segments[0].status === "confirmed", "XLIFF import semantic inline tags");
+        const xliffBuilt = window.CatHan.xliff.buildXliff(project, [{
+          id: "xliff-inline-1",
+          source: xliffParsed.segments[0].text,
+          target: xliffParsed.segments[0].target,
+          status: "confirmed"
+        }]);
+        assert(xliffBuilt.includes('ctype="x-bold"') && xliffBuilt.includes("<ph") && xliffBuilt.includes("&lt;br/&gt;"), "XLIFF export protected inline tags");
+        xliffParsed.segments[0].target = "Selam <b>evren</b><br/>";
+        xliffParsed.segments[0].status = "confirmed";
+        const xliffTarget = window.CatHan.xliff.buildTargetXliff(project, xliffParsed.segments, xliffParsed.structure);
+        const xliffRoundTrip = window.CatHan.xliff.parseXliffText(xliffTarget, "inline-target.xlf");
+        assert(xliffTarget.includes('original="inline.html"') && xliffTarget.includes("Existing reviewer note") && xliffRoundTrip.segments[0].target.includes("<b>evren</b>") && xliffRoundTrip.segments[0].status === "confirmed", "XLIFF target export preserves source structure");
+        let missingXliffStructureRejected = false;
+        try {
+          window.CatHan.xliff.buildTargetXliff(project, xliffParsed.segments, null);
+        } catch (error) {
+          missingXliffStructureRejected = error.message.includes("XLIFF reconstruction source data is missing.");
+        }
+        assert(missingXliffStructureRejected, "XLIFF target export rejects missing reconstruction source data");
+
+        const htmlFile = new File(["<!doctype html><html><head><title>Ignore me</title><style>.x{}</style></head><body><h1>Hello world</h1><p>Translate <strong>this</strong> sentence.</p><script>const hidden = 'skip';<\/script></body></html>"], "sample.html", { type: "text/html" });
+        const htmlParsed = await window.CatHan.localization.parseLocalizationFile(htmlFile);
+        assert(htmlParsed.segments.length === 3, "HTML import text extraction");
+        assert(htmlParsed.segments[2].text.includes("<strong>this</strong>") && htmlParsed.segments[2].tags.length === 2, "HTML inline tags stay inside one segment");
+        htmlParsed.segments[0].target = "Beni yok say";
+        htmlParsed.segments[1].target = "Merhaba dunya";
+        htmlParsed.segments[2].target = "Bu <strong>cumleyi</strong> cevir.";
+        const htmlBuilt = window.CatHan.localization.buildLocalizationFile("html", htmlParsed.segments, htmlParsed.structure);
+        assert(htmlBuilt.includes("<h1>Merhaba dunya</h1>") && htmlBuilt.includes("<p>Bu <strong>cumleyi</strong> cevir.</p>") && htmlBuilt.includes("const hidden = 'skip';"), "HTML export structure preservation");
+
+        const yamlFile = new File(["title: \"Hello\"\nlabels:\n  \"open project\": \"Open project\"\nmenu:\n  - label: File\n    hint: \"Open project\"\nbody: |-\n  First line.\n  Second line.\nflag: true\ncount: 3\n"], "sample.yaml", { type: "text/yaml" });
+        const yamlParsed = await window.CatHan.localization.parseLocalizationFile(yamlFile);
+        assert(yamlParsed.segments.length === 5 && yamlParsed.segments.some((segment) => segment.structure.key === "menu[0].hint") && yamlParsed.segments.some((segment) => segment.structure.key === "labels.open project"), "YAML nested, quoted-key, and block extraction");
+        yamlParsed.segments.forEach((segment) => {
+          segment.target = `TR ${segment.text}`;
+        });
+        const yamlBuilt = window.CatHan.localization.buildLocalizationFile("yaml", yamlParsed.segments, yamlParsed.structure);
+        assert(yamlBuilt.includes('title: "TR Hello"') && yamlBuilt.includes('"open project": "TR Open project"') && yamlBuilt.includes('hint: "TR Open project"') && yamlBuilt.includes("body: |-") && yamlBuilt.includes("  TR First line.") && yamlBuilt.includes("flag: true"), "YAML export structure preservation");
+
+        const externals = Array.from(document.querySelectorAll("script[src],link[href]"))
+          .map((el) => el.src || el.href)
+          .filter((url) => /^https?:/i.test(url) && new URL(url).origin !== window.location.origin);
+        assert(externals.length === 0, "no external script or stylesheet URLs");
+
+        const resultText = `SMOKE TEST PASS\n${results.join("\n")}`;
+        document.querySelector("#results").textContent = resultText;
+        window.parent?.postMessage({ type: "loopcat-test-result", name: "Smoke", text: resultText }, "*");
+      })().catch((error) => {
+        const resultText = `SMOKE TEST FAIL\n${error.stack || error.message}`;
+        document.querySelector("#results").textContent = resultText;
+        window.parent?.postMessage({ type: "loopcat-test-result", name: "Smoke", text: resultText }, "*");
+      });
+    </script>
+  </body>
+</html>

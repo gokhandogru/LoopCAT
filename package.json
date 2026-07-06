@@ -1,0 +1,120 @@
+{
+  "name": "loopcat",
+  "version": "0.0.1",
+  "description": "Local-first offline CAT tool for translation and post-editing projects.",
+  "homepage": "https://github.com/loopcat/loopcat",
+  "private": true,
+  "packageManager": "pnpm@11.0.7",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "desktop": "electron .",
+    "verify:release": "node scripts/verify-release.cjs",
+    "verify:provenance": "node scripts/verify-release-provenance.cjs",
+    "verify:provenance-selftest": "node scripts/verify-release-provenance-selftest.cjs",
+    "verify:signing-env": "node scripts/verify-signing-env.cjs",
+    "verify:signing-env-selftest": "node scripts/verify-signing-env-selftest.cjs",
+    "verify:browser-runner": "node scripts/verify-browser-runner.cjs",
+    "verify:ai-sidebar-ux": "node scripts/verify-ai-sidebar-ux.cjs",
+    "verify:ollama-live": "node scripts/verify-live-ollama.cjs",
+    "verify:ai-live": "node scripts/verify-live-ai-provider.cjs",
+    "verify:desktop-wrapper": "node scripts/verify-desktop-wrapper.cjs",
+    "verify:web-artifact": "node scripts/verify-web-artifact.cjs",
+    "verify:web-smoke": "node scripts/verify-web-smoke.cjs",
+    "verify:desktop-smoke": "node scripts/verify-packaged-desktop-smoke.cjs",
+    "verify:artifact": "node scripts/verify-desktop-artifact.cjs",
+    "verify:download-artifacts": "node scripts/verify-download-artifacts.cjs",
+    "verify:download-artifacts-selftest": "node scripts/verify-download-artifacts-selftest.cjs",
+    "verify:download-bundle": "node scripts/verify-download-artifacts.cjs --all",
+    "verify:platform-signatures": "node scripts/verify-platform-signatures.cjs",
+    "verify:platform-signatures-selftest": "node scripts/verify-platform-signatures-selftest.cjs",
+    "verify:evidence": "node scripts/verify-release-evidence.cjs",
+    "verify:evidence-selftest": "node scripts/verify-release-evidence-selftest.cjs",
+    "checksums": "node scripts/generate-checksums.cjs",
+    "verify:checksums": "node scripts/verify-checksums.cjs",
+    "pack": "node scripts/build-desktop.cjs --dir",
+    "dist:web": "node scripts/build-web.cjs",
+    "dist:html": "node scripts/build-web.cjs",
+    "dist": "node scripts/build-desktop.cjs",
+    "dist:win": "node scripts/build-desktop.cjs --win nsis portable",
+    "dist:mac": "node scripts/build-desktop.cjs --mac dmg zip",
+    "dist:linux": "node scripts/build-desktop.cjs --linux AppImage deb"
+  },
+  "keywords": [
+    "cat-tool",
+    "translation",
+    "post-editing",
+    "offline",
+    "local-first"
+  ],
+  "author": {
+    "name": "LoopCAT Maintainers",
+    "email": "loopcat-maintainers@users.noreply.github.com",
+    "url": "https://github.com/loopcat/loopcat"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "31.7.7",
+    "electron-builder": "24.13.3"
+  },
+  "build": {
+    "appId": "org.loopcat.desktop",
+    "productName": "LoopCAT",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "styles.css",
+      "manifest.webmanifest",
+      "service-worker.js",
+      "icons/**",
+      "app.js",
+      "storage.js",
+      "workspace-storage.js",
+      "docx.js",
+      "tm.js",
+      "termbase.js",
+      "tmx.js",
+      "tbx.js",
+      "encoding.js",
+      "xliff.js",
+      "localization.js",
+      "qa.js",
+      "validation.js",
+      "analysis.js",
+      "ai.js",
+      "worker-client.js",
+      "cat-worker.js",
+      "project.js",
+      "desktop/**",
+      "README.md",
+      "docs/**"
+    ],
+    "win": {
+      "icon": "icons/loopcat-icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "icon": "icons/loopcat-icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "icon": "icons/loopcat-icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "maintainer": "LoopCAT Maintainers <loopcat-maintainers@users.noreply.github.com>"
+    }
+  }
+}

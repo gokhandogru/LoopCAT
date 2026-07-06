@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>LoopCAT Workspace Storage Test</title>
+    <link rel="icon" href="data:,">
+  </head>
+  <body>
+    <pre id="results">Running...</pre>
+    <script src="./storage.js"></script>
+    <script src="./workspace-storage.js"></script>
+    <script src="./validation.js"></script>
+    <script>
+      class FakeFileHandle {
+        constructor(node) {
+          this.kind = "file";
+          this.name = node.name;
+          this.node = node;
+        }
+
+        writeError(message) {
+          const error = new Error(message || `Simulated write failure for ${this.name}`);
+          error.name = "NoModificationAllowedError";
+          return error;
+        }
+
+        async getFile() {
+          if (this.node.sizeOverride !== undefined) {
+            return {
+              size: this.node.sizeOverride,
+              text: async () => this.node.content || ""
+            };
+          }
+          return new File([this.node.content || ""], this.name, { type: "application/json" });
+        }
+
+        async createWritable() {
+          if (this.node.failOnCreateWritable) throw this.writeError(this.node.failOnCreateWritable);
+          let nextContent = "";
+          this.node.abortCalled = false;
+          return {
+            write: async (chunk) => {
+              if (this.node.failOnWrite) throw this.writeError(this.node.failOnWrite);
+              nextContent += chunk instanceof Blob ? await chunk.text() : String(chunk || "");
+            },
+            close: async () => {
+              if (this.node.failOnClose) throw this.writeError(this.node.failOnClose);
+              this.node.content = nextContent;
+            },
+            abort: async () => {
+              this.node.abortCalled = true;
+              this.node.abortedContent = nextContent;
+            }
+          };
+        }
+      }
+
+      class FakeDirectoryHandle {
+        constructor(name) {
+          this.kind = "directory";
+          this.name = name;
+          this.directories = new Map();
+          this.files = new Map();
+        }
+
+        notFound(name) {
+          const error = new Error(`${name} not found`);
+          error.name = "NotFoundError";
+          return error;
+        }
+
+        async queryPermission() {
+          return "granted";
+        }
+
+        async requestPermission() {
+          return "granted";
+        }
+
+        async getDirectoryHandle(name, options = {}) {
+          if (!this.directories.has(name)) {
+            if (!options.create) throw this.notFound(name);
+            this.directories.set(name, new FakeDirectoryHandle(name));
+          }
+          return this.directories.get(name);
+        }
+
+        async getFileHandle(name, options = {}) {
+          if (!this.files.has(name)) {
+            if (!options.create) throw this.notFound(name);
+            this.files.set(name, { name, content: "" });
+          }
+          return new FakeFileHandle(this.files.get(name));
+        }
+
+        async *entries() {
+          for (const [name, handle] of this.directories.entries()) yield [name, handle];
+          for (const [name, node] of this.files.entries()) yield [name, new FakeFileHandle(node)];
+        }
+      }
+
+      function readPath(root, path) {
+        const parts = String(path).split("/").filter(Boolean);
+        let dir = root;
+        for (const part of parts.slice(0, -1)) dir = dir.directories.get(part);
+        return dir.files.get(parts[parts.length - 1]).content;
+      }
+
+      function fileNode(root, path) {
+        const parts = String(path).split("/").filter(Boolean);
+        let dir = root;
+        for (const part of parts.slice(0, -1)) dir = dir.directories.get(part);
+        return dir.files.get(parts[parts.length - 1]);
+      }
+
+      function removePath(root, path) {
+        const parts = String(path).split("/").filter(Boolean);
+        let dir = root;
+        for (const part of parts.slice(0, -1)) dir = dir.directories.get(part);
+        dir.files.delete(parts[parts.length - 1]);
+      }
+
+      async function writeFakeFile(root, path, content, options = {}) {
+        const parts = String(path).split("/").filter(Boolean);
+        let dir = root;
+        for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part, { create: true });
+        dir.files.set(parts[parts.length - 1], { name: parts[parts.length - 1], content, ...options });
+      }
+
+      (async () => {
+        const out = [];
+        const assert = (condition, label) => {
+          if (!condition) throw new Error(label);
+          out.push(`PASS ${label}`);
+        };
+
+        const root = new FakeDirectoryHandle("LoopCAT Academic Work");
+        window.showDirectoryPicker = async () => root;
+
+        const workspace = window.CatHan.workspaceStorage;
+        const now = new Date().toISOString();
+        const projectId = `workspace-${Date.now()}`;
+        const pkg = {
+          app: "LoopCAT",
+          type: "project-package",
+          version: 1,
+          schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION,
+          exportedAt: now,
+          packageMetadata: {
+            format: "loopcat-project-package",
+            packageVersion: 1,
+            contractVersion: "loopcat-package-v1",
+            generator: "LoopCAT workspace storage test",
+            storageMode: "browser-cache"
+          },
+          project: {
+            id: projectId,
+            workspaceId: "local-workspace",
+            ownerId: "local-user",
+            name: "Workspace Recovery",
+            sourceLang: "en",
+            targetLang: "tr",
+            documents: [{ id: "doc-workspace", name: "article.docx", type: "docx" }],
+            resourceLinks: [
+              { id: "main-tm", type: "tm", name: "Academic TM", role: "main" },
+              { id: "main-tb", type: "termbase", name: "Academic Terms", role: "" }
+            ],
+            qaSettings: {},
+            aiSettings: { enabled: false, provider: "OpenAI", model: "gpt-5.2", sendSourceToAi: false },
+            createdAt: now,
+            updatedAt: now
+          },
+          segments: [{
+            id: "seg-workspace-1",
+            projectId,
+            documentId: "doc-workspace",
+            index: 0,
+            documentIndex: 0,
+            source: "Academic translation requires durable local saves.",
+            target: "Akademik ceviri kalici yerel kayit gerektirir.",
+            status: "confirmed",
+            createdAt: now,
+            updatedAt: now
+          }],
+          resources: {
+            tmEntries: [{
+              id: "tm-workspace-1",
+              source: "Academic translation",
+              target: "Akademik ceviri",
+              sourceLang: "en",
+              targetLang: "tr",
+              languagePair: "en::tr",
+              tmName: "Academic TM",
+              createdAt: now,
+              updatedAt: now
+            }],
+            terms: [{
+              id: "term-workspace-1",
+              sourceTerm: "durable local saves",
+              targetTerm: "kalici yerel kayitlar",
+              sourceLang: "en",
+              targetLang: "tr",
+              languagePair: "en::tr",
+              termBaseName: "Academic Terms",
+              createdAt: now,
+              updatedAt: now
+            }]
+          },
+          validation: { ok: true, errors: [], warnings: [], risky: [], simplified: [], skipped: [], preserved: ["Fixture valid."] }
+        };
+
+        const connected = await workspace.connectHandle(root, { persist: false });
+        assert(connected.connected && connected.mode === "workspace-folder", "mock workspace folder connects");
+
+        const saved = await workspace.saveProjectPackage(pkg);
+        const savedPackage = JSON.parse(readPath(root, saved.packagePath));
+        assert(savedPackage.project.id === projectId && savedPackage.packageMetadata.storageMode === "workspace-folder", "project package saved to visible folder");
+        assert(
+          savedPackage.validation.warnings.some((warning) => warning.includes("DOCX reconstruction data")) &&
+            savedPackage.validationReports.package.warnings.some((warning) => warning.includes("DOCX reconstruction data")),
+          "workspace package save refreshes stale embedded validation reports"
+        );
+        const initialManifest = JSON.parse(readPath(root, workspace.MANIFEST_FILE));
+        assert(
+          initialManifest.projects.length === 1 &&
+            initialManifest.projects[0].packagePath === saved.packagePath &&
+            initialManifest.projects[0].validationSummary.warnings > 0,
+          "workspace manifest records saved package with current validation summary"
+        );
+
+        const sensitiveRoot = new FakeDirectoryHandle("Bearer workspace-folder-name-token-that-must-not-appear");
+        await writeFakeFile(sensitiveRoot, workspace.MANIFEST_FILE, JSON.stringify({
+          app: "LoopCAT",
+          type: "workspace-manifest",
+          version: 1,
+          workspaceVersion: 1,
+          schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION,
+          createdAt: now,
+          updatedAt: now,
+          projects: [{
+            id: "Bearer workspace-manifest-project-id-token-that-must-not-export",
+            name: "Bearer workspace-manifest-project-label-token-that-must-not-export",
+            sourceLang: "en",
+            targetLang: "tr",
+            packagePath: "projects/missing/project.loopcat.json",
+            lastSavedAt: now,
+            updatedAt: now,
+            resourceRefs: [{
+              id: "Bearer workspace-manifest-resource-id-token-that-must-not-export",
+              type: "tm",
+              name: "Bearer workspace-manifest-resource-label-token-that-must-not-export",
+              sourceLang: "en",
+              targetLang: "tr"
+            }]
+          }],
+          resources: [{
+            id: "Bearer workspace-manifest-index-id-token-that-must-not-export",
+            type: "tm",
+            name: "Bearer workspace-manifest-index-label-token-that-must-not-export",
+            sourceLang: "en",
+            targetLang: "tr",
+            languagePair: "en::tr"
+          }],
+          backups: [{
+            id: "Bearer workspace-manifest-backup-id-token-that-must-not-export",
+            path: "backups/Bearer workspace-manifest-backup-path-token-that-must-not-export.json",
+            label: "Bearer workspace-manifest-backup-label-token-that-must-not-export",
+            createdAt: now,
+            projectCount: 1,
+            segmentCount: 2,
+            schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION
+          }]
+        }, null, 2));
+        await workspace.connectHandle(sensitiveRoot, { persist: false });
+        const sensitiveStatus = await workspace.getStatus();
+        const sensitiveStatusJson = JSON.stringify(sensitiveStatus.manifest);
+        assert(
+          !sensitiveStatusJson.includes("workspace-manifest-project-id-token-that-must-not-export") &&
+            !sensitiveStatusJson.includes("workspace-manifest-project-label-token-that-must-not-export") &&
+            !sensitiveStatusJson.includes("workspace-manifest-resource-id-token-that-must-not-export") &&
+            !sensitiveStatusJson.includes("workspace-manifest-resource-label-token-that-must-not-export") &&
+            !sensitiveStatusJson.includes("workspace-manifest-index-id-token-that-must-not-export") &&
+            !sensitiveStatusJson.includes("workspace-manifest-index-label-token-that-must-not-export") &&
+            !sensitiveStatusJson.includes("workspace-manifest-backup-id-token-that-must-not-export") &&
+            !sensitiveStatusJson.includes("workspace-manifest-backup-path-token-that-must-not-export") &&
+            !sensitiveStatusJson.includes("workspace-manifest-backup-label-token-that-must-not-export") &&
+            sensitiveStatusJson.includes("[redacted secret]"),
+          "workspace manifest load redacts credential-looking project resource and backup labels"
+        );
+        assert(
+          sensitiveStatus.name.includes("[redacted secret]") &&
+            !sensitiveStatus.name.includes("workspace-folder-name-token-that-must-not-appear"),
+          "workspace status redacts credential-looking folder names"
+        );
+        const sensitiveProjectId = `${projectId}-sensitive-workspace-save`;
+        const sensitivePkg = JSON.parse(JSON.stringify(pkg));
+        sensitivePkg.project.id = sensitiveProjectId;
+        sensitivePkg.project.name = "Sensitive Workspace Save";
+        sensitivePkg.segments = sensitivePkg.segments.map((segment) => ({
+          ...segment,
+          id: `${segment.id}-sensitive-workspace-save`,
+          projectId: sensitiveProjectId
+        }));
+        await workspace.saveProjectPackage(sensitivePkg);
+        const sensitiveWrittenManifestJson = readPath(sensitiveRoot, workspace.MANIFEST_FILE);
+        assert(
+          !sensitiveWrittenManifestJson.includes("workspace-manifest-project-label-token-that-must-not-export") &&
+            !sensitiveWrittenManifestJson.includes("workspace-manifest-resource-label-token-that-must-not-export") &&
+            !sensitiveWrittenManifestJson.includes("workspace-manifest-index-label-token-that-must-not-export") &&
+            !sensitiveWrittenManifestJson.includes("workspace-manifest-backup-id-token-that-must-not-export") &&
+            !sensitiveWrittenManifestJson.includes("workspace-manifest-backup-path-token-that-must-not-export") &&
+            !sensitiveWrittenManifestJson.includes("workspace-manifest-backup-label-token-that-must-not-export") &&
+            sensitiveWrittenManifestJson.includes("[redacted secret]"),
+          "workspace manifest writes redacted legacy project resource and backup labels after later save"
+        );
+        const unsafePathRoot = new FakeDirectoryHandle("LoopCAT Unsafe Path Workspace");
+        const unsafePathPkg = JSON.parse(JSON.stringify(pkg));
+        unsafePathPkg.project.id = `${projectId}-unsafe-path`;
+        unsafePathPkg.project.name = "Unsafe Path Package";
+        unsafePathPkg.segments = unsafePathPkg.segments.map((segment) => ({
+          ...segment,
+          id: `${segment.id}-unsafe-path`,
+          projectId: unsafePathPkg.project.id
+        }));
+        await writeFakeFile(
+          unsafePathRoot,
+          "projects/Bearer workspace-package-folder-token-that-must-not-sync/project.loopcat.json",
+          JSON.stringify(unsafePathPkg, null, 2)
+        );
+        await workspace.connectHandle(unsafePathRoot, { persist: false });
+        const unsafePathStatus = await workspace.getStatus();
+        const unsafePathManifestJson = readPath(unsafePathRoot, workspace.MANIFEST_FILE);
+        const unsafePathWarningsJson = JSON.stringify(unsafePathStatus.warnings || []);
+        assert(
+          unsafePathStatus.projectCount === 0 &&
+            unsafePathStatus.skippedProjectCount >= 1 &&
+            unsafePathWarningsJson.includes("[redacted secret]") &&
+            !unsafePathWarningsJson.includes("workspace-package-folder-token-that-must-not-sync") &&
+            !unsafePathManifestJson.includes("workspace-package-folder-token-that-must-not-sync"),
+          "workspace package scan skips unsafe credential-looking package folder paths"
+        );
+        let invalidManifestPathRejected = false;
+        try {
+          await workspace.readProjectPackage({
+            id: "invalid-workspace-path-project",
+            name: "Bearer workspace-read-path-label-token-that-must-not-appear",
+            packagePath: "backups/Bearer workspace-read-path-token-that-must-not-appear.json"
+          });
+        } catch (error) {
+          invalidManifestPathRejected =
+            error.message.includes("invalid workspace package path") &&
+            !error.message.includes("workspace-read-path-label-token-that-must-not-appear") &&
+            !error.message.includes("workspace-read-path-token-that-must-not-appear");
+        }
+        assert(invalidManifestPathRejected, "workspace package reader rejects unsafe manifest package paths before reading");
+        await workspace.connectHandle(sensitiveRoot, { persist: false });
+        const sensitiveIdWorkspacePkg = JSON.parse(JSON.stringify(pkg));
+        sensitiveIdWorkspacePkg.project.id = "Bearer workspace-package-project-id-token-that-must-not-write";
+        sensitiveIdWorkspacePkg.project.name = "Sensitive ID Workspace Package";
+        sensitiveIdWorkspacePkg.segments = sensitiveIdWorkspacePkg.segments.map((segment) => ({
+          ...segment,
+          projectId: sensitiveIdWorkspacePkg.project.id
+        }));
+        let sensitiveIdWorkspaceSaveRejected = false;
+        try {
+          await workspace.saveProjectPackage(sensitiveIdWorkspacePkg);
+        } catch (error) {
+          sensitiveIdWorkspaceSaveRejected =
+            error.name === "WorkspacePackageValidationError" &&
+            error.message.includes("credential-looking record IDs") &&
+            !error.message.includes("workspace-package-project-id-token-that-must-not-write");
+        }
+        const sensitiveProjectsDir = sensitiveRoot.directories.get("projects");
+        const sensitivePackageTexts = [];
+        for (const projectDir of (sensitiveProjectsDir ? sensitiveProjectsDir.directories.values() : [])) {
+          if (projectDir.files.has(workspace.PACKAGE_FILE)) sensitivePackageTexts.push(projectDir.files.get(workspace.PACKAGE_FILE).content || "");
+        }
+        const sensitiveWorkspaceAfterRejectedIdJson = [
+          readPath(sensitiveRoot, workspace.MANIFEST_FILE),
+          ...sensitivePackageTexts
+        ].join("\n");
+        assert(
+          sensitiveIdWorkspaceSaveRejected &&
+            !sensitiveWorkspaceAfterRejectedIdJson.includes("workspace-package-project-id-token-that-must-not-write"),
+          "workspace package save rejects credential-looking record IDs before writing"
+        );
+        const sensitiveHealth = await workspace.buildHealthReport({
+          projects: [{
+            id: "health-sensitive-project",
+            name: "Bearer workspace-health-project-token-that-must-not-appear",
+            sourceLang: "en",
+            targetLang: "tr",
+            resourceLinks: [{
+              id: "health-sensitive-tm",
+              type: "tm",
+              name: "Bearer workspace-health-resource-token-that-must-not-appear",
+              role: "main"
+            }]
+          }],
+          tmEntries: [],
+          terms: []
+        });
+        const sensitiveHealthJson = JSON.stringify(sensitiveHealth);
+        assert(
+          !sensitiveHealthJson.includes("workspace-health-project-token-that-must-not-appear") &&
+            !sensitiveHealthJson.includes("workspace-health-resource-token-that-must-not-appear") &&
+            sensitiveHealthJson.includes("[redacted secret]"),
+          "workspace health redacts credential-looking project and resource labels"
+        );
+        await writeFakeFile(
+          sensitiveRoot,
+          "projects/sk-workspace-folder-token-that-must-not-echo/project.loopcat.json",
+          "{ invalid package json"
+        );
+        const sensitiveWarnings = await workspace.buildHealthReport({ projects: [], tmEntries: [], terms: [] });
+        const sensitiveWarningsJson = JSON.stringify(sensitiveWarnings);
+        assert(
+          !sensitiveWarningsJson.includes("workspace-folder-token-that-must-not-echo") &&
+            sensitiveWarningsJson.includes("[redacted secret]"),
+          "workspace package scan warnings redact credential-looking folder labels"
+        );
+        await workspace.connectHandle(root, { persist: false });
+
+        const futureDirectProjectId = `${projectId}-future-direct-save`;
+        let futureDirectSaveRejected = false;
+        try {
+          await workspace.saveProjectPackage({
+            ...pkg,
+            schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION + 1,
+            project: {
+              ...pkg.project,
+              id: futureDirectProjectId,
+              name: "Future Direct Save"
+            },
+            segments: pkg.segments.map((segment) => ({
+              ...segment,
+              id: `${segment.id}-future-direct`,
+              projectId: futureDirectProjectId
+            }))
+          });
+        } catch (error) {
+          futureDirectSaveRejected = error.name === "WorkspacePackageValidationError" && error.message.includes("newer than this LoopCAT build supports");
+        }
+        const projectFoldersAfterFutureDirectSave = Array.from(root.directories.get("projects").directories.keys());
+        assert(
+          futureDirectSaveRejected &&
+            !projectFoldersAfterFutureDirectSave.some((name) => name.startsWith("Future-Direct-Save")) &&
+            readPath(root, workspace.MANIFEST_FILE) === JSON.stringify(initialManifest, null, 2),
+          "workspace package save rejects future-schema packages before writing"
+        );
+
+        const unlistedProjectId = `${projectId}-unlisted`;
+        const unlistedPackage = {
+          ...pkg,
+          project: {
+            ...pkg.project,
+            id: unlistedProjectId,
+            name: "Unlisted Workspace Package",
+            updatedAt: new Date(Date.now() + 1500).toISOString()
+          },
+          segments: pkg.segments.map((segment) => ({
+            ...segment,
+            id: `${segment.id}-unlisted`,
+            projectId: unlistedProjectId,
+            target: "Manifest disinda kalan hedef."
+          })),
+          packageMetadata: {
+            ...(pkg.packageMetadata || {}),
+            savedAt: new Date(Date.now() + 1500).toISOString(),
+            packagePath: "projects/Unlisted-Workspace-Package/project.loopcat.json",
+            storageMode: "workspace-folder"
+          }
+        };
+        await writeFakeFile(root, "projects/Unlisted-Workspace-Package/project.loopcat.json", JSON.stringify(unlistedPackage, null, 2));
+        const listedWithUnlisted = await workspace.listProjectPackages();
+        const statusWithUnlisted = await workspace.getStatus();
+        assert(
+          listedWithUnlisted.some((projectRef) =>
+            projectRef.id === unlistedProjectId &&
+              projectRef.packagePath === "projects/Unlisted-Workspace-Package/project.loopcat.json" &&
+              projectRef.validationSummary.warnings > 0
+          ) &&
+            JSON.parse(readPath(root, workspace.MANIFEST_FILE)).projects.length === 1,
+          "workspace package listing includes project folders missing from a stale manifest with current validation summaries without rewriting it"
+        );
+        assert(statusWithUnlisted.projectCount === 2, "workspace status counts project folders missing from a stale manifest");
+        const healthWithUnlisted = await workspace.buildHealthReport({
+          projects: [pkg.project, unlistedPackage.project],
+          tmEntries: pkg.resources.tmEntries,
+          terms: pkg.resources.terms,
+          dirtyProjectIds: []
+        });
+        assert(
+          healthWithUnlisted.preserved.some((item) => item.includes("2 visible project packages")) &&
+            healthWithUnlisted.preserved.some((item) => item.includes("1 project package") && item.includes("workspace manifest")) &&
+            healthWithUnlisted.preserved.some((item) => item.includes("visible resource reference")),
+          "workspace health counts project folders missing from a stale manifest without rewriting it"
+        );
+        removePath(root, "projects/Unlisted-Workspace-Package/project.loopcat.json");
+        const statusAfterRemovingUnlisted = await workspace.getStatus();
+        assert(statusAfterRemovingUnlisted.projectCount === 1, "workspace status ignores stale project refs when package files are missing");
+        assert(!statusAfterRemovingUnlisted.warnings.some((warning) => warning.includes("Unlisted-Workspace-Package")), "workspace status ignores empty project folders without package files");
+
+        const savedPackageNode = fileNode(root, saved.packagePath);
+        const savedManifestText = readPath(root, workspace.MANIFEST_FILE);
+        const savedPackageText = readPath(root, saved.packagePath);
+        savedPackageNode.failOnClose = "Simulated project package write failure Bearer workspace-last-error-token-that-must-not-appear";
+        let packageWriteRejected = false;
+        try {
+          await workspace.saveProjectPackage({
+            ...pkg,
+            segments: pkg.segments.map((segment) => ({ ...segment, target: "This failed write must not replace the saved target." }))
+          });
+        } catch (error) {
+          packageWriteRejected = error.name === "NoModificationAllowedError" && error.message.includes("project package write failure");
+        } finally {
+          delete savedPackageNode.failOnClose;
+        }
+        const statusAfterPackageWriteFailure = await workspace.getStatus();
+        assert(packageWriteRejected && savedPackageNode.abortCalled, "workspace package write failure rejects and aborts the writable stream");
+        assert(readPath(root, saved.packagePath) === savedPackageText, "workspace package write failure keeps the previous package file");
+        assert(readPath(root, workspace.MANIFEST_FILE) === savedManifestText && statusAfterPackageWriteFailure.manifest.projects[0].lastSavedAt === initialManifest.projects[0].lastSavedAt, "workspace package write failure does not advance the manifest");
+        assert(
+          statusAfterPackageWriteFailure.lastError.includes("project package write failure") &&
+            statusAfterPackageWriteFailure.lastError.includes("[redacted secret]") &&
+            !statusAfterPackageWriteFailure.lastError.includes("workspace-last-error-token-that-must-not-appear"),
+          `workspace status records redacted package write failures (${statusAfterPackageWriteFailure.lastError || "no lastError"})`
+        );
+
+        const validationReportNode = fileNode(root, "projects/Workspace-Recovery-" + projectId.replace(/^project-/, "").slice(0, 8) + "/validation-report.json");
+        validationReportNode.failOnClose = "Simulated validation report write failure Bearer workspace-validation-report-token-that-must-not-appear";
+        let validationReportSaveResult = null;
+        try {
+          validationReportSaveResult = await workspace.saveProjectPackage({
+            ...pkg,
+            segments: pkg.segments.map((segment) => ({ ...segment, target: "The package still saves when the validation sidecar fails." }))
+          });
+        } finally {
+          delete validationReportNode.failOnClose;
+        }
+        const manifestAfterValidationReportFailure = JSON.parse(readPath(root, workspace.MANIFEST_FILE));
+        assert(
+          validationReportSaveResult?.validationReportSaved === false &&
+            validationReportSaveResult.validationReportWarning.includes("validation report write failure") &&
+            validationReportSaveResult.validationReportWarning.includes("[redacted secret]") &&
+            !validationReportSaveResult.validationReportWarning.includes("workspace-validation-report-token-that-must-not-appear") &&
+            validationReportNode.abortCalled,
+          "workspace validation report sidecar failure returns a redacted non-blocking warning"
+        );
+        assert(
+          JSON.parse(readPath(root, saved.packagePath)).segments[0].target.includes("validation sidecar fails") &&
+            manifestAfterValidationReportFailure.projects[0].lastSavedAt === validationReportSaveResult.savedAt,
+          "workspace validation report sidecar failure still commits the package and manifest"
+        );
+
+        const resourceIndexNode = fileNode(root, "resources/resource-index.json");
+        const manifestBeforeResourceFailure = readPath(root, workspace.MANIFEST_FILE);
+        resourceIndexNode.failOnClose = "Simulated resource index write failure";
+        let resourceWriteRejected = false;
+        try {
+          await workspace.saveProjectPackage({
+            ...pkg,
+            project: { ...pkg.project, updatedAt: new Date(Date.now() + 500).toISOString() }
+          });
+        } catch (error) {
+          resourceWriteRejected = error.name === "NoModificationAllowedError" && error.message.includes("resource index write failure");
+        } finally {
+          delete resourceIndexNode.failOnClose;
+        }
+        const statusAfterResourceFailure = await workspace.getStatus();
+        assert(resourceWriteRejected && resourceIndexNode.abortCalled, "workspace resource index write failure rejects and aborts the writable stream");
+        assert(readPath(root, workspace.MANIFEST_FILE) === manifestBeforeResourceFailure && statusAfterResourceFailure.manifest.projects[0].lastSavedAt === manifestAfterValidationReportFailure.projects[0].lastSavedAt, "workspace resource index write failure leaves the manifest unchanged");
+        assert(statusAfterResourceFailure.lastError.includes("resource index write failure"), "workspace status records resource index write failures");
+
+        const manifestNode = fileNode(root, workspace.MANIFEST_FILE);
+        const manifestBeforeManifestFailure = readPath(root, workspace.MANIFEST_FILE);
+        manifestNode.failOnClose = "Simulated manifest write failure";
+        let manifestWriteRejected = false;
+        try {
+          await workspace.saveProjectPackage({
+            ...pkg,
+            project: { ...pkg.project, updatedAt: new Date(Date.now() + 750).toISOString() }
+          });
+        } catch (error) {
+          manifestWriteRejected = error.name === "NoModificationAllowedError" && error.message.includes("manifest write failure");
+        } finally {
+          delete manifestNode.failOnClose;
+        }
+        const statusAfterManifestFailure = await workspace.getStatus();
+        assert(manifestWriteRejected && manifestNode.abortCalled, "workspace manifest write failure rejects and aborts the writable stream");
+        assert(readPath(root, workspace.MANIFEST_FILE) === manifestBeforeManifestFailure && statusAfterManifestFailure.manifest.projects[0].lastSavedAt === manifestAfterValidationReportFailure.projects[0].lastSavedAt, "workspace manifest write failure does not advance in-memory or folder manifest state");
+        assert(statusAfterManifestFailure.lastError.includes("manifest write failure"), "workspace status records manifest write failures");
+
+        const renamedPkg = {
+          ...pkg,
+          project: {
+            ...pkg.project,
+            name: "Workspace Recovery Renamed",
+            updatedAt: new Date(Date.now() + 1000).toISOString()
+          }
+        };
+        const renamedSave = await workspace.saveProjectPackage(renamedPkg);
+        assert(renamedSave.packagePath !== saved.packagePath, "project rename writes package to renamed visible folder");
+        const statusAfterRecoveredManifestWrite = await workspace.getStatus();
+        assert(
+          !String(statusAfterRecoveredManifestWrite.lastError || "").includes("manifest write failure"),
+          "workspace successful manifest write clears stale write failure status"
+        );
+        removePath(root, workspace.MANIFEST_FILE);
+        await workspace.connectHandle(root, { persist: false });
+        const recoveredRenamed = JSON.parse(readPath(root, workspace.MANIFEST_FILE));
+        assert(
+          recoveredRenamed.projects.length === 1 &&
+            recoveredRenamed.projects[0].id === projectId &&
+            recoveredRenamed.projects[0].name === "Workspace Recovery Renamed" &&
+            recoveredRenamed.projects[0].packagePath === renamedSave.packagePath,
+          "workspace repair deduplicates renamed project package folders"
+        );
+
+        const manifest = JSON.parse(readPath(root, workspace.MANIFEST_FILE));
+        assert(manifest.projects.length === 1 && manifest.projects[0].packagePath === renamedSave.packagePath, "workspace manifest points to latest renamed package");
+
+        const resourceIndex = JSON.parse(readPath(root, "resources/resource-index.json"));
+        assert(resourceIndex.some((resource) => resource.type === "tm") && resourceIndex.some((resource) => resource.type === "termbase"), "resource index records TM and termbase summaries");
+
+        root.files.get(workspace.MANIFEST_FILE).content = "{ broken";
+        await workspace.connectHandle(root, { persist: false });
+        const recoveredCorrupt = JSON.parse(readPath(root, workspace.MANIFEST_FILE));
+        assert(recoveredCorrupt.projects.length === 1 && recoveredCorrupt.projects[0].id === projectId, "corrupt manifest recovers from project packages");
+
+        removePath(root, workspace.MANIFEST_FILE);
+        await workspace.connectHandle(root, { persist: false });
+        const recoveredMissing = JSON.parse(readPath(root, workspace.MANIFEST_FILE));
+        assert(recoveredMissing.projects.length === 1 && recoveredMissing.resources.length >= 2, "missing manifest recovers package and resource index");
+
+        await writeFakeFile(root, "projects/Oversized/project.loopcat.json", JSON.stringify({ ...pkg, project: { ...pkg.project, id: "oversized-project", name: "Oversized" } }), { sizeOverride: 51 * 1024 * 1024 });
+        removePath(root, workspace.MANIFEST_FILE);
+        await workspace.connectHandle(root, { persist: false });
+        const recoveredWithOversized = JSON.parse(readPath(root, workspace.MANIFEST_FILE));
+        const statusAfterOversizedRecovery = await workspace.getStatus();
+        assert(
+          recoveredWithOversized.projects.length === 1 &&
+            !recoveredWithOversized.projects.some((project) => project.id === "oversized-project") &&
+            statusAfterOversizedRecovery.lastError.includes("Skipped unreadable workspace package") &&
+            statusAfterOversizedRecovery.warnings.some((warning) => warning.includes("Oversized")),
+          "workspace recovery reports skipped oversized project packages"
+        );
+
+        const futureProjectId = `${projectId}-future-schema`;
+        await writeFakeFile(root, "projects/Future-Schema/project.loopcat.json", JSON.stringify({
+          ...pkg,
+          schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION + 1,
+          project: {
+            ...pkg.project,
+            id: futureProjectId,
+            name: "Future Schema",
+            updatedAt: new Date(Date.now() + 2000).toISOString()
+          },
+          segments: pkg.segments.map((segment) => ({
+            ...segment,
+            id: `${segment.id}-future`,
+            projectId: futureProjectId
+          }))
+        }, null, 2));
+        removePath(root, workspace.MANIFEST_FILE);
+        await workspace.connectHandle(root, { persist: false });
+        const recoveredWithFutureSchema = JSON.parse(readPath(root, workspace.MANIFEST_FILE));
+        const statusAfterFutureSchemaRecovery = await workspace.getStatus();
+        assert(
+          recoveredWithFutureSchema.projects.length === 1 &&
+            !recoveredWithFutureSchema.projects.some((project) => project.id === futureProjectId) &&
+            statusAfterFutureSchemaRecovery.warnings.some((warning) => warning.includes("Future-Schema") && warning.includes("newer than this LoopCAT build supports")),
+          "workspace recovery skips future-schema project packages"
+        );
+
+        let futureSchemaReadRejected = false;
+        try {
+          await workspace.readProjectPackage({ id: futureProjectId, name: "Future Schema", packagePath: "projects/Future-Schema/project.loopcat.json" });
+        } catch (error) {
+          futureSchemaReadRejected = error.name === "WorkspacePackageValidationError" && error.message.includes("newer than this LoopCAT build supports");
+        }
+        assert(futureSchemaReadRejected, "workspace package reader rejects future-schema project packages");
+
+        const allPackages = await workspace.readAllProjectPackages();
+        assert(allPackages.length === 1 && allPackages[0].pkg.segments[0].target.includes("Akademik"), "recovered manifest can reopen project package");
+
+        let oversizedReadRejected = false;
+        try {
+          await workspace.readProjectPackage({ id: "oversized-project", name: "Oversized", packagePath: "projects/Oversized/project.loopcat.json" });
+        } catch (error) {
+          oversizedReadRejected = error.name === "WorkspaceJsonTooLargeError" && error.message.includes("too large");
+        }
+        assert(oversizedReadRejected, "workspace package reader rejects oversized JSON files");
+
+        const repair = await workspace.repairWorkspaceManifest();
+        assert(
+          repair.recoveredProjectCount === 1 &&
+            repair.recoveredResourceCount >= 2 &&
+            repair.skippedProjectCount >= 1 &&
+            repair.warnings.some((warning) => warning.includes("Oversized")),
+          "workspace repair rebuilds manifest and reports unreadable project packages"
+        );
+
+        const health = await workspace.buildHealthReport({
+          projects: [pkg.project],
+          tmEntries: pkg.resources.tmEntries,
+          terms: pkg.resources.terms,
+          dirtyProjectIds: []
+        });
+        assert(
+          !health.ok &&
+            health.errors.some((error) => error.includes("Skipped unreadable workspace package in Oversized")) &&
+            health.errors.some((error) => error.includes("Skipped invalid workspace package in Future-Schema")) &&
+            health.preserved.length >= 2,
+          "workspace health reports unreadable and invalid project packages after recovery"
+        );
+
+        let futureBackupWriteRejected = false;
+        try {
+          await workspace.exportFullBackup({
+            app: "LoopCAT",
+            type: "full-backup",
+            schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION + 1,
+            exportedAt: now,
+            projects: [pkg.project],
+            segments: pkg.segments,
+            tmEntries: pkg.resources.tmEntries,
+            terms: pkg.resources.terms,
+            activityEvents: []
+          });
+        } catch (error) {
+          futureBackupWriteRejected = error.name === "WorkspaceBackupValidationError" && error.message.includes("newer than this LoopCAT build supports");
+        }
+        assert(
+          futureBackupWriteRejected && !root.directories.has("backups"),
+          "workspace backup export rejects future-schema backups before writing"
+        );
+
+        await writeFakeFile(root, "backups/Bearer workspace-backup-file-token-that-must-not-count.json", "{\"type\":\"full-backup\"}");
+        const statusAfterUnsafeBackup = await workspace.getStatus();
+        const healthAfterUnsafeBackup = await workspace.buildHealthReport({
+          projects: [pkg.project],
+          tmEntries: pkg.resources.tmEntries,
+          terms: pkg.resources.terms,
+          dirtyProjectIds: []
+        });
+        const unsafeBackupWarningsJson = JSON.stringify(statusAfterUnsafeBackup.warnings || []);
+        assert(
+          statusAfterUnsafeBackup.backupCount === 0 &&
+            statusAfterUnsafeBackup.warnings.some((warning) => warning.includes("Skipped workspace backup file")) &&
+            unsafeBackupWarningsJson.includes("[redacted secret]") &&
+            !unsafeBackupWarningsJson.includes("workspace-backup-file-token-that-must-not-count") &&
+            healthAfterUnsafeBackup.errors.some((error) => error.includes("Skipped workspace backup file")) &&
+            !JSON.stringify(healthAfterUnsafeBackup).includes("workspace-backup-file-token-that-must-not-count"),
+          "workspace backup scan skips unsafe credential-looking backup filenames"
+        );
+        removePath(root, "backups/Bearer workspace-backup-file-token-that-must-not-count.json");
+
+        const backupManifestBeforeFailure = readPath(root, workspace.MANIFEST_FILE);
+        const backupManifestNode = fileNode(root, workspace.MANIFEST_FILE);
+        const backupCountBeforeFailure = (await workspace.getStatus()).backupCount;
+        backupManifestNode.failOnClose = "Simulated backup manifest write failure Bearer workspace-backup-manifest-token-that-must-not-appear";
+        let backupManifestFailureResult = null;
+        try {
+          backupManifestFailureResult = await workspace.exportFullBackup({
+            app: "LoopCAT",
+            type: "full-backup",
+            schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION,
+            exportedAt: now,
+            projects: [pkg.project],
+            segments: pkg.segments,
+            tmEntries: pkg.resources.tmEntries,
+            terms: pkg.resources.terms,
+            activityEvents: []
+          });
+        } finally {
+          delete backupManifestNode.failOnClose;
+        }
+        const statusAfterBackupFailure = await workspace.getStatus();
+        assert(
+          backupManifestFailureResult?.manifestSaved === false &&
+            backupManifestFailureResult.manifestWarning.includes("backup manifest write failure") &&
+            backupManifestFailureResult.manifestWarning.includes("[redacted secret]") &&
+            !backupManifestFailureResult.manifestWarning.includes("workspace-backup-manifest-token-that-must-not-appear") &&
+            backupManifestNode.abortCalled,
+          "workspace backup manifest write failure returns a redacted non-blocking warning"
+        );
+        assert(readPath(root, workspace.MANIFEST_FILE) === backupManifestBeforeFailure, "workspace backup manifest write failure does not advance manifest state");
+        assert(
+          statusAfterBackupFailure.backupCount === backupCountBeforeFailure + 1 &&
+            readPath(root, backupManifestFailureResult.path).includes("\"full-backup\""),
+          "workspace backup manifest write failure still leaves the visible backup accounted for"
+        );
+
+        const savedBackup = await workspace.exportFullBackup({
+          app: "LoopCAT",
+          type: "full-backup",
+          schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION,
+          exportedAt: now,
+          projects: [pkg.project],
+          segments: pkg.segments,
+          tmEntries: pkg.resources.tmEntries,
+          terms: pkg.resources.terms,
+          activityEvents: []
+        });
+        const statusAfterSavedBackup = await workspace.getStatus();
+        removePath(root, savedBackup.path);
+        const statusAfterMissingBackup = await workspace.getStatus();
+        assert(
+          statusAfterMissingBackup.backupCount === statusAfterSavedBackup.backupCount - 1,
+          "workspace backup status ignores stale manifest refs when backup files are missing"
+        );
+
+        const resultText = `WORKSPACE STORAGE TEST PASS\n${out.join("\n")}`;
+        document.querySelector("#results").textContent = resultText;
+        window.parent?.postMessage({ type: "loopcat-test-result", name: "Workspace storage", text: resultText }, "*");
+      })().catch((error) => {
+        const resultText = `WORKSPACE STORAGE TEST FAIL\n${error.stack || error.message}`;
+        document.querySelector("#results").textContent = resultText;
+        window.parent?.postMessage({ type: "loopcat-test-result", name: "Workspace storage", text: resultText }, "*");
+      });
+    </script>
+  </body>
+</html>

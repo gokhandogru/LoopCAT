@@ -1,0 +1,20 @@
+{
+  "name": "LoopCAT",
+  "short_name": "LoopCAT",
+  "version": "0.0.1",
+  "description": "Local-first offline CAT tool for translation and post-editing projects.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f9fb",
+  "theme_color": "#202936",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icons/loopcat-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>LoopCAT Package Round Trip Test</title>
+    <link rel="icon" href="data:,">
+  </head>
+  <body>
+    <pre id="results">Running...</pre>
+    <script src="./storage.js"></script>
+    <script src="./workspace-storage.js"></script>
+    <script src="./docx.js"></script>
+    <script src="./tm.js"></script>
+    <script src="./termbase.js"></script>
+    <script src="./qa.js"></script>
+    <script src="./validation.js"></script>
+    <script src="./analysis.js"></script>
+    <script src="./ai.js"></script>
+    <script src="./worker-client.js"></script>
+    <script src="./project.js"></script>
+    <script>
+      (async () => {
+        const out = [];
+        const assert = (condition, label) => {
+          if (!condition) throw new Error(label);
+          out.push(`PASS ${label}`);
+        };
+
+        const now = new Date().toISOString();
+        const testId = `roundtrip-${Date.now()}`;
+        const tmName = `Roundtrip TM ${testId}`;
+        const tbName = `Roundtrip TB ${testId}`;
+        const documentId = `doc-${testId}`;
+
+        localStorage.setItem("loopcat.openai.apiKey", "sk-test-key-that-must-not-export");
+        sessionStorage.setItem("loopcat.openai.apiKey", "sk-session-key-that-must-not-export");
+
+        let project = await window.CatHan.project.createProject({
+          name: `Roundtrip ${testId}`,
+          domain: "Legal",
+          sourceLang: "en",
+          targetLang: "tr",
+          tmName,
+          termBaseName: tbName
+        });
+        project = await window.CatHan.project.updateProject({
+          ...project,
+          documents: [{ id: documentId, name: "contract.txt", type: "text" }],
+          aiSettings: {
+            ...project.aiSettings,
+            enabled: true,
+            provider: "OpenAI",
+            model: "gpt-5.2",
+            sendSourceToAi: false,
+            useTmContext: true,
+            useTermbaseContext: true,
+            styleGuide: "Use clear legal Turkish."
+          }
+        });
+
+        const segments = await window.CatHan.project.appendProjectSegments(project.id, [
+          { text: "This agreement starts today.", target: "Bu sozlesme bugun baslar." },
+          { text: "The client may terminate the agreement.", target: "" }
+        ], {
+          documentId,
+          documentName: "contract.txt",
+          documentType: "text"
+        });
+        segments[0].status = "confirmed";
+        segments[0].reviewState = "reviewed";
+        segments[0].comments = [{
+          id: `comment-${testId}`,
+          body: "Approved terminology.",
+          state: "open",
+          createdAt: now,
+          updatedAt: now
+        }];
+        segments[0].aiSuggestions = [{
+          id: `ai-suggestion-${testId}`,
+          provider: "OpenAI",
+          model: "gpt-5.2",
+          source: "AI suggestion copied source text must not travel separately.",
+          suggestedTarget: "Bu sozlesme bugun yururluge girer.",
+          explanation: ["Fixture suggestion for round-trip persistence."],
+          status: "review",
+          createdAt: now,
+          responseId: "resp-provider-trace-that-must-not-export",
+          prompt: "Provider prompt trace that must not export.",
+          customEndpoint: "https://ai.example.invalid/responses"
+        }];
+        await window.CatHan.project.saveSegments(segments);
+        const savedSegments = await window.CatHan.project.getProjectSegments(project.id);
+
+        const tmEntry = await window.CatHan.tm.saveTmEntry({
+          source: savedSegments[0].source,
+          target: savedSegments[0].target,
+          sourceLang: project.sourceLang,
+          targetLang: project.targetLang,
+          projectName: project.name,
+          tmName
+        });
+        const term = await window.CatHan.termbase.saveTerm({
+          sourceTerm: "agreement",
+          targetTerm: "sozlesme",
+          sourceLang: project.sourceLang,
+          targetLang: project.targetLang,
+          notes: "Legal term",
+          termBaseName: tbName
+        });
+        const activity = await window.CatHan.storage.recordActivityEvent({
+          projectId: project.id,
+          type: "package-roundtrip-test",
+          summary: "Package round-trip fixture created",
+          detail: { documentId }
+        });
+        const aiActivity = await window.CatHan.storage.recordActivityEvent({
+          projectId: project.id,
+          type: "ai-action",
+          summary: "AI prompt trace with source text must not export",
+          detail: {
+            provider: "OpenAI",
+            configuredProvider: "OpenAI",
+            prompt: "Activity prompt trace that must not export.",
+            responseId: "activity-response-id-that-must-not-export",
+            customEndpoint: "https://ai.example.invalid/responses"
+          }
+        });
+
+        const pkg = {
+          app: "LoopCAT",
+          type: "project-package",
+          version: 1,
+          schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION,
+          exportedAt: now,
+          packageMetadata: {
+            format: "loopcat-project-package",
+            packageVersion: 1,
+            contractVersion: "loopcat-package-v1",
+            generator: "LoopCAT package round-trip test",
+            storageMode: "browser-cache"
+          },
+          project,
+          segments: savedSegments,
+          resources: {
+            tmEntries: [tmEntry],
+            terms: [term]
+          },
+          resourceReferences: [
+            { id: `${project.id}-tm`, type: "tm", name: tmName, role: "main", sourceLang: project.sourceLang, targetLang: project.targetLang },
+            { id: `${project.id}-tb`, type: "termbase", name: tbName, role: "", sourceLang: project.sourceLang, targetLang: project.targetLang }
+          ],
+          sourceAssets: [{
+            id: documentId,
+            name: "contract.txt",
+            type: "text",
+            originalAvailable: false,
+            structurePreserved: true
+          }],
+          activityEvents: [activity, aiActivity]
+        };
+
+        const providerTracePackageReport = window.CatHan.validation.validateProjectPackage(pkg);
+        assert(
+          !providerTracePackageReport.ok &&
+            providerTracePackageReport.errors.some((error) => error.includes("AI provider trace metadata") && error.includes("responseId")),
+          "package validation rejects AI provider trace metadata before import"
+        );
+
+        const sanitizedPortablePackage = window.CatHan.storage.sanitizePortableValue(pkg);
+        const validation = window.CatHan.validation.validateProjectPackage(sanitizedPortablePackage);
+        sanitizedPortablePackage.validation = validation;
+        sanitizedPortablePackage.validationReports = { package: validation };
+        assert(validation.ok, `package contract validation (${validation.errors.join("; ")})`);
+        const futurePackageReport = window.CatHan.validation.validateProjectPackage({
+          ...sanitizedPortablePackage,
+          schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION + 1
+        });
+        assert(!futurePackageReport.ok && futurePackageReport.errors.some((error) => error.includes("newer than this LoopCAT build supports")), "package validation rejects future schema versions");
+
+        const json = JSON.stringify(sanitizedPortablePackage);
+        assert(!json.includes("sk-test-key") && !json.includes("sk-session-key"), "browser OpenAI keys stay out of package JSON");
+        assert(json.includes("loopcat-package-v1") && json.includes("loopcat-project-package"), "stable package metadata is exported");
+        const sanitizedPortableJson = json;
+        assert(
+          sanitizedPortablePackage.segments[0].aiSuggestions[0].suggestedTarget.includes("yururluge") &&
+            !sanitizedPortableJson.includes("copied source text") &&
+            !sanitizedPortableJson.includes("resp-provider-trace-that-must-not-export") &&
+            !sanitizedPortableJson.includes("Provider prompt trace") &&
+            !sanitizedPortableJson.includes("customEndpoint"),
+          "package sanitizer strips AI suggestion source and provider trace metadata"
+        );
+        assert(
+          sanitizedPortablePackage.activityEvents.find((event) => event.id === aiActivity.id)?.summary === "AI activity recorded" &&
+            !sanitizedPortableJson.includes("AI prompt trace with source text must not export") &&
+            !sanitizedPortableJson.includes("Activity prompt trace") &&
+            !sanitizedPortableJson.includes("activity-response-id-that-must-not-export") &&
+            !sanitizedPortableJson.includes("customEndpoint"),
+          "package sanitizer redacts AI activity summaries and provider trace metadata"
+        );
+        const leakedAiSuggestionPackage = JSON.parse(json);
+        leakedAiSuggestionPackage.segments[0].aiSuggestions[0].explanation = ["Bearer package-ai-suggestion-token-that-must-not-export"];
+        const sanitizedLeakedAiSuggestionPackage = window.CatHan.storage.sanitizePortableValue(leakedAiSuggestionPackage);
+        const sanitizedLeakedAiSuggestionJson = JSON.stringify(sanitizedLeakedAiSuggestionPackage);
+        const leakedAiSuggestionReport = window.CatHan.validation.validateProjectPackage(leakedAiSuggestionPackage);
+        assert(
+          !sanitizedLeakedAiSuggestionJson.includes("package-ai-suggestion-token-that-must-not-export") &&
+            sanitizedLeakedAiSuggestionJson.includes("[redacted secret]"),
+          "package sanitizer redacts credential-looking AI suggestion explanations"
+        );
+        assert(
+          !leakedAiSuggestionReport.ok &&
+            leakedAiSuggestionReport.errors.some((error) => error.includes("credential-looking AI suggestion metadata") && error.includes("segments.0.aiSuggestions.0.explanation.0")),
+          "package validation rejects credential-looking AI suggestion metadata"
+        );
+        const leakedSummaryPackage = JSON.parse(json);
+        leakedSummaryPackage.activityEvents[0].summary = "Unsafe Bearer package-summary-token-that-must-not-export";
+        leakedSummaryPackage.activityEvents[0].type = "Bearer package-activity-type-token-that-must-not-export";
+        const sanitizedLeakedSummaryPackage = window.CatHan.storage.sanitizePortableValue(leakedSummaryPackage);
+        const sanitizedLeakedSummaryJson = JSON.stringify(sanitizedLeakedSummaryPackage);
+        const leakedSummaryReport = window.CatHan.validation.validateProjectPackage(leakedSummaryPackage);
+        assert(
+          !sanitizedLeakedSummaryJson.includes("package-summary-token-that-must-not-export") &&
+            !sanitizedLeakedSummaryJson.includes("package-activity-type-token-that-must-not-export") &&
+            sanitizedLeakedSummaryJson.includes("[redacted secret]"),
+          "package sanitizer redacts credential-looking activity summaries and types"
+        );
+        assert(
+          !leakedSummaryReport.ok &&
+            leakedSummaryReport.errors.some((error) => error.includes("Activity event") && error.includes("summary") && error.includes("credential-looking")) &&
+            leakedSummaryReport.errors.some((error) => error.includes("Activity event") && error.includes("type") && error.includes("credential-looking")),
+          "package validation rejects credential-looking activity summaries and types"
+        );
+        const leakedStyleGuidePackage = JSON.parse(json);
+        leakedStyleGuidePackage.project.aiSettings.styleGuide = "Use Bearer package-style-token-that-must-not-export";
+        const sanitizedLeakedStyleGuidePackage = window.CatHan.storage.sanitizePortableValue(leakedStyleGuidePackage);
+        const sanitizedLeakedStyleGuideJson = JSON.stringify(sanitizedLeakedStyleGuidePackage);
+        const leakedStyleGuideReport = window.CatHan.validation.validateProjectPackage(leakedStyleGuidePackage);
+        assert(
+          !sanitizedLeakedStyleGuideJson.includes("package-style-token-that-must-not-export") &&
+            sanitizedLeakedStyleGuideJson.includes("[redacted secret]"),
+          "package sanitizer redacts credential-looking AI style instructions"
+        );
+        assert(
+          !leakedStyleGuideReport.ok &&
+            leakedStyleGuideReport.errors.some((error) => error.includes("credential-looking AI style instructions") && error.includes("aiSettings.styleGuide")),
+          "package validation rejects credential-looking AI style instructions"
+        );
+        const leakedAiSettingsMetadataPackage = JSON.parse(json);
+        leakedAiSettingsMetadataPackage.project.aiSettings.provider = "Bearer package-ai-provider-token-that-must-not-export";
+        leakedAiSettingsMetadataPackage.project.aiSettings.model = "Bearer package-ai-model-token-that-must-not-export";
+        leakedAiSettingsMetadataPackage.activityEvents[0].detail.provider = "Bearer package-activity-provider-token-that-must-not-export";
+        leakedAiSettingsMetadataPackage.activityEvents[0].detail.model = "Bearer package-activity-model-token-that-must-not-export";
+        const sanitizedLeakedAiSettingsMetadataPackage = window.CatHan.storage.sanitizePortableValue(leakedAiSettingsMetadataPackage);
+        const sanitizedLeakedAiSettingsMetadataJson = JSON.stringify(sanitizedLeakedAiSettingsMetadataPackage);
+        const leakedAiSettingsMetadataReport = window.CatHan.validation.validateProjectPackage(leakedAiSettingsMetadataPackage);
+        assert(
+          !sanitizedLeakedAiSettingsMetadataJson.includes("package-ai-provider-token-that-must-not-export") &&
+            !sanitizedLeakedAiSettingsMetadataJson.includes("package-ai-model-token-that-must-not-export") &&
+            !sanitizedLeakedAiSettingsMetadataJson.includes("package-activity-provider-token-that-must-not-export") &&
+            !sanitizedLeakedAiSettingsMetadataJson.includes("package-activity-model-token-that-must-not-export") &&
+            sanitizedLeakedAiSettingsMetadataJson.includes("[redacted secret]"),
+          "package sanitizer redacts credential-looking AI provider model and activity metadata"
+        );
+        assert(
+          !leakedAiSettingsMetadataReport.ok &&
+            leakedAiSettingsMetadataReport.errors.some((error) => error.includes("credential-looking AI settings metadata") && error.includes("aiSettings.provider") && error.includes("aiSettings.model")) &&
+            leakedAiSettingsMetadataReport.errors.some((error) => error.includes("credential-looking activity metadata") && error.includes("activityEvents.0.detail.provider") && error.includes("activityEvents.0.detail.model")),
+          "package validation rejects credential-looking AI provider model and activity metadata"
+        );
+        const leakedDomainPackage = JSON.parse(json);
+        leakedDomainPackage.project.domain = "Bearer package-domain-token-that-must-not-export";
+        const sanitizedLeakedDomainPackage = window.CatHan.storage.sanitizePortableValue(leakedDomainPackage);
+        const sanitizedLeakedDomainJson = JSON.stringify(sanitizedLeakedDomainPackage);
+        const leakedDomainReport = window.CatHan.validation.validateProjectPackage(leakedDomainPackage);
+        assert(
+          !sanitizedLeakedDomainJson.includes("package-domain-token-that-must-not-export") &&
+            sanitizedLeakedDomainJson.includes("[redacted secret]"),
+          "package sanitizer redacts credential-looking project domain metadata"
+        );
+        assert(
+          !leakedDomainReport.ok &&
+            leakedDomainReport.errors.some((error) => error.includes("credential-looking project domain metadata") && error.includes("project.domain")),
+          "package validation rejects credential-looking project domain metadata"
+        );
+        const leakedLabelPackage = JSON.parse(json);
+        leakedLabelPackage.project.name = "Bearer package-project-label-token-that-must-not-export";
+        leakedLabelPackage.project.sourceFileName = "Bearer package-source-file-label-token-that-must-not-export.html";
+        leakedLabelPackage.project.documents[0].name = "Bearer package-document-label-token-that-must-not-export.html";
+        leakedLabelPackage.project.resourceLinks[0].name = "Bearer package-resource-link-label-token-that-must-not-export";
+        leakedLabelPackage.resources.tmEntries[0].tmName = "Bearer package-tm-label-token-that-must-not-export";
+        leakedLabelPackage.resources.terms[0].termBaseName = "Bearer package-termbase-label-token-that-must-not-export";
+        leakedLabelPackage.resourceReferences[0].name = "Bearer package-resource-reference-label-token-that-must-not-export";
+        leakedLabelPackage.sourceAssets[0].name = "Bearer package-source-asset-label-token-that-must-not-export.html";
+        leakedLabelPackage.activityEvents[0].detail.fileName = "Bearer package-activity-file-label-token-that-must-not-export.html";
+        const sanitizedLeakedLabelPackage = window.CatHan.storage.sanitizePortableValue(leakedLabelPackage);
+        const sanitizedLeakedLabelJson = JSON.stringify(sanitizedLeakedLabelPackage);
+        const leakedLabelReport = window.CatHan.validation.validateProjectPackage(leakedLabelPackage);
+        assert(
+          !sanitizedLeakedLabelJson.includes("package-project-label-token-that-must-not-export") &&
+            !sanitizedLeakedLabelJson.includes("package-source-file-label-token-that-must-not-export") &&
+            !sanitizedLeakedLabelJson.includes("package-document-label-token-that-must-not-export") &&
+            !sanitizedLeakedLabelJson.includes("package-resource-link-label-token-that-must-not-export") &&
+            !sanitizedLeakedLabelJson.includes("package-tm-label-token-that-must-not-export") &&
+            !sanitizedLeakedLabelJson.includes("package-termbase-label-token-that-must-not-export") &&
+            !sanitizedLeakedLabelJson.includes("package-resource-reference-label-token-that-must-not-export") &&
+            !sanitizedLeakedLabelJson.includes("package-source-asset-label-token-that-must-not-export") &&
+            !sanitizedLeakedLabelJson.includes("package-activity-file-label-token-that-must-not-export") &&
+            sanitizedLeakedLabelJson.includes("[redacted secret]"),
+          "package sanitizer redacts credential-looking label metadata"
+        );
+        assert(
+          !leakedLabelReport.ok &&
+            leakedLabelReport.errors.some((error) =>
+              error.includes("credential-looking label metadata") &&
+                error.includes("project.name") &&
+                error.includes("project.documents.0.name") &&
+                error.includes("resources.tmEntries.0.tmName") &&
+                error.includes("resources.terms.0.termBaseName")
+          ),
+          "package validation rejects credential-looking label metadata"
+        );
+        const leakedRecordIdPackage = JSON.parse(json);
+        leakedRecordIdPackage.project.id = "Bearer package-project-id-token-that-must-not-export";
+        leakedRecordIdPackage.project.documents[0].id = "Bearer package-document-id-token-that-must-not-export";
+        leakedRecordIdPackage.sourceAssets[0].id = "Bearer package-document-id-token-that-must-not-export";
+        leakedRecordIdPackage.segments = leakedRecordIdPackage.segments.map((segment, index) => ({
+          ...segment,
+          id: index === 0 ? "Bearer package-segment-id-token-that-must-not-export" : segment.id,
+          projectId: leakedRecordIdPackage.project.id,
+          documentId: "Bearer package-document-id-token-that-must-not-export",
+          aiSuggestions: index === 0
+            ? [{
+              id: "Bearer package-ai-suggestion-id-token-that-must-not-export",
+              segmentId: "Bearer package-segment-id-token-that-must-not-export",
+              suggestedTarget: "ID redaction target"
+            }]
+            : segment.aiSuggestions
+        }));
+        leakedRecordIdPackage.activityEvents = leakedRecordIdPackage.activityEvents.map((event, index) => ({
+          ...event,
+          id: index === 0 ? "Bearer package-activity-id-token-that-must-not-export" : event.id,
+          workspaceId: index === 0 ? "Bearer package-workspace-id-token-that-must-not-export" : event.workspaceId,
+          ownerId: index === 0 ? "Bearer package-owner-id-token-that-must-not-export" : event.ownerId,
+          projectId: leakedRecordIdPackage.project.id,
+          createdBy: index === 0 ? "Bearer package-created-by-token-that-must-not-export" : event.createdBy
+        }));
+        const sanitizedLeakedRecordIdPackage = window.CatHan.storage.sanitizePortableValue(leakedRecordIdPackage);
+        const sanitizedLeakedRecordIdJson = JSON.stringify(sanitizedLeakedRecordIdPackage);
+        const sanitizedRecordIdPackageReport = window.CatHan.validation.validateProjectPackage(sanitizedLeakedRecordIdPackage);
+        assert(
+          !sanitizedLeakedRecordIdJson.includes("package-project-id-token-that-must-not-export") &&
+            !sanitizedLeakedRecordIdJson.includes("package-segment-id-token-that-must-not-export") &&
+            !sanitizedLeakedRecordIdJson.includes("package-document-id-token-that-must-not-export") &&
+            !sanitizedLeakedRecordIdJson.includes("package-ai-suggestion-id-token-that-must-not-export") &&
+            !sanitizedLeakedRecordIdJson.includes("package-activity-id-token-that-must-not-export") &&
+            !sanitizedLeakedRecordIdJson.includes("package-workspace-id-token-that-must-not-export") &&
+            !sanitizedLeakedRecordIdJson.includes("package-owner-id-token-that-must-not-export") &&
+            !sanitizedLeakedRecordIdJson.includes("package-created-by-token-that-must-not-export") &&
+            sanitizedLeakedRecordIdJson.includes("redacted-id-"),
+          "package sanitizer redacts credential-looking record IDs"
+        );
+        assert(
+          sanitizedRecordIdPackageReport.ok &&
+            /^redacted-id-[A-Za-z0-9-]+$/.test(sanitizedLeakedRecordIdPackage.project.id) &&
+            sanitizedLeakedRecordIdPackage.project.id === sanitizedLeakedRecordIdPackage.segments[0].projectId &&
+            sanitizedLeakedRecordIdPackage.project.id === sanitizedLeakedRecordIdPackage.activityEvents[0].projectId &&
+            sanitizedLeakedRecordIdPackage.project.documents[0].id === sanitizedLeakedRecordIdPackage.segments[0].documentId &&
+            sanitizedLeakedRecordIdPackage.segments[0].id === sanitizedLeakedRecordIdPackage.segments[0].aiSuggestions[0].segmentId,
+          "package sanitizer preserves record ID relationships after redaction"
+        );
+        const leakedValidationMessagePackage = JSON.parse(json);
+        leakedValidationMessagePackage.project.documents[0].name = "Bearer package-validation-document-label-token-that-must-not-echo.html";
+        leakedValidationMessagePackage.sourceAssets = [{
+          id: "missing-source-asset-id",
+          name: "Bearer package-validation-source-asset-label-token-that-must-not-echo.html",
+          type: "html",
+          originalAvailable: true,
+          structurePreserved: true
+        }];
+        const leakedValidationMessageReport = window.CatHan.validation.validateProjectPackage(leakedValidationMessagePackage);
+        const leakedValidationMessageJson = JSON.stringify(leakedValidationMessageReport);
+        assert(
+          !leakedValidationMessageJson.includes("package-validation-document-label-token-that-must-not-echo") &&
+            !leakedValidationMessageJson.includes("package-validation-source-asset-label-token-that-must-not-echo") &&
+            leakedValidationMessageJson.includes("[redacted secret]"),
+          "package validation report redacts credential-looking labels in warnings"
+        );
+        const legacyAcademicMetadataPackage = JSON.parse(json);
+        legacyAcademicMetadataPackage.project.academicMetadata = {
+          experimentNotes: "Bearer package-academic-token-that-must-not-export"
+        };
+        const sanitizedLegacyAcademicMetadataPackage = window.CatHan.storage.sanitizePortableValue(legacyAcademicMetadataPackage);
+        const sanitizedLegacyAcademicMetadataJson = JSON.stringify(sanitizedLegacyAcademicMetadataPackage);
+        const legacyAcademicMetadataReport = window.CatHan.validation.validateProjectPackage(legacyAcademicMetadataPackage);
+        assert(
+          !sanitizedLegacyAcademicMetadataJson.includes("academicMetadata") &&
+            !sanitizedLegacyAcademicMetadataJson.includes("package-academic-token-that-must-not-export"),
+          "package sanitizer strips legacy academic metadata"
+        );
+        assert(
+          legacyAcademicMetadataReport.ok,
+          "package validation ignores legacy academic metadata"
+        );
+        const leakedTermNotePackage = JSON.parse(json);
+        leakedTermNotePackage.resources.terms[0].notes = "Bearer package-term-note-token-that-must-not-export";
+        const sanitizedLeakedTermNotePackage = window.CatHan.storage.sanitizePortableValue(leakedTermNotePackage);
+        const sanitizedLeakedTermNoteJson = JSON.stringify(sanitizedLeakedTermNotePackage);
+        const leakedTermNoteReport = window.CatHan.validation.validateProjectPackage(leakedTermNotePackage);
+        assert(
+          !sanitizedLeakedTermNoteJson.includes("package-term-note-token-that-must-not-export") &&
+            sanitizedLeakedTermNoteJson.includes("[redacted secret]"),
+          "package sanitizer redacts credential-looking termbase notes"
+        );
+        assert(
+          !leakedTermNoteReport.ok &&
+            leakedTermNoteReport.errors.some((error) => error.includes("credential-looking termbase notes") && error.includes("resources.terms.0.notes")),
+          "package validation rejects credential-looking termbase notes"
+        );
+        const leakedTmOriginPackage = JSON.parse(json);
+        leakedTmOriginPackage.resources.tmEntries[0].projectName = "Bearer package-tm-origin-token-that-must-not-export";
+        const sanitizedLeakedTmOriginPackage = window.CatHan.storage.sanitizePortableValue(leakedTmOriginPackage);
+        const sanitizedLeakedTmOriginJson = JSON.stringify(sanitizedLeakedTmOriginPackage);
+        const leakedTmOriginReport = window.CatHan.validation.validateProjectPackage(leakedTmOriginPackage);
+        assert(
+          !sanitizedLeakedTmOriginJson.includes("package-tm-origin-token-that-must-not-export") &&
+            sanitizedLeakedTmOriginJson.includes("[redacted secret]"),
+          "package sanitizer redacts credential-looking TM origin metadata"
+        );
+        assert(
+          !leakedTmOriginReport.ok &&
+            leakedTmOriginReport.errors.some((error) => error.includes("credential-looking TM origin metadata") && error.includes("resources.tmEntries.0.projectName")),
+          "package validation rejects credential-looking TM origin metadata"
+        );
+        const foreignActivityPackage = JSON.parse(json);
+        foreignActivityPackage.activityEvents[0].projectId = "foreign-package-project";
+        const foreignActivityReport = window.CatHan.validation.validateProjectPackage(foreignActivityPackage);
+        assert(
+          !foreignActivityReport.ok &&
+            foreignActivityReport.errors.some((error) => error.includes("Activity event") && error.includes("different project")),
+          "package validation rejects activity events from a different project"
+        );
+
+        const leaked = JSON.parse(json);
+        leaked.project.aiSettings.apiKey = "sk-should-fail";
+        leaked.project.sessionCookie = "session-cookie-should-fail";
+        leaked.activityEvents[0].detail.authorizationToken = "bearer-should-fail";
+        const leakedReport = window.CatHan.validation.validateProjectPackage(leaked);
+        assert(
+          !leakedReport.ok &&
+            leakedReport.errors.some((error) => error.includes("secrets") && error.includes("authorizationToken") && error.includes("sessionCookie")),
+          "package validation blocks secrets anywhere in package"
+        );
+        const fakeSourceJsonPackage = JSON.parse(json);
+        fakeSourceJsonPackage.activityEvents[0].detail.sourceJson = {
+          accessToken: "fake-source-json-token-that-must-fail",
+          prompt: "Fake sourceJson prompt trace that must fail."
+        };
+        const fakeSourceJsonReport = window.CatHan.validation.validateProjectPackage(fakeSourceJsonPackage);
+        const sanitizedFakeSourceJsonPackage = window.CatHan.storage.sanitizePortableValue(fakeSourceJsonPackage);
+        const sanitizedFakeSourceJsonJson = JSON.stringify(sanitizedFakeSourceJsonPackage);
+        assert(
+          !fakeSourceJsonReport.ok &&
+            fakeSourceJsonReport.errors.some((error) => error.includes("secrets") && error.includes("accessToken")) &&
+            fakeSourceJsonReport.errors.some((error) => error.includes("AI provider trace metadata") && error.includes("prompt")),
+          "package validation blocks fake sourceJson metadata outside localization structures"
+        );
+        assert(
+          !sanitizedFakeSourceJsonJson.includes("fake-source-json-token-that-must-fail") &&
+            !sanitizedFakeSourceJsonJson.includes("Fake sourceJson prompt trace"),
+          "package sanitizer strips fake sourceJson metadata outside localization structures"
+        );
+        const leakedRuntime = JSON.parse(json);
+        leakedRuntime.project.fileHandle = { kind: "file", name: "source.docx" };
+        leakedRuntime.segments[0].directoryHandle = { kind: "directory", name: "workspace-folder" };
+        const leakedRuntimeReport = window.CatHan.validation.validateProjectPackage(leakedRuntime);
+        assert(!leakedRuntimeReport.ok && leakedRuntimeReport.errors.some((error) => error.includes("browser-only handles") && error.includes("fileHandle") && error.includes("directoryHandle")), "package validation blocks browser-only handles anywhere in package");
+        const leakedRuntimeObject = JSON.parse(json);
+        leakedRuntimeObject.activityEvents[0].detail.runtimeCallback = () => null;
+        leakedRuntimeObject.segments[0].runtimeSymbol = Symbol("runtime-only");
+        const leakedRuntimeObjectReport = window.CatHan.validation.validateProjectPackage(leakedRuntimeObject);
+        assert(
+          !leakedRuntimeObjectReport.ok &&
+            leakedRuntimeObjectReport.errors.some((error) => error.includes("runtime objects") && error.includes("runtimeCallback") && error.includes("runtimeSymbol")),
+          "package validation blocks runtime functions and symbols anywhere in package"
+        );
+        const sanitizedRuntimePackage = window.CatHan.storage.sanitizePortableValue(leakedRuntime);
+        const sanitizedRuntimeJson = JSON.stringify(sanitizedRuntimePackage);
+        assert(!sanitizedRuntimeJson.includes("fileHandle") && !sanitizedRuntimeJson.includes("directoryHandle"), "package sanitizer strips browser-only handles before export");
+
+        const parsed = JSON.parse(sanitizedPortableJson);
+        await window.CatHan.project.deleteProject(project.id);
+        await window.CatHan.storage.deleteByKey("tmEntries", tmEntry.id);
+        await window.CatHan.storage.deleteByKey("terms", term.id);
+        assert(!(await window.CatHan.storage.get("projects", project.id)), "original project removed before import");
+        assert(!(await window.CatHan.storage.get("tmEntries", tmEntry.id)), "original TM entry removed before import");
+        assert(!(await window.CatHan.storage.get("terms", term.id)), "original term removed before import");
+
+        await Promise.all([
+          window.CatHan.storage.bulkPut("projects", [parsed.project]),
+          window.CatHan.storage.bulkPut("segments", parsed.segments),
+          window.CatHan.storage.bulkPut("tmEntries", parsed.resources.tmEntries),
+          window.CatHan.storage.bulkPut("terms", parsed.resources.terms),
+          window.CatHan.storage.bulkPut("activityEvents", parsed.activityEvents)
+        ]);
+
+        const importedProject = await window.CatHan.storage.get("projects", project.id);
+        const importedSegments = await window.CatHan.project.getProjectSegments(project.id);
+        const importedTm = await window.CatHan.storage.get("tmEntries", tmEntry.id);
+        const importedTerm = await window.CatHan.storage.get("terms", term.id);
+        const importedActivity = await window.CatHan.storage.get("activityEvents", activity.id);
+        const importedAiActivity = await window.CatHan.storage.get("activityEvents", aiActivity.id);
+
+        assert(importedProject.name === project.name && importedProject.resourceLinks.length >= 2, "project metadata and resource links round trip");
+        assert(!("academicMetadata" in importedProject), "legacy academic metadata is not stored after round trip");
+        assert(importedProject.aiSettings.provider === "OpenAI" && !("apiKey" in importedProject.aiSettings), "AI settings round trip without secrets");
+        assert(importedSegments.length === 2 && importedSegments[0].comments.length === 1, "segments and comments round trip");
+        assert(importedSegments[0].aiSuggestions[0].suggestedTarget.includes("yururluge"), "AI suggestions round trip");
+        assert(importedTm.target === savedSegments[0].target && importedTerm.targetTerm === "sozlesme", "TM and termbase resources round trip");
+        assert(importedActivity.detail.documentId === documentId, "activity events round trip");
+        assert(importedAiActivity.summary === "AI activity recorded" && !JSON.stringify(importedAiActivity).includes("activity-response-id-that-must-not-export"), "AI activity events round trip without provider trace metadata");
+
+        const revalidated = window.CatHan.validation.validateProjectPackage(parsed);
+        assert(revalidated.ok, "parsed package remains valid after JSON round trip");
+
+        localStorage.removeItem("loopcat.openai.apiKey");
+        sessionStorage.removeItem("loopcat.openai.apiKey");
+
+        const resultText = `PACKAGE ROUNDTRIP TEST PASS\n${out.join("\n")}`;
+        document.querySelector("#results").textContent = resultText;
+        window.parent?.postMessage({ type: "loopcat-test-result", name: "Package round trip", text: resultText }, "*");
+      })().catch((error) => {
+        const resultText = `PACKAGE ROUNDTRIP TEST FAIL\n${error.stack || error.message}`;
+        document.querySelector("#results").textContent = resultText;
+        window.parent?.postMessage({ type: "loopcat-test-result", name: "Package round trip", text: resultText }, "*");
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>LoopCAT Security Policy Test</title>
+    <link rel="icon" href="data:,">
+  </head>
+  <body>
+    <pre id="results">Running...</pre>
+    <script src="./ai.js"></script>
+    <script>
+      (async () => {
+        const out = [];
+        const assert = (condition, label) => {
+          if (!condition) throw new Error(label);
+          out.push(`PASS ${label}`);
+        };
+
+        const indexHtml = await fetch("./index.html").then((response) => response.text());
+        const policy = indexHtml.match(/http-equiv="Content-Security-Policy"\s+content="([^"]+)"/)?.[1] || "";
+        const directives = new Map(policy.split(";").map((part) => {
+          const [name, ...values] = part.trim().split(/\s+/);
+          return [name, values];
+        }).filter(([name]) => name));
+        const connectSrc = directives.get("connect-src") || [];
+
+        assert(connectSrc.includes("'self'"), "CSP connect-src keeps local app access");
+        assert(connectSrc.includes(window.CatHan.ai.OPENAI_RESPONSES_URL), "CSP connect-src allows only the OpenAI Responses endpoint");
+        assert(connectSrc.includes(window.CatHan.ai.OPENAI_MODELS_URL), "CSP connect-src allows only the OpenAI Models endpoint for model refresh");
+        assert(connectSrc.includes(window.CatHan.ai.GEMINI_DEFAULT_BASE_URL.replace(/\/v1beta$/, "")), "CSP connect-src allows the explicit Gemini API origin");
+        assert(connectSrc.includes(window.CatHan.ai.ANTHROPIC_DEFAULT_BASE_URL.replace(/\/v1$/, "")), "CSP connect-src allows the explicit Anthropic API origin");
+        assert(connectSrc.includes(window.CatHan.ai.COHERE_DEFAULT_BASE_URL), "CSP connect-src allows the explicit Cohere API origin");
+        assert(connectSrc.includes("https://*.openai.azure.com") && connectSrc.includes("https://*.services.ai.azure.com"), "CSP connect-src allows Azure OpenAI resource domains");
+        assert(connectSrc.includes(window.CatHan.ai.OLLAMA_CLOUD_BASE_URL), "CSP connect-src allows the hosted Ollama origin");
+        assert(
+          ["https://api.deepseek.com", "https://api.mistral.ai", "https://api.x.ai", "https://api.perplexity.ai", "https://api.groq.com", "https://api.together.ai", "https://openrouter.ai", "https://router.huggingface.co", "https://api.deepinfra.com", "https://api.fireworks.ai"]
+            .every((origin) => connectSrc.includes(origin)),
+          "CSP connect-src allows explicit hosted AI provider origins"
+        );
+        assert(connectSrc.includes("http://localhost:11434") && connectSrc.includes("http://127.0.0.1:11434"), "CSP connect-src allows explicit Ollama loopback endpoints");
+        assert(connectSrc.includes("http://localhost:1234") && connectSrc.includes("http://127.0.0.1:1234"), "CSP connect-src allows explicit OpenAI-compatible local endpoints");
+        assert(!connectSrc.some((source) => source.includes("[::1]")), "CSP connect-src omits Chromium-invalid bracketed IPv6 loopback sources");
+        assert(!connectSrc.includes("https://api.openai.com"), "CSP connect-src does not allow the whole OpenAI origin");
+        assert(!connectSrc.includes("https:"), "CSP connect-src rejects generic secure network origins");
+        assert(!connectSrc.includes("http:"), "CSP connect-src rejects generic insecure network origins");
+        assert(!connectSrc.includes("http://example.com:11434"), "CSP connect-src rejects non-loopback local AI origins");
+        assert(directives.get("script-src")?.join(" ") === "'self'", "CSP script-src stays local-only");
+        assert(directives.get("worker-src")?.join(" ") === "'self'", "CSP worker-src stays local-only");
+        assert(directives.get("object-src")?.join(" ") === "'none'", "CSP object-src disables plugin content");
+        assert(directives.get("base-uri")?.join(" ") === "'none'", "CSP base-uri disables base URL injection");
+        assert(directives.get("form-action")?.join(" ") === "'none'", "CSP form-action disables form submission");
+
+        const segment = { id: "security-ai-segment", source: "Hello world." };
+        assert(!window.CatHan.ai.externalAiSourceSharingAllowed({ aiSettings: { enabled: true, sendSourceToAi: false } }), "AI source sharing helper blocks disabled source sharing");
+        assert(window.CatHan.ai.externalAiSourceSharingAllowed({ aiSettings: { enabled: true, sendSourceToAi: true } }), "AI source sharing helper allows explicit project consent");
+        assert("OpenAI".toLocaleLowerCase("tr") !== "openai" && window.CatHan.ai.isOpenAiProvider({ aiSettings: { provider: "OpenAI" } }), "OpenAI provider detection is stable under Turkish locale casing");
+        const originalFetch = window.fetch;
+        let fetchCount = 0;
+        let lastOpenAiRequest = null;
+        const expectReject = async (promise, expectedText, label) => {
+          try {
+            await promise;
+          } catch (error) {
+            assert(String(error.message || error).includes(expectedText), label);
+            return;
+          }
+          throw new Error(label);
+        };
+        window.fetch = async (url, options = {}) => {
+          fetchCount += 1;
+          lastOpenAiRequest = {
+            url: String(url),
+            body: JSON.parse(String(options.body || "{}"))
+          };
+          return {
+            ok: true,
+            json: async () => ({ id: "security-response", output_text: "Merhaba dunya." })
+          };
+        };
+        try {
+          await expectReject(
+            window.CatHan.ai.openAiSuggestion({
+              apiKey: "sk-test-not-sent",
+              segment,
+              project: { aiSettings: { enabled: false, sendSourceToAi: true } }
+            }),
+            "source sharing",
+            "OpenAI helper blocks disabled AI helpers before network request"
+          );
+          await expectReject(
+            window.CatHan.ai.openAiSuggestion({
+              apiKey: "sk-test-not-sent",
+              segment,
+              project: { aiSettings: { enabled: true, sendSourceToAi: false } }
+            }),
+            "source sharing",
+            "OpenAI helper blocks disabled source sharing before network request"
+          );
+          await expectReject(
+            window.CatHan.ai.openAiSuggestion({
+              apiKey: "sk-test-not-sent",
+              segment,
+              project: { aiSettings: { enabled: true, sendSourceToAi: true, provider: "Anthropic" } }
+            }),
+            "Choose OpenAI",
+            "OpenAI helper blocks unsupported providers before network request"
+          );
+          await expectReject(
+            window.CatHan.ai.openAiSuggestion({
+              apiKey: "",
+              segment,
+              project: { aiSettings: { enabled: false, sendSourceToAi: true, provider: "OpenAI" } }
+            }),
+            "source sharing",
+            "OpenAI helper checks project consent before API key requirement"
+          );
+          await expectReject(
+            window.CatHan.ai.openAiSuggestion({
+              apiKey: "",
+              segment,
+              project: { aiSettings: { enabled: true, sendSourceToAi: true, provider: "Anthropic" } }
+            }),
+            "Choose OpenAI",
+            "OpenAI helper checks provider before API key requirement"
+          );
+          await expectReject(
+            window.CatHan.ai.openAiSuggestion({
+              apiKey: "",
+              segment: { ...segment, source: "" },
+              project: { aiSettings: { enabled: true, sendSourceToAi: true, provider: "OpenAI" } }
+            }),
+            "no source text",
+            "OpenAI helper checks source text before API key requirement"
+          );
+          const navigatorOnlineDescriptor = Object.getOwnPropertyDescriptor(navigator, "onLine");
+          try {
+            Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
+            await expectReject(
+              window.CatHan.ai.openAiSuggestion({
+                apiKey: "",
+                segment,
+                project: { aiSettings: { enabled: true, sendSourceToAi: true, provider: "OpenAI" } }
+              }),
+              "offline",
+              "OpenAI helper checks offline state before API key requirement"
+            );
+          } finally {
+            if (navigatorOnlineDescriptor) Object.defineProperty(navigator, "onLine", navigatorOnlineDescriptor);
+            else Reflect.deleteProperty(navigator, "onLine");
+          }
+          assert(fetchCount === 0, "OpenAI helper does not call network before project consent");
+          const suggestion = await window.CatHan.ai.openAiSuggestion({
+            apiKey: "sk-test-local-stub",
+            segment,
+            project: {
+              sourceLang: "Bearer openai-source-language-token-that-must-not-be-sent",
+              targetLang: "session=openaitargetlanguagetokenthatmustnotbesent",
+              domain: "Bearer openai-domain-token-that-must-not-be-sent",
+              aiSettings: { enabled: true, sendSourceToAi: true, model: "test-model", styleGuide: "Use Bearer openai-style-token-that-must-not-be-sent" }
+            }
+          });
+          assert(fetchCount === 1 && suggestion.suggestedTarget === "Merhaba dunya.", "OpenAI helper sends only after explicit source-sharing consent");
+          assert(lastOpenAiRequest?.url === window.CatHan.ai.OPENAI_RESPONSES_URL, "OpenAI helper sends only to the explicit Responses endpoint");
+          assert(lastOpenAiRequest?.body?.store === false, "OpenAI helper opts out of provider response storage");
+          assert(
+            !JSON.stringify(lastOpenAiRequest?.body || {}).includes("openai-style-token-that-must-not-be-sent") &&
+              !JSON.stringify(lastOpenAiRequest?.body || {}).includes("openai-domain-token-that-must-not-be-sent") &&
+              !JSON.stringify(lastOpenAiRequest?.body || {}).includes("openai-source-language-token-that-must-not-be-sent") &&
+              !JSON.stringify(lastOpenAiRequest?.body || {}).includes("openaitargetlanguagetokenthatmustnotbesent") &&
+              JSON.stringify(lastOpenAiRequest?.body || {}).includes("[redacted secret]"),
+            "OpenAI helper redacts credential-looking language domain and style metadata before request body"
+          );
+          await window.CatHan.ai.openAiSuggestion({
+            apiKey: "sk-test-filtered-context",
+            segment,
+            tmMatches: [{ source: "Private TM source that must not be sent", target: "Private TM target that must not be sent", score: 97 }],
+            terms: [{ sourceTerm: "Private term that must not be sent", targetTerm: "Private term target that must not be sent" }],
+            project: {
+              sourceLang: "en",
+              targetLang: "tr",
+              aiSettings: {
+                enabled: true,
+                sendSourceToAi: true,
+                provider: "OpenAI",
+                model: "test-model",
+                useTmContext: false,
+                useTermbaseContext: false
+              }
+            }
+          });
+          assert(
+            fetchCount === 2 &&
+              !JSON.stringify(lastOpenAiRequest?.body || {}).includes("Private TM source that must not be sent") &&
+              !JSON.stringify(lastOpenAiRequest?.body || {}).includes("Private TM target that must not be sent") &&
+              !JSON.stringify(lastOpenAiRequest?.body || {}).includes("Private term that must not be sent") &&
+              !JSON.stringify(lastOpenAiRequest?.body || {}).includes("Private term target that must not be sent"),
+            "OpenAI helper strips disabled local TM and termbase context before request body"
+          );
+          await window.CatHan.ai.openAiSuggestion({
+            apiKey: "sk-test-redacted-context",
+            segment,
+            tmMatches: [{ source: "TM source Bearer openai-tm-source-token-that-must-not-be-sent", target: "TM target session=openaitmtargetsecret", score: 88 }],
+            terms: [{ sourceTerm: "Term Bearer openai-term-source-token-that-must-not-be-sent", targetTerm: "Target term", notes: "Note npm_openaitermnotesthatmustnotbesent" }],
+            project: {
+              sourceLang: "en",
+              targetLang: "tr",
+              aiSettings: {
+                enabled: true,
+                sendSourceToAi: true,
+                provider: "OpenAI",
+                model: "test-model",
+                useTmContext: true,
+                useTermbaseContext: true
+              }
+            }
+          });
+          assert(
+            fetchCount === 3 &&
+              JSON.stringify(lastOpenAiRequest?.body || {}).includes("Translation memory context") &&
+              JSON.stringify(lastOpenAiRequest?.body || {}).includes("Termbase context") &&
+              JSON.stringify(lastOpenAiRequest?.body || {}).includes("[redacted secret]") &&
+              !JSON.stringify(lastOpenAiRequest?.body || {}).includes("openai-tm-source-token-that-must-not-be-sent") &&
+              !JSON.stringify(lastOpenAiRequest?.body || {}).includes("openaitmtargetsecret") &&
+              !JSON.stringify(lastOpenAiRequest?.body || {}).includes("openai-term-source-token-that-must-not-be-sent") &&
+              !JSON.stringify(lastOpenAiRequest?.body || {}).includes("openaitermnotesthatmustnotbesent"),
+            "OpenAI helper redacts credential-looking local TM and termbase context before request body"
+          );
+          await window.CatHan.ai.openAiSuggestion({
+            apiKey: "sk-test-malformed-context",
+            segment,
+            tmMatches: { source: "Malformed TM source that must not be sent", target: "Malformed TM target that must not be sent" },
+            terms: null,
+            project: {
+              sourceLang: "en",
+              targetLang: "tr",
+              aiSettings: {
+                enabled: true,
+                sendSourceToAi: true,
+                provider: "OpenAI",
+                model: "test-model",
+                useTmContext: true,
+                useTermbaseContext: true
+              }
+            }
+          });
+          assert(
+            fetchCount === 4 &&
+              !JSON.stringify(lastOpenAiRequest?.body || {}).includes("Malformed TM source that must not be sent") &&
+              !JSON.stringify(lastOpenAiRequest?.body || {}).includes("Malformed TM target that must not be sent"),
+            "OpenAI helper ignores malformed local TM and termbase context before request body"
+          );
+
+          window.fetch = async () => {
+            fetchCount += 1;
+            return {
+              ok: false,
+              status: 400,
+              json: async () => ({ error: { message: "Provider rejected Bearer openai-error-token-that-must-not-leak." } })
+            };
+          };
+          let providerErrorMessage = "";
+          try {
+            await window.CatHan.ai.openAiSuggestion({
+              apiKey: "sk-test-provider-error",
+              segment,
+              project: { sourceLang: "en", targetLang: "tr", aiSettings: { enabled: true, sendSourceToAi: true, provider: "OpenAI", model: "test-model" } }
+            });
+          } catch (error) {
+            providerErrorMessage = error.message || String(error);
+          }
+          assert(
+            fetchCount === 5 &&
+              providerErrorMessage.includes("[redacted secret]") &&
+              !providerErrorMessage.includes("openai-error-token-that-must-not-leak"),
+            "OpenAI helper redacts credential-looking provider error messages"
+          );
+
+          window.fetch = async () => {
+            fetchCount += 1;
+            return {
+              ok: true,
+              json: async () => ({ id: "security-malformed-output", output: { content: [] } })
+            };
+          };
+          await expectReject(
+            window.CatHan.ai.openAiSuggestion({
+              apiKey: "sk-test-malformed-output",
+              segment,
+              project: { sourceLang: "en", targetLang: "tr", aiSettings: { enabled: true, sendSourceToAi: true, model: "test-model" } }
+            }),
+            "empty suggestion",
+            "OpenAI helper reports malformed provider output as empty suggestion"
+          );
+          assert(fetchCount === 6, "OpenAI helper malformed provider output is tested after consent and one provider attempt");
+
+          window.fetch = async (url, options = {}) => {
+            fetchCount += 1;
+            return new Promise((resolve, reject) => {
+              options.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+            });
+          };
+          await expectReject(
+            window.CatHan.ai.openAiSuggestion({
+              apiKey: "sk-test-timeout",
+              segment,
+              project: { sourceLang: "en", targetLang: "tr", aiSettings: { enabled: true, sendSourceToAi: true, model: "test-model" } },
+              timeoutMs: 5
+            }),
+            "timed out",
+            "OpenAI helper times out hung provider requests"
+          );
+          assert(fetchCount === 7, "OpenAI helper timeout is tested after consent and a single provider attempt");
+
+          window.fetch = async () => {
+            fetchCount += 1;
+            throw new TypeError("Failed to fetch");
+          };
+          await expectReject(
+            window.CatHan.ai.openAiSuggestion({
+              apiKey: "sk-test-network",
+              segment,
+              project: { sourceLang: "en", targetLang: "tr", aiSettings: { enabled: true, sendSourceToAi: true, model: "test-model" } }
+            }),
+            "could not connect",
+            "OpenAI helper reports provider connection failures clearly"
+          );
+          assert(fetchCount === 8, "OpenAI helper connection failure is tested after consent and one provider attempt");
+        } finally {
+          window.fetch = originalFetch;
+        }
+
+        const resultText = `SECURITY POLICY TEST PASS\n${out.join("\n")}`;
+        document.querySelector("#results").textContent = resultText;
+        window.parent?.postMessage({ type: "loopcat-test-result", name: "Security policy", text: resultText }, "*");
+      })().catch((error) => {
+        const resultText = `SECURITY POLICY TEST FAIL\n${error.stack || error.message}`;
+        document.querySelector("#results").textContent = resultText;
+        window.parent?.postMessage({ type: "loopcat-test-result", name: "Security policy", text: resultText }, "*");
+      });
+    </script>
+  </body>
+</html>

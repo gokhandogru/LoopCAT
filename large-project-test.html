@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>LoopCAT Large Project Test</title>
+  </head>
+  <body>
+    <pre id="results">Running...</pre>
+    <script src="./storage.js"></script>
+    <script src="./workspace-storage.js"></script>
+    <script src="./docx.js"></script>
+    <script src="./tm.js"></script>
+    <script src="./termbase.js"></script>
+    <script src="./qa.js"></script>
+    <script src="./validation.js"></script>
+    <script src="./analysis.js"></script>
+    <script src="./worker-client.js"></script>
+    <script src="./project.js"></script>
+    <script>
+      class FakeFileHandle {
+        constructor(node) {
+          this.kind = "file";
+          this.name = node.name;
+          this.node = node;
+        }
+
+        async getFile() {
+          return new File([this.node.content || ""], this.name, { type: "application/json" });
+        }
+
+        async createWritable() {
+          let nextContent = "";
+          return {
+            write: async (chunk) => {
+              nextContent += chunk instanceof Blob ? await chunk.text() : String(chunk || "");
+            },
+            close: async () => {
+              this.node.content = nextContent;
+            }
+          };
+        }
+      }
+
+      class FakeDirectoryHandle {
+        constructor(name) {
+          this.kind = "directory";
+          this.name = name;
+          this.directories = new Map();
+          this.files = new Map();
+        }
+
+        notFound(name) {
+          const error = new Error(`${name} not found`);
+          error.name = "NotFoundError";
+          return error;
+        }
+
+        async queryPermission() {
+          return "granted";
+        }
+
+        async requestPermission() {
+          return "granted";
+        }
+
+        async getDirectoryHandle(name, options = {}) {
+          if (!this.directories.has(name)) {
+            if (!options.create) throw this.notFound(name);
+            this.directories.set(name, new FakeDirectoryHandle(name));
+          }
+          return this.directories.get(name);
+        }
+
+        async getFileHandle(name, options = {}) {
+          if (!this.files.has(name)) {
+            if (!options.create) throw this.notFound(name);
+            this.files.set(name, { name, content: "" });
+          }
+          return new FakeFileHandle(this.files.get(name));
+        }
+
+        async *entries() {
+          for (const [name, handle] of this.directories.entries()) yield [name, handle];
+          for (const [name, node] of this.files.entries()) yield [name, new FakeFileHandle(node)];
+        }
+      }
+
+      function readPath(root, path) {
+        const parts = String(path).split("/").filter(Boolean);
+        let dir = root;
+        for (const part of parts.slice(0, -1)) dir = dir.directories.get(part);
+        return dir.files.get(parts[parts.length - 1]).content;
+      }
+
+      function largeSourceSegment(index) {
+        if (index % 47 === 0) {
+          return {
+            text: `The method highlights <b>finding ${index}</b> in table ${index % 5}.`,
+            target: `Yontem tablo ${index % 5} icinde <b>bulgu ${index}</b> vurgular.`
+          };
+        }
+        if (index % 20 === 0) {
+          return {
+            text: "The method section defines the corpus alignment procedure 2026.",
+            target: "Yontem bolumu korpus hizalama surecini 2026 olarak tanimlar."
+          };
+        }
+        return {
+          text: `Segment ${index} reports method finding ${index % 9} for corpus group ${index % 12}.`,
+          target: `Bolum ${index} korpus grubu ${index % 12} icin yontem bulgusunu ${index % 9} olarak bildirir.`
+        };
+      }
+
+      (async () => {
+        const out = [];
+        const assert = (condition, label) => {
+          if (!condition) throw new Error(label);
+          out.push(`PASS ${label}`);
+        };
+
+        const SEGMENT_COUNT = 2400;
+        const TM_COUNT = 900;
+        const MAX_WORKSPACE_JSON_BYTES = 50 * 1024 * 1024;
+        const now = new Date().toISOString();
+        const testId = `large-${Date.now()}`;
+        const tmName = `Large TM ${testId}`;
+        const tbName = `Large TB ${testId}`;
+        const documentId = `doc-${testId}`;
+        const root = new FakeDirectoryHandle("LoopCAT Large Workspace");
+        window.showDirectoryPicker = async () => root;
+
+        const staleProjects = (await window.CatHan.storage.getAll("projects"))
+          .filter((item) => String(item.name || "").startsWith("Large Academic Project large-"));
+        for (const staleProject of staleProjects) {
+          await window.CatHan.project.deleteProject(staleProject.id);
+        }
+        await Promise.all([
+          window.CatHan.storage.deleteWhere("tmEntries", (entry) =>
+            String(entry.tmName || "").startsWith("Large TM large-") ||
+              String(entry.projectName || "").startsWith("Large Academic Project large-")),
+          window.CatHan.storage.deleteWhere("terms", (term) => String(term.termBaseName || "").startsWith("Large TB large-")),
+          window.CatHan.storage.deleteWhere("tmTokenIndex", (record) => String(record.tmEntryId || "").startsWith("tm-large-"))
+        ]);
+
+        let project = await window.CatHan.project.createProject({
+          name: `Large Academic Project ${testId}`,
+          domain: "Academic",
+          sourceLang: "en",
+          targetLang: "tr",
+          tmName,
+          termBaseName: tbName
+        });
+        project = await window.CatHan.project.updateProject({
+          ...project,
+          documents: [{ id: documentId, name: "large-academic-project.txt", type: "text" }]
+        });
+
+        const sourceSegments = Array.from({ length: SEGMENT_COUNT }, (_, index) => largeSourceSegment(index));
+        const imported = await window.CatHan.project.appendProjectSegments(project.id, sourceSegments, {
+          documentId,
+          documentName: "large-academic-project.txt",
+          documentType: "text"
+        });
+        assert(imported.length === SEGMENT_COUNT, "large project imports thousands of segments");
+
+        imported.forEach((segment, index) => {
+          const nextTarget = `${segment.target} ${index % 2 ? "Son okuma tamamlandi." : "Akademik not eklendi."}`;
+          segment.targetHistory = [{
+            id: `history-${testId}-${index}`,
+            reason: "edit",
+            fromTarget: segment.target,
+            toTarget: nextTarget,
+            fromStatus: segment.status,
+            toStatus: index % 3 === 0 ? "confirmed" : "draft",
+            revisionBefore: segment.revision || 0,
+            createdAt: now,
+            updatedAt: now
+          }];
+          segment.target = nextTarget;
+          segment.status = index % 3 === 0 ? "confirmed" : "draft";
+          segment.reviewState = index % 101 === 0 ? "needs-review" : index % 137 === 0 ? "reviewed" : "";
+          segment.comments = index % 113 === 0 ? [{
+            id: `comment-${testId}-${index}`,
+            body: "Scale-test review note.",
+            state: "open",
+            createdAt: now,
+            updatedAt: now
+          }] : [];
+          segment.revision = Number(segment.revision || 0) + 1;
+        });
+
+        const batchStartedAt = Date.now();
+        const savedBatch = await window.CatHan.project.saveSegments(imported);
+        assert(savedBatch.length === SEGMENT_COUNT && Date.now() - batchStartedAt < 60000, "large project batch save completes");
+
+        const protectedTarget = `${savedBatch[0].target} Fresh saved version.`;
+        await window.CatHan.storage.put("segments", {
+          ...savedBatch[0],
+          target: protectedTarget,
+          revision: Number(savedBatch[0].revision || 0) + 5
+        });
+        const staleSave = await window.CatHan.project.saveSegments([{
+          ...savedBatch[0],
+          target: `${savedBatch[0].target} Older stale version.`,
+          revision: savedBatch[0].revision
+        }]);
+        const staleReload = await window.CatHan.storage.get("segments", savedBatch[0].id);
+        assert(staleSave[0].target === protectedTarget && staleReload.target === protectedTarget, "batch save preserves newer segment revisions");
+
+        const finalSegments = await window.CatHan.project.getProjectSegments(project.id);
+        assert(finalSegments.length === SEGMENT_COUNT && finalSegments[0].target === protectedTarget, "large project reload preserves saved targets");
+        assert(finalSegments.every((segment) => Array.isArray(segment.targetHistory) && segment.targetHistory.length >= 1), "large project reload preserves target history");
+
+        const termRecords = [
+          {
+            id: `term-method-${testId}`,
+            sourceTerm: "method",
+            targetTerm: "yontem",
+            sourceLang: project.sourceLang,
+            targetLang: project.targetLang,
+            languagePair: `${project.sourceLang}::${project.targetLang}`,
+            notes: "Approved academic term",
+            termBaseName: tbName,
+            isForbidden: false,
+            createdAt: now,
+            updatedAt: now
+          },
+          {
+            id: `term-forbidden-${testId}`,
+            sourceTerm: "method",
+            targetTerm: "yasak-terim",
+            sourceLang: project.sourceLang,
+            targetLang: project.targetLang,
+            languagePair: `${project.sourceLang}::${project.targetLang}`,
+            notes: "Forbidden scale-test term",
+            termBaseName: tbName,
+            isForbidden: true,
+            createdAt: now,
+            updatedAt: now
+          }
+        ];
+        await window.CatHan.termbase.importTerms(termRecords);
+
+        const tmEntries = [];
+        const seenTmUnits = new Set();
+        for (const segment of finalSegments) {
+          const key = `${segment.source}::${segment.target}`;
+          if (seenTmUnits.has(key)) continue;
+          seenTmUnits.add(key);
+          tmEntries.push({
+            id: `tm-${testId}-${tmEntries.length}`,
+            source: segment.source,
+            target: segment.target,
+            sourceLang: project.sourceLang,
+            targetLang: project.targetLang,
+            languagePair: `${project.sourceLang}::${project.targetLang}`,
+            projectName: project.name,
+            tmName,
+            signature: window.CatHan.tm.tokenSignature(segment.source),
+            createdAt: now,
+            updatedAt: now
+          });
+          if (tmEntries.length === TM_COUNT) break;
+        }
+        assert(tmEntries.length === TM_COUNT, "large TM fixture has enough unique units");
+        const importedTmCount = await window.CatHan.tm.importTmEntries(tmEntries);
+        assert(importedTmCount === TM_COUNT, "large TM resource imports without duplicates");
+        const matches = await window.CatHan.tm.findTmMatches({
+          source: finalSegments[100].source,
+          sourceLang: project.sourceLang,
+          targetLang: project.targetLang,
+          tmName,
+          limit: 5
+        });
+        assert(matches[0]?.score >= 95 && matches[0]?.target, "large TM lookup uses persistent index");
+
+        const qaSegments = finalSegments.map((segment) => ({
+          ...segment,
+          tags: segment.tags?.length ? segment.tags : window.CatHan.docx.detectProtectedTags(segment.source)
+        }));
+        const fallbackQa = () => Promise.resolve(window.CatHan.qa.runQaChecks(qaSegments, termRecords));
+        const qaIssues = window.CatHan.workerClient?.runQaChecks
+          ? await window.CatHan.workerClient.runQaChecks({ segments: qaSegments, terms: termRecords, fallback: fallbackQa })
+          : await fallbackQa();
+        assert(!qaIssues.some((issue) => issue.severity === "error"), "large project QA has no blocking errors");
+
+        const analysis = window.CatHan.analysis.analyzeProject(project, finalSegments, tmEntries);
+        assert(
+          analysis.totals.segments === SEGMENT_COUNT &&
+            analysis.totals.confirmed > 700 &&
+            analysis.totals.repetitions > 80 &&
+            analysis.totals.comments > 20,
+          "large project analysis counts progress, repetitions, and review notes"
+        );
+
+        const exportReport = window.CatHan.validation.validateExportReadiness({
+          project,
+          segments: finalSegments,
+          documentInfo: project.documents[0],
+          format: "txt",
+          terms: termRecords
+        });
+        assert(exportReport.ok && !exportReport.risky.length, "large project delivery validation stays clean");
+
+        const activity = await window.CatHan.storage.recordActivityEvent({
+          projectId: project.id,
+          type: "large-project-test",
+          summary: "Large project scale fixture saved",
+          detail: { documentId, segmentCount: SEGMENT_COUNT }
+        });
+        const pkg = {
+          app: "LoopCAT",
+          type: "project-package",
+          version: 1,
+          schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION,
+          exportedAt: now,
+          packageMetadata: {
+            format: "loopcat-project-package",
+            packageVersion: 1,
+            contractVersion: "loopcat-package-v1",
+            generator: "LoopCAT large project test",
+            storageMode: "browser-cache"
+          },
+          project,
+          segments: finalSegments,
+          resources: {
+            tmEntries,
+            terms: termRecords
+          },
+          resourceReferences: [
+            { id: `${project.id}-tm`, type: "tm", name: tmName, role: "main", sourceLang: project.sourceLang, targetLang: project.targetLang },
+            { id: `${project.id}-tb`, type: "termbase", name: tbName, role: "", sourceLang: project.sourceLang, targetLang: project.targetLang }
+          ],
+          sourceAssets: [{
+            id: documentId,
+            name: "large-academic-project.txt",
+            type: "text",
+            originalAvailable: false,
+            structurePreserved: true
+          }],
+          activityEvents: [activity]
+        };
+        const packageReport = window.CatHan.validation.validateProjectPackage(pkg);
+        pkg.validation = packageReport;
+        pkg.validationReports = { package: packageReport };
+        assert(packageReport.ok, `large project package validates (${packageReport.errors.join("; ")})`);
+        const packageJson = JSON.stringify(pkg);
+        assert(packageJson.length < MAX_WORKSPACE_JSON_BYTES, "large project package stays under workspace JSON safety limit");
+
+        const workspace = window.CatHan.workspaceStorage;
+        const connected = await workspace.connectHandle(root, { persist: false });
+        assert(connected.connected && connected.mode === "workspace-folder", "large project workspace folder connects");
+        const savedPackage = await workspace.saveProjectPackage(pkg);
+        const savedPackageJson = readPath(root, savedPackage.packagePath);
+        const savedWorkspacePackage = JSON.parse(savedPackageJson);
+        assert(savedWorkspacePackage.segments.length === SEGMENT_COUNT && savedWorkspacePackage.packageMetadata.storageMode === "workspace-folder", "large project workspace package saves visibly");
+        const health = await workspace.buildHealthReport({
+          projects: [project],
+          tmEntries,
+          terms: termRecords,
+          dirtyProjectIds: [project.id]
+        });
+        assert(health.ok && health.warnings.some((warning) => warning.includes("unsaved folder changes")), "large project workspace health reports dirty packages");
+
+        const backupData = {
+          app: "LoopCAT",
+          schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION,
+          exportedAt: now,
+          projects: [project],
+          segments: finalSegments,
+          tmEntries,
+          terms: termRecords,
+          activityEvents: [activity]
+        };
+        const backupReport = window.CatHan.validation.validateBackupFile(backupData);
+        assert(backupReport.ok, "large project backup data validates");
+        const backupRef = await workspace.exportFullBackup(backupData);
+        const manifest = JSON.parse(readPath(root, workspace.MANIFEST_FILE));
+        assert(backupRef.segmentCount === SEGMENT_COUNT && manifest.backups.length >= 1, "large project workspace backup records segment count");
+
+        await window.CatHan.project.deleteProject(project.id);
+        await Promise.all([
+          window.CatHan.storage.deleteWhere("tmEntries", (entry) => entry.tmName === tmName && entry.projectName === project.name),
+          window.CatHan.storage.deleteWhere("terms", (term) => term.termBaseName === tbName && term.sourceLang === project.sourceLang && term.targetLang === project.targetLang),
+          window.CatHan.storage.deleteWhere("tmTokenIndex", (record) => String(record.tmEntryId || "").startsWith(`tm-${testId}-`))
+        ]);
+
+        const resultText = `LARGE PROJECT TEST PASS\n${out.join("\n")}`;
+        document.querySelector("#results").textContent = resultText;
+        window.parent?.postMessage({ type: "loopcat-test-result", name: "Large project", text: resultText }, "*");
+      })().catch((error) => {
+        const resultText = `LARGE PROJECT TEST FAIL\n${error.stack || error.message}`;
+        document.querySelector("#results").textContent = resultText;
+        window.parent?.postMessage({ type: "loopcat-test-result", name: "Large project", text: resultText }, "*");
+      });
+    </script>
+  </body>
+</html>

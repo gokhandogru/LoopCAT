@@ -1,0 +1,909 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self' https://api.openai.com/v1/responses https://api.openai.com/v1/models https://generativelanguage.googleapis.com https://api.anthropic.com https://api.cohere.com https://*.openai.azure.com https://*.services.ai.azure.com https://ollama.com https://api.deepseek.com https://api.mistral.ai https://api.x.ai https://api.perplexity.ai https://api.groq.com https://api.together.ai https://openrouter.ai https://router.huggingface.co https://api.deepinfra.com https://api.fireworks.ai http://localhost:11434 http://127.0.0.1:11434 http://localhost:1234 http://127.0.0.1:1234; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <title>LoopCAT</title>
+    <meta name="theme-color" content="#202936">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./icons/loopcat-icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">L</div>
+          <div>
+            <h1>LoopCAT</h1>
+            <p>Local translation editor</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span id="saveStatus" class="save-status">Saved</span>
+          <button id="projectsViewBtn">Projects</button>
+          <button id="resourcesViewBtn">Resources</button>
+          <details class="menu workspace-menu">
+            <summary id="workspaceMenuSummary">Workspace</summary>
+            <div class="menu-panel workspace-menu-panel">
+              <div id="workspaceHealth" class="workspace-health"></div>
+              <button id="chooseWorkspaceBtn" type="button">Choose folder</button>
+              <button id="saveWorkspaceProjectBtn" type="button">Save project package</button>
+              <button id="syncWorkspaceBtn" type="button">Sync from folder</button>
+              <button id="workspaceBackupBtn" type="button">Export workspace backup</button>
+              <button id="repairWorkspaceBtn" type="button">Repair links</button>
+              <label class="menu-item">
+                Import project
+                <input id="projectPackageImportInput" type="file" accept="application/json,.json,.loopcat,.cathan">
+              </label>
+              <button id="backupExportBtn" type="button">Export browser backup</button>
+              <label class="menu-item">
+                Restore browser backup
+                <input id="backupImportInput" type="file" accept="application/json,.json">
+              </label>
+            </div>
+          </details>
+          <button id="newProjectBtn" class="primary">New project</button>
+        </div>
+      </header>
+
+      <main id="workspace" class="workspace projects-mode">
+        <aside class="project-rail">
+          <div class="panel-header">
+            <h2>Projects</h2>
+          </div>
+          <div id="projectList" class="project-list"></div>
+        </aside>
+
+        <section class="editor-area">
+          <section id="workspaceRecoveryPanel" class="workspace-recovery hidden" aria-live="polite">
+            <div>
+              <h3>Workspace packages need saving</h3>
+              <p id="workspaceRecoveryMessage"></p>
+              <ul id="workspaceRecoveryList"></ul>
+            </div>
+            <div class="toolbar-actions">
+              <button id="workspaceRecoverySaveBtn" class="primary" type="button">Save packages</button>
+              <button id="workspaceRecoveryOpenBtn" type="button">Workspace menu</button>
+              <button id="workspaceRecoveryDismissBtn" type="button">Dismiss</button>
+            </div>
+          </section>
+
+          <section id="backupReminderPanel" class="backup-reminder hidden" aria-live="polite">
+            <div>
+              <h3>Backup reminder</h3>
+              <p id="backupReminderMessage"></p>
+            </div>
+            <div class="toolbar-actions">
+              <button id="backupReminderExportBtn" class="primary" type="button">Export project</button>
+              <button id="backupReminderDismissBtn" type="button">Remind later</button>
+            </div>
+          </section>
+
+          <div id="projectsView" class="projects-view">
+            <div class="projects-header">
+              <div>
+                <h2>Projects</h2>
+                <p>Manage local translation projects across language pairs.</p>
+              </div>
+              <button id="newProjectFromDashboardBtn" class="primary">New project</button>
+            </div>
+
+            <div class="project-filters">
+              <input id="projectSearchInput" placeholder="Search projects">
+              <select id="languagePairFilter">
+                <option value="">All language pairs</option>
+              </select>
+            </div>
+
+            <div id="projectDashboard" class="project-dashboard"></div>
+          </div>
+
+          <div id="resourcesView" class="resources-view hidden">
+            <div class="resources-header">
+              <div>
+                <h2>Resources</h2>
+                <p>Manage translation memories and termbases across all projects.</p>
+              </div>
+            </div>
+
+            <div class="resource-tabs">
+              <button id="tmResourceTab" class="active" type="button">Translation memories</button>
+              <button id="tbResourceTab" type="button">Termbases</button>
+            </div>
+
+            <section id="tmResourcesPanel" class="resource-panel">
+              <div class="resource-import-row">
+                <input id="tmResourceNameInput" placeholder="TM name">
+                <input id="tmResourceSourceLangInput" placeholder="Source" value="en" list="languageOptions" autocomplete="off">
+                <input id="tmResourceTargetLangInput" placeholder="Target" value="tr" list="languageOptions" autocomplete="off">
+                <label class="file-button">
+                  Import TMX
+                  <input id="resourceTmxImportInput" type="file" accept=".tmx,application/xml,text/xml">
+                </label>
+              </div>
+              <div id="tmResourceDashboard" class="resource-dashboard"></div>
+              <div id="tmResourceDetail" class="resource-detail hidden"></div>
+            </section>
+
+            <section id="tbResourcesPanel" class="resource-panel hidden">
+              <div class="resource-import-row">
+                <input id="tbResourceNameInput" placeholder="TB name">
+                <input id="tbResourceSourceLangInput" placeholder="Source" value="en" list="languageOptions" autocomplete="off">
+                <input id="tbResourceTargetLangInput" placeholder="Target" value="tr" list="languageOptions" autocomplete="off">
+                <label class="file-button">
+                  Import TBX
+                  <input id="resourceTbxImportInput" type="file" accept=".tbx,application/xml,text/xml">
+                </label>
+                <label class="file-button">
+                  Import CSV/TSV/XLSX
+                  <input id="resourceTermListImportInput" type="file" accept=".csv,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+                </label>
+              </div>
+              <div id="tbResourceDashboard" class="resource-dashboard"></div>
+              <div id="tbResourceDetail" class="resource-detail hidden"></div>
+            </section>
+          </div>
+
+          <div id="emptyState" class="empty-state hidden">
+            <h2>Create or open a project</h2>
+            <p>Everything stays in this browser on this computer.</p>
+          </div>
+
+          <section id="validationReportPanel" class="validation-report hidden">
+            <div class="analysis-header">
+              <h3>Validation report</h3>
+              <span id="validationReportMeta"></span>
+            </div>
+            <div id="validationReportList"></div>
+          </section>
+
+          <div id="projectHomeView" class="project-home-view hidden">
+            <div class="project-home-header">
+              <div>
+                <h2 id="projectHomeTitle">Project</h2>
+                <p id="projectHomeMeta"></p>
+              </div>
+              <div class="toolbar-actions">
+                <button id="projectSettingsBtn" type="button">Project settings</button>
+                <button id="projectFileImportBtn">Import files</button>
+                <input id="projectFileImportInput" type="file" multiple accept=".docx,.docm,.dotx,.dotm,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.xlsx,.xlsm,.xltx,.xltm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.pptx,.pptm,.ppsx,.ppsm,.potx,.potm,application/vnd.openxmlformats-officedocument.presentationml.presentation,.odp,.otp,.ods,.ots,.odt,.ott,application/vnd.oasis.opendocument.text,application/vnd.oasis.opendocument.spreadsheet,application/vnd.oasis.opendocument.presentation,.html,.htm,.xhtml,text/html,application/xhtml+xml,.md,.markdown,text/markdown,text/x-markdown,.xlf,.xliff,.sdlxliff,application/x-xliff+xml,.po,.pot,.ttx,.txml,.xini,.mif,.idml,.icml,.dita,application/vnd.adobe.indesign-idml-package,.csv,text/csv,.tsv,text/tab-separated-values,.xml,.dtd,application/xml,text/xml,.json,.yaml,.yml,.php,.properties,.ts,.resx,.wix,.strings,.srt,.vtt,.sbv,.txt,text/plain">
+                <button id="projectPackageExportBtn">Export project</button>
+                <button id="projectHomeDeleteBtn" class="danger-small">Delete project</button>
+              </div>
+            </div>
+
+            <div id="projectHomeStats" class="project-home-stats"></div>
+            <section class="analysis-panel">
+              <div class="analysis-header">
+                <h3>Project analysis</h3>
+                <span id="analysisMeta"></span>
+              </div>
+              <div id="projectAnalysis" class="analysis-grid"></div>
+            </section>
+            <div class="file-list-header">
+              <h3>Files</h3>
+              <span id="fileCountText"></span>
+            </div>
+            <div id="projectFileList" class="project-file-list"></div>
+          </div>
+
+          <div id="editorView" class="editor-view hidden">
+            <div class="project-toolbar">
+              <div>
+                <h2 id="projectTitle">Untitled project</h2>
+                <p id="projectMeta"></p>
+              </div>
+              <div class="toolbar-actions">
+                <button id="projectFilesBtn">Files</button>
+                <button id="editorProjectSettingsBtn" type="button">Settings</button>
+                <details class="menu">
+                  <summary>Import</summary>
+                  <div class="menu-panel">
+                    <label class="menu-item encoding-menu-item">
+                      <span>Text encoding</span>
+                      <select id="fileEncodingSelect"></select>
+                    </label>
+                    <label class="menu-item">
+                      DOCX source
+                      <input id="docxInput" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                    </label>
+                    <label class="menu-item import-format-card" title="Office, OpenDocument, HTML/XHTML, Markdown, XLIFF/SDLXLIFF, PO, TTX, TXML, XINI, IDML, ICML, MIF, DITA, CSV/TSV, XML, DTD, JSON, YAML, PHP, properties, TS, RESX, WiX, strings, SRT, VTT, SBV, TXT">
+                      <span class="import-format-main">Other formats</span>
+                      <span class="import-format-sub">Office, OpenDocument, XML, resources, subtitles, text</span>
+                      <span class="import-format-chips" aria-hidden="true">
+                        <span>Office</span>
+                        <span>XLIFF</span>
+                        <span>DTP</span>
+                        <span>Code</span>
+                        <span>Subs</span>
+                      </span>
+                      <input id="localizationInput" type="file" accept=".docm,.dotx,.dotm,.xlsx,.xlsm,.xltx,.xltm,.pptx,.pptm,.ppsx,.ppsm,.potx,.potm,.odp,.otp,.ods,.ots,.odt,.ott,.html,.htm,.xhtml,text/html,application/xhtml+xml,.md,.markdown,text/markdown,text/x-markdown,.xlf,.xliff,.sdlxliff,application/x-xliff+xml,.po,.pot,.ttx,.txml,.xini,.mif,.idml,.icml,.dita,application/vnd.adobe.indesign-idml-package,.csv,text/csv,.tsv,text/tab-separated-values,.xml,.dtd,application/xml,text/xml,.json,.yaml,.yml,.php,.properties,.ts,.resx,.wix,.strings,.srt,.vtt,.sbv,.txt,text/plain">
+                    </label>
+                  </div>
+                </details>
+                <button id="confirmBtn" class="primary" title="Confirm current segment">Confirm</button>
+                <details class="menu">
+                  <summary>Actions</summary>
+                  <div class="menu-panel">
+                    <button id="saveTmBtn" type="button">Save target to TM</button>
+                    <button id="pretranslateBtn" type="button">Pretranslate from TM</button>
+                    <button id="copySourceBtn" type="button">Copy source</button>
+                    <button id="splitSegmentBtn" type="button">Split segment</button>
+                    <button id="mergeNextBtn" type="button">Merge with next</button>
+                    <button id="runQaBtn" type="button">Run QA checks</button>
+                    <button id="commandPaletteBtn" type="button">Command palette</button>
+                  </div>
+                </details>
+                <details class="menu">
+                  <summary>Export</summary>
+                  <div class="menu-panel">
+                    <button id="exportDocxBtn">Target DOCX</button>
+                    <button id="exportBilingualDocxBtn">Bilingual DOCX</button>
+                    <button id="exportLocalizationBtn">Current file</button>
+                    <button id="exportXliffBtn">XLIFF</button>
+                    <button id="exportTargetBtn">Target TXT</button>
+                    <button id="exportProjectReportBtn">Project report</button>
+                    <button id="exportAnonymizedProjectReportBtn">Anonymized report</button>
+                  </div>
+                </details>
+              </div>
+            </div>
+
+            <div class="progress-wrap">
+              <div class="progress-label">
+                <span id="progressText">0 of 0 confirmed</span>
+                <span id="wordCountText">0 words</span>
+              </div>
+              <div class="progress-bar"><div id="progressFill"></div></div>
+            </div>
+
+            <div class="segment-controls">
+              <select id="documentFilter">
+                <option value="">All documents</option>
+              </select>
+              <input id="segmentSearchInput" placeholder="Find in source or target">
+              <select id="segmentSearchScope">
+                <option value="both">Source and target</option>
+                <option value="source">Source only</option>
+                <option value="target">Target only</option>
+              </select>
+              <label class="checkbox-row compact-checkbox">
+                <input id="segmentRegexInput" type="checkbox">
+                Regex
+              </label>
+              <label class="checkbox-row compact-checkbox">
+                <input id="segmentCaseInput" type="checkbox">
+                Case
+              </label>
+              <details id="replaceMenu" class="menu replace-menu">
+                <summary>Replace</summary>
+                <div class="menu-panel replace-panel">
+                  <input id="replaceFindInput" placeholder="Find target text">
+                  <input id="replaceWithInput" placeholder="Replace with">
+                  <button id="replaceVisibleBtn" type="button">Replace visible targets</button>
+                  <button id="replaceAllBtn" type="button">Replace all targets</button>
+                </div>
+              </details>
+              <select id="segmentStatusFilter">
+                <option value="all">All segments</option>
+                <option value="open">Open segments</option>
+                <option value="empty">Empty</option>
+                <option value="draft">Draft</option>
+                <option value="confirmed">Confirmed</option>
+              </select>
+              <select id="reviewStateFilter">
+                <option value="">All review</option>
+                <option value="needs-review">Needs review</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="blocked">Blocked</option>
+                <option value="comments">With notes</option>
+              </select>
+              <select id="aiSegmentFilter">
+                <option value="">All AI</option>
+                <option value="ai-draft">AI initiated</option>
+                <option value="ai-suggestions">AI suggestions</option>
+                <option value="ai-review-risk">AI review risk</option>
+                <option value="high-ai-risk">High AI risk</option>
+              </select>
+              <button id="nextOpenBtn">Next open</button>
+            </div>
+
+            <div class="segment-grid-wrap">
+              <table class="segment-grid">
+                <thead>
+                  <tr>
+                    <th class="num-col">#</th>
+                    <th>Source</th>
+                    <th>Target</th>
+                    <th class="status-col">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="segmentBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <aside class="sidebar">
+          <section class="side-panel tm-panel" data-collapsible-panel>
+            <div class="panel-header">
+              <div class="panel-title">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize TM matches" aria-expanded="true">
+                  <span class="toggle-arrow" aria-hidden="true"></span>
+                </button>
+                <h2>TM matches</h2>
+              </div>
+              <div class="mini-actions">
+                <details class="menu resource-mini-menu">
+                  <summary>Files</summary>
+                  <div class="menu-panel">
+                    <label class="menu-item">
+                      Import TMX
+                      <input id="tmxImportInput" type="file" accept=".tmx,application/xml,text/xml">
+                    </label>
+                    <button id="tmxExportBtn" type="button">Export TMX</button>
+                  </div>
+                </details>
+              </div>
+            </div>
+            <div class="panel-content">
+              <div id="tmMatches" class="result-list muted">No active segment.</div>
+            </div>
+          </section>
+
+          <section class="side-panel tb-panel" data-collapsible-panel>
+            <div class="panel-header">
+              <div class="panel-title">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize terms" aria-expanded="true">
+                  <span class="toggle-arrow" aria-hidden="true"></span>
+                </button>
+                <h2>Terms</h2>
+              </div>
+              <div class="mini-actions">
+                <details class="menu resource-mini-menu">
+                  <summary>Files</summary>
+                  <div class="menu-panel">
+                    <label class="menu-item">
+                      Import TBX
+                      <input id="tbxImportInput" type="file" accept=".tbx,application/xml,text/xml">
+                    </label>
+                    <label class="menu-item">
+                      Import CSV/TSV/XLSX
+                      <input id="termListImportInput" type="file" accept=".csv,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+                    </label>
+                    <button id="tbxExportBtn" type="button">Export TBX</button>
+                  </div>
+                </details>
+              </div>
+            </div>
+            <div class="panel-content">
+              <div id="termSuggestions" class="result-list muted">No terms yet.</div>
+              <form id="termForm" class="term-form">
+                <select id="termBaseSelect" aria-label="Termbase"></select>
+                <input id="sourceTermInput" placeholder="Source term">
+                <input id="targetTermInput" placeholder="Target term">
+                <input id="termNotesInput" placeholder="Notes">
+                <label class="checkbox-row term-forbidden-row">
+                  <input id="termForbiddenInput" type="checkbox">
+                  Forbidden target
+                </label>
+                <button type="submit">Add term</button>
+              </form>
+            </div>
+          </section>
+
+          <section class="side-panel review-panel" data-collapsible-panel>
+            <div class="panel-header">
+              <div class="panel-title">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize review" aria-expanded="true">
+                  <span class="toggle-arrow" aria-hidden="true"></span>
+                </button>
+                <h2>Review</h2>
+              </div>
+            </div>
+            <div class="panel-content">
+              <form id="reviewForm" class="review-form empty-review">
+                <select id="reviewStateSelect" aria-label="Review state">
+                  <option value="">No review state</option>
+                  <option value="needs-review">Needs review</option>
+                  <option value="reviewed">Reviewed</option>
+                  <option value="blocked">Blocked</option>
+                </select>
+                <textarea id="reviewNoteInput" rows="3" placeholder="Review note"></textarea>
+                <textarea id="reviewCommentInput" rows="3" placeholder="Add comment"></textarea>
+                <button type="submit">Save review</button>
+              </form>
+              <div id="reviewCommentsList" class="comment-list muted">No active segment.</div>
+            </div>
+          </section>
+
+          <section class="side-panel project-card utility-panel collapsed" data-collapsible-panel>
+            <div class="panel-header">
+              <div class="panel-title">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Expand Project info" aria-expanded="false">
+                  <span class="toggle-arrow" aria-hidden="true"></span>
+                </button>
+                <h2>Project info</h2>
+              </div>
+            </div>
+            <div class="panel-content">
+              <form id="domainForm" class="domain-form">
+                <input id="projectDomainEditInput" placeholder="Domain">
+                <button type="submit">Save</button>
+              </form>
+              <dl id="projectInfo"></dl>
+            </div>
+          </section>
+
+          <section class="side-panel revision-panel utility-panel collapsed" data-collapsible-panel>
+            <div class="panel-header">
+              <div class="panel-title">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Expand revision history" aria-expanded="false">
+                  <span class="toggle-arrow" aria-hidden="true"></span>
+                </button>
+                <h2>Revision history</h2>
+              </div>
+            </div>
+            <div class="panel-content">
+              <div id="revisionHistoryList" class="revision-history-list muted">No active segment.</div>
+            </div>
+          </section>
+
+          <section class="side-panel ai-panel utility-panel collapsed" data-collapsible-panel>
+            <div class="panel-header">
+              <div class="panel-title">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Expand AI settings" aria-expanded="false">
+                  <span class="toggle-arrow" aria-hidden="true"></span>
+                </button>
+                <h2>AI Command Centre</h2>
+              </div>
+            </div>
+            <div class="panel-content">
+              <form id="aiSettingsForm" class="ai-settings-form">
+                <section class="local-ai-centre">
+                  <p id="localAiPrivacyNote" class="ai-privacy-note">Local AI requests are sent only to the provider URL below. Ollama is the default local provider.</p>
+                  <div class="local-ai-group local-ai-primary-group">
+                    <h3><span class="local-ai-section-number">1</span> Connect provider</h3>
+                    <label>
+                      Provider preset
+                      <select id="localAiPresetSelect">
+                        <option value="custom">Custom provider</option>
+                      </select>
+                    </label>
+                    <label>
+                      Base URL
+                      <input id="localAiBaseUrlInput" value="http://localhost:11434" autocomplete="off">
+                    </label>
+                    <div class="local-ai-actions">
+                      <button id="localAiTestBtn" type="button">Test connection</button>
+                      <button id="localAiStartLmStudioBtn" class="hidden" type="button">Start LM Studio server</button>
+                      <button id="localAiRefreshModelsBtn" type="button">Refresh models</button>
+                    </div>
+                    <div id="localAiStatus" class="local-ai-status disconnected">
+                      <span class="local-ai-status-dot" aria-hidden="true"></span>
+                      <span id="localAiStatusText">Disconnected</span>
+                    </div>
+                    <details class="local-ai-inline-details" id="localAiProviderDetails">
+                      <summary>Advanced provider options</summary>
+                    <label>
+                      Provider
+                      <select id="localAiProviderSelect">
+                        <optgroup label="Local and Ollama">
+                          <option value="ollama">Ollama</option>
+                          <option value="openai-compatible">LM Studio / OpenAI-compatible</option>
+                        </optgroup>
+                        <optgroup label="Hosted providers">
+                          <option value="openai">OpenAI</option>
+                          <option value="deepseek">DeepSeek</option>
+                          <option value="gemini">Google Gemini</option>
+                          <option value="anthropic">Anthropic Claude</option>
+                          <option value="cohere">Cohere Command</option>
+                          <option value="mistral">Mistral AI</option>
+                          <option value="xai">xAI Grok</option>
+                          <option value="perplexity">Perplexity Sonar</option>
+                        </optgroup>
+                        <optgroup label="Hosted routers">
+                          <option value="groq">Groq</option>
+                          <option value="together">Together AI</option>
+                          <option value="openrouter">OpenRouter</option>
+                          <option value="huggingface">Hugging Face Inference Providers</option>
+                          <option value="deepinfra">DeepInfra</option>
+                          <option value="fireworks">Fireworks AI</option>
+                        </optgroup>
+                        <optgroup label="Managed deployments">
+                          <option value="azure-openai">Azure OpenAI</option>
+                        </optgroup>
+                      </select>
+                    </label>
+                    <div class="local-ai-actions">
+                      <button id="localAiLocalCloudPresetBtn" type="button">Use local cloud model</button>
+                      <button id="localAiCloudPresetBtn" type="button">Use hosted Ollama</button>
+                    </div>
+                    <div id="localAiProviderSummary" class="local-ai-provider-summary" aria-live="polite"></div>
+                    </details>
+                    <div id="localAiHostedKeyControls" class="local-ai-key-controls hidden">
+                    <input id="localAiApiKeyInput" type="password" placeholder="Hosted provider API key; OpenAI can reuse saved OpenAI key">
+                    <label class="checkbox-row">
+                      <input id="rememberLocalAiKeyInput" type="checkbox">
+                      Remember hosted key in this browser
+                    </label>
+                    <button id="clearLocalAiKeyBtn" type="button">Clear hosted key</button>
+                    </div>
+                  </div>
+                  <div class="local-ai-group local-ai-primary-group">
+                    <h3><span class="local-ai-section-number">2</span> Choose model</h3>
+                    <label>
+                      Installed model
+                      <select id="localAiModelSelect">
+                        <option value="">Refresh models</option>
+                      </select>
+                    </label>
+                    <label>
+                      Model name
+                      <input id="localAiModelInput" value="translategemma" autocomplete="off">
+                    </label>
+                    <div id="localAiPullModelWrap" class="local-ai-actions">
+                    <button id="localAiPullModelBtn" type="button">Pull translategemma</button>
+                    </div>
+                  </div>
+                  <div class="local-ai-group local-ai-primary-group">
+                    <h3><span class="local-ai-section-number">3</span> Pre-translate</h3>
+                    <div class="local-ai-language-grid">
+                      <label>
+                        Source language
+                        <input id="localAiSourceLangInput" autocomplete="off" list="languageNameOptions">
+                      </label>
+                      <label>
+                        Source code
+                        <input id="localAiSourceCodeInput" autocomplete="off" list="languageCodeOptions">
+                      </label>
+                      <label>
+                        Target language
+                        <input id="localAiTargetLangInput" autocomplete="off" list="languageNameOptions">
+                      </label>
+                      <label>
+                        Target code
+                        <input id="localAiTargetCodeInput" autocomplete="off" list="languageCodeOptions">
+                      </label>
+                    </div>
+                    <label>
+                      Scope
+                      <select id="localAiModeSelect">
+                        <option value="selected">Selected segment only</option>
+                        <option value="untranslated">Untranslated segments only</option>
+                        <option value="visible">All visible segments</option>
+                        <option value="project">All project segments</option>
+                      </select>
+                    </label>
+                    <p class="local-ai-safeguard">Confirmed and locked segments are preserved. Existing target text is skipped unless overwrite is enabled.</p>
+                    <div class="local-ai-actions local-ai-run-actions">
+                      <button id="localAiPretranslateBtn" class="primary" type="button">Pre-translate</button>
+                      <button id="localAiCancelBtn" type="button" disabled>Cancel</button>
+                    </div>
+                    <div id="localAiProgress" class="local-ai-progress">No local AI batch running.</div>
+                    <details class="local-ai-inline-details" id="localAiAdvancedSettings">
+                      <summary>Advanced batch settings</summary>
+                    <div class="local-ai-language-grid">
+                      <label>
+                        Concurrency
+                        <input id="localAiConcurrencyInput" type="number" min="1" max="2" step="1">
+                      </label>
+                      <label>
+                        Timeout ms
+                        <input id="localAiTimeoutInput" type="number" min="5000" step="1000">
+                      </label>
+                    </div>
+                    <label class="checkbox-row">
+                      <input id="localAiOverwriteInput" type="checkbox">
+                      Overwrite existing target text
+                    </label>
+                    <label class="checkbox-row">
+                      <input id="localAiIncludeContextInput" type="checkbox" checked>
+                      Include nearby segment context
+                    </label>
+                    <label class="checkbox-row">
+                      <input id="localAiPreserveConfirmedInput" type="checkbox" checked disabled>
+                      Confirmed and locked segments are always preserved
+                    </label>
+                    </details>
+                  </div>
+                  <details class="local-ai-group local-ai-drawer">
+                    <summary>
+                      <span>Prompt test</span>
+                      <small>Preview and test one command</small>
+                    </summary>
+                    <label>
+                      Prompt type
+                      <select id="localAiPromptModeSelect">
+                        <option value="pretranslate">Pre-translation</option>
+                        <option value="review">Review / QA</option>
+                        <option value="tag-repair">Tag repair</option>
+                        <option value="polish">Polish draft</option>
+                        <option value="adapt">Adapt draft</option>
+                        <option value="variants">Alternatives</option>
+                        <option value="apply-terms">Apply terminology</option>
+                        <option value="extract-terms">Extract terminology</option>
+                        <option value="project-brief">Project brief</option>
+                      </select>
+                    </label>
+                    <label>
+                      Prompt test source
+                      <textarea id="localAiSampleInput" rows="3" placeholder="Use active segment source"></textarea>
+                    </label>
+                    <label>
+                      Prompt preview
+                      <textarea id="localAiPromptPreview" rows="5" readonly></textarea>
+                    </label>
+                    <button id="localAiPromptTestBtn" type="button">Test prompt</button>
+                  </details>
+                  <details class="local-ai-group local-ai-drawer">
+                    <summary>
+                      <span>Review and repair</span>
+                      <small>QA comments and tag fixes</small>
+                    </summary>
+                    <div class="local-ai-command-grid">
+                      <button id="localAiReviewSegmentBtn" type="button">AI review active segment</button>
+                      <button id="localAiReviewBatchBtn" type="button">AI QA batch</button>
+                      <button id="localAiRepairTagsBtn" type="button">Suggest tag repair</button>
+                      <button id="localAiRepairTagsBatchBtn" type="button">Repair tags batch</button>
+                    </div>
+                  </details>
+                  <details class="local-ai-group local-ai-drawer">
+                    <summary>
+                      <span>Draft editing</span>
+                      <small>Polish, adapt, and compare</small>
+                    </summary>
+                    <label>
+                      Adaptation
+                      <select id="localAiAdaptModeSelect">
+                        <option value="simplify">Simplify / clarify</option>
+                        <option value="formalize">Formalize</option>
+                        <option value="localize">Locale-adapt</option>
+                        <option value="shorten">Shorten</option>
+                      </select>
+                    </label>
+                    <div class="local-ai-command-grid">
+                      <button id="localAiPolishDraftBtn" type="button">Polish draft</button>
+                      <button id="localAiPolishBatchBtn" type="button">Polish drafts batch</button>
+                      <button id="localAiAdaptDraftBtn" type="button">Adapt draft</button>
+                      <button id="localAiAdaptBatchBtn" type="button">Adapt drafts batch</button>
+                    </div>
+                    <label>
+                      Alternative style
+                      <select id="localAiVariantModeSelect">
+                        <option value="standard">Literal, fluent, terminology-strict</option>
+                        <option value="formal">Formal</option>
+                        <option value="concise">Concise / UI</option>
+                        <option value="locale">Locale-adapted</option>
+                        <option value="plain">Plain language</option>
+                      </select>
+                    </label>
+                    <div class="local-ai-command-grid">
+                      <button id="localAiSuggestVariantsBtn" type="button">Suggest alternatives</button>
+                      <button id="localAiSuggestVariantsBatchBtn" type="button">Suggest alternatives batch</button>
+                    </div>
+                  </details>
+                  <details class="local-ai-group local-ai-drawer">
+                    <summary>
+                      <span>Terminology</span>
+                      <small>Apply or extract project terms</small>
+                    </summary>
+                    <div class="local-ai-command-grid">
+                      <button id="localAiApplyTermsBtn" type="button">Apply terms</button>
+                      <button id="localAiApplyTermsBatchBtn" type="button">Apply terms batch</button>
+                      <button id="localAiExtractTermsBtn" type="button">Extract terms</button>
+                      <button id="localAiExtractTermsBatchBtn" type="button">Extract terms batch</button>
+                    </div>
+                  </details>
+                  <details class="local-ai-group local-ai-drawer">
+                    <summary>
+                      <span>Project context</span>
+                      <small>Generate reusable guidance</small>
+                    </summary>
+                    <div class="local-ai-command-grid">
+                      <button id="localAiProjectBriefBtn" type="button">Generate project brief</button>
+                    </div>
+                  </details>
+                  <details class="local-ai-group local-ai-drawer local-ai-output-drawer" id="localAiOutputDrawer">
+                    <summary>
+                      <span>Latest AI output</span>
+                      <small>Results from optional tools</small>
+                    </summary>
+                  <div id="localAiPromptOutput" class="ai-suggestion-list muted">No local AI output yet.</div>
+                  </details>
+                </section>
+                <details class="cloud-ai-settings local-ai-group local-ai-drawer">
+                  <summary>
+                    <span>Cloud suggestion</span>
+                    <small>Optional OpenAI helper</small>
+                  </summary>
+                <label class="checkbox-row">
+                  <input id="aiEnabledInput" type="checkbox">
+                  Enable AI helpers for this project
+                </label>
+                <input id="aiProviderInput" placeholder="Provider, e.g. OpenAI, Anthropic, local">
+                <input id="aiModelInput" placeholder="Model name" value="gpt-5.5">
+                <input id="openAiApiKeyInput" type="password" placeholder="OpenAI API key">
+                <label class="checkbox-row">
+                  <input id="rememberOpenAiKeyInput" type="checkbox">
+                  Remember key in this browser
+                </label>
+                <button id="clearOpenAiKeyBtn" type="button">Clear saved key</button>
+                <p id="aiConnectionStatus" class="ai-privacy-note">API keys stay in this browser and are never exported with project packages.</p>
+                <label class="checkbox-row">
+                  <input id="aiSendSourceInput" type="checkbox">
+                  Allow source text to be sent to AI
+                </label>
+                <label class="checkbox-row">
+                  <input id="aiUseTmInput" type="checkbox">
+                  Include TM context
+                </label>
+                <label class="checkbox-row">
+                  <input id="aiUseTbInput" type="checkbox">
+                  Include termbase context
+                </label>
+                <textarea id="aiStyleGuideInput" rows="4" placeholder="Project style instructions"></textarea>
+                <button id="openAiSuggestionBtn" type="button">OpenAI suggestion</button>
+                <div id="aiSuggestionList" class="ai-suggestion-list muted">No AI suggestions yet.</div>
+                </details>
+                <button type="submit">Save AI settings</button>
+              </form>
+            </div>
+          </section>
+
+          <section class="side-panel" data-collapsible-panel>
+            <div class="panel-header">
+              <div class="panel-title">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize QA checks" aria-expanded="true">
+                  <span class="toggle-arrow" aria-hidden="true"></span>
+                </button>
+                <h2>QA checks</h2>
+              </div>
+            </div>
+            <div class="panel-content">
+              <div id="qaResults" class="result-list muted">Run QA to check the project.</div>
+            </div>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <div id="concordanceOverlay" class="concordance-overlay hidden">
+      <section class="concordance-popover" role="dialog" aria-modal="false" aria-labelledby="concordanceTitle">
+        <header>
+          <div>
+            <h2 id="concordanceTitle">Concordance</h2>
+            <p id="concordanceMeta"></p>
+          </div>
+          <button id="closeConcordanceBtn" type="button" aria-label="Close concordance">Close</button>
+        </header>
+        <div id="concordanceResults" class="concordance-results"></div>
+      </section>
+    </div>
+
+    <div id="commandPaletteOverlay" class="command-palette-overlay hidden">
+      <section class="command-palette" role="dialog" aria-modal="true" aria-labelledby="commandPaletteTitle">
+        <header>
+          <h2 id="commandPaletteTitle">Commands</h2>
+          <button id="closeCommandPaletteBtn" type="button" aria-label="Close commands">Close</button>
+        </header>
+        <input id="commandPaletteInput" placeholder="Find command">
+        <div id="commandPaletteResults" class="command-results"></div>
+      </section>
+    </div>
+
+    <dialog id="projectDialog">
+      <form id="projectForm" method="dialog" class="dialog-card">
+        <h2 id="projectDialogTitle">New project</h2>
+        <label>
+          Project name
+          <input id="projectNameInput" required autocomplete="off">
+        </label>
+        <label>
+          Creator
+          <input id="projectCreatorInput" autocomplete="off" placeholder="Who created this project">
+        </label>
+        <label>
+          Domain
+          <input id="projectDomainInput" autocomplete="off" placeholder="Legal, medical, technical...">
+        </label>
+        <section class="language-pair-quick-picks" aria-label="Frequent language pairs">
+          <div class="resource-config-header">
+            <h3>Language pair</h3>
+          </div>
+          <div id="frequentLanguagePairs" class="language-pair-chip-list"></div>
+        </section>
+        <div class="two-col">
+          <label>
+            Source language
+            <input id="sourceLangInput" value="en" required list="languageOptions" autocomplete="off">
+          </label>
+          <label>
+            Target language
+            <input id="targetLangInput" value="tr" required list="languageOptions" autocomplete="off">
+          </label>
+        </div>
+        <section class="project-storage-config">
+          <div class="resource-config-header">
+            <h3>Project storage</h3>
+            <p id="projectStorageStatus">Default folder: Documents</p>
+          </div>
+          <div class="project-storage-row">
+            <label class="checkbox-row">
+              <input id="saveProjectToFolderInput" type="checkbox" checked>
+              Save this project as a visible package folder
+            </label>
+            <button id="projectChooseWorkspaceBtn" type="button">Choose folder</button>
+          </div>
+        </section>
+        <section class="project-resource-config">
+          <div class="resource-config-header">
+            <h3>Project resources</h3>
+            <p>Select resources already in Resources. New units are saved to the main TM.</p>
+          </div>
+          <div class="resource-picker-block">
+            <div class="resource-picker-title">
+              <strong>Translation memories</strong>
+              <span>Main</span>
+            </div>
+            <div id="projectTmResourceList" class="resource-option-list"></div>
+            <label>
+              New main TM
+              <input id="newTmNameInput" autocomplete="off" placeholder="Create a new project TM">
+            </label>
+          </div>
+          <div class="resource-picker-block">
+            <div class="resource-picker-title">
+              <strong>Termbases</strong>
+            </div>
+            <div id="projectTbResourceList" class="resource-option-list"></div>
+            <label>
+              New termbase
+              <input id="newTermBaseNameInput" autocomplete="off" placeholder="Create a new project termbase">
+            </label>
+          </div>
+        </section>
+        <div class="dialog-actions">
+          <button type="button" id="cancelProjectBtn">Cancel</button>
+          <button class="primary" value="default">Create</button>
+        </div>
+      </form>
+    </dialog>
+
+    <datalist id="languageOptions"></datalist>
+    <datalist id="languageCodeOptions"></datalist>
+    <datalist id="languageNameOptions"></datalist>
+
+    <template id="segmentRowTemplate">
+      <tr>
+        <td class="num-col"></td>
+        <td class="source-cell"></td>
+        <td class="target-cell">
+          <textarea rows="2" spellcheck="true" dir="auto"></textarea>
+          <div class="target-tag-preview hidden" aria-label="Target with protected tags"></div>
+        </td>
+        <td class="status-col"><span class="status-pill"></span></td>
+      </tr>
+    </template>
+
+    <script src="./storage.js"></script>
+    <script src="./workspace-storage.js"></script>
+    <script src="./docx.js"></script>
+    <script src="./tm.js"></script>
+    <script src="./termbase.js"></script>
+    <script src="./tmx.js"></script>
+    <script src="./tbx.js"></script>
+    <script src="./encoding.js"></script>
+    <script src="./xliff.js"></script>
+    <script src="./localization.js"></script>
+    <script src="./qa.js"></script>
+    <script src="./validation.js"></script>
+    <script src="./analysis.js"></script>
+    <script src="./ai.js"></script>
+    <script src="./worker-client.js"></script>
+    <script src="./project.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
