@@ -114,7 +114,9 @@ const requiredAppFiles = [
   "app.js",
   "desktop/main.cjs",
   "desktop/preload.cjs",
-  "README.md"
+  "README.md",
+  "LICENSE",
+  "NOTICE"
 ];
 
 const requiredDesktopIconFiles = [
@@ -183,6 +185,8 @@ const analysisJs = readText("analysis.js");
 const catWorkerJs = readText("cat-worker.js");
 const serviceWorker = readText("service-worker.js");
 const readme = readText("README.md");
+const license = readText("LICENSE");
+const notice = readText("NOTICE");
 const roadmap = readText("ROADMAP.md");
 const securityPolicyTest = readText("security-policy-test.html");
 const offlineShellTest = readText("offline-shell-test.html");
@@ -194,6 +198,8 @@ const testRunner = readText("test-runner.html");
 const desktopMain = readText("desktop/main.cjs");
 const desktopPreload = readText("desktop/preload.cjs");
 const desktopBuildScript = readText("scripts/build-desktop.cjs");
+const webBuildScript = readText("scripts/build-web.cjs");
+const webArtifactScript = readText("scripts/verify-web-artifact.cjs");
 const releaseProvenanceScript = readText("scripts/verify-release-provenance.cjs");
 const releaseProvenanceSelfTestScript = readText("scripts/verify-release-provenance-selftest.cjs");
 const signingEnvScript = readText("scripts/verify-signing-env.cjs");
@@ -259,6 +265,15 @@ assert(packageJson.scripts?.["verify:platform-signatures-selftest"] === "node sc
 assert(packageJson.scripts?.["verify:evidence"] === "node scripts/verify-release-evidence.cjs", "package.json verify:evidence script must validate completed release smoke evidence.");
 assert(packageJson.scripts?.["verify:evidence-selftest"] === "node scripts/verify-release-evidence-selftest.cjs", "package.json verify:evidence-selftest script must exercise release evidence verifier failure modes.");
 assert(packageJson.scripts?.["verify:checksums"] === "node scripts/verify-checksums.cjs", "package.json verify:checksums script must verify SHA-256 sums.");
+assert(packageJson.license === "Apache-2.0", "package.json license must publish LoopCAT under Apache-2.0.");
+assert(packageJson.author?.name === "Dr. Gokhan Dogru", "package.json author must credit Dr. Gokhan Dogru.");
+assert(packageJson.author?.url === "https://www.linkedin.com/in/gokhan-dogru-localization/", "package.json author URL must link Dr. Gokhan Dogru's LinkedIn profile.");
+assertIncludes(license, "Apache License", "LICENSE must contain the Apache License title.");
+assertIncludes(license, "Version 2.0, January 2004", "LICENSE must contain Apache License 2.0 text.");
+assertIncludes(license, "https://www.apache.org/licenses/LICENSE-2.0", "LICENSE must point to the Apache License 2.0 URL.");
+assertIncludes(notice, "Copyright 2026 Dr. Gokhan Dogru", "NOTICE must preserve Dr. Gokhan Dogru's copyright notice.");
+assertIncludes(notice, "Co-created with Codex", "NOTICE must preserve the Codex co-creation attribution.");
+assertIncludes(notice, "https://www.linkedin.com/in/gokhan-dogru-localization/", "NOTICE must link Dr. Gokhan Dogru's LinkedIn profile.");
 
 assertIncludes(liveOllamaScript, "normalizeOllamaBaseUrl", "scripts/verify-live-ollama.cjs must normalize Ollama root and /api URLs like the app.");
 assertIncludes(liveOllamaScript, "ollamaApiUrl(baseUrl, \"/tags\")", "scripts/verify-live-ollama.cjs must verify Ollama model listing through /api/tags.");
@@ -304,6 +319,11 @@ assertIncludes(readme, "pnpm run dist:web", "README.md must document the static 
 assertIncludes(readme, "dist-web", "README.md must document that static HTML artifacts are written outside desktop dist.");
 assertIncludes(readme, "pnpm run verify:web-smoke", "README.md must document static HTML smoke verification.");
 assertIncludes(readme, "pnpm run verify:provenance", "README.md must document release provenance verification.");
+assertIncludes(readme, "Apache License 2.0", "README.md must document the Apache-2.0 license.");
+assertIncludes(webBuildScript, `"LICENSE"`, "scripts/build-web.cjs must include LICENSE in the static HTML artifact.");
+assertIncludes(webBuildScript, `"NOTICE"`, "scripts/build-web.cjs must include NOTICE in the static HTML artifact.");
+assertIncludes(webArtifactScript, `"LICENSE"`, "scripts/verify-web-artifact.cjs must verify LICENSE in the static HTML artifact.");
+assertIncludes(webArtifactScript, `"NOTICE"`, "scripts/verify-web-artifact.cjs must verify NOTICE in the static HTML artifact.");
 assertIncludes(indexHtml, `id="aboutBtn"`, "index.html must expose the product About button.");
 assertIncludes(indexHtml, `id="aboutDialog"`, "index.html must expose the product About dialog.");
 assertIncludes(indexHtml, "Co-created by Dr. Gokhan Dogru and Codex", "index.html About dialog must credit Dr. Gokhan Dogru and Codex.");
@@ -942,6 +962,8 @@ assertIncludes(browserRunnerMainScript, "allowedFiles.has(relativePath)", "scrip
 assertIncludes(browserRunnerMainScript, "\"test-runner.html\"", "scripts/browser-runner-electron.cjs must allow the browser test runner page.");
 assertIncludes(browserRunnerMainScript, "\"large-project-test.html\"", "scripts/browser-runner-electron.cjs must allow the large project browser fixture.");
 assertIncludes(browserRunnerMainScript, "\"app.js\"", "scripts/browser-runner-electron.cjs must allow the app coordinator needed by the app workflow test.");
+assertIncludes(browserRunnerMainScript, "\"LICENSE\"", "scripts/browser-runner-electron.cjs must allow the offline shell to cache LICENSE.");
+assertIncludes(browserRunnerMainScript, "\"NOTICE\"", "scripts/browser-runner-electron.cjs must allow the offline shell to cache NOTICE.");
 assertIncludes(browserRunnerMainScript, "test-runner.html", "scripts/browser-runner-electron.cjs must load the browser test runner.");
 assertIncludes(browserRunnerMainScript, "page-title-updated", "scripts/browser-runner-electron.cjs must observe the runner title status.");
 assertIncludes(browserRunnerMainScript, "ALL TESTS PASS", "scripts/browser-runner-electron.cjs must exit successfully only after the browser runner reports all tests passed.");

@@ -39,7 +39,9 @@ const WEB_ASSETS = [
   "cat-worker.js",
   "project.js",
   "app.js",
-  "README.md"
+  "README.md",
+  "LICENSE",
+  "NOTICE"
 ];
 
 const crcTable = (() => {

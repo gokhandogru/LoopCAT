@@ -2,6 +2,10 @@
 
 LoopCAT is a local-first browser CAT tool MVP. It runs as static HTML, CSS, and JavaScript and stores project data, segments, translation memory entries, and termbase entries in IndexedDB.
 
+## License
+
+LoopCAT is released under the Apache License 2.0. Copyright 2026 Dr. Gokhan Dogru. See `LICENSE` and `NOTICE` for the license text and attribution notice.
+
 ## MVP Scope
 
 This first version is intentionally focused on a reliable editing loop:
@@ -97,7 +101,7 @@ The code is split by responsibility so the app can grow without becoming one lar
 - `manifest.webmanifest` and `service-worker.js` define the installable offline app shell.
 - `scripts/build-web.cjs` creates the static HTML distribution ZIP in `dist-web/`.
 - `scripts/verify-web-artifact.cjs` verifies the static HTML ZIP, version alignment, checksums, and runtime asset list.
-- `scripts/verify-web-smoke.cjs` extracts the static HTML ZIP, serves it from localhost, and checks desktop/mobile rendering, console health, horizontal overflow, and the New project dialog.
+- `scripts/verify-web-smoke.cjs` extracts the static HTML ZIP, serves it from localhost, and checks desktop/mobile rendering, console health, horizontal overflow, and the New project and About dialogs.
 - `package.json` and `desktop/main.cjs` define the Electron desktop wrapper for Windows, macOS, and Linux packaging.
 - `scripts/verify-release.cjs` checks the offline desktop release contract before packaging.
 - `scripts/verify-live-ollama.cjs` optionally checks a real local or hosted Ollama runtime by listing models and running one non-streaming `/api/chat` translation probe with the selected model.

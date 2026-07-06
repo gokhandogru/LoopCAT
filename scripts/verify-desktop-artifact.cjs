@@ -9,6 +9,8 @@ const sourcePackageJson = JSON.parse(fs.readFileSync(path.join(root, "package.js
 
 const requiredFiles = [
   "README.md",
+  "LICENSE",
+  "NOTICE",
   "package.json",
   "index.html",
   "styles.css",

@@ -41,6 +41,8 @@ const allowedFiles = new Set([
   "cat-worker.js",
   "project.js",
   "app.js",
+  "LICENSE",
+  "NOTICE",
   "test-runner.html",
   "security-policy-test.html",
   "offline-shell-test.html",

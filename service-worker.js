@@ -26,7 +26,9 @@ const CORE_ASSETS = [
   "./worker-client.js",
   "./cat-worker.js",
   "./project.js",
-  "./app.js"
+  "./app.js",
+  "./LICENSE",
+  "./NOTICE"
 ];
 
 const CORE_ASSET_URLS = new Set(CORE_ASSETS.map((asset) => new URL(asset, self.location.href).href));

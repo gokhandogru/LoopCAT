@@ -2,7 +2,7 @@
   "name": "loopcat",
   "version": "0.0.1",
   "description": "Local-first offline CAT tool for translation and post-editing projects.",
-  "homepage": "https://github.com/loopcat/loopcat",
+  "homepage": "https://github.com/gokhandogru/LoopCAT",
   "private": true,
   "packageManager": "pnpm@11.0.7",
   "main": "desktop/main.cjs",
@@ -48,11 +48,11 @@
     "local-first"
   ],
   "author": {
-    "name": "LoopCAT Maintainers",
-    "email": "loopcat-maintainers@users.noreply.github.com",
-    "url": "https://github.com/loopcat/loopcat"
+    "name": "Dr. Gokhan Dogru",
+    "email": "gokhandogru@users.noreply.github.com",
+    "url": "https://www.linkedin.com/in/gokhan-dogru-localization/"
   },
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "devDependencies": {
     "electron": "31.7.7",
     "electron-builder": "24.13.3"
@@ -90,6 +90,8 @@
       "project.js",
       "desktop/**",
       "README.md",
+      "LICENSE",
+      "NOTICE",
       "docs/**"
     ],
     "win": {
@@ -114,7 +116,7 @@
         "deb"
       ],
       "category": "Office",
-      "maintainer": "LoopCAT Maintainers <loopcat-maintainers@users.noreply.github.com>"
+      "maintainer": "Dr. Gokhan Dogru <gokhandogru@users.noreply.github.com>"
     }
   }
 }

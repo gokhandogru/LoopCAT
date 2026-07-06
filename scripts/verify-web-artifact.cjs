@@ -40,7 +40,9 @@ const REQUIRED_WEB_ASSETS = [
   "cat-worker.js",
   "project.js",
   "app.js",
-  "README.md"
+  "README.md",
+  "LICENSE",
+  "NOTICE"
 ];
 
 function fail(message) {
