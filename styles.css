@@ -2268,6 +2268,48 @@ dialog::backdrop {
   display: flex;
 }
 
+.about-card {
+  gap: 16px;
+}
+
+.about-lede {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.about-meta {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.about-meta div {
+  display: grid;
+  gap: 3px;
+}
+
+.about-meta dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.about-meta dd {
+  margin: 0;
+}
+
+.about-meta a {
+  color: var(--focus);
+  overflow-wrap: anywhere;
+}
+
+.about-credit {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+
 .project-storage-config,
 .project-resource-config {
   display: grid;

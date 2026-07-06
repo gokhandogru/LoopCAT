@@ -389,6 +389,70 @@ function dialogScript() {
   })()`;
 }
 
+function aboutDialogScript() {
+  return `(() => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const text = (element) => element?.textContent?.replace(/\\s+/g, " ").trim() || "";
+    const visible = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return false;
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+    };
+    const waitFor = async (predicate, label) => {
+      const started = Date.now();
+      while (Date.now() - started < 15000) {
+        if (predicate()) return true;
+        await sleep(50);
+      }
+      throw new Error("Timed out waiting for " + label);
+    };
+    const elementLabel = (element) => {
+      if (element.id) return "#" + element.id;
+      if (element.className && typeof element.className === "string") return element.tagName.toLowerCase() + "." + element.className.trim().split(/\\s+/).slice(0, 2).join(".");
+      return element.tagName.toLowerCase();
+    };
+    const collectControlOverflow = () => Array.from(document.querySelectorAll("button, summary, .topbar, .toolbar-actions, .dialog-card, .dialog-actions, .project-storage-row, .two-col, .project-filters, .about-meta"))
+      .filter((element) => {
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        if (style.display === "none" || style.visibility === "hidden" || rect.width === 0 || rect.height === 0) return false;
+        return element.scrollWidth > element.clientWidth + 2;
+      })
+      .map((element) => ({
+        selector: elementLabel(element),
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        text: text(element).slice(0, 120)
+      }));
+    const run = async () => {
+      document.querySelector("#aboutBtn").click();
+      await waitFor(() => document.querySelector("#aboutDialog")?.open, "about dialog");
+      await waitFor(() => visible("#closeAboutBtn"), "about close button");
+      const dialog = document.querySelector("#aboutDialog");
+      const link = dialog.querySelector("a[href='https://www.linkedin.com/in/gokhan-dogru-localization/']");
+      const rect = dialog.getBoundingClientRect();
+      const documentWidth = Math.max(document.documentElement.scrollWidth, document.body?.scrollWidth || 0);
+      return {
+        dialogOpen: dialog.open === true,
+        bodyText: text(dialog),
+        linkTarget: link?.href || "",
+        dialogRect: {
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height
+        },
+        dialogFitsWidth: rect.left >= -2 && rect.right <= window.innerWidth + 2 && rect.width <= window.innerWidth + 2,
+        viewportOverflow: documentWidth > window.innerWidth + 2 ? [{ viewport: window.innerWidth, documentWidth }] : [],
+        controlOverflow: collectControlOverflow()
+      };
+    };
+    return run();
+  })()`;
+}
+
 async function capture(windowRef, fileName) {
   if (!screenshotDir) return "";
   await fs.mkdir(screenshotDir, { recursive: true });
@@ -437,8 +501,10 @@ async function inspectViewport(windowRef, url, viewport, pageMessages, loadError
     throw new Error(`${viewport.name} window was destroyed before inspection.${loadError ? ` loadURL reported: ${loadError}.` : ""} Server requests: ${serverRequests.slice(-20).join(" | ") || "(none)"}`);
   }
   await windowRef.webContents.executeJavaScript(`(() => {
-    const dialog = document.querySelector("#projectDialog");
-    if (dialog?.open) dialog.close();
+    for (const selector of ["#projectDialog", "#aboutDialog"]) {
+      const dialog = document.querySelector(selector);
+      if (dialog?.open) dialog.close();
+    }
     return true;
   })()`, true);
   await settlePaint(windowRef);
@@ -448,6 +514,15 @@ async function inspectViewport(windowRef, url, viewport, pageMessages, loadError
   const dialog = await windowRef.webContents.executeJavaScript(dialogScript(), true);
   await settlePaint(windowRef);
   const dialogScreenshot = await capture(windowRef, `web-smoke-${viewport.name}-dialog.png`);
+  await windowRef.webContents.executeJavaScript(`(() => {
+    const dialog = document.querySelector("#projectDialog");
+    if (dialog?.open) dialog.close();
+    return true;
+  })()`, true);
+  await settlePaint(windowRef);
+  const aboutDialog = await windowRef.webContents.executeJavaScript(aboutDialogScript(), true);
+  await settlePaint(windowRef);
+  const aboutScreenshot = await capture(windowRef, `web-smoke-${viewport.name}-about.png`);
 
   assert(shell.title === "LoopCAT", `${viewport.name} page title should be LoopCAT, got "${shell.title}".`);
   assert(shell.url === url, `${viewport.name} page URL should stay on ${url}, got "${shell.url}".${loadError ? ` loadURL reported: ${loadError}.` : ""}`);
@@ -465,6 +540,12 @@ async function inspectViewport(windowRef, url, viewport, pageMessages, loadError
   assert(dialog.dialogFitsWidth, `${viewport.name} New project dialog exceeds viewport width: ${JSON.stringify(dialog.dialogRect)}.`);
   assert(dialog.viewportOverflow.length === 0, `${viewport.name} dialog has horizontal viewport overflow: ${JSON.stringify(dialog.viewportOverflow)}.`);
   assert(dialog.controlOverflow.length === 0, `${viewport.name} dialog has overflowing controls: ${JSON.stringify(dialog.controlOverflow)}.`);
+  assert(aboutDialog.dialogOpen, `${viewport.name} About dialog did not open.`);
+  assert(aboutDialog.bodyText.includes("Co-created by Dr. Gokhan Dogru and Codex"), `${viewport.name} About dialog is missing co-creation credit.`);
+  assert(aboutDialog.linkTarget === "https://www.linkedin.com/in/gokhan-dogru-localization/", `${viewport.name} About dialog LinkedIn link is incorrect: "${aboutDialog.linkTarget}".`);
+  assert(aboutDialog.dialogFitsWidth, `${viewport.name} About dialog exceeds viewport width: ${JSON.stringify(aboutDialog.dialogRect)}.`);
+  assert(aboutDialog.viewportOverflow.length === 0, `${viewport.name} About dialog has horizontal viewport overflow: ${JSON.stringify(aboutDialog.viewportOverflow)}.`);
+  assert(aboutDialog.controlOverflow.length === 0, `${viewport.name} About dialog has overflowing controls: ${JSON.stringify(aboutDialog.controlOverflow)}.`);
   const relevantPageMessages = pageMessages.filter((message) => {
     if (loadError && message.includes(url) && message.includes("-2")) return false;
     return true;
@@ -474,7 +555,8 @@ async function inspectViewport(windowRef, url, viewport, pageMessages, loadError
   return {
     viewport: viewport.name,
     shellScreenshot,
-    dialogScreenshot
+    dialogScreenshot,
+    aboutScreenshot
   };
 }
 
@@ -522,7 +604,7 @@ app.whenReady().then(async () => {
       process.exitCode = 1;
     } else {
       const screenshotLines = screenshots
-        .flatMap((item) => [item.shellScreenshot, item.dialogScreenshot])
+        .flatMap((item) => [item.shellScreenshot, item.dialogScreenshot, item.aboutScreenshot])
         .filter(Boolean)
         .map((item) => `\n- ${item}`);
       writeLine("stdout", `Static web smoke verification passed for ${artifactName}.${screenshotLines.length ? ` Screenshots:${screenshotLines.join("")}` : ""}`);

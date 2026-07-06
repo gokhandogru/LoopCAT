@@ -767,6 +767,9 @@ const els = {
   workspace: document.querySelector("#workspace"),
   projectsViewBtn: document.querySelector("#projectsViewBtn"),
   resourcesViewBtn: document.querySelector("#resourcesViewBtn"),
+  aboutBtn: document.querySelector("#aboutBtn"),
+  aboutDialog: document.querySelector("#aboutDialog"),
+  closeAboutBtn: document.querySelector("#closeAboutBtn"),
   workspaceMenuSummary: document.querySelector("#workspaceMenuSummary"),
   workspaceMenu: document.querySelector(".workspace-menu"),
   workspaceHealth: document.querySelector("#workspaceHealth"),
@@ -10881,6 +10884,8 @@ function wireEvents() {
 
   els.projectsViewBtn.addEventListener("click", () => setView("projects"));
   els.resourcesViewBtn.addEventListener("click", () => setView("resources"));
+  els.aboutBtn.addEventListener("click", () => els.aboutDialog.showModal());
+  els.closeAboutBtn.addEventListener("click", () => els.aboutDialog.close());
   els.workspaceRecoverySaveBtn.addEventListener("click", async () => {
     try {
       await saveWorkspaceRecoveryPackages();

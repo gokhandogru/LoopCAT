@@ -304,6 +304,11 @@ assertIncludes(readme, "pnpm run dist:web", "README.md must document the static 
 assertIncludes(readme, "dist-web", "README.md must document that static HTML artifacts are written outside desktop dist.");
 assertIncludes(readme, "pnpm run verify:web-smoke", "README.md must document static HTML smoke verification.");
 assertIncludes(readme, "pnpm run verify:provenance", "README.md must document release provenance verification.");
+assertIncludes(indexHtml, `id="aboutBtn"`, "index.html must expose the product About button.");
+assertIncludes(indexHtml, `id="aboutDialog"`, "index.html must expose the product About dialog.");
+assertIncludes(indexHtml, "Co-created by Dr. Gokhan Dogru and Codex", "index.html About dialog must credit Dr. Gokhan Dogru and Codex.");
+assertIncludes(indexHtml, "https://www.linkedin.com/in/gokhan-dogru-localization/", "index.html About dialog must link Dr. Gokhan Dogru's LinkedIn profile.");
+assertIncludes(appJs, "aboutDialog.showModal()", "app.js must open the About dialog from the topbar.");
 assertIncludes(webSmokeScript, "const artifactName = `${productName} Web ${packageJson.version}.zip`;", "scripts/verify-web-smoke.cjs must open the versioned static HTML artifact.");
 assertIncludes(webSmokeScript, "BrowserWindow", "scripts/verify-web-smoke.cjs must render the static HTML artifact in Electron.");
 assertIncludes(webSmokeScript, "document.documentElement.scrollWidth", "scripts/verify-web-smoke.cjs must check for viewport-level horizontal overflow.");

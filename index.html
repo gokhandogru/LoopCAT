@@ -24,6 +24,7 @@
           <span id="saveStatus" class="save-status">Saved</span>
           <button id="projectsViewBtn">Projects</button>
           <button id="resourcesViewBtn">Resources</button>
+          <button id="aboutBtn" type="button">About</button>
           <details class="menu workspace-menu">
             <summary id="workspaceMenuSummary">Workspace</summary>
             <div class="menu-panel workspace-menu-panel">
@@ -793,6 +794,33 @@
         <div id="commandPaletteResults" class="command-results"></div>
       </section>
     </div>
+
+    <dialog id="aboutDialog">
+      <section class="dialog-card about-card" aria-labelledby="aboutDialogTitle">
+        <div>
+          <h2 id="aboutDialogTitle">About LoopCAT</h2>
+          <p class="about-lede">Local translation editor for project packages, translation memories, termbases, and offline-first review workflows.</p>
+        </div>
+        <dl class="about-meta">
+          <div>
+            <dt>Created by</dt>
+            <dd>Dr. Gokhan Dogru</dd>
+          </div>
+          <div>
+            <dt>Co-created with</dt>
+            <dd>Codex</dd>
+          </div>
+          <div>
+            <dt>Profile</dt>
+            <dd><a href="https://www.linkedin.com/in/gokhan-dogru-localization/" target="_blank" rel="noopener noreferrer">LinkedIn: gokhan-dogru-localization</a></dd>
+          </div>
+        </dl>
+        <p class="about-credit">Co-created by Dr. Gokhan Dogru and Codex.</p>
+        <div class="dialog-actions">
+          <button id="closeAboutBtn" class="primary" type="button">Close</button>
+        </div>
+      </section>
+    </dialog>
 
     <dialog id="projectDialog">
       <form id="projectForm" method="dialog" class="dialog-card">
