@@ -107,6 +107,7 @@ const requiredAppFiles = [
   "qa.js",
   "validation.js",
   "analysis.js",
+  "quality.js",
   "ai.js",
   "worker-client.js",
   "cat-worker.js",
@@ -182,6 +183,7 @@ const tbxJs = readText("tbx.js");
 const encodingJs = readText("encoding.js");
 const validationJs = readText("validation.js");
 const analysisJs = readText("analysis.js");
+const qualityJs = readText("quality.js");
 const catWorkerJs = readText("cat-worker.js");
 const serviceWorker = readText("service-worker.js");
 const readme = readText("README.md");
@@ -484,6 +486,12 @@ assertIncludes(indexHtml, `id="localAiProviderSummary"`, "AI Command Centre must
 assertIncludes(indexHtml, `id="localAiStartLmStudioBtn"`, "AI Command Centre must expose a desktop-only LM Studio server start button.");
 assertIncludes(indexHtml, `id="localAiPromptModeSelect"`, "AI Command Centre must expose a prompt-test mode selector for AI-native commands.");
 assertIncludes(indexHtml, `id="aiSegmentFilter"`, "Editor toolbar must expose AI metadata filtering for AI drafts, suggestions, and review risk.");
+assertIncludes(indexHtml, `id="focusModeBtn"`, "Editor toolbar must expose a Focus view toggle for noise-free segment editing.");
+assertIncludes(indexHtml, `id="exitFocusModeBtn"`, "Editor must expose an always-visible way to leave Focus view.");
+assertIncludes(appJs, "function setFocusMode", "app.js must manage Focus view through explicit editor state.");
+assertIncludes(appJs, "Enter Focus view", "Command palette must expose the Focus view toggle.");
+assertIncludes(readText("styles.css"), ".workspace.focus-mode .sidebar", "styles.css must hide the right sidebar in Focus view.");
+assertIncludes(readText("styles.css"), ".workspace.focus-mode .segment-controls", "styles.css must hide filtering controls in Focus view so only segments remain.");
 assertIncludes(indexHtml, `local-ai-group`, "AI Command Centre must group provider and workflow controls into scannable sections.");
 assertIncludes(indexHtml, `Connect provider`, "AI Command Centre must start with provider connection controls.");
 assertIncludes(indexHtml, `Choose model`, "AI Command Centre must put model selection before batch actions.");
@@ -820,6 +828,18 @@ assertIncludes(validationJs, "MAX_SCHEMA_VERSION", "validation.js must cap suppo
 assertIncludes(validationJs, "newer than this LoopCAT build supports", "validation.js must reject portable files from newer unsupported schemas.");
 assertIncludes(analysisJs, ".normalize(\"NFKC\").toLowerCase()", "analysis.js fallback normalization must be locale-stable when tm.js is unavailable.");
 assert(!analysisJs.includes(".toLocaleLowerCase()"), "analysis.js must not use the user interface locale for repetition analysis.");
+assertIncludes(qualityJs, "function buildQualityPassportData", "quality.js must build source-backed Quality Passport data.");
+assertIncludes(qualityJs, "function buildRiskQueue", "quality.js must expose risk-prioritized review queue construction.");
+assertIncludes(qualityJs, "function qualityCategoryLabel", "quality.js must label quality decision categories.");
+assertIncludes(appJs, "function exportQualityPassport", "app.js must wire Quality Passport export.");
+assertIncludes(appJs, "function saveQualityDecisionFromForm", "app.js must save active quality decisions.");
+assertIncludes(indexHtml, "qualityForm", "index.html must expose Quality Workbench controls.");
+assertIncludes(indexHtml, "qualityActiveEvidence", "index.html must expose active segment quality evidence.");
+assertIncludes(indexHtml, "<h2>Comments</h2>", "index.html must label the review panel as Comments.");
+assertIncludes(indexHtml, "<h2>QA Checks</h2>", "index.html must title-case the QA panel.");
+assertIncludes(readText("styles.css"), ".ai-panel {\n  order: 3;", "styles.css must place AI Command Centre directly after termbases.");
+assertIncludes(readText("styles.css"), ".qa-panel {\n  order: 4;", "styles.css must place QA Checks after AI Command Centre.");
+assertIncludes(readText("styles.css"), ".review-panel {\n  order: 5;", "styles.css must place Comments after QA Checks.");
 assertIncludes(catWorkerJs, ".normalize(\"NFKC\")", "cat-worker.js must normalize text before worker-side TM/QA matching.");
 assertIncludes(catWorkerJs, ".toLowerCase()", "cat-worker.js must use locale-stable casing for worker-side TM/QA matching.");
 assert(!catWorkerJs.includes(".toLocaleLowerCase()"), "cat-worker.js must not use the user interface locale for worker-side TM/QA matching.");

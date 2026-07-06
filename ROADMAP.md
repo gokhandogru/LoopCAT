@@ -35,6 +35,7 @@ This roadmap is aimed at an academic translator or post-editor who downloads Loo
 - Anonymized offline project reports preserve counts while redacting project names, file names, resource names, terminology text, activity summaries, activity types, and segment text.
 - Bilingual DOCX review exports include segment status, reviewer notes, structured comments, and QA summaries.
 - QA, project analysis, TM/TB management, comments/review states, find/replace, and offline HTML project reports.
+- Quality Workbench profile controls, LQA-style quality decision categories, risk-prioritized review navigation, and Quality Passport HTML exports are now supported so translators can produce count-only review evidence without exposing segment text.
 - Locale-stable TM token normalization, QA term matching, worker matching, repetition analysis, export validation, editor search/replace, and duplicate-file detection so cross-platform project behavior does not depend on the OS/browser UI locale.
 - Large-project browser coverage verifies thousands of segments, revision-aware batch saves, indexed TM lookup, QA, validation, visible workspace-package save, and backup metadata.
 - Project saves require a project name plus source and target languages, while malformed legacy browser-cache projects still list with safe identity fallbacks for recovery.

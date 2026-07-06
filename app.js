@@ -11,6 +11,7 @@ const { buildLocalizationFile, parseLocalizationFile } = window.CatHan.localizat
 const { runQaChecks } = window.CatHan.qa;
 const { validateProjectPackage: validatePackage, validateBackupFile, validateExportReadiness, reportCount, reportSummary } = window.CatHan.validation;
 const { analyzeProject } = window.CatHan.analysis;
+const { buildQualityPassportData, buildRiskQueue, defaultQualityProfile, qualityCategoryLabel: baseQualityCategoryLabel, scoreSegment } = window.CatHan.quality;
 const {
   DEFAULT_LOCAL_AI_MODEL,
   GEMINI_DEFAULT_MODEL,
@@ -90,6 +91,7 @@ const OFFLINE_APP_SHELL_WARMUP_ASSETS = [
   "./qa.js",
   "./validation.js",
   "./analysis.js",
+  "./quality.js",
   "./ai.js",
   "./worker-client.js",
   "./cat-worker.js",
@@ -715,6 +717,7 @@ const state = {
   activeIndex: -1,
   saveTimers: new Map(),
   view: "projects",
+  focusMode: false,
   documentFilter: "",
   segmentQuery: "",
   segmentSearchScope: "both",
@@ -741,6 +744,7 @@ const state = {
   activityEvents: [],
   qaChecks: [],
   qaFilter: "",
+  qualityRiskQueue: null,
   lastValidationReport: null,
   commandQuery: "",
   desktopSpellcheckTargetLang: null,
@@ -867,7 +871,10 @@ const els = {
   exportLocalizationBtn: document.querySelector("#exportLocalizationBtn"),
   exportXliffBtn: document.querySelector("#exportXliffBtn"),
   exportProjectReportBtn: document.querySelector("#exportProjectReportBtn"),
+  exportQualityPassportMenuBtn: document.querySelector("#exportQualityPassportMenuBtn"),
   exportAnonymizedProjectReportBtn: document.querySelector("#exportAnonymizedProjectReportBtn"),
+  focusModeBtn: document.querySelector("#focusModeBtn"),
+  exitFocusModeBtn: document.querySelector("#exitFocusModeBtn"),
   commandPaletteBtn: document.querySelector("#commandPaletteBtn"),
   commandPaletteOverlay: document.querySelector("#commandPaletteOverlay"),
   commandPaletteInput: document.querySelector("#commandPaletteInput"),
@@ -916,6 +923,25 @@ const els = {
   reviewNoteInput: document.querySelector("#reviewNoteInput"),
   reviewCommentInput: document.querySelector("#reviewCommentInput"),
   reviewCommentsList: document.querySelector("#reviewCommentsList"),
+  qualityForm: document.querySelector("#qualityForm"),
+  qualityStandardSelect: document.querySelector("#qualityStandardSelect"),
+  qualityReviewDepthSelect: document.querySelector("#qualityReviewDepthSelect"),
+  qualityRiskToleranceSelect: document.querySelector("#qualityRiskToleranceSelect"),
+  qualityTerminologyStrictnessSelect: document.querySelector("#qualityTerminologyStrictnessSelect"),
+  qualityAiDisclosureSelect: document.querySelector("#qualityAiDisclosureSelect"),
+  qualityAudienceInput: document.querySelector("#qualityAudienceInput"),
+  qualityToneInput: document.querySelector("#qualityToneInput"),
+  qualitySummary: document.querySelector("#qualitySummary"),
+  qualityActiveEvidence: document.querySelector("#qualityActiveEvidence"),
+  qualityDecisionForm: document.querySelector("#qualityDecisionForm"),
+  qualityIssueCategorySelect: document.querySelector("#qualityIssueCategorySelect"),
+  qualityIssueSeveritySelect: document.querySelector("#qualityIssueSeveritySelect"),
+  qualityDecisionNoteInput: document.querySelector("#qualityDecisionNoteInput"),
+  saveQualityDecisionBtn: document.querySelector("#saveQualityDecisionBtn"),
+  refreshQualityRiskBtn: document.querySelector("#refreshQualityRiskBtn"),
+  nextQualityRiskBtn: document.querySelector("#nextQualityRiskBtn"),
+  exportQualityPassportBtn: document.querySelector("#exportQualityPassportBtn"),
+  qualityRiskList: document.querySelector("#qualityRiskList"),
   aiSettingsForm: document.querySelector("#aiSettingsForm"),
   aiEnabledInput: document.querySelector("#aiEnabledInput"),
   aiProviderInput: document.querySelector("#aiProviderInput"),
@@ -1011,6 +1037,36 @@ function setSaveStatus(text, mode = "") {
       state.saveStatusTimer = 0;
     }, 5000);
   }
+}
+
+function renderFocusMode() {
+  const active = Boolean(state.focusMode && state.view === "editor" && state.project);
+  document.body.classList.toggle("focus-mode", active);
+  els.workspace.classList.toggle("focus-mode", active);
+  if (els.focusModeBtn) {
+    els.focusModeBtn.textContent = active ? "Normal view" : "Focus";
+    els.focusModeBtn.title = active ? "Return to the full editor" : "Show only translation segments";
+    els.focusModeBtn.setAttribute("aria-pressed", String(active));
+  }
+  if (els.exitFocusModeBtn) {
+    els.exitFocusModeBtn.classList.toggle("hidden", !active);
+    els.exitFocusModeBtn.setAttribute("aria-hidden", String(!active));
+  }
+}
+
+function setFocusMode(enabled) {
+  state.focusMode = Boolean(enabled && state.view === "editor" && state.project);
+  renderFocusMode();
+  document.querySelectorAll(".menu[open]").forEach((menu) => menu.removeAttribute("open"));
+  if (!state.project) return;
+  requestAnimationFrame(() => {
+    renderSegments({ preserveScroll: true });
+    if (state.focusMode) focusActiveTextarea();
+  });
+}
+
+function toggleFocusMode() {
+  setFocusMode(!state.focusMode);
 }
 
 function invalidateSegmentFilterCache() {
@@ -2681,10 +2737,13 @@ function commandList() {
   return [
     { id: "confirm", label: "Confirm segment", run: confirmCurrentSegment, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(state.segments.length) },
+    { id: "focus-mode", label: state.focusMode ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(state.view === "editor" && state.project) },
     { id: "copy-source", label: "Copy source", run: copySourceToTarget, enabled: Boolean(currentSegment()) },
     { id: "save-tm", label: "Save segment to TM", run: saveActiveSegmentToTm, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(state.project) },
     { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(state.project) },
+    { id: "quality-passport", label: "Export Quality Passport", run: exportQualityPassport, enabled: Boolean(state.project) },
+    { id: "next-quality-risk", label: "Next quality risk", run: goToNextQualityRisk, enabled: Boolean(state.project) },
     { id: "concordance", label: "Open concordance", run: openConcordanceSearch, enabled: Boolean(state.project) },
     { id: "replace-target", label: "Find and replace target text", run: openReplacePanel, enabled: Boolean(state.project) },
     { id: "project-report", label: "Export project report", run: exportProjectReport, enabled: Boolean(state.project) },
@@ -3120,6 +3179,7 @@ async function loadProjects(selectFirst = false) {
 
 function setView(view) {
   state.view = view;
+  if (view !== "editor") state.focusMode = false;
   renderEditor();
   if (view === "projects") refreshProjectSummaries();
   if (view === "resources") refreshResources();
@@ -3127,6 +3187,7 @@ function setView(view) {
 
 function showProjectHome() {
   if (!state.project) return;
+  state.focusMode = false;
   state.view = "project";
   state.documentFilter = "";
   state.activeIndex = state.segments.length ? 0 : -1;
@@ -4144,6 +4205,7 @@ function renderEditor() {
   els.projectHomeView.classList.toggle("hidden", state.view !== "project" || !hasProject);
   els.emptyState.classList.toggle("hidden", state.view !== "editor" || hasProject);
   els.editorView.classList.toggle("hidden", state.view !== "editor" || !hasProject);
+  renderFocusMode();
   if (!state.project) return;
 
   const resources = projectResourceSummary();
@@ -4184,6 +4246,7 @@ function renderEditor() {
   els.aiUseTbInput.checked = ai.useTermbaseContext !== false;
   els.aiStyleGuideInput.value = ai.styleGuide || "";
   renderLocalAiCommandCentre();
+  renderQualityWorkbench();
   renderTermbaseSelect();
 }
 
@@ -5433,6 +5496,12 @@ function handleGlobalKeydown(event) {
     openCommandPalette();
     return;
   }
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "f" && state.view === "editor" && state.project) {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleFocusMode();
+    return;
+  }
   const isK = key === "k" || event.code === "KeyK";
   const concordanceShortcut = isK && ((event.ctrlKey || event.metaKey) || event.altKey);
   if (concordanceShortcut && state.view === "editor") {
@@ -5449,6 +5518,11 @@ function handleGlobalKeydown(event) {
   if (event.key === "Escape" && !els.commandPaletteOverlay.classList.contains("hidden")) {
     event.preventDefault();
     closeCommandPalette();
+    return;
+  }
+  if (event.key === "Escape" && state.focusMode) {
+    event.preventDefault();
+    setFocusMode(false);
   }
 }
 
@@ -5527,6 +5601,7 @@ async function refreshSidebar() {
   renderReviewPanel();
   renderRevisionHistory();
   renderAiSuggestions();
+  renderQualityWorkbench();
   await Promise.all([refreshTmMatches(), refreshTerms()]);
 }
 
@@ -5554,6 +5629,348 @@ function renderReviewPanel() {
       </article>
     `).join("")
     : `<div class="muted">No structured comments.</div>`;
+}
+
+function qualityProfileFromForm() {
+  return defaultQualityProfile({
+    standard: els.qualityStandardSelect?.value,
+    reviewDepth: els.qualityReviewDepthSelect?.value,
+    riskTolerance: els.qualityRiskToleranceSelect?.value,
+    terminologyStrictness: els.qualityTerminologyStrictnessSelect?.value,
+    aiDisclosure: els.qualityAiDisclosureSelect?.value,
+    audience: els.qualityAudienceInput?.value,
+    tone: els.qualityToneInput?.value
+  });
+}
+
+function renderQualityProfileForm() {
+  if (!els.qualityForm || !state.project) return;
+  const profile = defaultQualityProfile(state.project.qualityProfile);
+  els.qualityStandardSelect.value = profile.standard;
+  els.qualityReviewDepthSelect.value = profile.reviewDepth;
+  els.qualityRiskToleranceSelect.value = profile.riskTolerance;
+  els.qualityTerminologyStrictnessSelect.value = profile.terminologyStrictness;
+  els.qualityAiDisclosureSelect.value = profile.aiDisclosure;
+  els.qualityAudienceInput.value = profile.audience || "";
+  els.qualityToneInput.value = profile.tone || "";
+}
+
+function qualityLabel(value) {
+  return {
+    "student-review": "Student review",
+    "freelance-delivery": "Freelance delivery",
+    "agency-delivery": "Agency delivery",
+    regulated: "Regulated",
+    targeted: "Targeted",
+    full: "Full",
+    lqa: "LQA",
+    balanced: "Balanced",
+    strict: "Strict",
+    standard: "Standard",
+    "not-used": "Not used",
+    "local-only": "Local only",
+    "hosted-disclosed": "Hosted disclosed",
+    "client-approved": "Client approved"
+  }[value] || value || "";
+}
+
+function qualityCategoryName(value) {
+  return baseQualityCategoryLabel?.(value) || {
+    accuracy: "Accuracy",
+    terminology: "Terminology",
+    fluency: "Fluency",
+    style: "Style",
+    locale: "Locale",
+    formatting: "Formatting",
+    compliance: "Compliance",
+    review: "Review"
+  }[value] || value || "Review";
+}
+
+function qualityDecisionSeverityLabel(value) {
+  return {
+    low: "Low",
+    medium: "Medium",
+    high: "High",
+    critical: "Critical"
+  }[value] || "Medium";
+}
+
+function qualityDecisionSeverity(value) {
+  const severity = stableLower(value || "");
+  return ["low", "medium", "high", "critical"].includes(severity) ? severity : "medium";
+}
+
+function qualityDecisionCategory(value) {
+  const category = stableLower(value || "");
+  return ["accuracy", "terminology", "fluency", "style", "locale", "formatting", "compliance", "review"].includes(category)
+    ? category
+    : "review";
+}
+
+function qualityQaBySegment(qaChecks = state.qaChecks) {
+  const map = new Map();
+  (qaChecks || []).forEach((check) => {
+    const segmentId = check?.segmentId || "";
+    if (!segmentId) return;
+    if (!map.has(segmentId)) map.set(segmentId, []);
+    map.get(segmentId).push(check);
+  });
+  return map;
+}
+
+function currentQualityRiskQueue(qaChecks = state.qaChecks) {
+  if (!state.project) return null;
+  return buildRiskQueue({
+    project: state.project,
+    segments: currentDocumentSegments(),
+    qaChecks,
+    profile: state.project.qualityProfile
+  });
+}
+
+function qualityRiskLevelLabel(level) {
+  return {
+    critical: "Critical",
+    high: "High",
+    medium: "Medium",
+    low: "Low",
+    clear: "Clear"
+  }[level] || "Risk";
+}
+
+function activeQualityEvidence(queue = null) {
+  const segment = currentSegment();
+  if (!state.project || !segment) return null;
+  const queuedItem = (queue?.items || []).find((item) => item.segmentId === segment.id);
+  if (queuedItem) return queuedItem;
+  return scoreSegment(segment, state.activeIndex, {
+    profile: state.project.qualityProfile,
+    qaBySegment: qualityQaBySegment()
+  });
+}
+
+function renderQualityActiveEvidence(queue) {
+  if (!els.qualityActiveEvidence || !els.qualityDecisionForm) return;
+  const segment = currentSegment();
+  if (!state.project || !segment) {
+    els.qualityActiveEvidence.textContent = "No active segment.";
+    els.qualityActiveEvidence.classList.add("muted");
+    if (els.saveQualityDecisionBtn) els.saveQualityDecisionBtn.disabled = true;
+    return;
+  }
+  if (els.saveQualityDecisionBtn) els.saveQualityDecisionBtn.disabled = false;
+  const evidence = activeQualityEvidence(queue);
+  const categories = Object.entries(evidence?.categoryCounts || {})
+    .sort((a, b) => b[1] - a[1] || qualityCategoryName(a[0]).localeCompare(qualityCategoryName(b[0])));
+  const categoryPills = categories.length
+    ? categories.map(([category, count]) => `<span class="quality-category-pill">${escapeHtml(qualityCategoryName(category))} ${count}</span>`).join("")
+    : `<span class="quality-category-pill">Clear</span>`;
+  const reasonItems = (evidence?.reasons || []).slice(0, 4).map((reason) => (
+    `<li>${escapeHtml(qualityCategoryName(reason.category))}: ${escapeHtml(reason.label)}</li>`
+  )).join("");
+  els.qualityActiveEvidence.classList.remove("muted");
+  els.qualityActiveEvidence.innerHTML = `
+    <header>
+      <strong>#${escapeHtml(String((evidence?.index ?? state.activeIndex) + 1))}</strong>
+      <span>${escapeHtml(qualityRiskLevelLabel(evidence?.level))} ${evidence?.score || 0}</span>
+    </header>
+    <div class="quality-category-row">${categoryPills}</div>
+    ${reasonItems ? `<ul>${reasonItems}</ul>` : `<p class="muted">No active quality signals.</p>`}
+  `;
+}
+
+function renderQualityWorkbench() {
+  if (!els.qualitySummary || !els.qualityRiskList) return;
+  if (!state.project) {
+    els.qualitySummary.textContent = "No project.";
+    els.qualitySummary.classList.add("muted");
+    els.qualityRiskList.textContent = "No risk queue yet.";
+    els.qualityRiskList.classList.add("muted");
+    renderQualityActiveEvidence(null);
+    return;
+  }
+  if (!els.qualityForm?.contains(document.activeElement)) renderQualityProfileForm();
+  const queue = state.qualityRiskQueue?.projectId === state.project.id ? state.qualityRiskQueue : currentQualityRiskQueue();
+  state.qualityRiskQueue = queue;
+  const profile = defaultQualityProfile(state.project.qualityProfile);
+  els.qualitySummary.classList.remove("muted");
+  els.qualitySummary.innerHTML = `
+    <div class="quality-summary-grid">
+      <div><strong>${queue.totalRiskItems}</strong><span>risk items</span></div>
+      <div><strong>${queue.highRiskCount}</strong><span>high risk</span></div>
+      <div><strong>${queue.averageScore}</strong><span>avg risk</span></div>
+    </div>
+    <p>${escapeHtml(qualityLabel(profile.standard))} - ${escapeHtml(qualityLabel(profile.reviewDepth))} - ${escapeHtml(qualityLabel(profile.riskTolerance))}</p>
+  `;
+  renderQualityActiveEvidence(queue);
+  if (!queue.items.length) {
+    els.qualityRiskList.textContent = "No unresolved quality risks in this scope.";
+    els.qualityRiskList.classList.add("muted");
+    return;
+  }
+  els.qualityRiskList.classList.remove("muted");
+  const fragment = document.createDocumentFragment();
+  queue.items.slice(0, 8).forEach((item) => {
+    const card = document.createElement("article");
+    card.className = `quality-risk-card ${item.level}`;
+    const reasonText = item.reasons.slice(0, 2).map((reason) => reason.label).join(" ");
+    const categoryText = Object.entries(item.categoryCounts || {})
+      .sort((a, b) => b[1] - a[1] || qualityCategoryName(a[0]).localeCompare(qualityCategoryName(b[0])))
+      .map(([category]) => qualityCategoryName(category))
+      .slice(0, 3)
+      .join(", ") || qualityCategoryName(item.category);
+    card.innerHTML = `
+      <header>
+        <strong>${escapeHtml(qualityRiskLevelLabel(item.level))} ${item.score}</strong>
+        <span>#${escapeHtml(item.label)}</span>
+      </header>
+      <p>${escapeHtml(item.documentName || "Document")}</p>
+      <p class="muted">${escapeHtml(categoryText)}: ${escapeHtml(reasonText || "Risk signal recorded.")}</p>
+    `;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Go";
+    button.addEventListener("click", () => goToQualityRiskItem(item));
+    card.append(button);
+    fragment.append(card);
+  });
+  els.qualityRiskList.replaceChildren(fragment);
+}
+
+async function saveQualityProfileFromForm() {
+  if (!state.project || !els.qualityForm) return false;
+  const previousProject = structuredClone(state.project);
+  const previousProjects = state.projects.map((project) => structuredClone(project));
+  const qualityProfile = qualityProfileFromForm();
+  try {
+    state.project = await updateProject({ ...state.project, qualityProfile });
+    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    state.qualityRiskQueue = currentQualityRiskQueue();
+    await refreshProjectSummaries();
+    markWorkspaceDirty();
+    renderQualityWorkbench();
+    const activityLogged = await logOptionalProjectActivity("quality-profile", "Quality profile saved", {
+      standard: qualityProfile.standard,
+      reviewDepth: qualityProfile.reviewDepth,
+      riskTolerance: qualityProfile.riskTolerance,
+      terminologyStrictness: qualityProfile.terminologyStrictness,
+      aiDisclosure: qualityProfile.aiDisclosure
+    }, "Quality profile save");
+    setSaveStatus(appendActivityWarning("Quality profile saved", activityLogged), exportStatusMode("saved", activityLogged));
+    return true;
+  } catch (error) {
+    state.project = previousProject;
+    state.projects = previousProjects;
+    renderQualityWorkbench();
+    setSaveStatus(error.message || "Quality profile save failed", "dirty");
+    return false;
+  }
+}
+
+async function saveQualityDecisionFromForm() {
+  if (!state.project || !els.qualityDecisionForm) return false;
+  const segment = currentSegment();
+  if (!segment) return false;
+  const snapshot = structuredClone(segment);
+  const category = qualityDecisionCategory(els.qualityIssueCategorySelect?.value);
+  const severity = qualityDecisionSeverity(els.qualityIssueSeveritySelect?.value);
+  const note = (els.qualityDecisionNoteInput?.value || "").trim();
+  const decisionTitle = `Quality decision: ${qualityCategoryName(category)} (${qualityDecisionSeverityLabel(severity)})`;
+  const now = new Date().toISOString();
+  try {
+    segment.reviewState = "needs-review";
+    segment.comments = [
+      ...(segment.comments || []),
+      {
+        id: makeId("comment"),
+        body: [decisionTitle, note].filter(Boolean).join("\n"),
+        state: "open",
+        qualityDecision: { category, severity },
+        createdAt: now,
+        updatedAt: now
+      }
+    ];
+    touchSegment(segment);
+    clearPendingSave(segment);
+    await saveSegment(segment);
+    if (els.qualityDecisionNoteInput) els.qualityDecisionNoteInput.value = "";
+    state.qualityRiskQueue = currentQualityRiskQueue();
+    renderReviewPanel();
+    renderQualityWorkbench();
+    updateRow(state.activeIndex);
+    markWorkspaceDirty();
+    const activityLogged = await logOptionalProjectActivity("quality-decision", "Quality decision saved", {
+      segmentId: segment.id,
+      category,
+      severity
+    }, "Quality decision save");
+    setSaveStatus(appendActivityWarning("Quality decision saved", activityLogged), exportStatusMode("saved", activityLogged));
+    return true;
+  } catch (error) {
+    Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
+    Object.assign(segment, snapshot);
+    prepareSegmentHistoryState(segment);
+    renderReviewPanel();
+    renderQualityWorkbench();
+    updateRow(state.activeIndex);
+    setSaveStatus(error.message || "Quality decision save failed", "dirty");
+    return false;
+  }
+}
+
+async function refreshQualityRiskQueue() {
+  if (!state.project) return null;
+  const checks = await runProjectQa();
+  if (!checks) return null;
+  state.qualityRiskQueue = currentQualityRiskQueue(checks);
+  renderQualityWorkbench();
+  return state.qualityRiskQueue;
+}
+
+async function goToQualityRiskItem(item) {
+  const index = state.segments.findIndex((segment) => segment.id === item?.segmentId);
+  if (index === -1) return;
+  const segment = state.segments[index];
+  if (!segmentPassesFilters(segment)) {
+    if (state.documentFilter && segment.documentId !== state.documentFilter) {
+      state.documentFilter = "";
+      els.documentFilter.value = "";
+    }
+    state.segmentQuery = "";
+    els.segmentSearchInput.value = "";
+    state.segmentStatusFilter = "all";
+    els.segmentStatusFilter.value = "all";
+    state.reviewStateFilter = "";
+    if (els.reviewStateFilter) els.reviewStateFilter.value = "";
+    state.aiSegmentFilter = "";
+    if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
+    renderSegments();
+  }
+  await setActiveSegment(index);
+  renderSegments();
+  focusActiveTextarea();
+}
+
+async function goToNextQualityRisk() {
+  if (!state.project) return;
+  if (!state.qualityRiskQueue || state.qualityRiskQueue.projectId !== state.project.id) {
+    state.qualityRiskQueue = currentQualityRiskQueue();
+  }
+  const queue = state.qualityRiskQueue;
+  if (!queue?.items?.length) {
+    setSaveStatus("No quality risks in this scope", "saved");
+    return;
+  }
+  const indexedItems = queue.items
+    .map((item) => ({
+      ...item,
+      globalIndex: state.segments.findIndex((segment) => segment.id === item.segmentId)
+    }))
+    .filter((item) => item.globalIndex !== -1)
+    .sort((a, b) => a.globalIndex - b.globalIndex);
+  const afterActive = indexedItems.find((item) => item.globalIndex > state.activeIndex);
+  await goToQualityRiskItem(afterActive || indexedItems[0] || queue.items[0]);
 }
 
 function revisionReasonLabel(reason) {
@@ -5856,6 +6273,8 @@ async function runProjectQa() {
     state.qaChecks = checks;
     state.qaFilter = "";
     renderQaResults();
+    state.qualityRiskQueue = currentQualityRiskQueue(checks);
+    renderQualityWorkbench();
     try {
       if (state.project[QA_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated QA activity log failure");
       await logProjectActivity("qa-run", "QA checks run", { issueCount: checks.length, documentId: state.documentFilter || "" });
@@ -10317,6 +10736,13 @@ function reportCountTableHtml(counts, emptyText = "None") {
   return `<table><tbody>${entries.map(([label, count]) => `<tr><th>${escapeHtml(label)}</th><td>${count}</td></tr>`).join("")}</tbody></table>`;
 }
 
+function qualityCategoryCountTableHtml(counts, emptyText = "None") {
+  const entries = Object.entries(counts || {})
+    .sort(([a], [b]) => qualityCategoryName(a).localeCompare(qualityCategoryName(b)));
+  if (!entries.length) return `<p class="muted">${escapeHtml(emptyText)}</p>`;
+  return `<table><tbody>${entries.map(([label, count]) => `<tr><th>${escapeHtml(qualityCategoryName(label))}</th><td>${count}</td></tr>`).join("")}</tbody></table>`;
+}
+
 function reportSafeLabel(value, fallback = "") {
   return redactSensitiveText(value || "").trim() || fallback;
 }
@@ -10345,12 +10771,26 @@ async function buildProjectReportData() {
   const qaChecks = workerClient?.runQaChecks
     ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
     : await fallback();
+  const qualityPassport = buildQualityPassportData({
+    project: state.project,
+    segments: state.segments,
+    qaChecks,
+    validation,
+    analysis,
+    terms,
+    activityEvents: reportActivityEvents,
+    tmEntries: scopedTm,
+    tmEntryCount: scopedTm.length,
+    termCount: terms.length,
+    profile: state.project.qualityProfile
+  });
   return {
     generatedAt: new Date().toISOString(),
     project: state.project,
     resources: projectResourceSummary(state.project),
     analysis,
     validation,
+    qualityPassport,
     qaChecks,
     qaBySeverity: countBy(qaChecks, (check) => check.severity),
     qaByType: countBy(qaChecks, (check) => check.type),
@@ -10378,6 +10818,10 @@ function projectReportHtml(data, options = {}) {
   const project = data.project;
   const totals = data.analysis.totals;
   const ai = data.analysis.ai || { drafts: 0, suggestionSegments: 0, suggestions: 0, reviewRisk: 0, highRisk: 0, risk: {} };
+  const quality = data.qualityPassport || {};
+  const qualityProfile = defaultQualityProfile(quality.profile || project.qualityProfile);
+  const qualityRiskQueue = quality.riskQueue || { totalRiskItems: 0, highRiskCount: 0, averageScore: 0, byLevel: {} };
+  const qualityEffort = quality.postEditingEffort || { label: "No segments", score: 0, drivers: [] };
   const validation = sanitizeValidationReportForDisplay(data.validation) || { errors: [], risky: [], warnings: [], preserved: [], simplified: [], skipped: [], ok: true };
   const files = anonymized
     ? data.analysis.files.map((file, index) => ({ ...file, name: `File ${index + 1}` }))
@@ -10453,6 +10897,28 @@ function projectReportHtml(data, options = {}) {
           <div class="card"><strong>${totals.comments}</strong><span>Review notes</span></div>
           <div class="card"><strong>${data.revisionCount}</strong><span>Target revisions</span></div>
         </div>
+      </section>
+      <section>
+        <h2>Quality Passport</h2>
+        <div class="cards">
+          <div class="card"><strong>${quality.confidenceScore ?? 0}</strong><span>Quality score</span></div>
+          <div class="card"><strong>${escapeHtml(qualityEffort.label)}</strong><span>Post-editing effort</span></div>
+          <div class="card"><strong>${qualityRiskQueue.totalRiskItems}</strong><span>Risk items</span></div>
+          <div class="card"><strong>${qualityRiskQueue.highRiskCount}</strong><span>High risk</span></div>
+        </div>
+        <table>
+          <tbody>
+            <tr><th>Standard</th><td>${escapeHtml(qualityLabel(qualityProfile.standard))}</td></tr>
+            <tr><th>Review depth</th><td>${escapeHtml(qualityLabel(qualityProfile.reviewDepth))}</td></tr>
+            <tr><th>Risk tolerance</th><td>${escapeHtml(qualityLabel(qualityProfile.riskTolerance))}</td></tr>
+            <tr><th>Terminology</th><td>${escapeHtml(qualityLabel(qualityProfile.terminologyStrictness))}</td></tr>
+            <tr><th>AI disclosure</th><td>${escapeHtml(qualityLabel(qualityProfile.aiDisclosure))}</td></tr>
+          </tbody>
+        </table>
+        <h3>Risk levels</h3>
+        ${reportCountTableHtml(qualityRiskQueue.byLevel || {}, "No unresolved quality risks.")}
+        <h3>Quality categories</h3>
+        ${qualityCategoryCountTableHtml(qualityRiskQueue.byCategory || {}, "No categorized quality risks.")}
       </section>
       <section>
         <h2>AI Triage</h2>
@@ -10531,6 +10997,161 @@ function projectReportHtml(data, options = {}) {
     </main>
   </body>
 </html>`;
+}
+
+function qualityPassportHtml(data) {
+  const project = data.project;
+  const passport = data.qualityPassport || {};
+  const profile = defaultQualityProfile(passport.profile || project.qualityProfile);
+  const riskQueue = passport.riskQueue || { items: [], byLevel: {}, totalRiskItems: 0, highRiskCount: 0, averageScore: 0 };
+  const validation = sanitizeValidationReportForDisplay(data.validation) || { errors: [], risky: [], warnings: [], preserved: [], simplified: [], skipped: [], ok: true };
+  const effort = passport.postEditingEffort || { label: "No segments", score: 0, drivers: [] };
+  const rows = (values, cells) => values.map((item) => `<tr>${cells(item).join("")}</tr>`).join("");
+  const projectTitle = reportSafeLabel(project.name, "Project");
+  const topRiskItems = (riskQueue.items || []).slice(0, 20);
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <title>${escapeHtml(projectTitle)} - LoopCAT Quality Passport</title>
+    <style>
+      :root { color-scheme: light; font-family: Arial, sans-serif; color: #1f2937; background: #f6f8fa; }
+      body { margin: 0; padding: 32px; }
+      main { max-width: 980px; margin: 0 auto; background: #fff; border: 1px solid #d9e0e7; border-radius: 8px; overflow: hidden; }
+      header { padding: 28px 32px; background: #202936; color: #fff; }
+      h1, h2, h3, p { margin-top: 0; }
+      h1 { font-size: 26px; margin-bottom: 8px; }
+      h2 { font-size: 18px; margin-bottom: 12px; }
+      section { padding: 24px 32px; border-top: 1px solid #e5eaf0; }
+      .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+      .card { border: 1px solid #d9e0e7; border-radius: 8px; padding: 14px; background: #fbfcfd; }
+      .card strong { display: block; font-size: 22px; margin-bottom: 4px; }
+      .muted { color: #657386; }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th, td { border-bottom: 1px solid #e5eaf0; padding: 9px 8px; text-align: left; vertical-align: top; }
+      th { color: #405064; background: #f4f7f9; }
+      ul { margin: 0; padding-left: 20px; }
+      footer { padding: 18px 32px; color: #657386; font-size: 12px; border-top: 1px solid #e5eaf0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>LoopCAT Quality Passport</h1>
+        <p>${escapeHtml(projectTitle)} - ${escapeHtml(languagePairDisplay(project.sourceLang, project.targetLang))}</p>
+        <p class="muted">Generated ${escapeHtml(formatDateTime(passport.generatedAt || data.generatedAt))}</p>
+      </header>
+      <section>
+        <h2>Quality Contract</h2>
+        <table>
+          <tbody>
+            <tr><th>Standard</th><td>${escapeHtml(qualityLabel(profile.standard))}</td></tr>
+            <tr><th>Review depth</th><td>${escapeHtml(qualityLabel(profile.reviewDepth))}</td></tr>
+            <tr><th>Risk tolerance</th><td>${escapeHtml(qualityLabel(profile.riskTolerance))}</td></tr>
+            <tr><th>Terminology</th><td>${escapeHtml(qualityLabel(profile.terminologyStrictness))}</td></tr>
+            <tr><th>AI disclosure</th><td>${escapeHtml(qualityLabel(profile.aiDisclosure))}</td></tr>
+            <tr><th>Audience</th><td>${escapeHtml(reportSafeLabel(profile.audience, "Not set"))}</td></tr>
+            <tr><th>Tone</th><td>${escapeHtml(reportSafeLabel(profile.tone, "Neutral"))}</td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Delivery Evidence</h2>
+        <div class="cards">
+          <div class="card"><strong>${passport.confidenceScore ?? 0}</strong><span>Quality score</span></div>
+          <div class="card"><strong>${escapeHtml(effort.label)}</strong><span>Post-editing effort</span></div>
+          <div class="card"><strong>${riskQueue.totalRiskItems}</strong><span>Risk items</span></div>
+          <div class="card"><strong>${riskQueue.highRiskCount}</strong><span>High risk</span></div>
+          <div class="card"><strong>${data.qaChecks.length}</strong><span>QA issues</span></div>
+          <div class="card"><strong>${data.analysis.totals.confirmedPercent}%</strong><span>Confirmed</span></div>
+        </div>
+      </section>
+      <section>
+        <h2>Risk Queue</h2>
+        <h3>By level</h3>
+        ${reportCountTableHtml(riskQueue.byLevel || {}, "No unresolved quality risks.")}
+        <h3>Quality Categories</h3>
+        ${qualityCategoryCountTableHtml(riskQueue.byCategory || {}, "No categorized quality risks.")}
+        <h3>Top risks</h3>
+        ${topRiskItems.length ? `<table>
+          <thead><tr><th>Segment</th><th>File</th><th>Category</th><th>Risk</th><th>Signals</th></tr></thead>
+          <tbody>${rows(topRiskItems, (item) => [
+            `<td>#${escapeHtml(item.label)}</td>`,
+            `<td>${escapeHtml(reportSafeLabel(item.documentName, "Document"))}</td>`,
+            `<td>${escapeHtml(qualityCategoryName(item.category))}</td>`,
+            `<td>${escapeHtml(qualityRiskLevelLabel(item.level))} ${item.score}</td>`,
+            `<td>${escapeHtml(item.reasons.map((reason) => reason.label).slice(0, 3).join(" "))}</td>`
+          ])}</tbody>
+        </table>` : `<p class="muted">No unresolved quality risks.</p>`}
+      </section>
+      <section>
+        <h2>QA Evidence</h2>
+        <h3>By severity</h3>
+        ${reportCountTableHtml(data.qaBySeverity)}
+        <h3>By type</h3>
+        ${reportCountTableHtml(data.qaByType)}
+      </section>
+      <section>
+        <h2>Review And AI Evidence</h2>
+        <div class="cards">
+          <div class="card"><strong>${data.analysis.totals.comments}</strong><span>Review notes</span></div>
+          <div class="card"><strong>${passport.ai?.drafts || 0}</strong><span>AI initiated</span></div>
+          <div class="card"><strong>${passport.ai?.reviewRisk || 0}</strong><span>AI review risk</span></div>
+          <div class="card"><strong>${passport.ai?.highRisk || 0}</strong><span>High AI risk</span></div>
+          <div class="card"><strong>${data.tmEntryCount}</strong><span>Linked TM units</span></div>
+          <div class="card"><strong>${data.termCount}</strong><span>Linked terms</span></div>
+        </div>
+        <h3>Review states</h3>
+        ${reportCountTableHtml(passport.reviewByState || {}, "No review states recorded.")}
+      </section>
+      <section>
+        <h2>Export Readiness</h2>
+        <div class="cards">
+          <div class="card"><strong>${validation.errors.length}</strong><span>Errors</span></div>
+          <div class="card"><strong>${validation.risky.length}</strong><span>Risks</span></div>
+          <div class="card"><strong>${validation.warnings.length}</strong><span>Warnings</span></div>
+        </div>
+        ${reportListHtml([...validation.errors, ...validation.risky, ...validation.warnings], "No export-readiness findings.")}
+      </section>
+      <section>
+        <h2>Effort Drivers</h2>
+        ${reportListHtml(effort.drivers || [], "No major post-editing drivers.")}
+      </section>
+      <footer>
+        This passport contains quality settings, counts, risk signals, and readiness evidence. Segment text is not included.
+      </footer>
+    </main>
+  </body>
+</html>`;
+}
+
+async function exportQualityPassport() {
+  if (!state.project) return;
+  try {
+    const data = await buildProjectReportData();
+    state.qaChecks = data.qaChecks;
+    state.qaFilter = "";
+    state.qualityRiskQueue = data.qualityPassport.riskQueue;
+    renderQaResults();
+    renderQualityWorkbench();
+    renderValidationReport(data.validation);
+    const base = fileSafeName(state.project.name || "project");
+    download(`${base}_quality-passport.html`, qualityPassportHtml(data), "text/html");
+    const activityLogged = await logOptionalProjectActivity("export", "Quality Passport exported", {
+      segmentCount: data.analysis.totals.segments,
+      wordCount: data.analysis.totals.words,
+      qaIssueCount: data.qaChecks.length,
+      qualityScore: data.qualityPassport.confidenceScore,
+      highRiskCount: data.qualityPassport.riskQueue.highRiskCount,
+      validationNoteCount: reportCount(data.validation)
+    }, "Quality Passport export");
+    const hasNotes = data.qaChecks.length || data.qualityPassport.riskQueue.highRiskCount || reportCount(data.validation);
+    setSaveStatus(appendActivityWarning(hasNotes ? "Quality Passport exported with notes" : "Quality Passport exported", activityLogged), exportStatusMode(hasNotes ? "dirty" : "saved", activityLogged));
+  } catch (error) {
+    setSaveStatus(error.message || "Quality Passport export failed", "dirty");
+  }
 }
 
 async function exportProjectReport(options = {}) {
@@ -10954,6 +11575,8 @@ function wireEvents() {
   els.projectFileImportBtn.addEventListener("click", () => els.projectFileImportInput.click());
   els.projectPackageExportBtn.addEventListener("click", exportProjectPackage);
   els.projectHomeDeleteBtn.addEventListener("click", () => confirmDeleteProject());
+  els.focusModeBtn?.addEventListener("click", toggleFocusMode);
+  els.exitFocusModeBtn?.addEventListener("click", () => setFocusMode(false));
   els.commandPaletteBtn.addEventListener("click", openCommandPalette);
   els.closeCommandPaletteBtn.addEventListener("click", closeCommandPalette);
   els.commandPaletteOverlay.addEventListener("click", (event) => {
@@ -11037,6 +11660,7 @@ function wireEvents() {
   els.exportLocalizationBtn.addEventListener("click", exportLocalization);
   els.exportXliffBtn.addEventListener("click", exportXliff);
   els.exportProjectReportBtn.addEventListener("click", exportProjectReport);
+  els.exportQualityPassportMenuBtn?.addEventListener("click", exportQualityPassport);
   els.exportAnonymizedProjectReportBtn.addEventListener("click", () => exportProjectReport({ anonymized: true }));
   els.copySourceBtn.addEventListener("click", copySourceToTarget);
   els.nextOpenBtn.addEventListener("click", goToNextOpenSegment);
@@ -11118,6 +11742,17 @@ function wireEvents() {
     event.preventDefault();
     await saveActiveReviewMetadata();
   });
+  els.qualityForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await saveQualityProfileFromForm();
+  });
+  els.qualityDecisionForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await saveQualityDecisionFromForm();
+  });
+  els.refreshQualityRiskBtn?.addEventListener("click", refreshQualityRiskQueue);
+  els.nextQualityRiskBtn?.addEventListener("click", goToNextQualityRisk);
+  els.exportQualityPassportBtn?.addEventListener("click", exportQualityPassport);
   els.aiSettingsForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     await saveAiSettings();
@@ -11877,6 +12512,26 @@ async function runAppWorkflowTest() {
     await flushPendingSegmentSaves(project.id);
     await openProjectFile(documentInfo.id);
     const segmentIndex = state.segments.findIndex((segment) => segment.documentId === documentInfo.id);
+    assert(Boolean(els.focusModeBtn && els.exitFocusModeBtn), "focus view controls are available in the editor");
+    setFocusMode(true);
+    assert(
+      state.focusMode &&
+        document.body.classList.contains("focus-mode") &&
+        els.workspace.classList.contains("focus-mode") &&
+        els.focusModeBtn.getAttribute("aria-pressed") === "true" &&
+        !els.exitFocusModeBtn.classList.contains("hidden") &&
+        Boolean(els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`)),
+      "focus view switches the editor into a noise-free segment layout"
+    );
+    setFocusMode(false);
+    assert(
+      !state.focusMode &&
+        !document.body.classList.contains("focus-mode") &&
+        !els.workspace.classList.contains("focus-mode") &&
+        els.focusModeBtn.getAttribute("aria-pressed") === "false" &&
+        els.exitFocusModeBtn.classList.contains("hidden"),
+      "focus view returns to the full editor layout"
+    );
     const autosaveRetryText = `Otomatik kayit yeniden deneme hedefi ${Date.now()}`;
     setHiddenSegmentField(state.segments[segmentIndex], AUTOSAVE_SAVE_FAILURE_TEST_FLAG, true);
     updateSegmentDraft(segmentIndex, autosaveRetryText);
@@ -14430,6 +15085,82 @@ async function runAppWorkflowTest() {
     );
     Reflect.deleteProperty(confirmRollbackSegment, CONFIRM_ACTIVITY_FAILURE_TEST_FLAG);
 
+    assert(
+      Boolean(
+        els.qualityForm &&
+          els.qualityActiveEvidence &&
+          els.qualityDecisionForm &&
+          els.qualityIssueCategorySelect &&
+          els.qualityIssueSeveritySelect &&
+          els.refreshQualityRiskBtn &&
+          els.exportQualityPassportBtn
+      ),
+      "quality workbench controls are available"
+    );
+    els.qualityStandardSelect.value = "agency-delivery";
+    els.qualityReviewDepthSelect.value = "lqa";
+    els.qualityRiskToleranceSelect.value = "strict";
+    els.qualityTerminologyStrictnessSelect.value = "strict";
+    els.qualityAiDisclosureSelect.value = "client-approved";
+    els.qualityAudienceInput.value = "Workflow client reviewers";
+    els.qualityToneInput.value = "Formal";
+    const qualityProfileSaved = await saveQualityProfileFromForm();
+    assert(
+      qualityProfileSaved &&
+        state.project.qualityProfile.standard === "agency-delivery" &&
+        state.project.qualityProfile.reviewDepth === "lqa" &&
+        state.project.qualityProfile.terminologyStrictness === "strict",
+      "quality profile persists project review contract"
+    );
+    state.qualityRiskQueue = currentQualityRiskQueue();
+    renderQualityWorkbench();
+    assert(
+      els.qualitySummary.textContent.includes("risk items") &&
+        els.qualityRiskList.textContent.length > 0,
+      "quality workbench renders risk summary"
+    );
+    const qualityDecisionSegment = currentSegment();
+    const qualityDecisionCommentCount = qualityDecisionSegment?.comments?.length || 0;
+    els.qualityIssueCategorySelect.value = "accuracy";
+    els.qualityIssueSeveritySelect.value = "high";
+    els.qualityDecisionNoteInput.value = "Quality evidence note";
+    const qualityDecisionSaved = await saveQualityDecisionFromForm();
+    const storedQualityDecisionSegment = (await getProjectSegments(project.id)).find((segment) => segment.id === qualityDecisionSegment?.id);
+    assert(
+      qualityDecisionSaved,
+      "quality decision save reports success"
+    );
+    assert(
+      storedQualityDecisionSegment?.reviewState === "needs-review",
+      "quality decision marks active segment needs-review"
+    );
+    assert(
+      (storedQualityDecisionSegment?.comments || []).length === qualityDecisionCommentCount + 1,
+      "quality decision persists one structured comment"
+    );
+    assert(
+      storedQualityDecisionSegment?.comments?.some((comment) =>
+        comment.body.includes("Quality decision: Accuracy (High)") &&
+          comment.body.includes("Quality evidence note") &&
+          comment.qualityDecision?.category === "accuracy" &&
+          comment.qualityDecision?.severity === "high"
+      ),
+      "quality decision persists category and severity metadata"
+    );
+    assert(
+      buildRiskQueue({
+        project: state.project,
+        segments: state.segments,
+        qaChecks: state.qaChecks,
+        profile: state.project.qualityProfile
+      })?.byCategory?.accuracy >= 1,
+      "quality decision contributes to category risk aggregation"
+    );
+    assert(
+      els.qualityActiveEvidence.textContent.includes("Accuracy"),
+      "quality decision renders active segment category evidence"
+    );
+
     const reportDownloads = [];
     const originalReportCreateObjectUrl = URL.createObjectURL.bind(URL);
     const originalReportAnchorClick = HTMLAnchorElement.prototype.click;
@@ -14468,6 +15199,14 @@ async function runAppWorkflowTest() {
           reportDownload.text.includes("AI initiated") &&
           reportDownload.text.includes("High AI risk"),
         "project report includes count-only AI triage metrics"
+      );
+      assert(
+        reportDownload.text.includes("Quality Passport") &&
+          reportDownload.text.includes("Quality score") &&
+          reportDownload.text.includes("Agency delivery") &&
+          reportDownload.text.includes("Quality categories") &&
+          reportDownload.text.includes("Accuracy"),
+        "project report includes quality passport metrics"
       );
       assert(
         !reportDownload.text.includes("external-domain-token-that-must-redact") &&
@@ -14547,6 +15286,20 @@ async function runAppWorkflowTest() {
       );
       assert(state.activityEvents.some((event) => event.type === "export" && event.summary === "Project report exported"), "project report export records project activity");
       assert(state.workspaceDirtyProjectIds.has(project.id), "project report export marks workspace package dirty");
+
+      await exportQualityPassport();
+      const qualityPassportDownload = await waitFor(() => reportDownloads.find((item) => item.text.includes("LoopCAT Quality Passport")), "quality passport download");
+      assert(
+        qualityPassportDownload.text.includes("Quality Contract") &&
+          qualityPassportDownload.text.includes("Delivery Evidence") &&
+          qualityPassportDownload.text.includes("Risk Queue") &&
+          qualityPassportDownload.text.includes("Quality Categories") &&
+          qualityPassportDownload.text.includes("Accuracy"),
+        "quality passport export creates evidence HTML"
+      );
+      assert(qualityPassportDownload.text.includes(`Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`), "quality passport export includes restrictive CSP");
+      assert(!qualityPassportDownload.text.includes(reportTargetText), "quality passport omits segment target text");
+      assert(state.activityEvents.some((event) => event.type === "export" && event.summary === "Quality Passport exported"), "quality passport export records project activity");
 
       await exportProjectReport({ anonymized: true });
       const anonymizedReportDownload = await waitFor(() => reportDownloads.find((item) => item.text.includes("LoopCAT Anonymized Project Report")), "anonymized project report download");

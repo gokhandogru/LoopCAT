@@ -108,6 +108,7 @@ const ALLOWED_APP_FILES = new Set([
   "qa.js",
   "validation.js",
   "analysis.js",
+  "quality.js",
   "ai.js",
   "worker-client.js",
   "cat-worker.js",

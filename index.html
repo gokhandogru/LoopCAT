@@ -225,6 +225,7 @@
                   </div>
                 </details>
                 <button id="confirmBtn" class="primary" title="Confirm current segment">Confirm</button>
+                <button id="focusModeBtn" type="button" title="Show only translation segments">Focus</button>
                 <details class="menu">
                   <summary>Actions</summary>
                   <div class="menu-panel">
@@ -246,6 +247,7 @@
                     <button id="exportXliffBtn">XLIFF</button>
                     <button id="exportTargetBtn">Target TXT</button>
                     <button id="exportProjectReportBtn">Project report</button>
+                    <button id="exportQualityPassportMenuBtn" type="button">Quality Passport</button>
                     <button id="exportAnonymizedProjectReportBtn">Anonymized report</button>
                   </div>
                 </details>
@@ -331,10 +333,10 @@
           <section class="side-panel tm-panel" data-collapsible-panel>
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize TM matches" aria-expanded="true">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize TM Matches" aria-expanded="true">
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
-                <h2>TM matches</h2>
+                <h2>TM Matches</h2>
               </div>
               <div class="mini-actions">
                 <details class="menu resource-mini-menu">
@@ -357,10 +359,10 @@
           <section class="side-panel tb-panel" data-collapsible-panel>
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize terms" aria-expanded="true">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize Termbases" aria-expanded="true">
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
-                <h2>Terms</h2>
+                <h2>Termbases</h2>
               </div>
               <div class="mini-actions">
                 <details class="menu resource-mini-menu">
@@ -398,10 +400,10 @@
           <section class="side-panel review-panel" data-collapsible-panel>
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize review" aria-expanded="true">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize comments" aria-expanded="true">
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
-                <h2>Review</h2>
+                <h2>Comments</h2>
               </div>
             </div>
             <div class="panel-content">
@@ -414,19 +416,112 @@
                 </select>
                 <textarea id="reviewNoteInput" rows="3" placeholder="Review note"></textarea>
                 <textarea id="reviewCommentInput" rows="3" placeholder="Add comment"></textarea>
-                <button type="submit">Save review</button>
+                <button type="submit">Save comments</button>
               </form>
               <div id="reviewCommentsList" class="comment-list muted">No active segment.</div>
+            </div>
+          </section>
+
+          <section class="side-panel quality-panel utility-panel collapsed" data-collapsible-panel>
+            <div class="panel-header">
+              <div class="panel-title">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Expand Quality Workbench" aria-expanded="false">
+                  <span class="toggle-arrow" aria-hidden="true"></span>
+                </button>
+                <h2>Quality Workbench</h2>
+              </div>
+            </div>
+            <div class="panel-content">
+              <form id="qualityForm" class="quality-form">
+                <label>
+                  Standard
+                  <select id="qualityStandardSelect">
+                    <option value="student-review">Student review</option>
+                    <option value="freelance-delivery">Freelance delivery</option>
+                    <option value="agency-delivery">Agency delivery</option>
+                    <option value="regulated">Regulated</option>
+                  </select>
+                </label>
+                <label>
+                  Review depth
+                  <select id="qualityReviewDepthSelect">
+                    <option value="targeted">Targeted</option>
+                    <option value="full">Full</option>
+                    <option value="lqa">LQA</option>
+                  </select>
+                </label>
+                <label>
+                  Risk tolerance
+                  <select id="qualityRiskToleranceSelect">
+                    <option value="balanced">Balanced</option>
+                    <option value="strict">Strict</option>
+                    <option value="regulated">Regulated</option>
+                  </select>
+                </label>
+                <label>
+                  Terminology
+                  <select id="qualityTerminologyStrictnessSelect">
+                    <option value="standard">Standard</option>
+                    <option value="strict">Strict</option>
+                  </select>
+                </label>
+                <label>
+                  AI disclosure
+                  <select id="qualityAiDisclosureSelect">
+                    <option value="not-used">Not used</option>
+                    <option value="local-only">Local only</option>
+                    <option value="hosted-disclosed">Hosted disclosed</option>
+                    <option value="client-approved">Client approved</option>
+                  </select>
+                </label>
+                <input id="qualityAudienceInput" placeholder="Audience">
+                <input id="qualityToneInput" placeholder="Tone">
+                <button type="submit">Save profile</button>
+              </form>
+              <div id="qualitySummary" class="quality-summary muted">No quality profile loaded.</div>
+              <div id="qualityActiveEvidence" class="quality-active-evidence muted">No active segment.</div>
+              <form id="qualityDecisionForm" class="quality-decision-form">
+                <label>
+                  Category
+                  <select id="qualityIssueCategorySelect">
+                    <option value="accuracy">Accuracy</option>
+                    <option value="terminology">Terminology</option>
+                    <option value="fluency">Fluency</option>
+                    <option value="style">Style</option>
+                    <option value="locale">Locale</option>
+                    <option value="formatting">Formatting</option>
+                    <option value="compliance">Compliance</option>
+                    <option value="review">Review</option>
+                  </select>
+                </label>
+                <label>
+                  Severity
+                  <select id="qualityIssueSeveritySelect">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </label>
+                <textarea id="qualityDecisionNoteInput" placeholder="Decision note"></textarea>
+                <button id="saveQualityDecisionBtn" type="submit">Save decision</button>
+              </form>
+              <div class="quality-actions">
+                <button id="refreshQualityRiskBtn" type="button">Refresh risks</button>
+                <button id="nextQualityRiskBtn" type="button">Next risk</button>
+                <button id="exportQualityPassportBtn" type="button">Quality Passport</button>
+              </div>
+              <div id="qualityRiskList" class="quality-risk-list muted">No risk queue yet.</div>
             </div>
           </section>
 
           <section class="side-panel project-card utility-panel collapsed" data-collapsible-panel>
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Expand Project info" aria-expanded="false">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Expand Project Info" aria-expanded="false">
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
-                <h2>Project info</h2>
+                <h2>Project Info</h2>
               </div>
             </div>
             <div class="panel-content">
@@ -441,10 +536,10 @@
           <section class="side-panel revision-panel utility-panel collapsed" data-collapsible-panel>
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Expand revision history" aria-expanded="false">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Expand Revision History" aria-expanded="false">
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
-                <h2>Revision history</h2>
+                <h2>Revision History</h2>
               </div>
             </div>
             <div class="panel-content">
@@ -754,13 +849,13 @@
             </div>
           </section>
 
-          <section class="side-panel" data-collapsible-panel>
+          <section class="side-panel qa-panel" data-collapsible-panel>
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize QA checks" aria-expanded="true">
+                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize QA Checks" aria-expanded="true">
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
-                <h2>QA checks</h2>
+                <h2>QA Checks</h2>
               </div>
             </div>
             <div class="panel-content">
@@ -770,6 +865,8 @@
         </aside>
       </main>
     </div>
+
+    <button id="exitFocusModeBtn" class="focus-exit-btn hidden" type="button">Exit Focus</button>
 
     <div id="concordanceOverlay" class="concordance-overlay hidden">
       <section class="concordance-popover" role="dialog" aria-modal="false" aria-labelledby="concordanceTitle">
@@ -929,6 +1026,7 @@
     <script src="./qa.js"></script>
     <script src="./validation.js"></script>
     <script src="./analysis.js"></script>
+    <script src="./quality.js"></script>
     <script src="./ai.js"></script>
     <script src="./worker-client.js"></script>
     <script src="./project.js"></script>

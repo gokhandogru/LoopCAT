@@ -62,10 +62,13 @@ Required fields:
 - `resourceLinks`: Array of linked TM/TB resources.
 - `qaSettings`
 - `aiSettings`
+- `qualityProfile`
 - `createdAt`
 - `updatedAt`
 
 `aiSettings` may include provider, model, source-sharing consent, context toggles, and style instructions. It must not include API keys, tokens, authorization headers, or other secrets.
+
+`qualityProfile` may include the review standard, review depth, risk tolerance, terminology strictness, AI disclosure stance, audience, and tone used by the Quality Workbench and Quality Passport exports. It must not include client secrets, API keys, provider traces, or credentials.
 
 Legacy packages may still contain `academicMetadata`; current LoopCAT builds ignore and strip that field during local saves, package exports, backups, and workspace writes.
 
@@ -127,6 +130,8 @@ Recommended fields:
 - `structure`
 
 Segment IDs must be unique inside a package. Segment `projectId` values should match `project.id`.
+
+Structured `comments` may include optional `qualityDecision` metadata with `category` and `severity` fields. Current quality categories are `accuracy`, `terminology`, `fluency`, `style`, `locale`, `formatting`, `compliance`, and `review`; current severities are `low`, `medium`, `high`, and `critical`.
 
 ## Resources
 

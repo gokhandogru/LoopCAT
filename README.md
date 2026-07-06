@@ -40,12 +40,15 @@ This first version is intentionally focused on a reliable editing loop:
 - Insert protected placeholders into target segments.
 - Prevent confirming a segment when protected placeholders are missing.
 - Run QA checks for empty targets, missing tags, copied source, number mismatches, punctuation mismatches, and termbase usage, with severity, fix hints, counts, filtering, and jump-to-issue navigation.
+- Configure a project quality profile for the review standard, review depth, risk tolerance, terminology strictness, AI disclosure stance, audience, and tone.
+- Use the Quality Workbench to calculate a risk queue from QA issues, review comments, AI review risk, AI-initiated drafts, revision density, confirmation state, terminology strictness, and profile settings, then jump to the next highest-priority segment.
+- Classify active-segment quality decisions with LQA-style categories such as accuracy, terminology, fluency, style, locale, formatting, compliance, and review.
 - Block delivery exports when target segments are still empty or protected tags/placeholders are missing.
 - Merge with the next segment or split the active segment when the source format can be reconstructed safely, such as unstructured text or compatible DOCX paragraph segments.
 - Autosave segment changes locally, retrying transient background save failures and keeping queued edits pending if a forced save flush fails.
 - Request persistent browser storage when available, estimate local storage usage, and warn in the Workspace menu if storage remains best-effort or nearly full.
 - Confirm segments and save them to a local translation memory.
-- Mark segments as needs review, reviewed, or blocked; filter by review state; and save reviewer notes plus structured comments.
+- Mark segments as needs review, reviewed, or blocked; filter by review state; and save reviewer notes, structured comments, and category-backed quality decisions.
 - Show exact and fuzzy TM matches for the active segment.
 - Add local termbase entries and show terms found in the active source segment.
 - Mark target terms as forbidden and block delivery exports when forbidden terminology appears.
@@ -61,6 +64,7 @@ This first version is intentionally focused on a reliable editing loop:
 - Show validation reports for project packages, export readiness, and backup restore checks.
 - Review project analysis for progress, repetitions, TM leverage, untranslated segments, review flags, and comments.
 - Export offline project reports with terminology status tables for approved and forbidden terms.
+- Export a Quality Passport HTML report with the project quality contract, quality score, post-editing effort estimate, risk queue, quality category breakdowns, QA evidence, review/AI evidence, and export-readiness notes while omitting segment text.
 - Export anonymized offline project reports for research documentation.
 - Include target revision counts in offline project reports while keeping segment text out of the report.
 - Track local activity events for imports, exports, QA runs, segment confirmations, review changes, and AI actions, including the actual AI provider used and the configured project provider where they differ.

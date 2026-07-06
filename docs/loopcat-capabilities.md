@@ -219,7 +219,7 @@ Current QA checks:
 Current review capabilities:
 
 - Mark target rows as needs review, reviewed, or blocked.
-- Save reviewer notes and structured comments.
+- Save reviewer notes, structured comments, and category-backed quality decisions.
 - Filter by review state.
 - Export bilingual DOCX review files with segment status, reviewer notes, structured comments, and QA summaries.
 - Include revision counts in reports.
@@ -227,6 +227,9 @@ Current review capabilities:
 Current reporting capabilities:
 
 - Project analysis for progress, repetitions, TM leverage, untranslated segments, review flags, comments, and AI triage.
+- Quality Workbench risk queue using QA issues, review state, comments, category-backed quality decisions, AI review risk, AI-initiated drafts, AI suggestions, target revision density, confirmation state, and the project quality profile.
+- Project quality profile covering review standard, review depth, risk tolerance, terminology strictness, AI disclosure, audience, and tone.
+- Quality Passport export with quality contract, quality score, post-editing effort estimate, risk levels, quality categories, top risk signals, QA evidence, review/AI evidence, and export-readiness notes. Segment source and target text are not included.
 - Normal offline HTML project report with counts, terminology status, QA totals, and activity summaries.
 - Anonymized offline HTML project report that redacts project names, file names, resource names, terminology text, activity summaries, activity types, and segment text.
 - Restrictive CSP in exported report HTML.
@@ -235,6 +238,7 @@ Suggested tests:
 
 - Run QA on a file with empty targets, missing tags, number mismatch, and forbidden terminology.
 - Export normal and anonymized project reports and inspect what is included or redacted.
+- Save a quality profile, classify one quality decision, refresh the risk queue, jump to the next risk, and export a Quality Passport.
 - Export a bilingual DOCX review file and confirm comments/statuses are represented.
 
 ## 9. Export And Delivery

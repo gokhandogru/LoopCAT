@@ -175,6 +175,30 @@ function defaultAiSettings(settings = {}) {
   };
 }
 
+const QUALITY_STANDARDS = new Set(["student-review", "freelance-delivery", "agency-delivery", "regulated"]);
+const QUALITY_REVIEW_DEPTHS = new Set(["targeted", "full", "lqa"]);
+const QUALITY_RISK_TOLERANCES = new Set(["balanced", "strict", "regulated"]);
+const QUALITY_TERMINOLOGY_STRICTNESS = new Set(["standard", "strict"]);
+const QUALITY_AI_DISCLOSURE_MODES = new Set(["not-used", "local-only", "hosted-disclosed", "client-approved"]);
+
+function qualityChoice(value, allowed, fallback) {
+  const clean = cleanText(value);
+  return allowed.has(clean) ? clean : fallback;
+}
+
+function defaultQualityProfile(profile = {}) {
+  const source = profile && typeof profile === "object" ? profile : {};
+  return {
+    standard: qualityChoice(source.standard, QUALITY_STANDARDS, "freelance-delivery"),
+    reviewDepth: qualityChoice(source.reviewDepth, QUALITY_REVIEW_DEPTHS, "targeted"),
+    riskTolerance: qualityChoice(source.riskTolerance, QUALITY_RISK_TOLERANCES, "balanced"),
+    terminologyStrictness: qualityChoice(source.terminologyStrictness, QUALITY_TERMINOLOGY_STRICTNESS, "standard"),
+    aiDisclosure: qualityChoice(source.aiDisclosure, QUALITY_AI_DISCLOSURE_MODES, "local-only"),
+    audience: redactSensitiveText(cleanText(source.audience)).slice(0, 120),
+    tone: redactSensitiveText(cleanText(source.tone, "Neutral")).slice(0, 80)
+  };
+}
+
 function sanitizedAiSuggestion(suggestion = {}, context = null) {
   const activeContext = context || createPortableSanitizerContext();
   const source = suggestion && typeof suggestion === "object" ? suggestion : {};
@@ -413,6 +437,7 @@ function normalizeProject(project = {}) {
       enabledChecks: ["empty", "tag", "copy", "number", "punctuation", "term"]
     },
     aiSettings: defaultAiSettings(projectWithoutAcademicMetadata.aiSettings),
+    qualityProfile: defaultQualityProfile(projectWithoutAcademicMetadata.qualityProfile),
     exportHistory: projectWithoutAcademicMetadata.exportHistory || []
   };
 }
@@ -531,6 +556,7 @@ function sanitizePortableValue(value, key = "", path = [], context = null) {
   const activeContext = context || createPortableSanitizerContext();
   const currentPath = key ? [...path, key] : path;
   if (key === "aiSettings") return defaultAiSettings(value);
+  if (key === "qualityProfile") return defaultQualityProfile(value);
   if (key === "aiSuggestions") return Array.isArray(value) ? value.map((item) => sanitizedAiSuggestion(item, activeContext)) : [];
   if (key === "activityEvents") return Array.isArray(value) ? value.map((item) => sanitizedActivityEvent(item, activeContext)) : [];
   if (isActivityEventLike(value)) return sanitizedActivityEvent(value, activeContext);
