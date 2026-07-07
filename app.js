@@ -65,6 +65,7 @@ const {
 } = window.CatHan.ai;
 const workerClient = window.CatHan.workerClient;
 const workspaceStorage = window.CatHan.workspaceStorage;
+const uiI18n = window.CatHan.i18n;
 const APP_NAME = "LoopCAT";
 const LEGACY_APP_NAME = "CatHan";
 const OPENAI_KEY_STORAGE = "loopcat.openai.apiKey";
@@ -777,6 +778,9 @@ const els = {
   workspaceMenuSummary: document.querySelector("#workspaceMenuSummary"),
   workspaceMenu: document.querySelector(".workspace-menu"),
   workspaceHealth: document.querySelector("#workspaceHealth"),
+  uiLocaleSelect: document.querySelector("#uiLocaleSelect"),
+  uiLocaleImportInput: document.querySelector("#uiLocaleImportInput"),
+  exportUiSourceBtn: document.querySelector("#exportUiSourceBtn"),
   workspaceRecoveryPanel: document.querySelector("#workspaceRecoveryPanel"),
   workspaceRecoveryMessage: document.querySelector("#workspaceRecoveryMessage"),
   workspaceRecoveryList: document.querySelector("#workspaceRecoveryList"),
@@ -1022,17 +1026,111 @@ const els = {
   backupExportBtn: document.querySelector("#backupExportBtn")
 };
 
+function uiT(key, values = {}) {
+  return uiI18n?.t ? uiI18n.t(key, values) : key;
+}
+
+function uiSource(text, values = {}) {
+  return uiI18n?.source ? uiI18n.source(text, values) : String(text || "");
+}
+
+function currentUiLocale() {
+  return uiI18n?.getLocale?.() || document.documentElement.lang || "en-US";
+}
+
+function uiLabel(key, values = {}) {
+  return uiT(`ui.label.${key}`, values);
+}
+
+function uiLabelHtml(key, values = {}) {
+  return escapeHtml(uiLabel(key, values));
+}
+
+function translatedSourceText(text, values = {}) {
+  return uiSource(text, values);
+}
+
+function translatedSourceHtml(text, values = {}) {
+  return escapeHtml(translatedSourceText(text, values));
+}
+
+function uiConfirm(message) {
+  return window.confirm(uiSource(message));
+}
+
+function uiAlert(message) {
+  window.alert(uiSource(message));
+}
+
+function renderUiLocaleOptions() {
+  if (!els.uiLocaleSelect || !uiI18n?.availableLocales) return;
+  const current = uiI18n.getLocale();
+  els.uiLocaleSelect.replaceChildren(...uiI18n.availableLocales().map((locale) => {
+    const option = document.createElement("option");
+    option.value = locale.locale;
+    option.textContent = `${locale.label || locale.locale}${locale.custom ? ` (${uiSource("custom")})` : ""}`;
+    return option;
+  }));
+  els.uiLocaleSelect.value = current;
+}
+
+function refreshLocalizedUi() {
+  uiI18n?.localizeStaticDom?.(document.body);
+  renderUiLocaleOptions();
+  renderFocusMode();
+  renderWorkspaceStatus();
+  renderProjectStorageStatus();
+  if (state.view === "projects") renderProjectsView();
+  if (state.view === "resources") renderResourcesView();
+  if (state.project) {
+    if (state.view === "project") {
+      renderProjectHome();
+      void renderProjectAnalysis();
+    }
+    renderEditor();
+    renderProgress();
+    renderReviewPanel();
+    renderQualityWorkbench();
+    renderRevisionHistory();
+    renderQaResults();
+    refreshSidebar();
+  }
+}
+
+async function importUiLocaleFile() {
+  const file = els.uiLocaleImportInput?.files?.[0];
+  if (!file || !uiI18n?.saveCustomLocale) return;
+  try {
+    const catalog = JSON.parse(await file.text());
+    const locale = uiI18n.saveCustomLocale(catalog);
+    renderUiLocaleOptions();
+    uiI18n.setLocale(locale);
+    refreshLocalizedUi();
+    setSaveStatus("Interface translation imported", "saved");
+  } catch (error) {
+    setSaveStatus(error.message || "Interface translation import failed", "dirty");
+  } finally {
+    if (els.uiLocaleImportInput) els.uiLocaleImportInput.value = "";
+  }
+}
+
+function exportUiSourceCatalog() {
+  if (!uiI18n?.sourceCatalogJson) return;
+  download(`loopcat-ui-source-${new Date().toISOString().slice(0, 10)}.json`, uiI18n.sourceCatalogJson(), "application/json");
+  setSaveStatus("UI source exported", "saved");
+}
+
 function setSaveStatus(text, mode = "") {
   if (state.saveStatusTimer) {
     clearTimeout(state.saveStatusTimer);
     state.saveStatusTimer = 0;
   }
   const displayText = redactSensitiveText(text || "").trim();
-  els.saveStatus.textContent = displayText;
+  els.saveStatus.textContent = uiSource(displayText);
   els.saveStatus.className = `save-status ${mode}`;
   if ((mode === "saved" || displayText.startsWith("Saved to ")) && displayText !== "Saved") {
     state.saveStatusTimer = setTimeout(() => {
-      els.saveStatus.textContent = "Saved";
+      els.saveStatus.textContent = uiT("app.status.saved");
       els.saveStatus.className = "save-status saved";
       state.saveStatusTimer = 0;
     }, 5000);
@@ -1044,8 +1142,8 @@ function renderFocusMode() {
   document.body.classList.toggle("focus-mode", active);
   els.workspace.classList.toggle("focus-mode", active);
   if (els.focusModeBtn) {
-    els.focusModeBtn.textContent = active ? "Normal view" : "Focus";
-    els.focusModeBtn.title = active ? "Return to the full editor" : "Show only translation segments";
+    els.focusModeBtn.textContent = active ? uiT("app.focus.normalView") : uiT("app.focus.focus");
+    els.focusModeBtn.title = active ? uiT("app.focus.returnTitle") : uiT("app.focus.showOnlyTitle");
     els.focusModeBtn.setAttribute("aria-pressed", String(active));
   }
   if (els.exitFocusModeBtn) {
@@ -2010,8 +2108,10 @@ function segmentHasAiDraft(segment = {}) {
 function aiPretranslationBadge(segment = {}) {
   return {
     className: "ai-initiated",
-    text: "AI initiated",
-    title: `AI-initiated pretranslation${segment.aiPretranslation?.model ? `: ${segment.aiPretranslation.model}` : ""}`
+    text: uiSource("AI initiated"),
+    title: segment.aiPretranslation?.model
+      ? uiLabel("aiInitiatedPretranslationModel", { model: segment.aiPretranslation.model })
+      : uiLabel("aiInitiatedPretranslation")
   };
 }
 
@@ -2303,10 +2403,10 @@ function languageNameForUi(code) {
   const clean = canonicalLanguageCode(code);
   if (!clean) return "";
   const configuredName = configuredLanguageName(clean);
-  if (configuredName) return configuredName;
+  if (configuredName) return uiSource(configuredName);
   try {
     if (typeof Intl.DisplayNames === "function") {
-      const names = new Intl.DisplayNames([navigator.language || "en"], { type: "language" });
+      const names = new Intl.DisplayNames([uiI18n?.getLocale?.() || navigator.language || "en"], { type: "language" });
       const label = names.of(clean);
       if (label && label !== clean) return label;
     }
@@ -2727,10 +2827,18 @@ function canRunBilingualDocxExport(report) {
 
 function reviewLabel(value) {
   return {
-    "needs-review": "Needs review",
-    reviewed: "Reviewed",
-    blocked: "Blocked"
+    "needs-review": uiSource("Needs review"),
+    reviewed: uiSource("Reviewed"),
+    blocked: uiSource("Blocked")
   }[value] || "";
+}
+
+function segmentStatusLabel(status) {
+  return {
+    empty: uiLabel("empty"),
+    draft: uiLabel("draft"),
+    confirmed: uiLabel("confirmed")
+  }[status] || uiSource(status);
 }
 
 function commandList() {
@@ -2845,13 +2953,13 @@ async function flushPendingSegmentSaves(projectId = "") {
 }
 
 function formatDate(value) {
-  if (!value) return "Never";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
+  if (!value) return uiSource("Never");
+  return new Intl.DateTimeFormat(uiI18n?.getLocale?.() || undefined, { dateStyle: "medium" }).format(new Date(value));
 }
 
 function formatDateTime(value) {
-  if (!value) return "Never";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  if (!value) return uiSource("Never");
+  return new Intl.DateTimeFormat(uiI18n?.getLocale?.() || undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 function workspaceDirtyIds() {
@@ -2970,9 +3078,7 @@ function clearWorkspaceDirtyMemoryOnly() {
 }
 
 function workspaceStatusLine(status = state.workspaceStatus) {
-  if (!status?.supported) return "Folder storage unavailable";
-  if (!status.connected) return "Browser cache";
-  return displaySafeText(status.name, "Workspace folder");
+  return uiT("workspace.menu.summary");
 }
 
 function renderWorkspaceStatus() {
@@ -2980,19 +3086,29 @@ function renderWorkspaceStatus() {
   const status = state.workspaceStatus || {};
   const dirtyCount = visibleWorkspaceDirtyCount(status);
   els.workspaceMenuSummary.textContent = dirtyCount
-    ? `${workspaceStatusLine(status)} (${dirtyCount} unsaved)`
+    ? uiT("workspace.menu.summaryDirty", { count: dirtyCount })
     : workspaceStatusLine(status);
-  const mode = status.connected ? "Workspace folder" : "Browser cache";
-  const folderSupport = status.supported ? "Folder write support available" : "Use manual project and backup import/export";
+  const mode = status.connected ? uiT("workspace.status.folderTitle") : uiT("workspace.status.localTitle");
+  const folderSupport = status.supported
+    ? uiT("workspace.status.localDetail")
+    : uiT("workspace.status.unsupportedDetail");
   const storageWarnings = storageDurabilityWarnings(state.storageDurability);
+  const folderName = displaySafeText(status.name, uiT("workspace.status.workspaceFolder"));
+  const countLine = status.connected
+    ? uiT("workspace.status.folderContents", {
+      packages: status.projectCount || 0,
+      resources: status.resourceCount || 0,
+      backups: status.backupCount || 0
+    })
+    : "";
   els.workspaceHealth.innerHTML = `
     <strong>${escapeHtml(mode)}</strong>
-    <span>${status.connected ? displaySafeHtml(status.name, "Workspace folder") : escapeHtml(folderSupport)}</span>
-    <span>${escapeHtml(storageDurabilityLine(state.storageDurability))}</span>
-    <span>Last sync: ${escapeHtml(formatDateTime(status.lastSyncedAt))}</span>
-    <span>${status.projectCount || 0} package${status.projectCount === 1 ? "" : "s"} - ${status.resourceCount || 0} resource${status.resourceCount === 1 ? "" : "s"} - ${status.backupCount || 0} backup${status.backupCount === 1 ? "" : "s"}</span>
-    ${dirtyCount ? `<span class="workspace-warning">${dirtyCount} project package${dirtyCount === 1 ? "" : "s"} not saved to the workspace folder.</span>` : ""}
-    ${storageWarnings.map((warning) => `<span class="workspace-warning">${escapeHtml(warning)}</span>`).join("")}
+    <span>${status.connected ? escapeHtml(uiT("workspace.status.folderDetail", { name: folderName })) : escapeHtml(folderSupport)}</span>
+    <span>${escapeHtml(uiSource(storageDurabilityLine(state.storageDurability)))}</span>
+    ${status.connected ? `<span>${escapeHtml(uiT("workspace.status.lastSync", { date: formatDateTime(status.lastSyncedAt) }))}</span>` : ""}
+    ${countLine ? `<span>${escapeHtml(countLine)}</span>` : ""}
+    ${dirtyCount ? `<span class="workspace-warning">${escapeHtml(uiT("workspace.status.dirtyWarning", { count: dirtyCount }))}</span>` : ""}
+    ${storageWarnings.map((warning) => `<span class="workspace-warning">${escapeHtml(uiSource(warning))}</span>`).join("")}
     ${(status.warnings || []).length ? `<span class="workspace-warning">${escapeHtml(status.warnings[0])}${status.warnings.length > 1 ? ` (${status.warnings.length} total)` : ""}</span>` : ""}
   `;
   els.chooseWorkspaceBtn.disabled = !status.supported;
@@ -3120,7 +3236,7 @@ function renderProjectStorageStatus() {
   if (!els.projectStorageStatus || !workspaceStorage) return;
   const status = state.workspaceStatus || {};
   if (!status.supported) {
-    els.projectStorageStatus.textContent = "Folder saving is unavailable in this browser. Project packages can still be imported and exported manually.";
+    els.projectStorageStatus.textContent = uiSource("Folder saving is unavailable in this browser. Project packages can still be imported and exported manually.");
     els.saveProjectToFolderInput.checked = false;
     els.saveProjectToFolderInput.disabled = true;
     els.projectChooseWorkspaceBtn.disabled = true;
@@ -3129,8 +3245,8 @@ function renderProjectStorageStatus() {
   els.saveProjectToFolderInput.disabled = false;
   els.projectChooseWorkspaceBtn.disabled = false;
   els.projectStorageStatus.textContent = status.connected
-    ? `Folder: ${displaySafeText(status.name, "Workspace folder")}. New package saves go there.`
-    : "Default folder: Documents. You can choose a different folder before creating the project.";
+    ? uiLabel("projectStorageFolder", { name: displaySafeText(status.name, uiT("workspace.status.workspaceFolder")) })
+    : uiLabel("projectStorageDefault");
 }
 
 function projectProgress(segments) {
@@ -3257,7 +3373,9 @@ function projectDialogValues() {
 }
 
 function resourceOptionHtml(resource, type, selected, main) {
-  const countLabel = resource.count ? `${resource.count} ${type === "tm" ? "units" : "terms"}` : "empty";
+  const countLabel = resource.count
+    ? uiLabel(type === "tm" ? "unitCount" : "termCount", { count: resource.count })
+    : uiLabel("empty");
   const checkbox = `<input type="checkbox" data-resource-type="${type}" data-resource-name="${escapeHtml(resource.name)}" ${selected ? "checked" : ""}>`;
   const radio = type === "tm"
     ? `<input type="radio" name="projectMainTm" data-main-tm="${escapeHtml(resource.name)}" ${main ? "checked" : ""}>`
@@ -3284,10 +3402,10 @@ function renderProjectResourcePickers(project = state.project) {
   const tbResources = matchingResourceSummaries("tb", sourceLang, targetLang, selectedTbNames);
   els.projectTmResourceList.innerHTML = tmResources.length
     ? tmResources.map((resource) => resourceOptionHtml(resource, "tm", selectedTmNames.includes(resource.name), resource.name === main)).join("")
-    : `<div class="muted">No matching TMs in Resources for this language pair.</div>`;
+    : `<div class="muted">${uiLabelHtml("noMatchingTms")}</div>`;
   els.projectTbResourceList.innerHTML = tbResources.length
     ? tbResources.map((resource) => resourceOptionHtml(resource, "tb", selectedTbNames.includes(resource.name), false)).join("")
-    : `<div class="muted">No matching TBs in Resources for this language pair.</div>`;
+    : `<div class="muted">${uiLabelHtml("noMatchingTbs")}</div>`;
   els.projectTmResourceList.querySelectorAll('[data-main-tm]').forEach((radio) => {
     radio.addEventListener("change", () => {
       const name = radio.dataset.mainTm;
@@ -3309,8 +3427,8 @@ async function openProjectDialog(mode = "create") {
   state.projectDialogMode = mode;
   await refreshResources();
   const editing = mode === "edit" && state.project;
-  els.projectDialogTitle.textContent = editing ? "Project settings" : "New project";
-  els.projectForm.querySelector(".primary").textContent = editing ? "Save settings" : "Create";
+  els.projectDialogTitle.textContent = editing ? uiSource("Project settings") : uiSource("New project");
+  els.projectForm.querySelector(".primary").textContent = editing ? uiSource("Save settings") : uiSource("Create");
   if (els.projectCreatorInput) {
     els.projectCreatorInput.value = editing ? cleanCreatorName(state.project.creatorName) : await suggestedCreatorName();
   }
@@ -3506,21 +3624,21 @@ function renderValidationReport(report) {
   if (!displayReport) return;
   els.validationReportMeta.innerHTML = `
     <span>${escapeHtml(reportSummary(displayReport))}</span>
-    <button class="validation-dismiss" type="button" aria-label="Dismiss validation report">Dismiss</button>
+    <button class="validation-dismiss" type="button" aria-label="${translatedSourceHtml("Dismiss validation report")}">${translatedSourceHtml("Dismiss")}</button>
   `;
   els.validationReportMeta.querySelector(".validation-dismiss").addEventListener("click", () => renderValidationReport(null));
   const groups = [
-    ["errors", "Errors"],
-    ["risky", "Risk"],
-    ["warnings", "Warnings"],
-    ["simplified", "Simplified"],
-    ["skipped", "Skipped"],
-    ["preserved", "Preserved"]
+    ["errors", uiLabel("errors")],
+    ["risky", uiLabel("risk")],
+    ["warnings", uiSource("Warnings")],
+    ["simplified", uiLabel("simplified")],
+    ["skipped", uiLabel("skipped")],
+    ["preserved", uiLabel("preserved")]
   ];
   const html = groups
     .flatMap(([key, label]) => (displayReport[key] || []).map((message) => `<div class="validation-item"><strong>${label}</strong>: ${escapeHtml(message)}</div>`))
     .join("");
-  els.validationReportList.innerHTML = html ? `<div class="validation-items">${html}</div>` : `<div class="muted">No validation issues.</div>`;
+  els.validationReportList.innerHTML = html ? `<div class="validation-items">${html}</div>` : `<div class="muted">${translatedSourceHtml("No validation issues.")}</div>`;
   if (displayReport.ok) {
     state.validationReportTimer = setTimeout(() => {
       renderValidationReport(null);
@@ -3538,32 +3656,32 @@ async function renderProjectAnalysis() {
   const tmNames = new Set(projectTmNames(project));
   const analysis = analyzeProject(project, segments, tmEntries.filter((entry) => tmNames.has(entry.tmName)));
   const ai = analysis.ai || {};
-  els.analysisMeta.textContent = `Generated ${formatDate(analysis.generatedAt)}`;
+  els.analysisMeta.textContent = uiLabel("generatedAt", { date: formatDate(analysis.generatedAt) });
   els.projectAnalysis.innerHTML = `
-    <div><strong>${analysis.totals.confirmedPercent}%</strong><span>confirmed</span></div>
-    <div><strong>${analysis.totals.untranslated}</strong><span>untranslated</span></div>
-    <div><strong>${analysis.totals.repetitions}</strong><span>repetitions</span></div>
-    <div><strong>${analysis.leverage.exact}</strong><span>exact TM</span></div>
-    <div><strong>${analysis.leverage.fuzzy95 + analysis.leverage.fuzzy85}</strong><span>strong fuzzy</span></div>
-    <div><strong>${analysis.totals.segments - analysis.totals.confirmed}</strong><span>open segments</span></div>
-    <div><strong>${analysis.totals.files}</strong><span>files</span></div>
-    <div><strong>${analysis.totals.words}</strong><span>source words</span></div>
-    <div><strong>${ai.drafts || 0}</strong><span>AI initiated</span></div>
-    <div><strong>${ai.suggestionSegments || 0}</strong><span>AI suggestion rows</span></div>
-    <div><strong>${ai.highRisk || 0}</strong><span>high AI risk</span></div>
+    <div><strong>${analysis.totals.confirmedPercent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
+    <div><strong>${analysis.totals.untranslated}</strong><span>${uiLabelHtml("untranslated")}</span></div>
+    <div><strong>${analysis.totals.repetitions}</strong><span>${uiLabelHtml("repetitions")}</span></div>
+    <div><strong>${analysis.leverage.exact}</strong><span>${uiLabelHtml("exactTm")}</span></div>
+    <div><strong>${analysis.leverage.fuzzy95 + analysis.leverage.fuzzy85}</strong><span>${uiLabelHtml("strongFuzzy")}</span></div>
+    <div><strong>${analysis.totals.segments - analysis.totals.confirmed}</strong><span>${uiLabelHtml("openSegments")}</span></div>
+    <div><strong>${analysis.totals.files}</strong><span>${uiLabelHtml("files")}</span></div>
+    <div><strong>${analysis.totals.words}</strong><span>${uiLabelHtml("sourceWords")}</span></div>
+    <div><strong>${ai.drafts || 0}</strong><span>${translatedSourceHtml("AI initiated")}</span></div>
+    <div><strong>${ai.suggestionSegments || 0}</strong><span>${uiLabelHtml("aiSuggestionRows")}</span></div>
+    <div><strong>${ai.highRisk || 0}</strong><span>${uiLabelHtml("highAiRisk")}</span></div>
   `;
 }
 
 function renderProjectList() {
   if (!state.projects.length) {
-    els.projectList.innerHTML = `<div class="muted">No projects yet.</div>`;
+    els.projectList.innerHTML = `<div class="muted">${translatedSourceHtml("No projects yet.")}</div>`;
     return;
   }
   const fragment = document.createDocumentFragment();
   state.projects.forEach((project) => {
     const button = document.createElement("button");
     button.className = `project-item ${state.project?.id === project.id ? "active" : ""}`;
-    button.innerHTML = `<strong>${displaySafeHtml(project.name)}</strong><span>${escapeHtml(languagePair(project))}</span><span>${project.sourceFileName ? displaySafeHtml(project.sourceFileName) : "No source file"}</span>`;
+    button.innerHTML = `<strong>${displaySafeHtml(project.name)}</strong><span>${escapeHtml(languagePair(project))}</span><span>${project.sourceFileName ? displaySafeHtml(project.sourceFileName) : uiLabelHtml("noSourceFile")}</span>`;
     button.addEventListener("click", () => openProject(project.id));
     fragment.append(button);
   });
@@ -3674,7 +3792,7 @@ function setLocalAiStatus(status, text) {
     els.localAiStatus.className = `local-ai-status ${state.localAi.connectionStatus}`;
   }
   if (els.localAiStatusText) {
-    els.localAiStatusText.textContent = state.localAi.statusText || "Disconnected";
+    els.localAiStatusText.textContent = uiSource(state.localAi.statusText || "Disconnected");
   }
 }
 
@@ -3686,7 +3804,7 @@ function renderLocalAiModelOptions(settings) {
   if (!models.length) {
     const option = document.createElement("option");
     option.value = "";
-    option.textContent = "Refresh models";
+    option.textContent = uiSource("Refresh models");
     els.localAiModelSelect.append(option);
   }
   models.forEach((model) => {
@@ -3698,7 +3816,7 @@ function renderLocalAiModelOptions(settings) {
   if (currentModel && !models.some((model) => model.name === currentModel)) {
     const option = document.createElement("option");
     option.value = currentModel;
-    option.textContent = `${currentModel} (manual)`;
+    option.textContent = uiSource("{value1} (manual)", { value1: currentModel });
     els.localAiModelSelect.prepend(option);
   }
   els.localAiModelSelect.value = currentModel && Array.from(els.localAiModelSelect.options).some((option) => option.value === currentModel)
@@ -4031,10 +4149,10 @@ function renderLocalAiProviderSummary(settings) {
   const guidance = localAiProviderGuidance(settings);
   const capabilities = localAiProviderCapabilityLabels(settings, provider);
   const badges = [
-    sharesExternally ? "Hosted/network" : "Local loopback",
-    needsKey ? "API key required" : "No API key",
-    canPull ? "Pull supported" : "Manual model",
-    settings.includeNearbyContext !== false ? "Nearby context on" : "Nearby context off"
+    sharesExternally ? uiLabel("hostedNetwork") : uiLabel("localLoopback"),
+    needsKey ? uiLabel("apiKeyRequired") : uiLabel("noApiKey"),
+    canPull ? uiLabel("pullSupported") : uiLabel("manualModel"),
+    settings.includeNearbyContext !== false ? uiLabel("nearbyContextOn") : uiLabel("nearbyContextOff")
   ];
   els.localAiProviderSummary.innerHTML = `
     <div class="local-ai-provider-summary-head">
@@ -4044,12 +4162,12 @@ function renderLocalAiProviderSummary(settings) {
     <div class="local-ai-provider-badges">
       ${badges.map((badge) => `<span>${escapeHtml(badge)}</span>`).join("")}
     </div>
-    <p class="local-ai-provider-guidance">${displaySafeHtml(guidance)}</p>
+    <p class="local-ai-provider-guidance">${displaySafeHtml(uiSource(guidance))}</p>
     <dl>
-      <div><dt>Base</dt><dd>${displaySafeHtml(settings.baseUrl || OLLAMA_DEFAULT_BASE_URL)}</dd></div>
-      <div><dt>Tools</dt><dd>${escapeHtml(capabilities.join(" - "))}</dd></div>
-      <div><dt>Models</dt><dd>${escapeHtml(endpoints.models)}</dd></div>
-      <div><dt>Translate</dt><dd>${escapeHtml(endpoints.translate)}</dd></div>
+      <div><dt>${uiLabelHtml("base")}</dt><dd>${displaySafeHtml(settings.baseUrl || OLLAMA_DEFAULT_BASE_URL)}</dd></div>
+      <div><dt>${uiLabelHtml("tools")}</dt><dd>${escapeHtml(capabilities.map((item) => uiSource(item)).join(" - "))}</dd></div>
+      <div><dt>${uiLabelHtml("models")}</dt><dd>${escapeHtml(endpoints.models)}</dd></div>
+      <div><dt>${uiLabelHtml("translate")}</dt><dd>${escapeHtml(endpoints.translate)}</dd></div>
     </dl>
   `;
 }
@@ -4062,7 +4180,7 @@ function renderLocalAiProviderControls(settings) {
   if (els.localAiPullModelBtn) {
     const canPull = localAiCanPullModel(settings, provider);
     els.localAiPullModelBtn.disabled = state.localAi.running || !canPull;
-    els.localAiPullModelBtn.textContent = canPull ? `Pull ${settings.model || DEFAULT_LOCAL_AI_MODEL}` : "Pull unavailable";
+    els.localAiPullModelBtn.textContent = canPull ? uiSource("Pull {value1}", { value1: settings.model || DEFAULT_LOCAL_AI_MODEL }) : uiSource("Pull unavailable");
     els.localAiPullModelWrap?.classList.toggle("hidden", !canPull);
   }
   if (els.localAiStartLmStudioBtn) {
@@ -4076,12 +4194,12 @@ function renderLocalAiProviderControls(settings) {
 }
 
 function localAiPresetGroupLabel(preset) {
-  if (!preset) return "Hosted providers";
-  if (preset.id === "ollama-local" || preset.id === "lm-studio") return "Local runtimes";
-  if (preset.id === "ollama-local-cloud" || preset.id === "ollama-cloud") return "Ollama hosted and cloud";
-  if (preset.id === "azure-openai") return "Managed deployments";
-  if (["groq", "together", "openrouter", "huggingface", "deepinfra", "fireworks"].includes(preset.id)) return "Hosted routers";
-  return "Hosted providers";
+  if (!preset) return uiLabel("hostedProviders");
+  if (preset.id === "ollama-local" || preset.id === "lm-studio") return uiLabel("localRuntimes");
+  if (preset.id === "ollama-local-cloud" || preset.id === "ollama-cloud") return uiLabel("ollamaHostedCloud");
+  if (preset.id === "azure-openai") return uiLabel("managedDeployments");
+  if (["groq", "together", "openrouter", "huggingface", "deepinfra", "fireworks"].includes(preset.id)) return uiSource("Hosted routers");
+  return uiLabel("hostedProviders");
 }
 
 function renderLocalAiPresetOptions(settings) {
@@ -4091,7 +4209,7 @@ function renderLocalAiPresetOptions(settings) {
   els.localAiPresetSelect.innerHTML = "";
   const customOption = document.createElement("option");
   customOption.value = "custom";
-  customOption.textContent = "Custom provider";
+  customOption.textContent = uiSource("Custom provider");
   els.localAiPresetSelect.append(customOption);
   const groups = new Map();
   LOCAL_AI_PROVIDER_PRESETS.forEach((preset) => {
@@ -4210,23 +4328,23 @@ function renderEditor() {
 
   const resources = projectResourceSummary();
   els.projectTitle.textContent = displaySafeText(state.project.name);
-  els.projectMeta.textContent = `${languagePair()} - Main TM: ${displaySafeText(resources.mainTm, "None")} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
+  els.projectMeta.textContent = `${languagePair()} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
   els.projectDomainEditInput.value = state.project.domain || "";
   els.domainForm.classList.add("clean");
   els.domainForm.classList.toggle("hidden", Boolean((state.project.domain || "").trim()));
   els.projectInfo.innerHTML = `
-    <dt>Name</dt><dd>${displaySafeHtml(state.project.name)}</dd>
-    <dt>Creator</dt><dd>${displaySafeHtml(state.project.creatorName || "Not set")}</dd>
-    <dt>Domain</dt><dd>${displaySafeHtml(state.project.domain || "Not set")}</dd>
-    <dt>Languages</dt><dd>${escapeHtml(languagePair())}</dd>
-    <dt>Workspace</dt><dd>${escapeHtml(state.project.workspaceId || "local-workspace")}</dd>
-    <dt>Source file</dt><dd>${displaySafeHtml(state.project.sourceFileName || "Not imported")}</dd>
-    <dt>Main TM</dt><dd>${displaySafeHtml(resources.mainTm)}</dd>
-    <dt>Linked TMs</dt><dd>${displaySafeHtml(resources.tmNames.join(", "))}</dd>
-    <dt>Linked TBs</dt><dd>${displaySafeHtml(resources.tbNames.join(", "))}</dd>
-    <dt>Documents</dt><dd>${projectDocuments().length || 0}</dd>
-    <dt>Segments</dt><dd>${state.segments.length}</dd>
-    <dt>Activity</dt><dd>${state.activityEvents.length} event${state.activityEvents.length === 1 ? "" : "s"}</dd>
+    <dt>${uiLabelHtml("name")}</dt><dd>${displaySafeHtml(state.project.name)}</dd>
+    <dt>${translatedSourceHtml("Creator")}</dt><dd>${displaySafeHtml(state.project.creatorName || uiLabel("notSet"))}</dd>
+    <dt>${translatedSourceHtml("Domain")}</dt><dd>${displaySafeHtml(state.project.domain || uiLabel("notSet"))}</dd>
+    <dt>${uiLabelHtml("languages")}</dt><dd>${escapeHtml(languagePair())}</dd>
+    <dt>${translatedSourceHtml("Workspace")}</dt><dd>${escapeHtml(state.project.workspaceId || "local-workspace")}</dd>
+    <dt>${uiLabelHtml("sourceFile")}</dt><dd>${displaySafeHtml(state.project.sourceFileName || uiLabel("notImported"))}</dd>
+    <dt>${uiLabelHtml("mainTm")}</dt><dd>${displaySafeHtml(resources.mainTm)}</dd>
+    <dt>${uiLabelHtml("linkedTms")}</dt><dd>${displaySafeHtml(resources.tmNames.join(", "))}</dd>
+    <dt>${uiLabelHtml("linkedTbs")}</dt><dd>${displaySafeHtml(resources.tbNames.join(", "))}</dd>
+    <dt>${translatedSourceHtml("Documents")}</dt><dd>${projectDocuments().length || 0}</dd>
+    <dt>${uiLabelHtml("segmentsTitle")}</dt><dd>${state.segments.length}</dd>
+    <dt>${uiLabelHtml("activity")}</dt><dd>${uiLabelHtml("eventCount", { count: state.activityEvents.length })}</dd>
   `;
   const ai = defaultAiSettings(state.project.aiSettings);
   els.aiEnabledInput.checked = Boolean(ai.enabled);
@@ -4273,16 +4391,16 @@ function renderProjectHome() {
   const sourceWords = total.words;
   const resources = projectResourceSummary();
   els.projectHomeTitle.textContent = displaySafeText(state.project.name);
-  els.projectHomeMeta.textContent = `${languagePair()} - ${displaySafeText(state.project.domain || "No domain")} - Main TM: ${displaySafeText(resources.mainTm, "None")} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
+  els.projectHomeMeta.textContent = `${languagePair()} - ${displaySafeText(state.project.domain || uiLabel("noDomain"))} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
   els.projectHomeStats.innerHTML = `
-    <div><strong>${total.percent}%</strong><span>confirmed</span></div>
-    <div><strong>${documents.length}</strong><span>files</span></div>
-    <div><strong>${state.segments.length}</strong><span>segments</span></div>
-    <div><strong>${sourceWords}</strong><span>source words</span></div>
+    <div><strong>${total.percent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
+    <div><strong>${documents.length}</strong><span>${uiLabelHtml("files")}</span></div>
+    <div><strong>${state.segments.length}</strong><span>${uiLabelHtml("segments")}</span></div>
+    <div><strong>${sourceWords}</strong><span>${uiLabelHtml("sourceWords")}</span></div>
   `;
-  els.fileCountText.textContent = documents.length ? `${documents.length} file${documents.length === 1 ? "" : "s"}` : "No files imported";
+  els.fileCountText.textContent = documents.length ? uiLabel("fileCount", { count: documents.length }) : uiSource("No files imported");
   if (!documents.length) {
-    els.projectFileList.innerHTML = `<div class="empty-file-state">Import a DOCX or other format file to start translating this project.</div>`;
+    els.projectFileList.innerHTML = `<div class="empty-file-state">${translatedSourceHtml("Import a DOCX or other format file to start translating this project.")}</div>`;
     return;
   }
   const fragment = document.createDocumentFragment();
@@ -4299,24 +4417,24 @@ function renderProjectHome() {
         <span class="language-badge">${stats.percent}%</span>
       </header>
       <div class="project-stats">
-        <div><strong>${stats.words}</strong><span>words</span></div>
-        <div><strong>${stats.segments}</strong><span>segments</span></div>
+        <div><strong>${stats.words}</strong><span>${uiLabelHtml("words")}</span></div>
+        <div><strong>${stats.segments}</strong><span>${uiLabelHtml("segments")}</span></div>
       </div>
       <div class="progress-bar"><div style="width:${stats.percent}%"></div></div>
       <footer>
-        <span>${stats.empty} empty - ${stats.draft} draft</span>
+        <span>${uiLabelHtml("emptyDraftCount", { empty: stats.empty, draft: stats.draft })}</span>
         <div class="file-card-actions"></div>
       </footer>
     `;
     const deleteButton = document.createElement("button");
     deleteButton.className = "danger-small";
     deleteButton.type = "button";
-    deleteButton.textContent = "Delete";
+    deleteButton.textContent = uiSource("Delete");
     deleteButton.addEventListener("click", () => confirmDeleteFile(documentInfo));
     const openButton = document.createElement("button");
     openButton.className = "primary";
     openButton.type = "button";
-    openButton.textContent = "Open";
+    openButton.textContent = uiSource("Open");
     openButton.addEventListener("click", () => openProjectFile(documentInfo.id));
     card.querySelector(".file-card-actions").append(deleteButton, openButton);
     fragment.append(card);
@@ -4330,7 +4448,7 @@ function renderDocumentFilter() {
   const fragment = document.createDocumentFragment();
   const allOption = document.createElement("option");
   allOption.value = "";
-  allOption.textContent = "All documents";
+  allOption.textContent = uiSource("All documents");
   fragment.append(allOption);
   documents.forEach((documentInfo) => {
     const option = document.createElement("option");
@@ -4349,7 +4467,7 @@ function renderLanguagePairFilter() {
   const fragment = document.createDocumentFragment();
   const allOption = document.createElement("option");
   allOption.value = "";
-  allOption.textContent = "All language pairs";
+  allOption.textContent = uiSource("All language pairs");
   fragment.append(allOption);
   pairs.forEach((pair) => {
     const [sourceLang, targetLang] = pair.split("::");
@@ -4366,7 +4484,7 @@ function renderProjectsView() {
   const query = stableLower(els.projectSearchInput.value.trim());
   const pair = els.languagePairFilter.value;
   if (!state.projectSummaries.length) {
-    els.projectDashboard.innerHTML = `<div class="muted">No projects yet. Create one to begin.</div>`;
+    els.projectDashboard.innerHTML = `<div class="muted">${translatedSourceHtml("No projects yet. Create one to begin.")}</div>`;
     return;
   }
   const summaries = state.projectSummaries.filter((project) => {
@@ -4376,7 +4494,7 @@ function renderProjectsView() {
   });
 
   if (!summaries.length) {
-    els.projectDashboard.innerHTML = `<div class="muted">No projects match this view.</div>`;
+    els.projectDashboard.innerHTML = `<div class="muted">${translatedSourceHtml("No projects match this view.")}</div>`;
     return;
   }
 
@@ -4388,29 +4506,29 @@ function renderProjectsView() {
       <header>
         <div>
           <h3>${displaySafeHtml(project.name)}</h3>
-          <p>${displaySafeHtml(project.domain ? `${project.domain} - ${project.sourceFileName || "No source file imported"}` : project.sourceFileName || "No source file imported")}</p>
+          <p>${displaySafeHtml(project.domain ? `${project.domain} - ${project.sourceFileName || uiLabel("noSourceFileImported")}` : project.sourceFileName || uiLabel("noSourceFileImported"))}</p>
         </div>
         <span class="language-badge">${escapeHtml(languagePair(project))}</span>
       </header>
       <div class="project-stats">
-        <div><strong>${project.progress.percent}%</strong><span>confirmed</span></div>
-        <div><strong>${project.progress.total}</strong><span>segments</span></div>
-        <div><strong>${project.wordCount}</strong><span>words</span></div>
+        <div><strong>${project.progress.percent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
+        <div><strong>${project.progress.total}</strong><span>${uiLabelHtml("segments")}</span></div>
+        <div><strong>${project.wordCount}</strong><span>${uiLabelHtml("words")}</span></div>
       </div>
       <div class="progress-bar"><div style="width:${project.progress.percent}%"></div></div>
       <footer>
-        <span>Updated ${escapeHtml(formatDate(project.updatedAt))}</span>
+        <span>${uiLabelHtml("updatedAt", { date: formatDate(project.updatedAt) })}</span>
       </footer>
     `;
     const deleteButton = document.createElement("button");
     deleteButton.className = "danger-small";
     deleteButton.type = "button";
-    deleteButton.textContent = "Delete";
+    deleteButton.textContent = uiSource("Delete");
     deleteButton.addEventListener("click", () => confirmDeleteProject(project.id));
     const openButton = document.createElement("button");
     openButton.className = "primary";
     openButton.type = "button";
-    openButton.textContent = "Open";
+    openButton.textContent = uiSource("Open");
     openButton.addEventListener("click", () => openProject(project.id));
     tile.querySelector("footer").append(deleteButton, openButton);
     fragment.append(tile);
@@ -4421,7 +4539,7 @@ function renderProjectsView() {
 async function confirmDeleteProject(projectId = state.project?.id) {
   const project = state.projects.find((item) => item.id === projectId);
   if (!project) return false;
-  const ok = window.confirm(`Delete project "${displaySafeText(project.name)}" and all of its files? This cannot be undone.`);
+  const ok = uiConfirm(`Delete project "${displaySafeText(project.name)}" and all of its files? This cannot be undone.`);
   if (!ok) return false;
   try {
     await flushPendingSegmentSaves(project.id);
@@ -4446,7 +4564,7 @@ async function confirmDeleteProject(projectId = state.project?.id) {
 
 async function confirmDeleteFile(documentInfo) {
   if (!state.project || !documentInfo) return false;
-  const ok = window.confirm(`Delete file "${displaySafeText(documentInfo.name)}" from this project? This cannot be undone.`);
+  const ok = uiConfirm(`Delete file "${displaySafeText(documentInfo.name)}" from this project? This cannot be undone.`);
   if (!ok) return false;
   try {
     await flushPendingSegmentSaves(state.project.id);
@@ -4511,7 +4629,7 @@ function renderResourceDashboard(type) {
   const dashboard = isTm ? els.tmResourceDashboard : els.tbResourceDashboard;
   const summaries = summarizeResources(isTm ? state.resourceTmEntries : state.resourceTerms, isTm ? "tmName" : "termBaseName");
   if (!summaries.length) {
-    dashboard.innerHTML = `<div class="empty-file-state">No ${isTm ? "translation memories" : "termbases"} yet.</div>`;
+    dashboard.innerHTML = `<div class="empty-file-state">${uiLabelHtml(isTm ? "noTranslationMemories" : "noTermbases")}</div>`;
     return;
   }
   const fragment = document.createDocumentFragment();
@@ -4527,28 +4645,28 @@ function renderResourceDashboard(type) {
         <span class="language-badge">${resource.count}</span>
       </header>
       <div class="project-stats">
-        <div><strong>${resource.count}</strong><span>${isTm ? "entries" : "terms"}</span></div>
-        <div><strong>${escapeHtml(resource.sourceLang || "-")}</strong><span>source</span></div>
-        <div><strong>${escapeHtml(resource.targetLang || "-")}</strong><span>target</span></div>
+        <div><strong>${resource.count}</strong><span>${uiLabelHtml(isTm ? "entries" : "terms")}</span></div>
+        <div><strong>${escapeHtml(resource.sourceLang || "-")}</strong><span>${uiLabelHtml("source")}</span></div>
+        <div><strong>${escapeHtml(resource.targetLang || "-")}</strong><span>${uiLabelHtml("target")}</span></div>
       </div>
       <footer>
-        <span>Updated ${escapeHtml(formatDate(resource.updatedAt))}</span>
+        <span>${uiLabelHtml("updatedAt", { date: formatDate(resource.updatedAt) })}</span>
         <div class="resource-card-actions"></div>
       </footer>
     `;
     const deleteButton = document.createElement("button");
     deleteButton.className = "danger-small";
     deleteButton.type = "button";
-    deleteButton.textContent = "Delete";
+    deleteButton.textContent = uiSource("Delete");
     deleteButton.addEventListener("click", () => confirmDeleteResource(type, resource.key));
     const exportButton = document.createElement("button");
     exportButton.type = "button";
-    exportButton.textContent = "Export";
+    exportButton.textContent = uiSource("Export");
     exportButton.addEventListener("click", () => exportResource(type, resource.key));
     const openButton = document.createElement("button");
     openButton.className = "primary";
     openButton.type = "button";
-    openButton.textContent = "Open";
+    openButton.textContent = uiSource("Open");
     openButton.addEventListener("click", () => {
       state.resourceType = type;
       state.openResource = resource.key;
@@ -4689,9 +4807,9 @@ function renderTmResourceDetail() {
     <div class="resource-detail-header">
       <div>
         <h3>${displaySafeHtml(info.name)}</h3>
-        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${entries.length} entries</p>
+        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${uiLabelHtml("entryCount", { count: entries.length })}</p>
       </div>
-      <button id="closeTmResourceBtn" type="button">Close</button>
+      <button id="closeTmResourceBtn" type="button">${translatedSourceHtml("Close")}</button>
     </div>
     <div class="resource-table"></div>
   `;
@@ -4715,9 +4833,9 @@ function renderTbResourceDetail() {
     <div class="resource-detail-header">
       <div>
         <h3>${displaySafeHtml(info.name)}</h3>
-        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${terms.length} terms</p>
+        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${uiLabelHtml("termCount", { count: terms.length })}</p>
       </div>
-      <button id="closeTbResourceBtn" type="button">Close</button>
+      <button id="closeTbResourceBtn" type="button">${translatedSourceHtml("Close")}</button>
     </div>
     <div class="resource-table"></div>
   `;
@@ -4733,14 +4851,14 @@ function renderTmEntryRow(entry) {
   const row = document.createElement("article");
   row.className = "resource-row";
   row.innerHTML = `
-    <textarea data-field="source" aria-label="Source">${escapeHtml(entry.source)}</textarea>
-    <textarea data-field="target" aria-label="Target">${escapeHtml(entry.target)}</textarea>
+    <textarea data-field="source" aria-label="${translatedSourceHtml("Source")}">${escapeHtml(entry.source)}</textarea>
+    <textarea data-field="target" aria-label="${translatedSourceHtml("Target")}">${escapeHtml(entry.target)}</textarea>
     <div class="resource-row-actions"></div>
   `;
   const actions = row.querySelector(".resource-row-actions");
   const saveButton = document.createElement("button");
   saveButton.type = "button";
-  saveButton.textContent = "Save";
+  saveButton.textContent = uiSource("Save");
   saveButton.addEventListener("click", async () => {
     await saveEditedTmResourceEntry(entry, {
       source: row.querySelector('[data-field="source"]').value,
@@ -4750,9 +4868,9 @@ function renderTmEntryRow(entry) {
   const deleteButton = document.createElement("button");
   deleteButton.className = "danger-small";
   deleteButton.type = "button";
-  deleteButton.textContent = "Delete";
+  deleteButton.textContent = uiSource("Delete");
   deleteButton.addEventListener("click", async () => {
-    if (!window.confirm("Delete this TM entry? This cannot be undone.")) return;
+    if (!uiConfirm("Delete this TM entry? This cannot be undone.")) return;
     await deleteTmResourceEntry(entry);
   });
   actions.append(saveButton, deleteButton);
@@ -4763,16 +4881,16 @@ function renderTermRow(term) {
   const row = document.createElement("article");
   row.className = "resource-row term-resource-row";
   row.innerHTML = `
-    <input data-field="sourceTerm" aria-label="Source term" value="${escapeHtml(term.sourceTerm)}">
-    <input data-field="targetTerm" aria-label="Target term" value="${escapeHtml(term.targetTerm)}">
-    <input data-field="notes" aria-label="Notes" value="${escapeHtml(term.notes || "")}">
-    <label class="checkbox-row resource-checkbox"><input data-field="isForbidden" type="checkbox" ${term.isForbidden ? "checked" : ""}>Forbidden</label>
+    <input data-field="sourceTerm" aria-label="${translatedSourceHtml("Source term")}" value="${escapeHtml(term.sourceTerm)}">
+    <input data-field="targetTerm" aria-label="${translatedSourceHtml("Target term")}" value="${escapeHtml(term.targetTerm)}">
+    <input data-field="notes" aria-label="${translatedSourceHtml("Notes")}" value="${escapeHtml(term.notes || "")}">
+    <label class="checkbox-row resource-checkbox"><input data-field="isForbidden" type="checkbox" ${term.isForbidden ? "checked" : ""}>${uiLabelHtml("forbidden")}</label>
     <div class="resource-row-actions"></div>
   `;
   const actions = row.querySelector(".resource-row-actions");
   const saveButton = document.createElement("button");
   saveButton.type = "button";
-  saveButton.textContent = "Save";
+  saveButton.textContent = uiSource("Save");
   saveButton.addEventListener("click", async () => {
     await saveEditedTermResourceEntry(term, {
       sourceTerm: row.querySelector('[data-field="sourceTerm"]').value,
@@ -4784,9 +4902,9 @@ function renderTermRow(term) {
   const deleteButton = document.createElement("button");
   deleteButton.className = "danger-small";
   deleteButton.type = "button";
-  deleteButton.textContent = "Delete";
+  deleteButton.textContent = uiSource("Delete");
   deleteButton.addEventListener("click", async () => {
-    if (!window.confirm("Delete this term? This cannot be undone.")) return;
+    if (!uiConfirm("Delete this term? This cannot be undone.")) return;
     await deleteTermResourceEntry(term);
   });
   actions.append(saveButton, deleteButton);
@@ -4795,8 +4913,8 @@ function renderTermRow(term) {
 
 async function confirmDeleteResource(type, key) {
   const info = resourceLabelFromKey(key);
-  const label = type === "tm" ? "translation memory" : "termbase";
-  if (!window.confirm(`Delete ${label} "${displaySafeText(info.name)}" (${languagePairDisplay(info.sourceLang, info.targetLang)})? This cannot be undone.`)) return false;
+  const label = type === "tm" ? uiLabel("translationMemory") : uiLabel("termbase");
+  if (!window.confirm(uiLabel("deleteResourceConfirm", { type: label, name: displaySafeText(info.name), pair: languagePairDisplay(info.sourceLang, info.targetLang) }))) return false;
   try {
     if (RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.has(`${type}:${key}`)) throw new Error(`Simulated ${type === "tm" ? "TM" : "termbase"} resource delete failure`);
     const items = resourceItems(type, key);
@@ -4994,12 +5112,12 @@ function renderStatusCell(row, segment) {
   const statusCell = row.querySelector(".status-col");
   const pill = row.querySelector(".status-pill");
   pill.className = `status-pill ${segment.status}`;
-  pill.textContent = segment.status;
+  pill.textContent = segmentStatusLabel(segment.status);
   statusCell.querySelectorAll(".tag-warning, .review-pill, .comment-marker, .ai-segment-badge").forEach((item) => item.remove());
   if (hasTagIssue(segment)) {
     const warning = document.createElement("div");
     warning.className = "tag-warning";
-    warning.textContent = `Missing: ${missingTags(segment).map(tagDisplayText).join(", ")}`;
+    warning.textContent = uiLabel("missingValue", { value: missingTags(segment).map(tagDisplayText).join(", ") });
     statusCell.append(warning);
   }
   if (segment.reviewState) {
@@ -5012,7 +5130,7 @@ function renderStatusCell(row, segment) {
   if (commentCount) {
     const marker = document.createElement("div");
     marker.className = "comment-marker";
-    marker.textContent = `${commentCount} note${commentCount === 1 ? "" : "s"}`;
+    marker.textContent = uiLabel("noteCount", { count: commentCount });
     statusCell.append(marker);
   }
   const aiBadges = [];
@@ -5022,8 +5140,8 @@ function renderStatusCell(row, segment) {
   if (segmentHasAiSuggestions(segment)) {
     aiBadges.push({
       className: "ai-suggestion",
-      text: `${segment.aiSuggestions.length} AI suggestion${segment.aiSuggestions.length === 1 ? "" : "s"}`,
-      title: "Reviewable AI suggestions are available for this segment"
+      text: uiLabel("aiSuggestionCount", { count: segment.aiSuggestions.length }),
+      title: uiSource("Reviewable AI suggestions are available for this segment")
     });
   }
   const riskLevel = aiReviewRiskLevel(segment);
@@ -5031,7 +5149,7 @@ function renderStatusCell(row, segment) {
     aiBadges.push({
       className: `ai-risk ai-risk-${riskLevel}`,
       text: `${aiReviewRiskLabel(riskLevel)}`,
-      title: "Risk-ranked AI review comment"
+      title: uiSource("Risk-ranked AI review comment")
     });
   }
   aiBadges.forEach((item) => {
@@ -5061,7 +5179,7 @@ function renderSegments(options = {}) {
     const cell = document.createElement("td");
     cell.colSpan = 4;
     cell.className = "muted";
-    cell.textContent = "No segments match this view.";
+    cell.textContent = uiSource("No segments match this view.");
     row.append(cell);
     els.segmentBody.replaceChildren(row);
     return;
@@ -5111,8 +5229,8 @@ function renderProgress() {
     words += sourceWordCount(segment);
   }
   const open = total - confirmed;
-  els.progressText.textContent = `${confirmed} confirmed - ${open} open - ${total} total`;
-  els.wordCountText.textContent = `${words} source words`;
+  els.progressText.textContent = uiLabel("progressSummary", { confirmed, open, total });
+  els.wordCountText.textContent = uiLabel("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
@@ -5460,9 +5578,12 @@ function closeCommandPalette() {
 
 function renderCommandPalette() {
   const query = stableLower(state.commandQuery);
-  const commands = commandList().filter((command) => !query || stableLower(command.label).includes(query));
+  const commands = commandList().filter((command) => {
+    const label = uiSource(command.label);
+    return !query || stableLower(label).includes(query) || stableLower(command.label).includes(query);
+  });
   if (!commands.length) {
-    els.commandPaletteResults.innerHTML = `<div class="muted">No commands match.</div>`;
+    els.commandPaletteResults.innerHTML = `<div class="muted">${translatedSourceHtml("No commands match.")}</div>`;
     return;
   }
   const fragment = document.createDocumentFragment();
@@ -5471,7 +5592,7 @@ function renderCommandPalette() {
     button.type = "button";
     button.className = "command-item";
     button.disabled = !command.enabled;
-    button.innerHTML = `<span>${escapeHtml(command.label)}</span>`;
+    button.innerHTML = `<span>${escapeHtml(uiSource(command.label))}</span>`;
     button.addEventListener("click", async () => {
       if (!command.enabled) return;
       closeCommandPalette();
@@ -5541,9 +5662,14 @@ async function openConcordanceSearch() {
     .filter((entry) => tmNames.has(entry.tmName))
     .filter((entry) => stableLower(entry.source).includes(query))
     .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
-  els.concordanceMeta.textContent = `"${keyword}" - ${projectResourceSummary().tmLabel} - ${languagePair()} - ${results.length} result${results.length === 1 ? "" : "s"}`;
+  els.concordanceMeta.textContent = uiLabel("concordanceResultSummary", {
+    keyword,
+    resource: projectResourceSummary().tmLabel,
+    pair: languagePair(),
+    count: results.length
+  });
   if (!results.length) {
-    els.concordanceResults.innerHTML = `<div class="muted">No TM units contain this keyword.</div>`;
+    els.concordanceResults.innerHTML = `<div class="muted">${translatedSourceHtml("No TM units contain this keyword.")}</div>`;
   } else {
     const fragment = document.createDocumentFragment();
     results.forEach((entry) => {
@@ -5556,7 +5682,7 @@ async function openConcordanceSearch() {
       `;
       const insertButton = document.createElement("button");
       insertButton.type = "button";
-      insertButton.textContent = "Insert target";
+      insertButton.textContent = uiSource("Insert target");
       insertButton.addEventListener("click", () => {
         insertTarget(entry.target);
         closeConcordance();
@@ -5624,11 +5750,11 @@ function renderReviewPanel() {
   els.reviewCommentsList.innerHTML = comments.length
     ? comments.map((comment) => `
       <article class="comment-card">
-        <header><strong>${escapeHtml(comment.state || "open")}</strong><span>${escapeHtml(formatDate(comment.updatedAt || comment.createdAt))}</span></header>
+        <header><strong>${escapeHtml(uiSource(comment.state || "open"))}</strong><span>${escapeHtml(formatDate(comment.updatedAt || comment.createdAt))}</span></header>
         <div>${escapeHtml(comment.body)}</div>
       </article>
     `).join("")
-    : `<div class="muted">No structured comments.</div>`;
+    : `<div class="muted">${uiLabelHtml("noStructuredComments")}</div>`;
 }
 
 function qualityProfileFromForm() {
@@ -5656,7 +5782,7 @@ function renderQualityProfileForm() {
 }
 
 function qualityLabel(value) {
-  return {
+  const label = {
     "student-review": "Student review",
     "freelance-delivery": "Freelance delivery",
     "agency-delivery": "Agency delivery",
@@ -5672,10 +5798,11 @@ function qualityLabel(value) {
     "hosted-disclosed": "Hosted disclosed",
     "client-approved": "Client approved"
   }[value] || value || "";
+  return uiSource(label);
 }
 
 function qualityCategoryName(value) {
-  return baseQualityCategoryLabel?.(value) || {
+  const label = baseQualityCategoryLabel?.(value) || {
     accuracy: "Accuracy",
     terminology: "Terminology",
     fluency: "Fluency",
@@ -5685,15 +5812,17 @@ function qualityCategoryName(value) {
     compliance: "Compliance",
     review: "Review"
   }[value] || value || "Review";
+  return uiSource(label);
 }
 
 function qualityDecisionSeverityLabel(value) {
-  return {
+  const label = {
     low: "Low",
     medium: "Medium",
     high: "High",
     critical: "Critical"
   }[value] || "Medium";
+  return uiSource(label);
 }
 
 function qualityDecisionSeverity(value) {
@@ -5730,13 +5859,14 @@ function currentQualityRiskQueue(qaChecks = state.qaChecks) {
 }
 
 function qualityRiskLevelLabel(level) {
-  return {
+  const label = {
     critical: "Critical",
     high: "High",
     medium: "Medium",
     low: "Low",
     clear: "Clear"
   }[level] || "Risk";
+  return uiSource(label);
 }
 
 function activeQualityEvidence(queue = null) {
@@ -5754,7 +5884,7 @@ function renderQualityActiveEvidence(queue) {
   if (!els.qualityActiveEvidence || !els.qualityDecisionForm) return;
   const segment = currentSegment();
   if (!state.project || !segment) {
-    els.qualityActiveEvidence.textContent = "No active segment.";
+    els.qualityActiveEvidence.textContent = uiSource("No active segment.");
     els.qualityActiveEvidence.classList.add("muted");
     if (els.saveQualityDecisionBtn) els.saveQualityDecisionBtn.disabled = true;
     return;
@@ -5765,7 +5895,7 @@ function renderQualityActiveEvidence(queue) {
     .sort((a, b) => b[1] - a[1] || qualityCategoryName(a[0]).localeCompare(qualityCategoryName(b[0])));
   const categoryPills = categories.length
     ? categories.map(([category, count]) => `<span class="quality-category-pill">${escapeHtml(qualityCategoryName(category))} ${count}</span>`).join("")
-    : `<span class="quality-category-pill">Clear</span>`;
+    : `<span class="quality-category-pill">${translatedSourceHtml("Clear")}</span>`;
   const reasonItems = (evidence?.reasons || []).slice(0, 4).map((reason) => (
     `<li>${escapeHtml(qualityCategoryName(reason.category))}: ${escapeHtml(reason.label)}</li>`
   )).join("");
@@ -5776,16 +5906,16 @@ function renderQualityActiveEvidence(queue) {
       <span>${escapeHtml(qualityRiskLevelLabel(evidence?.level))} ${evidence?.score || 0}</span>
     </header>
     <div class="quality-category-row">${categoryPills}</div>
-    ${reasonItems ? `<ul>${reasonItems}</ul>` : `<p class="muted">No active quality signals.</p>`}
+    ${reasonItems ? `<ul>${reasonItems}</ul>` : `<p class="muted">${uiLabelHtml("noActiveQualitySignals")}</p>`}
   `;
 }
 
 function renderQualityWorkbench() {
   if (!els.qualitySummary || !els.qualityRiskList) return;
   if (!state.project) {
-    els.qualitySummary.textContent = "No project.";
+    els.qualitySummary.textContent = uiSource("No project.");
     els.qualitySummary.classList.add("muted");
-    els.qualityRiskList.textContent = "No risk queue yet.";
+    els.qualityRiskList.textContent = uiSource("No risk queue yet.");
     els.qualityRiskList.classList.add("muted");
     renderQualityActiveEvidence(null);
     return;
@@ -5797,15 +5927,15 @@ function renderQualityWorkbench() {
   els.qualitySummary.classList.remove("muted");
   els.qualitySummary.innerHTML = `
     <div class="quality-summary-grid">
-      <div><strong>${queue.totalRiskItems}</strong><span>risk items</span></div>
-      <div><strong>${queue.highRiskCount}</strong><span>high risk</span></div>
-      <div><strong>${queue.averageScore}</strong><span>avg risk</span></div>
+      <div><strong>${queue.totalRiskItems}</strong><span>${uiLabelHtml("riskItems")}</span></div>
+      <div><strong>${queue.highRiskCount}</strong><span>${uiLabelHtml("highRisk")}</span></div>
+      <div><strong>${queue.averageScore}</strong><span>${uiLabelHtml("avgRisk")}</span></div>
     </div>
     <p>${escapeHtml(qualityLabel(profile.standard))} - ${escapeHtml(qualityLabel(profile.reviewDepth))} - ${escapeHtml(qualityLabel(profile.riskTolerance))}</p>
   `;
   renderQualityActiveEvidence(queue);
   if (!queue.items.length) {
-    els.qualityRiskList.textContent = "No unresolved quality risks in this scope.";
+    els.qualityRiskList.textContent = uiSource("No unresolved quality risks in this scope.");
     els.qualityRiskList.classList.add("muted");
     return;
   }
@@ -5825,12 +5955,12 @@ function renderQualityWorkbench() {
         <strong>${escapeHtml(qualityRiskLevelLabel(item.level))} ${item.score}</strong>
         <span>#${escapeHtml(item.label)}</span>
       </header>
-      <p>${escapeHtml(item.documentName || "Document")}</p>
-      <p class="muted">${escapeHtml(categoryText)}: ${escapeHtml(reasonText || "Risk signal recorded.")}</p>
+      <p>${escapeHtml(item.documentName || uiLabel("document"))}</p>
+      <p class="muted">${escapeHtml(categoryText)}: ${escapeHtml(reasonText || uiLabel("riskSignalRecorded"))}</p>
     `;
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = "Go";
+    button.textContent = uiLabel("go");
     button.addEventListener("click", () => goToQualityRiskItem(item));
     card.append(button);
     fragment.append(card);
@@ -5974,7 +6104,7 @@ async function goToNextQualityRisk() {
 }
 
 function revisionReasonLabel(reason) {
-  return {
+  const label = {
     edit: "Edit",
     replace: "Replace",
     confirm: "Confirm",
@@ -5986,19 +6116,20 @@ function revisionReasonLabel(reason) {
     split: "Split",
     merge: "Merge"
   }[reason] || reason || "Change";
+  return uiSource(label);
 }
 
 function renderRevisionHistory() {
   if (!els.revisionHistoryList) return;
   const segment = currentSegment();
   if (!segment) {
-    els.revisionHistoryList.textContent = "No active segment.";
+    els.revisionHistoryList.textContent = uiSource("No active segment.");
     els.revisionHistoryList.classList.add("muted");
     return;
   }
   const history = Array.isArray(segment.targetHistory) ? segment.targetHistory.slice().reverse() : [];
   if (!history.length) {
-    els.revisionHistoryList.textContent = "No target revisions yet.";
+    els.revisionHistoryList.textContent = uiSource("No target revisions yet.");
     els.revisionHistoryList.classList.add("muted");
     return;
   }
@@ -6006,10 +6137,10 @@ function renderRevisionHistory() {
   els.revisionHistoryList.innerHTML = history.slice(0, 8).map((entry) => `
     <article class="revision-card">
       <header><strong>${escapeHtml(revisionReasonLabel(entry.reason))}</strong><span>${escapeHtml(formatDateTime(entry.updatedAt || entry.createdAt))}</span></header>
-      <div class="revision-status">${escapeHtml(entry.fromStatus || "empty")} -> ${escapeHtml(entry.toStatus || "empty")}</div>
+      <div class="revision-status">${escapeHtml(segmentStatusLabel(entry.fromStatus || "empty"))} -> ${escapeHtml(segmentStatusLabel(entry.toStatus || "empty"))}</div>
       <div class="revision-pair">
-        <div><span>Before</span><p>${escapeHtml(entry.fromTarget || "") || "&nbsp;"}</p></div>
-        <div><span>After</span><p>${escapeHtml(entry.toTarget || "") || "&nbsp;"}</p></div>
+        <div><span>${uiLabelHtml("before")}</span><p>${escapeHtml(entry.fromTarget || "") || "&nbsp;"}</p></div>
+        <div><span>${uiLabelHtml("after")}</span><p>${escapeHtml(entry.toTarget || "") || "&nbsp;"}</p></div>
       </div>
     </article>
   `).join("");
@@ -6098,10 +6229,18 @@ function qaSummary(checks) {
   }, {});
 }
 
+function qaCheckMessage(check) {
+  return uiSource(check?.message || "", check?.messageValues || {});
+}
+
+function qaCheckFixHint(check) {
+  return check?.fixHint ? uiSource(check.fixHint, check.fixHintValues || {}) : "";
+}
+
 function renderQaResults() {
   const checks = state.qaFilter ? state.qaChecks.filter((check) => check.type === state.qaFilter) : state.qaChecks;
   if (!state.qaChecks.length) {
-    els.qaResults.textContent = "No QA issues found.";
+    els.qaResults.textContent = uiSource("No QA issues found.");
     els.qaResults.classList.add("muted");
     return;
   }
@@ -6113,7 +6252,7 @@ function renderQaResults() {
   const allButton = document.createElement("button");
   allButton.type = "button";
   allButton.className = state.qaFilter ? "" : "active";
-  allButton.textContent = `All ${state.qaChecks.length}`;
+  allButton.textContent = uiSource("All {value1}", { value1: state.qaChecks.length });
   allButton.addEventListener("click", () => {
     state.qaFilter = "";
     renderQaResults();
@@ -6123,7 +6262,7 @@ function renderQaResults() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = state.qaFilter === type ? "active" : "";
-    button.textContent = `${type} ${count}`;
+    button.textContent = `${uiSource(type)} ${count}`;
     button.addEventListener("click", () => {
       state.qaFilter = state.qaFilter === type ? "" : type;
       renderQaResults();
@@ -6134,10 +6273,11 @@ function renderQaResults() {
   checks.slice(0, 100).forEach((check) => {
     const card = document.createElement("article");
     card.className = "qa-card";
-    card.innerHTML = `<header><strong>${escapeHtml(check.type)}</strong><span class="severity-pill ${escapeHtml(check.severity || "info")}">${escapeHtml(check.severity || "info")}</span><span>#${escapeHtml(check.label)}</span></header><p>${escapeHtml(check.message)}</p>${check.fixHint ? `<p class="muted">${escapeHtml(check.fixHint)}</p>` : ""}`;
+    const fixHint = qaCheckFixHint(check);
+    card.innerHTML = `<header><strong>${escapeHtml(uiSource(check.type))}</strong><span class="severity-pill ${escapeHtml(check.severity || "info")}">${escapeHtml(uiSource(check.severity || "info"))}</span><span>#${escapeHtml(check.label)}</span></header><p>${escapeHtml(qaCheckMessage(check))}</p>${fixHint ? `<p class="muted">${escapeHtml(fixHint)}</p>` : ""}`;
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = "Go";
+    button.textContent = uiLabel("go");
     button.addEventListener("click", async () => {
       const index = state.segments.findIndex((segment) => segment.id === check.segmentId);
       if (index !== -1) {
@@ -6155,7 +6295,7 @@ function renderQaResults() {
 async function refreshTmMatches() {
   const segment = currentSegment();
   if (!segment || !state.project) {
-    els.tmMatches.textContent = "No active segment.";
+    els.tmMatches.textContent = uiSource("No active segment.");
     els.tmMatches.classList.add("muted");
     return;
   }
@@ -6167,19 +6307,19 @@ async function refreshTmMatches() {
   });
   els.tmMatches.classList.toggle("muted", !matches.length);
   if (!matches.length) {
-    els.tmMatches.textContent = "No TM matches.";
+    els.tmMatches.textContent = uiSource("No TM matches.");
     return;
   }
   const fragment = document.createDocumentFragment();
   matches.forEach((match) => {
     const card = document.createElement("article");
     card.className = "match-card";
-    card.innerHTML = `<header><strong>${match.score}% match</strong><span>${escapeHtml(match.tmName || "")}</span></header>
+    card.innerHTML = `<header><strong>${uiLabelHtml("matchPercent", { score: match.score })}</strong><span>${escapeHtml(match.tmName || "")}</span></header>
       <p>${escapeHtml(match.source)}</p>
       <p><strong>${escapeHtml(match.target)}</strong></p>
       ${match.projectName ? `<p class="muted">${escapeHtml(match.projectName)}</p>` : ""}`;
     const button = document.createElement("button");
-    button.textContent = "Insert";
+    button.textContent = uiLabel("insert");
     button.addEventListener("click", () => insertTarget(match.target));
     card.append(button);
     fragment.append(card);
@@ -6190,7 +6330,7 @@ async function refreshTmMatches() {
 async function refreshTerms() {
   const segment = currentSegment();
   if (!segment || !state.project) {
-    els.termSuggestions.textContent = "No active segment.";
+    els.termSuggestions.textContent = uiSource("No active segment.");
     els.termSuggestions.classList.add("muted");
     return;
   }
@@ -6202,17 +6342,17 @@ async function refreshTerms() {
   });
   els.termSuggestions.classList.toggle("muted", !suggestions.length);
   if (!suggestions.length) {
-    els.termSuggestions.textContent = "No terms found in this segment.";
+    els.termSuggestions.textContent = uiSource("No terms found in this segment.");
     return;
   }
   const fragment = document.createDocumentFragment();
   suggestions.forEach((term) => {
     const card = document.createElement("article");
     card.className = `term-card${term.isForbidden ? " forbidden-term-card" : ""}`;
-    card.innerHTML = `<header><strong>${escapeHtml(term.sourceTerm)}</strong><span>${escapeHtml(term.targetTerm)}</span><span>${term.isForbidden ? "Forbidden" : "Approved"}</span><span>${escapeHtml(term.termBaseName || "")}</span></header>
+    card.innerHTML = `<header><strong>${escapeHtml(term.sourceTerm)}</strong><span>${escapeHtml(term.targetTerm)}</span><span>${uiLabelHtml(term.isForbidden ? "forbidden" : "approved")}</span><span>${escapeHtml(term.termBaseName || "")}</span></header>
       ${term.notes ? `<p>${escapeHtml(term.notes)}</p>` : ""}`;
     const button = document.createElement("button");
-    button.textContent = "Delete";
+    button.textContent = uiSource("Delete");
     button.addEventListener("click", async () => {
       await deleteTermResourceEntry(term, { refreshResourceView: false, refreshSuggestions: true });
     });
@@ -6425,17 +6565,17 @@ function renderAiSuggestions() {
   const segment = currentSegment();
   const suggestions = segment?.aiSuggestions || [];
   if (!suggestions.length) {
-    els.aiSuggestionList.textContent = "No AI suggestions yet.";
+    els.aiSuggestionList.textContent = uiSource("No AI suggestions yet.");
     els.aiSuggestionList.classList.add("muted");
     return;
   }
   els.aiSuggestionList.classList.remove("muted");
   els.aiSuggestionList.innerHTML = suggestions.slice().reverse().slice(0, 4).map((suggestion) => `
     <article class="ai-suggestion-card">
-      <header><strong>${escapeHtml(suggestion.provider || "AI")}</strong><span>${escapeHtml(suggestion.model || (suggestion.confidence ? `${suggestion.confidence}%` : "review"))}</span></header>
+      <header><strong>${escapeHtml(suggestion.provider || "AI")}</strong><span>${escapeHtml(suggestion.model || (suggestion.confidence ? `${suggestion.confidence}%` : uiSource("review")))}</span></header>
       <p>${escapeHtml(suggestion.suggestedTarget || "")}</p>
       <ul>${(suggestion.explanation || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-      <footer><button type="button" data-apply-ai-suggestion="${escapeHtml(suggestion.id)}">Apply to target</button></footer>
+      <footer><button type="button" data-apply-ai-suggestion="${escapeHtml(suggestion.id)}">${uiLabelHtml("applyToTarget")}</button></footer>
     </article>
   `).join("");
   els.aiSuggestionList.querySelectorAll("[data-apply-ai-suggestion]").forEach((button) => {
@@ -6914,12 +7054,12 @@ const AI_REVIEW_RISK_ORDER = { none: 0, low: 1, medium: 2, high: 3, critical: 4 
 
 function aiReviewRiskLabel(level) {
   return {
-    none: "No issues found",
-    low: "Low risk",
-    medium: "Medium risk",
-    high: "High risk",
-    critical: "Critical risk"
-  }[level] || "Unranked risk";
+    none: uiLabel("noIssuesFound"),
+    low: uiLabel("lowRisk"),
+    medium: uiLabel("mediumRisk"),
+    high: uiLabel("highRisk"),
+    critical: uiLabel("criticalRisk")
+  }[level] || uiLabel("unrankedRisk");
 }
 
 function normalizeAiReviewRisk(reviewRisk = {}, reviewText = "") {
@@ -9561,7 +9701,7 @@ async function pretranslateWithLocalAi() {
     }
   }
   if (settings.overwriteExisting) {
-    const ok = window.confirm("Overwrite existing target text in eligible draft segments? Confirmed and locked segments are always preserved.");
+    const ok = uiConfirm("Overwrite existing target text in eligible draft segments? Confirmed and locked segments are always preserved.");
     if (!ok) {
       setSaveStatus("Local AI pre-translation canceled", "saved");
       return;
@@ -9695,7 +9835,7 @@ function confirmExternalAiPromptShare({ provider, includesSourceText, contextLab
     ...contextLabels
   ];
   const payload = humanReadableList(payloadItems);
-  return window.confirm(`Open ${provider} and send ${payload} outside LoopCAT?`);
+  return uiConfirm(`Open ${provider} and send ${payload} outside LoopCAT?`);
 }
 
 async function splitCurrentSegment() {
@@ -9948,7 +10088,7 @@ function projectHasDocumentNamed(fileName) {
 
 function confirmDuplicateImport(file) {
   if (!projectHasDocumentNamed(file.name)) return true;
-  return window.confirm(`A file named "${displaySafeText(file.name)}" already exists in this project. Import it again anyway?`);
+  return uiConfirm(`A file named "${displaySafeText(file.name)}" already exists in this project. Import it again anyway?`);
 }
 
 async function importProjectDocument(file) {
@@ -10290,7 +10430,7 @@ async function importProjectPackageData(pkg, options = {}) {
   await reportImportProgress("Validating project package", { name: sourceName });
   const validation = validateProjectPackage(pkg);
   if (!validation.ok) {
-    if (!options.suppressAlert) window.alert(validationAlertText(validation, "Project package import failed validation"));
+    if (!options.suppressAlert) uiAlert(validationAlertText(validation, "Project package import failed validation"));
     renderValidationReport(validation);
     setSaveStatus("Project package import failed validation", "dirty");
     return null;
@@ -10298,9 +10438,9 @@ async function importProjectPackageData(pkg, options = {}) {
   const existing = state.projects.find((project) => project.id === pkg.project.id);
   let importAsCopy = false;
   if (existing) {
-    const replace = options.replaceExisting ?? window.confirm(`A project named "${displaySafeText(existing.name)}" already exists. Replace it with this package?`);
+    const replace = options.replaceExisting ?? uiConfirm(`A project named "${displaySafeText(existing.name)}" already exists. Replace it with this package?`);
     if (!replace) {
-      importAsCopy = options.importAsCopy ?? window.confirm("Keep the existing project and import this package as a separate copy?");
+      importAsCopy = options.importAsCopy ?? uiConfirm("Keep the existing project and import this package as a separate copy?");
       if (!importAsCopy) return null;
     }
   }
@@ -10724,27 +10864,58 @@ function countBy(items, keyFn) {
   }, {});
 }
 
+function reportLocale() {
+  return currentUiLocale();
+}
+
+function reportDir() {
+  return uiI18n?.localeDir?.(reportLocale()) || "ltr";
+}
+
+function reportText(text, values = {}) {
+  return uiSource(text, values);
+}
+
+function reportHtml(text, values = {}) {
+  return escapeHtml(reportText(text, values));
+}
+
 function reportListHtml(items, emptyText = "None") {
   return items?.length
     ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
-    : `<p class="muted">${escapeHtml(emptyText)}</p>`;
+    : `<p class="muted">${reportHtml(emptyText)}</p>`;
 }
 
 function reportCountTableHtml(counts, emptyText = "None") {
   const entries = Object.entries(counts || {}).sort(([a], [b]) => a.localeCompare(b));
-  if (!entries.length) return `<p class="muted">${escapeHtml(emptyText)}</p>`;
-  return `<table><tbody>${entries.map(([label, count]) => `<tr><th>${escapeHtml(label)}</th><td>${count}</td></tr>`).join("")}</tbody></table>`;
+  if (!entries.length) return `<p class="muted">${reportHtml(emptyText)}</p>`;
+  return `<table><tbody>${entries.map(([label, count]) => `<tr><th>${escapeHtml(reportText(label))}</th><td>${count}</td></tr>`).join("")}</tbody></table>`;
 }
 
 function qualityCategoryCountTableHtml(counts, emptyText = "None") {
   const entries = Object.entries(counts || {})
     .sort(([a], [b]) => qualityCategoryName(a).localeCompare(qualityCategoryName(b)));
-  if (!entries.length) return `<p class="muted">${escapeHtml(emptyText)}</p>`;
+  if (!entries.length) return `<p class="muted">${reportHtml(emptyText)}</p>`;
   return `<table><tbody>${entries.map(([label, count]) => `<tr><th>${escapeHtml(qualityCategoryName(label))}</th><td>${count}</td></tr>`).join("")}</tbody></table>`;
 }
 
 function reportSafeLabel(value, fallback = "") {
   return redactSensitiveText(value || "").trim() || fallback;
+}
+
+function reportQaChecksTableHtml(checks = []) {
+  if (!checks.length) return `<p class="muted">${reportHtml("No QA issues found.")}</p>`;
+  const rows = checks.slice(0, 50).map((check) => `<tr>
+    <td>#${escapeHtml(check.label || "")}</td>
+    <td>${escapeHtml(reportText(check.type || ""))}</td>
+    <td>${escapeHtml(reportText(check.severity || "info"))}</td>
+    <td>${escapeHtml(qaCheckMessage(check))}</td>
+    <td>${escapeHtml(qaCheckFixHint(check) || reportText("None"))}</td>
+  </tr>`).join("");
+  return `<table>
+    <thead><tr><th>${reportHtml("Segment")}</th><th>${reportHtml("Type")}</th><th>${reportHtml("Severity")}</th><th>${reportHtml("Message")}</th><th>${reportHtml("Recommendation")}</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
 }
 
 async function buildProjectReportData() {
@@ -10841,10 +11012,10 @@ function projectReportHtml(data, options = {}) {
     notes: validation.preserved.length + validation.simplified.length + validation.skipped.length
   };
   const rows = (values, cells) => values.map((item) => `<tr>${cells(item).join("")}</tr>`).join("");
-  const projectTitle = anonymized ? "Anonymized project" : reportSafeLabel(project.name, "Project");
-  const reportTitle = anonymized ? "LoopCAT Anonymized Project Report" : "LoopCAT Project Report";
+  const projectTitle = anonymized ? reportText("Anonymized project") : reportSafeLabel(project.name, reportText("Project"));
+  const reportTitle = anonymized ? reportText("LoopCAT Anonymized Project Report") : reportText("LoopCAT Project Report");
   return `<!doctype html>
-<html lang="en">
+<html lang="${escapeHtml(reportLocale())}" dir="${escapeHtml(reportDir())}">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10875,67 +11046,67 @@ function projectReportHtml(data, options = {}) {
       <header>
         <h1>${escapeHtml(reportTitle)}</h1>
         <p>${escapeHtml(projectTitle)} - ${escapeHtml(languagePairDisplay(project.sourceLang, project.targetLang))}</p>
-        <p class="muted">Generated ${escapeHtml(formatDateTime(data.generatedAt))}</p>
+        <p class="muted">${reportHtml("Generated {date}", { date: formatDateTime(data.generatedAt) })}</p>
       </header>
       <section>
-        <h2>Project</h2>
+        <h2>${reportHtml("Project")}</h2>
         <div class="meta">
-          <div class="card"><strong>${escapeHtml(redactSensitiveText(project.domain || "").trim() || "Not set")}</strong><span>Domain</span></div>
-          <div class="card"><strong>${totals.confirmedPercent}%</strong><span>Confirmed</span></div>
-          <div class="card"><strong>${totals.words}</strong><span>Source words</span></div>
-          <div class="card"><strong>${data.qaChecks.length}</strong><span>QA issues</span></div>
+          <div class="card"><strong>${escapeHtml(redactSensitiveText(project.domain || "").trim() || reportText("Not set"))}</strong><span>${reportHtml("Domain")}</span></div>
+          <div class="card"><strong>${totals.confirmedPercent}%</strong><span>${reportHtml("Confirmed")}</span></div>
+          <div class="card"><strong>${totals.words}</strong><span>${reportHtml("Source words")}</span></div>
+          <div class="card"><strong>${data.qaChecks.length}</strong><span>${reportHtml("QA issues")}</span></div>
         </div>
       </section>
       <section>
-        <h2>Progress</h2>
+        <h2>${reportHtml("Progress")}</h2>
         <div class="cards">
-          <div class="card"><strong>${totals.files}</strong><span>Files</span></div>
-          <div class="card"><strong>${totals.segments}</strong><span>Segments</span></div>
-          <div class="card"><strong>${totals.confirmed}</strong><span>Confirmed</span></div>
-          <div class="card"><strong>${totals.untranslated}</strong><span>Untranslated</span></div>
-          <div class="card"><strong>${totals.repetitions}</strong><span>Repetitions</span></div>
-          <div class="card"><strong>${totals.comments}</strong><span>Review notes</span></div>
-          <div class="card"><strong>${data.revisionCount}</strong><span>Target revisions</span></div>
+          <div class="card"><strong>${totals.files}</strong><span>${reportHtml("Files")}</span></div>
+          <div class="card"><strong>${totals.segments}</strong><span>${reportHtml("Segments")}</span></div>
+          <div class="card"><strong>${totals.confirmed}</strong><span>${reportHtml("Confirmed")}</span></div>
+          <div class="card"><strong>${totals.untranslated}</strong><span>${reportHtml("Untranslated")}</span></div>
+          <div class="card"><strong>${totals.repetitions}</strong><span>${reportHtml("Repetitions")}</span></div>
+          <div class="card"><strong>${totals.comments}</strong><span>${reportHtml("Review notes")}</span></div>
+          <div class="card"><strong>${data.revisionCount}</strong><span>${reportHtml("Target revisions")}</span></div>
         </div>
       </section>
       <section>
-        <h2>Quality Passport</h2>
+        <h2>${reportHtml("Quality Passport")}</h2>
         <div class="cards">
-          <div class="card"><strong>${quality.confidenceScore ?? 0}</strong><span>Quality score</span></div>
-          <div class="card"><strong>${escapeHtml(qualityEffort.label)}</strong><span>Post-editing effort</span></div>
-          <div class="card"><strong>${qualityRiskQueue.totalRiskItems}</strong><span>Risk items</span></div>
-          <div class="card"><strong>${qualityRiskQueue.highRiskCount}</strong><span>High risk</span></div>
+          <div class="card"><strong>${quality.confidenceScore ?? 0}</strong><span>${reportHtml("Quality score")}</span></div>
+          <div class="card"><strong>${escapeHtml(reportText(qualityEffort.label))}</strong><span>${reportHtml("Post-editing effort")}</span></div>
+          <div class="card"><strong>${qualityRiskQueue.totalRiskItems}</strong><span>${reportHtml("Risk items")}</span></div>
+          <div class="card"><strong>${qualityRiskQueue.highRiskCount}</strong><span>${reportHtml("High risk")}</span></div>
         </div>
         <table>
           <tbody>
-            <tr><th>Standard</th><td>${escapeHtml(qualityLabel(qualityProfile.standard))}</td></tr>
-            <tr><th>Review depth</th><td>${escapeHtml(qualityLabel(qualityProfile.reviewDepth))}</td></tr>
-            <tr><th>Risk tolerance</th><td>${escapeHtml(qualityLabel(qualityProfile.riskTolerance))}</td></tr>
-            <tr><th>Terminology</th><td>${escapeHtml(qualityLabel(qualityProfile.terminologyStrictness))}</td></tr>
-            <tr><th>AI disclosure</th><td>${escapeHtml(qualityLabel(qualityProfile.aiDisclosure))}</td></tr>
+            <tr><th>${reportHtml("Standard")}</th><td>${escapeHtml(qualityLabel(qualityProfile.standard))}</td></tr>
+            <tr><th>${reportHtml("Review depth")}</th><td>${escapeHtml(qualityLabel(qualityProfile.reviewDepth))}</td></tr>
+            <tr><th>${reportHtml("Risk tolerance")}</th><td>${escapeHtml(qualityLabel(qualityProfile.riskTolerance))}</td></tr>
+            <tr><th>${reportHtml("Terminology")}</th><td>${escapeHtml(qualityLabel(qualityProfile.terminologyStrictness))}</td></tr>
+            <tr><th>${reportHtml("AI disclosure")}</th><td>${escapeHtml(qualityLabel(qualityProfile.aiDisclosure))}</td></tr>
           </tbody>
         </table>
-        <h3>Risk levels</h3>
+        <h3>${reportHtml("Risk levels")}</h3>
         ${reportCountTableHtml(qualityRiskQueue.byLevel || {}, "No unresolved quality risks.")}
-        <h3>Quality categories</h3>
+        <h3>${reportHtml("Quality categories")}</h3>
         ${qualityCategoryCountTableHtml(qualityRiskQueue.byCategory || {}, "No categorized quality risks.")}
       </section>
       <section>
-        <h2>AI Triage</h2>
+        <h2>${reportHtml("AI Triage")}</h2>
         <div class="cards">
-          <div class="card"><strong>${ai.drafts || 0}</strong><span>AI initiated</span></div>
-          <div class="card"><strong>${ai.suggestionSegments || 0}</strong><span>Segments with AI suggestions</span></div>
-          <div class="card"><strong>${ai.suggestions || 0}</strong><span>AI suggestions</span></div>
-          <div class="card"><strong>${ai.reviewRisk || 0}</strong><span>AI review risk</span></div>
-          <div class="card"><strong>${ai.highRisk || 0}</strong><span>High AI risk</span></div>
+          <div class="card"><strong>${ai.drafts || 0}</strong><span>${reportHtml("AI initiated")}</span></div>
+          <div class="card"><strong>${ai.suggestionSegments || 0}</strong><span>${reportHtml("Segments with AI suggestions")}</span></div>
+          <div class="card"><strong>${ai.suggestions || 0}</strong><span>${reportHtml("AI suggestions")}</span></div>
+          <div class="card"><strong>${ai.reviewRisk || 0}</strong><span>${reportHtml("AI review risk")}</span></div>
+          <div class="card"><strong>${ai.highRisk || 0}</strong><span>${reportHtml("High AI risk")}</span></div>
         </div>
-        <h3>AI review risk levels</h3>
+        <h3>${reportHtml("AI review risk levels")}</h3>
         ${reportCountTableHtml(ai.risk || {}, "No AI review risk recorded.")}
       </section>
       <section>
-        <h2>Files</h2>
+        <h2>${reportHtml("Files")}</h2>
         <table>
-          <thead><tr><th>File</th><th>Type</th><th>Segments</th><th>Words</th><th>Confirmed</th><th>Untranslated</th></tr></thead>
+          <thead><tr><th>${reportHtml("File")}</th><th>${reportHtml("Type")}</th><th>${reportHtml("Segments")}</th><th>${reportHtml("Words")}</th><th>${reportHtml("Confirmed")}</th><th>${reportHtml("Untranslated")}</th></tr></thead>
           <tbody>${rows(files, (file) => [
             `<td>${escapeHtml(file.name)}</td>`,
             `<td>${escapeHtml(file.type)}</td>`,
@@ -10947,52 +11118,53 @@ function projectReportHtml(data, options = {}) {
         </table>
       </section>
       <section>
-        <h2>Resources</h2>
+        <h2>${reportHtml("Resources")}</h2>
         <div class="cards">
-          <div class="card"><strong>${escapeHtml(anonymized ? "Redacted" : resources.mainTm)}</strong><span>Main TM</span></div>
-          <div class="card"><strong>${data.tmEntryCount}</strong><span>Linked TM units</span></div>
-          <div class="card"><strong>${data.termCount}</strong><span>Linked terms</span></div>
-          <div class="card"><strong>${data.forbiddenTermCount}</strong><span>Forbidden terms</span></div>
+          <div class="card"><strong>${escapeHtml(anonymized ? reportText("Redacted") : resources.mainTm)}</strong><span>${reportHtml("Main TM")}</span></div>
+          <div class="card"><strong>${data.tmEntryCount}</strong><span>${reportHtml("Linked TM units")}</span></div>
+          <div class="card"><strong>${data.termCount}</strong><span>${reportHtml("Linked terms")}</span></div>
+          <div class="card"><strong>${data.forbiddenTermCount}</strong><span>${reportHtml("Forbidden terms")}</span></div>
         </div>
-        <p class="muted">${anonymized ? "Resource names are redacted." : `TMs: ${escapeHtml(resources.tmNames.join(", ") || "None")}`}</p>
-        ${anonymized ? "" : `<p class="muted">TBs: ${escapeHtml(resources.tbNames.join(", ") || "None")}</p>`}
+        <p class="muted">${anonymized ? reportHtml("Resource names are redacted.") : `${reportHtml("TMs")}: ${escapeHtml(resources.tmNames.join(", ") || reportText("None"))}`}</p>
+        ${anonymized ? "" : `<p class="muted">${reportHtml("TBs")}: ${escapeHtml(resources.tbNames.join(", ") || reportText("None"))}</p>`}
       </section>
       <section>
-        <h2>Terminology</h2>
-        ${anonymized ? `<p class="muted">Terminology text is omitted from this anonymized report. Counts are preserved in Resources.</p>` : data.terms.length ? `<table>
-          <thead><tr><th>Source term</th><th>Target term</th><th>Status</th><th>Termbase</th><th>Notes</th></tr></thead>
+        <h2>${reportHtml("Terminology")}</h2>
+        ${anonymized ? `<p class="muted">${reportHtml("Terminology text is omitted from this anonymized report. Counts are preserved in Resources.")}</p>` : data.terms.length ? `<table>
+          <thead><tr><th>${reportHtml("Source term")}</th><th>${reportHtml("Target term")}</th><th>${reportHtml("Status")}</th><th>${reportHtml("Termbase")}</th><th>${reportHtml("Notes")}</th></tr></thead>
           <tbody>${rows(data.terms, (term) => [
             `<td>${escapeHtml(term.sourceTerm)}</td>`,
             `<td>${escapeHtml(term.targetTerm)}</td>`,
-            `<td>${term.isForbidden ? "Forbidden" : "Approved"}</td>`,
+            `<td>${reportHtml(term.isForbidden ? "Forbidden" : "Approved")}</td>`,
             `<td>${escapeHtml(reportSafeLabel(term.termBaseName))}</td>`,
             `<td>${escapeHtml(term.notes)}</td>`
           ])}</tbody>
-        </table>` : `<p class="muted">No linked terms.</p>`}
+        </table>` : `<p class="muted">${reportHtml("No linked terms.")}</p>`}
       </section>
       <section>
-        <h2>QA Summary</h2>
-        <h3>By severity</h3>
+        <h2>${reportHtml("QA Summary")}</h2>
+        <h3>${reportHtml("By severity")}</h3>
         ${reportCountTableHtml(data.qaBySeverity)}
-        <h3>By type</h3>
+        <h3>${reportHtml("By type")}</h3>
         ${reportCountTableHtml(data.qaByType)}
+        ${anonymized ? "" : `<h3>${reportHtml("QA details")}</h3>${reportQaChecksTableHtml(data.qaChecks)}`}
       </section>
       <section>
-        <h2>Export Readiness</h2>
+        <h2>${reportHtml("Export Readiness")}</h2>
         ${reportCountTableHtml(validationCounts)}
-        <h3>Risk and warnings</h3>
+        <h3>${reportHtml("Risk and warnings")}</h3>
         ${reportListHtml([...validation.risky, ...validation.warnings], "No risk or warning notes.")}
       </section>
       <section>
-        <h2>Recent Activity</h2>
-        ${anonymized ? reportCountTableHtml(data.activityByType || {}, "No activity recorded.") : data.activityEvents.length ? `<table><thead><tr><th>Time</th><th>Type</th><th>Summary</th></tr></thead><tbody>${rows(data.activityEvents.slice(0, 10), (event) => [
+        <h2>${reportHtml("Recent Activity")}</h2>
+        ${anonymized ? reportCountTableHtml(data.activityByType || {}, "No activity recorded.") : data.activityEvents.length ? `<table><thead><tr><th>${reportHtml("Time")}</th><th>${reportHtml("Type")}</th><th>${reportHtml("Summary")}</th></tr></thead><tbody>${rows(data.activityEvents.slice(0, 10), (event) => [
           `<td>${escapeHtml(formatDateTime(event.createdAt))}</td>`,
-          `<td>${escapeHtml(event.type)}</td>`,
+          `<td>${escapeHtml(reportText(event.type))}</td>`,
           `<td>${escapeHtml(event.summary)}</td>`
-        ])}</tbody></table>` : `<p class="muted">No activity recorded.</p>`}
+        ])}</tbody></table>` : `<p class="muted">${reportHtml("No activity recorded.")}</p>`}
       </section>
       <footer>
-        ${anonymized ? "This anonymized report contains counts without project names, file names, resource names, terminology text, activity summaries, or segment text." : "This report contains project metadata, counts, terminology, QA totals, and activity summaries. Segment text is not included."}
+        ${anonymized ? reportHtml("This anonymized report contains counts without project names, file names, resource names, terminology text, activity summaries, or segment text.") : reportHtml("This report contains project metadata, counts, terminology, QA totals, and activity summaries. Segment text is not included.")}
       </footer>
     </main>
   </body>
@@ -11007,15 +11179,15 @@ function qualityPassportHtml(data) {
   const validation = sanitizeValidationReportForDisplay(data.validation) || { errors: [], risky: [], warnings: [], preserved: [], simplified: [], skipped: [], ok: true };
   const effort = passport.postEditingEffort || { label: "No segments", score: 0, drivers: [] };
   const rows = (values, cells) => values.map((item) => `<tr>${cells(item).join("")}</tr>`).join("");
-  const projectTitle = reportSafeLabel(project.name, "Project");
+  const projectTitle = reportSafeLabel(project.name, reportText("Project"));
   const topRiskItems = (riskQueue.items || []).slice(0, 20);
   return `<!doctype html>
-<html lang="en">
+<html lang="${escapeHtml(reportLocale())}" dir="${escapeHtml(reportDir())}">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-    <title>${escapeHtml(projectTitle)} - LoopCAT Quality Passport</title>
+    <title>${escapeHtml(projectTitle)} - ${reportHtml("LoopCAT Quality Passport")}</title>
     <style>
       :root { color-scheme: light; font-family: Arial, sans-serif; color: #1f2937; background: #f6f8fa; }
       body { margin: 0; padding: 32px; }
@@ -11039,88 +11211,90 @@ function qualityPassportHtml(data) {
   <body>
     <main>
       <header>
-        <h1>LoopCAT Quality Passport</h1>
+        <h1>${reportHtml("LoopCAT Quality Passport")}</h1>
         <p>${escapeHtml(projectTitle)} - ${escapeHtml(languagePairDisplay(project.sourceLang, project.targetLang))}</p>
-        <p class="muted">Generated ${escapeHtml(formatDateTime(passport.generatedAt || data.generatedAt))}</p>
+        <p class="muted">${reportHtml("Generated {date}", { date: formatDateTime(passport.generatedAt || data.generatedAt) })}</p>
       </header>
       <section>
-        <h2>Quality Contract</h2>
+        <h2>${reportHtml("Quality Contract")}</h2>
         <table>
           <tbody>
-            <tr><th>Standard</th><td>${escapeHtml(qualityLabel(profile.standard))}</td></tr>
-            <tr><th>Review depth</th><td>${escapeHtml(qualityLabel(profile.reviewDepth))}</td></tr>
-            <tr><th>Risk tolerance</th><td>${escapeHtml(qualityLabel(profile.riskTolerance))}</td></tr>
-            <tr><th>Terminology</th><td>${escapeHtml(qualityLabel(profile.terminologyStrictness))}</td></tr>
-            <tr><th>AI disclosure</th><td>${escapeHtml(qualityLabel(profile.aiDisclosure))}</td></tr>
-            <tr><th>Audience</th><td>${escapeHtml(reportSafeLabel(profile.audience, "Not set"))}</td></tr>
-            <tr><th>Tone</th><td>${escapeHtml(reportSafeLabel(profile.tone, "Neutral"))}</td></tr>
+            <tr><th>${reportHtml("Standard")}</th><td>${escapeHtml(qualityLabel(profile.standard))}</td></tr>
+            <tr><th>${reportHtml("Review depth")}</th><td>${escapeHtml(qualityLabel(profile.reviewDepth))}</td></tr>
+            <tr><th>${reportHtml("Risk tolerance")}</th><td>${escapeHtml(qualityLabel(profile.riskTolerance))}</td></tr>
+            <tr><th>${reportHtml("Terminology")}</th><td>${escapeHtml(qualityLabel(profile.terminologyStrictness))}</td></tr>
+            <tr><th>${reportHtml("AI disclosure")}</th><td>${escapeHtml(qualityLabel(profile.aiDisclosure))}</td></tr>
+            <tr><th>${reportHtml("Audience")}</th><td>${escapeHtml(reportSafeLabel(profile.audience, reportText("Not set")))}</td></tr>
+            <tr><th>${reportHtml("Tone")}</th><td>${escapeHtml(reportSafeLabel(profile.tone, reportText("Neutral")))}</td></tr>
           </tbody>
         </table>
       </section>
       <section>
-        <h2>Delivery Evidence</h2>
+        <h2>${reportHtml("Delivery Evidence")}</h2>
         <div class="cards">
-          <div class="card"><strong>${passport.confidenceScore ?? 0}</strong><span>Quality score</span></div>
-          <div class="card"><strong>${escapeHtml(effort.label)}</strong><span>Post-editing effort</span></div>
-          <div class="card"><strong>${riskQueue.totalRiskItems}</strong><span>Risk items</span></div>
-          <div class="card"><strong>${riskQueue.highRiskCount}</strong><span>High risk</span></div>
-          <div class="card"><strong>${data.qaChecks.length}</strong><span>QA issues</span></div>
-          <div class="card"><strong>${data.analysis.totals.confirmedPercent}%</strong><span>Confirmed</span></div>
+          <div class="card"><strong>${passport.confidenceScore ?? 0}</strong><span>${reportHtml("Quality score")}</span></div>
+          <div class="card"><strong>${escapeHtml(reportText(effort.label))}</strong><span>${reportHtml("Post-editing effort")}</span></div>
+          <div class="card"><strong>${riskQueue.totalRiskItems}</strong><span>${reportHtml("Risk items")}</span></div>
+          <div class="card"><strong>${riskQueue.highRiskCount}</strong><span>${reportHtml("High risk")}</span></div>
+          <div class="card"><strong>${data.qaChecks.length}</strong><span>${reportHtml("QA issues")}</span></div>
+          <div class="card"><strong>${data.analysis.totals.confirmedPercent}%</strong><span>${reportHtml("Confirmed")}</span></div>
         </div>
       </section>
       <section>
-        <h2>Risk Queue</h2>
-        <h3>By level</h3>
+        <h2>${reportHtml("Risk Queue")}</h2>
+        <h3>${reportHtml("By level")}</h3>
         ${reportCountTableHtml(riskQueue.byLevel || {}, "No unresolved quality risks.")}
-        <h3>Quality Categories</h3>
+        <h3>${reportHtml("Quality Categories")}</h3>
         ${qualityCategoryCountTableHtml(riskQueue.byCategory || {}, "No categorized quality risks.")}
-        <h3>Top risks</h3>
+        <h3>${reportHtml("Top risks")}</h3>
         ${topRiskItems.length ? `<table>
-          <thead><tr><th>Segment</th><th>File</th><th>Category</th><th>Risk</th><th>Signals</th></tr></thead>
+          <thead><tr><th>${reportHtml("Segment")}</th><th>${reportHtml("File")}</th><th>${reportHtml("Category")}</th><th>${reportHtml("Risk")}</th><th>${reportHtml("Signals")}</th></tr></thead>
           <tbody>${rows(topRiskItems, (item) => [
             `<td>#${escapeHtml(item.label)}</td>`,
-            `<td>${escapeHtml(reportSafeLabel(item.documentName, "Document"))}</td>`,
+            `<td>${escapeHtml(reportSafeLabel(item.documentName, reportText("Document")))}</td>`,
             `<td>${escapeHtml(qualityCategoryName(item.category))}</td>`,
             `<td>${escapeHtml(qualityRiskLevelLabel(item.level))} ${item.score}</td>`,
             `<td>${escapeHtml(item.reasons.map((reason) => reason.label).slice(0, 3).join(" "))}</td>`
           ])}</tbody>
-        </table>` : `<p class="muted">No unresolved quality risks.</p>`}
+        </table>` : `<p class="muted">${reportHtml("No unresolved quality risks.")}</p>`}
       </section>
       <section>
-        <h2>QA Evidence</h2>
-        <h3>By severity</h3>
+        <h2>${reportHtml("QA Evidence")}</h2>
+        <h3>${reportHtml("By severity")}</h3>
         ${reportCountTableHtml(data.qaBySeverity)}
-        <h3>By type</h3>
+        <h3>${reportHtml("By type")}</h3>
         ${reportCountTableHtml(data.qaByType)}
+        <h3>${reportHtml("QA details")}</h3>
+        ${reportQaChecksTableHtml(data.qaChecks)}
       </section>
       <section>
-        <h2>Review And AI Evidence</h2>
+        <h2>${reportHtml("Review And AI Evidence")}</h2>
         <div class="cards">
-          <div class="card"><strong>${data.analysis.totals.comments}</strong><span>Review notes</span></div>
-          <div class="card"><strong>${passport.ai?.drafts || 0}</strong><span>AI initiated</span></div>
-          <div class="card"><strong>${passport.ai?.reviewRisk || 0}</strong><span>AI review risk</span></div>
-          <div class="card"><strong>${passport.ai?.highRisk || 0}</strong><span>High AI risk</span></div>
-          <div class="card"><strong>${data.tmEntryCount}</strong><span>Linked TM units</span></div>
-          <div class="card"><strong>${data.termCount}</strong><span>Linked terms</span></div>
+          <div class="card"><strong>${data.analysis.totals.comments}</strong><span>${reportHtml("Review notes")}</span></div>
+          <div class="card"><strong>${passport.ai?.drafts || 0}</strong><span>${reportHtml("AI initiated")}</span></div>
+          <div class="card"><strong>${passport.ai?.reviewRisk || 0}</strong><span>${reportHtml("AI review risk")}</span></div>
+          <div class="card"><strong>${passport.ai?.highRisk || 0}</strong><span>${reportHtml("High AI risk")}</span></div>
+          <div class="card"><strong>${data.tmEntryCount}</strong><span>${reportHtml("Linked TM units")}</span></div>
+          <div class="card"><strong>${data.termCount}</strong><span>${reportHtml("Linked terms")}</span></div>
         </div>
-        <h3>Review states</h3>
+        <h3>${reportHtml("Review states")}</h3>
         ${reportCountTableHtml(passport.reviewByState || {}, "No review states recorded.")}
       </section>
       <section>
-        <h2>Export Readiness</h2>
+        <h2>${reportHtml("Export Readiness")}</h2>
         <div class="cards">
-          <div class="card"><strong>${validation.errors.length}</strong><span>Errors</span></div>
-          <div class="card"><strong>${validation.risky.length}</strong><span>Risks</span></div>
-          <div class="card"><strong>${validation.warnings.length}</strong><span>Warnings</span></div>
+          <div class="card"><strong>${validation.errors.length}</strong><span>${reportHtml("Errors")}</span></div>
+          <div class="card"><strong>${validation.risky.length}</strong><span>${reportHtml("Risks")}</span></div>
+          <div class="card"><strong>${validation.warnings.length}</strong><span>${reportHtml("Warnings")}</span></div>
         </div>
         ${reportListHtml([...validation.errors, ...validation.risky, ...validation.warnings], "No export-readiness findings.")}
       </section>
       <section>
-        <h2>Effort Drivers</h2>
+        <h2>${reportHtml("Effort Drivers")}</h2>
         ${reportListHtml(effort.drivers || [], "No major post-editing drivers.")}
       </section>
       <footer>
-        This passport contains quality settings, counts, risk signals, and readiness evidence. Segment text is not included.
+        ${reportHtml("This passport contains quality settings, counts, risk signals, and readiness evidence. Segment text is not included.")}
       </footer>
     </main>
   </body>
@@ -11403,7 +11577,7 @@ async function handleResourceTmxImport(file) {
   const sourceLang = normalizeLanguageInputElement(els.tmResourceSourceLangInput);
   const targetLang = normalizeLanguageInputElement(els.tmResourceTargetLangInput);
   if (!tmName || !sourceLang || !targetLang) {
-    window.alert("Enter a TM name, source language, and target language before importing.");
+    uiAlert("Enter a TM name, source language, and target language before importing.");
     return;
   }
   await reportImportProgress("Reading TMX resource", file);
@@ -11429,7 +11603,7 @@ async function handleResourceTbxImport(file) {
   const sourceLang = normalizeLanguageInputElement(els.tbResourceSourceLangInput);
   const targetLang = normalizeLanguageInputElement(els.tbResourceTargetLangInput);
   if (!termBaseName || !sourceLang || !targetLang) {
-    window.alert("Enter a TB name, source language, and target language before importing.");
+    uiAlert("Enter a TB name, source language, and target language before importing.");
     return;
   }
   await reportImportProgress("Reading TBX resource", file);
@@ -11455,7 +11629,7 @@ async function handleResourceTermListImport(file) {
   const sourceLang = normalizeLanguageInputElement(els.tbResourceSourceLangInput);
   const targetLang = normalizeLanguageInputElement(els.tbResourceTargetLangInput);
   if (!termBaseName || !sourceLang || !targetLang) {
-    window.alert("Enter a TB name, source language, and target language before importing.");
+    uiAlert("Enter a TB name, source language, and target language before importing.");
     return;
   }
   await reportImportProgress("Reading term list resource", file);
@@ -11507,6 +11681,12 @@ function wireEvents() {
   els.resourcesViewBtn.addEventListener("click", () => setView("resources"));
   els.aboutBtn.addEventListener("click", () => els.aboutDialog.showModal());
   els.closeAboutBtn.addEventListener("click", () => els.aboutDialog.close());
+  els.uiLocaleSelect?.addEventListener("change", () => {
+    uiI18n?.setLocale?.(els.uiLocaleSelect.value);
+    refreshLocalizedUi();
+  });
+  els.uiLocaleImportInput?.addEventListener("change", importUiLocaleFile);
+  els.exportUiSourceBtn?.addEventListener("click", exportUiSourceCatalog);
   els.workspaceRecoverySaveBtn.addEventListener("click", async () => {
     try {
       await saveWorkspaceRecoveryPackages();
@@ -17005,6 +17185,8 @@ async function runAppWorkflowTest() {
   }
 }
 
+uiI18n?.init?.();
+renderUiLocaleOptions();
 bindLocalAiOutputDrawer();
 wireEvents();
 startWorkspaceAutosave();

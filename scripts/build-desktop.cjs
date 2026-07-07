@@ -130,12 +130,24 @@ function removeBuilderDebugSidecars() {
   }
 }
 
+function runNodeScript(scriptName) {
+  const result = spawnSync(process.execPath, [path.join(root, "scripts", scriptName)], {
+    cwd: root,
+    env,
+    stdio: "inherit"
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`${scriptName} failed.`);
+}
+
 let releaseBuildLock = null;
 let exitCode = 0;
 try {
   assertPlatformBuildHost(process.argv.slice(2));
   releaseBuildLock = acquireBuildLock();
   removeBuildScratch();
+  runNodeScript("i18n-validate.cjs");
+  runNodeScript("i18n-compile.cjs");
 
   const command = process.platform === "win32" ? "electron-builder.cmd" : "electron-builder";
   const result = spawnSync(command, process.argv.slice(2), {

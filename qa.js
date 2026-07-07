@@ -14,7 +14,7 @@ function containsTerm(text, term) {
   return ` ${normalizeText(text)} `.includes(` ${normalizedTerm} `);
 }
 
-function issue({ type, severity, segment, index, message, fixHint }) {
+function issue({ type, severity, segment, index, message, messageValues, fixHint, fixHintValues }) {
   return {
     id: `qa-${segment.id || index}-${type}`,
     severity,
@@ -23,7 +23,9 @@ function issue({ type, severity, segment, index, message, fixHint }) {
     documentId: segment.documentId || "",
     label: `${index + 1}`,
     message,
+    messageValues: messageValues || {},
     fixHint,
+    fixHintValues: fixHintValues || {},
     createdAt: new Date().toISOString()
   };
 }
@@ -72,7 +74,10 @@ function runQaChecks(segments, terms = [], tagHelpers = {}) {
         severity: "error",
         segment,
         index,
-        message: `Missing protected placeholder ${tagDisplayText(tag)}.`,
+        message: "Missing protected placeholder {value1}.",
+        messageValues: {
+          value1: tagDisplayText(tag)
+        },
         fixHint: "Insert the missing protected placeholder into the target."
       }));
     });
@@ -117,7 +122,10 @@ function runQaChecks(segments, terms = [], tagHelpers = {}) {
           severity: "error",
           segment,
           index,
-          message: `Forbidden term used: ${term.targetTerm}.`,
+          message: "Forbidden term used: {value1}.",
+          messageValues: {
+            value1: term.targetTerm
+          },
           fixHint: "Replace this with the approved wording or document a termbase exception before delivery."
         }));
         return;
@@ -125,10 +133,14 @@ function runQaChecks(segments, terms = [], tagHelpers = {}) {
       if (!term.isForbidden && !containsTerm(target, term.targetTerm)) {
         checks.push(issue({
           type: "term",
-          severity: "warning",
-          segment,
-          index,
-          message: `Term may be missing: ${term.sourceTerm} -> ${term.targetTerm}.`,
+        severity: "warning",
+        segment,
+        index,
+          message: "Term may be missing: {sourceTerm} -> {targetTerm}.",
+          messageValues: {
+            sourceTerm: term.sourceTerm,
+            targetTerm: term.targetTerm
+          },
           fixHint: "Use the approved term or update the termbase if this is a valid exception."
         }));
       }

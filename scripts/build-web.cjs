@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -39,11 +40,25 @@ const WEB_ASSETS = [
   "worker-client.js",
   "cat-worker.js",
   "project.js",
+  "i18n.js",
+  "i18n/source.en-US.js",
+  "i18n/locales/ca-ES.js",
+  "i18n/locales/en-US.js",
+  "i18n/locales/tr-TR.js",
   "app.js",
   "README.md",
   "LICENSE",
   "NOTICE"
 ];
+
+function runNodeScript(scriptName) {
+  const result = spawnSync(process.execPath, [path.join(root, "scripts", scriptName)], {
+    cwd: root,
+    stdio: "inherit"
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`${scriptName} failed.`);
+}
 
 const crcTable = (() => {
   const table = new Uint32Array(256);
@@ -155,6 +170,9 @@ function assertAssetPath(relativePath) {
 function sha256(filePath) {
   return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 }
+
+runNodeScript("i18n-validate.cjs");
+runNodeScript("i18n-compile.cjs");
 
 fs.rmSync(distDir, { recursive: true, force: true });
 fs.mkdirSync(distDir, { recursive: true });

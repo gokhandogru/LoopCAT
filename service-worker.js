@@ -27,6 +27,11 @@ const CORE_ASSETS = [
   "./worker-client.js",
   "./cat-worker.js",
   "./project.js",
+  "./i18n.js",
+  "./i18n/source.en-US.js",
+  "./i18n/locales/ca-ES.js",
+  "./i18n/locales/en-US.js",
+  "./i18n/locales/tr-TR.js",
   "./app.js",
   "./LICENSE",
   "./NOTICE"

@@ -29,20 +29,51 @@
             <summary id="workspaceMenuSummary">Workspace</summary>
             <div class="menu-panel workspace-menu-panel">
               <div id="workspaceHealth" class="workspace-health"></div>
-              <button id="chooseWorkspaceBtn" type="button">Choose folder</button>
-              <button id="saveWorkspaceProjectBtn" type="button">Save project package</button>
-              <button id="syncWorkspaceBtn" type="button">Sync from folder</button>
-              <button id="workspaceBackupBtn" type="button">Export workspace backup</button>
-              <button id="repairWorkspaceBtn" type="button">Repair links</button>
-              <label class="menu-item">
-                Import project
-                <input id="projectPackageImportInput" type="file" accept="application/json,.json,.loopcat,.cathan">
-              </label>
-              <button id="backupExportBtn" type="button">Export browser backup</button>
-              <label class="menu-item">
-                Restore browser backup
-                <input id="backupImportInput" type="file" accept="application/json,.json">
-              </label>
+              <div class="workspace-primary-actions">
+                <button id="chooseWorkspaceBtn" type="button">Choose storage folder</button>
+                <button id="saveWorkspaceProjectBtn" type="button">Save current project</button>
+              </div>
+              <details class="workspace-submenu">
+                <summary>Move projects</summary>
+                <div class="workspace-submenu-body">
+                  <label class="menu-item">
+                    Import project package
+                    <input id="projectPackageImportInput" type="file" accept="application/json,.json,.loopcat,.cathan">
+                  </label>
+                  <button id="syncWorkspaceBtn" type="button">Sync from folder</button>
+                </div>
+              </details>
+              <details class="workspace-submenu">
+                <summary>Backups</summary>
+                <div class="workspace-submenu-body">
+                  <button id="backupExportBtn" type="button">Export browser backup</button>
+                  <label class="menu-item">
+                    Restore browser backup
+                    <input id="backupImportInput" type="file" accept="application/json,.json">
+                  </label>
+                  <button id="workspaceBackupBtn" type="button">Export folder backup</button>
+                </div>
+              </details>
+              <details class="workspace-submenu">
+                <summary>Interface language</summary>
+                <div class="workspace-submenu-body">
+                  <label class="menu-item locale-menu-item">
+                    <span>Language</span>
+                    <select id="uiLocaleSelect" aria-label="Interface language"></select>
+                  </label>
+                  <label class="menu-item">
+                    Import UI translation
+                    <input id="uiLocaleImportInput" type="file" accept="application/json,.json">
+                  </label>
+                  <button id="exportUiSourceBtn" type="button">Export UI source</button>
+                </div>
+              </details>
+              <details class="workspace-submenu">
+                <summary>Advanced</summary>
+                <div class="workspace-submenu-body">
+                  <button id="repairWorkspaceBtn" type="button">Repair folder links</button>
+                </div>
+              </details>
             </div>
           </details>
           <button id="newProjectBtn" class="primary">New project</button>
@@ -1030,6 +1061,11 @@
     <script src="./ai.js"></script>
     <script src="./worker-client.js"></script>
     <script src="./project.js"></script>
+    <script src="./i18n.js"></script>
+    <script src="./i18n/source.en-US.js"></script>
+    <script src="./i18n/locales/ca-ES.js"></script>
+    <script src="./i18n/locales/en-US.js"></script>
+    <script src="./i18n/locales/tr-TR.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

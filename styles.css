@@ -53,11 +53,13 @@ button,
   white-space: nowrap;
 }
 
-.encoding-menu-item {
+.encoding-menu-item,
+.locale-menu-item {
   justify-content: space-between;
 }
 
-.encoding-menu-item select {
+.encoding-menu-item select,
+.locale-menu-item select {
   max-width: 220px;
   min-height: 30px;
   border: 1px solid var(--line);
@@ -201,6 +203,9 @@ input[type="file"] {
 
 .workspace-menu-panel {
   min-width: 300px;
+  max-width: min(360px, calc(100vw - 24px));
+  max-height: min(74vh, 620px);
+  overflow-y: auto;
 }
 
 .workspace-health {
@@ -680,12 +685,21 @@ input[type="file"] {
   overflow: hidden;
 }
 
-.project-tile header,
+.project-tile header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
 .file-card header,
 .resource-card header {
   display: flex;
   justify-content: space-between;
   gap: 12px;
+}
+
+.project-tile header > div {
+  min-width: 0;
 }
 
 .file-card header {
@@ -722,6 +736,10 @@ input[type="file"] {
   overflow-wrap: anywhere;
 }
 
+.project-tile p {
+  overflow-wrap: break-word;
+}
+
 .language-badge {
   align-self: flex-start;
   border-radius: 999px;
@@ -730,6 +748,13 @@ input[type="file"] {
   padding: 4px 8px;
   font-size: 12px;
   white-space: nowrap;
+}
+
+.project-tile .language-badge {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .project-stats {
@@ -1047,6 +1072,48 @@ input[type="file"] {
 .menu-item:hover {
   border-color: transparent;
   background: #eef4f7;
+}
+
+.workspace-primary-actions,
+.workspace-submenu-body {
+  display: grid;
+  gap: 4px;
+}
+
+.workspace-primary-actions {
+  padding-top: 2px;
+}
+
+.workspace-primary-actions button:first-child {
+  font-weight: 700;
+}
+
+.workspace-submenu {
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+}
+
+.workspace-submenu > summary {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.workspace-submenu > summary:hover {
+  background: #eef4f7;
+}
+
+.workspace-submenu[open] > summary {
+  background: #f8fafc;
+}
+
+.workspace-submenu-body {
+  padding-top: 4px;
 }
 
 .import-format-card {

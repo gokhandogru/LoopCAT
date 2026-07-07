@@ -347,7 +347,7 @@
           [{ id: "qa-forbidden-term", source: "Computer-assisted translation tools.", target: "Bilgisayar destekli makine cevirisi araclari.", status: "draft" }],
           [forbiddenTerm]
         );
-        assert(forbiddenQaIssues.some((issue) => issue.type === "forbidden-term" && issue.severity === "error" && issue.message.includes("makine cevirisi")), "QA rejects forbidden target terms");
+        assert(forbiddenQaIssues.some((issue) => issue.type === "forbidden-term" && issue.severity === "error" && issue.messageValues?.value1 === "makine cevirisi"), "QA rejects forbidden target terms");
         const duplicateTagQaIssues = window.CatHan.qa.runQaChecks(
           [{
             id: "qa-duplicate-tags",
@@ -358,7 +358,7 @@
           }],
           []
         );
-        assert(duplicateTagQaIssues.some((issue) => issue.type === "tag" && issue.message.includes("<b>")), "QA counts duplicate protected tags");
+        assert(duplicateTagQaIssues.some((issue) => issue.type === "tag" && issue.messageValues?.value1 === "<b>"), "QA counts duplicate protected tags");
         const workerQaIssues = await window.CatHan.workerClient.runQaChecks({
           segments: [{ id: "qa-worker-1", source: "Value <b>one</b> 42.", target: "Deger 41.", status: "draft", tags: [{ text: "<b>", type: "tag" }, { text: "</b>", type: "tag" }] }],
           terms: [],

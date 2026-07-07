@@ -29,6 +29,7 @@ This first version is intentionally focused on a reliable editing loop:
 - Segment source text into editable translation units, with DOCX import protection for common academic abbreviations and initials.
 - Edit target segments in a CAT-style grid.
 - Use native browser/Electron spellcheck in target segment editors, with the desktop wrapper syncing spellcheck to the active project target language where the runtime supports it.
+- Choose the LoopCAT interface language from the Workspace menu, including built-in English and Turkish, import custom UI translation JSON, and export the English UI source catalog for translators.
 - Keep bounded per-segment target revision history for post-editing review.
 - Search and filter segments while translating, including AI-generated pretranslations, AI suggestions, and risk-ranked AI review comments. AI-pretranslated rows display as `AI initiated`; confirming one clears `Needs review` while keeping the AI origin visible.
 - Search by source, target, or both, with optional regex and case-sensitive matching.
@@ -104,6 +105,8 @@ The code is split by responsibility so the app can grow without becoming one lar
 - `index.html` defines the static UI shell.
 - `manifest.webmanifest` and `service-worker.js` define the installable offline app shell.
 - `scripts/build-web.cjs` creates the static HTML distribution ZIP in `dist-web/`.
+- `i18n.js`, `i18n/source.en-US.json`, and `i18n/locales/*.json` own UI internationalization for the app shell and generated interface text; compiled `*.js` catalog files are bundled so the static app still works offline and from local files.
+- `scripts/i18n-extract.cjs`, `scripts/i18n-sync.cjs`, `scripts/i18n-validate.cjs`, and `scripts/i18n-compile.cjs` maintain the source catalog, create target locale files, validate placeholders/keys, and compile runtime catalogs. To add a locale, run `node scripts/i18n-sync.cjs --locale ca-ES`, translate `i18n/locales/ca-ES.json`, then run `node scripts/i18n-validate.cjs` and `node scripts/i18n-compile.cjs`.
 - `scripts/verify-web-artifact.cjs` verifies the static HTML ZIP, version alignment, checksums, and runtime asset list.
 - `scripts/verify-web-smoke.cjs` extracts the static HTML ZIP, serves it from localhost, and checks desktop/mobile rendering, console health, horizontal overflow, and the New project and About dialogs.
 - `package.json` and `desktop/main.cjs` define the Electron desktop wrapper for Windows, macOS, and Linux packaging.
