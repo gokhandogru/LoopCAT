@@ -112,7 +112,12 @@ const ALLOWED_APP_FILES = new Set([
   "ai.js",
   "worker-client.js",
   "cat-worker.js",
-  "project.js"
+  "project.js",
+  "i18n.js",
+  "i18n/source.en-US.js",
+  "i18n/locales/ca-ES.js",
+  "i18n/locales/en-US.js",
+  "i18n/locales/tr-TR.js"
 ]);
 
 function registerPrivilegedSchemes() {
@@ -856,6 +861,9 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
           index: await fetchAppShellAsset("./index.html", "LoopCAT"),
           app: await fetchAppShellAsset("./app.js", "registerOfflineAppShell"),
           serviceWorker: await fetchAppShellAsset("./service-worker.js", "loopcat-offline-"),
+          i18nRuntime: await fetchAppShellAsset("./i18n.js", "window.CatHan.i18n"),
+          i18nSource: await fetchAppShellAsset("./i18n/source.en-US.js", "workspace.menu.summary"),
+          i18nLocale: await fetchAppShellAsset("./i18n/locales/en-US.js", "ui.label.confirmed"),
           testRunnerBlocked: false
         };
         try {
@@ -884,6 +892,12 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
           projectProbe,
           workflowProbe,
           appShellAssetProbe,
+          i18nProbe: {
+            runtimeReady: Boolean(window.CatHan?.i18n?.t),
+            storageLabel: window.CatHan?.i18n?.t?.("workspace.menu.summary") || "",
+            confirmedLabel: window.CatHan?.i18n?.t?.("ui.label.confirmed") || "",
+            workspaceSummaryText: document.querySelector("#workspaceMenuSummary")?.textContent || ""
+          },
           bodyText: document.body ? document.body.innerText.slice(0, 400) : ""
         };
       })()`, true);
@@ -920,7 +934,17 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
       if (!result?.appShellAssetProbe?.app?.includesExpectedText) missing.push("packaged app.js content");
       if (!result?.appShellAssetProbe?.serviceWorker?.fetchOk) missing.push("packaged service-worker.js fetch");
       if (!result?.appShellAssetProbe?.serviceWorker?.includesExpectedText) missing.push("packaged service-worker.js content");
+      if (!result?.appShellAssetProbe?.i18nRuntime?.fetchOk) missing.push("packaged i18n.js fetch");
+      if (!result?.appShellAssetProbe?.i18nRuntime?.includesExpectedText) missing.push("packaged i18n.js content");
+      if (!result?.appShellAssetProbe?.i18nSource?.fetchOk) missing.push("packaged i18n source catalog fetch");
+      if (!result?.appShellAssetProbe?.i18nSource?.includesExpectedText) missing.push("packaged i18n source catalog content");
+      if (!result?.appShellAssetProbe?.i18nLocale?.fetchOk) missing.push("packaged i18n locale catalog fetch");
+      if (!result?.appShellAssetProbe?.i18nLocale?.includesExpectedText) missing.push("packaged i18n locale catalog content");
       if (!result?.appShellAssetProbe?.testRunnerBlocked) missing.push("test runner excluded from desktop protocol");
+      if (!result?.i18nProbe?.runtimeReady) missing.push("i18n runtime");
+      if (result?.i18nProbe?.storageLabel !== "Storage") missing.push("workspace storage i18n label");
+      if (result?.i18nProbe?.confirmedLabel !== "confirmed") missing.push("confirmed i18n label");
+      if (result?.i18nProbe?.workspaceSummaryText === "workspace.menu.summary") missing.push("raw workspace i18n key hidden");
       for (const storeName of ["projects", "segments", "appMeta"]) {
         if (!result?.storageProbe?.objectStores?.includes(storeName)) missing.push(`IndexedDB store ${storeName}`);
       }

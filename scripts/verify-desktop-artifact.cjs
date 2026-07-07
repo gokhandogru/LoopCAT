@@ -36,6 +36,11 @@ const requiredFiles = [
   "worker-client.js",
   "cat-worker.js",
   "project.js",
+  "i18n.js",
+  "i18n/source.en-US.js",
+  "i18n/locales/ca-ES.js",
+  "i18n/locales/en-US.js",
+  "i18n/locales/tr-TR.js",
   "desktop/main.cjs",
   "docs/desktop-packaging.md",
   "docs/loopcat-package-format-v1.md",
@@ -68,7 +73,12 @@ const expectedDesktopProtocolFiles = [
   "ai.js",
   "worker-client.js",
   "cat-worker.js",
-  "project.js"
+  "project.js",
+  "i18n.js",
+  "i18n/source.en-US.js",
+  "i18n/locales/ca-ES.js",
+  "i18n/locales/en-US.js",
+  "i18n/locales/tr-TR.js"
 ];
 
 const forbiddenPatterns = [

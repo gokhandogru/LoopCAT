@@ -86,10 +86,16 @@ const expectedRuntimeFiles = [
   "qa.js",
   "validation.js",
   "analysis.js",
+  "quality.js",
   "ai.js",
   "worker-client.js",
   "cat-worker.js",
-  "project.js"
+  "project.js",
+  "i18n.js",
+  "i18n/source.en-US.js",
+  "i18n/locales/ca-ES.js",
+  "i18n/locales/en-US.js",
+  "i18n/locales/tr-TR.js"
 ];
 
 for (const relativePath of expectedRuntimeFiles) {
@@ -125,6 +131,7 @@ for (const [input, expected] of [
   ["", "index.html"],
   ["./index.html", "index.html"],
   ["styles.css", "styles.css"],
+  ["i18n/locales/en-US.js", "i18n/locales/en-US.js"],
   ["icons/loopcat-icon.svg", "icons/loopcat-icon.svg"],
   ["icons//loopcat-icon.svg", "icons/loopcat-icon.svg"]
 ]) {
@@ -147,6 +154,7 @@ for (const [url, expectedFile] of [
   ["loopcat://app/", "index.html"],
   ["loopcat://app/index.html", "index.html"],
   ["loopcat://app/styles.css", "styles.css"],
+  ["loopcat://app/i18n/locales/en-US.js", "i18n/locales/en-US.js"],
   ["loopcat://app/icons/loopcat-icon.svg", "icons/loopcat-icon.svg"]
 ]) {
   const resolved = wrapper.resolveAppFile(url);
