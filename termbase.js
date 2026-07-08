@@ -1,8 +1,13 @@
 (() => {
-const { bulkPut, deleteByKey, deleteStoresWhereAtomically, getAllByIndex, makeId, put, constants } = window.CatHan.storage;
+const { bulkPut, countByIndex, deleteByKey, deleteStoresWhereAtomically, deleteWhere, get, getAll, getAllByIndex, makeId, put, constants } = window.CatHan.storage;
 const { normalizeText } = window.CatHan.tm;
 const LOCAL_WORKSPACE_ID = constants?.LOCAL_WORKSPACE_ID || "local-workspace";
 const LOCAL_USER_ID = constants?.LOCAL_USER_ID || "local-user";
+const TERM_INDEX_META_PREFIX = "term-token-index:";
+const MAX_TERM_INDEX_TOKENS = 12;
+const MAX_TERM_SOURCE_TOKENS = 40;
+const MAX_TERM_CANDIDATES = 1200;
+const RESOURCE_IMPORT_CHUNK_SIZE = 1000;
 const SENSITIVE_TEXT_VALUE_PATTERN = /(sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._~+/=-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|npm_[A-Za-z0-9_]{8,}|(?:session|cookie)[=:][A-Za-z0-9._~+/=-]{8,})/i;
 const textDecoder = new TextDecoder("utf-8");
 
@@ -34,6 +39,138 @@ function languagePairFromFields(sourceLang, targetLang) {
   const source = cleanPortableLabel(sourceLang);
   const target = cleanPortableLabel(targetLang);
   return source && target ? `${source}::${target}` : "";
+}
+
+function languagePairOf(term = {}) {
+  return cleanPortableLabel(term.languagePair) || languagePairFromFields(term.sourceLang, term.targetLang);
+}
+
+function tokens(text) {
+  return Array.from(new Set(normalizeText(text).split(" ").filter((token) => token.length > 1)));
+}
+
+function termIndexMetaKey(languagePair) {
+  return `${TERM_INDEX_META_PREFIX}${languagePair}`;
+}
+
+function termTokens(term) {
+  return tokens(term.sourceTerm).slice(0, MAX_TERM_INDEX_TOKENS);
+}
+
+function indexRecordsForTerm(term) {
+  const languagePair = languagePairOf(term);
+  if (!languagePair) return [];
+  return termTokens(term).map((token) => ({
+    id: `${term.id}::${token}`,
+    termId: term.id,
+    languagePair,
+    termBaseName: term.termBaseName || "",
+    token,
+    updatedAt: term.updatedAt || term.createdAt || new Date().toISOString()
+  }));
+}
+
+function latestTermTimestamp(terms) {
+  return (terms || []).reduce((latest, term) => {
+    const value = term.updatedAt || term.createdAt || "";
+    return value > latest ? value : latest;
+  }, "");
+}
+
+async function writeTermIndexMeta(languagePair, terms) {
+  await put("appMeta", {
+    key: termIndexMetaKey(languagePair),
+    languagePair,
+    termCount: terms.length,
+    latestTermUpdatedAt: latestTermTimestamp(terms),
+    dirty: false,
+    updatedAt: new Date().toISOString()
+  });
+}
+
+async function writeTermIndexMetaClean(languagePair) {
+  if (!languagePair) return;
+  const existing = await get("appMeta", termIndexMetaKey(languagePair));
+  await put("appMeta", {
+    ...(existing || {}),
+    key: termIndexMetaKey(languagePair),
+    languagePair,
+    dirty: false,
+    updatedAt: new Date().toISOString()
+  });
+}
+
+async function markTermIndexDirty(languagePair) {
+  await put("appMeta", {
+    key: termIndexMetaKey(languagePair),
+    languagePair,
+    dirty: true,
+    updatedAt: new Date().toISOString()
+  });
+}
+
+async function bulkPutInChunks(storeName, records, options = {}) {
+  const chunkSize = Math.max(100, Number(options.chunkSize || RESOURCE_IMPORT_CHUNK_SIZE));
+  let saved = 0;
+  for (let index = 0; index < records.length; index += chunkSize) {
+    const chunk = records.slice(index, index + chunkSize);
+    if (chunk.length) await bulkPut(storeName, chunk);
+    saved += chunk.length;
+    if (typeof options.onProgress === "function") {
+      await options.onProgress({ saved, total: records.length, chunkSize: chunk.length, storeName });
+    }
+  }
+  return saved;
+}
+
+async function rebuildTermIndex(languagePair, terms = null, options = {}) {
+  const sourceTerms = terms || await getAllByIndex("terms", "languagePair", languagePair);
+  await deleteWhere("termTokenIndex", (record) => record.languagePair === languagePair);
+  const records = sourceTerms.flatMap(indexRecordsForTerm);
+  if (records.length) {
+    await bulkPutInChunks("termTokenIndex", records, {
+      chunkSize: options.chunkSize,
+      onProgress: options.onProgress
+    });
+  }
+  await writeTermIndexMeta(languagePair, sourceTerms);
+  return sourceTerms.length;
+}
+
+async function rebuildAllTermIndexes(options = {}) {
+  const terms = await getAll("terms");
+  const byPair = new Map();
+  terms.forEach((term) => {
+    const languagePair = languagePairOf(term);
+    if (!languagePair) return;
+    if (!byPair.has(languagePair)) byPair.set(languagePair, []);
+    byPair.get(languagePair).push(term);
+  });
+  await deleteWhere("termTokenIndex", () => true);
+  let indexed = 0;
+  for (const [languagePair, pairTerms] of byPair) {
+    const records = pairTerms.flatMap(indexRecordsForTerm);
+    if (records.length) {
+      await bulkPutInChunks("termTokenIndex", records, {
+        chunkSize: options.chunkSize,
+        onProgress: options.onProgress
+      });
+    }
+    await writeTermIndexMeta(languagePair, pairTerms);
+    indexed += pairTerms.length;
+  }
+  return indexed;
+}
+
+async function ensureTermIndex(languagePair) {
+  const meta = await get("appMeta", termIndexMetaKey(languagePair));
+  if (meta && !meta.dirty) return;
+  await rebuildTermIndex(languagePair);
+}
+
+async function putTermIndexRecords(terms) {
+  const records = (terms || []).flatMap(indexRecordsForTerm);
+  if (records.length) await bulkPut("termTokenIndex", records);
 }
 
 function containsNormalizedTerm(text, term) {
@@ -382,13 +519,45 @@ async function parseTermWorkbook(arrayBufferOrBytes, options = {}) {
 async function saveTerm(input = {}) {
   const { sourceTerm, targetTerm, sourceLang, targetLang, notes, termBaseName, isForbidden = false } = input || {};
   const term = termRecord({ sourceTerm, targetTerm, sourceLang, targetLang, notes, termBaseName, isForbidden });
+  await ensureTermIndex(term.languagePair);
   await put("terms", term);
+  await putTermIndexRecords([term]);
+  await writeTermIndexMetaClean(term.languagePair);
   return term;
 }
 
-async function importTerms(terms) {
+async function importTerms(terms, options = {}) {
   const normalizedTerms = (terms || []).map((term) => termRecord(term, { preserveUpdatedAt: true }));
-  await bulkPut("terms", normalizedTerms);
+  const pairs = new Set(normalizedTerms.map(languagePairOf).filter(Boolean));
+  const pairIndexModes = new Map();
+  await Promise.all(Array.from(pairs, async (languagePair) => {
+    const [meta, existingCount] = await Promise.all([
+      get("appMeta", termIndexMetaKey(languagePair)),
+      countByIndex ? countByIndex("terms", "languagePair", languagePair) : Promise.resolve(0)
+    ]);
+    pairIndexModes.set(languagePair, { rebuild: existingCount > 0 && (!meta || meta.dirty) });
+  }));
+  const chunkSize = Math.max(100, Number(options.chunkSize || RESOURCE_IMPORT_CHUNK_SIZE));
+  let saved = 0;
+  for (let index = 0; index < normalizedTerms.length; index += chunkSize) {
+    const chunk = normalizedTerms.slice(index, index + chunkSize);
+    await bulkPut("terms", chunk);
+    await putTermIndexRecords(chunk);
+    saved += chunk.length;
+    if (typeof options.onProgress === "function") {
+      await options.onProgress({ saved, total: normalizedTerms.length, chunkSize: chunk.length });
+    }
+  }
+  for (const languagePair of pairs) {
+    if (pairIndexModes.get(languagePair)?.rebuild) {
+      await rebuildTermIndex(languagePair, null, {
+        chunkSize,
+        onProgress: options.onIndexProgress
+      });
+    } else {
+      await writeTermIndexMetaClean(languagePair);
+    }
+  }
   return normalizedTerms.length;
 }
 
@@ -399,19 +568,34 @@ async function deleteTerm(id) {
 async function deleteTerms(ids) {
   const idSet = new Set((ids || []).map((id) => String(id || "")).filter(Boolean));
   if (!idSet.size) return 0;
+  const existingTerms = (await Promise.all(Array.from(idSet, (id) => get("terms", id)))).filter(Boolean);
   if (deleteStoresWhereAtomically) {
     await deleteStoresWhereAtomically({
-      terms: (term) => idSet.has(term.id)
+      terms: (term) => idSet.has(term.id),
+      termTokenIndex: (record) => idSet.has(record.termId)
     });
-    return idSet.size;
+  } else {
+    for (const id of idSet) {
+      await deleteByKey("terms", id);
+      await deleteWhere("termTokenIndex", (record) => record.termId === id);
+    }
   }
-  for (const id of idSet) await deleteByKey("terms", id);
+  const languagePairs = new Set(existingTerms.map(languagePairOf).filter(Boolean));
+  for (const languagePair of languagePairs) await ensureTermIndex(languagePair);
+  for (const languagePair of languagePairs) await writeTermIndexMetaClean(languagePair);
   return idSet.size;
 }
 
 async function updateTerm(term = {}) {
   const updated = termRecord(term, { requireId: true });
+  const previous = await get("terms", updated.id);
+  const languagePairsToEnsure = new Set([languagePairOf(previous), updated.languagePair].filter(Boolean));
+  for (const languagePair of languagePairsToEnsure) await ensureTermIndex(languagePair);
+  await deleteWhere("termTokenIndex", (record) => record.termId === updated.id);
   await put("terms", updated);
+  await putTermIndexRecords([updated]);
+  const languagePairs = new Set([languagePairOf(previous), updated.languagePair].filter(Boolean));
+  for (const languagePair of languagePairs) await writeTermIndexMetaClean(languagePair);
   return updated;
 }
 
@@ -423,7 +607,25 @@ async function findTerms(options = {}) {
   const { source, sourceLang, targetLang, termBaseName, termBaseNames } = options || {};
   const languagePair = languagePairFromFields(sourceLang, targetLang);
   if (!languagePair || !normalizeText(source)) return [];
-  const terms = await getAllByIndex("terms", "languagePair", languagePair);
+  const sourceTokens = tokens(source).slice(0, MAX_TERM_SOURCE_TOKENS);
+  let terms;
+  if (sourceTokens.length) {
+    await ensureTermIndex(languagePair);
+    const allowedNames = resourceNameSet(termBaseNames, termBaseName);
+    const candidateHits = new Map();
+    const tokenRows = await Promise.all(sourceTokens.map((token) => getAllByIndex("termTokenIndex", "languagePairToken", [languagePair, token])));
+    tokenRows.flat().forEach((record) => {
+      if (allowedNames.size && !allowedNames.has(record.termBaseName)) return;
+      candidateHits.set(record.termId, (candidateHits.get(record.termId) || 0) + 1);
+    });
+    const candidateIds = Array.from(candidateHits.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, MAX_TERM_CANDIDATES)
+      .map(([id]) => id);
+    terms = (await Promise.all(candidateIds.map((id) => get("terms", id)))).filter(Boolean);
+  } else {
+    terms = await getAllByIndex("terms", "languagePair", languagePair);
+  }
   const allowedNames = resourceNameSet(termBaseNames, termBaseName);
   return terms
     .filter((term) => !allowedNames.size || allowedNames.has(term.termBaseName))
@@ -444,6 +646,8 @@ window.CatHan.termbase = {
   containsNormalizedTerm,
   termRanges,
   normalizeTerm,
+  rebuildTermIndex,
+  rebuildAllTermIndexes,
   parseTermList,
   parseTermWorkbook,
   saveTerm,

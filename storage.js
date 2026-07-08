@@ -1,6 +1,6 @@
 (() => {
 const DB_NAME = "cathan-local-cat";
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const LOCAL_WORKSPACE_ID = "local-workspace";
 const LOCAL_USER_ID = "local-user";
 const APP_NAME = "LoopCAT";
@@ -10,6 +10,7 @@ const RUNTIME_HANDLE_FIELD_PATTERN = /^(?:file|directory|browser|workspace|nativ
 const PROVIDER_TRACE_FIELD_PATTERN = /^(?:responseId|requestId|prompt|promptTemplate|providerRequestId|providerResponseId|customEndpoint)$/i;
 const SENSITIVE_TEXT_VALUE_PATTERN = /(sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._~+/=-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|npm_[A-Za-z0-9_]{8,}|(?:session|cookie)[=:][A-Za-z0-9._~+/=-]{8,})/i;
 const TM_INDEX_META_PREFIX = "tm-token-index:";
+const TERM_INDEX_META_PREFIX = "term-token-index:";
 const RESOURCE_LINK_TYPES = new Set(["tm", "termbase"]);
 const PORTABLE_LABEL_VALUE_KEYS = new Set(["createdByName", "creatorName", "creatorOrigin", "documentName", "fileName", "filename", "projectName", "sourceFileName", "sourceLang", "targetLang", "termBaseName", "tmName"]);
 const PORTABLE_LABEL_CONTAINER_KEYS = new Set(["documents", "project", "projects", "resourceLinks", "resourceReferences", "sourceAssets"]);
@@ -62,6 +63,14 @@ function ensureStores(db) {
     const terms = db.createObjectStore("terms", { keyPath: "id" });
     terms.createIndex("languagePair", "languagePair");
     terms.createIndex("termBaseName", "termBaseName");
+  }
+  if (!db.objectStoreNames.contains("termTokenIndex")) {
+    const termTokenIndex = db.createObjectStore("termTokenIndex", { keyPath: "id" });
+    termTokenIndex.createIndex("languagePair", "languagePair");
+    termTokenIndex.createIndex("languagePairToken", ["languagePair", "token"]);
+    termTokenIndex.createIndex("termId", "termId");
+    termTokenIndex.createIndex("termBaseName", "termBaseName");
+    termTokenIndex.createIndex("termBaseNameToken", ["languagePair", "termBaseName", "token"]);
   }
   if (!db.objectStoreNames.contains("appMeta")) {
     db.createObjectStore("appMeta", { keyPath: "key" });
@@ -490,11 +499,21 @@ function migrateToVersion4(db, tx) {
   });
 }
 
+function migrateToVersion5(db, tx) {
+  ensureStores(db);
+  tx.objectStore("appMeta").put({
+    key: "schema",
+    version: DB_VERSION,
+    updatedAt: new Date().toISOString()
+  });
+}
+
 function runMigrations(db, tx, oldVersion) {
   ensureStores(db);
   if (oldVersion < 2) migrateToVersion2(db, tx);
   if (oldVersion < 3) migrateToVersion3(db, tx);
   if (oldVersion < 4) migrateToVersion4(db, tx);
+  if (oldVersion < 5) migrateToVersion5(db, tx);
 }
 
 function openDatabase() {
@@ -979,6 +998,13 @@ async function getAllByIndex(storeName, indexName, value) {
   return requestToPromise(index.getAll(value));
 }
 
+async function countByIndex(storeName, indexName, value) {
+  const db = await openDatabase();
+  const tx = db.transaction(storeName, "readonly");
+  const index = tx.objectStore(storeName).index(indexName);
+  return requestToPromise(index.count(value));
+}
+
 async function deleteByKey(storeName, key) {
   const db = await openDatabase();
   const tx = db.transaction(storeName, "readwrite");
@@ -1103,9 +1129,13 @@ async function importAllData(data) {
   assertSegmentsBelongToRestoredProjects(segments, projects);
   assertSegmentsBelongToProjectDocuments(segments, projects, "backup");
   assertActivityEventsBelongToRestoredProjects(activityEvents, projects);
-  const languagePairs = Array.from(new Set(tmEntries.map(languagePairOf).filter((pair) => pair !== "::")));
+  const tmLanguagePairs = Array.from(new Set(tmEntries.map(languagePairOf).filter((pair) => pair !== "::")));
+  const termLanguagePairs = Array.from(new Set(terms.map(languagePairOf).filter((pair) => pair !== "::")));
   const existingAppMeta = await getAll("appMeta");
-  const preservedAppMeta = existingAppMeta.filter((item) => !String(item?.key || "").startsWith(TM_INDEX_META_PREFIX));
+  const preservedAppMeta = existingAppMeta.filter((item) => {
+    const key = String(item?.key || "");
+    return !key.startsWith(TM_INDEX_META_PREFIX) && !key.startsWith(TERM_INDEX_META_PREFIX);
+  });
   const now = new Date().toISOString();
   await replaceStoresAtomically({
     projects,
@@ -1114,10 +1144,17 @@ async function importAllData(data) {
     terms,
     activityEvents,
     tmTokenIndex: [],
+    termTokenIndex: [],
     appMeta: [
       ...preservedAppMeta,
-      ...languagePairs.map((languagePair) => ({
+      ...tmLanguagePairs.map((languagePair) => ({
         key: `${TM_INDEX_META_PREFIX}${languagePair}`,
+        languagePair,
+        dirty: true,
+        updatedAt: now
+      })),
+      ...termLanguagePairs.map((languagePair) => ({
+        key: `${TERM_INDEX_META_PREFIX}${languagePair}`,
         languagePair,
         dirty: true,
         updatedAt: now
@@ -1141,6 +1178,7 @@ window.CatHan.storage = {
   get,
   getAll,
   getAllByIndex,
+  countByIndex,
   deleteByKey,
   deleteWhere,
   deleteProjectRecords,

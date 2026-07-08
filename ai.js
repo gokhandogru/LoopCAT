@@ -4265,6 +4265,7 @@ function applyAiPretranslation(segment, result) {
   segment.status = "draft";
   segment.reviewState = "needs-review";
   segment.aiPretranslation = aiPretranslationMetadata(result);
+  delete segment.tmPretranslation;
   return segment;
 }
 

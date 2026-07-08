@@ -3,9 +3,9 @@ const { buildBilingualDocx, buildTargetDocx, detectProtectedTags, extractDocxSeg
 const { appendProjectSegments, appendProjectSegmentsAndUpdateProject, createProject, deleteProject, deleteProjectDocument, deleteSegment, getProjectSegments, listProjects, replaceProjectSegments, saveSegment, saveSegments, updateProject } = window.CatHan.project;
 const { bulkPut, constants: storageConstants, createPortableSanitizerContext, exportAllData, getAll, getAllByIndex, importAllData, importProjectPackageRecords, listActivityEvents, makeId, recordActivityEvent, sanitizePortableValue } = window.CatHan.storage;
 const { deleteTmEntry, deleteTmEntries, getTmMatchCandidates, importTmEntries, listTmEntries, rebuildAllTmIndexes, saveTmEntry, scoreTmEntries, updateTmEntry } = window.CatHan.tm;
-const { buildTmx, parseTmx } = window.CatHan.tmx;
-const { deleteTerm, deleteTerms, findTerms, importTerms, listTerms, parseTermList, parseTermWorkbook, saveTerm, termRanges, updateTerm } = window.CatHan.termbase;
-const { buildTbx, parseTbx } = window.CatHan.tbx;
+const { buildTmx, parseTmx, parseTmxAsync } = window.CatHan.tmx;
+const { deleteTerm, deleteTerms, findTerms, importTerms, listTerms, parseTermList, parseTermWorkbook, rebuildAllTermIndexes, saveTerm, termRanges, updateTerm } = window.CatHan.termbase;
+const { buildTbx, parseTbx, parseTbxAsync } = window.CatHan.tbx;
 const { buildTargetXliff, buildXliff, parseXliffFile } = window.CatHan.xliff;
 const { buildLocalizationFile, parseLocalizationFile } = window.CatHan.localization;
 const { runQaChecks } = window.CatHan.qa;
@@ -1499,6 +1499,7 @@ function setSegmentTargetAndStatus(segment, target, status, reason = "edit") {
   recordSegmentTargetHistory(segment, nextTarget, nextStatus, reason);
   segment.target = nextTarget;
   segment.status = nextStatus;
+  if (reason !== "pretranslate") delete segment.tmPretranslation;
 }
 
 function touchSegment(segment) {
@@ -2112,6 +2113,28 @@ function aiPretranslationBadge(segment = {}) {
     title: segment.aiPretranslation?.model
       ? uiLabel("aiInitiatedPretranslationModel", { model: segment.aiPretranslation.model })
       : uiLabel("aiInitiatedPretranslation")
+  };
+}
+
+function tmPretranslationScore(segment = {}) {
+  const score = Number(segment.tmPretranslation?.score);
+  if (!Number.isFinite(score)) return null;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function segmentHasTmPretranslation(segment = {}) {
+  return tmPretranslationScore(segment) !== null;
+}
+
+function tmPretranslationBadge(segment = {}) {
+  const score = tmPretranslationScore(segment);
+  const tmName = String(segment.tmPretranslation?.tmName || "").trim();
+  return {
+    className: "tm-pretranslation",
+    text: `TM ${score}%`,
+    title: tmName
+      ? uiSource("TM pretranslation match: {value1}% from {value2}", { value1: score, value2: tmName })
+      : uiSource("TM pretranslation match: {value1}%", { value1: score })
   };
 }
 
@@ -5113,7 +5136,15 @@ function renderStatusCell(row, segment) {
   const pill = row.querySelector(".status-pill");
   pill.className = `status-pill ${segment.status}`;
   pill.textContent = segmentStatusLabel(segment.status);
-  statusCell.querySelectorAll(".tag-warning, .review-pill, .comment-marker, .ai-segment-badge").forEach((item) => item.remove());
+  statusCell.querySelectorAll(".tag-warning, .review-pill, .comment-marker, .tm-match-badge, .ai-segment-badge").forEach((item) => item.remove());
+  if (segmentHasTmPretranslation(segment)) {
+    const item = tmPretranslationBadge(segment);
+    const badge = document.createElement("div");
+    badge.className = `tm-match-badge ${item.className}`;
+    badge.textContent = item.text;
+    badge.title = item.title;
+    statusCell.append(badge);
+  }
   if (hasTagIssue(segment)) {
     const warning = document.createElement("div");
     warning.className = "tag-warning";
@@ -5505,15 +5536,21 @@ async function pretranslateFromTm() {
       });
       const match = matches[0];
       if (!match || match.score < threshold || !match.target?.trim()) continue;
-      proposals.push({ segment, target: match.target });
+      proposals.push({ segment, match });
     }
     if (!proposals.length) {
       setSaveStatus(`No TM matches at ${threshold}% or higher.`, "saved");
       return;
     }
-    for (const { segment, target } of proposals) {
+    for (const { segment, match } of proposals) {
       snapshots.set(segment.id, structuredClone(segment));
-      setSegmentTargetAndStatus(segment, target, "draft", "pretranslate");
+      setSegmentTargetAndStatus(segment, match.target, "draft", "pretranslate");
+      segment.tmPretranslation = {
+        score: Math.max(0, Math.min(100, Math.round(Number(match.score || 0)))),
+        tmName: String(match.tmName || "").trim(),
+        matchId: String(match.id || "").trim(),
+        appliedAt: new Date().toISOString()
+      };
       touchSegment(segment);
       updated.push(segment);
     }
@@ -10230,6 +10267,14 @@ async function readImportTextFile(file, options = textDecodingOptions()) {
   return file.text();
 }
 
+function importProgressDetail(done, total, unitLabel) {
+  const totalCount = Math.max(0, Number(total || 0));
+  const doneCount = Math.max(0, Number(done || 0));
+  const percent = totalCount ? Math.min(100, Math.floor((doneCount / totalCount) * 100)) : 100;
+  const countText = totalCount ? `${doneCount}/${totalCount}` : `${doneCount}`;
+  return `${percent}% - ${countText} ${unitLabel}`;
+}
+
 function fileImportFailureMessage(error, label) {
   return `${label} failed: ${error?.message || "The selected file could not be imported."}`;
 }
@@ -10467,6 +10512,7 @@ async function importProjectPackageData(pkg, options = {}) {
   });
   await reportImportProgress("Rebuilding resource indexes", { name: sourceName });
   await rebuildAllTmIndexes();
+  await rebuildAllTermIndexes();
   await reportImportProgress("Refreshing projects", { name: sourceName });
   const activityResult = await logOptionalActivityForProject(prepared.project.id, "import", "Project package imported", { fileName: sourceName, warningCount: reportCount(importReport), importAsCopy }, "Project package import");
   const activityLogged = activityResult.ok;
@@ -10503,6 +10549,7 @@ async function restoreBackupData(backup) {
   await importAllData(backup);
   await reportImportProgress("Rebuilding resource indexes");
   await rebuildAllTmIndexes();
+  await rebuildAllTermIndexes();
   await reportImportProgress("Refreshing projects");
   state.project = null;
   state.segments = [];
@@ -11479,14 +11526,34 @@ async function handleTmxImport(file) {
   if (!state.project) return;
   assertFileSize(file, "TMX file", MAX_RESOURCE_IMPORT_BYTES);
   await reportImportProgress("Reading TMX", file);
-  const entries = parseTmx(await readImportTextFile(file), {
+  const text = await readImportTextFile(file);
+  await reportImportProgress("Parsing TMX", file);
+  const entries = await parseTmxAsync(text, {
     sourceLang: state.project.sourceLang,
     targetLang: state.project.targetLang,
     tmName: mainTmName(),
     projectName: `${state.project.name} TMX import`
+  }, {
+    yieldFn: yieldToUi,
+    onProgress: (progress) => reportImportProgress(
+      "Parsing TMX",
+      file,
+      `${progress.percent}% - ${progress.entries} entr${progress.entries === 1 ? "y" : "ies"}`
+    )
   });
   await reportImportProgress("Saving TM entries", file, `${entries.length} entr${entries.length === 1 ? "y" : "ies"}`);
-  await importTmEntries(entries);
+  await importTmEntries(entries, {
+    onProgress: (progress) => reportImportProgress(
+      "Saving TM entries",
+      file,
+      importProgressDetail(progress.saved, progress.total, `entr${progress.saved === 1 ? "y" : "ies"}`)
+    ),
+    onIndexProgress: (progress) => reportImportProgress(
+      "Indexing TM entries",
+      file,
+      importProgressDetail(progress.saved, progress.total, "index rows")
+    )
+  });
   markProjectsUsingResourceDirty("tm", mainTmName(), state.project.sourceLang, state.project.targetLang);
   await reportImportProgress("Refreshing TM matches", file);
   await refreshTmMatches();
@@ -11512,13 +11579,33 @@ async function handleTbxImport(file) {
   if (!state.project) return;
   assertFileSize(file, "TBX file", MAX_RESOURCE_IMPORT_BYTES);
   await reportImportProgress("Reading TBX", file);
-  const terms = parseTbx(await readImportTextFile(file), {
+  const text = await readImportTextFile(file);
+  await reportImportProgress("Parsing TBX", file);
+  const terms = await parseTbxAsync(text, {
     sourceLang: state.project.sourceLang,
     targetLang: state.project.targetLang,
     termBaseName: els.termBaseSelect.value || primaryTermBaseName()
+  }, {
+    yieldFn: yieldToUi,
+    onProgress: (progress) => reportImportProgress(
+      "Parsing TBX",
+      file,
+      `${progress.percent}% - ${progress.terms} term${progress.terms === 1 ? "" : "s"}`
+    )
   });
   await reportImportProgress("Saving terms", file, `${terms.length} term${terms.length === 1 ? "" : "s"}`);
-  await importTerms(terms);
+  await importTerms(terms, {
+    onProgress: (progress) => reportImportProgress(
+      "Saving terms",
+      file,
+      importProgressDetail(progress.saved, progress.total, `term${progress.saved === 1 ? "" : "s"}`)
+    ),
+    onIndexProgress: (progress) => reportImportProgress(
+      "Indexing terms",
+      file,
+      importProgressDetail(progress.saved, progress.total, "index rows")
+    )
+  });
   markProjectsUsingResourceDirty("termbase", els.termBaseSelect.value || primaryTermBaseName(), state.project.sourceLang, state.project.targetLang);
   await reportImportProgress("Refreshing terms", file);
   await refreshProjectTerms({ rerender: true });
@@ -11546,7 +11633,18 @@ async function handleTermListImport(file) {
     fileName: file.name
   });
   await reportImportProgress("Saving terms", file, `${terms.length} term${terms.length === 1 ? "" : "s"}`);
-  await importTerms(terms);
+  await importTerms(terms, {
+    onProgress: (progress) => reportImportProgress(
+      "Saving terms",
+      file,
+      importProgressDetail(progress.saved, progress.total, `term${progress.saved === 1 ? "" : "s"}`)
+    ),
+    onIndexProgress: (progress) => reportImportProgress(
+      "Indexing terms",
+      file,
+      importProgressDetail(progress.saved, progress.total, "index rows")
+    )
+  });
   markProjectsUsingResourceDirty("termbase", termBaseName, state.project.sourceLang, state.project.targetLang);
   await reportImportProgress("Refreshing terms", file);
   await refreshProjectTerms({ rerender: true });
@@ -11581,14 +11679,34 @@ async function handleResourceTmxImport(file) {
     return;
   }
   await reportImportProgress("Reading TMX resource", file);
-  const entries = parseTmx(await readImportTextFile(file), {
+  const text = await readImportTextFile(file);
+  await reportImportProgress("Parsing TMX resource", file);
+  const entries = await parseTmxAsync(text, {
     sourceLang,
     targetLang,
     tmName,
     projectName: "Resources import"
+  }, {
+    yieldFn: yieldToUi,
+    onProgress: (progress) => reportImportProgress(
+      "Parsing TMX resource",
+      file,
+      `${progress.percent}% - ${progress.entries} entr${progress.entries === 1 ? "y" : "ies"}`
+    )
   });
   await reportImportProgress("Saving TM resource entries", file, `${entries.length} entr${entries.length === 1 ? "y" : "ies"}`);
-  await importTmEntries(entries);
+  await importTmEntries(entries, {
+    onProgress: (progress) => reportImportProgress(
+      "Saving TM resource entries",
+      file,
+      importProgressDetail(progress.saved, progress.total, `entr${progress.saved === 1 ? "y" : "ies"}`)
+    ),
+    onIndexProgress: (progress) => reportImportProgress(
+      "Indexing TM resource entries",
+      file,
+      importProgressDetail(progress.saved, progress.total, "index rows")
+    )
+  });
   markProjectsUsingResourceDirty("tm", tmName, sourceLang, targetLang);
   await reportImportProgress("Refreshing resources", file);
   state.resourceType = "tm";
@@ -11607,13 +11725,33 @@ async function handleResourceTbxImport(file) {
     return;
   }
   await reportImportProgress("Reading TBX resource", file);
-  const terms = parseTbx(await readImportTextFile(file), {
+  const text = await readImportTextFile(file);
+  await reportImportProgress("Parsing TBX resource", file);
+  const terms = await parseTbxAsync(text, {
     sourceLang,
     targetLang,
     termBaseName
+  }, {
+    yieldFn: yieldToUi,
+    onProgress: (progress) => reportImportProgress(
+      "Parsing TBX resource",
+      file,
+      `${progress.percent}% - ${progress.terms} term${progress.terms === 1 ? "" : "s"}`
+    )
   });
   await reportImportProgress("Saving termbase resource terms", file, `${terms.length} term${terms.length === 1 ? "" : "s"}`);
-  await importTerms(terms);
+  await importTerms(terms, {
+    onProgress: (progress) => reportImportProgress(
+      "Saving termbase resource terms",
+      file,
+      importProgressDetail(progress.saved, progress.total, `term${progress.saved === 1 ? "" : "s"}`)
+    ),
+    onIndexProgress: (progress) => reportImportProgress(
+      "Indexing termbase resource terms",
+      file,
+      importProgressDetail(progress.saved, progress.total, "index rows")
+    )
+  });
   markProjectsUsingResourceDirty("termbase", termBaseName, sourceLang, targetLang);
   await reportImportProgress("Refreshing resources", file);
   state.resourceType = "tb";
@@ -11640,7 +11778,18 @@ async function handleResourceTermListImport(file) {
     fileName: file.name
   });
   await reportImportProgress("Saving termbase resource terms", file, `${terms.length} term${terms.length === 1 ? "" : "s"}`);
-  await importTerms(terms);
+  await importTerms(terms, {
+    onProgress: (progress) => reportImportProgress(
+      "Saving termbase resource terms",
+      file,
+      importProgressDetail(progress.saved, progress.total, `term${progress.saved === 1 ? "" : "s"}`)
+    ),
+    onIndexProgress: (progress) => reportImportProgress(
+      "Indexing termbase resource terms",
+      file,
+      importProgressDetail(progress.saved, progress.total, "index rows")
+    )
+  });
   markProjectsUsingResourceDirty("termbase", termBaseName, sourceLang, targetLang);
   await reportImportProgress("Refreshing resources", file);
   state.resourceType = "tb";
@@ -12574,6 +12723,59 @@ async function runAppWorkflowTest() {
       windows1254TbxTerms[0]?.targetTerm === "\u0131\u015f\u0131k terimi" &&
         windows1254TbxTerms[0]?.notes === "\u00c7al\u0131\u015fma notu",
       "TBX import decodes Windows-1254 termbase text"
+    );
+    await setActiveSegment(workflowSegmentIndex);
+    const regionalLocaleTmx = `<?xml version="1.0" encoding="UTF-8"?>
+<tmx version="1.4">
+  <body>
+    <tu>
+      <tuv xml:lang="en-US"><seg>Hello world.</seg></tuv>
+      <tuv xml:lang="tr-TR"><seg>Merhaba dunya.</seg></tuv>
+    </tu>
+    <tu>
+      <tuv><seg>No locale TM source.</seg></tuv>
+      <tuv><seg>Yerelsiz TM hedefi.</seg></tuv>
+    </tu>
+  </body>
+</tmx>`;
+    const regionalLocaleTmxOk = await runFileImportTask("TMX import", () => handleTmxImport(new File([regionalLocaleTmx], "workflow-regional.tmx", { type: "application/xml" })));
+    const importedRegionalTmEntries = await listTmEntries({ sourceLang: "en", targetLang: "tr", tmNames: [mainTmName()] });
+    assert(
+      regionalLocaleTmxOk &&
+        importedRegionalTmEntries.some((entry) => entry.source === "Hello world." && entry.target === "Merhaba dunya." && entry.sourceLang === "en" && entry.targetLang === "tr") &&
+        importedRegionalTmEntries.some((entry) => entry.source === "No locale TM source." && entry.target === "Yerelsiz TM hedefi."),
+      "TMX import accepts regional and missing locale metadata while storing project languages"
+    );
+    assert(
+      Array.from(els.tmMatches.querySelectorAll(".match-card")).some((card) => card.textContent.includes("100%") && card.textContent.includes("Merhaba dunya.")),
+      "TMX import refreshes sidebar matches with match rates"
+    );
+    const regionalLocaleTbx = `<?xml version="1.0" encoding="UTF-8"?>
+<tbx>
+  <text>
+    <body>
+      <termEntry id="regional-term">
+        <langSet xml:lang="en-GB"><tig><term>Hello</term></tig></langSet>
+        <langSet xml:lang="tr-TR"><tig><term>Merhaba</term></tig></langSet>
+      </termEntry>
+      <termEntry id="missing-locale-term">
+        <langSet><tig><term>world</term></tig></langSet>
+        <langSet><tig><term>dunya</term></tig></langSet>
+      </termEntry>
+    </body>
+  </text>
+</tbx>`;
+    const regionalLocaleTbxOk = await runFileImportTask("TBX import", () => handleTbxImport(new File([regionalLocaleTbx], "workflow-regional.tbx", { type: "application/xml" })));
+    const importedRegionalTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: projectTermBaseNames() });
+    assert(
+      regionalLocaleTbxOk &&
+        importedRegionalTerms.some((term) => term.sourceTerm === "Hello" && term.targetTerm === "Merhaba" && term.sourceLang === "en" && term.targetLang === "tr") &&
+        importedRegionalTerms.some((term) => term.sourceTerm === "world" && term.targetTerm === "dunya"),
+      "TBX import accepts regional and missing locale metadata while storing project languages"
+    );
+    assert(
+      Array.from(els.termSuggestions.querySelectorAll(".term-card")).some((card) => card.textContent.includes("Hello") && card.textContent.includes("Merhaba")),
+      "TBX import refreshes termbase sidebar suggestions"
     );
     const previousEncodingSelection = els.fileEncodingSelect.value;
     els.fileEncodingSelect.value = "windows-1254";
@@ -14744,8 +14946,13 @@ async function runAppWorkflowTest() {
     const successfulPretranslation = (await getProjectSegments(project.id)).find((segment) => segment.id === pretranslateSegment.id);
     assert(
       els.saveStatus.textContent.includes("Pretranslated 1 segment") &&
-        successfulPretranslation?.target === pretranslateTarget,
+        successfulPretranslation?.target === pretranslateTarget &&
+        successfulPretranslation?.tmPretranslation?.score === 100,
       "pretranslation success saves target from TM"
+    );
+    assert(
+      Array.from(els.segmentBody.querySelectorAll(".tm-match-badge")).some((badge) => badge.textContent.includes("TM 100%")),
+      "pretranslation success shows TM match rate badge near segment status"
     );
 
     const localAiGlossaryProvider = aiProviderRegistry.get("ollama");

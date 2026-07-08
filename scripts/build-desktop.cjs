@@ -140,6 +140,22 @@ function runNodeScript(scriptName) {
   if (result.status !== 0) throw new Error(`${scriptName} failed.`);
 }
 
+function electronBuilderInvocation(args = []) {
+  const localCli = path.join(root, "node_modules", "electron-builder", "cli.js");
+  if (fs.existsSync(localCli)) {
+    return {
+      command: process.execPath,
+      args: [localCli, ...args],
+      shell: false
+    };
+  }
+  return {
+    command: process.platform === "win32" ? "electron-builder.cmd" : "electron-builder",
+    args,
+    shell: process.platform === "win32"
+  };
+}
+
 let releaseBuildLock = null;
 let exitCode = 0;
 try {
@@ -149,12 +165,12 @@ try {
   runNodeScript("i18n-validate.cjs");
   runNodeScript("i18n-compile.cjs");
 
-  const command = process.platform === "win32" ? "electron-builder.cmd" : "electron-builder";
-  const result = spawnSync(command, process.argv.slice(2), {
+  const invocation = electronBuilderInvocation(process.argv.slice(2));
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: root,
     env,
     stdio: "inherit",
-    shell: process.platform === "win32"
+    shell: invocation.shell
   });
 
   if (result.error) {

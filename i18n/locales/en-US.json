@@ -1462,6 +1462,8 @@
     "auto.tm.matches.considered.value1.3a2cba1c": "TM matches considered: {value1}",
     "auto.tm.name.66cf1184": "TM name",
     "auto.tm.pretranslation.failed.eeeca913": "TM pretranslation failed",
+    "auto.tm.pretranslation.match.value1.3fadbeb1": "TM pretranslation match: {value1}%",
+    "auto.tm.pretranslation.match.value1.from.value2.60824e35": "TM pretranslation match: {value1}% from {value2}",
     "auto.tmx.export.failed.9c5d7385": "TMX export failed",
     "auto.together.9034ff9e": "together",
     "auto.together.ai.1623de67": "Together AI",

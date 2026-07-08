@@ -1,6 +1,6 @@
 {
   "name": "loopcat",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Local-first offline CAT tool for translation and post-editing projects.",
   "homepage": "https://github.com/gokhandogru/LoopCAT",
   "private": true,

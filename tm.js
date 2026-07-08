@@ -1,10 +1,11 @@
 (() => {
-const { bulkPut, deleteByKey, deleteStoresWhereAtomically, deleteWhere, get, getAll, getAllByIndex, makeId, put, constants } = window.CatHan.storage;
+const { bulkPut, countByIndex, deleteByKey, deleteStoresWhereAtomically, deleteWhere, get, getAll, getAllByIndex, makeId, put, constants } = window.CatHan.storage;
 const LOCAL_WORKSPACE_ID = constants?.LOCAL_WORKSPACE_ID || "local-workspace";
 const LOCAL_USER_ID = constants?.LOCAL_USER_ID || "local-user";
 const TM_INDEX_META_PREFIX = "tm-token-index:";
 const MAX_INDEX_TOKENS = 24;
 const MAX_INDEX_CANDIDATES = 600;
+const RESOURCE_IMPORT_CHUNK_SIZE = 1000;
 const SENSITIVE_TEXT_VALUE_PATTERN = /(sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._~+/=-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|npm_[A-Za-z0-9_]{8,}|(?:session|cookie)[=:][A-Za-z0-9._~+/=-]{8,})/i;
 
 function redactSensitiveText(value) {
@@ -142,6 +143,32 @@ async function writeIndexMeta(languagePair, entries) {
   });
 }
 
+async function writeIndexMetaClean(languagePair) {
+  if (!languagePair) return;
+  const existing = await get("appMeta", tmIndexMetaKey(languagePair));
+  await put("appMeta", {
+    ...(existing || {}),
+    key: tmIndexMetaKey(languagePair),
+    languagePair,
+    dirty: false,
+    updatedAt: new Date().toISOString()
+  });
+}
+
+async function bulkPutInChunks(storeName, records, options = {}) {
+  const chunkSize = Math.max(100, Number(options.chunkSize || RESOURCE_IMPORT_CHUNK_SIZE));
+  let saved = 0;
+  for (let index = 0; index < records.length; index += chunkSize) {
+    const chunk = records.slice(index, index + chunkSize);
+    if (chunk.length) await bulkPut(storeName, chunk);
+    saved += chunk.length;
+    if (typeof options.onProgress === "function") {
+      await options.onProgress({ saved, total: records.length, chunkSize: chunk.length, storeName });
+    }
+  }
+  return saved;
+}
+
 async function markTmIndexDirty(languagePair) {
   await put("appMeta", {
     key: tmIndexMetaKey(languagePair),
@@ -151,16 +178,21 @@ async function markTmIndexDirty(languagePair) {
   });
 }
 
-async function rebuildTmIndex(languagePair, entries = null) {
+async function rebuildTmIndex(languagePair, entries = null, options = {}) {
   const sourceEntries = entries || await getAllByIndex("tmEntries", "languagePair", languagePair);
   await deleteWhere("tmTokenIndex", (record) => record.languagePair === languagePair);
   const records = sourceEntries.flatMap(indexRecordsForEntry);
-  if (records.length) await bulkPut("tmTokenIndex", records);
+  if (records.length) {
+    await bulkPutInChunks("tmTokenIndex", records, {
+      chunkSize: options.chunkSize,
+      onProgress: options.onProgress
+    });
+  }
   await writeIndexMeta(languagePair, sourceEntries);
   return sourceEntries.length;
 }
 
-async function rebuildAllTmIndexes() {
+async function rebuildAllTmIndexes(options = {}) {
   const entries = await getAll("tmEntries");
   const byPair = new Map();
   entries.forEach((entry) => {
@@ -172,7 +204,12 @@ async function rebuildAllTmIndexes() {
   await deleteWhere("tmTokenIndex", () => true);
   for (const [languagePair, pairEntries] of byPair) {
     const records = pairEntries.flatMap(indexRecordsForEntry);
-    if (records.length) await bulkPut("tmTokenIndex", records);
+    if (records.length) {
+      await bulkPutInChunks("tmTokenIndex", records, {
+        chunkSize: options.chunkSize,
+        onProgress: options.onProgress
+      });
+    }
     await writeIndexMeta(languagePair, pairEntries);
   }
   return entries.length;
@@ -182,6 +219,11 @@ async function ensureTmIndex(languagePair) {
   const meta = await get("appMeta", tmIndexMetaKey(languagePair));
   if (meta && !meta.dirty) return;
   await rebuildTmIndex(languagePair);
+}
+
+async function putTmIndexRecords(entries) {
+  const records = (entries || []).flatMap(indexRecordsForEntry);
+  if (records.length) await bulkPut("tmTokenIndex", records);
 }
 
 function levenshtein(a, b) {
@@ -214,35 +256,71 @@ async function saveTmEntry(input = {}) {
   const { source, target, sourceLang, targetLang, projectName, tmName } = input || {};
   const candidate = tmEntryRecord({ source, target, sourceLang, targetLang, projectName, tmName });
   const languagePair = candidate.languagePair;
+  await ensureTmIndex(languagePair);
   const existing = (await getAllByIndex("tmEntries", "languagePair", languagePair)).find((entry) =>
     entry.tmName === candidate.tmName &&
     normalizeText(entry.source) === normalizeText(candidate.source) &&
     normalizeText(entry.target) === normalizeText(candidate.target)
   );
   const entry = tmEntryRecord(candidate, { existing });
+  if (existing?.id) await deleteWhere("tmTokenIndex", (record) => record.tmEntryId === existing.id);
   await put("tmEntries", entry);
-  await markTmIndexDirty(languagePair);
+  await putTmIndexRecords([entry]);
+  await writeIndexMetaClean(languagePair);
   return entry;
 }
 
-async function importTmEntries(entries) {
+async function importTmEntries(entries, options = {}) {
   const byKey = new Map();
   (entries || []).map((entry) => tmEntryRecord(entry, { preserveUpdatedAt: true })).forEach((entry) => {
     byKey.set(memoryKey(entry), entry);
   });
   const uniqueEntries = Array.from(byKey.values());
-  await bulkPut("tmEntries", uniqueEntries);
   const pairs = new Set(uniqueEntries.map(languagePairOf).filter(Boolean));
-  for (const languagePair of pairs) await markTmIndexDirty(languagePair);
+  const pairIndexModes = new Map();
+  await Promise.all(Array.from(pairs, async (languagePair) => {
+    const [meta, existingCount] = await Promise.all([
+      get("appMeta", tmIndexMetaKey(languagePair)),
+      countByIndex ? countByIndex("tmEntries", "languagePair", languagePair) : Promise.resolve(0)
+    ]);
+    pairIndexModes.set(languagePair, { rebuild: existingCount > 0 && (!meta || meta.dirty) });
+  }));
+  const chunkSize = Math.max(100, Number(options.chunkSize || RESOURCE_IMPORT_CHUNK_SIZE));
+  let saved = 0;
+  for (let index = 0; index < uniqueEntries.length; index += chunkSize) {
+    const chunk = uniqueEntries.slice(index, index + chunkSize);
+    await bulkPut("tmEntries", chunk);
+    const indexRecords = chunk.flatMap(indexRecordsForEntry);
+    if (indexRecords.length) await bulkPutInChunks("tmTokenIndex", indexRecords, { chunkSize });
+    saved += chunk.length;
+    if (typeof options.onProgress === "function") {
+      await options.onProgress({ saved, total: uniqueEntries.length, chunkSize: chunk.length });
+    }
+  }
+  for (const languagePair of pairs) {
+    if (pairIndexModes.get(languagePair)?.rebuild) {
+      await rebuildTmIndex(languagePair, null, {
+        chunkSize,
+        onProgress: options.onIndexProgress
+      });
+    } else {
+      await writeIndexMetaClean(languagePair);
+    }
+  }
   return uniqueEntries.length;
 }
 
 async function updateTmEntry(entry = {}) {
-  const previousLanguagePair = languagePairOf(entry);
+  const previous = entry?.id ? await get("tmEntries", entry.id) : null;
+  const previousLanguagePair = languagePairOf(previous || entry);
   const updated = tmEntryRecord(entry, { requireId: true });
+  const languagePairsToEnsure = new Set([previousLanguagePair, updated.languagePair].filter(Boolean));
+  for (const languagePair of languagePairsToEnsure) await ensureTmIndex(languagePair);
+  await deleteWhere("tmTokenIndex", (record) => record.tmEntryId === updated.id);
   await put("tmEntries", updated);
-  if (previousLanguagePair && previousLanguagePair !== updated.languagePair) await markTmIndexDirty(previousLanguagePair);
-  await markTmIndexDirty(updated.languagePair);
+  await putTmIndexRecords([updated]);
+  if (previousLanguagePair && previousLanguagePair !== updated.languagePair) await writeIndexMetaClean(previousLanguagePair);
+  await writeIndexMetaClean(updated.languagePair);
   return updated;
 }
 
@@ -268,7 +346,8 @@ async function deleteTmEntries(ids) {
     }
   }
   const languagePairs = new Set(existingEntries.map(languagePairOf).filter(Boolean));
-  for (const languagePair of languagePairs) await markTmIndexDirty(languagePair);
+  for (const languagePair of languagePairs) await ensureTmIndex(languagePair);
+  for (const languagePair of languagePairs) await writeIndexMetaClean(languagePair);
   return existingIds.size;
 }
 

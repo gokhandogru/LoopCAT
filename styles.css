@@ -1314,6 +1314,7 @@ input[type="file"] {
 
 .review-pill,
 .comment-marker,
+.tm-match-badge,
 .ai-segment-badge {
   display: inline-flex;
   align-items: center;
@@ -1343,6 +1344,12 @@ input[type="file"] {
 .comment-marker {
   background: #edf2ff;
   color: #294d90;
+}
+
+.tm-match-badge {
+  background: #e7f4f1;
+  color: var(--accent-strong);
+  border: 1px solid #b8ddd5;
 }
 
 .ai-segment-badge {
