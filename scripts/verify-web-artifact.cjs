@@ -46,6 +46,8 @@ const REQUIRED_WEB_ASSETS = [
   "i18n/locales/en-US.js",
   "i18n/locales/tr-TR.js",
   "app.js",
+  "package.json",
+  "scripts/opus-cat-web-bridge.cjs",
   "README.md",
   "LICENSE",
   "NOTICE"
@@ -170,7 +172,8 @@ for (const asset of REQUIRED_WEB_ASSETS) {
 }
 
 for (const entry of entries.keys()) {
-  if (/^(desktop|scripts|docs|dist|dist-web|test-artifacts)\//i.test(entry) || /(?:test|runner|fixture)\.html$/i.test(entry)) {
+  const allowedScript = entry === "scripts/opus-cat-web-bridge.cjs";
+  if (/^(desktop|docs|dist|dist-web|test-artifacts)\//i.test(entry) || (/^scripts\//i.test(entry) && !allowedScript) || /(?:test|runner|fixture)\.html$/i.test(entry)) {
     fail(`Static web artifact includes non-runtime file: ${entry}`);
   }
 }

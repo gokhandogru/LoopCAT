@@ -39,6 +39,8 @@
         );
         assert(connectSrc.includes("http://localhost:11434") && connectSrc.includes("http://127.0.0.1:11434"), "CSP connect-src allows explicit Ollama loopback endpoints");
         assert(connectSrc.includes("http://localhost:1234") && connectSrc.includes("http://127.0.0.1:1234"), "CSP connect-src allows explicit OpenAI-compatible local endpoints");
+        assert(connectSrc.includes("http://localhost:8500") && connectSrc.includes("http://127.0.0.1:8500"), "CSP connect-src allows explicit OPUS-CAT loopback endpoints");
+        assert(connectSrc.includes("http://localhost:8502") && connectSrc.includes("http://127.0.0.1:8502"), "CSP connect-src allows explicit OPUS-CAT web bridge loopback endpoints");
         assert(!connectSrc.some((source) => source.includes("[::1]")), "CSP connect-src omits Chromium-invalid bracketed IPv6 loopback sources");
         assert(!connectSrc.includes("https://api.openai.com"), "CSP connect-src does not allow the whole OpenAI origin");
         assert(!connectSrc.includes("https:"), "CSP connect-src rejects generic secure network origins");

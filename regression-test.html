@@ -5311,6 +5311,68 @@
             !window.CatHan.ai.localAiProviderNeedsApiKey("openai-compatible", "http://localhost:1234/v1"),
           "OpenAI-compatible local provider lists models and parses chat completions"
         );
+        const opusCatProvider = window.CatHan.ai.aiProviderRegistry.get("opus-cat");
+        const opusCatModelUrls = [];
+        const opusCatModels = await opusCatProvider.listModels({
+          baseUrl: "http://localhost:8500/MTRestService",
+          sourceCode: "en",
+          targetCode: "tr",
+          fetchImpl: async (url) => {
+            opusCatModelUrls.push(String(url));
+            if (String(url).includes("ListSupportedLanguagePairs")) {
+              return { ok: true, json: async () => ["en-tr", "fi-en"] };
+            }
+            if (String(url).includes("GetLanguagePairModelTags")) {
+              return { ok: true, json: async () => ["legal-domain"] };
+            }
+            throw new Error(`Unexpected OPUS-CAT model URL ${url}`);
+          }
+        });
+        let opusCatTranslationUrl = "";
+        const opusCatTranslation = await opusCatProvider.translateSegment({
+          baseUrl: "http://localhost:8500",
+          model: "default",
+          sourceCode: "en",
+          targetCode: "tr",
+          fetchImpl: async (url) => {
+            opusCatTranslationUrl = String(url);
+            return {
+              ok: true,
+              json: async () => ({
+                translation: "Translation: Merhaba OPUS-CAT.",
+                Translation: "Translation: Merhaba OPUS-CAT."
+              })
+            };
+          }
+        }, {
+          text: "Hello OPUS-CAT.",
+          sourceLanguage: "English",
+          sourceCode: "en",
+          targetLanguage: "Turkish",
+          targetCode: "tr"
+        });
+        const opusCatTranslationParsedUrl = new URL(opusCatTranslationUrl);
+        assert(
+          window.CatHan.ai.normalizeOpusCatBaseUrl("http://localhost:8500/MTRestService") === "http://localhost:8500" &&
+            window.CatHan.ai.opusCatApiUrl("http://localhost:8500", "/TranslateJson") === "http://localhost:8500/MTRestService/TranslateJson" &&
+            opusCatModels.models.some((model) => model.name === "default") &&
+            opusCatModels.models.some((model) => model.name === "legal-domain") &&
+            opusCatModelUrls[0] === "http://localhost:8500/MTRestService/ListSupportedLanguagePairs?tokenCode=0" &&
+            opusCatModelUrls[1] === "http://localhost:8500/MTRestService/GetLanguagePairModelTags?tokenCode=0&srcLangCode=en&trgLangCode=tr" &&
+            opusCatTranslationParsedUrl.origin === "http://localhost:8500" &&
+            opusCatTranslationParsedUrl.pathname === "/MTRestService/TranslateJson" &&
+            opusCatTranslationParsedUrl.searchParams.get("input") === "Hello OPUS-CAT." &&
+            opusCatTranslationParsedUrl.searchParams.get("srcLangCode") === "en" &&
+            opusCatTranslationParsedUrl.searchParams.get("trgLangCode") === "tr" &&
+            opusCatTranslationParsedUrl.searchParams.get("modelTag") === "" &&
+            opusCatTranslation.translatedText === "Merhaba OPUS-CAT." &&
+            opusCatTranslation.providerId === "opus-cat" &&
+            opusCatTranslation.model === "default" &&
+            window.CatHan.ai.localAiProviderPresetForSettings({ providerId: "opus-cat", baseUrl: "http://localhost:8500/MTRestService" })?.id === "opus-cat" &&
+            !window.CatHan.ai.localAiProviderNeedsApiKey("opus-cat", "http://localhost:8500") &&
+            !window.CatHan.ai.localAiProviderSharesExternally("opus-cat", "http://localhost:8500"),
+          "OPUS-CAT provider lists installed language-pair model tags and pretranslates through local MTRestService"
+        );
         const hostedCompatiblePresetIds = window.CatHan.ai.LOCAL_AI_PROVIDER_PRESETS
           .filter((preset) => preset.providerId === "openai-compatible")
           .map((preset) => preset.id);

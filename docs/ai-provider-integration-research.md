@@ -7,6 +7,7 @@ Current implementation status:
 - Implemented: Ollama cloud-offload models through local Ollama, using loopback API calls with cloud-suffixed model names such as `gpt-oss:120b-cloud` and explicit external-processing confirmation.
 - Implemented: the AI Command Centre exposes separate quick buttons for direct hosted Ollama and local Ollama cloud-offload models so the two privacy modes are visually distinct.
 - Implemented: local OpenAI-compatible `/v1/models` and `/v1/chat/completions`, suitable for LM Studio and similar loopback servers.
+- Implemented: local OPUS-CAT MT Engine through `MTRestService/ListSupportedLanguagePairs`, `MTRestService/GetLanguagePairModelTags`, and `MTRestService/TranslateJson`, suitable for installed OPUS-MT language-pair models.
 - Implemented: generic hosted OpenAI-compatible URLs are accepted only for explicitly allowlisted provider origins; arbitrary hosted compatible endpoints fail before the network request and should be promoted to named provider presets with exact origin/path allowlists.
 - Implemented: native Hugging Face Inference Providers through the router `GET /v1/models` and `POST /v1/chat/completions` endpoints with bearer-token auth.
 - Implemented: explicit OpenAI Responses API single-segment suggestions and batch pretranslation with `store: false`.
@@ -56,6 +57,7 @@ The provider map was rechecked against official provider documentation on 2026-0
 - Perplexity: translation/review requests use Sonar with search disabled so CAT-tool output does not include citations, related questions, or web-research commentary.
 - Azure OpenAI: LoopCAT treats the model field as the deployment name and limits traffic to Azure OpenAI resource domains plus the v1 OpenAI-compatible paths.
 - Generic OpenAI-compatible: loopback servers such as LM Studio stay enabled by default; hosted-compatible URLs must be explicitly allowlisted and promoted to named presets before keys, settings, or requests are accepted.
+- OPUS-CAT: LoopCAT treats OPUS-CAT as a local MT-engine connector rather than a prompt-completion provider. It sends plain segment text plus source/target language codes to the local `MTRestService` API and exposes only connection test, installed model-tag refresh, and pre-translation.
 - Verification tooling: `verify:ollama-live` remains the exact Ollama API probe, while `verify:ai-live` exercises the provider-native hosted adapters with one key-scoped, non-secret model-list and translation probe.
 
 ## Provider Matrix
@@ -66,6 +68,7 @@ The provider map was rechecked against official provider documentation on 2026-0
 | Ollama hosted | Ollama API with bearer key | `GET https://ollama.com/api/tags` | `POST https://ollama.com/api/chat` | Existing `OllamaProvider` when base URL is `https://ollama.com`; direct hosted presets use model names such as `gpt-oss:120b` |
 | Ollama cloud model via local Ollama | Local Ollama API with cloud-suffixed model name | `GET http://localhost:11434/api/tags` | `POST http://localhost:11434/api/chat` | Existing `OllamaProvider`; LoopCAT treats `*-cloud` / `:cloud` models as externally processed and asks for confirmation |
 | LM Studio | OpenAI-compatible local API | `GET /v1/models` | `POST /v1/chat/completions` | Existing `OpenAICompatibleProvider` |
+| OPUS-CAT MT Engine | OPUS-CAT local HTTP API | `GET /MTRestService/ListSupportedLanguagePairs` and `GET /MTRestService/GetLanguagePairModelTags` | `GET /MTRestService/TranslateJson` | Existing `OpusCatProvider`, pre-translation only |
 | OpenAI | Responses API and Chat Completions | `GET /v1/models` | `POST /v1/responses` or `/v1/chat/completions` | Existing `OpenAIProvider` uses Responses for suggestions and pretranslation |
 | Google Gemini | Gemini Developer API Interactions | `GET /v1beta/models` | `POST /v1beta/interactions` | Existing `GeminiProvider` |
 | Anthropic Claude | Messages API | `GET /v1/models` | `POST /v1/messages` | Existing `AnthropicProvider` |
@@ -92,6 +95,7 @@ This guidance is shown directly in the AI Command Centre provider summary.
 | Ollama cloud via local Ollama | Larger Ollama-hosted models while preserving the local Ollama workflow, with explicit external-processing confirmation |
 | Hosted Ollama | Direct hosted Ollama models after sign-in, hosted key entry, and external source-sharing confirmation |
 | LM Studio / local OpenAI-compatible | Local OpenAI-compatible models without changing the shared pre-translation and AI-command workflow |
+| OPUS-CAT local | Private offline neural MT using OPUS-CAT MT Engine and installed OPUS-MT language-pair models; pre-translation only |
 | OpenAI / Azure OpenAI | High-quality hosted pre-translation, review, rewriting, terminology-aware editing, and organization-managed deployment workflows |
 | Gemini | Long-context project briefs, style-context synthesis, and multilingual draft generation |
 | DeepSeek | Cost-conscious technical translation, reasoning-heavy review, and batch QA |
@@ -118,6 +122,7 @@ Official docs used for the implementation map:
 - Hugging Face Inference Providers docs: https://huggingface.co/docs/inference-providers/
 - DeepInfra OpenAI-compatible API docs: https://deepinfra.com/docs/openai_api
 - Fireworks AI API docs: https://docs.fireworks.ai/api-reference/post-chatcompletions
+- OPUS-CAT docs and source: https://helsinki-nlp.github.io/OPUS-CAT/install and https://github.com/Helsinki-NLP/OPUS-CAT
 
 ## Recommended Architecture
 

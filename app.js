@@ -20,6 +20,7 @@ const {
   OPENAI_DEFAULT_BASE_URL,
   OLLAMA_CLOUD_BASE_URL,
   OLLAMA_DEFAULT_BASE_URL,
+  OPUS_CAT_DEFAULT_BASE_URL,
   aiCommandService,
   aiProviderRegistry,
   browserAppearsOffline,
@@ -34,6 +35,7 @@ const {
   buildTranslateGemmaPrompt,
   normalizedProviderBaseUrl,
   ollamaApiUrl,
+  opusCatApiUrl,
   openAiApiUrl,
   deepSeekApiUrl,
   geminiApiUrl,
@@ -4042,6 +4044,12 @@ function localAiEndpointSummary(settings = {}) {
       translate: `POST ${endpointPathLabel(ollamaApiUrl(baseUrl, "/chat"))}`
     };
   }
+  if (providerId === "opus-cat") {
+    return {
+      models: `GET ${endpointPathLabel(opusCatApiUrl(baseUrl, "/ListSupportedLanguagePairs"))}`,
+      translate: `GET ${endpointPathLabel(opusCatApiUrl(baseUrl, "/TranslateJson"))}`
+    };
+  }
   if (providerId === "openai") {
     return {
       models: `GET ${endpointPathLabel(openAiApiUrl(baseUrl, "/models"))}`,
@@ -4218,7 +4226,7 @@ function renderLocalAiProviderControls(settings) {
 
 function localAiPresetGroupLabel(preset) {
   if (!preset) return uiLabel("hostedProviders");
-  if (preset.id === "ollama-local" || preset.id === "lm-studio") return uiLabel("localRuntimes");
+  if (preset.id === "ollama-local" || preset.id === "lm-studio" || preset.id === "opus-cat") return uiLabel("localRuntimes");
   if (preset.id === "ollama-local-cloud" || preset.id === "ollama-cloud") return uiLabel("ollamaHostedCloud");
   if (preset.id === "azure-openai") return uiLabel("managedDeployments");
   if (["groq", "together", "openrouter", "huggingface", "deepinfra", "fireworks"].includes(preset.id)) return uiSource("Hosted routers");

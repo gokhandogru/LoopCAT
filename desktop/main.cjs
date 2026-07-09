@@ -32,6 +32,14 @@ const LOCAL_AI_RUNTIME_PATHS = new Set([
   "/v1/models",
   "/v1/chat/completions"
 ]);
+const OPUS_CAT_RUNTIME_PORT = "8500";
+const OPUS_CAT_RUNTIME_ACTION_QUERY_KEYS = new Map([
+  ["/mtrestservice/listsupportedlanguagepairs", new Set(["tokenCode"])],
+  ["/mtrestservice/getlanguagepairmodeltags", new Set(["tokenCode", "srcLangCode", "trgLangCode"])],
+  ["/mtrestservice/checkmodelstatus", new Set(["tokenCode", "srcLangCode", "trgLangCode", "modelTag"])],
+  ["/mtrestservice/translatejson", new Set(["tokenCode", "input", "srcLangCode", "trgLangCode", "modelTag", "inputIsSingleSentence"])],
+  ["/mtrestservice/translatepost", new Set(["tokenCode", "input", "srcLangCode", "trgLangCode", "modelTag"])]
+]);
 const OLLAMA_CLOUD_HOST = "ollama.com";
 const OLLAMA_CLOUD_API_PATHS = new Set([
   "/api/tags",
@@ -250,6 +258,29 @@ function isAllowedLocalAiRuntimeUrl(requestUrl) {
   }
 }
 
+function isAllowedOpusCatRuntimeUrl(requestUrl) {
+  try {
+    const url = new URL(requestUrl);
+    if (
+      url.protocol !== "http:" ||
+      url.username ||
+      url.password ||
+      url.hash ||
+      !LOCAL_AI_RUNTIME_HOSTS.has(url.hostname.toLowerCase()) ||
+      url.port !== OPUS_CAT_RUNTIME_PORT
+    ) {
+      return false;
+    }
+    const allowedKeys = OPUS_CAT_RUNTIME_ACTION_QUERY_KEYS.get(url.pathname.toLowerCase());
+    if (!allowedKeys) return false;
+    const keys = Array.from(url.searchParams.keys());
+    if (new Set(keys).size !== keys.length) return false;
+    return keys.every((key) => allowedKeys.has(key));
+  } catch {
+    return false;
+  }
+}
+
 function isAllowedOllamaCloudUrl(requestUrl) {
   try {
     const url = new URL(requestUrl);
@@ -359,6 +390,7 @@ function isAllowedNetworkRequest(requestUrl) {
     if (url.href === "about:blank") return true;
     if (isAllowedOpenAiResponsesUrl(requestUrl)) return true;
     if (isAllowedLocalAiRuntimeUrl(requestUrl)) return true;
+    if (isAllowedOpusCatRuntimeUrl(requestUrl)) return true;
     if (isAllowedOllamaCloudUrl(requestUrl)) return true;
     if (isAllowedGeminiUrl(requestUrl)) return true;
     if (isAllowedAnthropicUrl(requestUrl)) return true;
@@ -369,6 +401,17 @@ function isAllowedNetworkRequest(requestUrl) {
   } catch {
     return false;
   }
+}
+
+function opusCatCorsResponseHeaders(responseHeaders = {}) {
+  const headers = {};
+  Object.entries(responseHeaders || {}).forEach(([key, value]) => {
+    if (!/^access-control-allow-/i.test(key)) headers[key] = value;
+  });
+  headers["Access-Control-Allow-Origin"] = ["*"];
+  headers["Access-Control-Allow-Methods"] = ["GET"];
+  headers["Access-Control-Allow-Headers"] = ["Content-Type"];
+  return headers;
 }
 
 function registerAppProtocol() {
@@ -988,6 +1031,13 @@ function configureNetworkBoundaries() {
   session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
     callback({ cancel: !isAllowedNetworkRequest(details.url) });
   });
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    if (isAllowedOpusCatRuntimeUrl(details.url)) {
+      callback({ responseHeaders: opusCatCorsResponseHeaders(details.responseHeaders) });
+      return;
+    }
+    callback({ responseHeaders: details.responseHeaders });
+  });
 }
 
 function configurePermissions() {
@@ -1226,6 +1276,8 @@ module.exports = {
   LOCAL_AI_RUNTIME_HOSTS,
   LOCAL_AI_RUNTIME_PORTS,
   LOCAL_AI_RUNTIME_PATHS,
+  OPUS_CAT_RUNTIME_PORT,
+  OPUS_CAT_RUNTIME_ACTION_QUERY_KEYS,
   OLLAMA_CLOUD_HOST,
   OLLAMA_CLOUD_API_PATHS,
   GEMINI_HOST,
@@ -1250,6 +1302,7 @@ module.exports = {
   resolveAppFile,
   isAllowedOpenAiResponsesUrl,
   isAllowedLocalAiRuntimeUrl,
+  isAllowedOpusCatRuntimeUrl,
   isAllowedOllamaCloudUrl,
   isAllowedGeminiUrl,
   isAllowedAnthropicUrl,
@@ -1258,6 +1311,7 @@ module.exports = {
   isAllowedAzureOpenAiUrl,
   isAllowedHostedOpenAiCompatibleUrl,
   isAllowedNetworkRequest,
+  opusCatCorsResponseHeaders,
   isLoopcatUrl,
   isLoopcatOrigin,
   isAllowedAppNavigationUrl,

@@ -16,9 +16,9 @@ The desktop wrapper:
 - keeps top-level navigation pinned to the bundled `index.html` app shell;
 - serves the bundled app shell from packaged files through `loopcat://app/`;
 - keeps service workers disabled on the private desktop protocol; browser/PWA service-worker caching is tested separately on an HTTP origin and must cache the complete core app shell before activation;
-- blocks renderer network requests except bundled app-shell files, the exact OpenAI Responses and Models API endpoints, Azure OpenAI resource-domain `/openai/v1/models`, `/openai/v1/responses`, and `/openai/v1/chat/completions` paths, Gemini `/v1beta/models` and `/v1beta/interactions`, Anthropic `/v1/models` and `/v1/messages`, Cohere `/v1/models` and `/v2/chat`, hosted Ollama `/api/tags` and `/api/chat`, and exact native or OpenAI-compatible model-list/chat-completion paths for DeepSeek, Mistral AI, xAI, Perplexity Sonar, Groq, Together AI, OpenRouter, Hugging Face Inference Providers, DeepInfra, and Fireworks AI, matching the browser CSP;
+- blocks renderer network requests except bundled app-shell files, the exact OpenAI Responses and Models API endpoints, Azure OpenAI resource-domain `/openai/v1/models`, `/openai/v1/responses`, and `/openai/v1/chat/completions` paths, Gemini `/v1beta/models` and `/v1beta/interactions`, Anthropic `/v1/models` and `/v1/messages`, Cohere `/v1/models` and `/v2/chat`, hosted Ollama `/api/tags` and `/api/chat`, local OPUS-CAT `MTRestService` actions on port `8500`, and exact native or OpenAI-compatible model-list/chat-completion paths for DeepSeek, Mistral AI, xAI, Perplexity Sonar, Groq, Together AI, OpenRouter, Hugging Face Inference Providers, DeepInfra, and Fireworks AI, matching the browser CSP;
 - denies renderer-created popup windows and blocks system-browser external opens by default;
-- allows renderer network requests to explicit local AI loopback API paths for Ollama and OpenAI-compatible runtimes, while keeping other HTTP requests blocked;
+- allows renderer network requests to explicit local AI loopback API paths for Ollama, OPUS-CAT, and OpenAI-compatible runtimes, while keeping other HTTP requests blocked;
 - keeps local project data in the app's browser profile storage.
 
 ## Developer Run

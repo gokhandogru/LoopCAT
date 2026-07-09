@@ -36,7 +36,9 @@ const AZURE_OPENAI_DEFAULT_MODEL = "gpt-4.1-nano";
 const OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434";
 const OLLAMA_CLOUD_BASE_URL = "https://ollama.com";
 const LM_STUDIO_DEFAULT_BASE_URL = "http://localhost:1234/v1";
+const OPUS_CAT_DEFAULT_BASE_URL = "http://localhost:8500";
 const DEFAULT_LOCAL_AI_MODEL = "translategemma";
+const OPUS_CAT_DEFAULT_MODEL = "default";
 const OPENAI_COMPATIBLE_HOSTED_ALLOWED_HOSTS = new Set([
   "api.deepseek.com",
   "api.mistral.ai",
@@ -68,6 +70,7 @@ const LOCAL_AI_PROVIDER_PRESETS = [
   { id: "xai", label: "xAI Grok", providerId: "xai", baseUrl: XAI_DEFAULT_BASE_URL, model: XAI_DEFAULT_MODEL },
   { id: "azure-openai", label: "Azure OpenAI", providerId: "azure-openai", baseUrl: AZURE_OPENAI_DEFAULT_BASE_URL, model: AZURE_OPENAI_DEFAULT_MODEL },
   { id: "lm-studio", label: "LM Studio local", providerId: "openai-compatible", baseUrl: LM_STUDIO_DEFAULT_BASE_URL, model: DEFAULT_LOCAL_AI_MODEL },
+  { id: "opus-cat", label: "OPUS-CAT local", providerId: "opus-cat", baseUrl: OPUS_CAT_DEFAULT_BASE_URL, model: OPUS_CAT_DEFAULT_MODEL },
   { id: "deepseek", label: "DeepSeek", providerId: "deepseek", baseUrl: DEEPSEEK_DEFAULT_BASE_URL, model: DEEPSEEK_DEFAULT_MODEL },
   { id: "perplexity", label: "Perplexity Sonar", providerId: "perplexity", baseUrl: PERPLEXITY_DEFAULT_BASE_URL, model: PERPLEXITY_DEFAULT_MODEL },
   { id: "groq", label: "Groq", providerId: "groq", baseUrl: GROQ_DEFAULT_BASE_URL, model: GROQ_DEFAULT_MODEL },
@@ -131,11 +134,15 @@ const LOCAL_AI_PROVIDER_GUIDANCE = {
   "openai-compatible": {
     local: "Best for LM Studio and other loopback OpenAI-compatible servers so translators can use local models without changing the workflow.",
     hosted: "Best only for explicitly allowlisted compatible providers; add a named preset before using a hosted custom endpoint."
+  },
+  "opus-cat": {
+    local: "Best for private offline neural MT through the local OPUS-CAT MT Engine and installed OPUS-MT language-pair models.",
+    hosted: "Best only when an OPUS-CAT engine is intentionally exposed on a trusted private network; LoopCAT treats non-loopback OPUS-CAT URLs as external processing."
   }
 };
 const LOCAL_AI_SETTINGS_STORAGE = "loopcat.localAi.settings";
 const DEFAULT_LOCAL_AI_TIMEOUT_MS = 120000;
-const LOCAL_AI_PROVIDER_IDS = new Set(["ollama", "openai", "deepseek", "gemini", "anthropic", "cohere", "mistral", "xai", "perplexity", "groq", "together", "openrouter", "huggingface", "deepinfra", "fireworks", "azure-openai", "openai-compatible"]);
+const LOCAL_AI_PROVIDER_IDS = new Set(["ollama", "openai", "deepseek", "gemini", "anthropic", "cohere", "mistral", "xai", "perplexity", "groq", "together", "openrouter", "huggingface", "deepinfra", "fireworks", "azure-openai", "openai-compatible", "opus-cat"]);
 const LOCAL_AI_PRETRANSLATION_MODES = new Set(["selected", "untranslated", "visible", "project"]);
 const LOCAL_AI_VARIANT_MODES = new Set(["standard", "formal", "concise", "locale", "plain"]);
 const LOCAL_AI_ADAPT_MODES = new Set(["simplify", "formalize", "localize", "shorten"]);
@@ -230,6 +237,22 @@ function ollamaApiUrl(baseUrl, endpoint) {
   const { apiBaseUrl } = normalizeOllamaBaseUrl(baseUrl);
   const cleanEndpoint = String(endpoint || "").replace(/^\/?api\/?/, "").replace(/^\/+/, "");
   return `${apiBaseUrl}/${cleanEndpoint}`;
+}
+
+function normalizeOpusCatBaseUrl(baseUrl = OPUS_CAT_DEFAULT_BASE_URL) {
+  const normalized = normalizeUrl(baseUrl, OPUS_CAT_DEFAULT_BASE_URL);
+  const url = new URL(normalized);
+  let path = url.pathname.replace(/\/+$/, "");
+  path = path.replace(/\/mtrestservice$/i, "");
+  return trimTrailingSlashes(`${url.origin}${path === "/" ? "" : path}`);
+}
+
+function opusCatApiUrl(baseUrl, endpoint) {
+  const rootBaseUrl = normalizeOpusCatBaseUrl(baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
+  const cleanEndpoint = String(endpoint || "")
+    .replace(/^\/?mtrestservice\/?/i, "")
+    .replace(/^\/+/, "");
+  return `${rootBaseUrl}/MTRestService/${cleanEndpoint}`;
 }
 
 function normalizeOpenAiCompatibleBaseUrl(baseUrl = LM_STUDIO_DEFAULT_BASE_URL) {
@@ -487,6 +510,7 @@ function normalizedProviderBaseUrl(providerId, baseUrl) {
   if (providerId === "fireworks") return normalizeFireworksBaseUrl(baseUrl || FIREWORKS_DEFAULT_BASE_URL);
   if (providerId === "azure-openai") return normalizeAzureOpenAiBaseUrl(baseUrl || AZURE_OPENAI_DEFAULT_BASE_URL);
   if (providerId === "openai-compatible") return normalizeOpenAiCompatibleBaseUrl(baseUrl || LM_STUDIO_DEFAULT_BASE_URL);
+  if (providerId === "opus-cat") return normalizeOpusCatBaseUrl(baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
   return normalizeUrl(baseUrl || "", "");
 }
 
@@ -529,6 +553,8 @@ function localAiProviderPresetForSettings(settings = {}) {
       ? AZURE_OPENAI_DEFAULT_BASE_URL
     : providerId === "openai-compatible"
       ? LM_STUDIO_DEFAULT_BASE_URL
+    : providerId === "opus-cat"
+      ? OPUS_CAT_DEFAULT_BASE_URL
       : OLLAMA_DEFAULT_BASE_URL;
   const normalizedBaseUrl = normalizedProviderBaseUrl(providerId, settings.baseUrl || settings.localBaseUrl || fallbackBaseUrl);
   const model = String(settings.model || settings.localModel || "").trim();
@@ -593,6 +619,7 @@ function localAiProviderNeedsApiKey(providerId, baseUrl) {
   if (providerId === "fireworks") return true;
   if (providerId === "azure-openai") return true;
   if (providerId === "openai-compatible") return !isLoopbackBaseUrl(baseUrl, LM_STUDIO_DEFAULT_BASE_URL);
+  if (providerId === "opus-cat") return false;
   return false;
 }
 
@@ -617,6 +644,7 @@ function localAiProviderSharesExternally(providerId, baseUrl, model = "") {
   if (providerId === "fireworks") return true;
   if (providerId === "azure-openai") return true;
   if (providerId === "openai-compatible") return !isLoopbackBaseUrl(baseUrl, LM_STUDIO_DEFAULT_BASE_URL);
+  if (providerId === "opus-cat") return !isLoopbackBaseUrl(baseUrl, OPUS_CAT_DEFAULT_BASE_URL);
   return true;
 }
 
@@ -634,6 +662,9 @@ function localAiProviderGuidance(settings = {}) {
     return guidance.local;
   }
   if (providerId === "openai-compatible" && !localAiProviderSharesExternally(providerId, baseUrl, model)) {
+    return guidance.local;
+  }
+  if (providerId === "opus-cat" && !localAiProviderSharesExternally(providerId, baseUrl, model)) {
     return guidance.local;
   }
   return guidance.hosted || guidance.local || "Best for provider-specific AI assistance through LoopCAT's shared translation workflow.";
@@ -709,6 +740,8 @@ function defaultLocalAiSettings(settings = {}, project = null) {
       ? AZURE_OPENAI_DEFAULT_BASE_URL
     : providerId === "openai-compatible"
       ? LM_STUDIO_DEFAULT_BASE_URL
+    : providerId === "opus-cat"
+      ? OPUS_CAT_DEFAULT_BASE_URL
       : OLLAMA_DEFAULT_BASE_URL;
   const fallbackModel = providerId === "openai"
     ? OPENAI_DEFAULT_MODEL
@@ -740,6 +773,8 @@ function defaultLocalAiSettings(settings = {}, project = null) {
       ? FIREWORKS_DEFAULT_MODEL
     : providerId === "azure-openai"
           ? AZURE_OPENAI_DEFAULT_MODEL
+    : providerId === "opus-cat"
+      ? OPUS_CAT_DEFAULT_MODEL
       : DEFAULT_LOCAL_AI_MODEL;
   const sourceCode = redactSensitiveText(source.sourceCode || source.localSourceCode || project?.sourceLang || "en").trim() || "en";
   const targetCode = redactSensitiveText(source.targetCode || source.localTargetCode || project?.targetLang || "tr").trim() || "tr";
@@ -1682,6 +1717,158 @@ const OllamaProvider = {
         loadDuration: data.load_duration || 0,
         promptEvalCount: data.prompt_eval_count || 0,
         evalCount: data.eval_count || 0
+      }
+    };
+  }
+};
+
+function opusCatLanguageCode(value, fallback = "und") {
+  const clean = String(value || fallback || "").trim().toLowerCase().replaceAll("_", "-");
+  const match = clean.match(/[a-z]{2,3}/);
+  return match?.[0] || String(fallback || "und").trim().toLowerCase() || "und";
+}
+
+function opusCatLanguagePairMatches(pair, sourceCode, targetCode) {
+  const tokens = String(pair || "").toLowerCase().match(/[a-z]{2,3}/g) || [];
+  return tokens.length >= 2 && tokens[0] === sourceCode && tokens[1] === targetCode;
+}
+
+function opusCatModelTag(model = "") {
+  const tag = String(model || "").trim();
+  return tag && !/^(?:default|auto)$/i.test(tag) ? tag : "";
+}
+
+function opusCatQuery(params = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    query.set(key, String(value));
+  });
+  return query.toString();
+}
+
+function opusCatTranslationText(data) {
+  if (typeof data === "string") return data;
+  return typeof data?.translation === "string"
+    ? data.translation
+    : typeof data?.Translation === "string"
+      ? data.Translation
+      : "";
+}
+
+function opusCatReachableError(baseUrl) {
+  return `OPUS-CAT MT Engine is not reachable at ${normalizeOpusCatBaseUrl(baseUrl || OPUS_CAT_DEFAULT_BASE_URL)}. Start OPUS-CAT MT Engine and try again.`;
+}
+
+function opusCatStatusError(data, status) {
+  const raw = redactSensitiveText(data?.error || data?.message || "").trim();
+  if (status === 401 || status === 403) return "OPUS-CAT rejected the request. Check that the local MT Engine is running and accepting local API requests.";
+  if (status === 404) return "OPUS-CAT did not expose the expected MTRestService endpoint. Check the OPUS-CAT MT Engine version and port.";
+  return raw || `OPUS-CAT request failed with status ${status}.`;
+}
+
+async function opusCatJson(action, params = {}, options = {}, config = {}) {
+  const baseUrl = normalizeOpusCatBaseUrl(config.baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
+  const query = opusCatQuery(params);
+  const url = `${opusCatApiUrl(baseUrl, action)}${query ? `?${query}` : ""}`;
+  let result = null;
+  try {
+    result = await fetchJsonWithTimeout(url, options, config);
+  } catch (error) {
+    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
+    throw new Error(opusCatReachableError(baseUrl));
+  }
+  if (!result.response?.ok) {
+    throw new Error(opusCatStatusError(result.data, result.response?.status));
+  }
+  return result.data;
+}
+
+const OpusCatProvider = {
+  id: "opus-cat",
+  name: "OPUS-CAT",
+  defaultBaseUrl: OPUS_CAT_DEFAULT_BASE_URL,
+  defaultModel: OPUS_CAT_DEFAULT_MODEL,
+  async testConnection(config = {}) {
+    const baseUrl = normalizeOpusCatBaseUrl(config.baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
+    const data = await opusCatJson("ListSupportedLanguagePairs", { tokenCode: "0" }, { method: "GET" }, { ...config, baseUrl });
+    const supportedLanguagePairs = Array.isArray(data) ? data.map((item) => String(item || "").trim()).filter(Boolean) : [];
+    return {
+      ok: true,
+      provider: "OPUS-CAT",
+      version: supportedLanguagePairs.length ? `${supportedLanguagePairs.length} pair${supportedLanguagePairs.length === 1 ? "" : "s"}` : "",
+      baseUrl,
+      modelCount: supportedLanguagePairs.length
+    };
+  },
+  async listModels(config = {}) {
+    const settings = defaultLocalAiSettings({ ...config, providerId: "opus-cat" }, config.project);
+    const baseUrl = normalizeOpusCatBaseUrl(config.baseUrl || settings.baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
+    const sourceCode = opusCatLanguageCode(config.sourceCode || settings.sourceCode || config.sourceLanguage || settings.sourceLanguage || "en", "en");
+    const targetCode = opusCatLanguageCode(config.targetCode || settings.targetCode || config.targetLanguage || settings.targetLanguage || "tr", "tr");
+    const data = await opusCatJson("ListSupportedLanguagePairs", { tokenCode: "0" }, { method: "GET" }, { ...settings, ...config, baseUrl });
+    const supportedLanguagePairs = Array.isArray(data) ? data.map((item) => String(item || "").trim()).filter(Boolean) : [];
+    const pairSupported = supportedLanguagePairs.some((pair) => opusCatLanguagePairMatches(pair, sourceCode, targetCode));
+    let modelTags = [];
+    if (pairSupported) {
+      const tagData = await opusCatJson("GetLanguagePairModelTags", {
+        tokenCode: "0",
+        srcLangCode: sourceCode,
+        trgLangCode: targetCode
+      }, { method: "GET" }, { ...settings, ...config, baseUrl });
+      modelTags = Array.isArray(tagData) ? tagData.map((item) => String(item || "").trim()).filter(Boolean) : [];
+    }
+    const models = pairSupported
+      ? [
+        { name: OPUS_CAT_DEFAULT_MODEL, size: 0, modifiedAt: "" },
+        ...modelTags.filter((tag) => tag !== OPUS_CAT_DEFAULT_MODEL).map((tag) => ({ name: tag, size: 0, modifiedAt: "" }))
+      ]
+      : [];
+    return {
+      models,
+      raw: {
+        supportedLanguagePairs,
+        sourceCode,
+        targetCode,
+        modelTags
+      }
+    };
+  },
+  async translateSegment(config = {}, request = {}) {
+    const settings = defaultLocalAiSettings({ ...config, providerId: "opus-cat", model: config.model || request.model }, request.project);
+    const baseUrl = normalizeOpusCatBaseUrl(config.baseUrl || settings.baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
+    const model = String(config.model || request.model || settings.model || OPUS_CAT_DEFAULT_MODEL).trim() || OPUS_CAT_DEFAULT_MODEL;
+    const modelTag = opusCatModelTag(model);
+    const sourceText = String(request.text ?? request.segment?.source ?? "");
+    if (!sourceText.trim()) throw new Error("The segment has no source text.");
+    const sourceCode = opusCatLanguageCode(request.sourceCode || settings.sourceCode || request.sourceLanguage || settings.sourceLanguage || "en", "en");
+    const targetCode = opusCatLanguageCode(request.targetCode || settings.targetCode || request.targetLanguage || settings.targetLanguage || "tr", "tr");
+    const startedAt = localAiStartedAt();
+    const data = await opusCatJson("TranslateJson", {
+      tokenCode: "0",
+      input: sourceText,
+      srcLangCode: sourceCode,
+      trgLangCode: targetCode,
+      modelTag,
+      inputIsSingleSentence: "true"
+    }, { method: "GET" }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
+    const rawOutput = opusCatTranslationText(data);
+    if (typeof rawOutput !== "string") throw new Error("OPUS-CAT returned a malformed translation response.");
+    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
+    if (!translatedText.trim()) throw new Error("OPUS-CAT returned an empty translation for this segment. Check that an OPUS-CAT model is installed for the selected language pair.");
+    return {
+      translatedText,
+      rawOutput,
+      provider: "OPUS-CAT",
+      providerId: "opus-cat",
+      model: modelTag || OPUS_CAT_DEFAULT_MODEL,
+      durationMs: requestDurationMs(startedAt),
+      prompt: sourceText,
+      metadata: {
+        sourceCode,
+        targetCode,
+        modelTag,
+        segmentedTranslationCount: Array.isArray(data?.SegmentedTranslation) ? data.SegmentedTranslation.length : 0
       }
     };
   }
@@ -4211,6 +4398,7 @@ aiProviderRegistry.register(CohereProvider);
 aiProviderRegistry.register(MistralProvider);
 aiProviderRegistry.register(AzureOpenAIProvider);
 aiProviderRegistry.register(OpenAICompatibleProvider);
+aiProviderRegistry.register(OpusCatProvider);
 
 function isLockedSegment(segment = {}) {
   return Boolean(segment.locked || segment.isLocked || segment.readOnly || segment.readonly || segment.status === "locked");
@@ -4773,8 +4961,10 @@ window.CatHan.ai = {
   OLLAMA_DEFAULT_BASE_URL,
   OLLAMA_CLOUD_BASE_URL,
   LM_STUDIO_DEFAULT_BASE_URL,
+  OPUS_CAT_DEFAULT_BASE_URL,
   LOCAL_AI_PROVIDER_PRESETS,
   DEFAULT_LOCAL_AI_MODEL,
+  OPUS_CAT_DEFAULT_MODEL,
   DEFAULT_LOCAL_AI_TIMEOUT_MS,
   LOCAL_AI_ADAPT_MODES,
   browserAppearsOffline,
@@ -4831,6 +5021,8 @@ window.CatHan.ai = {
   azureOpenAiApiUrl,
   normalizeOpenAiCompatibleBaseUrl,
   openAiCompatibleApiUrl,
+  normalizeOpusCatBaseUrl,
+  opusCatApiUrl,
   isLoopbackBaseUrl,
   isAllowedOpenAiCompatibleHostedBaseUrl,
   isOllamaCloudBaseUrl,
@@ -4859,6 +5051,7 @@ window.CatHan.ai = {
   MistralProvider,
   AzureOpenAIProvider,
   OpenAICompatibleProvider,
+  OpusCatProvider,
   aiProviderRegistry,
   preTranslationService,
   aiCommandService

@@ -40,6 +40,8 @@ const requiredExports = [
   "resolveAppFile",
   "isAllowedOpenAiResponsesUrl",
   "isAllowedNetworkRequest",
+  "isAllowedOpusCatRuntimeUrl",
+  "opusCatCorsResponseHeaders",
   "isAllowedGeminiUrl",
   "isAllowedHostedOpenAiCompatibleUrl",
   "isLoopcatUrl",
@@ -237,6 +239,7 @@ for (const url of [
 assert(wrapper.LOCAL_AI_RUNTIME_HOSTS.has("localhost"), "Desktop local AI allowlist must include localhost.");
 assert(wrapper.LOCAL_AI_RUNTIME_PORTS.has("11434"), "Desktop local AI allowlist must include Ollama's default port.");
 assert(wrapper.LOCAL_AI_RUNTIME_PORTS.has("1234"), "Desktop local AI allowlist must include LM Studio's default port.");
+assertEqual(wrapper.OPUS_CAT_RUNTIME_PORT, "8500", "Desktop OPUS-CAT allowlist must pin the default local OPUS-CAT HTTP port.");
 assert(wrapper.OLLAMA_CLOUD_HOST === "ollama.com", "Desktop hosted Ollama allowlist must pin ollama.com.");
 assert(wrapper.GEMINI_HOST === "generativelanguage.googleapis.com", "Desktop Gemini allowlist must pin the Gemini API host.");
 assert(wrapper.ANTHROPIC_HOST === "api.anthropic.com", "Desktop Anthropic allowlist must pin the Anthropic API host.");
@@ -302,6 +305,32 @@ for (const url of [
 ]) {
   assert(!wrapper.isAllowedLocalAiRuntimeUrl(url), `isAllowedLocalAiRuntimeUrl must reject ${url}.`);
 }
+for (const url of [
+  "http://localhost:8500/MTRestService/ListSupportedLanguagePairs?tokenCode=0",
+  "http://127.0.0.1:8500/MTRestService/GetLanguagePairModelTags?tokenCode=0&srcLangCode=en&trgLangCode=tr",
+  "http://localhost:8500/MTRestService/TranslateJson?tokenCode=0&input=Hello&srcLangCode=en&trgLangCode=tr&modelTag=&inputIsSingleSentence=true"
+]) {
+  assert(wrapper.isAllowedOpusCatRuntimeUrl(url), `isAllowedOpusCatRuntimeUrl must allow ${url}.`);
+}
+for (const url of [
+  "http://localhost:8500/MTRestService/TranslateJson?tokenCode=0&input=Hello&apiKey=sk-opus-cat-query-token-that-must-not-pass&srcLangCode=en&trgLangCode=tr",
+  "http://localhost:8500/MTRestService/TranslateJson?tokenCode=0&tokenCode=1&input=Hello&srcLangCode=en&trgLangCode=tr",
+  "http://localhost:8500/MTRestService/Unknown?tokenCode=0",
+  "http://localhost:8501/MTRestService/TranslateJson?tokenCode=0&input=Hello&srcLangCode=en&trgLangCode=tr",
+  "http://user:pass@localhost:8500/MTRestService/TranslateJson?tokenCode=0&input=Hello&srcLangCode=en&trgLangCode=tr",
+  "https://localhost:8500/MTRestService/TranslateJson?tokenCode=0&input=Hello&srcLangCode=en&trgLangCode=tr"
+]) {
+  assert(!wrapper.isAllowedOpusCatRuntimeUrl(url), `isAllowedOpusCatRuntimeUrl must reject ${url}.`);
+}
+const opusCatCorsHeaders = wrapper.opusCatCorsResponseHeaders({
+  "Content-Type": ["application/json; charset=utf-8"],
+  "Access-Control-Allow-Origin": ["https://unexpected.example"],
+  Server: ["Microsoft-HTTPAPI/2.0"]
+});
+assertEqual(opusCatCorsHeaders["Access-Control-Allow-Origin"]?.[0], "*", "OPUS-CAT desktop response headers must allow the renderer to read local MT JSON.");
+assertEqual(opusCatCorsHeaders["Access-Control-Allow-Methods"]?.[0], "GET", "OPUS-CAT desktop response headers must expose the local GET API.");
+assertEqual(opusCatCorsHeaders["Content-Type"]?.[0], "application/json; charset=utf-8", "OPUS-CAT desktop response headers must preserve normal response metadata.");
+assert(!Object.hasOwn(opusCatCorsHeaders, "access-control-allow-origin"), "OPUS-CAT desktop response headers must avoid duplicate CORS header casing.");
 for (const url of [
   "https://ollama.com/api/tags",
   "https://ollama.com/api/chat"
@@ -497,7 +526,8 @@ for (const url of [
   "https://api.deepinfra.com/v1/openai/chat/completions",
   "https://api.fireworks.ai/inference/v1/chat/completions",
   "http://localhost:11434/api/chat",
-  "http://127.0.0.1:1234/v1/models"
+  "http://127.0.0.1:1234/v1/models",
+  "http://localhost:8500/MTRestService/TranslateJson?tokenCode=0&input=Hello&srcLangCode=en&trgLangCode=tr&modelTag=&inputIsSingleSentence=true"
 ]) {
   assert(wrapper.isAllowedNetworkRequest(url), `Desktop network boundary must allow ${url}.`);
 }
@@ -541,6 +571,8 @@ for (const url of [
   "https://example.com/script.js",
   "http://localhost:11435/api/chat",
   "http://localhost:11434/api/show",
+  "http://localhost:8500/MTRestService/TranslateJson?tokenCode=0&input=Hello&srcLangCode=en&trgLangCode=tr&apiKey=sk-opus-cat-query-token-that-must-not-pass",
+  "http://localhost:8501/MTRestService/TranslateJson?tokenCode=0&input=Hello&srcLangCode=en&trgLangCode=tr",
   "http://user:pass@localhost:11434/api/chat",
   "http://example.com:11434/api/chat",
   "devtools://devtools/bundled/inspector.html"

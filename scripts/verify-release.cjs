@@ -136,6 +136,7 @@ const requiredReleaseFiles = [
   "scripts/verify-browser-runner.cjs",
   "scripts/verify-live-ollama.cjs",
   "scripts/verify-live-ai-provider.cjs",
+  "scripts/opus-cat-web-bridge.cjs",
   "scripts/build-web.cjs",
   "scripts/verify-web-artifact.cjs",
   "scripts/verify-web-smoke.cjs",
@@ -252,6 +253,7 @@ assert(packageJson.scripts?.["verify:browser-runner"] === "node scripts/verify-b
 assert(packageJson.scripts?.["verify:ai-sidebar-ux"] === "node scripts/verify-ai-sidebar-ux.cjs", "package.json verify:ai-sidebar-ux script must execute the AI sidebar UX verifier.");
 assert(packageJson.scripts?.["verify:ollama-live"] === "node scripts/verify-live-ollama.cjs", "package.json verify:ollama-live script must run the optional live Ollama verifier.");
 assert(packageJson.scripts?.["verify:ai-live"] === "node scripts/verify-live-ai-provider.cjs", "package.json verify:ai-live script must run the optional live hosted AI provider verifier.");
+assert(packageJson.scripts?.["opuscat:web-bridge"] === "node scripts/opus-cat-web-bridge.cjs", "package.json opuscat:web-bridge script must start the local OPUS-CAT browser bridge.");
 assert(packageJson.scripts?.["dist:web"] === "node scripts/build-web.cjs", "package.json dist:web script must build the static HTML distribution artifact.");
 assert(packageJson.scripts?.["dist:html"] === "node scripts/build-web.cjs", "package.json dist:html script must alias the static HTML distribution build.");
 assert(packageJson.scripts?.["verify:web-artifact"] === "node scripts/verify-web-artifact.cjs", "package.json verify:web-artifact script must verify the static HTML distribution artifact.");
@@ -317,15 +319,21 @@ assertIncludes(desktopWorkflow, "pnpm run verify:provenance -- --allow-untagged"
 assertIncludes(desktopWorkflow, "pnpm run verify:provenance-selftest", "Desktop release workflow must self-test release provenance validation before packaging.");
 assertIncludes(desktopPackagingDocs, "pnpm run verify:provenance", "Desktop packaging docs must document release provenance verification.");
 assertIncludes(desktopPackagingDocs, "DeepSeek, Mistral AI, xAI, Perplexity Sonar, Groq, Together AI, OpenRouter, Hugging Face Inference Providers, DeepInfra, and Fireworks AI", "Desktop packaging docs must document the explicit hosted AI provider network allowlist.");
+assertIncludes(desktopPackagingDocs, "local OPUS-CAT `MTRestService` actions on port `8500`", "Desktop packaging docs must document the local OPUS-CAT MT Engine network allowlist.");
 assertIncludes(readme, "pnpm run dist:web", "README.md must document the static HTML distribution build.");
 assertIncludes(readme, "dist-web", "README.md must document that static HTML artifacts are written outside desktop dist.");
 assertIncludes(readme, "pnpm run verify:web-smoke", "README.md must document static HTML smoke verification.");
 assertIncludes(readme, "pnpm run verify:provenance", "README.md must document release provenance verification.");
 assertIncludes(readme, "Apache License 2.0", "README.md must document the Apache-2.0 license.");
+assertIncludes(readme, "OPUS-CAT MT Engine", "README.md must document the OPUS-CAT MT Engine connector.");
+assertIncludes(readme, "MTRestService/ListSupportedLanguagePairs", "README.md must document the OPUS-CAT local connection check endpoint.");
+assertIncludes(readme, "http://127.0.0.1:8502", "README.md must document the OPUS-CAT browser bridge base URL.");
 assertIncludes(webBuildScript, `"LICENSE"`, "scripts/build-web.cjs must include LICENSE in the static HTML artifact.");
 assertIncludes(webBuildScript, `"NOTICE"`, "scripts/build-web.cjs must include NOTICE in the static HTML artifact.");
+assertIncludes(webBuildScript, `"scripts/opus-cat-web-bridge.cjs"`, "scripts/build-web.cjs must include the OPUS-CAT browser bridge in the static web artifact.");
 assertIncludes(webArtifactScript, `"LICENSE"`, "scripts/verify-web-artifact.cjs must verify LICENSE in the static HTML artifact.");
 assertIncludes(webArtifactScript, `"NOTICE"`, "scripts/verify-web-artifact.cjs must verify NOTICE in the static HTML artifact.");
+assertIncludes(webArtifactScript, `"scripts/opus-cat-web-bridge.cjs"`, "scripts/verify-web-artifact.cjs must verify the OPUS-CAT browser bridge in the static web artifact.");
 assertIncludes(indexHtml, `id="aboutBtn"`, "index.html must expose the product About button.");
 assertIncludes(indexHtml, `id="aboutDialog"`, "index.html must expose the product About dialog.");
 assertIncludes(indexHtml, "Co-created by Dr. Gokhan Dogru and Codex", "index.html About dialog must credit Dr. Gokhan Dogru and Codex.");
@@ -449,6 +457,7 @@ assertIncludes(indexHtml, `https://router.huggingface.co`, "Content Security Pol
 assertIncludes(indexHtml, `https://api.deepinfra.com`, "Content Security Policy must allow the explicit DeepInfra origin for native hosted pretranslation.");
 assertIncludes(indexHtml, `https://api.fireworks.ai`, "Content Security Policy must allow the explicit Fireworks AI origin for native hosted pretranslation.");
 assertIncludes(indexHtml, `id="localAiPresetSelect"`, "AI Command Centre must expose the provider preset selector.");
+assertIncludes(indexHtml, `<option value="opus-cat">OPUS-CAT MT Engine</option>`, "AI Command Centre must expose OPUS-CAT MT Engine as a provider.");
 assertIncludes(indexHtml, `<option value="gemini">Google Gemini</option>`, "AI Command Centre must expose Gemini as a provider.");
 assertIncludes(indexHtml, `<option value="deepseek">DeepSeek</option>`, "AI Command Centre must expose DeepSeek as a provider.");
 assertIncludes(indexHtml, `<option value="anthropic">Anthropic Claude</option>`, "AI Command Centre must expose Anthropic Claude as a provider.");
@@ -507,6 +516,8 @@ assertIncludes(readText("styles.css"), ".workspace.projects-mode .project-rail",
 assertIncludes(readText("styles.css"), ".workspace.projects-mode .sidebar", "styles.css must prevent editor sidebar first-paint flashes in project/dashboard screens.");
 assertIncludes(indexHtml, `http://localhost:11434`, "Content Security Policy must allow the explicit local Ollama loopback endpoint.");
 assertIncludes(indexHtml, `http://127.0.0.1:1234`, "Content Security Policy must allow the explicit local OpenAI-compatible loopback endpoint.");
+assertIncludes(indexHtml, `http://localhost:8500`, "Content Security Policy must allow the explicit local OPUS-CAT loopback endpoint.");
+assertIncludes(indexHtml, `http://127.0.0.1:8502`, "Content Security Policy must allow the explicit local OPUS-CAT web bridge endpoint.");
 assert(!indexHtml.includes(`http://[::1]`), "Content Security Policy must not include Chromium-invalid bracketed IPv6 loopback sources.");
 assert(!indexHtml.includes(`connect-src 'self' https://api.openai.com;`), "Content Security Policy must not allow the whole OpenAI origin.");
 assertIncludes(indexHtml, `object-src 'none'`, "Content Security Policy must disable plugin/object content.");
@@ -527,6 +538,7 @@ const anthropicProviderFunction = functionBody(aiJs, "const AnthropicProvider = 
 const cohereProviderFunction = functionBody(aiJs, "const CohereProvider = {", "function mistralProviderAuthError");
 const mistralProviderFunction = functionBody(aiJs, "const MistralProvider = {", "function azureOpenAiProviderAuthError");
 const azureOpenAiProviderFunction = functionBody(aiJs, "const AzureOpenAIProvider = {", "function openAiCompatibleStatusError");
+const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "const OpenAIProvider = {");
 assertIncludes(aiJs, `const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"`, "ai.js must keep the external OpenAI endpoint explicit and narrow.");
 assertIncludes(aiJs, `const OPENAI_MODELS_URL = "https://api.openai.com/v1/models"`, "ai.js must keep the external OpenAI models endpoint explicit and narrow.");
 assertIncludes(aiJs, `const DEEPSEEK_DEFAULT_BASE_URL = "https://api.deepseek.com"`, "ai.js must keep the DeepSeek API base URL centralized.");
@@ -543,6 +555,7 @@ assertIncludes(aiJs, `const HUGGINGFACE_DEFAULT_BASE_URL = "https://router.huggi
 assertIncludes(aiJs, `const DEEPINFRA_DEFAULT_BASE_URL = "https://api.deepinfra.com/v1/openai"`, "ai.js must keep the DeepInfra API base URL centralized.");
 assertIncludes(aiJs, `const FIREWORKS_DEFAULT_BASE_URL = "https://api.fireworks.ai/inference/v1"`, "ai.js must keep the Fireworks AI API base URL centralized.");
 assertIncludes(aiJs, `const AZURE_OPENAI_DEFAULT_BASE_URL = "https://YOUR-RESOURCE-NAME.openai.azure.com/openai/v1"`, "ai.js must keep the Azure OpenAI base URL centralized.");
+assertIncludes(aiJs, `const OPUS_CAT_DEFAULT_BASE_URL = "http://localhost:8500"`, "ai.js must keep the local OPUS-CAT MT Engine base URL centralized.");
 assertIncludes(aiJs, "const GeminiProvider = {", "ai.js must implement the native Gemini provider.");
 assertIncludes(aiJs, "const DeepSeekProvider = {", "ai.js must implement the native DeepSeek provider.");
 assertIncludes(aiJs, "deepSeekApiUrl", "ai.js must normalize DeepSeek model-list and chat-completion endpoints.");
@@ -611,6 +624,14 @@ assertIncludes(aiJs, "azureOpenAiAuthHeaders", "ai.js must send Azure OpenAI API
 assertIncludes(aiJs, "azureOpenAiApiUrl", "ai.js must normalize Azure OpenAI v1 endpoints.");
 assertIncludes(azureOpenAiProviderFunction, "store: false", "ai.js Azure OpenAI Responses requests must opt out of provider-side storage.");
 assertIncludes(azureOpenAiProviderFunction, "max_output_tokens: 1200", "ai.js Azure OpenAI Responses requests must include bounded max_output_tokens.");
+assertIncludes(aiJs, "const OpusCatProvider = {", "ai.js must implement the OPUS-CAT MT Engine provider.");
+assertIncludes(aiJs, "opusCatApiUrl", "ai.js must normalize OPUS-CAT MTRestService endpoints.");
+assertIncludes(defaultLocalAiSettingsFunction, "providerId === \"opus-cat\"", "ai.js must default OPUS-CAT settings to the OPUS-CAT base URL/model, not Ollama.");
+assertIncludes(opusCatProviderFunction, "ListSupportedLanguagePairs", "ai.js OPUS-CAT provider must test and list installed language pairs.");
+assertIncludes(opusCatProviderFunction, "GetLanguagePairModelTags", "ai.js OPUS-CAT provider must list language-pair model tags.");
+assertIncludes(opusCatProviderFunction, "TranslateJson", "ai.js OPUS-CAT provider must pretranslate through the OPUS-CAT TranslateJson endpoint.");
+assertIncludes(aiJs, "aiProviderRegistry.register(OpusCatProvider)", "ai.js must register the OPUS-CAT provider.");
+assertIncludes(aiJs, "if (providerId === \"opus-cat\") return false;", "ai.js must treat local OPUS-CAT as a no-key provider.");
 assertIncludes(aiJs, "function buildAiReviewPrompt", "ai.js must include a provider-neutral AI review prompt builder.");
 assertIncludes(aiJs, "function parseAiReviewRisk", "ai.js must parse AI review severity output into structured risk metadata.");
 assertIncludes(aiJs, "function translationMemoryPromptBlock", "ai.js must include provider-neutral TM context for translation prompts.");
@@ -662,6 +683,8 @@ assertIncludes(aiJs, "OPENAI_COMPATIBLE_ENDPOINT_PATH_OVERRIDES", "ai.js must ha
 assertIncludes(aiJs, "OPENAI_COMPATIBLE_HOSTED_ALLOWED_HOSTS", "ai.js must keep generic hosted OpenAI-compatible endpoints on an explicit allowlist.");
 assertIncludes(aiJs, "assertOpenAiCompatibleHostedAllowed", "ai.js must block unsupported hosted OpenAI-compatible endpoints before fetch.");
 assertIncludes(appJs, "assertLocalAiEndpointAllowed", "app.js must preflight unsupported hosted OpenAI-compatible endpoints before saving keys or settings.");
+assertIncludes(appJs, "opusCatApiUrl", "app.js must render OPUS-CAT endpoint summaries through the OPUS-CAT URL helper.");
+assertIncludes(appJs, "providerId === \"opus-cat\"", "app.js must treat OPUS-CAT as a local runtime workflow in the AI Command Centre.");
 assertIncludes(appJs, "localAiPresetSelect", "app.js must wire the Local AI provider preset selector.");
 assertIncludes(appJs, "localAiLocalCloudPresetBtn", "app.js must wire the Ollama local cloud-model quick preset button.");
 assertIncludes(appJs, "reviewActiveSegmentWithLocalAi", "app.js must wire the active-segment AI review command.");
@@ -758,7 +781,7 @@ assertIncludes(appJs, "confirming reviewed AI-pretranslated segment clears needs
 assertIncludes(appJs, "function aiPretranslationBadge", "app.js must centralize AI draft to AI initiated row-badge behavior.");
 assertIncludes(readText("styles.css"), "#e7f2ff", "styles.css must render confirmed AI-initiated segment badges with a light-blue background.");
 assertIncludes(appJs, "project report includes count-only AI triage metrics", "app workflow test must verify project reports expose AI triage counts without segment text.");
-assertIncludes(appJs, "high AI risk</span>", "Project analysis must surface high-risk AI review counts.");
+assertIncludes(appJs, "uiLabelHtml(\"highAiRisk\")", "Project analysis must surface high-risk AI review counts.");
 assertIncludes(readText("analysis.js"), "aiSuggestionSegments", "analysis.js must count project-level AI suggestion row metadata.");
 assertIncludes(regressionHtml, "analysis counts AI triage draft suggestion and risk metadata", "regression test must verify project-level AI triage analysis counters.");
 assertIncludes(appJs, "AI tag repair active segment saves review suggestion without overwriting target", "app workflow test must verify the active-segment AI tag repair command.");
@@ -1034,7 +1057,7 @@ assertIncludes(functionBody(appJs, "function clearOpenAiKey", "function openAiKe
 assertIncludes(appJs, "function sanitizeValidationReportForDisplay", "app.js must centralize redaction for validation report display messages.");
 assertIncludes(functionBody(appJs, "function sanitizeValidationReportForDisplay", "function renderValidationReport"), "redactSensitiveText(message || \"\")", "app.js must redact credential-looking validation report messages before display.");
 assertIncludes(appJs, "function validationAlertText", "app.js must sanitize project-package validation alert text before display.");
-assertIncludes(appJs, "window.alert(validationAlertText(validation", "app.js project-package validation alerts must use sanitized validation text.");
+assertIncludes(appJs, "uiAlert(validationAlertText(validation", "app.js project-package validation alerts must use sanitized validation text.");
 assertIncludes(functionBody(appJs, "function download", "function escapeHtml"), "finally", "app.js download helper must clean up temporary links even when the browser rejects the download click.");
 assertIncludes(functionBody(appJs, "function download", "function escapeHtml"), "clickAccepted ? setTimeout(revokeDownloadUrl, 1000) : revokeDownloadUrl()", "app.js download helper must immediately revoke temporary object URLs when the click handoff fails.");
 assertIncludes(appJs, "downloads sanitize reserved names path separators unsafe characters and credential-looking labels", "app workflow test must verify download filename sanitization and label redaction.");
@@ -1599,8 +1622,11 @@ assertIncludes(appJs, "production UI does not expose mock AI suggestions", "app 
 assertIncludes(smokeTest, "OpenAI suggestion with explanation", "smoke-test.html must exercise the production OpenAI suggestion shape with a local stub.");
 assertIncludes(smokeTest, "OpenAI helper obeys disabled local context toggles", "smoke-test.html must verify disabled OpenAI local context toggles are enforced by the helper.");
 assertIncludes(regressionTest, "OpenAI suggestion includes TM context explanation", "regression-test.html must exercise production OpenAI suggestion context with a local stub.");
+assertIncludes(regressionTest, "OPUS-CAT provider lists installed language-pair model tags and pretranslates through local MTRestService", "regression-test.html must verify OPUS-CAT model-tag discovery and pretranslation.");
 assertIncludes(securityPolicyTest, "OpenAI helper opts out of provider response storage", "security-policy-test.html must verify OpenAI Responses requests opt out of provider-side storage.");
 assertIncludes(securityPolicyTest, "OpenAI helper reports provider connection failures clearly", "security-policy-test.html must verify OpenAI provider connection failures get clear status text.");
+assertIncludes(securityPolicyTest, "CSP connect-src allows explicit OPUS-CAT loopback endpoints", "security-policy-test.html must verify OPUS-CAT loopback CSP access.");
+assertIncludes(securityPolicyTest, "CSP connect-src allows explicit OPUS-CAT web bridge loopback endpoints", "security-policy-test.html must verify OPUS-CAT web bridge CSP access.");
 assertIncludes(readme, "OpenAI provider-stub flow", "README.md must describe smoke-test AI coverage as provider-stub coverage, not a mock AI flow.");
 assertIncludes(readme, "refuses OpenAI suggestions while the browser reports offline", "README.md must document OpenAI offline preflight before saving keys/settings.");
 assertIncludes(readme, "only when OpenAI is the selected provider", "README.md must document provider-scoped OpenAI key storage.");
@@ -1694,8 +1720,10 @@ assertIncludes(desktopMain, "openExternalUrl(url)", "desktop/main.cjs must route
 assertIncludes(desktopMain, "configureNetworkBoundaries()", "desktop/main.cjs must configure renderer network request boundaries.");
 assertIncludes(desktopMain, "webRequest.onBeforeRequest", "desktop/main.cjs must enforce network request allowlisting at the Electron session layer.");
 assertIncludes(desktopMain, "isAllowedNetworkRequest(details.url)", "desktop/main.cjs must route desktop network checks through a testable helper.");
+assertIncludes(desktopMain, "webRequest.onHeadersReceived", "desktop/main.cjs must adjust allowed local OPUS-CAT response headers for renderer access.");
 assertIncludes(desktopMain, "isAllowedOpenAiResponsesUrl(requestUrl)", "desktop/main.cjs must route OpenAI network checks through an exact endpoint helper.");
 assertIncludes(desktopMain, "isAllowedLocalAiRuntimeUrl(requestUrl)", "desktop/main.cjs must route local AI runtime checks through an exact loopback helper.");
+assertIncludes(desktopMain, "isAllowedOpusCatRuntimeUrl(requestUrl)", "desktop/main.cjs must route OPUS-CAT runtime checks through an exact loopback helper.");
 assertIncludes(desktopMain, "isAllowedOllamaCloudUrl(requestUrl)", "desktop/main.cjs must route hosted Ollama checks through an exact hosted helper.");
 assertIncludes(desktopMain, "isAllowedGeminiUrl(requestUrl)", "desktop/main.cjs must route Gemini checks through an exact hosted helper.");
 assertIncludes(desktopMain, "isAllowedAzureOpenAiUrl(requestUrl)", "desktop/main.cjs must route Azure OpenAI checks through an exact hosted helper.");
@@ -1703,6 +1731,7 @@ assertIncludes(desktopMain, "isAllowedHostedOpenAiCompatibleUrl(requestUrl)", "d
 assertIncludes(desktopMain, "href === OPENAI_RESPONSES_URL || href === OPENAI_MODELS_URL", "desktop/main.cjs must reject OpenAI endpoint variants with credentials, query strings, fragments, or alternate ports.");
 assertIncludes(desktopMain, "https://api.openai.com/v1/responses", "desktop/main.cjs must keep the explicit external AI endpoint narrow.");
 assertIncludes(desktopMain, "LOCAL_AI_RUNTIME_PATHS", "desktop/main.cjs must allow only explicit local AI runtime paths.");
+assertIncludes(desktopMain, "OPUS_CAT_RUNTIME_ACTION_QUERY_KEYS", "desktop/main.cjs must allow only explicit OPUS-CAT MTRestService actions and query keys.");
 assertIncludes(desktopMain, "OLLAMA_CLOUD_API_PATHS", "desktop/main.cjs must allow only explicit hosted Ollama API paths.");
 assertIncludes(desktopMain, "GEMINI_API_PATHS", "desktop/main.cjs must allow only explicit Gemini API paths.");
 assertIncludes(desktopMain, "HOSTED_OPENAI_COMPATIBLE_API_PATHS", "desktop/main.cjs must allow only explicit hosted OpenAI-compatible API paths.");
@@ -1788,6 +1817,8 @@ assertIncludes(desktopWrapperScript, "isAllowedAnthropicUrl", "scripts/verify-de
 assertIncludes(desktopWrapperScript, "isAllowedCohereUrl", "scripts/verify-desktop-wrapper.cjs must verify exact Cohere endpoint allowlisting.");
 assertIncludes(desktopWrapperScript, "isAllowedAzureOpenAiUrl", "scripts/verify-desktop-wrapper.cjs must verify exact Azure OpenAI endpoint allowlisting.");
 assertIncludes(desktopWrapperScript, "isAllowedHostedOpenAiCompatibleUrl", "scripts/verify-desktop-wrapper.cjs must verify hosted OpenAI-compatible endpoint allowlisting.");
+assertIncludes(desktopWrapperScript, "isAllowedOpusCatRuntimeUrl", "scripts/verify-desktop-wrapper.cjs must verify OPUS-CAT loopback endpoint allowlisting.");
+assertIncludes(desktopWrapperScript, "opusCatCorsResponseHeaders", "scripts/verify-desktop-wrapper.cjs must verify OPUS-CAT local CORS response headers.");
 assertIncludes(desktopWrapperScript, "isAllowedNetworkRequest", "scripts/verify-desktop-wrapper.cjs must verify desktop network request allowlisting.");
 assertIncludes(desktopWrapperScript, "isAllowedAppNavigationUrl", "scripts/verify-desktop-wrapper.cjs must verify top-level app navigation allowlisting.");
 assertIncludes(desktopWrapperScript, "loopcat://app/styles.css", "scripts/verify-desktop-wrapper.cjs must verify top-level navigation cannot open runtime assets.");
@@ -1821,6 +1852,8 @@ assertIncludes(desktopWrapperScript, "https://generativelanguage.googleapis.com/
 assertIncludes(desktopWrapperScript, "https://api.anthropic.com/v1/messages?x-api-key=anthropic-query-key-that-must-not-pass", "scripts/verify-desktop-wrapper.cjs must verify Anthropic query-string key variants are denied.");
 assertIncludes(desktopWrapperScript, "https://api.cohere.com/v2/chat?key=cohere-query-key-that-must-not-pass", "scripts/verify-desktop-wrapper.cjs must verify Cohere query-string key variants are denied.");
 assertIncludes(desktopWrapperScript, "https://loopcat-test.openai.azure.com/openai/v1/responses?api-version=2024-10-21", "scripts/verify-desktop-wrapper.cjs must verify Azure OpenAI query-string variants are denied.");
+assertIncludes(desktopWrapperScript, "http://localhost:8500/MTRestService/TranslateJson", "scripts/verify-desktop-wrapper.cjs must verify OPUS-CAT TranslateJson endpoint access.");
+assertIncludes(desktopWrapperScript, "http://localhost:8501/MTRestService/TranslateJson", "scripts/verify-desktop-wrapper.cjs must verify alternate OPUS-CAT ports are denied.");
 assertIncludes(desktopWrapperScript, "https://example.com/script.js", "scripts/verify-desktop-wrapper.cjs must verify arbitrary external scripts are denied.");
 assertIncludes(desktopWrapperScript, "createRendererWebPreferences", "scripts/verify-desktop-wrapper.cjs must verify desktop renderer web preferences.");
 assertIncludes(desktopWrapperScript, "Packaged desktop runs must not expose DevTools", "scripts/verify-desktop-wrapper.cjs must verify packaged DevTools are disabled.");
@@ -1853,6 +1886,8 @@ assertIncludes(desktopArtifactScript, "https://generativelanguage.googleapis.com
 assertIncludes(desktopArtifactScript, "https://api.anthropic.com", "scripts/verify-desktop-artifact.cjs must verify packaged Anthropic CSP access.");
 assertIncludes(desktopArtifactScript, "https://api.cohere.com", "scripts/verify-desktop-artifact.cjs must verify packaged Cohere CSP access.");
 assertIncludes(desktopArtifactScript, "https://ollama.com", "scripts/verify-desktop-artifact.cjs must verify packaged hosted Ollama CSP access.");
+assertIncludes(desktopArtifactScript, "http://localhost:8500", "scripts/verify-desktop-artifact.cjs must verify packaged OPUS-CAT CSP access.");
+assertIncludes(desktopArtifactScript, "http://127.0.0.1:8502", "scripts/verify-desktop-artifact.cjs must verify packaged OPUS-CAT web bridge CSP access.");
 assertIncludes(desktopArtifactScript, "https://*.openai.azure.com", "scripts/verify-desktop-artifact.cjs must verify packaged Azure OpenAI CSP access.");
 assertIncludes(desktopArtifactScript, "https://*.services.ai.azure.com", "scripts/verify-desktop-artifact.cjs must verify packaged Azure AI Foundry CSP access.");
 assertIncludes(desktopArtifactScript, "https://api.mistral.ai", "scripts/verify-desktop-artifact.cjs must verify packaged Mistral AI CSP access.");

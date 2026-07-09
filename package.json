@@ -18,6 +18,7 @@
     "verify:ai-sidebar-ux": "node scripts/verify-ai-sidebar-ux.cjs",
     "verify:ollama-live": "node scripts/verify-live-ollama.cjs",
     "verify:ai-live": "node scripts/verify-live-ai-provider.cjs",
+    "opuscat:web-bridge": "node scripts/opus-cat-web-bridge.cjs",
     "verify:desktop-wrapper": "node scripts/verify-desktop-wrapper.cjs",
     "verify:web-artifact": "node scripts/verify-web-artifact.cjs",
     "verify:web-smoke": "node scripts/verify-web-smoke.cjs",

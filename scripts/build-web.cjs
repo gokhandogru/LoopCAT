@@ -46,6 +46,8 @@ const WEB_ASSETS = [
   "i18n/locales/en-US.js",
   "i18n/locales/tr-TR.js",
   "app.js",
+  "package.json",
+  "scripts/opus-cat-web-bridge.cjs",
   "README.md",
   "LICENSE",
   "NOTICE"

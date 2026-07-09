@@ -303,7 +303,7 @@ function verifyArchive(asarPath) {
   if (!desktopMain.includes(`".openai.azure.com"`) || !desktopMain.includes(`".services.ai.azure.com"`)) {
     fail(`${path.relative(root, asarPath)} desktop wrapper does not allow Azure OpenAI resource domains.`);
   }
-  if (!indexHtml.includes(`http://localhost:11434`) || !indexHtml.includes(`http://127.0.0.1:1234`)) {
+  if (!indexHtml.includes(`http://localhost:11434`) || !indexHtml.includes(`http://127.0.0.1:1234`) || !indexHtml.includes(`http://localhost:8500`) || !indexHtml.includes(`http://127.0.0.1:8502`)) {
     fail(`${path.relative(root, asarPath)} packaged index.html does not allow explicit local AI loopback endpoints.`);
   }
 
