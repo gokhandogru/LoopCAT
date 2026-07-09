@@ -6,11 +6,11 @@ LoopCAT is a local-first browser CAT tool MVP. It runs as static HTML, CSS, and 
 
 Download LoopCAT from the [LoopCAT v0.0.2 release](https://github.com/gokhandogru/LoopCAT/releases/tag/v0.0.2). Use the release assets below instead of GitHub's automatic source-code ZIP:
 
-- Web version: download [`LoopCAT Web 0.0.2.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT%20Web%200.0.2.zip), extract it, and open `index.html`. For installable offline PWA behavior, serve the extracted folder from a local or hosted HTTP/HTTPS origin; direct `file://` opening still runs the app, but browsers do not allow service-worker installation from local files.
-- Windows desktop installer: download [`LoopCAT Windows Setup 0.0.2.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT%20Windows%20Setup%200.0.2.zip), extract it, and run `LoopCAT Setup 0.0.2.exe`.
-- Windows portable desktop: download [`LoopCAT 0.0.2 Portable.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT%200.0.2%20Portable.zip), extract it, and run `LoopCAT 0.0.2.exe` without installing.
+- Web version: download [`LoopCAT.Web.0.0.2.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT.Web.0.0.2.zip), extract it, and open `index.html`. For installable offline PWA behavior, serve the extracted folder from a local or hosted HTTP/HTTPS origin; direct `file://` opening still runs the app, but browsers do not allow service-worker installation from local files.
+- Windows desktop installer: download [`LoopCAT.Windows.Setup.0.0.2.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT.Windows.Setup.0.0.2.zip), extract it, and run `LoopCAT Setup 0.0.2.exe`.
+- Windows portable desktop: download [`LoopCAT.0.0.2.Portable.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT.0.0.2.Portable.zip), extract it, and run `LoopCAT 0.0.2.exe` without installing.
 
-The release also includes [`LoopCAT 0.0.2 SHA256SUMS.txt`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT%200.0.2%20SHA256SUMS.txt) so you can verify the downloaded ZIP files.
+The release also includes [`LoopCAT.0.0.2.SHA256SUMS.txt`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT.0.0.2.SHA256SUMS.txt) so you can verify the downloaded ZIP files.
 
 ### Connect LM Studio with TranslateGemma 4B
 
