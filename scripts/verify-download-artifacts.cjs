@@ -42,6 +42,18 @@ function exactFile(name) {
   return new RegExp(`^${regexEscape(name)}$`, "i");
 }
 
+function isWindowsInstallerZipName(name) {
+  return exactFile(`${productName} Windows Setup ${packageJson.version}.zip`).test(name);
+}
+
+function isWindowsPortableZipName(name) {
+  return exactFile(`${productName} ${packageJson.version} Portable.zip`).test(name);
+}
+
+function isWindowsDesktopZipName(name) {
+  return isWindowsInstallerZipName(name) || isWindowsPortableZipName(name);
+}
+
 function debFile() {
   return new RegExp(`^${escapedPackageName}_${escapedVersion}_[a-z0-9.+~-]+\\.deb$`, "i");
 }
@@ -55,6 +67,16 @@ const artifactRules = {
     {
       label: "Windows portable executable",
       match: (file) => file.ext === ".exe" && exactFile(`${productName} ${packageJson.version}.exe`).test(file.name)
+    },
+    {
+      label: "Windows installer ZIP",
+      optional: true,
+      match: (file) => file.ext === ".zip" && isWindowsInstallerZipName(file.name)
+    },
+    {
+      label: "Windows portable ZIP",
+      optional: true,
+      match: (file) => file.ext === ".zip" && isWindowsPortableZipName(file.name)
     }
   ],
   mac: [
@@ -64,7 +86,7 @@ const artifactRules = {
     },
     {
       label: "macOS ZIP",
-      match: (file) => file.ext === ".zip" && productVersionFile("zip").test(file.name)
+      match: (file) => file.ext === ".zip" && productVersionFile("zip").test(file.name) && !isWindowsDesktopZipName(file.name)
     }
   ],
   linux: [
@@ -156,7 +178,7 @@ if (!fs.existsSync(distDir)) {
     for (const rule of artifactRules[platformName]) {
       const matches = candidates.filter(rule.match);
       if (!matches.length) {
-        fail(`${rule.label} is missing from ${path.relative(root, distDir) || distDir}.`);
+        if (!rule.optional) fail(`${rule.label} is missing from ${path.relative(root, distDir) || distDir}.`);
         continue;
       }
       if (matches.length > 1) {

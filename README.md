@@ -2,6 +2,24 @@
 
 LoopCAT is a local-first browser CAT tool MVP. It runs as static HTML, CSS, and JavaScript and stores project data, segments, translation memory entries, and termbase entries in IndexedDB.
 
+## How to Install
+
+Download LoopCAT from the [LoopCAT v0.0.2 release](https://github.com/gokhandogru/LoopCAT/releases/tag/v0.0.2). Use the release assets below instead of GitHub's automatic source-code ZIP:
+
+- Web version: download [`LoopCAT Web 0.0.2.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT%20Web%200.0.2.zip), extract it, and open `index.html`. For installable offline PWA behavior, serve the extracted folder from a local or hosted HTTP/HTTPS origin; direct `file://` opening still runs the app, but browsers do not allow service-worker installation from local files.
+- Windows desktop installer: download [`LoopCAT Windows Setup 0.0.2.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT%20Windows%20Setup%200.0.2.zip), extract it, and run `LoopCAT Setup 0.0.2.exe`.
+- Windows portable desktop: download [`LoopCAT 0.0.2 Portable.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT%200.0.2%20Portable.zip), extract it, and run `LoopCAT 0.0.2.exe` without installing.
+
+The release also includes [`LoopCAT 0.0.2 SHA256SUMS.txt`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT%200.0.2%20SHA256SUMS.txt) so you can verify the downloaded ZIP files.
+
+### Connect LM Studio with TranslateGemma 4B
+
+1. Install [LM Studio](https://lmstudio.ai/) and download or import a TranslateGemma 4B model, such as a `translategemma-4b-it` GGUF build. Google's [Gemma with LM Studio guide](https://ai.google.dev/gemma/docs/integrations/lmstudio) describes using LM Studio's model downloader or importing a local GGUF file, and Google's [TranslateGemma announcement](https://blog.google/innovation-and-ai/technology/developers-tools/translategemma/) describes the 4B, 12B, and 27B translation model family.
+2. In LM Studio, load the TranslateGemma 4B model, open the `Developer` tab, and start the local server. LM Studio documents its [OpenAI-compatible base URL](https://lmstudio.ai/docs/developer/openai-compat) as `http://localhost:1234/v1` when the server runs on port `1234`.
+3. If you use LoopCAT in the browser/PWA build, enable CORS for the local LM Studio server, or start it with `lms server start --port 1234 --bind 127.0.0.1 --cors`. LM Studio's [`lms server start` docs](https://lmstudio.ai/docs/cli/serve/server-start) note that CORS is off unless enabled and that `127.0.0.1` keeps the server on localhost; keep it bound to `127.0.0.1` unless you intentionally want another device on your network to reach it.
+4. In LoopCAT, open `AI Command Centre`, choose provider preset `LM Studio local`, keep base URL `http://localhost:1234/v1`, leave the API key empty for local loopback use, then click `Test connection`.
+5. Click `Refresh models`, choose the exact model ID shown by LM Studio, confirm the project source and target languages, then run `Pre-translate`. LoopCAT marks generated text as AI-initiated and leaves it ready for human review.
+
 ## License
 
 LoopCAT is released under the Apache License 2.0. Copyright 2026 Dr. Gokhan Dogru. See `LICENSE` and `NOTICE` for the license text and attribution notice.
@@ -240,13 +258,13 @@ Ollama cloud model through local Ollama:
 3. Keep base URL `http://localhost:11434` and model `gpt-oss:120b-cloud`, or enter another cloud-suffixed Ollama model.
 4. LoopCAT still asks for confirmation because cloud-suffixed Ollama models may be processed through Ollama Cloud, even though the API request first goes to local Ollama.
 
-LM Studio or another local OpenAI-compatible server:
+LM Studio with TranslateGemma 4B or another local OpenAI-compatible server:
 
-1. Choose provider preset `LM Studio local`.
-2. Use base URL `http://localhost:1234/v1` unless the server uses another loopback URL.
-3. In the desktop app, click `Start LM Studio server` if the server is stopped; `Test connection` also tries this once automatically for the local LM Studio preset.
-4. In a browser/PWA build, start the server from LM Studio or run `lms server start --port 1234 --bind 127.0.0.1 --cors`.
-5. Click `Test connection`, `Refresh models`, choose the exact model ID shown by LM Studio, such as `translategemma-4b-it`, and run `Pre-translate`.
+1. Install LM Studio, download or import a TranslateGemma 4B model such as `translategemma-4b-it`, and load it in LM Studio.
+2. Open LM Studio's `Developer` tab and start the local server. Use base URL `http://localhost:1234/v1` unless you changed the server port.
+3. In the LoopCAT desktop app, choose provider preset `LM Studio local`, then click `Start LM Studio server` if the server is stopped; `Test connection` also tries this once automatically for the local LM Studio preset.
+4. In a browser/PWA build, start the server from LM Studio with CORS enabled or run `lms server start --port 1234 --bind 127.0.0.1 --cors`.
+5. Click `Test connection`, `Refresh models`, choose the exact model ID shown by LM Studio, such as `translategemma-4b-it`, confirm the project source and target languages, and run `Pre-translate`.
 
 Hugging Face Inference Providers:
 

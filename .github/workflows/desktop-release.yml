@@ -25,6 +25,7 @@ jobs:
             artifact: LoopCAT-Windows
             uploadPath: |
               dist/*.exe
+              dist/*.zip
               dist/SHA256SUMS.txt
           - name: macOS
             os: macos-latest

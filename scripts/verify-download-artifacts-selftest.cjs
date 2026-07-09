@@ -34,6 +34,8 @@ function writeFixtureDownloadFile(dir, relativePath) {
 function createBaseFixture(dir) {
   writeFixtureDownloadFile(dir, `${productName} ${version}.exe`);
   writeFixtureDownloadFile(dir, `${productName} Setup ${version}.exe`);
+  writeFixtureDownloadFile(dir, `${productName} ${version} Portable.zip`);
+  writeFixtureDownloadFile(dir, `${productName} Windows Setup ${version}.zip`);
   writeFixtureDownloadFile(dir, `${productName}-${version}.dmg`);
   writeFixtureDownloadFile(dir, `${productName}-${version}.zip`);
   writeFixtureDownloadFile(dir, `${productName}-${version}.AppImage`);

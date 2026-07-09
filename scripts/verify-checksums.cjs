@@ -37,12 +37,25 @@ function exactFile(name) {
   return new RegExp(`^${regexEscape(name)}$`, "i");
 }
 
+function isWindowsInstallerZipName(name) {
+  return exactFile(`${productName} Windows Setup ${packageJson.version}.zip`).test(name);
+}
+
+function isWindowsPortableZipName(name) {
+  return exactFile(`${productName} ${packageJson.version} Portable.zip`).test(name);
+}
+
+function isWindowsDesktopZipName(name) {
+  return isWindowsInstallerZipName(name) || isWindowsPortableZipName(name);
+}
+
 function isExpectedPublicDownloadArtifactName(name) {
   if (/(?:^|[._\s-])(?:source|src|symbols|debug)(?:[._\s-]|$)/i.test(name)) return false;
   return exactFile(`${productName} Setup ${packageJson.version}.exe`).test(name) ||
     exactFile(`${productName} ${packageJson.version}.exe`).test(name) ||
     productVersionFile("dmg").test(name) ||
-    productVersionFile("zip").test(name) ||
+    isWindowsDesktopZipName(name) ||
+    (productVersionFile("zip").test(name) && !isWindowsDesktopZipName(name)) ||
     productVersionFile("AppImage").test(name) ||
     new RegExp(`^${escapedPackageName}_${escapedVersion}_[a-z0-9.+~-]+\\.deb$`, "i").test(name);
 }
