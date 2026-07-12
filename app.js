@@ -2,7 +2,7 @@
 const { buildBilingualDocx, buildTargetDocx, detectProtectedTags, extractDocxSegments } = window.CatHan.docx;
 const { appendProjectSegments, appendProjectSegmentsAndUpdateProject, createProject, deleteProject, deleteProjectDocument, deleteSegment, getProjectSegments, listProjects, replaceProjectSegments, saveSegment, saveSegments, updateProject } = window.CatHan.project;
 const { bulkPut, constants: storageConstants, createPortableSanitizerContext, exportAllData, getAll, getAllByIndex, importAllData, importProjectPackageRecords, listActivityEvents, makeId, recordActivityEvent, sanitizePortableValue } = window.CatHan.storage;
-const { deleteTmEntry, deleteTmEntries, getTmMatchCandidates, importTmEntries, listTmEntries, rebuildAllTmIndexes, saveTmEntry, scoreTmEntries, updateTmEntry } = window.CatHan.tm;
+const { deleteTmEntry, deleteTmEntries, getTmMatchCandidates, getTmMatchCandidateBatches, importTmEntries, listTmEntries, rebuildAllTmIndexes, saveTmEntry, scoreTmEntries, updateTmEntry } = window.CatHan.tm;
 const { buildTmx, parseTmx, parseTmxAsync } = window.CatHan.tmx;
 const { deleteTerm, deleteTerms, findTerms, importTerms, listTerms, parseTermList, parseTermWorkbook, rebuildAllTermIndexes, saveTerm, termRanges, updateTerm } = window.CatHan.termbase;
 const { buildTbx, parseTbx, parseTbxAsync } = window.CatHan.tbx;
@@ -89,6 +89,7 @@ const OFFLINE_APP_SHELL_WARMUP_ASSETS = [
   "./termbase.js",
   "./tmx.js",
   "./tbx.js",
+  "./encoding.js",
   "./xliff.js",
   "./localization.js",
   "./qa.js",
@@ -99,11 +100,17 @@ const OFFLINE_APP_SHELL_WARMUP_ASSETS = [
   "./worker-client.js",
   "./cat-worker.js",
   "./project.js",
+  "./i18n.js",
+  "./i18n/source.en-US.js",
+  "./i18n/locales/ca-ES.js",
+  "./i18n/locales/en-US.js",
+  "./i18n/locales/tr-TR.js",
   "./app.js"
 ];
 
 const SEGMENT_ROW_HEIGHT = 118;
 const SEGMENT_ROW_BUFFER = 8;
+const TM_PRETRANSLATE_BATCH_SIZE = 100;
 const MAX_PORTABLE_JSON_BYTES = 50 * 1024 * 1024;
 const MAX_PROJECT_IMPORT_BYTES = 100 * 1024 * 1024;
 const MAX_RESOURCE_IMPORT_BYTES = 100 * 1024 * 1024;
@@ -715,8 +722,10 @@ const segmentSourceWordCounts = new WeakMap();
 const state = {
   projects: [],
   projectSummaries: [],
+  projectSummaryRevisions: new Map(),
   project: null,
   segments: [],
+  progressSummary: null,
   activeIndex: -1,
   saveTimers: new Map(),
   view: "projects",
@@ -740,6 +749,11 @@ const state = {
   segmentWindow: { start: 0, end: 0, total: 0, indexes: [] },
   importTask: "",
   segmentScrollFrame: 0,
+  segmentRowFrame: 0,
+  pendingRowUpdates: new Set(),
+  confirmingSegmentIds: new Set(),
+  tmPretranslating: false,
+  revisionHistoryFrame: 0,
   saveStatusTimer: 0,
   validationReportTimer: 0,
   workspaceAutosaveTimer: 0,
@@ -803,6 +817,7 @@ const els = {
   projectDialog: document.querySelector("#projectDialog"),
   projectDialogTitle: document.querySelector("#projectDialogTitle"),
   projectForm: document.querySelector("#projectForm"),
+  projectAdvancedOptions: document.querySelector("#projectAdvancedOptions"),
   cancelProjectBtn: document.querySelector("#cancelProjectBtn"),
   projectCreatorInput: document.querySelector("#projectCreatorInput"),
   projectSettingsBtn: document.querySelector("#projectSettingsBtn"),
@@ -1504,12 +1519,12 @@ function setSegmentTargetAndStatus(segment, target, status, reason = "edit") {
   if (reason !== "pretranslate") delete segment.tmPretranslation;
 }
 
-function touchSegment(segment) {
+function touchSegment(segment, options = {}) {
   if (!segment) return segment;
   const revision = Number(segment.revision || 0);
   segment.revision = (Number.isFinite(revision) ? revision : 0) + 1;
   segment.updatedAt = new Date().toISOString();
-  invalidateSegmentFilterCache();
+  if (options.invalidateFilters !== false) invalidateSegmentFilterCache();
   return segment;
 }
 
@@ -2088,6 +2103,22 @@ async function rankTmMatchesFromEntries(entries, options) {
 async function findProjectTmMatches(options) {
   const entries = await getTmMatchCandidates(options);
   return rankTmMatchesFromEntries(entries, options);
+}
+
+async function rankTmMatchBatches(candidateBatches, optionsList) {
+  const fallback = () => Promise.resolve(candidateBatches.map((entries, index) => scoreTmEntries(entries, optionsList[index] || {})));
+  if (!workerClient?.findTmMatchesBatch) return fallback();
+  return workerClient.findTmMatchesBatch({ entries: candidateBatches, options: optionsList, fallback });
+}
+
+async function findProjectTmMatchesBatch(optionsList) {
+  const requests = Array.isArray(optionsList) ? optionsList : [];
+  if (!requests.length) return [];
+  if (!getTmMatchCandidateBatches) {
+    return Promise.all(requests.map((options) => findProjectTmMatches(options)));
+  }
+  const candidateBatches = await getTmMatchCandidateBatches(requests);
+  return rankTmMatchBatches(candidateBatches, requests);
 }
 
 function projectResourceSearchText(project) {
@@ -3050,7 +3081,11 @@ function handleBeforeUnload(event) {
 }
 
 function markWorkspaceDirty(projectId = state.project?.id) {
-  if (projectId) state.workspaceDirtyProjectIds.add(projectId);
+  if (!projectId) return;
+  const changed = !state.workspaceDirtyProjectIds.has(projectId);
+  state.workspaceDirtyProjectIds.add(projectId);
+  markProjectSummaryDirty(projectId);
+  if (!changed) return;
   persistWorkspaceDirtyIds();
   renderWorkspaceStatus();
 }
@@ -3058,7 +3093,9 @@ function markWorkspaceDirty(projectId = state.project?.id) {
 function markWorkspaceProjectsDirty(projectIds = []) {
   let changed = false;
   projectIds.forEach((projectId) => {
-    if (!projectId || state.workspaceDirtyProjectIds.has(projectId)) return;
+    if (!projectId) return;
+    markProjectSummaryDirty(projectId);
+    if (state.workspaceDirtyProjectIds.has(projectId)) return;
     state.workspaceDirtyProjectIds.add(projectId);
     changed = true;
   });
@@ -3158,8 +3195,8 @@ function renderWorkspaceRecoveryPanel() {
   if (!shouldShow) return;
   const connected = Boolean(state.workspaceStatus?.connected);
   els.workspaceRecoveryMessage.textContent = connected
-    ? "These projects were changed before the app closed and their visible workspace packages still need to be written."
-    : "These projects were changed before the app closed. Choose the workspace folder again, then save the visible packages.";
+    ? "Your edits are saved in LoopCAT but have not yet been copied to your workspace folder."
+    : "Your edits are saved in this browser. Choose your workspace folder to keep a visible recovery copy.";
   els.workspaceRecoveryList.innerHTML = ids
     .map((id) => {
       const project = knownProjectById(id);
@@ -3288,8 +3325,16 @@ function projectProgress(segments) {
   return { total, confirmed, draft, words, percent };
 }
 
-async function summarizeProject(project) {
-  const segments = await getProjectSegments(project.id);
+function projectSummaryRevision(projectId) {
+  return Number(state.projectSummaryRevisions.get(projectId) || 0);
+}
+
+function markProjectSummaryDirty(projectId) {
+  if (!projectId) return;
+  state.projectSummaryRevisions.set(projectId, projectSummaryRevision(projectId) + 1);
+}
+
+function projectSummaryRecord(project, segments, summaryRevision = projectSummaryRevision(project.id)) {
   const progress = projectProgress(segments);
   const projectSearchText = stableLower(`${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`);
   return {
@@ -3297,18 +3342,45 @@ async function summarizeProject(project) {
     progress,
     wordCount: progress.words,
     searchText: projectSearchText,
-    languagePairKey: languagePairKey(project)
+    languagePairKey: languagePairKey(project),
+    summaryRevision
   };
 }
 
+async function summarizeProject(project, segments = null, summaryRevision = projectSummaryRevision(project.id)) {
+  const projectSegments = Array.isArray(segments) ? segments : await getProjectSegments(project.id);
+  return projectSummaryRecord(project, projectSegments, summaryRevision);
+}
+
 async function refreshProjectSummaries() {
-  state.projectSummaries = await Promise.all(state.projects.map(summarizeProject));
+  const cachedById = new Map(state.projectSummaries.map((summary) => [summary.id, summary]));
+  state.projectSummaries = await Promise.all(state.projects.map((project) => {
+    const revision = projectSummaryRevision(project.id);
+    const cached = cachedById.get(project.id);
+    if (cached && cached.updatedAt === project.updatedAt && cached.summaryRevision === revision) {
+      return {
+        ...cached,
+        ...project,
+        progress: cached.progress,
+        wordCount: cached.wordCount,
+        searchText: stableLower(`${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`),
+        languagePairKey: languagePairKey(project),
+        summaryRevision: revision
+      };
+    }
+    const inMemorySegments = state.project?.id === project.id ? state.segments : null;
+    return summarizeProject(project, inMemorySegments, revision);
+  }));
   renderLanguagePairFilter();
   renderProjectsView();
 }
 
 async function loadProjects(selectFirst = false) {
   state.projects = await listProjects();
+  const knownProjectIds = new Set(state.projects.map((project) => project.id));
+  for (const projectId of state.projectSummaryRevisions.keys()) {
+    if (!knownProjectIds.has(projectId)) state.projectSummaryRevisions.delete(projectId);
+  }
   pruneWorkspaceDirtyProjectIds();
   await refreshProjectSummaries();
   renderProjectList();
@@ -3463,8 +3535,9 @@ async function openProjectDialog(mode = "create") {
   setLanguageInputValue(document.querySelector("#targetLangInput"), editing ? state.project.targetLang : "tr");
   els.newTmNameInput.value = editing ? "" : "";
   els.newTermBaseNameInput.value = editing ? "" : "";
+  if (els.projectAdvancedOptions) els.projectAdvancedOptions.open = Boolean(editing);
   if (els.saveProjectToFolderInput) {
-    els.saveProjectToFolderInput.checked = workspaceStorage?.isSupported() ? true : false;
+    els.saveProjectToFolderInput.checked = Boolean(editing && workspaceStorage?.isSupported());
   }
   renderProjectStorageStatus();
   renderProjectResourcePickers(editing ? state.project : null);
@@ -3551,12 +3624,14 @@ async function projectTermsForValidation() {
   });
 }
 
-async function logProjectActivity(type, summary, detail = {}) {
-  if (!state.project) return null;
-  const event = await recordActivityEvent({ projectId: state.project.id, type, summary, detail });
-  state.activityEvents = await listActivityEvents(state.project.id);
-  markWorkspaceDirty(state.project.id);
-  renderBackupReminder();
+async function logProjectActivity(type, summary, detail = {}, project = state.project) {
+  if (!project) return null;
+  const event = await recordActivityEvent({ projectId: project.id, type, summary, detail });
+  if (event && state.project?.id === project.id) {
+    state.activityEvents = [event, ...state.activityEvents.filter((item) => item.id !== event.id)];
+    renderBackupReminder();
+  }
+  markWorkspaceDirty(project.id);
   return event;
 }
 
@@ -3684,7 +3759,7 @@ async function renderProjectAnalysis() {
   els.analysisMeta.textContent = uiLabel("generatedAt", { date: formatDate(analysis.generatedAt) });
   els.projectAnalysis.innerHTML = `
     <div><strong>${analysis.totals.confirmedPercent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
-    <div><strong>${analysis.totals.untranslated}</strong><span>${uiLabelHtml("untranslated")}</span></div>
+    <div><strong>${analysis.totals.untranslated}</strong><span>${translatedSourceHtml("empty targets")}</span></div>
     <div><strong>${analysis.totals.repetitions}</strong><span>${uiLabelHtml("repetitions")}</span></div>
     <div><strong>${analysis.leverage.exact}</strong><span>${uiLabelHtml("exactTm")}</span></div>
     <div><strong>${analysis.leverage.fuzzy95 + analysis.leverage.fuzzy85}</strong><span>${uiLabelHtml("strongFuzzy")}</span></div>
@@ -4458,14 +4533,17 @@ function renderProjectHome() {
       </footer>
     `;
     const deleteButton = document.createElement("button");
+    const fileLabel = displaySafeText(documentInfo.name, uiSource("file"));
     deleteButton.className = "danger-small";
     deleteButton.type = "button";
     deleteButton.textContent = uiSource("Delete");
+    deleteButton.setAttribute("aria-label", uiSource("Delete file {value1}", { value1: fileLabel }));
     deleteButton.addEventListener("click", () => confirmDeleteFile(documentInfo));
     const openButton = document.createElement("button");
     openButton.className = "primary";
     openButton.type = "button";
     openButton.textContent = uiSource("Open");
+    openButton.setAttribute("aria-label", uiSource("Open file {value1}", { value1: fileLabel }));
     openButton.addEventListener("click", () => openProjectFile(documentInfo.id));
     card.querySelector(".file-card-actions").append(deleteButton, openButton);
     fragment.append(card);
@@ -4552,14 +4630,17 @@ function renderProjectsView() {
       </footer>
     `;
     const deleteButton = document.createElement("button");
+    const projectLabel = displaySafeText(project.name, uiSource("project"));
     deleteButton.className = "danger-small";
     deleteButton.type = "button";
     deleteButton.textContent = uiSource("Delete");
+    deleteButton.setAttribute("aria-label", uiSource("Delete project {value1}", { value1: projectLabel }));
     deleteButton.addEventListener("click", () => confirmDeleteProject(project.id));
     const openButton = document.createElement("button");
     openButton.className = "primary";
     openButton.type = "button";
     openButton.textContent = uiSource("Open");
+    openButton.setAttribute("aria-label", uiSource("Open project {value1}", { value1: projectLabel }));
     openButton.addEventListener("click", () => openProject(project.id));
     tile.querySelector("footer").append(deleteButton, openButton);
     fragment.append(tile);
@@ -4686,18 +4767,22 @@ function renderResourceDashboard(type) {
       </footer>
     `;
     const deleteButton = document.createElement("button");
+    const resourceLabel = displaySafeText(resource.name, uiSource("resource"));
     deleteButton.className = "danger-small";
     deleteButton.type = "button";
     deleteButton.textContent = uiSource("Delete");
+    deleteButton.setAttribute("aria-label", uiSource("Delete resource {value1}", { value1: resourceLabel }));
     deleteButton.addEventListener("click", () => confirmDeleteResource(type, resource.key));
     const exportButton = document.createElement("button");
     exportButton.type = "button";
     exportButton.textContent = uiSource("Export");
+    exportButton.setAttribute("aria-label", uiSource("Export resource {value1}", { value1: resourceLabel }));
     exportButton.addEventListener("click", () => exportResource(type, resource.key));
     const openButton = document.createElement("button");
     openButton.className = "primary";
     openButton.type = "button";
     openButton.textContent = uiSource("Open");
+    openButton.setAttribute("aria-label", uiSource("Open resource {value1}", { value1: resourceLabel }));
     openButton.addEventListener("click", () => {
       state.resourceType = type;
       state.openResource = resource.key;
@@ -5121,6 +5206,7 @@ function renderSegmentRow(index) {
   appendTextWithSourceMarkup(sourceCell, segment);
   const textarea = row.querySelector("textarea");
   textarea.dir = "auto";
+  textarea.setAttribute("aria-label", uiSource("Target translation for segment {value1}", { value1: index + 1 }));
   applyTargetSpellcheckLanguage(textarea);
   textarea.value = segment.target || "";
   textarea.addEventListener("focus", () => {
@@ -5259,7 +5345,27 @@ function updateRow(index) {
   renderStatusCell(row, segment);
 }
 
-function renderProgress() {
+function scheduleRowUpdate(index) {
+  if (!Number.isInteger(index) || index < 0) return;
+  state.pendingRowUpdates.add(index);
+  if (state.segmentRowFrame) return;
+  state.segmentRowFrame = requestAnimationFrame(() => {
+    state.segmentRowFrame = 0;
+    const indexes = Array.from(state.pendingRowUpdates);
+    state.pendingRowUpdates.clear();
+    indexes.forEach(updateRow);
+  });
+}
+
+function scheduleRevisionHistoryRender() {
+  if (state.revisionHistoryFrame) return;
+  state.revisionHistoryFrame = requestAnimationFrame(() => {
+    state.revisionHistoryFrame = 0;
+    renderRevisionHistory();
+  });
+}
+
+function calculateProgressSummary() {
   const total = state.segments.length;
   let confirmed = 0;
   let words = 0;
@@ -5267,6 +5373,30 @@ function renderProgress() {
     if (segment.status === "confirmed") confirmed += 1;
     words += sourceWordCount(segment);
   }
+  return { projectId: state.project?.id || "", total, confirmed, words };
+}
+
+function renderProgress(options = {}) {
+  const previousStatus = options.previousStatus;
+  const nextStatus = options.nextStatus;
+  const cached = state.progressSummary;
+  const canApplyStatusDelta =
+    cached &&
+    cached.projectId === (state.project?.id || "") &&
+    cached.total === state.segments.length &&
+    previousStatus !== undefined &&
+    nextStatus !== undefined;
+  let summary;
+  if (canApplyStatusDelta) {
+    let confirmed = cached.confirmed;
+    if (previousStatus === "confirmed" && nextStatus !== "confirmed") confirmed -= 1;
+    if (previousStatus !== "confirmed" && nextStatus === "confirmed") confirmed += 1;
+    summary = { ...cached, confirmed: Math.max(0, Math.min(cached.total, confirmed)) };
+  } else {
+    summary = calculateProgressSummary();
+  }
+  state.progressSummary = summary;
+  const { total, confirmed, words } = summary;
   const open = total - confirmed;
   els.progressText.textContent = uiLabel("progressSummary", { confirmed, open, total });
   els.wordCountText.textContent = uiLabel("sourceWordCount", { count: words });
@@ -5286,8 +5416,10 @@ function ensureSegmentVisible(index) {
 
 async function setActiveSegment(index) {
   if (index < 0 || index >= state.segments.length) return;
+  if (index === state.activeIndex) return;
   const oldIndex = state.activeIndex;
   state.activeIndex = index;
+  renderConfirmBusyState();
   ensureSegmentVisible(index);
   updateRow(oldIndex);
   updateRow(index);
@@ -5314,15 +5446,21 @@ async function goToNextOpenSegment() {
 function updateSegmentDraft(index, target) {
   const segment = state.segments[index];
   if (!segment) return;
+  const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
+  const passedFiltersBefore = segmentPassesFilters(segment);
   setSegmentTargetAndStatus(segment, target, target.trim() ? "draft" : "empty", "edit");
-  touchSegment(segment);
-  if (segmentPassesFilters(segment)) {
-    updateRow(index);
+  const passedFiltersAfter = segmentPassesFilters(segment);
+  const filterMembershipChanged = passedFiltersBefore !== passedFiltersAfter;
+  touchSegment(segment, { invalidateFilters: filterMembershipChanged });
+  if (filterMembershipChanged) {
+    renderSegments({ preserveScroll: true });
+  } else if (passedFiltersAfter) {
+    scheduleRowUpdate(index);
   } else {
-    renderSegments();
+    state.pendingRowUpdates.delete(index);
   }
-  renderProgress();
-  renderRevisionHistory();
+  renderProgress({ previousStatus, nextStatus: segment.status });
+  scheduleRevisionHistoryRender();
   markWorkspaceDirty();
   debounceSave(segment);
 }
@@ -5419,52 +5557,75 @@ function debounceSave(segment) {
   queueSegmentSave(segment);
 }
 
+function renderConfirmBusyState() {
+  const busy = Boolean(currentSegment()?.id && state.confirmingSegmentIds.has(currentSegment().id));
+  els.confirmBtn.disabled = busy;
+  els.confirmBtn.setAttribute("aria-busy", String(busy));
+}
+
 async function confirmCurrentSegment() {
   const segment = currentSegment();
   if (!segment || !segment.target.trim()) return;
+  if (state.confirmingSegmentIds.has(segment.id)) return;
   const missing = missingTags(segment);
   if (missing.length) {
     setSaveStatus(`Cannot confirm: missing ${missing.map(tagDisplayText).join(", ")}`, "dirty");
-    renderSegments();
+    updateRow(state.activeIndex);
     focusActiveTextarea();
     return;
   }
+  const segmentIndex = state.activeIndex;
+  const project = state.project;
+  const previousStatus = segment.status;
+  const passedFiltersBefore = segmentPassesFilters(segment);
   const previous = structuredClone(segment);
   let savedConfirmedRevision = 0;
+  state.confirmingSegmentIds.add(segment.id);
+  renderConfirmBusyState();
   try {
     recordSegmentTargetHistory(segment, segment.target, "confirmed", "confirm");
     segment.status = "confirmed";
     if (segment.reviewState === "needs-review") segment.reviewState = "";
     touchSegment(segment);
     clearPendingSave(segment);
+    setSaveStatus("Saving...");
+    if (passedFiltersBefore !== segmentPassesFilters(segment)) renderSegments({ preserveScroll: true });
+    else updateRow(segmentIndex);
+    renderProgress({ previousStatus, nextStatus: segment.status });
+    scheduleRevisionHistoryRender();
     if (segment[CONFIRM_FAILURE_TEST_FLAG]) throw new Error("Simulated confirm save failure");
     await saveSegment(segment);
     savedConfirmedRevision = Number(segment.revision || 0);
     if (segment[CONFIRM_POST_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated post-save confirm failure");
-    let tmSaved = true;
-    try {
-      await saveActiveSegmentToTm({ reportStatus: false });
-    } catch (tmError) {
-      tmSaved = false;
-      console.warn("Confirm TM save failed.", tmError);
-    }
-    let activityLogged = true;
-    try {
-      if (segment[CONFIRM_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated confirm activity failure");
-      await logProjectActivity("confirm-segment", "Segment confirmed", { segmentId: segment.id, documentId: segment.documentId });
-    } catch (activityError) {
-      activityLogged = false;
-      console.warn("Confirm activity log failed.", activityError);
-    }
     markWorkspaceDirty();
+    const navigation = goToNextOpenSegment().catch((navigationError) => {
+      console.warn("Confirm navigation refresh failed.", navigationError);
+      focusActiveTextarea();
+    });
+    renderConfirmBusyState();
+    const [tmResult, activityResult] = await Promise.all([
+      saveSegmentToTm(segment, project)
+        .then(() => true)
+        .catch((tmError) => {
+          console.warn("Confirm TM save failed.", tmError);
+          return false;
+        }),
+      Promise.resolve()
+        .then(() => {
+          if (segment[CONFIRM_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated confirm activity failure");
+          return logProjectActivity("confirm-segment", "Segment confirmed", { segmentId: segment.id, documentId: segment.documentId }, project);
+        })
+        .then(() => true)
+        .catch((activityError) => {
+          console.warn("Confirm activity log failed.", activityError);
+          return false;
+        }),
+      navigation
+    ]);
     const warnings = [];
-    if (!tmSaved) warnings.push("TM save failed");
-    if (!activityLogged) warnings.push("activity log failed");
+    if (!tmResult) warnings.push("TM save failed");
+    if (!activityResult) warnings.push("activity log failed");
     setSaveStatus(warnings.length ? `Saved; ${warnings.join("; ")}` : "Saved", warnings.length ? "dirty" : "saved");
-    renderSegments();
-    renderProgress();
-    renderRevisionHistory();
-    await goToNextOpenSegment();
   } catch (error) {
     Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
     Object.assign(segment, previous);
@@ -5475,7 +5636,7 @@ async function confirmCurrentSegment() {
         await saveSegment(segment);
       } catch (rollbackError) {
         setSaveStatus(`${error.message || "Confirm segment failed"}; rollback save failed: ${rollbackError.message || rollbackError}`, "dirty");
-        renderSegments();
+        renderSegments({ preserveScroll: true });
         renderProgress();
         renderRevisionHistory();
         focusActiveTextarea();
@@ -5483,11 +5644,29 @@ async function confirmCurrentSegment() {
       }
     }
     setSaveStatus(error.message || "Confirm segment failed", "dirty");
-    renderSegments();
+    renderSegments({ preserveScroll: true });
     renderProgress();
     renderRevisionHistory();
     focusActiveTextarea();
+  } finally {
+    state.confirmingSegmentIds.delete(segment.id);
+    renderConfirmBusyState();
   }
+}
+
+async function saveSegmentToTm(segment, project = state.project) {
+  if (!segment || !project || !segment.source.trim() || !segment.target.trim()) return null;
+  if (segment[SAVE_TM_FAILURE_TEST_FLAG]) throw new Error("Simulated TM save failure");
+  const entry = await saveTmEntry({
+    source: segment.source,
+    target: segment.target,
+    sourceLang: project.sourceLang,
+    targetLang: project.targetLang,
+    projectName: project.name,
+    tmName: mainTmName(project)
+  });
+  markWorkspaceDirty(project.id);
+  return entry;
 }
 
 async function saveActiveSegmentToTm(options = {}) {
@@ -5495,17 +5674,8 @@ async function saveActiveSegmentToTm(options = {}) {
   const segment = currentSegment();
   if (!segment || !state.project || !segment.source.trim() || !segment.target.trim()) return null;
   try {
-    if (segment[SAVE_TM_FAILURE_TEST_FLAG]) throw new Error("Simulated TM save failure");
-    const entry = await saveTmEntry({
-      source: segment.source,
-      target: segment.target,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      projectName: state.project.name,
-      tmName: mainTmName()
-    });
+    const entry = await saveSegmentToTm(segment, state.project);
     await refreshTmMatches();
-    markWorkspaceDirty();
     if (reportStatus) setSaveStatus("Segment saved to TM", "saved");
     return entry;
   } catch (error) {
@@ -5516,7 +5686,7 @@ async function saveActiveSegmentToTm(options = {}) {
 }
 
 async function pretranslateFromTm() {
-  if (!state.project) return;
+  if (!state.project || state.tmPretranslating) return;
   const raw = window.prompt("Minimum TM match percentage to pretranslate", "85");
   if (raw === null) return;
   const threshold = Number(raw);
@@ -5531,18 +5701,33 @@ async function pretranslateFromTm() {
   }
   const snapshots = new Map();
   const updated = [];
+  state.tmPretranslating = true;
+  els.pretranslateBtn.disabled = true;
+  els.pretranslateBtn.setAttribute("aria-busy", "true");
   try {
     setSaveStatus("Pretranslating...");
-    const proposals = [];
-    for (const segment of candidates) {
-      const matches = await findProjectTmMatches({
-        source: segment.source,
+    await yieldToUi();
+    const tmNames = projectTmNames();
+    const uniqueSources = Array.from(new Set(candidates.map((segment) => segment.source)));
+    const matchesBySource = new Map();
+    for (let offset = 0; offset < uniqueSources.length; offset += TM_PRETRANSLATE_BATCH_SIZE) {
+      const sources = uniqueSources.slice(offset, offset + TM_PRETRANSLATE_BATCH_SIZE);
+      const options = sources.map((source) => ({
+        source,
         sourceLang: state.project.sourceLang,
         targetLang: state.project.targetLang,
-        tmNames: projectTmNames(),
+        tmNames,
         limit: 1
-      });
-      const match = matches[0];
+      }));
+      const batches = await findProjectTmMatchesBatch(options);
+      sources.forEach((source, index) => matchesBySource.set(source, batches[index]?.[0] || null));
+      const completed = Math.min(offset + sources.length, uniqueSources.length);
+      setSaveStatus(`Pretranslating... ${completed}/${uniqueSources.length}`);
+      await yieldToUi();
+    }
+    const proposals = [];
+    for (const segment of candidates) {
+      const match = matchesBySource.get(segment.source);
       if (!match || match.score < threshold || !match.target?.trim()) continue;
       proposals.push({ segment, match });
     }
@@ -5571,8 +5756,8 @@ async function pretranslateFromTm() {
     } catch (activityError) {
       console.warn("Pretranslation activity log failed.", activityError);
     }
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
-    renderAll();
+    renderSegments({ preserveScroll: true });
+    renderProgress();
     await refreshSidebar();
     markWorkspaceDirty();
     setSaveStatus(`Pretranslated ${updated.length} segment${updated.length === 1 ? "" : "s"} at ${threshold}%+`, "saved");
@@ -5589,6 +5774,10 @@ async function pretranslateFromTm() {
     renderRevisionHistory();
     focusActiveTextarea();
     setSaveStatus(error.message || "TM pretranslation failed", "dirty");
+  } finally {
+    state.tmPretranslating = false;
+    els.pretranslateBtn.disabled = false;
+    els.pretranslateBtn.setAttribute("aria-busy", "false");
   }
 }
 
@@ -6344,12 +6533,15 @@ async function refreshTmMatches() {
     els.tmMatches.classList.add("muted");
     return;
   }
+  const segmentId = segment.id;
+  const projectId = state.project.id;
   const matches = await findProjectTmMatches({
     source: segment.source,
     sourceLang: state.project.sourceLang,
     targetLang: state.project.targetLang,
     tmNames: projectTmNames()
   });
+  if (state.project?.id !== projectId || currentSegment()?.id !== segmentId) return;
   els.tmMatches.classList.toggle("muted", !matches.length);
   if (!matches.length) {
     els.tmMatches.textContent = uiSource("No TM matches.");
@@ -6379,12 +6571,15 @@ async function refreshTerms() {
     els.termSuggestions.classList.add("muted");
     return;
   }
+  const segmentId = segment.id;
+  const projectId = state.project.id;
   const suggestions = await findTerms({
     source: segment.source,
     sourceLang: state.project.sourceLang,
     targetLang: state.project.targetLang,
     termBaseNames: projectTermBaseNames()
   });
+  if (state.project?.id !== projectId || currentSegment()?.id !== segmentId) return;
   els.termSuggestions.classList.toggle("muted", !suggestions.length);
   if (!suggestions.length) {
     els.termSuggestions.textContent = uiSource("No terms found in this segment.");
@@ -12366,6 +12561,11 @@ async function runAppWorkflowTest() {
     assert(Boolean(document.querySelector('link[rel="manifest"]')), "installable app manifest linked");
     const productionMockAiSelector = "#mock" + "AiSuggestionBtn";
     assert(!document.querySelector(productionMockAiSelector), "production UI does not expose mock AI suggestions");
+    assert(
+      Boolean(document.querySelector('label.compact-field input#tmResourceNameInput')) &&
+        Boolean(document.querySelector('#sourceTermInput[aria-label="Source term"]')),
+      "resource creation controls keep persistent and assistive labels"
+    );
     const originalStorageDurability = state.storageDurability;
     state.storageDurability = { checked: true, supported: true, persisted: true, requested: true, usageBytes: 10 * 1024 * 1024, quotaBytes: 1000 * 1024 * 1024 };
     renderWorkspaceStatus();
@@ -12902,6 +13102,24 @@ async function runAppWorkflowTest() {
     await flushPendingSegmentSaves(project.id);
     await openProjectFile(documentInfo.id);
     const segmentIndex = state.segments.findIndex((segment) => segment.documentId === documentInfo.id);
+    const projectToolbarBounds = document.querySelector(".project-toolbar")?.getBoundingClientRect();
+    const toolbarActionsBounds = document.querySelector(".project-toolbar .toolbar-actions")?.getBoundingClientRect();
+    const progressBounds = document.querySelector(".progress-wrap")?.getBoundingClientRect();
+    assert(
+      Boolean(projectToolbarBounds && toolbarActionsBounds && progressBounds) &&
+        toolbarActionsBounds.bottom <= projectToolbarBounds.bottom + 1 &&
+        toolbarActionsBounds.bottom <= progressBounds.top + 1,
+      "responsive editor toolbar keeps every action above the progress panel"
+    );
+    const activeTargetEditor = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
+    assert(
+      activeTargetEditor?.getAttribute("aria-label") === uiSource("Target translation for segment {value1}", { value1: segmentIndex + 1 }),
+      "segment target editors expose a segment-specific accessible name"
+    );
+    assert(
+      els.projectList.closest(".project-rail").scrollWidth <= els.projectList.closest(".project-rail").clientWidth + 2,
+      "project navigation labels wrap without horizontal scrolling"
+    );
     assert(Boolean(els.focusModeBtn && els.exitFocusModeBtn), "focus view controls are available in the editor");
     setFocusMode(true);
     assert(
@@ -16461,7 +16679,7 @@ async function runAppWorkflowTest() {
       renderWorkspaceStatus();
       assert(
         !els.workspaceRecoveryPanel.classList.contains("hidden") &&
-          els.workspaceRecoveryMessage.textContent.includes("changed before the app closed") &&
+          els.workspaceRecoveryMessage.textContent.includes("saved in LoopCAT") &&
           els.workspaceRecoveryList.textContent.includes(project.name),
         "startup workspace recovery panel names unsaved project packages"
       );

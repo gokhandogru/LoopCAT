@@ -20,9 +20,11 @@ const mimeTypes = new Map([
 const allowedFiles = new Set([
   "index.html",
   "styles.css",
+  "liquid-glass/styles.css",
   "manifest.webmanifest",
   "service-worker.js",
   "icons/loopcat-icon.svg",
+  "icons/loopcat-icon.png",
   "storage.js",
   "workspace-storage.js",
   "docx.js",

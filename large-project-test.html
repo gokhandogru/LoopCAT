@@ -273,6 +273,21 @@
           limit: 5
         });
         assert(matches[0]?.score >= 95 && matches[0]?.target, "large TM lookup uses persistent index");
+        const batchOptions = finalSegments.slice(0, 150).map((segment) => ({
+          source: segment.source,
+          sourceLang: project.sourceLang,
+          targetLang: project.targetLang,
+          tmName,
+          limit: 1
+        }));
+        const batchLookupStartedAt = Date.now();
+        const batchMatches = await window.CatHan.tm.findTmMatchesBatch(batchOptions);
+        assert(
+          batchMatches.length === batchOptions.length &&
+            batchMatches.every((items) => items[0]?.score >= 95 && items[0]?.target) &&
+            Date.now() - batchLookupStartedAt < 30000,
+          "batched TM lookup resolves many segments through shared indexed reads"
+        );
 
         const qaSegments = finalSegments.map((segment) => ({
           ...segment,

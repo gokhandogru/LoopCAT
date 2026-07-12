@@ -71,9 +71,11 @@ assert(!wrapper.ALLOWED_EXTERNAL_HOSTS.has("example.com"), "Desktop external hos
 const expectedRuntimeFiles = [
   "index.html",
   "styles.css",
+  "liquid-glass/styles.css",
   "manifest.webmanifest",
   "service-worker.js",
   "icons/loopcat-icon.svg",
+  "icons/loopcat-icon.png",
   "app.js",
   "storage.js",
   "workspace-storage.js",
@@ -156,8 +158,10 @@ for (const [url, expectedFile] of [
   ["loopcat://app/", "index.html"],
   ["loopcat://app/index.html", "index.html"],
   ["loopcat://app/styles.css", "styles.css"],
+  ["loopcat://app/liquid-glass/styles.css", "liquid-glass/styles.css"],
   ["loopcat://app/i18n/locales/en-US.js", "i18n/locales/en-US.js"],
-  ["loopcat://app/icons/loopcat-icon.svg", "icons/loopcat-icon.svg"]
+  ["loopcat://app/icons/loopcat-icon.svg", "icons/loopcat-icon.svg"],
+  ["loopcat://app/icons/loopcat-icon.png", "icons/loopcat-icon.png"]
 ]) {
   const resolved = wrapper.resolveAppFile(url);
   assert(resolved, `resolveAppFile(${url}) must resolve to a file.`);

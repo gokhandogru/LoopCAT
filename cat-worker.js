@@ -8,12 +8,20 @@ function normalizeText(text) {
 }
 
 function tokens(text) {
-  return Array.from(new Set(normalizeText(text).split(" ").filter((token) => token.length > 2)));
+  return tokensFromNormalized(normalizeText(text));
+}
+
+function tokensFromNormalized(text) {
+  return Array.from(new Set(String(text || "").split(" ").filter((token) => token.length > 2)));
 }
 
 function tokenOverlap(source, candidate) {
-  const a = tokens(source);
-  const b = new Set(tokens(candidate));
+  return tokenOverlapTokens(tokens(source), tokens(candidate));
+}
+
+function tokenOverlapTokens(sourceTokens, candidateTokens) {
+  const a = sourceTokens;
+  const b = new Set(candidateTokens);
   if (!a.length || !b.size) return 0;
   return a.filter((token) => b.has(token)).length / Math.max(a.length, b.size);
 }
@@ -61,6 +69,10 @@ function levenshtein(a, b) {
 function similarity(source, candidate) {
   const a = normalizeText(source);
   const b = normalizeText(candidate);
+  return similarityNormalized(a, b);
+}
+
+function similarityNormalized(a, b) {
   if (!a && !b) return 100;
   if (!a || !b) return 0;
   const max = Math.max(a.length, b.length);
@@ -76,21 +88,26 @@ function scoreTmEntries(entries, options = {}) {
   const sourceText = cleanText(source);
   const normalizedSource = normalizeText(sourceText);
   if (!normalizedSource) return [];
+  const sourceTokens = tokensFromNormalized(normalizedSource);
   const languagePair = languagePairFromFields(sourceLang, targetLang);
   const allowedNames = resourceNameSet(tmNames, tmName);
   const byKey = new Map();
-  (entries || [])
-    .filter((entry) => !languagePair || languagePairOf(entry) === languagePair)
-    .filter((entry) => !allowedNames.size || allowedNames.has(entry.tmName))
-    .filter((entry) => normalizeText(entry.source) === normalizedSource || tokenOverlap(sourceText, entry.source) >= 0.15)
-    .forEach((entry) => {
-      const scored = { ...entry, score: similarity(sourceText, entry.source) };
-      if (scored.score < 45) return;
-      const existing = byKey.get(memoryKey(entry));
-      if (!existing || scored.score > existing.score || new Date(scored.updatedAt) > new Date(existing.updatedAt)) {
-        byKey.set(memoryKey(entry), scored);
-      }
-    });
+  (entries || []).forEach((entry) => {
+    if (languagePair && languagePairOf(entry) !== languagePair) return;
+    if (allowedNames.size && !allowedNames.has(entry.tmName)) return;
+    const normalizedCandidate = normalizeText(entry.source);
+    if (
+      normalizedCandidate !== normalizedSource &&
+      tokenOverlapTokens(sourceTokens, tokensFromNormalized(normalizedCandidate)) < 0.15
+    ) return;
+    const scored = { ...entry, score: similarityNormalized(normalizedSource, normalizedCandidate) };
+    if (scored.score < 45) return;
+    const key = [languagePairOf(entry), entry.tmName || "", normalizedCandidate, normalizeText(entry.target)].join("::");
+    const existing = byKey.get(key);
+    if (!existing || scored.score > existing.score || new Date(scored.updatedAt) > new Date(existing.updatedAt)) {
+      byKey.set(key, scored);
+    }
+  });
   return Array.from(byKey.values())
     .sort((a, b) => b.score - a.score || new Date(b.updatedAt) - new Date(a.updatedAt))
     .slice(0, limit);
@@ -232,6 +249,20 @@ self.addEventListener("message", (event) => {
   try {
     if (type === "tm-match") {
       self.postMessage({ id, ok: true, result: scoreTmEntries(payload.entries, payload.options) });
+      return;
+    }
+    if (type === "tm-match-batch") {
+      const entriesById = new Map((Array.isArray(payload.entries) ? payload.entries : []).map((entry) => [entry.id, entry]));
+      const candidateIds = Array.isArray(payload.candidateIds) ? payload.candidateIds : [];
+      const options = Array.isArray(payload.options) ? payload.options : [];
+      self.postMessage({
+        id,
+        ok: true,
+        result: candidateIds.map((ids, index) => scoreTmEntries(
+          (Array.isArray(ids) ? ids : []).map((entryId) => entriesById.get(entryId)).filter(Boolean),
+          options[index] || {}
+        ))
+      });
       return;
     }
     if (type === "qa") {

@@ -1,5 +1,5 @@
 (() => {
-const { bulkPut, countByIndex, deleteByKey, deleteStoresWhereAtomically, deleteWhere, get, getAll, getAllByIndex, makeId, put, constants } = window.CatHan.storage;
+const { bulkPut, countByIndex, deleteByKey, deleteStoresWhereAtomically, deleteWhere, get, getMany, getAll, getAllByIndex, getAllByIndexMany, makeId, put, constants } = window.CatHan.storage;
 const { normalizeText } = window.CatHan.tm;
 const LOCAL_WORKSPACE_ID = constants?.LOCAL_WORKSPACE_ID || "local-workspace";
 const LOCAL_USER_ID = constants?.LOCAL_USER_ID || "local-user";
@@ -613,7 +613,9 @@ async function findTerms(options = {}) {
     await ensureTermIndex(languagePair);
     const allowedNames = resourceNameSet(termBaseNames, termBaseName);
     const candidateHits = new Map();
-    const tokenRows = await Promise.all(sourceTokens.map((token) => getAllByIndex("termTokenIndex", "languagePairToken", [languagePair, token])));
+    const tokenRows = getAllByIndexMany
+      ? await getAllByIndexMany("termTokenIndex", "languagePairToken", sourceTokens.map((token) => [languagePair, token]))
+      : await Promise.all(sourceTokens.map((token) => getAllByIndex("termTokenIndex", "languagePairToken", [languagePair, token])));
     tokenRows.flat().forEach((record) => {
       if (allowedNames.size && !allowedNames.has(record.termBaseName)) return;
       candidateHits.set(record.termId, (candidateHits.get(record.termId) || 0) + 1);
@@ -622,7 +624,9 @@ async function findTerms(options = {}) {
       .sort((a, b) => b[1] - a[1])
       .slice(0, MAX_TERM_CANDIDATES)
       .map(([id]) => id);
-    terms = (await Promise.all(candidateIds.map((id) => get("terms", id)))).filter(Boolean);
+    terms = ((getMany
+      ? await getMany("terms", candidateIds)
+      : await Promise.all(candidateIds.map((id) => get("terms", id))))).filter(Boolean);
   } else {
     terms = await getAllByIndex("terms", "languagePair", languagePair);
   }

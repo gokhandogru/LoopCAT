@@ -4,11 +4,11 @@
   --surface: #ffffff;
   --surface-2: #eef2f5;
   --text: #18202a;
-  --muted: #627082;
+  --muted: #596779;
   --line: #d8dee6;
   --accent: #1f7a68;
   --accent-strong: #146454;
-  --warn: #a35f00;
+  --warn: #8a5000;
   --ok: #237047;
   --focus: #2f6fed;
   --shadow: 0 18px 45px rgba(31, 42, 55, 0.12);
@@ -383,6 +383,9 @@ input[type="file"] {
   min-height: 68px;
   display: block;
   padding: 10px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: normal;
 }
 
 .project-item strong {
@@ -638,8 +641,22 @@ input[type="file"] {
 .resource-import-row {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) 112px 112px auto;
+  align-items: end;
   gap: 8px;
   margin-bottom: 14px;
+}
+
+.compact-field {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.compact-field input {
+  width: 100%;
+  min-width: 0;
 }
 
 .resource-import-row .file-button {
@@ -948,6 +965,7 @@ input[type="file"] {
 }
 
 .project-toolbar {
+  flex: 0 0 auto;
   min-height: 74px;
   padding: 12px 20px;
   background: var(--surface);
@@ -1155,12 +1173,14 @@ input[type="file"] {
 }
 
 .progress-wrap {
+  flex: 0 0 auto;
   padding: 10px 20px;
   background: #fbfcfd;
   border-bottom: 1px solid var(--line);
 }
 
 .segment-controls {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -2546,6 +2566,17 @@ dialog {
   width: min(640px, calc(100vw - 32px));
 }
 
+#projectDialog {
+  max-height: min(860px, calc(100vh - 32px));
+  overflow: hidden;
+}
+
+#projectForm {
+  max-height: min(860px, calc(100vh - 32px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 dialog::backdrop {
   background: rgba(15, 23, 42, 0.36);
 }
@@ -2565,6 +2596,42 @@ dialog::backdrop {
 
 .dialog-card label.checkbox-row {
   display: flex;
+}
+
+.project-advanced-options {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.project-advanced-options > summary {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.project-advanced-options > summary small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.project-advanced-options[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.project-advanced-body {
+  display: grid;
+  gap: 16px;
+  padding: 14px;
+  background: var(--surface);
+  border-radius: 0 0 8px 8px;
 }
 
 .about-card {
@@ -2751,6 +2818,32 @@ dialog::backdrop {
   gap: 8px;
 }
 
+#projectForm > .dialog-actions {
+  position: sticky;
+  z-index: 4;
+  bottom: -22px;
+  margin: 0 -22px -22px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 -10px 24px rgba(31, 42, 55, 0.06);
+}
+
+@media (max-width: 1350px) and (min-width: 1121px) {
+  .workspace {
+    grid-template-columns: 220px minmax(520px, 1fr) 320px;
+  }
+
+  .workspace.projects-mode {
+    grid-template-columns: 220px minmax(520px, 1fr);
+  }
+
+  .project-rail,
+  .sidebar {
+    padding: 12px;
+  }
+}
+
 @media (max-width: 1500px) {
   .project-toolbar {
     grid-template-columns: 1fr;
@@ -2766,10 +2859,13 @@ dialog::backdrop {
 @media (max-width: 1120px) {
   .workspace {
     grid-template-columns: 220px minmax(420px, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 
   .sidebar {
     grid-column: 1 / -1;
+    height: auto;
+    max-height: 280px;
     border-left: 0;
     border-top: 1px solid var(--line);
     display: grid;
@@ -2839,6 +2935,7 @@ dialog::backdrop {
   .sidebar {
     grid-template-columns: 1fr;
     height: auto;
+    max-height: none;
   }
 
   .segment-grid {

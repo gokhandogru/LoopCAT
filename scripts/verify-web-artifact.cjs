@@ -18,6 +18,7 @@ const failures = [];
 const REQUIRED_WEB_ASSETS = [
   "index.html",
   "styles.css",
+  "liquid-glass/styles.css",
   "manifest.webmanifest",
   "service-worker.js",
   "icons/loopcat-icon.svg",

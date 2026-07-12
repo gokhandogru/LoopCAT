@@ -5,16 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self' https://api.openai.com/v1/responses https://api.openai.com/v1/models https://generativelanguage.googleapis.com https://api.anthropic.com https://api.cohere.com https://*.openai.azure.com https://*.services.ai.azure.com https://ollama.com https://api.deepseek.com https://api.mistral.ai https://api.x.ai https://api.perplexity.ai https://api.groq.com https://api.together.ai https://openrouter.ai https://router.huggingface.co https://api.deepinfra.com https://api.fireworks.ai http://localhost:11434 http://127.0.0.1:11434 http://localhost:1234 http://127.0.0.1:1234 http://localhost:8500 http://127.0.0.1:8500 http://localhost:8502 http://127.0.0.1:8502; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <title>LoopCAT</title>
-    <meta name="theme-color" content="#202936">
+    <meta name="theme-color" content="#dfe8f0">
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="icon" href="./icons/loopcat-icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./liquid-glass/styles.css">
   </head>
-  <body>
+  <body class="liquid-glass-edition">
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
-          <div class="brand-mark">L</div>
+          <div class="brand-mark"><img src="./icons/loopcat-icon.png" alt=""></div>
           <div>
             <h1>LoopCAT</h1>
             <p>Local translation editor</p>
@@ -91,24 +92,24 @@
         <section class="editor-area">
           <section id="workspaceRecoveryPanel" class="workspace-recovery hidden" aria-live="polite">
             <div>
-              <h3>Workspace packages need saving</h3>
+              <h3>Save your latest work to a folder</h3>
               <p id="workspaceRecoveryMessage"></p>
               <ul id="workspaceRecoveryList"></ul>
             </div>
             <div class="toolbar-actions">
-              <button id="workspaceRecoverySaveBtn" class="primary" type="button">Save packages</button>
-              <button id="workspaceRecoveryOpenBtn" type="button">Workspace menu</button>
+              <button id="workspaceRecoverySaveBtn" class="primary" type="button">Save projects to folder</button>
+              <button id="workspaceRecoveryOpenBtn" type="button">Choose folder</button>
               <button id="workspaceRecoveryDismissBtn" type="button">Dismiss</button>
             </div>
           </section>
 
           <section id="backupReminderPanel" class="backup-reminder hidden" aria-live="polite">
             <div>
-              <h3>Backup reminder</h3>
+              <h3>Protect your work</h3>
               <p id="backupReminderMessage"></p>
             </div>
             <div class="toolbar-actions">
-              <button id="backupReminderExportBtn" class="primary" type="button">Export project</button>
+              <button id="backupReminderExportBtn" class="primary" type="button">Download recovery copy</button>
               <button id="backupReminderDismissBtn" type="button">Remind later</button>
             </div>
           </section>
@@ -117,14 +118,14 @@
             <div class="projects-header">
               <div>
                 <h2>Projects</h2>
-                <p>Manage local translation projects across language pairs.</p>
+                <p>Open a project or create one to start translating.</p>
               </div>
               <button id="newProjectFromDashboardBtn" class="primary">New project</button>
             </div>
 
             <div class="project-filters">
-              <input id="projectSearchInput" placeholder="Search projects">
-              <select id="languagePairFilter">
+              <input id="projectSearchInput" placeholder="Search projects" aria-label="Search projects">
+              <select id="languagePairFilter" aria-label="Filter projects by language pair">
                 <option value="">All language pairs</option>
               </select>
             </div>
@@ -147,9 +148,9 @@
 
             <section id="tmResourcesPanel" class="resource-panel">
               <div class="resource-import-row">
-                <input id="tmResourceNameInput" placeholder="TM name">
-                <input id="tmResourceSourceLangInput" placeholder="Source" value="en" list="languageOptions" autocomplete="off">
-                <input id="tmResourceTargetLangInput" placeholder="Target" value="tr" list="languageOptions" autocomplete="off">
+                <label class="compact-field"><span>Memory name</span><input id="tmResourceNameInput" placeholder="TM name"></label>
+                <label class="compact-field"><span>Source language</span><input id="tmResourceSourceLangInput" placeholder="Source" value="en" list="languageOptions" autocomplete="off"></label>
+                <label class="compact-field"><span>Target language</span><input id="tmResourceTargetLangInput" placeholder="Target" value="tr" list="languageOptions" autocomplete="off"></label>
                 <label class="file-button">
                   Import TMX
                   <input id="resourceTmxImportInput" type="file" accept=".tmx,application/xml,text/xml">
@@ -161,9 +162,9 @@
 
             <section id="tbResourcesPanel" class="resource-panel hidden">
               <div class="resource-import-row">
-                <input id="tbResourceNameInput" placeholder="TB name">
-                <input id="tbResourceSourceLangInput" placeholder="Source" value="en" list="languageOptions" autocomplete="off">
-                <input id="tbResourceTargetLangInput" placeholder="Target" value="tr" list="languageOptions" autocomplete="off">
+                <label class="compact-field"><span>Termbase name</span><input id="tbResourceNameInput" placeholder="TB name"></label>
+                <label class="compact-field"><span>Source language</span><input id="tbResourceSourceLangInput" placeholder="Source" value="en" list="languageOptions" autocomplete="off"></label>
+                <label class="compact-field"><span>Target language</span><input id="tbResourceTargetLangInput" placeholder="Target" value="tr" list="languageOptions" autocomplete="off"></label>
                 <label class="file-button">
                   Import TBX
                   <input id="resourceTbxImportInput" type="file" accept=".tbx,application/xml,text/xml">
@@ -228,7 +229,7 @@
                 <p id="projectMeta"></p>
               </div>
               <div class="toolbar-actions">
-                <button id="projectFilesBtn">Files</button>
+                <button id="projectFilesBtn">Back to files</button>
                 <button id="editorProjectSettingsBtn" type="button">Settings</button>
                 <details class="menu">
                   <summary>Import</summary>
@@ -256,9 +257,9 @@
                   </div>
                 </details>
                 <button id="confirmBtn" class="primary" title="Confirm current segment">Confirm</button>
-                <button id="focusModeBtn" type="button" title="Show only translation segments">Focus</button>
+                <button id="focusModeBtn" type="button" title="Show only translation segments">Focus mode</button>
                 <details class="menu">
-                  <summary>Actions</summary>
+                  <summary>Segment tools</summary>
                   <div class="menu-panel">
                     <button id="saveTmBtn" type="button">Save target to TM</button>
                     <button id="pretranslateBtn" type="button">Pretranslate from TM</button>
@@ -274,7 +275,7 @@
                   <div class="menu-panel">
                     <button id="exportDocxBtn">Target DOCX</button>
                     <button id="exportBilingualDocxBtn">Bilingual DOCX</button>
-                    <button id="exportLocalizationBtn">Current file</button>
+                    <button id="exportLocalizationBtn">Export current file</button>
                     <button id="exportXliffBtn">XLIFF</button>
                     <button id="exportTargetBtn">Target TXT</button>
                     <button id="exportProjectReportBtn">Project report</button>
@@ -294,22 +295,22 @@
             </div>
 
             <div class="segment-controls">
-              <select id="documentFilter">
+              <select id="documentFilter" aria-label="Document">
                 <option value="">All documents</option>
               </select>
-              <input id="segmentSearchInput" placeholder="Find in source or target">
-              <select id="segmentSearchScope">
+              <input id="segmentSearchInput" placeholder="Find in source or target" aria-label="Find in source or target">
+              <select id="segmentSearchScope" aria-label="Search scope">
                 <option value="both">Source and target</option>
                 <option value="source">Source only</option>
                 <option value="target">Target only</option>
               </select>
               <label class="checkbox-row compact-checkbox">
                 <input id="segmentRegexInput" type="checkbox">
-                Regex
+                Use regular expressions
               </label>
               <label class="checkbox-row compact-checkbox">
                 <input id="segmentCaseInput" type="checkbox">
-                Case
+                Match case
               </label>
               <details id="replaceMenu" class="menu replace-menu">
                 <summary>Replace</summary>
@@ -320,28 +321,28 @@
                   <button id="replaceAllBtn" type="button">Replace all targets</button>
                 </div>
               </details>
-              <select id="segmentStatusFilter">
+              <select id="segmentStatusFilter" aria-label="Segment status">
                 <option value="all">All segments</option>
                 <option value="open">Open segments</option>
                 <option value="empty">Empty</option>
                 <option value="draft">Draft</option>
                 <option value="confirmed">Confirmed</option>
               </select>
-              <select id="reviewStateFilter">
-                <option value="">All review</option>
+              <select id="reviewStateFilter" aria-label="Review state">
+                <option value="">All review states</option>
                 <option value="needs-review">Needs review</option>
                 <option value="reviewed">Reviewed</option>
                 <option value="blocked">Blocked</option>
                 <option value="comments">With notes</option>
               </select>
-              <select id="aiSegmentFilter">
-                <option value="">All AI</option>
+              <select id="aiSegmentFilter" aria-label="AI status">
+                <option value="">All AI states</option>
                 <option value="ai-draft">AI initiated</option>
                 <option value="ai-suggestions">AI suggestions</option>
                 <option value="ai-review-risk">AI review risk</option>
                 <option value="high-ai-risk">High AI risk</option>
               </select>
-              <button id="nextOpenBtn">Next open</button>
+              <button id="nextOpenBtn">Next unconfirmed</button>
             </div>
 
             <div class="segment-grid-wrap">
@@ -416,9 +417,9 @@
               <div id="termSuggestions" class="result-list muted">No terms yet.</div>
               <form id="termForm" class="term-form">
                 <select id="termBaseSelect" aria-label="Termbase"></select>
-                <input id="sourceTermInput" placeholder="Source term">
-                <input id="targetTermInput" placeholder="Target term">
-                <input id="termNotesInput" placeholder="Notes">
+                <input id="sourceTermInput" placeholder="Source term" aria-label="Source term">
+                <input id="targetTermInput" placeholder="Target term" aria-label="Target term">
+                <input id="termNotesInput" placeholder="Notes" aria-label="Term notes">
                 <label class="checkbox-row term-forbidden-row">
                   <input id="termForbiddenInput" type="checkbox">
                   Forbidden target
@@ -982,46 +983,54 @@
             <input id="targetLangInput" value="tr" required list="languageOptions" autocomplete="off">
           </label>
         </div>
-        <section class="project-storage-config">
-          <div class="resource-config-header">
-            <h3>Project storage</h3>
-            <p id="projectStorageStatus">Default folder: Documents</p>
+        <details id="projectAdvancedOptions" class="project-advanced-options">
+          <summary>
+            <span>Storage and resources</span>
+            <small>Optional setup</small>
+          </summary>
+          <div class="project-advanced-body">
+            <section class="project-storage-config">
+              <div class="resource-config-header">
+                <h3>Project storage</h3>
+                <p id="projectStorageStatus">Default folder: Documents</p>
+              </div>
+              <div class="project-storage-row">
+                <label class="checkbox-row">
+                  <input id="saveProjectToFolderInput" type="checkbox">
+                  Save this project as a visible package folder
+                </label>
+                <button id="projectChooseWorkspaceBtn" type="button">Choose folder</button>
+              </div>
+            </section>
+            <section class="project-resource-config">
+              <div class="resource-config-header">
+                <h3>Project resources</h3>
+                <p>Select resources already in Resources. New units are saved to the main TM.</p>
+              </div>
+              <div class="resource-picker-block">
+                <div class="resource-picker-title">
+                  <strong>Translation memories</strong>
+                  <span>Main</span>
+                </div>
+                <div id="projectTmResourceList" class="resource-option-list"></div>
+                <label>
+                  New main TM
+                  <input id="newTmNameInput" autocomplete="off" placeholder="Create a new project TM">
+                </label>
+              </div>
+              <div class="resource-picker-block">
+                <div class="resource-picker-title">
+                  <strong>Termbases</strong>
+                </div>
+                <div id="projectTbResourceList" class="resource-option-list"></div>
+                <label>
+                  New termbase
+                  <input id="newTermBaseNameInput" autocomplete="off" placeholder="Create a new project termbase">
+                </label>
+              </div>
+            </section>
           </div>
-          <div class="project-storage-row">
-            <label class="checkbox-row">
-              <input id="saveProjectToFolderInput" type="checkbox" checked>
-              Save this project as a visible package folder
-            </label>
-            <button id="projectChooseWorkspaceBtn" type="button">Choose folder</button>
-          </div>
-        </section>
-        <section class="project-resource-config">
-          <div class="resource-config-header">
-            <h3>Project resources</h3>
-            <p>Select resources already in Resources. New units are saved to the main TM.</p>
-          </div>
-          <div class="resource-picker-block">
-            <div class="resource-picker-title">
-              <strong>Translation memories</strong>
-              <span>Main</span>
-            </div>
-            <div id="projectTmResourceList" class="resource-option-list"></div>
-            <label>
-              New main TM
-              <input id="newTmNameInput" autocomplete="off" placeholder="Create a new project TM">
-            </label>
-          </div>
-          <div class="resource-picker-block">
-            <div class="resource-picker-title">
-              <strong>Termbases</strong>
-            </div>
-            <div id="projectTbResourceList" class="resource-option-list"></div>
-            <label>
-              New termbase
-              <input id="newTermBaseNameInput" autocomplete="off" placeholder="Create a new project termbase">
-            </label>
-          </div>
-        </section>
+        </details>
         <div class="dialog-actions">
           <button type="button" id="cancelProjectBtn">Cancel</button>
           <button class="primary" value="default">Create</button>

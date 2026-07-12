@@ -18,6 +18,7 @@ const checksumPath = path.join(distDir, "SHA256SUMS.txt");
 const WEB_ASSETS = [
   "index.html",
   "styles.css",
+  "liquid-glass/styles.css",
   "manifest.webmanifest",
   "service-worker.js",
   "icons/loopcat-icon.svg",

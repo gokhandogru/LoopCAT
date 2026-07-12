@@ -6,14 +6,14 @@
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f7f9fb",
-  "theme_color": "#202936",
+  "background_color": "#dfe8f0",
+  "theme_color": "#dfe8f0",
   "orientation": "any",
   "icons": [
     {
-      "src": "./icons/loopcat-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "./icons/loopcat-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

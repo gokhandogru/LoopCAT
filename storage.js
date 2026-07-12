@@ -985,6 +985,14 @@ async function get(storeName, key) {
   return requestToPromise(tx.objectStore(storeName).get(key));
 }
 
+async function getMany(storeName, keys = []) {
+  if (!keys.length) return [];
+  const db = await openDatabase();
+  const tx = db.transaction(storeName, "readonly");
+  const store = tx.objectStore(storeName);
+  return Promise.all(keys.map((key) => requestToPromise(store.get(key))));
+}
+
 async function getAll(storeName) {
   const db = await openDatabase();
   const tx = db.transaction(storeName, "readonly");
@@ -996,6 +1004,14 @@ async function getAllByIndex(storeName, indexName, value) {
   const tx = db.transaction(storeName, "readonly");
   const index = tx.objectStore(storeName).index(indexName);
   return requestToPromise(index.getAll(value));
+}
+
+async function getAllByIndexMany(storeName, indexName, values = []) {
+  if (!values.length) return [];
+  const db = await openDatabase();
+  const tx = db.transaction(storeName, "readonly");
+  const index = tx.objectStore(storeName).index(indexName);
+  return Promise.all(values.map((value) => requestToPromise(index.getAll(value))));
 }
 
 async function countByIndex(storeName, indexName, value) {
@@ -1176,8 +1192,10 @@ window.CatHan.storage = {
   deleteStoresWhereAtomically,
   importProjectPackageRecords,
   get,
+  getMany,
   getAll,
   getAllByIndex,
+  getAllByIndexMany,
   countByIndex,
   deleteByKey,
   deleteWhere,

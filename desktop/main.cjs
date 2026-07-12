@@ -86,6 +86,7 @@ const SPELLCHECKER_LANGUAGE_FALLBACKS = new Map([
 const DESKTOP_SMOKE_MODE = process.env.LOOPCAT_DESKTOP_SMOKE === "1";
 const DESKTOP_SMOKE_TIMEOUT_MS = Number(process.env.LOOPCAT_DESKTOP_SMOKE_TIMEOUT_MS || 30000);
 const DESKTOP_SMOKE_RESULT_FILE = process.env.LOOPCAT_DESKTOP_SMOKE_RESULT_FILE || "";
+const DESKTOP_SMOKE_SCREENSHOT_FILE = process.env.LOOPCAT_DESKTOP_SMOKE_SCREENSHOT_FILE || "";
 const DESKTOP_SMOKE_USER_DATA_DIR = process.env.LOOPCAT_DESKTOP_SMOKE_USER_DATA_DIR || "";
 const DESKTOP_SMOKE_NO_SANDBOX = DESKTOP_SMOKE_MODE && process.env.LOOPCAT_DESKTOP_SMOKE_NO_SANDBOX === "1";
 const DESKTOP_CHROMIUM_NO_SANDBOX = process.env.LOOPCAT_DESKTOP_NO_SANDBOX
@@ -99,9 +100,11 @@ let desktopSandboxFallbackUsed = false;
 const ALLOWED_APP_FILES = new Set([
   "index.html",
   "styles.css",
+  "liquid-glass/styles.css",
   "manifest.webmanifest",
   "service-worker.js",
   "icons/loopcat-icon.svg",
+  "icons/loopcat-icon.png",
   "app.js",
   "storage.js",
   "workspace-storage.js",
@@ -902,6 +905,8 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
           !(await storage.get("projects", project.id));
         const appShellAssetProbe = {
           index: await fetchAppShellAsset("./index.html", "LoopCAT"),
+          liquidGlassCss: await fetchAppShellAsset("./liquid-glass/styles.css", "--glass-accent: #109888"),
+          liquidGlassIcon: await fetchAppShellAsset("./icons/loopcat-icon.png"),
           app: await fetchAppShellAsset("./app.js", "registerOfflineAppShell"),
           serviceWorker: await fetchAppShellAsset("./service-worker.js", "loopcat-offline-"),
           i18nRuntime: await fetchAppShellAsset("./i18n.js", "window.CatHan.i18n"),
@@ -916,6 +921,11 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
           appShellAssetProbe.testRunnerBlocked = true;
         }
         const db = await storage.openDatabase();
+        const topbar = document.querySelector(".topbar");
+        const newProjectButton = document.querySelector("#newProjectBtn");
+        const topbarStyle = topbar ? getComputedStyle(topbar) : null;
+        const newProjectStyle = newProjectButton ? getComputedStyle(newProjectButton) : null;
+        const loadedStyleSheets = Array.from(document.styleSheets).map((sheet) => sheet.href || "inline");
         return {
           readyState: document.readyState,
           title: document.title,
@@ -935,6 +945,17 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
           projectProbe,
           workflowProbe,
           appShellAssetProbe,
+          visualProbe: {
+            liquidGlassBodyClass: document.body?.classList.contains("liquid-glass-edition") || false,
+            liquidGlassStyleSheetLoaded: loadedStyleSheets.some((href) => href.includes("/liquid-glass/styles.css")),
+            canvasColor: getComputedStyle(document.documentElement).getPropertyValue("--glass-canvas").trim(),
+            accentColor: getComputedStyle(document.documentElement).getPropertyValue("--glass-accent").trim(),
+            topbarBackdropFilter: topbarStyle?.backdropFilter || topbarStyle?.webkitBackdropFilter || "",
+            newProjectBackground: newProjectStyle?.backgroundColor || "",
+            viewportWidth: window.innerWidth,
+            documentScrollWidth: document.documentElement.scrollWidth,
+            noPageOverflow: document.documentElement.scrollWidth <= window.innerWidth
+          },
           i18nProbe: {
             runtimeReady: Boolean(window.CatHan?.i18n?.t),
             storageLabel: window.CatHan?.i18n?.t?.("workspace.menu.summary") || "",
@@ -973,6 +994,9 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
       if (!result?.workflowProbe?.backupIncludesSavedTargets) missing.push("backup includes saved targets");
       if (!result?.appShellAssetProbe?.index?.fetchOk) missing.push("packaged index.html fetch");
       if (!result?.appShellAssetProbe?.index?.includesExpectedText) missing.push("packaged index.html content");
+      if (!result?.appShellAssetProbe?.liquidGlassCss?.fetchOk) missing.push("packaged Liquid Glass stylesheet fetch");
+      if (!result?.appShellAssetProbe?.liquidGlassCss?.includesExpectedText) missing.push("packaged Liquid Glass stylesheet content");
+      if (!result?.appShellAssetProbe?.liquidGlassIcon?.fetchOk) missing.push("packaged LoopCAT PNG icon fetch");
       if (!result?.appShellAssetProbe?.app?.fetchOk) missing.push("packaged app.js fetch");
       if (!result?.appShellAssetProbe?.app?.includesExpectedText) missing.push("packaged app.js content");
       if (!result?.appShellAssetProbe?.serviceWorker?.fetchOk) missing.push("packaged service-worker.js fetch");
@@ -994,11 +1018,26 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
       if (result?.title !== "LoopCAT") missing.push("document title LoopCAT");
       if (result?.url !== `${APP_SCHEME}://${APP_HOST}/index.html`) missing.push("loopcat app-shell URL");
       if (!String(result?.bodyText || "").includes("Local translation editor")) missing.push("brand text");
+      if (!result?.visualProbe?.liquidGlassBodyClass) missing.push("Liquid Glass body class");
+      if (!result?.visualProbe?.liquidGlassStyleSheetLoaded) missing.push("Liquid Glass stylesheet application");
+      if (String(result?.visualProbe?.canvasColor || "").toLowerCase() !== "#dfe8f0") missing.push("Liquid Glass canvas token");
+      if (String(result?.visualProbe?.accentColor || "").toLowerCase() !== "#109888") missing.push("Liquid Glass accent token");
+      if (!String(result?.visualProbe?.topbarBackdropFilter || "").includes("blur")) missing.push("Liquid Glass topbar material");
+      if (result?.visualProbe?.newProjectBackground !== "rgb(8, 123, 112)") missing.push("Liquid Glass primary action color");
+      if (!result?.visualProbe?.noPageOverflow) missing.push("packaged app page overflow");
+      let screenshotFile = "";
+      if (!missing.length && DESKTOP_SMOKE_SCREENSHOT_FILE) {
+        const screenshot = await mainWindow.webContents.capturePage();
+        fs.mkdirSync(path.dirname(DESKTOP_SMOKE_SCREENSHOT_FILE), { recursive: true });
+        fs.writeFileSync(DESKTOP_SMOKE_SCREENSHOT_FILE, screenshot.toPNG());
+        screenshotFile = DESKTOP_SMOKE_SCREENSHOT_FILE;
+      }
       clearTimeout(timeout);
       finishOnce(missing.length ? 1 : 0, {
         ok: missing.length === 0,
         reason: missing.length ? "missing-runtime-ui" : "desktop-smoke-pass",
         missing,
+        screenshotFile,
         desktopRuntime: desktopRuntime(),
         result
       });

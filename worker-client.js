@@ -68,6 +68,23 @@ async function findTmMatches({ entries, options, fallback }) {
   }
 }
 
+async function findTmMatchesBatch({ entries, options, fallback }) {
+  try {
+    const uniqueEntries = new Map();
+    const candidateIds = (entries || []).map((items) => (items || []).map((entry) => {
+      uniqueEntries.set(entry.id, entry);
+      return entry.id;
+    }));
+    return await requestWorker("tm-match-batch", {
+      entries: Array.from(uniqueEntries.values()),
+      candidateIds,
+      options
+    });
+  } catch (error) {
+    return fallback();
+  }
+}
+
 async function runQaChecks({ segments, terms, fallback }) {
   try {
     return await requestWorker("qa", { segments, terms });
@@ -87,6 +104,7 @@ function status() {
 window.CatHan = window.CatHan || {};
 window.CatHan.workerClient = {
   findTmMatches,
+  findTmMatchesBatch,
   runQaChecks,
   status
 };

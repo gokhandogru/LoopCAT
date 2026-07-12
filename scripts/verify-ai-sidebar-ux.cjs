@@ -48,9 +48,11 @@ const mimeTypes = new Map([
 const allowedFiles = new Set([
   "index.html",
   "styles.css",
+  "liquid-glass/styles.css",
   "manifest.webmanifest",
   "service-worker.js",
   "icons/loopcat-icon.svg",
+  "icons/loopcat-icon.png",
   "storage.js",
   "workspace-storage.js",
   "docx.js",
@@ -58,15 +60,22 @@ const allowedFiles = new Set([
   "termbase.js",
   "tmx.js",
   "tbx.js",
+  "encoding.js",
   "xliff.js",
   "localization.js",
   "qa.js",
   "validation.js",
   "analysis.js",
+  "quality.js",
   "ai.js",
   "worker-client.js",
   "cat-worker.js",
   "project.js",
+  "i18n.js",
+  "i18n/source.en-US.js",
+  "i18n/locales/ca-ES.js",
+  "i18n/locales/en-US.js",
+  "i18n/locales/tr-TR.js",
   "app.js"
 ]);
 
@@ -237,6 +246,19 @@ app.whenReady().then(async () => {
   const url = `http://127.0.0.1:${port}/index.html`;
   const pageErrors = [];
   ipcMain.handle("loopcat:start-lm-studio-server", async () => ({ ok: true, message: "Fake LM Studio server started." }));
+  ipcMain.handle("loopcat:get-creator-identity", async () => ({ displayName: "LoopCAT UX test" }));
+  ipcMain.handle("loopcat:set-spellchecker-languages", async (_event, languages = []) => ({
+    ok: true,
+    requestedLanguages: Array.isArray(languages) ? languages : [],
+    activeLanguages: Array.isArray(languages) ? languages : [],
+    reason: "test"
+  }));
+  ipcMain.handle("loopcat:get-spellchecker-info", async () => ({
+    supported: true,
+    enabled: true,
+    languages: [],
+    availableLanguages: []
+  }));
   windowRef = new BrowserWindow({
     width: 1440,
     height: 1000,

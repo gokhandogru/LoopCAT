@@ -1,0 +1,1391 @@
+:root {
+  --glass-canvas: #dfe8f0;
+  --glass-canvas-deep: #d6e1eb;
+  --glass-panel: rgba(255, 255, 255, 0.68);
+  --glass-panel-strong: rgba(255, 255, 255, 0.84);
+  --glass-surface: #ffffff;
+  --glass-surface-soft: #f7f9fc;
+  --glass-text: #172033;
+  --glass-muted: #677186;
+  --glass-line: rgba(255, 255, 255, 0.82);
+  --glass-line-solid: #dce3ec;
+  --glass-accent: #109888;
+  --glass-accent-strong: #087b70;
+  --glass-accent-soft: #e2f6f1;
+  --glass-confirm: #087b70;
+  --glass-confirm-strong: #07645d;
+  --glass-success: #137f6d;
+  --glass-warning: #a96816;
+  --glass-danger: #b64949;
+  --glass-shadow: 0 24px 64px rgba(67, 82, 105, 0.16), 0 3px 12px rgba(67, 82, 105, 0.08);
+  --glass-shadow-soft: 0 16px 36px rgba(67, 82, 105, 0.12), 0 2px 8px rgba(67, 82, 105, 0.06);
+  --glass-radius-xl: 28px;
+  --glass-radius-lg: 22px;
+  --glass-radius-md: 15px;
+  --glass-radius-sm: 11px;
+  --glass-blur: 24px;
+
+  --bg: var(--glass-canvas);
+  --surface: var(--glass-surface);
+  --surface-2: var(--glass-surface-soft);
+  --text: var(--glass-text);
+  --muted: var(--glass-muted);
+  --line: var(--glass-line-solid);
+  --accent: var(--glass-accent);
+  --accent-strong: var(--glass-accent-strong);
+  --warn: var(--glass-warning);
+  --ok: var(--glass-success);
+  --focus: var(--glass-accent);
+  --shadow: var(--glass-shadow-soft);
+}
+
+* {
+  scrollbar-color: rgba(103, 113, 134, 0.42) transparent;
+  scrollbar-width: thin;
+}
+
+html,
+body {
+  min-width: 320px;
+  background: var(--glass-canvas);
+  color: var(--glass-text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+}
+
+body.liquid-glass-edition {
+  overflow: hidden;
+}
+
+.liquid-glass-edition ::selection {
+  background: rgba(16, 152, 136, 0.2);
+}
+
+.liquid-glass-edition :focus-visible {
+  outline: 3px solid rgba(16, 152, 136, 0.34);
+  outline-offset: 2px;
+}
+
+.liquid-glass-edition .app-shell {
+  min-height: 100vh;
+  height: 100vh;
+  background: var(--glass-canvas);
+}
+
+.liquid-glass-edition h1,
+.liquid-glass-edition h2,
+.liquid-glass-edition h3,
+.liquid-glass-edition h4,
+.liquid-glass-edition strong {
+  letter-spacing: -0.018em;
+}
+
+.liquid-glass-edition button,
+.liquid-glass-edition input,
+.liquid-glass-edition select,
+.liquid-glass-edition textarea,
+.liquid-glass-edition summary,
+.liquid-glass-edition .file-button {
+  font: inherit;
+}
+
+.liquid-glass-edition button,
+.liquid-glass-edition summary,
+.liquid-glass-edition .file-button {
+  min-height: 40px;
+  border: 1px solid rgba(132, 145, 165, 0.24);
+  border-radius: var(--glass-radius-sm);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--glass-text);
+  box-shadow: 0 1px 2px rgba(45, 55, 72, 0.04);
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.liquid-glass-edition button:hover,
+.liquid-glass-edition summary:hover,
+.liquid-glass-edition .file-button:hover {
+  border-color: rgba(16, 152, 136, 0.3);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 6px 16px rgba(67, 82, 105, 0.1);
+}
+
+.liquid-glass-edition button:active,
+.liquid-glass-edition .file-button:active {
+  transform: translateY(1px);
+}
+
+.liquid-glass-edition button:disabled {
+  box-shadow: none;
+  opacity: 0.48;
+}
+
+.liquid-glass-edition button.primary,
+.liquid-glass-edition .primary,
+.liquid-glass-edition #confirmBtn {
+  border-color: var(--glass-confirm);
+  background: var(--glass-confirm);
+  color: #ffffff;
+  box-shadow: 0 9px 22px rgba(8, 123, 112, 0.24);
+}
+
+.liquid-glass-edition button.primary:hover,
+.liquid-glass-edition .primary:hover,
+.liquid-glass-edition #confirmBtn:hover {
+  border-color: var(--glass-confirm-strong);
+  background: var(--glass-confirm-strong);
+}
+
+.liquid-glass-edition input,
+.liquid-glass-edition select,
+.liquid-glass-edition textarea {
+  min-height: 42px;
+  border: 1px solid rgba(132, 145, 165, 0.28);
+  border-radius: var(--glass-radius-sm);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--glass-text);
+  box-shadow: inset 0 1px 2px rgba(67, 82, 105, 0.035);
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.liquid-glass-edition input:hover,
+.liquid-glass-edition select:hover,
+.liquid-glass-edition textarea:hover {
+  border-color: rgba(16, 152, 136, 0.34);
+}
+
+.liquid-glass-edition input:focus,
+.liquid-glass-edition select:focus,
+.liquid-glass-edition textarea:focus {
+  border-color: var(--glass-accent);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(16, 152, 136, 0.1);
+  outline: none;
+}
+
+.liquid-glass-edition input[type="checkbox"] {
+  min-height: auto;
+  accent-color: var(--glass-accent);
+  box-shadow: none;
+}
+
+.liquid-glass-edition .muted {
+  color: var(--glass-muted);
+}
+
+/* Floating command island */
+.liquid-glass-edition .topbar {
+  position: relative;
+  z-index: 40;
+  min-height: 76px;
+  margin: 18px 20px 0;
+  padding: 10px 14px 10px 16px;
+  border: 1px solid var(--glass-line);
+  border-radius: 24px;
+  background: var(--glass-panel);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+}
+
+.liquid-glass-edition .brand {
+  min-width: 208px;
+  gap: 11px;
+}
+
+.liquid-glass-edition .brand-mark {
+  width: 43px;
+  height: 43px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  box-shadow: 0 8px 20px rgba(16, 152, 136, 0.16);
+  overflow: hidden;
+}
+
+.liquid-glass-edition .brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.liquid-glass-edition .brand h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 760;
+  line-height: 1.1;
+}
+
+.liquid-glass-edition .brand p {
+  margin: 3px 0 0;
+  color: var(--glass-muted);
+  font-size: 12px;
+}
+
+.liquid-glass-edition .topbar-actions {
+  gap: 7px;
+}
+
+.liquid-glass-edition .topbar-actions > button,
+.liquid-glass-edition .topbar-actions > details > summary {
+  padding-inline: 14px;
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.44);
+  font-weight: 650;
+}
+
+.liquid-glass-edition .topbar-actions > button:hover,
+.liquid-glass-edition .topbar-actions > details > summary:hover {
+  border-color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.liquid-glass-edition .topbar-actions > #newProjectBtn {
+  border-color: var(--glass-confirm);
+  background: var(--glass-confirm);
+  box-shadow: 0 9px 22px rgba(8, 123, 112, 0.22);
+}
+
+.liquid-glass-edition .topbar-actions > #newProjectBtn:hover {
+  border-color: var(--glass-confirm-strong);
+  background: var(--glass-confirm-strong);
+}
+
+.liquid-glass-edition .save-status {
+  min-width: 68px;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid rgba(39, 135, 103, 0.18);
+  border-radius: 999px;
+  background: rgba(234, 248, 242, 0.8);
+  color: var(--glass-success);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Main floating workbench */
+.liquid-glass-edition .workspace {
+  height: calc(100vh - 112px);
+  min-height: 0;
+  padding: 16px 20px 20px;
+  gap: 16px;
+  grid-template-columns: 232px minmax(560px, 1fr) 348px;
+  background: transparent;
+}
+
+.liquid-glass-edition .workspace.projects-mode {
+  grid-template-columns: 232px minmax(560px, 1fr);
+}
+
+.liquid-glass-edition .project-rail,
+.liquid-glass-edition .sidebar {
+  min-width: 0;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--glass-radius-xl);
+  background: var(--glass-panel);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+}
+
+.liquid-glass-edition .project-rail {
+  height: 100%;
+  padding: 18px 14px;
+  overflow: hidden;
+}
+
+.liquid-glass-edition .project-rail > .panel-header {
+  min-height: 44px;
+  padding: 0 6px 12px;
+  border: 0;
+}
+
+.liquid-glass-edition .project-rail > .panel-header h2 {
+  font-size: 13px;
+  color: var(--glass-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.liquid-glass-edition .project-list {
+  gap: 7px;
+  overflow-y: auto;
+}
+
+.liquid-glass-edition .project-item {
+  min-height: 66px;
+  padding: 11px 12px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.liquid-glass-edition .project-item:hover {
+  border-color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.liquid-glass-edition .project-item.active {
+  border-color: rgba(16, 152, 136, 0.15);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 8px 20px rgba(67, 82, 105, 0.1);
+}
+
+.liquid-glass-edition .project-item span,
+.liquid-glass-edition .project-item small {
+  color: var(--glass-muted);
+}
+
+.liquid-glass-edition .editor-area {
+  min-width: 0;
+  height: 100%;
+  container-type: inline-size;
+  border: 1px solid rgba(255, 255, 255, 0.84);
+  border-radius: var(--glass-radius-xl);
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
+  overflow: hidden;
+}
+
+/* Project and resource dashboards */
+.liquid-glass-edition .projects-view,
+.liquid-glass-edition .resources-view,
+.liquid-glass-edition .project-home-view {
+  height: 100%;
+  padding: 24px;
+  background: #f9fafc;
+  overflow-y: auto;
+}
+
+.liquid-glass-edition .projects-header,
+.liquid-glass-edition .resources-header,
+.liquid-glass-edition .project-home-header {
+  min-height: 78px;
+  margin-bottom: 16px;
+  padding: 4px 4px 16px;
+  border-bottom: 1px solid var(--glass-line-solid);
+}
+
+.liquid-glass-edition .projects-header h2,
+.liquid-glass-edition .resources-header h2,
+.liquid-glass-edition .project-home-header h2 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 760;
+}
+
+.liquid-glass-edition .projects-header p,
+.liquid-glass-edition .resources-header p,
+.liquid-glass-edition .project-home-header p {
+  margin-top: 5px;
+  color: var(--glass-muted);
+}
+
+.liquid-glass-edition .project-filters,
+.liquid-glass-edition .resource-import-row {
+  padding: 14px;
+  border: 1px solid var(--glass-line-solid);
+  border-radius: var(--glass-radius-md);
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(67, 82, 105, 0.055);
+}
+
+.liquid-glass-edition .project-dashboard,
+.liquid-glass-edition .project-file-list,
+.liquid-glass-edition .resource-dashboard {
+  gap: 14px;
+}
+
+.liquid-glass-edition .project-tile,
+.liquid-glass-edition .file-card,
+.liquid-glass-edition .resource-card,
+.liquid-glass-edition .resource-detail {
+  border: 1px solid var(--glass-line-solid);
+  border-radius: var(--glass-radius-md);
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(67, 82, 105, 0.06);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.liquid-glass-edition .project-tile:hover,
+.liquid-glass-edition .file-card:hover,
+.liquid-glass-edition .resource-card:hover {
+  border-color: rgba(16, 152, 136, 0.26);
+  box-shadow: 0 15px 34px rgba(67, 82, 105, 0.11);
+  transform: translateY(-1px);
+}
+
+.liquid-glass-edition .project-stats,
+.liquid-glass-edition .project-home-stats,
+.liquid-glass-edition .analysis-grid {
+  gap: 10px;
+}
+
+.liquid-glass-edition .project-stats div,
+.liquid-glass-edition .project-home-stats div,
+.liquid-glass-edition .analysis-grid div {
+  border: 1px solid #e9edf3;
+  border-radius: 13px;
+  background: #f8f9fc;
+}
+
+.liquid-glass-edition .project-stats strong,
+.liquid-glass-edition .project-home-stats strong,
+.liquid-glass-edition .analysis-grid strong {
+  color: var(--glass-accent-strong);
+}
+
+.liquid-glass-edition .language-badge,
+.liquid-glass-edition .quality-category-pill,
+.liquid-glass-edition .severity-pill {
+  border-color: rgba(16, 152, 136, 0.14);
+  background: var(--glass-accent-soft);
+  color: var(--glass-accent-strong);
+}
+
+.liquid-glass-edition .resource-tabs {
+  width: fit-content;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 4px;
+  border: 1px solid var(--glass-line-solid);
+  border-radius: 14px;
+  background: #eef1f6;
+}
+
+.liquid-glass-edition .resource-tabs button {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.liquid-glass-edition .resource-tabs button.active {
+  background: #ffffff;
+  color: var(--glass-accent-strong);
+  box-shadow: 0 5px 14px rgba(67, 82, 105, 0.1);
+}
+
+.liquid-glass-edition .resource-table {
+  border-color: var(--glass-line-solid);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.liquid-glass-edition .resource-row {
+  border-color: #edf0f4;
+  background: #ffffff;
+}
+
+.liquid-glass-edition .resource-row:hover {
+  background: #f2fbf8;
+}
+
+.liquid-glass-edition .analysis-panel,
+.liquid-glass-edition .file-list-header {
+  border: 1px solid var(--glass-line-solid);
+  border-radius: var(--glass-radius-md);
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(67, 82, 105, 0.05);
+}
+
+/* Editor: opaque center for sustained reading */
+.liquid-glass-edition .editor-view {
+  height: 100%;
+  background: #ffffff;
+}
+
+.liquid-glass-edition .project-toolbar {
+  min-height: 0;
+  padding: 13px 16px 12px 20px;
+  border-bottom: 1px solid var(--glass-line-solid);
+  background: #ffffff;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.liquid-glass-edition .project-toolbar h2 {
+  font-size: 20px;
+  font-weight: 760;
+}
+
+.liquid-glass-edition .project-toolbar p {
+  color: var(--glass-muted);
+}
+
+.liquid-glass-edition .project-toolbar .toolbar-actions {
+  gap: 6px;
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.liquid-glass-edition .project-toolbar .toolbar-actions > button,
+.liquid-glass-edition .project-toolbar .toolbar-actions > details > summary {
+  min-height: 38px;
+  padding-inline: 11px;
+  background: #f7f8fb;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.liquid-glass-edition .project-toolbar #confirmBtn {
+  padding-inline: 18px;
+}
+
+@container (min-width: 1100px) {
+  .liquid-glass-edition .project-toolbar {
+    grid-template-columns: minmax(220px, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .liquid-glass-edition .project-toolbar .toolbar-actions {
+    width: auto;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+}
+
+.liquid-glass-edition .progress-wrap {
+  padding: 10px 20px 9px;
+  border-bottom: 1px solid var(--glass-line-solid);
+  background: #fbfcfe;
+}
+
+.liquid-glass-edition .progress-label {
+  color: var(--glass-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.liquid-glass-edition .progress-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: #e8ebf1;
+  overflow: hidden;
+}
+
+.liquid-glass-edition #progressFill {
+  border-radius: inherit;
+  background: var(--glass-accent);
+}
+
+.liquid-glass-edition .segment-controls {
+  gap: 7px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--glass-line-solid);
+  background: #f7f9fc;
+}
+
+.liquid-glass-edition .segment-controls input,
+.liquid-glass-edition .segment-controls select,
+.liquid-glass-edition .segment-controls button,
+.liquid-glass-edition .segment-controls summary {
+  min-height: 36px;
+  border-radius: 9px;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.liquid-glass-edition #segmentSearchInput {
+  min-width: 220px;
+}
+
+.liquid-glass-edition #nextOpenBtn {
+  margin-left: auto;
+  border-color: rgba(16, 152, 136, 0.18);
+  background: var(--glass-accent-soft);
+  color: var(--glass-accent-strong);
+  font-weight: 700;
+}
+
+.liquid-glass-edition .segment-grid-wrap {
+  min-height: 0;
+  background: #ffffff;
+}
+
+.liquid-glass-edition .segment-grid {
+  color: var(--glass-text);
+  table-layout: fixed;
+}
+
+.liquid-glass-edition .segment-grid th {
+  height: 42px;
+  padding: 9px 12px;
+  border-color: #e8ecf2;
+  background: #f7f9fc;
+  color: var(--glass-muted);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.liquid-glass-edition .segment-grid td {
+  padding: 12px;
+  border-color: #e9edf3;
+  background: #ffffff;
+}
+
+.liquid-glass-edition .segment-grid tr:hover td {
+  background: #fbfbfe;
+}
+
+.liquid-glass-edition .segment-grid tr.active td {
+  background: #f2fbf8;
+  box-shadow: inset 0 1px rgba(16, 152, 136, 0.15), inset 0 -1px rgba(16, 152, 136, 0.15);
+}
+
+.liquid-glass-edition .segment-grid tr.active td:first-child {
+  box-shadow: inset 3px 0 var(--glass-accent), inset 0 1px rgba(16, 152, 136, 0.15), inset 0 -1px rgba(16, 152, 136, 0.15);
+}
+
+.liquid-glass-edition .source-cell {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.liquid-glass-edition .target-cell textarea {
+  min-height: 72px;
+  padding: 11px 12px;
+  border-color: transparent;
+  border-radius: 10px;
+  background: #f7f9fc;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.liquid-glass-edition .target-cell textarea:focus {
+  border-color: var(--glass-accent);
+  background: #ffffff;
+}
+
+.liquid-glass-edition .tag-chip {
+  min-height: 18px;
+  padding: 1px 4px;
+  margin-inline: 1px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  line-height: 1.2;
+  box-shadow: none;
+}
+
+.liquid-glass-edition button.tag-chip-action {
+  min-height: 22px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #f7faf9;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.15;
+  box-shadow: none;
+}
+
+.liquid-glass-edition .source-cell button.tag-chip-action {
+  min-height: 20px;
+  padding-block: 1px;
+}
+
+.liquid-glass-edition .tag-tray {
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.liquid-glass-edition .status-pill {
+  border-radius: 999px;
+  font-weight: 720;
+}
+
+.liquid-glass-edition .status-pill.confirmed {
+  background: #e8f6f0;
+  color: var(--glass-success);
+}
+
+.liquid-glass-edition .status-pill.draft {
+  background: #fff2e1;
+  color: var(--glass-warning);
+}
+
+.liquid-glass-edition .status-pill.empty {
+  background: #edf0f5;
+  color: var(--glass-muted);
+}
+
+.liquid-glass-edition .review-pill,
+.liquid-glass-edition .comment-marker,
+.liquid-glass-edition .tm-match-badge,
+.liquid-glass-edition .ai-segment-badge,
+.liquid-glass-edition .tag-warning {
+  border-radius: 999px;
+}
+
+/* Glass inspector */
+.liquid-glass-edition .sidebar {
+  height: 100%;
+  padding: 12px;
+  gap: 10px;
+  border-left: 1px solid var(--glass-line);
+  overflow-y: auto;
+}
+
+.liquid-glass-edition .side-panel {
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 9px 24px rgba(67, 82, 105, 0.08);
+  overflow: visible;
+}
+
+.liquid-glass-edition .side-panel > .panel-header {
+  min-height: 50px;
+  padding: 8px 10px;
+  border-bottom-color: rgba(132, 145, 165, 0.16);
+  background: transparent;
+}
+
+.liquid-glass-edition .side-panel .panel-title {
+  gap: 7px;
+}
+
+.liquid-glass-edition .side-panel h2 {
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.liquid-glass-edition .panel-toggle {
+  min-width: 28px;
+  min-height: 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: rgba(255, 255, 255, 0.44);
+  box-shadow: none;
+}
+
+.liquid-glass-edition .side-panel .panel-content {
+  padding: 10px;
+  background: transparent;
+}
+
+.liquid-glass-edition .match-card,
+.liquid-glass-edition .term-card,
+.liquid-glass-edition .qa-card,
+.liquid-glass-edition .comment-card,
+.liquid-glass-edition .revision-card,
+.liquid-glass-edition .ai-suggestion-card,
+.liquid-glass-edition .quality-category-row {
+  border: 1px solid rgba(132, 145, 165, 0.18);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 5px 14px rgba(67, 82, 105, 0.055);
+}
+
+.liquid-glass-edition .tm-panel .match-card {
+  border-color: rgba(39, 135, 103, 0.18);
+  background: rgba(239, 249, 245, 0.88);
+}
+
+.liquid-glass-edition .tb-panel .term-card {
+  border-color: rgba(169, 104, 22, 0.18);
+  background: rgba(255, 249, 240, 0.9);
+}
+
+.liquid-glass-edition .tb-panel .forbidden-term-card {
+  border-color: rgba(182, 73, 73, 0.2);
+  background: rgba(255, 244, 244, 0.9);
+}
+
+.liquid-glass-edition .term-form,
+.liquid-glass-edition .review-form,
+.liquid-glass-edition .quality-form,
+.liquid-glass-edition .quality-decision-form,
+.liquid-glass-edition .domain-form,
+.liquid-glass-edition .ai-settings-form {
+  gap: 8px;
+}
+
+.liquid-glass-edition .side-panel input,
+.liquid-glass-edition .side-panel select,
+.liquid-glass-edition .side-panel textarea,
+.liquid-glass-edition .side-panel button,
+.liquid-glass-edition .side-panel summary {
+  min-height: 36px;
+  font-size: 12px;
+}
+
+.liquid-glass-edition .side-panel textarea {
+  min-height: 78px;
+}
+
+.liquid-glass-edition .quality-summary,
+.liquid-glass-edition .quality-active-evidence,
+.liquid-glass-edition .quality-risk-list,
+.liquid-glass-edition .revision-history-list,
+.liquid-glass-edition .ai-suggestion-list,
+.liquid-glass-edition .local-ai-progress,
+.liquid-glass-edition .local-ai-provider-summary {
+  border-radius: 12px;
+  background: rgba(247, 249, 252, 0.9);
+}
+
+.liquid-glass-edition .local-ai-centre {
+  gap: 10px;
+}
+
+.liquid-glass-edition .local-ai-group {
+  border-color: rgba(132, 145, 165, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.liquid-glass-edition .local-ai-group h3,
+.liquid-glass-edition .local-ai-drawer > summary {
+  color: var(--glass-text);
+}
+
+.liquid-glass-edition .local-ai-section-number {
+  background: var(--glass-confirm);
+  color: #ffffff;
+}
+
+.liquid-glass-edition .local-ai-status.connected {
+  border-color: rgba(39, 135, 103, 0.2);
+  background: #edf8f3;
+}
+
+.liquid-glass-edition .local-ai-status.disconnected {
+  border-color: rgba(182, 73, 73, 0.15);
+  background: #fff3f3;
+}
+
+/* Menus, overlays, dialogs, and system states */
+.liquid-glass-edition .menu-panel {
+  z-index: 100;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+}
+
+.liquid-glass-edition .menu-panel button,
+.liquid-glass-edition .menu-panel .menu-item,
+.liquid-glass-edition .workspace-submenu > summary {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.liquid-glass-edition .menu-panel button:hover,
+.liquid-glass-edition .menu-panel .menu-item:hover,
+.liquid-glass-edition .workspace-submenu > summary:hover {
+  background: rgba(16, 152, 136, 0.08);
+}
+
+/*
+ * Keep Replace inside the rounded editor surface. The generic menu is anchored
+ * to its summary, which pushes most of this wider panel beyond the editor's
+ * clipped left edge at desktop widths. Anchor this one popover to the complete
+ * filter bar instead and lay its actions out compactly in two columns.
+ */
+.liquid-glass-edition .segment-controls {
+  position: relative;
+  z-index: 10;
+}
+
+.liquid-glass-edition .replace-menu {
+  position: static;
+}
+
+.liquid-glass-edition .replace-panel {
+  left: 14px;
+  right: 14px;
+  top: calc(100% + 8px);
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px;
+  border-color: rgba(16, 152, 136, 0.16);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 48px rgba(55, 70, 92, 0.2);
+}
+
+.liquid-glass-edition .replace-panel input,
+.liquid-glass-edition .replace-panel button {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.liquid-glass-edition .replace-panel button {
+  border-color: rgba(16, 152, 136, 0.16);
+  background: var(--glass-accent-soft);
+  color: var(--glass-accent-strong);
+  font-weight: 720;
+}
+
+.liquid-glass-edition .replace-panel #replaceAllBtn {
+  border-color: var(--glass-confirm-strong);
+  background: var(--glass-confirm-strong);
+  color: #ffffff;
+}
+
+.liquid-glass-edition .workspace-menu-panel {
+  width: min(420px, calc(100vw - 40px));
+}
+
+.liquid-glass-edition .workspace-health,
+.liquid-glass-edition .workspace-submenu-body {
+  border-color: rgba(132, 145, 165, 0.16);
+  border-radius: 12px;
+  background: rgba(247, 249, 252, 0.72);
+}
+
+.liquid-glass-edition .workspace-recovery,
+.liquid-glass-edition .backup-reminder,
+.liquid-glass-edition .validation-report {
+  margin: 14px 14px 0;
+  border: 1px solid rgba(169, 104, 22, 0.2);
+  border-radius: var(--glass-radius-md);
+  background: #fff8ee;
+  box-shadow: 0 8px 22px rgba(67, 82, 105, 0.06);
+}
+
+.liquid-glass-edition .empty-state,
+.liquid-glass-edition .empty-file-state {
+  border: 1px dashed rgba(16, 152, 136, 0.28);
+  border-radius: var(--glass-radius-md);
+  background: #f8f7ff;
+}
+
+.liquid-glass-edition .concordance-overlay,
+.liquid-glass-edition .command-palette-overlay {
+  background: rgba(43, 51, 66, 0.24);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.liquid-glass-edition .concordance-popover,
+.liquid-glass-edition .command-palette {
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(28px) saturate(145%);
+  -webkit-backdrop-filter: blur(28px) saturate(145%);
+}
+
+.liquid-glass-edition .command-results button,
+.liquid-glass-edition .concordance-results article {
+  border-radius: 12px;
+}
+
+.liquid-glass-edition dialog {
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(28px) saturate(145%);
+  -webkit-backdrop-filter: blur(28px) saturate(145%);
+}
+
+.liquid-glass-edition dialog::backdrop {
+  background: rgba(43, 51, 66, 0.28);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.liquid-glass-edition .dialog-card {
+  gap: 16px;
+  background: transparent;
+}
+
+.liquid-glass-edition .project-advanced-options,
+.liquid-glass-edition .project-storage-config,
+.liquid-glass-edition .project-resource-config,
+.liquid-glass-edition .resource-picker-block {
+  border-color: rgba(132, 145, 165, 0.2);
+  border-radius: 14px;
+  background: rgba(247, 249, 252, 0.78);
+}
+
+.liquid-glass-edition .project-advanced-body {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.liquid-glass-edition #projectForm > .dialog-actions {
+  border-color: rgba(132, 145, 165, 0.18);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.liquid-glass-edition .focus-exit-btn {
+  border-color: var(--glass-confirm);
+  border-radius: 999px;
+  background: var(--glass-confirm);
+  color: #ffffff;
+  box-shadow: var(--glass-shadow-soft);
+}
+
+.liquid-glass-edition .focus-exit-btn:hover {
+  border-color: var(--glass-confirm-strong);
+  background: var(--glass-confirm-strong);
+  color: #ffffff;
+}
+
+.liquid-glass-edition .danger-small {
+  border-color: rgba(182, 73, 73, 0.18);
+  background: #fff5f5;
+  color: var(--glass-danger);
+}
+
+.liquid-glass-edition .danger-small:hover {
+  border-color: rgba(182, 73, 73, 0.34);
+  background: #ffebeb;
+}
+
+@media (max-width: 1480px) {
+  .liquid-glass-edition .workspace {
+    grid-template-columns: 210px minmax(520px, 1fr) 320px;
+  }
+
+  .liquid-glass-edition .workspace.projects-mode {
+    grid-template-columns: 210px minmax(520px, 1fr);
+  }
+
+  .liquid-glass-edition .topbar-actions > button,
+  .liquid-glass-edition .topbar-actions > details > summary {
+    padding-inline: 10px;
+  }
+}
+
+@media (max-width: 1180px) {
+  body.liquid-glass-edition {
+    overflow: auto;
+  }
+
+  .liquid-glass-edition .app-shell {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .liquid-glass-edition .topbar {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .liquid-glass-edition .topbar-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .liquid-glass-edition .workspace,
+  .liquid-glass-edition .workspace.projects-mode {
+    height: auto;
+    min-height: calc(100vh - 124px);
+    grid-template-columns: 210px minmax(0, 1fr);
+    grid-template-rows: minmax(720px, auto) auto;
+  }
+
+  .liquid-glass-edition .sidebar {
+    grid-column: 1 / -1;
+    height: auto;
+    max-height: none;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .liquid-glass-edition .side-panel {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 780px) {
+  .liquid-glass-edition .topbar {
+    margin: 10px 10px 0;
+    border-radius: 20px;
+  }
+
+  .liquid-glass-edition .brand {
+    min-width: 0;
+  }
+
+  .liquid-glass-edition .brand p,
+  .liquid-glass-edition .save-status {
+    display: none;
+  }
+
+  .liquid-glass-edition .topbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .liquid-glass-edition .topbar-actions > button,
+  .liquid-glass-edition .topbar-actions > details {
+    flex: 1 1 auto;
+  }
+
+  .liquid-glass-edition .topbar-actions > details > summary {
+    width: 100%;
+  }
+
+  .liquid-glass-edition .workspace,
+  .liquid-glass-edition .workspace.projects-mode {
+    padding: 10px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+  }
+
+  .liquid-glass-edition .project-rail,
+  .liquid-glass-edition .editor-area,
+  .liquid-glass-edition .sidebar {
+    grid-column: 1;
+    border-radius: 20px;
+  }
+
+  .liquid-glass-edition .project-rail {
+    height: auto;
+    max-height: 190px;
+  }
+
+  .liquid-glass-edition .project-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .liquid-glass-edition .editor-area {
+    min-height: 760px;
+  }
+
+  .liquid-glass-edition .projects-view,
+  .liquid-glass-edition .resources-view,
+  .liquid-glass-edition .project-home-view {
+    padding: 16px;
+  }
+
+  .liquid-glass-edition .project-toolbar {
+    padding: 14px;
+  }
+
+  .liquid-glass-edition .segment-controls {
+    align-items: stretch;
+  }
+
+  .liquid-glass-edition .segment-controls > * {
+    flex: 1 1 150px;
+  }
+
+  .liquid-glass-edition .replace-panel {
+    left: 10px;
+    right: 10px;
+  }
+
+  .liquid-glass-edition #segmentSearchInput {
+    min-width: 0;
+  }
+
+  .liquid-glass-edition #nextOpenBtn {
+    margin-left: 0;
+  }
+
+  .liquid-glass-edition .segment-grid {
+    min-width: 720px;
+  }
+
+  .liquid-glass-edition .segment-grid-wrap {
+    overflow: auto;
+  }
+
+  .liquid-glass-edition .sidebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .liquid-glass-edition .resource-import-row,
+  .liquid-glass-edition .two-col,
+  .liquid-glass-edition .local-ai-language-grid,
+  .liquid-glass-edition .local-ai-command-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .liquid-glass-edition dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+  }
+}
+
+@media (max-width: 560px) {
+  .liquid-glass-edition .replace-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid-glass-edition *,
+  .liquid-glass-edition *::before,
+  .liquid-glass-edition *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/*
+ * Chromium exposes the same user preference Apple asks Liquid Glass apps to
+ * respect. Keep the functional layer distinct, but make it fully opaque when
+ * transparency is reduced so controls never depend on blur for legibility.
+ */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-panel: #f8fafc;
+    --glass-panel-strong: #ffffff;
+    --glass-line: #cbd5e1;
+    --glass-shadow: 0 12px 28px rgba(67, 82, 105, 0.16);
+    --glass-shadow-soft: 0 6px 18px rgba(67, 82, 105, 0.12);
+  }
+
+  .liquid-glass-edition .topbar,
+  .liquid-glass-edition .project-rail,
+  .liquid-glass-edition .sidebar,
+  .liquid-glass-edition .menu-panel,
+  .liquid-glass-edition .concordance-popover,
+  .liquid-glass-edition .command-palette,
+  .liquid-glass-edition dialog,
+  .liquid-glass-edition #projectForm > .dialog-actions {
+    background: var(--glass-panel-strong);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .liquid-glass-edition .concordance-overlay,
+  .liquid-glass-edition .command-palette-overlay,
+  .liquid-glass-edition dialog::backdrop {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --glass-muted: #4a5568;
+    --glass-line: #aab6c5;
+    --glass-line-solid: #aab6c5;
+    --glass-accent: #087b70;
+    --glass-accent-strong: #065d55;
+    --glass-confirm: #07645d;
+    --glass-confirm-strong: #054e49;
+  }
+
+  .liquid-glass-edition :focus-visible {
+    outline-color: #065d55;
+    outline-width: 4px;
+  }
+
+  .liquid-glass-edition .topbar,
+  .liquid-glass-edition .project-rail,
+  .liquid-glass-edition .sidebar,
+  .liquid-glass-edition .editor-area,
+  .liquid-glass-edition .menu-panel,
+  .liquid-glass-edition dialog {
+    border-color: var(--glass-line-solid);
+  }
+}
+
+@media (forced-colors: active) {
+  .liquid-glass-edition button,
+  .liquid-glass-edition summary,
+  .liquid-glass-edition .file-button,
+  .liquid-glass-edition input,
+  .liquid-glass-edition select,
+  .liquid-glass-edition textarea {
+    forced-color-adjust: auto;
+  }
+
+  .liquid-glass-edition :focus-visible {
+    outline: 3px solid Highlight;
+  }
+}
+
+/*
+ * Focus mode must win over every edition breakpoint. The production Focus
+ * rules load before this edition stylesheet, so repeat the structural rules
+ * here with edition-specific selectors and keep the reading surface full-width.
+ */
+body.liquid-glass-edition.focus-mode {
+  height: 100vh;
+  overflow: hidden;
+  background: #f4f7fa;
+}
+
+body.liquid-glass-edition.focus-mode .app-shell {
+  width: 100%;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.liquid-glass-edition .workspace.focus-mode,
+.liquid-glass-edition .workspace.projects-mode.focus-mode {
+  width: 100%;
+  height: 100vh;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.liquid-glass-edition .workspace.focus-mode .editor-area {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  width: 100%;
+  height: 100vh;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.liquid-glass-edition .workspace.focus-mode .editor-view,
+.liquid-glass-edition .workspace.focus-mode .segment-grid-wrap {
+  width: 100%;
+  height: 100vh;
+  min-height: 0;
+  overflow: auto;
+}
+
+.liquid-glass-edition .workspace.focus-mode .segment-grid-wrap {
+  box-sizing: border-box;
+  padding-top: 56px;
+}
+
+.liquid-glass-edition .workspace.focus-mode .workspace-recovery,
+.liquid-glass-edition .workspace.focus-mode .backup-reminder,
+.liquid-glass-edition .workspace.focus-mode .validation-report {
+  display: none !important;
+}
+
+.liquid-glass-edition .workspace.focus-mode .segment-grid {
+  width: 100%;
+  min-width: 720px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+body.liquid-glass-edition.focus-mode .focus-exit-btn:not(.hidden) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

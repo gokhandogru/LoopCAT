@@ -1,14 +1,18 @@
 const APP_VERSION = "0.0.2";
+// Bump when a cached UI asset changes so installed PWAs refresh their shell.
+const STATIC_ASSET_REVISION = "2026-07-12-liquid-glass-windows-editor-performance";
 const CACHE_PREFIX = "loopcat-offline-";
-const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}`;
+const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}-${STATIC_ASSET_REVISION}`;
 
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
+  "./liquid-glass/styles.css",
   "./manifest.webmanifest",
   "./service-worker.js",
   "./icons/loopcat-icon.svg",
+  "./icons/loopcat-icon.png",
   "./storage.js",
   "./workspace-storage.js",
   "./docx.js",

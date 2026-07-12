@@ -91,9 +91,11 @@ function packageIncludes(buildFiles, relativePath) {
 const requiredAppFiles = [
   "index.html",
   "styles.css",
+  "liquid-glass/styles.css",
   "manifest.webmanifest",
   "service-worker.js",
   "icons/loopcat-icon.svg",
+  "icons/loopcat-icon.png",
   "storage.js",
   "workspace-storage.js",
   "docx.js",
@@ -934,7 +936,7 @@ for (const asset of expectedCacheAssets) {
 
 assertIncludes(serviceWorker, `const APP_VERSION = "${packageJson.version}"`, "service-worker.js APP_VERSION must match package.json.");
 assertIncludes(serviceWorker, `const CACHE_PREFIX = "loopcat-offline-"`, "service-worker.js must keep a LoopCAT-only cache prefix.");
-assertIncludes(serviceWorker, "const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}`", "service-worker.js cache name must be derived from APP_VERSION.");
+assertIncludes(serviceWorker, "const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}-${STATIC_ASSET_REVISION}`", "service-worker.js cache name must be derived from APP_VERSION and the static asset revision.");
 assertIncludes(serviceWorker, "key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME", "service-worker.js must delete only old LoopCAT offline caches during activation.");
 assertIncludes(serviceWorker, "CORE_ASSET_URLS", "service-worker.js must keep an explicit core asset URL allowlist.");
 assertIncludes(serviceWorker, "failedAssets", "service-worker.js must collect failed core asset cache writes.");

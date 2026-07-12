@@ -1,5 +1,5 @@
 (() => {
-const { bulkPut, countByIndex, deleteByKey, deleteStoresWhereAtomically, deleteWhere, get, getAll, getAllByIndex, makeId, put, constants } = window.CatHan.storage;
+const { bulkPut, countByIndex, deleteByKey, deleteStoresWhereAtomically, deleteWhere, get, getMany, getAll, getAllByIndex, getAllByIndexMany, makeId, put, constants } = window.CatHan.storage;
 const LOCAL_WORKSPACE_ID = constants?.LOCAL_WORKSPACE_ID || "local-workspace";
 const LOCAL_USER_ID = constants?.LOCAL_USER_ID || "local-user";
 const TM_INDEX_META_PREFIX = "tm-token-index:";
@@ -7,6 +7,7 @@ const MAX_INDEX_TOKENS = 24;
 const MAX_INDEX_CANDIDATES = 600;
 const RESOURCE_IMPORT_CHUNK_SIZE = 1000;
 const SENSITIVE_TEXT_VALUE_PATTERN = /(sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._~+/=-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|npm_[A-Za-z0-9_]{8,}|(?:session|cookie)[=:][A-Za-z0-9._~+/=-]{8,})/i;
+let tmSignatureIndexAvailable = true;
 
 function redactSensitiveText(value) {
   return String(value || "").replace(new RegExp(SENSITIVE_TEXT_VALUE_PATTERN.source, "gi"), "[redacted secret]");
@@ -42,7 +43,11 @@ function normalizeText(text) {
 }
 
 function tokens(text) {
-  return Array.from(new Set(normalizeText(text).split(" ").filter((token) => token.length > 2)));
+  return tokensFromNormalized(normalizeText(text));
+}
+
+function tokensFromNormalized(text) {
+  return Array.from(new Set(String(text || "").split(" ").filter((token) => token.length > 2)));
 }
 
 function tokenSignature(text) {
@@ -50,8 +55,12 @@ function tokenSignature(text) {
 }
 
 function tokenOverlap(source, candidate) {
-  const a = tokens(source);
-  const b = new Set(tokens(candidate));
+  return tokenOverlapTokens(tokens(source), tokens(candidate));
+}
+
+function tokenOverlapTokens(sourceTokens, candidateTokens) {
+  const a = sourceTokens;
+  const b = new Set(candidateTokens);
   if (!a.length || !b.size) return 0;
   return a.filter((token) => b.has(token)).length / Math.max(a.length, b.size);
 }
@@ -246,6 +255,10 @@ function levenshtein(a, b) {
 function similarity(source, candidate) {
   const a = normalizeText(source);
   const b = normalizeText(candidate);
+  return similarityNormalized(a, b);
+}
+
+function similarityNormalized(a, b) {
   if (!a && !b) return 100;
   if (!a || !b) return 0;
   const max = Math.max(a.length, b.length);
@@ -257,15 +270,34 @@ async function saveTmEntry(input = {}) {
   const candidate = tmEntryRecord({ source, target, sourceLang, targetLang, projectName, tmName });
   const languagePair = candidate.languagePair;
   await ensureTmIndex(languagePair);
-  const existing = (await getAllByIndex("tmEntries", "languagePair", languagePair)).find((entry) =>
+  let existingCandidates;
+  if (tmSignatureIndexAvailable) {
+    try {
+      existingCandidates = await getAllByIndex("tmEntries", "signature", candidate.signature);
+    } catch (error) {
+      if (error?.name !== "NotFoundError") throw error;
+      tmSignatureIndexAvailable = false;
+    }
+  }
+  if (!existingCandidates) {
+    existingCandidates = await getTmMatchCandidates({
+      source: candidate.source,
+      sourceLang: candidate.sourceLang,
+      targetLang: candidate.targetLang,
+      tmName: candidate.tmName
+    });
+  }
+  const existing = existingCandidates.find((entry) =>
+    languagePairOf(entry) === languagePair &&
     entry.tmName === candidate.tmName &&
     normalizeText(entry.source) === normalizeText(candidate.source) &&
     normalizeText(entry.target) === normalizeText(candidate.target)
   );
   const entry = tmEntryRecord(candidate, { existing });
-  if (existing?.id) await deleteWhere("tmTokenIndex", (record) => record.tmEntryId === existing.id);
   await put("tmEntries", entry);
-  await putTmIndexRecords([entry]);
+  // An exact existing unit keeps the same language, resource, source, and token rows.
+  // Rewriting those rows would turn every confirmation into a full index deletion scan.
+  if (!existing) await putTmIndexRecords([entry]);
   await writeIndexMetaClean(languagePair);
   return entry;
 }
@@ -360,21 +392,26 @@ function scoreTmEntries(entries, options = {}) {
   const sourceText = cleanText(source);
   const normalizedSource = normalizeText(sourceText);
   if (!normalizedSource) return [];
+  const sourceTokens = tokensFromNormalized(normalizedSource);
   const languagePair = languagePairFromFields(sourceLang, targetLang);
   const allowedNames = resourceNameSet(tmNames, tmName);
   const byKey = new Map();
-  (entries || [])
-    .filter((entry) => !languagePair || languagePairOf(entry) === languagePair)
-    .filter((entry) => !allowedNames.size || allowedNames.has(entry.tmName))
-    .filter((entry) => normalizeText(entry.source) === normalizedSource || tokenOverlap(sourceText, entry.source) >= 0.15)
-    .forEach((entry) => {
-      const scored = { ...entry, score: similarity(sourceText, entry.source) };
-      if (scored.score < 45) return;
-      const existing = byKey.get(memoryKey(entry));
-      if (!existing || scored.score > existing.score || new Date(scored.updatedAt) > new Date(existing.updatedAt)) {
-        byKey.set(memoryKey(entry), scored);
-      }
-    });
+  (entries || []).forEach((entry) => {
+    if (languagePair && languagePairOf(entry) !== languagePair) return;
+    if (allowedNames.size && !allowedNames.has(entry.tmName)) return;
+    const normalizedCandidate = normalizeText(entry.source);
+    if (
+      normalizedCandidate !== normalizedSource &&
+      tokenOverlapTokens(sourceTokens, tokensFromNormalized(normalizedCandidate)) < 0.15
+    ) return;
+    const scored = { ...entry, score: similarityNormalized(normalizedSource, normalizedCandidate) };
+    if (scored.score < 45) return;
+    const key = [languagePairOf(entry), entry.tmName || "", normalizedCandidate, normalizeText(entry.target)].join("::");
+    const existing = byKey.get(key);
+    if (!existing || scored.score > existing.score || new Date(scored.updatedAt) > new Date(existing.updatedAt)) {
+      byKey.set(key, scored);
+    }
+  });
   return Array.from(byKey.values())
     .sort((a, b) => b.score - a.score || new Date(b.updatedAt) - new Date(a.updatedAt))
     .slice(0, limit);
@@ -401,13 +438,84 @@ async function getTmMatchCandidates(options = {}) {
     .slice(0, MAX_INDEX_CANDIDATES)
     .map(([id]) => id);
   if (!candidateIds.length) return [];
-  return (await Promise.all(candidateIds.map((id) => get("tmEntries", id)))).filter(Boolean);
+  const entries = getMany
+    ? await getMany("tmEntries", candidateIds)
+    : await Promise.all(candidateIds.map((id) => get("tmEntries", id)));
+  return entries.filter(Boolean);
+}
+
+async function getTmMatchCandidateBatches(optionsList = []) {
+  const requests = Array.isArray(optionsList) ? optionsList : [];
+  const results = requests.map(() => []);
+  const groups = new Map();
+
+  requests.forEach((options, index) => {
+    const source = cleanText(options?.source);
+    const languagePair = languagePairFromFields(options?.sourceLang, options?.targetLang);
+    if (!source || !languagePair) return;
+    if (!groups.has(languagePair)) groups.set(languagePair, []);
+    groups.get(languagePair).push({ index, options: options || {}, sourceTokens: tokens(source).slice(0, MAX_INDEX_TOKENS) });
+  });
+
+  await Promise.all(Array.from(groups, async ([languagePair, group]) => {
+    await ensureTmIndex(languagePair);
+    const uniqueTokens = Array.from(new Set(group.flatMap((request) => request.sourceTokens)));
+    const tokenRows = uniqueTokens.length
+      ? (getAllByIndexMany
+          ? await getAllByIndexMany("tmTokenIndex", "languagePairToken", uniqueTokens.map((token) => [languagePair, token]))
+          : await Promise.all(uniqueTokens.map((token) => getAllByIndex("tmTokenIndex", "languagePairToken", [languagePair, token]))))
+      : [];
+    const rowsByToken = new Map(uniqueTokens.map((token, index) => [token, tokenRows[index] || []]));
+    const candidateIdsByRequest = new Map();
+    const allCandidateIds = new Set();
+    let allPairEntries = null;
+
+    for (const request of group) {
+      if (!request.sourceTokens.length) {
+        allPairEntries ||= await getAllByIndex("tmEntries", "languagePair", languagePair);
+        results[request.index] = allPairEntries;
+        continue;
+      }
+      const allowedNames = resourceNameSet(request.options.tmNames, request.options.tmName);
+      const candidateHits = new Map();
+      request.sourceTokens.forEach((token) => {
+        (rowsByToken.get(token) || []).forEach((record) => {
+          if (allowedNames.size && !allowedNames.has(record.tmName)) return;
+          candidateHits.set(record.tmEntryId, (candidateHits.get(record.tmEntryId) || 0) + 1);
+        });
+      });
+      const ids = Array.from(candidateHits.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, MAX_INDEX_CANDIDATES)
+        .map(([id]) => id);
+      candidateIdsByRequest.set(request.index, ids);
+      ids.forEach((id) => allCandidateIds.add(id));
+    }
+
+    const ids = Array.from(allCandidateIds);
+    if (!ids.length) return;
+    const entries = getMany
+      ? await getMany("tmEntries", ids)
+      : await Promise.all(ids.map((id) => get("tmEntries", id)));
+    const entriesById = new Map(entries.filter(Boolean).map((entry) => [entry.id, entry]));
+    candidateIdsByRequest.forEach((candidateIds, requestIndex) => {
+      results[requestIndex] = candidateIds.map((id) => entriesById.get(id)).filter(Boolean);
+    });
+  }));
+
+  return results;
 }
 
 async function findTmMatches(options = {}) {
   const { source, sourceLang, targetLang, tmName, tmNames, limit = 6 } = options || {};
   const candidates = await getTmMatchCandidates({ source, sourceLang, targetLang, tmName, tmNames });
   return scoreTmEntries(candidates, { source, sourceLang, targetLang, tmName, tmNames, limit });
+}
+
+async function findTmMatchesBatch(optionsList = []) {
+  const requests = Array.isArray(optionsList) ? optionsList : [];
+  const candidates = await getTmMatchCandidateBatches(requests);
+  return candidates.map((entries, index) => scoreTmEntries(entries, requests[index] || {}));
 }
 
 async function listTmEntries(options = {}) {
@@ -426,6 +534,7 @@ window.CatHan.tm = {
   tokenSignature,
   scoreTmEntries,
   getTmMatchCandidates,
+  getTmMatchCandidateBatches,
   rebuildTmIndex,
   rebuildAllTmIndexes,
   saveTmEntry,
@@ -434,6 +543,7 @@ window.CatHan.tm = {
   updateTmEntry,
   deleteTmEntry,
   deleteTmEntries,
-  findTmMatches
+  findTmMatches,
+  findTmMatchesBatch
 };
 })();
