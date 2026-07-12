@@ -791,6 +791,8 @@ const els = {
   aboutBtn: document.querySelector("#aboutBtn"),
   aboutDialog: document.querySelector("#aboutDialog"),
   closeAboutBtn: document.querySelector("#closeAboutBtn"),
+  tmPretranslateDialog: document.querySelector("#tmPretranslateDialog"),
+  tmPretranslateThresholdInput: document.querySelector("#tmPretranslateThresholdInput"),
   workspaceMenuSummary: document.querySelector("#workspaceMenuSummary"),
   workspaceMenu: document.querySelector(".workspace-menu"),
   workspaceHealth: document.querySelector("#workspaceHealth"),
@@ -5685,26 +5687,46 @@ async function saveActiveSegmentToTm(options = {}) {
   }
 }
 
+function requestTmPretranslationThreshold() {
+  const dialog = els.tmPretranslateDialog;
+  const input = els.tmPretranslateThresholdInput;
+  if (!dialog || !input || typeof dialog.showModal !== "function") {
+    throw new Error("TM pretranslation settings are unavailable in this browser.");
+  }
+  input.value = "85";
+  dialog.returnValue = "";
+  return new Promise((resolve) => {
+    dialog.addEventListener("close", () => {
+      resolve(dialog.returnValue === "apply" ? input.value : null);
+    }, { once: true });
+    dialog.showModal();
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  });
+}
+
 async function pretranslateFromTm() {
   if (!state.project || state.tmPretranslating) return;
-  const raw = window.prompt("Minimum TM match percentage to pretranslate", "85");
-  if (raw === null) return;
-  const threshold = Number(raw);
-  if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) {
-    setSaveStatus("Enter a match percentage between 0 and 100.", "dirty");
-    return;
-  }
-  const candidates = currentDocumentSegments().filter((segment) => !segment.target.trim() && segment.source.trim());
-  if (!candidates.length) {
-    setSaveStatus("No empty segments to pretranslate.", "saved");
-    return;
-  }
   const snapshots = new Map();
   const updated = [];
   state.tmPretranslating = true;
   els.pretranslateBtn.disabled = true;
   els.pretranslateBtn.setAttribute("aria-busy", "true");
   try {
+    const raw = await requestTmPretranslationThreshold();
+    if (raw === null) return;
+    const threshold = Number(raw);
+    if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) {
+      setSaveStatus("Enter a match percentage between 0 and 100.", "dirty");
+      return;
+    }
+    const candidates = currentDocumentSegments().filter((segment) => !segment.target.trim() && segment.source.trim());
+    if (!candidates.length) {
+      setSaveStatus("No empty segments to pretranslate.", "saved");
+      return;
+    }
     setSaveStatus("Pretranslating...");
     await yieldToUi();
     const tmNames = projectTmNames();
@@ -15154,10 +15176,24 @@ async function runAppWorkflowTest() {
     const pretranslateSegmentIndex = state.segments.findIndex((segment) => segment.documentId === pretranslateDocument.id);
     const pretranslateSegment = state.segments[pretranslateSegmentIndex];
     const originalPrompt = window.prompt;
-    window.prompt = () => "80";
+    let browserPromptCalls = 0;
+    window.prompt = () => {
+      browserPromptCalls += 1;
+      return "80";
+    };
+    const runTmPretranslationFromDialog = async () => {
+      const pending = pretranslateFromTm();
+      assert(
+        els.tmPretranslateDialog.open && browserPromptCalls === 0,
+        "TM pretranslation uses the in-app threshold dialog instead of a browser prompt"
+      );
+      els.tmPretranslateThresholdInput.value = "80";
+      els.tmPretranslateDialog.close("apply");
+      await pending;
+    };
     try {
       setHiddenSegmentField(pretranslateSegment, PRETRANSLATE_SAVE_FAILURE_TEST_FLAG, true);
-      await pretranslateFromTm();
+      await runTmPretranslationFromDialog();
       const failedPretranslation = (await getProjectSegments(project.id)).find((segment) => segment.id === pretranslateSegment.id);
       assert(
         els.saveStatus.textContent.includes("Simulated pretranslation save failure") &&
@@ -15165,7 +15201,7 @@ async function runAppWorkflowTest() {
           failedPretranslation?.target === "",
         "pretranslation save failure restores empty target state"
       );
-      await pretranslateFromTm();
+      await runTmPretranslationFromDialog();
     } finally {
       window.prompt = originalPrompt;
     }

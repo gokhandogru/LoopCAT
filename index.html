@@ -952,6 +952,23 @@
       </section>
     </dialog>
 
+    <dialog id="tmPretranslateDialog">
+      <form id="tmPretranslateForm" method="dialog" class="dialog-card" aria-labelledby="tmPretranslateDialogTitle">
+        <div>
+          <h2 id="tmPretranslateDialogTitle">Pretranslate from TM</h2>
+          <p class="muted">Fill empty segments with translation-memory matches at or above this score.</p>
+        </div>
+        <label>
+          Minimum match percentage
+          <input id="tmPretranslateThresholdInput" type="number" min="0" max="100" step="1" value="85" inputmode="decimal" required autocomplete="off">
+        </label>
+        <div class="dialog-actions">
+          <button type="submit" value="cancel" formnovalidate>Cancel</button>
+          <button class="primary" type="submit" value="apply">Pretranslate</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="projectDialog">
       <form id="projectForm" method="dialog" class="dialog-card">
         <h2 id="projectDialogTitle">New project</h2>

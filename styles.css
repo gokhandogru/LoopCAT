@@ -2566,6 +2566,10 @@ dialog {
   width: min(640px, calc(100vw - 32px));
 }
 
+#tmPretranslateDialog {
+  width: min(440px, calc(100vw - 32px));
+}
+
 #projectDialog {
   max-height: min(860px, calc(100vh - 32px));
   overflow: hidden;

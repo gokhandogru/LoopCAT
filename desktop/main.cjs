@@ -926,6 +926,19 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
         const topbarStyle = topbar ? getComputedStyle(topbar) : null;
         const newProjectStyle = newProjectButton ? getComputedStyle(newProjectButton) : null;
         const loadedStyleSheets = Array.from(document.styleSheets).map((sheet) => sheet.href || "inline");
+        const tmPretranslateDialog = document.querySelector("#tmPretranslateDialog");
+        const tmPretranslateThresholdInput = document.querySelector("#tmPretranslateThresholdInput");
+        const tmPretranslateDialogProbe = {
+          available: Boolean(tmPretranslateDialog && tmPretranslateThresholdInput && typeof tmPretranslateDialog.showModal === "function"),
+          opened: false,
+          closed: false
+        };
+        if (tmPretranslateDialogProbe.available) {
+          tmPretranslateDialog.showModal();
+          tmPretranslateDialogProbe.opened = tmPretranslateDialog.open && tmPretranslateThresholdInput.value === "85";
+          tmPretranslateDialog.close("cancel");
+          tmPretranslateDialogProbe.closed = !tmPretranslateDialog.open && tmPretranslateDialog.returnValue === "cancel";
+        }
         return {
           readyState: document.readyState,
           title: document.title,
@@ -962,6 +975,7 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
             confirmedLabel: window.CatHan?.i18n?.t?.("ui.label.confirmed") || "",
             workspaceSummaryText: document.querySelector("#workspaceMenuSummary")?.textContent || ""
           },
+          tmPretranslateDialogProbe,
           bodyText: document.body ? document.body.innerText.slice(0, 400) : ""
         };
       })()`, true);
@@ -1012,6 +1026,9 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
       if (result?.i18nProbe?.storageLabel !== "Storage") missing.push("workspace storage i18n label");
       if (result?.i18nProbe?.confirmedLabel !== "confirmed") missing.push("confirmed i18n label");
       if (result?.i18nProbe?.workspaceSummaryText === "workspace.menu.summary") missing.push("raw workspace i18n key hidden");
+      if (!result?.tmPretranslateDialogProbe?.available) missing.push("TM pretranslation threshold dialog availability");
+      if (!result?.tmPretranslateDialogProbe?.opened) missing.push("TM pretranslation threshold dialog open");
+      if (!result?.tmPretranslateDialogProbe?.closed) missing.push("TM pretranslation threshold dialog close");
       for (const storeName of ["projects", "segments", "appMeta"]) {
         if (!result?.storageProbe?.objectStores?.includes(storeName)) missing.push(`IndexedDB store ${storeName}`);
       }

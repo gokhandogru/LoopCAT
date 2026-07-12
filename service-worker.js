@@ -1,6 +1,6 @@
 const APP_VERSION = "0.0.2";
 // Bump when a cached UI asset changes so installed PWAs refresh their shell.
-const STATIC_ASSET_REVISION = "2026-07-12-liquid-glass-windows-editor-performance";
+const STATIC_ASSET_REVISION = "2026-07-13-liquid-glass-windows-tm-pretranslate-dialog";
 const CACHE_PREFIX = "loopcat-offline-";
 const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}-${STATIC_ASSET_REVISION}`;
 
