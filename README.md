@@ -1,6 +1,27 @@
 # LoopCAT
 
-LoopCAT is a local-first browser CAT tool MVP. It runs as static HTML, CSS, and JavaScript and stores project data, segments, translation memory entries, and termbase entries in IndexedDB.
+LoopCAT is a local-first computer-assisted translation (CAT) tool for translators, post-editors, reviewers, and academic translation projects. It runs as a static browser app or an Electron desktop app and keeps projects, segments, translation memories, termbases, review data, and settings on the user's machine by default.
+
+LoopCAT is designed for a complete single-user workflow: create a project, import source files, translate or post-edit, use TM and terminology, run QA, review changes, recover from packages or backups, and export target files without requiring an internet connection. Local or hosted AI can be added explicitly, but it is optional and does not replace the offline workflow.
+
+[Install](#how-to-install) | [Current status](#current-project-status) | [What works today](#what-works-today) | [Limitations and remaining work](#current-limitations-and-remaining-work) | [AI providers](#local-ai-command-centre) | [Tests](#browser-tests) | [Roadmap](ROADMAP.md) | [License](#license)
+
+## Current Project Status
+
+LoopCAT is beyond a proof-of-concept MVP: the core offline CAT workflow and recovery model are implemented, and version `0.0.2` is available as a web bundle plus Windows installer and portable downloads. The project is still under active development and should not yet be described as a fully production-qualified cross-platform desktop release.
+
+| Area | Current state |
+| --- | --- |
+| Core translation workflow | Implemented: multi-file projects, segmentation, CAT-grid editing, statuses, comments, revision history, QA, TM, terminology, analysis, and target export. |
+| Offline and recovery | Implemented: IndexedDB autosave, portable project packages, full browser backups, visible workspace-folder packages where supported, and offline web/desktop shells. |
+| Public downloads | Version `0.0.2` provides a web bundle, Windows installer, and Windows portable package with checksums. |
+| Cross-platform desktop | Electron packaging targets Windows, macOS, and Linux. Signed/notarized public artifacts and recorded clean-machine evidence for every platform remain release-qualification work. |
+| Format support | Broad import/export coverage is implemented, including DOCX, localization formats, publishing formats, subtitles, resources, and terminology exchange. Perfect reconstruction of every complex Office, OpenDocument, and DTP structure is not claimed. |
+| Scale | Browser tests cover projects with thousands of segments and indexed TM lookup. True chunked document import, deeper persistent indexes, and long-duration autosave/memory profiling remain. |
+| AI | Optional and local-first. Ollama, LM Studio/OpenAI-compatible runtimes, and OPUS-CAT can run locally; hosted providers require explicit configuration and source-sharing confirmation. |
+| Collaboration | Server sync, shared cloud workspaces, and real-time multi-user collaboration are not implemented. |
+
+The detailed distinction between shipped behavior, release blockers, near-term priorities, and ongoing guardrails is maintained in [ROADMAP.md](ROADMAP.md).
 
 ## How to Install
 
@@ -12,21 +33,15 @@ Download LoopCAT from the [LoopCAT v0.0.2 release](https://github.com/gokhandogr
 
 The release also includes [`LoopCAT.0.0.2.SHA256SUMS.txt`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT.0.0.2.SHA256SUMS.txt) so you can verify the downloaded ZIP files.
 
-### Connect LM Studio with TranslateGemma 4B
-
-1. Install [LM Studio](https://lmstudio.ai/) and download or import a TranslateGemma 4B model, such as a `translategemma-4b-it` GGUF build. Google's [Gemma with LM Studio guide](https://ai.google.dev/gemma/docs/integrations/lmstudio) describes using LM Studio's model downloader or importing a local GGUF file, and Google's [TranslateGemma announcement](https://blog.google/innovation-and-ai/technology/developers-tools/translategemma/) describes the 4B, 12B, and 27B translation model family.
-2. In LM Studio, load the TranslateGemma 4B model, open the `Developer` tab, and start the local server. LM Studio documents its [OpenAI-compatible base URL](https://lmstudio.ai/docs/developer/openai-compat) as `http://localhost:1234/v1` when the server runs on port `1234`.
-3. If you use LoopCAT in the browser/PWA build, enable CORS for the local LM Studio server, or start it with `lms server start --port 1234 --bind 127.0.0.1 --cors`. LM Studio's [`lms server start` docs](https://lmstudio.ai/docs/cli/serve/server-start) note that CORS is off unless enabled and that `127.0.0.1` keeps the server on localhost; keep it bound to `127.0.0.1` unless you intentionally want another device on your network to reach it.
-4. In LoopCAT, open `AI Command Centre`, choose provider preset `LM Studio local`, keep base URL `http://localhost:1234/v1`, leave the API key empty for local loopback use, then click `Test connection`.
-5. Click `Refresh models`, choose the exact model ID shown by LM Studio, confirm the project source and target languages, then run `Pre-translate`. LoopCAT marks generated text as AI-initiated and leaves it ready for human review.
-
 ## License
 
 LoopCAT is released under the Apache License 2.0. Copyright 2026 Dr. Gokhan Dogru. See `LICENSE` and `NOTICE` for the license text and attribution notice.
 
-## MVP Scope
+## What Works Today
 
-This first version is intentionally focused on a reliable editing loop:
+The following capabilities are implemented in the current codebase and covered by the project's browser, package, storage, workflow, or release checks.
+
+### Projects And File Handling
 
 - Create and reopen local projects.
 - Use a Projects view to browse many projects across different language pairs.
@@ -45,6 +60,9 @@ This first version is intentionally focused on a reliable editing loop:
 - Delete projects or individual files after an in-app confirmation prompt.
 - Filter the editor by document.
 - Segment source text into editable translation units, with DOCX import protection for common academic abbreviations and initials.
+
+### Editor, Review, And Quality
+
 - Edit target segments in a CAT-style grid.
 - Use native browser/Electron spellcheck in target segment editors, with the desktop wrapper syncing spellcheck to the active project target language where the runtime supports it.
 - Choose the LoopCAT interface language from the Workspace menu, including built-in English and Turkish, import custom UI translation JSON, and export the English UI source catalog for translators.
@@ -68,12 +86,18 @@ This first version is intentionally focused on a reliable editing loop:
 - Request persistent browser storage when available, estimate local storage usage, and warn in the Workspace menu if storage remains best-effort or nearly full.
 - Confirm segments and save them to a local translation memory.
 - Mark segments as needs review, reviewed, or blocked; filter by review state; and save reviewer notes, structured comments, and category-backed quality decisions.
+
+### Translation Memories And Terminology
+
 - Show exact and fuzzy TM matches for the active segment.
 - Add local termbase entries and show terms found in the active source segment.
 - Mark target terms as forbidden and block delivery exports when forbidden terminology appears.
 - Import/export TMX and TBX with termbase notes preserved, and import CSV/TSV/XLSX terminology lists.
 - Preview, edit, export, import, and delete TM/TB resources across language pairs.
 - Normalize direct TM and termbase saves/imports so malformed or incomplete resource rows are rejected before they can be stored, fail closed on incomplete direct resource lookups, and reject incomplete TMX/TBX exchange metadata before parsing or export.
+
+### Recovery, Reporting, And Optional AI
+
 - Export/import a project backup.
 - Restore full browser backups by replacing the backed-up stores and rebuilding derived indexes.
 - Export/import a single portable LoopCAT project package with validation warnings.
@@ -95,6 +119,9 @@ This first version is intentionally focused on a reliable editing loop:
 - Ignore malformed optional local TM/termbase context before AI request construction and report malformed provider output as an empty suggestion instead of a raw failure.
 - Keep user-facing AI suggestions on the real provider path only; production builds do not expose mock AI drafts.
 - Redact credential-looking source/target language metadata before project saves, package validation, and external AI prompt construction.
+
+### Delivery And Offline Use
+
 - Export the current target text as a simple `.txt` file.
 - Export the current project as XLIFF 1.2.
 - Export imported Other formats target files back through their original structure, including package-preserving Office/OpenDocument/DTP exports and text/XML/resource/subtitle formats.
@@ -107,18 +134,36 @@ This first version is intentionally focused on a reliable editing loop:
 - Export a bilingual review `.docx` with segment status, reviewer notes, structured comments, and QA summaries.
 - Install as an offline-capable web app when served locally or wrapped in a desktop shell.
 
-## Deliberately Deferred
+## Current Limitations And Remaining Work
 
-These are not part of the robust MVP yet:
+The current implementation is usable for substantial single-user offline projects, but the following work remains before LoopCAT meets its full cross-platform production-ready goal.
 
-- Perfect reconstruction for every complex feature in DOCX/OpenXML/OpenDocument/DTP files. The app preserves original packages and rewrites mapped text in-place, but very deep layout constructs such as SmartArt, unusual embedded objects, advanced spreadsheet rich-text runs, complex nested fields, and untested publisher-specific structures still need fixture coverage.
-- Optional offline spellcheck language-pack management and QA spellcheck dictionaries beyond native browser/Electron spellcheck.
-- Persistent inverted-index tables and chunked indexing for very large TMs.
-- Server sync, collaboration, or cloud storage.
+### Release Qualification
+
+- The repository can build Windows, macOS, and Linux desktop targets, but version `0.0.2` currently publishes the web and Windows downloads described above.
+- A public cross-platform desktop release still requires signed Windows artifacts, signed and notarized macOS artifacts, checksum-verified Linux artifacts, and completed clean-machine evidence for every public download.
+- Disk-full and permission-denied workspace-save results must be recorded for release candidates. The automated gates and evidence template exist, but they do not replace real platform testing.
+
+### Format Fidelity And Scale
+
+- Perfect reconstruction is not guaranteed for every complex feature in DOCX/OpenXML/OpenDocument/DTP files. LoopCAT preserves original packages and rewrites mapped text in place, but very deep layout constructs such as SmartArt, unusual embedded objects, advanced spreadsheet rich-text runs, complex nested fields, anchored objects, and untested publisher-specific structures still need broader fixture coverage.
+- IDML coverage needs deeper real-world fixtures for threaded stories, footnotes, tables, anchored objects, multi-story article order, and varied InDesign exports.
+- Very large document imports still need true chunked processing. Import progress yields around heavy phases, but parsing and persistence are not yet a fully streamed import pipeline.
+- Large-project tests cover thousands of segments; truly long-running autosave and memory profiling remain.
+- Translation memories use a derived token index, but deeper persistent inverted indexes and chunked indexing for very large TMs remain.
+- Optional offline spellcheck language-pack management and QA spellcheck dictionaries beyond native browser/Electron spellcheck are not implemented.
+
+### Product And Engineering Scope
+
+- Server sync, shared cloud storage, team ownership, and real-time collaboration are not implemented. Portable project packages, browser backups, and visible workspace-folder packages are the current handoff and recovery model.
+- Revision history is stored per segment and counted in reports, but richer research-oriented revision-history export options remain.
+- The main UI coordinator is still large and is intended to be split into smaller controllers after behavior and release gates stabilize.
+
+See [ROADMAP.md](ROADMAP.md) for the ordered release blockers, near-term priorities, shipped baseline, and production-ready exit criterion.
 
 ## Architecture
 
-The code is split by responsibility so the app can grow without becoming one large script:
+Storage, format, validation, QA, AI, and worker responsibilities are split into dedicated modules. `app.js` still acts as the large UI coordinator and remains a planned maintainability refactor.
 
 - `index.html` defines the static UI shell.
 - `manifest.webmanifest` and `service-worker.js` define the installable offline app shell.
@@ -182,6 +227,8 @@ The `Prompt Test` area can preview and send the exact prompt family for pre-tran
 
 Project analysis and offline project reports include project-level AI triage metrics for AI-initiated rows, segments with AI suggestions, total AI suggestions, AI review risk, and high-risk AI review rows. These report counts stay metadata-only; segment text, prompt traces, and provider responses are not included.
 
+### Ollama And TranslateGemma
+
 1. Install Ollama for Windows from the official [Ollama Windows download page](https://ollama.com/download/windows). Ollama documents Windows installs as user-directory installs that do not require Administrator rights; model files need additional disk space.
 2. Start Ollama, then install a translation-capable model:
 
@@ -213,7 +260,7 @@ Project analysis and offline project reports include project-level AI triage met
 23. To harvest terminology from more context, choose a translation mode such as `all visible` or `all project segments`, then click `Extract terms batch`. LoopCAT processes matching source/target snippets, saves only new term candidates, records segment-level failures without stopping the whole run, and lets you cancel the batch.
 24. To prepare reusable context, click `Generate project brief`. LoopCAT uses project metadata, document names, sample segments, and termbase hints to append a concise brief to the existing project style instructions.
 
-Optional live Ollama verification:
+### Optional Live Ollama Verification
 
 - Local Ollama with TranslateGemma:
 
@@ -230,7 +277,7 @@ Optional live Ollama verification:
 
 The live verifier uses the same `/api/tags` and non-streaming `/api/chat` shape as the AI Command Centre, checks that the requested model is visible, sends one short translation probe, and never prints the API key.
 
-Optional live hosted-provider verification:
+### Optional Live Hosted-Provider Verification
 
 ```powershell
 $env:OPENAI_API_KEY="your-openai-key"
@@ -245,21 +292,21 @@ pnpm run verify:ai-live -- --provider mistral --model mistral-large-latest
 
 The hosted-provider verifier currently covers OpenAI, DeepSeek, Gemini, Anthropic, Cohere, Mistral, xAI, Perplexity, Groq, Together AI, OpenRouter, Hugging Face Inference Providers, DeepInfra, Fireworks AI, Azure OpenAI, and OpenAI-compatible loopback servers. Its defaults mirror the AI Command Centre presets, but you can pass `--model` for a specific deployment or provider-listed model. It sends the sample source text to the selected provider, checks model listing by default, supports `--strict-model-check` for CI-like probes, and never prints the API key.
 
-Hosted Ollama:
+### Hosted Ollama
 
 1. In the AI Command Centre, choose provider `Ollama` and click `Use hosted Ollama`, or set base URL to `https://ollama.com`.
 2. Add the hosted Ollama API key in `Hosted provider API key`. The key is kept in browser storage only and is never exported with project packages.
 3. Click `Test connection`, `Refresh models`, choose a hosted model such as `gpt-oss:120b`, then run `Pre-translate`.
 4. LoopCAT asks for confirmation before sending source text to hosted Ollama.
 
-Ollama cloud model through local Ollama:
+### Ollama Cloud Model Through Local Ollama
 
 1. Sign in to Ollama locally and keep the local Ollama runtime running.
 2. In `Provider preset`, choose `Ollama cloud model via local Ollama`, or click `Use local cloud model`.
 3. Keep base URL `http://localhost:11434` and model `gpt-oss:120b-cloud`, or enter another cloud-suffixed Ollama model.
 4. LoopCAT still asks for confirmation because cloud-suffixed Ollama models may be processed through Ollama Cloud, even though the API request first goes to local Ollama.
 
-LM Studio with TranslateGemma 4B or another local OpenAI-compatible server:
+### LM Studio With TranslateGemma Or Another Local Server
 
 1. Install LM Studio, download or import a TranslateGemma 4B model such as `translategemma-4b-it`, and load it in LM Studio.
 2. Open LM Studio's `Developer` tab and start the local server. Use base URL `http://localhost:1234/v1` unless you changed the server port.
@@ -280,7 +327,7 @@ LM Studio with TranslateGemma 4B or another local OpenAI-compatible server:
 
 The browser sandbox cannot launch OPUS-CAT, Node.js, or another local executable from `index.html`. Fully automatic browser connection therefore requires either a running CORS-enabled OPUS-CAT engine or a bridge/launcher that was started outside the browser. The LoopCAT desktop wrapper supplies this compatibility layer internally.
 
-Hugging Face Inference Providers:
+### Hugging Face Inference Providers
 
 1. In `Provider preset`, choose `Hugging Face Inference Providers`, or choose provider `Hugging Face Inference Providers`.
 2. Use base URL `https://router.huggingface.co/v1`.
@@ -289,7 +336,7 @@ Hugging Face Inference Providers:
 5. Click `Test connection`, then `Pre-translate`.
 6. LoopCAT sends Hugging Face chat-completion requests with bearer auth in a header, not in the URL, and asks for confirmation before source text leaves LoopCAT.
 
-OpenAI pre-translation:
+### OpenAI Pre-Translation
 
 1. Choose provider `OpenAI`.
 2. Use base URL `https://api.openai.com/v1`.
@@ -297,7 +344,7 @@ OpenAI pre-translation:
 4. Click `Test connection`, `Refresh models`, choose an OpenAI model, and run `Pre-translate`.
 5. LoopCAT sends Responses API requests with provider-side storage disabled and asks for confirmation before source text leaves LoopCAT.
 
-DeepSeek pre-translation:
+### DeepSeek Pre-Translation
 
 1. Choose provider preset `DeepSeek`, or choose provider `DeepSeek`.
 2. Use base URL `https://api.deepseek.com`.
@@ -305,7 +352,7 @@ DeepSeek pre-translation:
 4. Click `Test connection`, `Refresh models`, choose a DeepSeek model such as `deepseek-v4-pro`, and run `Pre-translate`.
 5. LoopCAT sends DeepSeek chat-completion requests with bearer auth in a header, not in the URL, and asks for confirmation before source text leaves LoopCAT.
 
-Azure OpenAI pre-translation:
+### Azure OpenAI Pre-Translation
 
 1. Choose provider preset `Azure OpenAI`, or choose provider `Azure OpenAI`.
 2. Set base URL to your Azure resource's v1 endpoint, for example `https://YOUR-RESOURCE-NAME.openai.azure.com/openai/v1`.
@@ -314,7 +361,7 @@ Azure OpenAI pre-translation:
 5. Click `Test connection`, `Refresh models` if your resource exposes model listing, then run `Pre-translate`.
 6. LoopCAT sends Azure OpenAI Responses API requests with `store: false`, sends the key in the `api-key` header, and asks for confirmation before source text leaves LoopCAT.
 
-Gemini pre-translation:
+### Gemini Pre-Translation
 
 1. Choose provider preset `Google Gemini`, or choose provider `Google Gemini`.
 2. Use base URL `https://generativelanguage.googleapis.com/v1beta`.
@@ -322,7 +369,7 @@ Gemini pre-translation:
 4. Click `Test connection`, `Refresh models`, choose a Gemini model, and run `Pre-translate`.
 5. LoopCAT sends Gemini Interactions API requests with the API key in a header, not in the URL, disables provider-side interaction storage with `store: false`, and asks for confirmation before source text leaves LoopCAT.
 
-Anthropic Claude pre-translation:
+### Anthropic Claude Pre-Translation
 
 1. Choose provider preset `Anthropic Claude`, or choose provider `Anthropic Claude`.
 2. Use base URL `https://api.anthropic.com/v1`.
@@ -330,7 +377,7 @@ Anthropic Claude pre-translation:
 4. Click `Test connection`, `Refresh models`, choose a Claude model, and run `Pre-translate`.
 5. LoopCAT sends Anthropic Messages API requests with the API key in the `x-api-key` header, pins `anthropic-version`, and asks for confirmation before source text leaves LoopCAT.
 
-Cohere Command pre-translation:
+### Cohere Command Pre-Translation
 
 1. Choose provider preset `Cohere Command`, or choose provider `Cohere Command`.
 2. Use base URL `https://api.cohere.com`.
@@ -338,7 +385,7 @@ Cohere Command pre-translation:
 4. Click `Test connection`, `Refresh models`, choose a Cohere model, and run `Pre-translate`.
 5. LoopCAT sends Cohere Chat V2 requests with bearer auth in a header, not in the URL, and asks for confirmation before source text leaves LoopCAT.
 
-Mistral AI pre-translation:
+### Mistral AI Pre-Translation
 
 1. Choose provider preset `Mistral AI`, or choose provider `Mistral AI`.
 2. Use base URL `https://api.mistral.ai/v1`.
@@ -346,7 +393,7 @@ Mistral AI pre-translation:
 4. Click `Test connection`, `Refresh models`, choose a Mistral model such as `mistral-large-latest`, and run `Pre-translate`.
 5. LoopCAT sends Mistral chat-completion requests with bearer auth in a header, not in the URL, and asks for confirmation before source text leaves LoopCAT.
 
-xAI Grok pre-translation:
+### xAI Grok Pre-Translation
 
 1. Choose provider preset `xAI Grok`, or choose provider `xAI Grok`.
 2. Use base URL `https://api.x.ai/v1`.
@@ -354,7 +401,7 @@ xAI Grok pre-translation:
 4. Click `Test connection`, `Refresh models`, choose an xAI model such as `grok-4.3`, and run `Pre-translate`.
 5. LoopCAT sends xAI Responses API requests with `store: false`, sends the key in the bearer-auth header, and asks for confirmation before source text leaves LoopCAT.
 
-Perplexity Sonar pre-translation:
+### Perplexity Sonar Pre-Translation
 
 1. Choose provider preset `Perplexity Sonar`, or choose provider `Perplexity Sonar`.
 2. Use base URL `https://api.perplexity.ai/v1`.
@@ -362,7 +409,7 @@ Perplexity Sonar pre-translation:
 4. Click `Test connection`, `Refresh models`, choose a Sonar model such as `sonar-pro`, and run `Pre-translate`.
 5. LoopCAT sends Perplexity Sonar requests to `/v1/sonar` with bearer auth, disables search for CAT-tool translation and AI commands, and asks for confirmation before source text leaves LoopCAT.
 
-Groq pre-translation:
+### Groq Pre-Translation
 
 1. Choose provider preset `Groq`, or choose provider `Groq`.
 2. Use base URL `https://api.groq.com/openai/v1`.
@@ -370,7 +417,7 @@ Groq pre-translation:
 4. Click `Test connection`, `Refresh models`, choose a Groq model such as `llama-3.3-70b-versatile`, and run `Pre-translate`.
 5. LoopCAT sends Groq chat-completion requests with bearer auth in a header, not in the URL, and asks for confirmation before source text leaves LoopCAT.
 
-Together AI pre-translation:
+### Together AI Pre-Translation
 
 1. Choose provider preset `Together AI`, or choose provider `Together AI`.
 2. Use base URL `https://api.together.ai/v1`.
@@ -378,7 +425,7 @@ Together AI pre-translation:
 4. Click `Test connection`, `Refresh models`, choose a Together model such as `MiniMaxAI/MiniMax-M3`, and run `Pre-translate`.
 5. LoopCAT sends Together AI chat-completion requests with bearer auth in a header, not in the URL, and asks for confirmation before source text leaves LoopCAT.
 
-OpenRouter pre-translation:
+### OpenRouter Pre-Translation
 
 1. Choose provider preset `OpenRouter`, or choose provider `OpenRouter`.
 2. Use base URL `https://openrouter.ai/api/v1`.
@@ -386,7 +433,7 @@ OpenRouter pre-translation:
 4. Click `Test connection`, `Refresh models`, choose an OpenRouter model such as `openai/gpt-4.1-mini`, and run `Pre-translate`.
 5. LoopCAT sends OpenRouter chat-completion requests with bearer auth in a header, not in the URL, and asks for confirmation before source text leaves LoopCAT.
 
-Hugging Face Inference Providers pre-translation:
+### Hugging Face Inference Providers Pre-Translation
 
 1. Choose provider preset `Hugging Face Inference Providers`, or choose provider `Hugging Face Inference Providers`.
 2. Use base URL `https://router.huggingface.co/v1`.
@@ -394,7 +441,7 @@ Hugging Face Inference Providers pre-translation:
 4. Click `Test connection`, `Refresh models`, choose a router model such as `openai/gpt-oss-120b:cerebras`, and run `Pre-translate`.
 5. LoopCAT sends Hugging Face chat-completion requests with bearer auth in a header, not in the URL, and asks for confirmation before source text leaves LoopCAT.
 
-DeepInfra pre-translation:
+### DeepInfra Pre-Translation
 
 1. Choose provider preset `DeepInfra`, or choose provider `DeepInfra`.
 2. Use base URL `https://api.deepinfra.com/v1/openai`.
@@ -402,7 +449,7 @@ DeepInfra pre-translation:
 4. Click `Test connection`, `Refresh models`, choose a DeepInfra model such as `meta-llama/Meta-Llama-3.1-70B-Instruct`, and run `Pre-translate`.
 5. LoopCAT sends DeepInfra chat-completion requests with bearer auth in a header, not in the URL, and asks for confirmation before source text leaves LoopCAT.
 
-Fireworks AI pre-translation:
+### Fireworks AI Pre-Translation
 
 1. Choose provider preset `Fireworks AI`, or choose provider `Fireworks AI`.
 2. Use base URL `https://api.fireworks.ai/inference/v1`.
@@ -410,7 +457,7 @@ Fireworks AI pre-translation:
 4. Click `Test connection`, `Refresh models`, choose a Fireworks model such as `accounts/fireworks/models/llama-v3p1-8b-instruct`, and run `Pre-translate`.
 5. LoopCAT sends Fireworks AI chat-completion requests with bearer auth in a header, not in the URL, and asks for confirmation before source text leaves LoopCAT.
 
-Troubleshooting:
+### Troubleshooting
 
 - If LoopCAT says Ollama is not reachable, start Ollama and test `http://localhost:11434/api/version`.
 - If LoopCAT cannot auto-connect to OPUS-CAT, start OPUS-CAT MT Engine and test `http://localhost:8500/MTRestService/ListSupportedLanguagePairs?tokenCode=0`. If that URL works but the plain web build still fails, the engine needs CORS support or the included compatibility bridge.
@@ -516,7 +563,7 @@ Projects now carry local workspace/user metadata, resource links, QA settings, A
 
 Normal project reports include project counts, terminology status, QA totals, export-readiness notes, and activity summaries without segment text, while redacting credential-looking project/file/resource labels, validation-note labels, project domain metadata, termbase notes, activity summaries, and activity types. Anonymized project reports keep counts but redact project names, file names, resource names, terminology text, credential-looking project domain metadata, activity summaries, activity types, and segment text. Exported report HTML includes a restrictive CSP that disables scripts, network connections, forms, object content, and base URL changes.
 
-When a workspace folder is connected, LoopCAT saves visible project package folders and keeps a `loopcat-workspace.json` manifest plus a resource index. If that manifest is missing or damaged, the workspace layer can rebuild it by scanning existing `projects/*/project.loopcat.json` packages and deduplicating renamed project folders by project ID. If the manifest is valid but stale, package listings still merge manifest entries with visible package folders so sync can see project packages that were written before an interrupted manifest update. Stale workspace manifests are rewritten through a fixed project/resource/backup metadata shape, so credential-looking labels, backup paths, unsafe package paths, and unknown legacy fields are redacted or dropped before they are shown or written again. Workspace scans skip credential-looking package folder names and backup filenames instead of recording those external paths in the manifest or backup count. Workspace health reports, validation sidecars, workspace package scan warnings, workspace write errors, backup-manifest warnings, and workspace sync warnings also redact credential-looking project, folder, resource, backup, read-error, and write-error text. Workspace package and backup counts are based on visible safe files in the folder, with manifest metadata used only to enrich matching visible files. Empty project folders without a `project.loopcat.json` file are ignored; damaged, oversized, invalid, or unsafe-path package files still produce visible warnings.
+When a workspace folder is connected, LoopCAT saves visible project package folders and keeps a `loopcat-workspace.json` manifest plus a resource index. Direct folder connection uses the File System Access API and is currently available in Chromium-based browsers such as Chrome and Edge. Firefox and Safari continue in browser-cache mode and use project-package and backup import/export for portable recovery. If that manifest is missing or damaged, the workspace layer can rebuild it by scanning existing `projects/*/project.loopcat.json` packages and deduplicating renamed project folders by project ID. If the manifest is valid but stale, package listings still merge manifest entries with visible package folders so sync can see project packages that were written before an interrupted manifest update. Stale workspace manifests are rewritten through a fixed project/resource/backup metadata shape, so credential-looking labels, backup paths, unsafe package paths, and unknown legacy fields are redacted or dropped before they are shown or written again. Workspace scans skip credential-looking package folder names and backup filenames instead of recording those external paths in the manifest or backup count. Workspace health reports, validation sidecars, workspace package scan warnings, workspace write errors, backup-manifest warnings, and workspace sync warnings also redact credential-looking project, folder, resource, backup, read-error, and write-error text. Workspace package and backup counts are based on visible safe files in the folder, with manifest metadata used only to enrich matching visible files. Empty project folders without a `project.loopcat.json` file are ignored; damaged, oversized, invalid, or unsafe-path package files still produce visible warnings.
 Workspace health checks also inspect visible package files, so a project package present in the folder but missing from a stale manifest is counted and reported without rewriting the manifest during a read-only health check.
 
 When a folder is connected after work already exists in the browser cache, LoopCAT compares local project IDs with the workspace manifest. Local projects missing from the visible folder are marked unsaved immediately, while projects already present in the folder stay clean so workspace sync is not blocked unnecessarily.
@@ -534,4 +581,4 @@ If the app opens after a previous session ended with unsaved workspace packages,
 
 Long-running projects also show a backup reminder when there is no recent portable project package export, with a direct export action and a one-day remind-later option.
 
-For best results, open `index.html` in a modern Chromium-based browser, Edge, or Safari with support for `DecompressionStream`.
+For best results, open `index.html` in a current Chrome, Edge, Firefox, or Safari release with support for `DecompressionStream`.
