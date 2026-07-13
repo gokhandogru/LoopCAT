@@ -271,12 +271,14 @@ LM Studio with TranslateGemma 4B or another local OpenAI-compatible server:
 
 1. Install OPUS-CAT MT Engine from the official OPUS-CAT install page, start the engine, and install the source-target OPUS-MT model pairs you need inside OPUS-CAT.
 2. In `AI Command Centre`, choose provider preset `OPUS-CAT local`, or choose provider `OPUS-CAT MT Engine`.
-3. In LoopCAT Desktop, keep base URL `http://localhost:8500`. LoopCAT also accepts `http://localhost:8500/MTRestService` and normalizes it to the engine root.
-   In the plain web `index.html` version, start the local bridge first with `pnpm run opuscat:web-bridge` from the repository, or `node scripts/opus-cat-web-bridge.cjs` from the extracted web ZIP, then use base URL `http://127.0.0.1:8502`.
-4. Confirm the project source and target language codes match an installed OPUS-CAT language pair, then click `Test connection` and `Refresh models`.
-5. Choose `default` or a listed OPUS-CAT model tag, then run `Pre-translate`.
-6. OPUS-CAT is a machine-translation pre-translation connector. AI review/QA, tag repair, polish, adaptation, alternatives, terminology extraction/application, and project briefs need an LLM provider.
-7. Use LoopCAT Desktop or the local web bridge for OPUS-CAT if the browser build reports a connection failure even though the OPUS-CAT URL works in PowerShell or a browser tab. OPUS-CAT's local HTTP service may not send browser CORS headers; the desktop wrapper and the `http://127.0.0.1:8502` bridge add the missing local-only response header for approved OPUS-CAT endpoints.
+3. Keep the OPUS-CAT preset base URL at `http://localhost:8500`. LoopCAT also accepts `http://localhost:8500/MTRestService` and normalizes it to the engine root.
+4. Click `Test connection`. LoopCAT automatically tries the configured URL, the standard IPv4/localhost engine addresses on port `8500`, and the compatibility web bridge on port `8502`. It saves the first readable endpoint, so the web build does not need a manual URL change.
+5. A CORS-enabled OPUS-CAT engine connects directly from supported browsers. For an older engine whose HTTP API does not expose browser CORS headers, start the included compatibility bridge with `pnpm run opuscat:web-bridge` or `node scripts/opus-cat-web-bridge.cjs`; LoopCAT discovers it automatically at `http://127.0.0.1:8502`.
+6. Confirm the project source and target language codes match an installed OPUS-CAT language pair, then click `Refresh models`.
+7. Choose `default` or a listed OPUS-CAT model tag, then run `Pre-translate`.
+8. OPUS-CAT is a machine-translation pre-translation connector. AI review/QA, tag repair, polish, adaptation, alternatives, terminology extraction/application, and project briefs need an LLM provider.
+
+The browser sandbox cannot launch OPUS-CAT, Node.js, or another local executable from `index.html`. Fully automatic browser connection therefore requires either a running CORS-enabled OPUS-CAT engine or a bridge/launcher that was started outside the browser. The LoopCAT desktop wrapper supplies this compatibility layer internally.
 
 Hugging Face Inference Providers:
 
@@ -411,7 +413,7 @@ Fireworks AI pre-translation:
 Troubleshooting:
 
 - If LoopCAT says Ollama is not reachable, start Ollama and test `http://localhost:11434/api/version`.
-- If LoopCAT says OPUS-CAT MT Engine is not reachable, start OPUS-CAT MT Engine and test `http://localhost:8500/MTRestService/ListSupportedLanguagePairs?tokenCode=0`.
+- If LoopCAT cannot auto-connect to OPUS-CAT, start OPUS-CAT MT Engine and test `http://localhost:8500/MTRestService/ListSupportedLanguagePairs?tokenCode=0`. If that URL works but the plain web build still fails, the engine needs CORS support or the included compatibility bridge.
 - If OPUS-CAT model refresh returns no pair-specific tags, install or enable that source-target language pair in OPUS-CAT and check the language codes in LoopCAT.
 - If the model is not installed, run `ollama run translategemma` or use `Pull model`.
 - `Pull model` applies to local Ollama. OPUS-CAT models are installed in OPUS-CAT. Hosted Ollama, OpenAI, DeepSeek, Mistral AI, xAI Grok, Perplexity Sonar, Groq, Together AI, OpenRouter, Hugging Face Inference Providers, DeepInfra, Fireworks AI, and OpenAI-compatible providers list the models exposed by the provider.

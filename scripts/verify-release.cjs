@@ -558,6 +558,7 @@ assertIncludes(aiJs, `const DEEPINFRA_DEFAULT_BASE_URL = "https://api.deepinfra.
 assertIncludes(aiJs, `const FIREWORKS_DEFAULT_BASE_URL = "https://api.fireworks.ai/inference/v1"`, "ai.js must keep the Fireworks AI API base URL centralized.");
 assertIncludes(aiJs, `const AZURE_OPENAI_DEFAULT_BASE_URL = "https://YOUR-RESOURCE-NAME.openai.azure.com/openai/v1"`, "ai.js must keep the Azure OpenAI base URL centralized.");
 assertIncludes(aiJs, `const OPUS_CAT_DEFAULT_BASE_URL = "http://localhost:8500"`, "ai.js must keep the local OPUS-CAT MT Engine base URL centralized.");
+assertIncludes(aiJs, `const OPUS_CAT_WEB_BRIDGE_BASE_URL = "http://127.0.0.1:8502"`, "ai.js must keep the OPUS-CAT browser bridge URL centralized.");
 assertIncludes(aiJs, "const GeminiProvider = {", "ai.js must implement the native Gemini provider.");
 assertIncludes(aiJs, "const DeepSeekProvider = {", "ai.js must implement the native DeepSeek provider.");
 assertIncludes(aiJs, "deepSeekApiUrl", "ai.js must normalize DeepSeek model-list and chat-completion endpoints.");
@@ -628,6 +629,8 @@ assertIncludes(azureOpenAiProviderFunction, "store: false", "ai.js Azure OpenAI 
 assertIncludes(azureOpenAiProviderFunction, "max_output_tokens: 1200", "ai.js Azure OpenAI Responses requests must include bounded max_output_tokens.");
 assertIncludes(aiJs, "const OpusCatProvider = {", "ai.js must implement the OPUS-CAT MT Engine provider.");
 assertIncludes(aiJs, "opusCatApiUrl", "ai.js must normalize OPUS-CAT MTRestService endpoints.");
+assertIncludes(aiJs, "function opusCatConnectionCandidates", "ai.js must discover standard direct and bridged OPUS-CAT endpoints.");
+assertIncludes(opusCatProviderFunction, "connectionMode: opusCatConnectionMode(baseUrl)", "ai.js OPUS-CAT connection tests must report the discovered connection route.");
 assertIncludes(defaultLocalAiSettingsFunction, "providerId === \"opus-cat\"", "ai.js must default OPUS-CAT settings to the OPUS-CAT base URL/model, not Ollama.");
 assertIncludes(opusCatProviderFunction, "ListSupportedLanguagePairs", "ai.js OPUS-CAT provider must test and list installed language pairs.");
 assertIncludes(opusCatProviderFunction, "GetLanguagePairModelTags", "ai.js OPUS-CAT provider must list language-pair model tags.");
@@ -687,6 +690,7 @@ assertIncludes(aiJs, "assertOpenAiCompatibleHostedAllowed", "ai.js must block un
 assertIncludes(appJs, "assertLocalAiEndpointAllowed", "app.js must preflight unsupported hosted OpenAI-compatible endpoints before saving keys or settings.");
 assertIncludes(appJs, "opusCatApiUrl", "app.js must render OPUS-CAT endpoint summaries through the OPUS-CAT URL helper.");
 assertIncludes(appJs, "providerId === \"opus-cat\"", "app.js must treat OPUS-CAT as a local runtime workflow in the AI Command Centre.");
+assertIncludes(appJs, "finishLocalAiConnection", "app.js must save an automatically discovered OPUS-CAT endpoint after a successful connection test.");
 assertIncludes(appJs, "localAiPresetSelect", "app.js must wire the Local AI provider preset selector.");
 assertIncludes(appJs, "localAiLocalCloudPresetBtn", "app.js must wire the Ollama local cloud-model quick preset button.");
 assertIncludes(appJs, "reviewActiveSegmentWithLocalAi", "app.js must wire the active-segment AI review command.");
@@ -1625,6 +1629,7 @@ assertIncludes(smokeTest, "OpenAI suggestion with explanation", "smoke-test.html
 assertIncludes(smokeTest, "OpenAI helper obeys disabled local context toggles", "smoke-test.html must verify disabled OpenAI local context toggles are enforced by the helper.");
 assertIncludes(regressionTest, "OpenAI suggestion includes TM context explanation", "regression-test.html must exercise production OpenAI suggestion context with a local stub.");
 assertIncludes(regressionTest, "OPUS-CAT provider lists installed language-pair model tags and pretranslates through local MTRestService", "regression-test.html must verify OPUS-CAT model-tag discovery and pretranslation.");
+assertIncludes(regressionTest, "Simulated browser CORS or connection failure", "regression-test.html must verify OPUS-CAT falls back from a browser-blocked direct endpoint to the local bridge.");
 assertIncludes(securityPolicyTest, "OpenAI helper opts out of provider response storage", "security-policy-test.html must verify OpenAI Responses requests opt out of provider-side storage.");
 assertIncludes(securityPolicyTest, "OpenAI helper reports provider connection failures clearly", "security-policy-test.html must verify OpenAI provider connection failures get clear status text.");
 assertIncludes(securityPolicyTest, "CSP connect-src allows explicit OPUS-CAT loopback endpoints", "security-policy-test.html must verify OPUS-CAT loopback CSP access.");

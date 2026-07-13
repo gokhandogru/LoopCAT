@@ -7073,6 +7073,30 @@ function localAiConnectionErrorLooksStartable(error) {
   return /not reachable|failed to fetch|unable to connect|connection refused/i.test(message);
 }
 
+async function finishLocalAiConnection(settings, provider, result, saveMessage = "AI provider connection works") {
+  const discoveredBaseUrl = String(result?.baseUrl || "").trim();
+  if (
+    settings.providerId === "opus-cat" &&
+    discoveredBaseUrl &&
+    normalizedProviderBaseUrl("opus-cat", discoveredBaseUrl) !== normalizedProviderBaseUrl("opus-cat", settings.baseUrl)
+  ) {
+    els.localAiBaseUrlInput.value = discoveredBaseUrl;
+    const rememberedSettings = await persistLocalAiSettings({ silent: true });
+    renderLocalAiPresetOptions(rememberedSettings);
+    renderLocalAiProviderControls(rememberedSettings);
+    renderLocalAiPromptPreview();
+  }
+  const version = result?.version ? ` ${result.version}` : "";
+  const route = result?.connectionMode ? ` via ${result.connectionMode}` : "";
+  setLocalAiStatus("connected", `${result?.provider || provider.name}${version} connected${route}`);
+  setSaveStatus(
+    result?.autoDiscovered && discoveredBaseUrl
+      ? `OPUS-CAT connection found and saved at ${discoveredBaseUrl}`
+      : saveMessage,
+    "saved"
+  );
+}
+
 async function startLmStudioServerFromUi(settings = localAiSettingsFromForm()) {
   const bridge = localAiDesktopBridge();
   if (!bridge || !canStartLmStudioServer(settings)) {
@@ -7124,17 +7148,13 @@ async function testLocalAiConnection(options = {}) {
   setLocalAiStatus("checking", "Checking AI provider...");
   try {
     const result = await provider.testConnection(config);
-    const version = result.version ? ` ${result.version}` : "";
-    setLocalAiStatus("connected", `${result.provider || provider.name}${version} connected`);
-    setSaveStatus("AI provider connection works", "saved");
+    await finishLocalAiConnection(settings, provider, result);
   } catch (error) {
     if (!options.skipLmStudioAutoStart && canStartLmStudioServer(settings) && localAiConnectionErrorLooksStartable(error)) {
       try {
         await startLmStudioServerFromUi(settings);
         const result = await provider.testConnection(config);
-        const version = result.version ? ` ${result.version}` : "";
-        setLocalAiStatus("connected", `${result.provider || provider.name}${version} connected`);
-        setSaveStatus("LM Studio server started; AI provider connection works", "saved");
+        await finishLocalAiConnection(settings, provider, result, "LM Studio server started; AI provider connection works");
         return;
       } catch (startError) {
         const message = startError.message || error.message || "AI provider connection failed.";
