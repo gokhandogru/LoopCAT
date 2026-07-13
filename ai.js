@@ -1792,7 +1792,7 @@ function opusCatReachableError(baseUrl) {
 }
 
 function opusCatAutoConnectError() {
-  return "LoopCAT could not read OPUS-CAT on its standard local endpoints. Start OPUS-CAT and try again. Browser builds require a CORS-enabled OPUS-CAT engine or the included LoopCAT web bridge; a web page cannot start local programs automatically.";
+  return "OPUS-CAT connection failed. Open Connection help for setup steps.";
 }
 
 function opusCatStatusError(data, status) {

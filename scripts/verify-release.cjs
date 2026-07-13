@@ -338,6 +338,11 @@ assertIncludes(webArtifactScript, `"NOTICE"`, "scripts/verify-web-artifact.cjs m
 assertIncludes(webArtifactScript, `"scripts/opus-cat-web-bridge.cjs"`, "scripts/verify-web-artifact.cjs must verify the OPUS-CAT browser bridge in the static web artifact.");
 assertIncludes(indexHtml, `id="aboutBtn"`, "index.html must expose the product About button.");
 assertIncludes(indexHtml, `id="aboutDialog"`, "index.html must expose the product About dialog.");
+assertIncludes(indexHtml, `id="opusCatHelpDialog"`, "index.html must expose actionable OPUS-CAT web connection help.");
+assertIncludes(indexHtml, `id="localAiOpusCatHelpBtn"`, "AI Command Centre must expose OPUS-CAT connection help after a failed test.");
+assertIncludes(indexHtml, "http://localhost:8500/MTRestService/ListSupportedLanguagePairs?tokenCode=0", "OPUS-CAT help must link the local engine diagnostic endpoint.");
+assertIncludes(indexHtml, "https://helsinki-nlp.github.io/OPUS-CAT/install", "OPUS-CAT help must link the official installation guide.");
+assertIncludes(indexHtml, "node scripts/opus-cat-web-bridge.cjs", "OPUS-CAT help must document the cross-platform bridge command without requiring npm.");
 assertIncludes(indexHtml, "Co-created by Dr. Gokhan Dogru and Codex", "index.html About dialog must credit Dr. Gokhan Dogru and Codex.");
 assertIncludes(indexHtml, "https://www.linkedin.com/in/gokhan-dogru-localization/", "index.html About dialog must link Dr. Gokhan Dogru's LinkedIn profile.");
 assertIncludes(appJs, "aboutDialog.showModal()", "app.js must open the About dialog from the topbar.");
@@ -630,6 +635,7 @@ assertIncludes(azureOpenAiProviderFunction, "max_output_tokens: 1200", "ai.js Az
 assertIncludes(aiJs, "const OpusCatProvider = {", "ai.js must implement the OPUS-CAT MT Engine provider.");
 assertIncludes(aiJs, "opusCatApiUrl", "ai.js must normalize OPUS-CAT MTRestService endpoints.");
 assertIncludes(aiJs, "function opusCatConnectionCandidates", "ai.js must discover standard direct and bridged OPUS-CAT endpoints.");
+assertIncludes(aiJs, "OPUS-CAT connection failed. Open Connection help for setup steps.", "ai.js must keep OPUS-CAT inline failure status concise and actionable.");
 assertIncludes(opusCatProviderFunction, "connectionMode: opusCatConnectionMode(baseUrl)", "ai.js OPUS-CAT connection tests must report the discovered connection route.");
 assertIncludes(defaultLocalAiSettingsFunction, "providerId === \"opus-cat\"", "ai.js must default OPUS-CAT settings to the OPUS-CAT base URL/model, not Ollama.");
 assertIncludes(opusCatProviderFunction, "ListSupportedLanguagePairs", "ai.js OPUS-CAT provider must test and list installed language pairs.");
@@ -691,6 +697,8 @@ assertIncludes(appJs, "assertLocalAiEndpointAllowed", "app.js must preflight uns
 assertIncludes(appJs, "opusCatApiUrl", "app.js must render OPUS-CAT endpoint summaries through the OPUS-CAT URL helper.");
 assertIncludes(appJs, "providerId === \"opus-cat\"", "app.js must treat OPUS-CAT as a local runtime workflow in the AI Command Centre.");
 assertIncludes(appJs, "finishLocalAiConnection", "app.js must save an automatically discovered OPUS-CAT endpoint after a successful connection test.");
+assertIncludes(appJs, "function showOpusCatConnectionHelp", "app.js must show actionable OPUS-CAT help after a failed connection test.");
+assertIncludes(functionBody(appJs, "async function testLocalAiConnection", "async function refreshLocalAiModels"), "showOpusCatConnectionHelp()", "app.js OPUS-CAT connection failure must open the help dialog.");
 assertIncludes(appJs, "localAiPresetSelect", "app.js must wire the Local AI provider preset selector.");
 assertIncludes(appJs, "localAiLocalCloudPresetBtn", "app.js must wire the Ollama local cloud-model quick preset button.");
 assertIncludes(appJs, "reviewActiveSegmentWithLocalAi", "app.js must wire the active-segment AI review command.");

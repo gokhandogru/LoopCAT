@@ -5364,6 +5364,17 @@
             throw new TypeError("Simulated browser CORS or connection failure");
           }
         });
+        let opusCatSetupError = null;
+        try {
+          await opusCatProvider.testConnection({
+            baseUrl: "http://localhost:8500",
+            fetchImpl: async () => {
+              throw new TypeError("Simulated unavailable OPUS-CAT endpoints");
+            }
+          });
+        } catch (error) {
+          opusCatSetupError = error;
+        }
         assert(
           window.CatHan.ai.normalizeOpusCatBaseUrl("http://localhost:8500/MTRestService") === "http://localhost:8500" &&
             window.CatHan.ai.opusCatApiUrl("http://localhost:8500", "/TranslateJson") === "http://localhost:8500/MTRestService/TranslateJson" &&
@@ -5385,6 +5396,7 @@
             discoveredOpusCat.connectionMode === "browser bridge" &&
             discoveredOpusCat.autoDiscovered === true &&
             opusCatProbeUrls.length === 3 &&
+            opusCatSetupError?.message === "OPUS-CAT connection failed. Open Connection help for setup steps." &&
             window.CatHan.ai.localAiProviderPresetForSettings({ providerId: "opus-cat", baseUrl: "http://localhost:8500/MTRestService" })?.id === "opus-cat" &&
             window.CatHan.ai.localAiProviderPresetForSettings({ providerId: "opus-cat", baseUrl: "http://127.0.0.1:8502" })?.id === "opus-cat" &&
             !window.CatHan.ai.localAiProviderNeedsApiKey("opus-cat", "http://localhost:8500") &&

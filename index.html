@@ -608,6 +608,7 @@
                       <button id="localAiTestBtn" type="button">Test connection</button>
                       <button id="localAiStartLmStudioBtn" class="hidden" type="button">Start LM Studio server</button>
                       <button id="localAiRefreshModelsBtn" type="button">Refresh models</button>
+                      <button id="localAiOpusCatHelpBtn" class="hidden" type="button">Connection help</button>
                     </div>
                     <div id="localAiStatus" class="local-ai-status disconnected">
                       <span class="local-ai-status-dot" aria-hidden="true"></span>
@@ -948,6 +949,48 @@
         <p class="about-credit">Co-created by Dr. Gokhan Dogru and Codex.</p>
         <div class="dialog-actions">
           <button id="closeAboutBtn" class="primary" type="button">Close</button>
+        </div>
+      </section>
+    </dialog>
+
+    <dialog id="opusCatHelpDialog">
+      <section class="dialog-card opus-cat-help-card" aria-labelledby="opusCatHelpDialogTitle">
+        <header>
+          <h2 id="opusCatHelpDialogTitle">Connect OPUS-CAT to LoopCAT Web</h2>
+          <p class="opus-cat-help-intro">LoopCAT tried the standard OPUS-CAT addresses but the browser could not read a response. Use these checks in order.</p>
+        </header>
+        <ol class="opus-cat-help-steps">
+          <li>
+            <span class="opus-cat-help-number" aria-hidden="true">1</span>
+            <div>
+              <h3>Check the OPUS-CAT engine</h3>
+              <p>Keep OPUS-CAT open, then open the engine check. A working engine shows a language-pair list such as <code>["en-tr"]</code>.</p>
+              <a href="http://localhost:8500/MTRestService/ListSupportedLanguagePairs?tokenCode=0" target="_blank" rel="noopener noreferrer">Open engine check</a>
+              <p class="muted">If the page does not load, start OPUS-CAT MT Engine and load the required model before testing again.</p>
+            </div>
+          </li>
+          <li>
+            <span class="opus-cat-help-number" aria-hidden="true">2</span>
+            <div>
+              <h3>Use a browser-readable OPUS-CAT build</h3>
+              <p>If the engine check works but LoopCAT still fails, the OPUS-CAT build is probably not sending the CORS permission required by browsers. Install or update OPUS-CAT from its official installation page.</p>
+              <a href="https://helsinki-nlp.github.io/OPUS-CAT/install" target="_blank" rel="noopener noreferrer">Open OPUS-CAT installation guide</a>
+            </div>
+          </li>
+          <li>
+            <span class="opus-cat-help-number" aria-hidden="true">3</span>
+            <div>
+              <h3>For an older engine, start the LoopCAT bridge</h3>
+              <p>From the extracted LoopCAT Web folder, run this command in PowerShell or Terminal and keep that window open:</p>
+              <code class="opus-cat-help-command">node scripts/opus-cat-web-bridge.cjs</code>
+              <p class="muted">The bridge requires <a href="https://nodejs.org/en/download" target="_blank" rel="noopener noreferrer">Node.js</a>. If <code>node</code> is not recognized, install Node.js first. Leave LoopCAT's Base URL at <code>http://localhost:8500</code>; LoopCAT finds the bridge on port 8502 automatically.</p>
+            </div>
+          </li>
+        </ol>
+        <p class="opus-cat-help-note"><strong>Fastest alternative:</strong> use LoopCAT Desktop, which includes the local compatibility layer and does not require the separate web bridge.</p>
+        <div class="dialog-actions">
+          <button id="closeOpusCatHelpBtn" type="button">Close</button>
+          <button id="retryOpusCatConnectionBtn" class="primary" type="button">Try connection again</button>
         </div>
       </section>
     </dialog>
