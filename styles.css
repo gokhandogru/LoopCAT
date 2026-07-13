@@ -2570,6 +2570,12 @@ dialog {
   width: min(440px, calc(100vw - 32px));
 }
 
+#opusCatHelpDialog {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+}
+
 #projectDialog {
   max-height: min(860px, calc(100vh - 32px));
   overflow: hidden;
@@ -2678,6 +2684,96 @@ dialog::backdrop {
   padding-top: 12px;
   border-top: 1px solid var(--line);
   color: var(--muted);
+}
+
+.opus-cat-help-card {
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.opus-cat-help-card header {
+  display: grid;
+  gap: 8px;
+}
+
+.opus-cat-help-intro,
+.opus-cat-help-steps p,
+.opus-cat-help-note {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.opus-cat-help-intro,
+.opus-cat-help-steps p {
+  color: var(--muted);
+}
+
+.opus-cat-help-steps {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.opus-cat-help-steps li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.opus-cat-help-steps li:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.opus-cat-help-number {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.opus-cat-help-steps li > div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.opus-cat-help-steps h3 {
+  margin: 3px 0 0;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.opus-cat-help-steps a {
+  width: fit-content;
+  color: var(--focus);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.opus-cat-help-command {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f4f7fa;
+  color: var(--text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.opus-cat-help-note {
+  padding-left: 12px;
+  border-left: 3px solid var(--focus);
 }
 
 .project-storage-config,

@@ -7,7 +7,7 @@ Current implementation status:
 - Implemented: Ollama cloud-offload models through local Ollama, using loopback API calls with cloud-suffixed model names such as `gpt-oss:120b-cloud` and explicit external-processing confirmation.
 - Implemented: the AI Command Centre exposes separate quick buttons for direct hosted Ollama and local Ollama cloud-offload models so the two privacy modes are visually distinct.
 - Implemented: local OpenAI-compatible `/v1/models` and `/v1/chat/completions`, suitable for LM Studio and similar loopback servers.
-- Implemented: local OPUS-CAT MT Engine through `MTRestService/ListSupportedLanguagePairs`, `MTRestService/GetLanguagePairModelTags`, and `MTRestService/TranslateJson`, suitable for installed OPUS-MT language-pair models.
+- Implemented: local OPUS-CAT MT Engine through `MTRestService/ListSupportedLanguagePairs`, `MTRestService/GetLanguagePairModelTags`, and `MTRestService/TranslateJson`, with automatic discovery of direct CORS-enabled engine endpoints and the loopback browser bridge.
 - Implemented: generic hosted OpenAI-compatible URLs are accepted only for explicitly allowlisted provider origins; arbitrary hosted compatible endpoints fail before the network request and should be promoted to named provider presets with exact origin/path allowlists.
 - Implemented: native Hugging Face Inference Providers through the router `GET /v1/models` and `POST /v1/chat/completions` endpoints with bearer-token auth.
 - Implemented: explicit OpenAI Responses API single-segment suggestions and batch pretranslation with `store: false`.

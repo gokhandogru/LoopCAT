@@ -5352,9 +5352,33 @@
           targetCode: "tr"
         });
         const opusCatTranslationParsedUrl = new URL(opusCatTranslationUrl);
+        const opusCatProbeUrls = [];
+        const discoveredOpusCat = await opusCatProvider.testConnection({
+          baseUrl: "http://localhost:8500",
+          fetchImpl: async (url) => {
+            const probeUrl = String(url);
+            opusCatProbeUrls.push(probeUrl);
+            if (probeUrl.startsWith("http://127.0.0.1:8502/")) {
+              return { ok: true, json: async () => ["en-tr"] };
+            }
+            throw new TypeError("Simulated browser CORS or connection failure");
+          }
+        });
+        let opusCatSetupError = null;
+        try {
+          await opusCatProvider.testConnection({
+            baseUrl: "http://localhost:8500",
+            fetchImpl: async () => {
+              throw new TypeError("Simulated unavailable OPUS-CAT endpoints");
+            }
+          });
+        } catch (error) {
+          opusCatSetupError = error;
+        }
         assert(
           window.CatHan.ai.normalizeOpusCatBaseUrl("http://localhost:8500/MTRestService") === "http://localhost:8500" &&
             window.CatHan.ai.opusCatApiUrl("http://localhost:8500", "/TranslateJson") === "http://localhost:8500/MTRestService/TranslateJson" &&
+            window.CatHan.ai.opusCatConnectionCandidates("http://localhost:8500").join("|") === "http://localhost:8500|http://127.0.0.1:8500|http://127.0.0.1:8502|http://localhost:8502" &&
             opusCatModels.models.some((model) => model.name === "default") &&
             opusCatModels.models.some((model) => model.name === "legal-domain") &&
             opusCatModelUrls[0] === "http://localhost:8500/MTRestService/ListSupportedLanguagePairs?tokenCode=0" &&
@@ -5368,7 +5392,13 @@
             opusCatTranslation.translatedText === "Merhaba OPUS-CAT." &&
             opusCatTranslation.providerId === "opus-cat" &&
             opusCatTranslation.model === "default" &&
+            discoveredOpusCat.baseUrl === "http://127.0.0.1:8502" &&
+            discoveredOpusCat.connectionMode === "browser bridge" &&
+            discoveredOpusCat.autoDiscovered === true &&
+            opusCatProbeUrls.length === 3 &&
+            opusCatSetupError?.message === "OPUS-CAT connection failed. Open Connection help for setup steps." &&
             window.CatHan.ai.localAiProviderPresetForSettings({ providerId: "opus-cat", baseUrl: "http://localhost:8500/MTRestService" })?.id === "opus-cat" &&
+            window.CatHan.ai.localAiProviderPresetForSettings({ providerId: "opus-cat", baseUrl: "http://127.0.0.1:8502" })?.id === "opus-cat" &&
             !window.CatHan.ai.localAiProviderNeedsApiKey("opus-cat", "http://localhost:8500") &&
             !window.CatHan.ai.localAiProviderSharesExternally("opus-cat", "http://localhost:8500"),
           "OPUS-CAT provider lists installed language-pair model tags and pretranslates through local MTRestService"

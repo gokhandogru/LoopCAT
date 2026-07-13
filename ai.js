@@ -37,6 +37,9 @@ const OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434";
 const OLLAMA_CLOUD_BASE_URL = "https://ollama.com";
 const LM_STUDIO_DEFAULT_BASE_URL = "http://localhost:1234/v1";
 const OPUS_CAT_DEFAULT_BASE_URL = "http://localhost:8500";
+const OPUS_CAT_IPV4_BASE_URL = "http://127.0.0.1:8500";
+const OPUS_CAT_WEB_BRIDGE_BASE_URL = "http://127.0.0.1:8502";
+const OPUS_CAT_WEB_BRIDGE_LOCALHOST_URL = "http://localhost:8502";
 const DEFAULT_LOCAL_AI_MODEL = "translategemma";
 const OPUS_CAT_DEFAULT_MODEL = "default";
 const OPENAI_COMPATIBLE_HOSTED_ALLOWED_HOSTS = new Set([
@@ -253,6 +256,31 @@ function opusCatApiUrl(baseUrl, endpoint) {
     .replace(/^\/?mtrestservice\/?/i, "")
     .replace(/^\/+/, "");
   return `${rootBaseUrl}/MTRestService/${cleanEndpoint}`;
+}
+
+function opusCatConnectionCandidates(baseUrl = OPUS_CAT_DEFAULT_BASE_URL) {
+  const configuredBaseUrl = normalizeOpusCatBaseUrl(baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
+  if (!isLoopbackBaseUrl(configuredBaseUrl, OPUS_CAT_DEFAULT_BASE_URL)) return [configuredBaseUrl];
+  return Array.from(new Set([
+    configuredBaseUrl,
+    OPUS_CAT_DEFAULT_BASE_URL,
+    OPUS_CAT_IPV4_BASE_URL,
+    OPUS_CAT_WEB_BRIDGE_BASE_URL,
+    OPUS_CAT_WEB_BRIDGE_LOCALHOST_URL
+  ].map((candidate) => normalizeOpusCatBaseUrl(candidate))));
+}
+
+function isKnownLocalOpusCatBaseUrl(baseUrl) {
+  const normalized = normalizeOpusCatBaseUrl(baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
+  return opusCatConnectionCandidates(OPUS_CAT_DEFAULT_BASE_URL).includes(normalized);
+}
+
+function opusCatConnectionMode(baseUrl) {
+  try {
+    return new URL(normalizeOpusCatBaseUrl(baseUrl)).port === "8502" ? "browser bridge" : "direct engine";
+  } catch {
+    return "configured endpoint";
+  }
 }
 
 function normalizeOpenAiCompatibleBaseUrl(baseUrl = LM_STUDIO_DEFAULT_BASE_URL) {
@@ -560,7 +588,10 @@ function localAiProviderPresetForSettings(settings = {}) {
   const model = String(settings.model || settings.localModel || "").trim();
   const matchingPresets = LOCAL_AI_PROVIDER_PRESETS.filter((preset) => (
     preset.providerId === providerId &&
-    normalizedProviderBaseUrl(preset.providerId, preset.baseUrl) === normalizedBaseUrl
+    (
+      normalizedProviderBaseUrl(preset.providerId, preset.baseUrl) === normalizedBaseUrl ||
+      (providerId === "opus-cat" && preset.id === "opus-cat" && isKnownLocalOpusCatBaseUrl(normalizedBaseUrl))
+    )
   ));
   return matchingPresets.find((preset) => model && preset.model === model) || matchingPresets[0] || null;
 }
@@ -1760,6 +1791,10 @@ function opusCatReachableError(baseUrl) {
   return `OPUS-CAT MT Engine is not reachable at ${normalizeOpusCatBaseUrl(baseUrl || OPUS_CAT_DEFAULT_BASE_URL)}. Start OPUS-CAT MT Engine and try again.`;
 }
 
+function opusCatAutoConnectError() {
+  return "OPUS-CAT connection failed. Open Connection help for setup steps.";
+}
+
 function opusCatStatusError(data, status) {
   const raw = redactSensitiveText(data?.error || data?.message || "").trim();
   if (status === 401 || status === 403) return "OPUS-CAT rejected the request. Check that the local MT Engine is running and accepting local API requests.";
@@ -1790,16 +1825,34 @@ const OpusCatProvider = {
   defaultBaseUrl: OPUS_CAT_DEFAULT_BASE_URL,
   defaultModel: OPUS_CAT_DEFAULT_MODEL,
   async testConnection(config = {}) {
-    const baseUrl = normalizeOpusCatBaseUrl(config.baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
-    const data = await opusCatJson("ListSupportedLanguagePairs", { tokenCode: "0" }, { method: "GET" }, { ...config, baseUrl });
-    const supportedLanguagePairs = Array.isArray(data) ? data.map((item) => String(item || "").trim()).filter(Boolean) : [];
-    return {
-      ok: true,
-      provider: "OPUS-CAT",
-      version: supportedLanguagePairs.length ? `${supportedLanguagePairs.length} pair${supportedLanguagePairs.length === 1 ? "" : "s"}` : "",
-      baseUrl,
-      modelCount: supportedLanguagePairs.length
-    };
+    const configuredBaseUrl = normalizeOpusCatBaseUrl(config.baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
+    const candidates = opusCatConnectionCandidates(configuredBaseUrl);
+    let lastError = null;
+    for (const baseUrl of candidates) {
+      try {
+        const data = await opusCatJson(
+          "ListSupportedLanguagePairs",
+          { tokenCode: "0" },
+          { method: "GET" },
+          { ...config, baseUrl, timeoutMs: Math.min(Number(config.timeoutMs) || 5000, 5000) }
+        );
+        const supportedLanguagePairs = Array.isArray(data) ? data.map((item) => String(item || "").trim()).filter(Boolean) : [];
+        return {
+          ok: true,
+          provider: "OPUS-CAT",
+          version: supportedLanguagePairs.length ? `${supportedLanguagePairs.length} pair${supportedLanguagePairs.length === 1 ? "" : "s"}` : "",
+          baseUrl,
+          connectionMode: opusCatConnectionMode(baseUrl),
+          autoDiscovered: baseUrl !== configuredBaseUrl,
+          modelCount: supportedLanguagePairs.length
+        };
+      } catch (error) {
+        if (String(error?.message || "").toLowerCase().includes("canceled")) throw error;
+        lastError = error;
+      }
+    }
+    if (!isLoopbackBaseUrl(configuredBaseUrl, OPUS_CAT_DEFAULT_BASE_URL) && lastError) throw lastError;
+    throw new Error(opusCatAutoConnectError());
   },
   async listModels(config = {}) {
     const settings = defaultLocalAiSettings({ ...config, providerId: "opus-cat" }, config.project);
@@ -4962,6 +5015,7 @@ window.CatHan.ai = {
   OLLAMA_CLOUD_BASE_URL,
   LM_STUDIO_DEFAULT_BASE_URL,
   OPUS_CAT_DEFAULT_BASE_URL,
+  OPUS_CAT_WEB_BRIDGE_BASE_URL,
   LOCAL_AI_PROVIDER_PRESETS,
   DEFAULT_LOCAL_AI_MODEL,
   OPUS_CAT_DEFAULT_MODEL,
@@ -5023,6 +5077,7 @@ window.CatHan.ai = {
   openAiCompatibleApiUrl,
   normalizeOpusCatBaseUrl,
   opusCatApiUrl,
+  opusCatConnectionCandidates,
   isLoopbackBaseUrl,
   isAllowedOpenAiCompatibleHostedBaseUrl,
   isOllamaCloudBaseUrl,

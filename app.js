@@ -791,6 +791,9 @@ const els = {
   aboutBtn: document.querySelector("#aboutBtn"),
   aboutDialog: document.querySelector("#aboutDialog"),
   closeAboutBtn: document.querySelector("#closeAboutBtn"),
+  opusCatHelpDialog: document.querySelector("#opusCatHelpDialog"),
+  closeOpusCatHelpBtn: document.querySelector("#closeOpusCatHelpBtn"),
+  retryOpusCatConnectionBtn: document.querySelector("#retryOpusCatConnectionBtn"),
   tmPretranslateDialog: document.querySelector("#tmPretranslateDialog"),
   tmPretranslateThresholdInput: document.querySelector("#tmPretranslateThresholdInput"),
   workspaceMenuSummary: document.querySelector("#workspaceMenuSummary"),
@@ -996,6 +999,7 @@ const els = {
   localAiTestBtn: document.querySelector("#localAiTestBtn"),
   localAiStartLmStudioBtn: document.querySelector("#localAiStartLmStudioBtn"),
   localAiRefreshModelsBtn: document.querySelector("#localAiRefreshModelsBtn"),
+  localAiOpusCatHelpBtn: document.querySelector("#localAiOpusCatHelpBtn"),
   localAiModelSelect: document.querySelector("#localAiModelSelect"),
   localAiModelInput: document.querySelector("#localAiModelInput"),
   localAiPullModelWrap: document.querySelector("#localAiPullModelWrap"),
@@ -4344,6 +4348,7 @@ function applyLocalAiProviderPreset(presetId) {
   if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = preset.baseUrl;
   if (els.localAiModelInput) els.localAiModelInput.value = preset.model;
   state.localAi.models = [];
+  setOpusCatConnectionHelpVisible(false);
   setLocalAiStatus("disconnected", `${preset.label} selected`);
   const settings = localAiSettingsFromForm();
   renderLocalAiPresetOptions(settings);
@@ -7073,6 +7078,41 @@ function localAiConnectionErrorLooksStartable(error) {
   return /not reachable|failed to fetch|unable to connect|connection refused/i.test(message);
 }
 
+function setOpusCatConnectionHelpVisible(visible) {
+  els.localAiOpusCatHelpBtn?.classList.toggle("hidden", !visible);
+}
+
+function showOpusCatConnectionHelp() {
+  setOpusCatConnectionHelpVisible(true);
+  if (!els.opusCatHelpDialog || typeof els.opusCatHelpDialog.showModal !== "function" || els.opusCatHelpDialog.open) return;
+  els.opusCatHelpDialog.showModal();
+}
+
+async function finishLocalAiConnection(settings, provider, result, saveMessage = "AI provider connection works") {
+  const discoveredBaseUrl = String(result?.baseUrl || "").trim();
+  if (
+    settings.providerId === "opus-cat" &&
+    discoveredBaseUrl &&
+    normalizedProviderBaseUrl("opus-cat", discoveredBaseUrl) !== normalizedProviderBaseUrl("opus-cat", settings.baseUrl)
+  ) {
+    els.localAiBaseUrlInput.value = discoveredBaseUrl;
+    const rememberedSettings = await persistLocalAiSettings({ silent: true });
+    renderLocalAiPresetOptions(rememberedSettings);
+    renderLocalAiProviderControls(rememberedSettings);
+    renderLocalAiPromptPreview();
+  }
+  const version = result?.version ? ` ${result.version}` : "";
+  const route = result?.connectionMode ? ` via ${result.connectionMode}` : "";
+  setOpusCatConnectionHelpVisible(false);
+  setLocalAiStatus("connected", `${result?.provider || provider.name}${version} connected${route}`);
+  setSaveStatus(
+    result?.autoDiscovered && discoveredBaseUrl
+      ? `OPUS-CAT connection found and saved at ${discoveredBaseUrl}`
+      : saveMessage,
+    "saved"
+  );
+}
+
 async function startLmStudioServerFromUi(settings = localAiSettingsFromForm()) {
   const bridge = localAiDesktopBridge();
   if (!bridge || !canStartLmStudioServer(settings)) {
@@ -7121,20 +7161,17 @@ async function testLocalAiConnection(options = {}) {
     setSaveStatus(message, "dirty");
     return;
   }
+  setOpusCatConnectionHelpVisible(false);
   setLocalAiStatus("checking", "Checking AI provider...");
   try {
     const result = await provider.testConnection(config);
-    const version = result.version ? ` ${result.version}` : "";
-    setLocalAiStatus("connected", `${result.provider || provider.name}${version} connected`);
-    setSaveStatus("AI provider connection works", "saved");
+    await finishLocalAiConnection(settings, provider, result);
   } catch (error) {
     if (!options.skipLmStudioAutoStart && canStartLmStudioServer(settings) && localAiConnectionErrorLooksStartable(error)) {
       try {
         await startLmStudioServerFromUi(settings);
         const result = await provider.testConnection(config);
-        const version = result.version ? ` ${result.version}` : "";
-        setLocalAiStatus("connected", `${result.provider || provider.name}${version} connected`);
-        setSaveStatus("LM Studio server started; AI provider connection works", "saved");
+        await finishLocalAiConnection(settings, provider, result, "LM Studio server started; AI provider connection works");
         return;
       } catch (startError) {
         const message = startError.message || error.message || "AI provider connection failed.";
@@ -7146,6 +7183,7 @@ async function testLocalAiConnection(options = {}) {
     const message = error.message || "AI provider connection failed.";
     setLocalAiStatus("error", message);
     setSaveStatus(message, "dirty");
+    if (settings.providerId === "opus-cat") showOpusCatConnectionHelp();
   }
 }
 
@@ -12055,6 +12093,12 @@ function wireEvents() {
   els.resourcesViewBtn.addEventListener("click", () => setView("resources"));
   els.aboutBtn.addEventListener("click", () => els.aboutDialog.showModal());
   els.closeAboutBtn.addEventListener("click", () => els.aboutDialog.close());
+  els.localAiOpusCatHelpBtn?.addEventListener("click", showOpusCatConnectionHelp);
+  els.closeOpusCatHelpBtn?.addEventListener("click", () => els.opusCatHelpDialog?.close());
+  els.retryOpusCatConnectionBtn?.addEventListener("click", async () => {
+    els.opusCatHelpDialog?.close();
+    await testLocalAiConnection();
+  });
   els.uiLocaleSelect?.addEventListener("change", () => {
     uiI18n?.setLocale?.(els.uiLocaleSelect.value);
     refreshLocalizedUi();
@@ -12325,6 +12369,7 @@ function wireEvents() {
     els.localAiBaseUrlInput.value = provider?.defaultBaseUrl || OLLAMA_DEFAULT_BASE_URL;
     if (els.localAiModelInput) els.localAiModelInput.value = provider?.defaultModel || (els.localAiProviderSelect.value === "openai" ? OPENAI_DEFAULT_MODEL : els.localAiProviderSelect.value === "gemini" ? GEMINI_DEFAULT_MODEL : DEFAULT_LOCAL_AI_MODEL);
     state.localAi.models = [];
+    setOpusCatConnectionHelpVisible(false);
     setLocalAiStatus("disconnected", "Disconnected");
     renderLocalAiPresetOptions(localAiSettingsFromForm());
     renderLocalAiProviderControls(localAiSettingsFromForm());
@@ -12332,6 +12377,7 @@ function wireEvents() {
     renderLocalAiPromptPreview();
   });
   els.localAiBaseUrlInput?.addEventListener("input", () => {
+    setOpusCatConnectionHelpVisible(false);
     setLocalAiStatus("disconnected", "Disconnected");
     const settings = localAiSettingsFromForm();
     renderLocalAiPresetOptions(settings);
