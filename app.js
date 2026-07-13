@@ -6,7 +6,7 @@ const { deleteTmEntry, deleteTmEntries, getTmMatchCandidates, getTmMatchCandidat
 const { buildTmx, parseTmx, parseTmxAsync } = window.CatHan.tmx;
 const { deleteTerm, deleteTerms, findTerms, importTerms, listTerms, parseTermList, parseTermWorkbook, rebuildAllTermIndexes, saveTerm, termRanges, updateTerm } = window.CatHan.termbase;
 const { buildTbx, parseTbx, parseTbxAsync } = window.CatHan.tbx;
-const { buildTargetXliff, buildXliff, parseXliffFile } = window.CatHan.xliff;
+const { buildTargetXliff, buildXliff, buildXliff22, parseXliffFile, xliffMimeType } = window.CatHan.xliff;
 const { buildLocalizationFile, parseLocalizationFile } = window.CatHan.localization;
 const { runQaChecks } = window.CatHan.qa;
 const { validateProjectPackage: validatePackage, validateBackupFile, validateExportReadiness, reportCount, reportSummary } = window.CatHan.validation;
@@ -896,6 +896,7 @@ const els = {
   exportTargetBtn: document.querySelector("#exportTargetBtn"),
   exportLocalizationBtn: document.querySelector("#exportLocalizationBtn"),
   exportXliffBtn: document.querySelector("#exportXliffBtn"),
+  exportXliff22Btn: document.querySelector("#exportXliff22Btn"),
   exportProjectReportBtn: document.querySelector("#exportProjectReportBtn"),
   exportQualityPassportMenuBtn: document.querySelector("#exportQualityPassportMenuBtn"),
   exportAnonymizedProjectReportBtn: document.querySelector("#exportAnonymizedProjectReportBtn"),
@@ -1394,9 +1395,9 @@ function download(filename, content, type = "application/octet-stream") {
   }
 }
 
-function localizationDownloadMimeType(ext) {
+function localizationDownloadMimeType(ext, structure = null) {
   const value = stableLower(ext);
-  if (XLIFF_DOCUMENT_TYPES.has(value)) return "application/x-xliff+xml";
+  if (XLIFF_DOCUMENT_TYPES.has(value)) return xliffMimeType(structure?.version || "1.2");
   if (["html", "htm"].includes(value)) return "text/html";
   if (value === "xhtml") return "application/xhtml+xml";
   if (value === "md") return "text/markdown";
@@ -11757,7 +11758,7 @@ async function exportLocalization() {
       ? buildTargetXliff(state.project, segments, structure)
       : await buildLocalizationFile(documentType, segments, structure);
     const ext = documentType === "yml" ? "yaml" : documentType === "markdown" ? "md" : documentType;
-    const type = localizationDownloadMimeType(ext);
+    const type = localizationDownloadMimeType(ext, structure);
     download(`${fileSafeName(documentInfo.name)}_${state.project.targetLang}.${ext}`, content, type);
     const activityLogged = await logOptionalProjectActivity("export", "Localization file exported", { documentId: documentInfo.id, documentType, segmentCount: segments.length }, "Localization export");
     setSaveStatus(appendActivityWarning("Localization file exported", activityLogged), exportStatusMode("saved", activityLogged));
@@ -11766,7 +11767,7 @@ async function exportLocalization() {
   }
 }
 
-async function exportXliff() {
+async function exportXliff(version = "1.2") {
   if (!state.project) return;
   try {
     await flushPendingSegmentSaves();
@@ -11777,12 +11778,20 @@ async function exportXliff() {
     if (!canRunDeliveryExport(report)) return;
     const base = scopedExportBaseName(state.project.name || "project", documentInfo);
     const exportProject = documentInfo ? { ...state.project, sourceFileName: documentInfo.name } : state.project;
-    download(`${base}_${state.project.sourceLang}-${state.project.targetLang}.xlf`, buildXliff(exportProject, segments), "application/x-xliff+xml");
-    const activityLogged = await logOptionalProjectActivity("export", "XLIFF exported", { documentId: documentInfo?.id || "", fileName: documentInfo?.name || "", segmentCount: segments.length }, "XLIFF export");
-    setSaveStatus(appendActivityWarning("XLIFF exported", activityLogged), exportStatusMode("saved", activityLogged));
+    const isXliff22 = version === "2.2";
+    const content = isXliff22 ? buildXliff22(exportProject, segments) : buildXliff(exportProject, segments);
+    const label = isXliff22 ? "XLIFF 2.2" : "XLIFF";
+    const exportedMessage = isXliff22 ? "XLIFF 2.2 exported" : "XLIFF exported";
+    download(`${base}_${state.project.sourceLang}-${state.project.targetLang}.xlf`, content, xliffMimeType(version));
+    const activityLogged = await logOptionalProjectActivity("export", exportedMessage, { documentId: documentInfo?.id || "", fileName: documentInfo?.name || "", segmentCount: segments.length, xliffVersion: version }, `${label} export`);
+    setSaveStatus(appendActivityWarning(exportedMessage, activityLogged), exportStatusMode("saved", activityLogged));
   } catch (error) {
-    setSaveStatus(error.message || "XLIFF export failed", "dirty");
+    setSaveStatus(error.message || (version === "2.2" ? "XLIFF 2.2 export failed" : "XLIFF export failed"), "dirty");
   }
+}
+
+async function exportXliff22() {
+  return exportXliff("2.2");
 }
 
 async function handleTmxImport(file) {
@@ -12257,6 +12266,7 @@ function wireEvents() {
   els.exportTargetBtn.addEventListener("click", exportTargetText);
   els.exportLocalizationBtn.addEventListener("click", exportLocalization);
   els.exportXliffBtn.addEventListener("click", exportXliff);
+  els.exportXliff22Btn.addEventListener("click", exportXliff22);
   els.exportProjectReportBtn.addEventListener("click", exportProjectReport);
   els.exportQualityPassportMenuBtn?.addEventListener("click", exportQualityPassport);
   els.exportAnonymizedProjectReportBtn.addEventListener("click", () => exportProjectReport({ anonymized: true }));
@@ -16195,6 +16205,8 @@ async function runAppWorkflowTest() {
       assert(els.saveStatus.textContent === "Localization file exported" && statusDownloads.some((item) => item.type === "text/html"), "localization export reports clean success");
       await exportXliff();
       assert(els.saveStatus.textContent === "XLIFF exported" && statusDownloads.some((item) => item.type === "application/x-xliff+xml"), "XLIFF export reports clean success");
+      await exportXliff22();
+      assert(els.saveStatus.textContent === "XLIFF 2.2 exported" && statusDownloads.some((item) => item.type === "application/xliff+xml"), "XLIFF 2.2 export reports clean success with the registered MIME type");
       await saveTmEntry({
         source: "TMX origin privacy source.",
         target: "TMX origin privacy target.",

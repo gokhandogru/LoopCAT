@@ -27,8 +27,8 @@ function cleanEnv(overrides = {}) {
   return env;
 }
 
-function run(platform, env = {}) {
-  return spawnSync(process.execPath, [verifier, platform], {
+function run(platform, env = {}, separator = false) {
+  return spawnSync(process.execPath, [verifier, ...(separator ? ["--"] : []), platform], {
     cwd: root,
     encoding: "utf8",
     env: cleanEnv(env)
@@ -39,8 +39,8 @@ function outputOf(result) {
   return `${result.stdout || ""}\n${result.stderr || ""}`;
 }
 
-function expectPass(platform, env, label, expectedText = "") {
-  const result = run(platform, env);
+function expectPass(platform, env, label, expectedText = "", separator = false) {
+  const result = run(platform, env, separator);
   const output = outputOf(result);
   if (result.status !== 0) {
     failures.push(`${label} should pass but failed: ${output.trim()}`);
@@ -76,6 +76,13 @@ expectPass(
   { WIN_CSC_LINK: "selftest-secret-link", WIN_CSC_KEY_PASSWORD: "selftest-secret-password" },
   "Windows-specific certificate credentials",
   "WIN_CSC_LINK + WIN_CSC_KEY_PASSWORD"
+);
+expectPass(
+  "linux",
+  {},
+  "pnpm separator compatibility",
+  "Signing environment verification passed for linux",
+  true
 );
 expectFail("mac", {}, "macOS missing credentials", "macOS Developer ID certificate");
 expectFail(

@@ -35,7 +35,7 @@ LoopCAT imports primary DOCX files plus many structure-preserving "Other formats
 Current import families:
 
 - DOCX.
-- XLIFF and SDLXLIFF.
+- XLIFF 1.2, XLIFF 2.0/2.1/2.2 Core, and SDLXLIFF.
 - Modern Office package variants where supported by the localization parser.
 - OpenDocument package formats.
 - HTML, XHTML, XML, DITA, DTD, Markdown.
@@ -248,8 +248,8 @@ LoopCAT can export simple and structure-preserving target files.
 Current export capabilities:
 
 - Target TXT export.
-- Generic XLIFF 1.2 project handoff export.
-- Current imported XLIFF/SDLXLIFF target reconstruction.
+- Generic XLIFF 1.2 or XLIFF 2.2 Core project handoff export.
+- Current imported XLIFF/SDLXLIFF target reconstruction. XLIFF 2.x reconstruction retains the original hierarchy, notes, ignorable content, skeletons, original data, and non-Core extension XML while replacing mapped targets and segment states.
 - Target DOCX reconstruction from original DOCX package.
 - Bilingual DOCX review export.
 - Structure-preserving localization exports for supported Other formats.
@@ -269,6 +269,13 @@ Current export safety:
 - Download filenames are sanitized for path separators, unsafe characters, reserved Windows device names, and credential-looking values.
 - Failed browser download clicks report visibly and clean up temporary links/object URLs.
 - Project packages and backups are validated before export or restore.
+
+XLIFF 2.2 scope:
+
+- Core file/group/unit/segment hierarchy, language metadata, notes, state, `xml:space`, `originalData`, and Core inline codes are parsed and reconstructed.
+- XLIFF 2.0 and 2.1 Core remain accepted for backward compatibility.
+- Optional Part 2 modules and custom namespaces are preserved in current-file exports, but module-specific editing and generic module authoring are future work.
+- The release gate validates both a representative Core 2.2 fixture and a live generic export against vendored official schemas.
 
 Suggested tests:
 

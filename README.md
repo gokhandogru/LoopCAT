@@ -8,7 +8,7 @@ LoopCAT is designed for a complete single-user workflow: create a project, impor
 
 ## Current Project Status
 
-LoopCAT is beyond a proof-of-concept MVP: the core offline CAT workflow and recovery model are implemented, and version `0.0.2` is available as a web bundle plus Windows installer and portable downloads. The project is still under active development and should not yet be described as a fully production-qualified cross-platform desktop release.
+LoopCAT is beyond a proof-of-concept MVP: the core offline CAT workflow and recovery model are implemented. The `0.0.3` development line adds XLIFF 2.2 Core support, while version `0.0.2` remains the latest published web bundle plus Windows installer and portable download until the new Windows artifacts are signed and release-qualified. The project is still under active development and should not yet be described as a fully production-qualified cross-platform desktop release.
 
 | Area | Current state |
 | --- | --- |
@@ -16,7 +16,7 @@ LoopCAT is beyond a proof-of-concept MVP: the core offline CAT workflow and reco
 | Offline and recovery | Implemented: IndexedDB autosave, portable project packages, full browser backups, visible workspace-folder packages where supported, and offline web/desktop shells. |
 | Public downloads | Version `0.0.2` provides a web bundle, Windows installer, and Windows portable package with checksums. |
 | Cross-platform desktop | Electron packaging targets Windows, macOS, and Linux. Signed/notarized public artifacts and recorded clean-machine evidence for every platform remain release-qualification work. |
-| Format support | Broad import/export coverage is implemented, including DOCX, localization formats, publishing formats, subtitles, resources, and terminology exchange. Perfect reconstruction of every complex Office, OpenDocument, and DTP structure is not claimed. |
+| Format support | Broad import/export coverage is implemented, including XLIFF 1.2 and XLIFF 2.0/2.1/2.2 Core, DOCX, localization formats, publishing formats, subtitles, resources, and terminology exchange. Perfect reconstruction of every complex Office, OpenDocument, and DTP structure is not claimed. |
 | Scale | Browser tests cover projects with thousands of segments and indexed TM lookup. True chunked document import, deeper persistent indexes, and long-duration autosave/memory profiling remain. |
 | AI | Optional and local-first. Ollama, LM Studio/OpenAI-compatible runtimes, and OPUS-CAT can run locally; hosted providers require explicit configuration and source-sharing confirmation. |
 | Collaboration | Server sync, shared cloud workspaces, and real-time multi-user collaboration are not implemented. |
@@ -123,12 +123,13 @@ The following capabilities are implemented in the current codebase and covered b
 ### Delivery And Offline Use
 
 - Export the current target text as a simple `.txt` file.
-- Export the current project as XLIFF 1.2.
+- Export the current project as XLIFF 1.2 or standards-namespaced XLIFF 2.2 Core.
 - Export imported Other formats target files back through their original structure, including package-preserving Office/OpenDocument/DTP exports and text/XML/resource/subtitle formats.
 - Validate direct localization export format labels and segment lists before building target files.
 - Preserve literal source-file keys and cells that look like private metadata, such as JSON keys or CSV/TSV headers named `prompt`, `password`, `accessToken`, or `fileHandle`, while still stripping real app secrets and AI provider traces from packages and backups.
-- Export XLIFF with protected inline markup for handoff, with direct export metadata validated before a handoff file is built.
-- Export imported XLIFF files back into their original unit structure, with delivery blocked if the required source reconstruction data is missing.
+- Export XLIFF with protected inline markup for handoff, with direct export metadata validated before a handoff file is built. XLIFF 2.2 handoffs use `originalData`, `pc`, and `ph` instead of embedding HTML-like codes directly.
+- Import XLIFF 2.0, 2.1, and 2.2 Core units, groups, segments, notes, whitespace rules, states, and Core inline codes; non-Core extension/module XML is retained in the original document shell.
+- Export imported XLIFF files back into their original unit structure, including XLIFF 2.2 segment state on `<segment>`, with delivery blocked if source reconstruction or file/unit/segment mapping data is missing.
 - Export a target `.docx` from the original DOCX package.
 - Keep delivery exports bound to the selected document so a mixed project cannot silently export a different file.
 - Export a bilingual review `.docx` with segment status, reviewer notes, structured comments, and QA summaries.
@@ -146,6 +147,7 @@ The current implementation is usable for substantial single-user offline project
 
 ### Format Fidelity And Scale
 
+- XLIFF 2.2 support currently targets the Core vocabulary plus lossless preservation of non-Core module/extension XML during current-file reconstruction. LoopCAT does not yet provide module-specific editing interfaces or semantic authoring for every Part 2 module.
 - Perfect reconstruction is not guaranteed for every complex feature in DOCX/OpenXML/OpenDocument/DTP files. LoopCAT preserves original packages and rewrites mapped text in place, but very deep layout constructs such as SmartArt, unusual embedded objects, advanced spreadsheet rich-text runs, complex nested fields, anchored objects, and untested publisher-specific structures still need broader fixture coverage.
 - IDML coverage needs deeper real-world fixtures for threaded stories, footnotes, tables, anchored objects, multi-story article order, and varied InDesign exports.
 - Very large document imports still need true chunked processing. Import progress yields around heavy phases, but parsing and persistence are not yet a fully streamed import pipeline.
@@ -178,7 +180,8 @@ Storage, format, validation, QA, AI, and worker responsibilities are split into 
 - `scripts/verify-live-ollama.cjs` optionally checks a real local or hosted Ollama runtime by listing models and running one non-streaming `/api/chat` translation probe with the selected model.
 - `scripts/verify-live-ai-provider.cjs` optionally checks a configured hosted AI provider by refreshing models and running one short translation probe without printing API keys.
 - `scripts/verify-desktop-wrapper.cjs` checks the desktop `loopcat://app/` protocol allowlist, URL/path safety, and renderer network request allowlist before packaging.
-- `scripts/verify-packaged-desktop-smoke.cjs` launches the unpacked packaged desktop app in hidden smoke mode and verifies the bundled app shell renders through `loopcat://app/index.html` with packaged app-shell assets, working IndexedDB, real project/segment persistence, packaged HTML, XLIFF, and target DOCX import/export probes, bilingual DOCX generation, backup export with saved targets, and test pages blocked from the desktop protocol in an isolated temporary profile.
+- `scripts/verify-xliff22-schema.cjs` validates both a release fixture and a live generic export against vendored OASIS Core, metadata, and W3C XML schemas without a network dependency.
+- `scripts/verify-packaged-desktop-smoke.cjs` launches the unpacked packaged desktop app in hidden smoke mode and verifies the bundled app shell renders through `loopcat://app/index.html` with packaged app-shell assets, working IndexedDB, real project/segment persistence, packaged HTML, XLIFF 2.2, and target DOCX import/export probes, bilingual DOCX generation, backup export with saved targets, and test pages blocked from the desktop protocol in an isolated temporary profile.
 - `scripts/verify-desktop-artifact.cjs` inspects packaged `app.asar` payloads for required runtime files derived from the app shell/service worker/desktop protocol, source-file freshness, integrity metadata, network policy, and accidental test/debug files.
 - `scripts/verify-checksums.cjs` checks `dist/SHA256SUMS.txt` against the generated public desktop download artifacts and rejects public artifacts whose filenames do not match the expected LoopCAT release names and current package version or whose file size indicates a truncated/interrupted build.
 - `scripts/verify-release-provenance-selftest.cjs` proves the provenance verifier rejects missing `.git`, empty `.git`, invalid worktree gitdir files, missing linked gitdirs, and missing Git executables before Git commands are trusted.
@@ -203,7 +206,7 @@ Storage, format, validation, QA, AI, and worker responsibilities are split into 
 - `tmx.js` owns TMX parsing and generation.
 - `termbase.js` owns termbase storage and term lookup.
 - `tbx.js` owns TBX parsing and generation.
-- `xliff.js` owns XLIFF import and generation for project handoff.
+- `xliff.js` owns XLIFF 1.2 and 2.x Core import, XLIFF 1.2/2.2 handoff generation, and structure-preserving target reconstruction.
 
 `docx.js` keeps DOCX package reading, target reconstruction, bilingual export, and placeholder detection separate from project storage.
 

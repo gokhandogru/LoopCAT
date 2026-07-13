@@ -86,14 +86,14 @@ Recommended project-level fields:
 
 `localizationStructures` entries vary by format:
 
-- XLIFF, HTML, and Android XML may store original source XML/HTML text in `source`. Imported XLIFF target-file export requires this `source` data so unit structure is preserved.
+- XLIFF, HTML, and Android XML may store original source XML/HTML text in `source`. Imported XLIFF target-file export requires this `source` data so unit structure, XLIFF 2.x extensions, and untouched content are preserved. XLIFF structures also record `version` and `namespace`.
 - JSON may store the parsed source object in `sourceJson`.
 - YAML, Markdown, and iOS `.strings` may store original line arrays in `sourceLines`.
 - PO/POT store original source lines for `msgstr` reconstruction, and SRT stores original source text plus per-cue timing metadata.
 - CSV/TSV may store parsed rows and delimiter metadata. Rows are arrays of source-file cell text, so headers or cells named like `prompt`, `password`, `accessToken`, `fileHandle`, or `customEndpoint` remain document content rather than LoopCAT metadata.
 - IDML may store the original package as `packageBase64` and the translated story paths in `storyPaths`.
 
-When a localization structure is present, each segment for that document should also keep its segment-level reconstruction mapping, such as XLIFF unit indexes, PO `msgstr` line indexes, SRT cue timing, JSON paths, Markdown/YAML line ranges, delimited row indexes, HTML/XML element indexes, iOS strings line indexes, or IDML story/content indexes. Delivery export is blocked when this mapping is missing because the app cannot safely place the translated target back into the original file shell.
+When a localization structure is present, each segment for that document should also keep its segment-level reconstruction mapping, such as XLIFF unit indexes, PO `msgstr` line indexes, SRT cue timing, JSON paths, Markdown/YAML line ranges, delimited row indexes, HTML/XML element indexes, iOS strings line indexes, or IDML story/content indexes. XLIFF 2.x segments additionally keep file, unit, and segment indexes plus stable ids, group path, state, and effective `xml:space`. Delivery export is blocked when required mapping is missing because the app cannot safely place the translated target back into the original file shell.
 
 These fields are allowed in portable project packages because they are required for local target-file reconstruction. They must still pass the privacy rules below and must never contain browser file handles, credentials, or runtime-only objects.
 

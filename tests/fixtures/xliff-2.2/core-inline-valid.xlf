@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:2.2" version="2.2" srcLang="en" trgLang="tr">
+  <file id="f1" original="schema-smoke.html">
+    <unit id="u1" name="segment-1">
+      <notes>
+        <note id="n1" ref="#s1">LoopCAT segment 1</note>
+      </notes>
+      <originalData>
+        <data id="d1">&lt;b&gt;</data>
+        <data id="d2">&lt;/b&gt;</data>
+        <data id="d3">&lt;br/&gt;</data>
+      </originalData>
+      <segment id="s1" state="final">
+        <source>Open <pc id="c1" dataRefStart="d1" dataRefEnd="d2" type="fmt" subType="xlf:b">file</pc><ph id="c2" dataRef="d3" type="fmt"/></source>
+        <target>Dosyayi <pc id="c1" dataRefStart="d1" dataRefEnd="d2" type="fmt" subType="xlf:b">ac</pc><ph id="c2" dataRef="d3" type="fmt"/></target>
+      </segment>
+    </unit>
+  </file>
+</xliff>

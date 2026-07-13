@@ -1,6 +1,6 @@
 {
   "name": "loopcat",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Local-first offline CAT tool for translation and post-editing projects.",
   "homepage": "https://github.com/gokhandogru/LoopCAT",
   "private": true,
@@ -10,6 +10,7 @@
     "start": "electron .",
     "desktop": "electron .",
     "verify:release": "node scripts/verify-release.cjs",
+    "verify:xliff22-schema": "node scripts/verify-xliff22-schema.cjs",
     "verify:provenance": "node scripts/verify-release-provenance.cjs",
     "verify:provenance-selftest": "node scripts/verify-release-provenance-selftest.cjs",
     "verify:signing-env": "node scripts/verify-signing-env.cjs",

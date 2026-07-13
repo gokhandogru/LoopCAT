@@ -129,6 +129,7 @@ const requiredDesktopIconFiles = [
 ];
 
 const requiredReleaseFiles = [
+  "pnpm-workspace.yaml",
   "scripts/build-desktop.cjs",
   "scripts/verify-release-provenance.cjs",
   "scripts/verify-release-provenance-selftest.cjs",
@@ -153,6 +154,12 @@ const requiredReleaseFiles = [
   "scripts/verify-checksums.cjs",
   "scripts/verify-release-evidence.cjs",
   "scripts/verify-release-evidence-selftest.cjs",
+  "scripts/verify-xliff22-schema.cjs",
+  "scripts/verify-xliff22-schema.ps1",
+  "tests/fixtures/xliff-2.2/core-inline-valid.xlf",
+  "tests/schemas/xliff-2.2/xliff_core_2.2.xsd",
+  "tests/schemas/xliff-2.2/metadata.xsd",
+  "tests/schemas/xliff-2.2/xml.xsd",
   "docs/desktop-packaging.md",
   "docs/release-smoke-evidence-template.md"
 ];
@@ -170,6 +177,7 @@ for (const file of requiredReleaseFiles) {
 const packageJson = readJson("package.json");
 const gitignore = readText(".gitignore");
 const pnpmLock = readText("pnpm-lock.yaml");
+const pnpmWorkspace = readText("pnpm-workspace.yaml");
 const manifest = readJson("manifest.webmanifest");
 const indexHtml = readText("index.html");
 const regressionHtml = readText("regression-test.html");
@@ -248,7 +256,9 @@ assert(packageJson.scripts && packageJson.scripts.desktop, "package.json must ex
 assert(packageJson.scripts && packageJson.scripts.dist, "package.json must expose a desktop distribution script.");
 assert(packageJson.scripts?.checksums === "node scripts/generate-checksums.cjs", "package.json checksums script must generate SHA-256 sums.");
 assert(packageJson.scripts?.["verify:provenance"] === "node scripts/verify-release-provenance.cjs", "package.json verify:provenance script must verify release Git provenance.");
+assertIncludes(pnpmWorkspace, "electron: true", "pnpm-workspace.yaml must explicitly allow Electron's pinned install script for deterministic desktop builds.");
 assert(packageJson.scripts?.["verify:provenance-selftest"] === "node scripts/verify-release-provenance-selftest.cjs", "package.json verify:provenance-selftest script must exercise release provenance verifier failure modes.");
+assert(packageJson.scripts?.["verify:xliff22-schema"] === "node scripts/verify-xliff22-schema.cjs", "package.json verify:xliff22-schema script must validate XLIFF 2.2 fixtures against the vendored OASIS schema.");
 assert(packageJson.scripts?.["verify:signing-env"] === "node scripts/verify-signing-env.cjs", "package.json verify:signing-env script must verify platform signing inputs.");
 assert(packageJson.scripts?.["verify:signing-env-selftest"] === "node scripts/verify-signing-env-selftest.cjs", "package.json verify:signing-env-selftest script must exercise signing environment verifier failure modes.");
 assert(packageJson.scripts?.["verify:browser-runner"] === "node scripts/verify-browser-runner.cjs", "package.json verify:browser-runner script must execute the browser test runner.");
@@ -1559,6 +1569,15 @@ assert(!xliffJs.includes("if (!structure?.source) return buildXliff(project, seg
 assertIncludes(xliffJs, "function xliffProjectMetadata", "xliff.js generic export must validate and normalize project metadata before building XLIFF.");
 assertIncludes(xliffJs, "XLIFF source language is required.", "xliff.js generic export must reject missing source-language metadata with a clear error.");
 assertIncludes(xliffJs, "function xliffSegmentRecord", "xliff.js generic export must validate segment source text before building XLIFF units.");
+assertIncludes(xliffJs, "urn:oasis:names:tc:xliff:document:2.2", "xliff.js must recognize the OASIS XLIFF 2.2 Core namespace.");
+assertIncludes(xliffJs, "function validateXliff2Document", "xliff.js must validate XLIFF 2.x structure before import and after reconstruction.");
+assertIncludes(xliffJs, "function buildXliff22", "xliff.js must provide generic XLIFF 2.2 handoff export.");
+assertIncludes(xliffJs, "function appendXliff2InlineContent", "xliff.js must reconstruct XLIFF 2.x target inline codes from preserved templates.");
+assertIncludes(xliffJs, "application/xliff+xml", "xliff.js must expose the registered MIME type for XLIFF 2.x.");
+assertIncludes(indexHtml, 'id="exportXliff22Btn"', "index.html must expose a dedicated XLIFF 2.2 handoff export action.");
+assertIncludes(smokeTest, "XLIFF 2.2 target export reconstructs Core structure and preserves extensions", "smoke-test.html must verify XLIFF 2.2 target reconstruction and extension preservation.");
+assertIncludes(smokeTest, "Generic XLIFF 2.2 handoff export uses Core 2.2 inline codes and round-trips", "smoke-test.html must verify generic XLIFF 2.2 handoff round-trips.");
+assertIncludes(regressionTest, "XLIFF 2.2 validation rejects", "regression-test.html must exercise malformed XLIFF 2.2 rejection.");
 assertIncludes(regressionTest, "direct XLIFF export normalizes required project metadata", "regression-test.html must verify direct XLIFF export normalizes project metadata.");
 assertIncludes(regressionTest, "direct XLIFF export rejects missing project metadata", "regression-test.html must verify direct XLIFF export rejects incomplete project metadata.");
 assertIncludes(regressionTest, "direct XLIFF export rejects malformed segment metadata", "regression-test.html must verify direct XLIFF export rejects malformed segment metadata.");
@@ -1780,6 +1799,8 @@ assertIncludes(desktopMain, "localizationApi.parseLocalizationFile", "desktop/ma
 assertIncludes(desktopMain, "localizationApi.buildLocalizationFile", "desktop/main.cjs desktop smoke must prove packaged localization target export works.");
 assertIncludes(desktopMain, "xliffApi.parseXliffText", "desktop/main.cjs desktop smoke must prove packaged XLIFF import works.");
 assertIncludes(desktopMain, "xliffApi.buildTargetXliff", "desktop/main.cjs desktop smoke must prove packaged XLIFF target export works.");
+assertIncludes(desktopMain, "xliffApi.buildXliff22", "desktop/main.cjs desktop smoke must prove packaged XLIFF 2.2 handoff export works.");
+assertIncludes(desktopMain, "XLIFF 2.2 handoff export", "desktop/main.cjs desktop smoke must fail if packaged XLIFF 2.2 handoff export breaks.");
 assertIncludes(desktopMain, "docxApi.extractDocxSegments", "desktop/main.cjs desktop smoke must prove packaged DOCX source import works.");
 assertIncludes(desktopMain, "docxApi.buildTargetDocx", "desktop/main.cjs desktop smoke must prove packaged target DOCX reconstruction works.");
 assertIncludes(desktopMain, "docxApi.buildBilingualDocx", "desktop/main.cjs desktop smoke must prove packaged bilingual DOCX generation works.");
@@ -2027,6 +2048,7 @@ assertIncludes(desktopWorkflow, "sudo apt-get install -y xvfb ruby ruby-dev buil
 assertIncludes(desktopWorkflow, "sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64", "Desktop release workflow must install the available libfuse2 package for AppImage checks.");
 assertIncludes(desktopWorkflow, "sudo gem install --no-document fpm", "Desktop release workflow must install fpm for Linux DEB packaging.");
 assertIncludes(desktopWorkflow, "pnpm run verify:release", "Desktop release workflow must verify the release contract through pnpm.");
+assertIncludes(desktopWorkflow, "pnpm run verify:xliff22-schema", "Desktop release workflow must validate XLIFF 2.2 fixtures against the vendored OASIS schema.");
 assertIncludes(desktopWorkflow, "pnpm run verify:provenance-selftest", "Desktop release workflow must self-test release provenance validation before packaging.");
 assertIncludes(desktopWorkflow, "pnpm run verify:evidence-selftest", "Desktop release workflow must self-test release evidence validation before packaging.");
 assertIncludes(desktopWorkflow, "pnpm run verify:download-artifacts-selftest", "Desktop release workflow must self-test download artifact naming and checksum rules before packaging.");

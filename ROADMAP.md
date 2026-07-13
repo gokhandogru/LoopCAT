@@ -54,6 +54,9 @@ The core offline CAT workflow, recovery model, academic review features, broad f
 - Timed background autosave failures stay visibly pending and retry automatically, so transient local storage failures do not leave a dead save timer.
 - DOCX text-box paragraphs plus release-style headers, footers, footnotes, comments, tables, hyperlinks, simple fields, tested complex field-code/result runs with hidden instructions excluded from source text, exact leading/trailing Word tabs and manual line/hyphen controls, run-level content controls, custom XML spans, SmartTag spans, list numbering, academic abbreviation-aware segmentation, and bold/italic/underline inline text are covered by round-trip regression tests.
 - Protected inline tags and placeholders shown as short copyable labels while preserving original export text; complex Word run styles can be shown as semantic `<b>`, `<i>`, or `<u>` tags while retaining hidden style ids for exact DOCX reconstruction.
+- XLIFF 2.2 Core import and target reconstruction support file/group/unit/segment hierarchy, notes, `xml:space`, Core states, `originalData`, and the `cp`/`ph`/`pc`/`sc`/`ec`/`mrk`/`sm`/`em` inline vocabulary. XLIFF 2.0 and 2.1 Core documents remain compatible.
+- Generic handoff can be exported as XLIFF 1.2 or XLIFF 2.2. The 2.2 path uses the registered `application/xliff+xml` MIME type and is checked against vendored OASIS schemas in the release workflow.
+- Current-file XLIFF 2.x reconstruction updates only mapped target content and Core segment state while retaining groups, notes, ignorable content, original data, skeletons, custom attributes, and Part 2/custom extension XML in the source shell.
 - Export gates for empty target segments, missing protected tags, unbalanced inline markup, invalid XML characters, unsafe HTML, entity-obfuscated scriptable HTML attributes, and CSS-escaped scriptable style attributes.
 - Final DOCX, XLIFF target, and localization target reconstruction use target text only and do not silently reinsert source text for empty target segments.
 - Delivery exports obey the selected document and block visibly when the selected file type cannot produce that export.
@@ -123,6 +126,8 @@ These are release-blocking requirements. A build is not production-ready merely 
 
 - Deepen DOCX reconstruction coverage for nested fields, unusual anchored shapes, complex tables, and broader real-world header, footer, footnote, and comment fixtures.
 - Expand IDML fixture depth for threaded stories, footnotes, tables, anchored objects, multi-story article order, and real-world InDesign exports.
+- Add module-aware editing and validation for the optional XLIFF 2.2 Part 2 modules. Current support preserves module XML during reconstruction but does not expose every module as editable LoopCAT data.
+- Broaden XLIFF interoperability fixtures with files emitted by additional commercial and open-source CAT tools, especially spanning codes, subflows, resegmentation, and module-heavy documents.
 - Add real-world fixtures whenever a new format relies on a less common character encoding.
 
 ### Priority 2: Performance, Scale, And Maintainability
@@ -200,7 +205,8 @@ These are release-blocking requirements. A build is not production-ready merely 
 - DOCX reconstruction ignores deleted tracked-change text, excludes hidden complex-field instructions from translatable source text, preserves Word tabs and manual line/no-break/soft-hyphen controls, exposes complex bold/italic/underline run properties through semantic tags with style ids, and preserves surrounding Word structure for mixed-style hyperlinks, simple fields, tested complex field-code/results, run-level content controls, custom XML, and SmartTag text.
 - DOCX segmentation keeps common academic abbreviations and initials, such as `Prof.`, `Fig.`, `e.g.`, and `A. B. Author`, inside their sentence-level translation units.
 - Markdown import/export has structure-preserving round-trip coverage for headings, paragraphs, lists, blockquotes, front matter, code fences, tables, and reference links.
-- XLIFF current-file export blocks missing source reconstruction data instead of silently producing a generic XLIFF, and generic XLIFF handoff export validates project language metadata plus segment source text before writing.
+- XLIFF current-file export blocks missing source reconstruction data instead of silently producing a generic XLIFF, and generic XLIFF 1.2/2.2 handoff export validates project language metadata plus segment source text before writing.
+- XLIFF 2.2 Core states, hierarchy, notes, whitespace, original data, inline codes, and extension-preserving target reconstruction are covered by browser and packaged-desktop probes plus offline OASIS schema validation.
 - Structure-preserving localization exports validate segment-level reconstruction maps, including subtitle cue timing, PO line indexes, JSON paths, delimited rows, HTML/XML element indexes, and IDML story positions.
 - Direct localization export calls normalize format labels and reject malformed segment lists before dispatching to format-specific builders.
 - Export validation requires real numeric reconstruction indexes, matching the localization builders, so malformed package metadata is reported before a target export attempt.

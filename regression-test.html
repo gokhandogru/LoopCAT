@@ -667,6 +667,57 @@
           version: "1.2"
         });
         assert(unchangedTargetXliff.includes("<source>XLIFF source</source>"), "direct XLIFF target export tolerates missing segment list");
+        const compatibleXliff21 = window.CatHan.xliff.parseXliffText(`<?xml version="1.0"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:2.0" version="2.1" srcLang="en">
+  <file id="f1"><unit id="u1"><segment id="s1"><source>Compatible source</source></segment></unit></file>
+</xliff>`, "compatible-21.xlf");
+        assert(compatibleXliff21.structure.version === "2.1" && compatibleXliff21.segments[0].text === "Compatible source", "XLIFF 2.2 support remains compatible with Core 2.0 and 2.1 documents");
+        const invalidXliff22Fixtures = [
+          {
+            label: "namespace",
+            source: `<xliff xmlns="urn:oasis:names:tc:xliff:document:2.0" version="2.2" srcLang="en"><file id="f"><unit id="u"><segment><source>Text</source></segment></unit></file></xliff>`,
+            message: "requires the corresponding OASIS 2.x namespace"
+          },
+          {
+            label: "duplicate structural ids",
+            source: `<xliff xmlns="urn:oasis:names:tc:xliff:document:2.2" version="2.2" srcLang="en"><file id="f"><unit id="u"><segment><source>Text</source></segment></unit><unit id="u"><segment><source>More text</source></segment></unit></file></xliff>`,
+            message: "ids must be unique"
+          },
+          {
+            label: "missing target language",
+            source: `<xliff xmlns="urn:oasis:names:tc:xliff:document:2.2" version="2.2" srcLang="en"><file id="f"><unit id="u"><segment><source>Text</source><target>Metin</target></segment></unit></file></xliff>`,
+            message: "trgLang is required"
+          },
+          {
+            label: "broken originalData reference",
+            source: `<xliff xmlns="urn:oasis:names:tc:xliff:document:2.2" version="2.2" srcLang="en"><file id="f"><unit id="u"><originalData><data id="d1">code</data></originalData><segment><source><ph id="c1" dataRef="missing"/></source></segment></unit></file></xliff>`,
+            message: "does not reference unit originalData"
+          },
+          {
+            label: "broken spanning marker",
+            source: `<xliff xmlns="urn:oasis:names:tc:xliff:document:2.2" version="2.2" srcLang="en"><file id="f"><unit id="u"><segment><source><em startRef="missing"/></source></segment></unit></file></xliff>`,
+            message: "does not reference a start marker"
+          }
+        ];
+        invalidXliff22Fixtures.forEach((fixture) => {
+          let rejected = false;
+          try {
+            window.CatHan.xliff.parseXliffText(fixture.source, `${fixture.label}.xlf`);
+          } catch (error) {
+            rejected = String(error.message || "").includes(fixture.message);
+          }
+          assert(rejected, `XLIFF 2.2 validation rejects ${fixture.label}`);
+        });
+        let mismatchedXliff22MarkupRejected = false;
+        try {
+          window.CatHan.xliff.buildXliff22(
+            { name: "Protected markup", sourceLang: "en", targetLang: "tr" },
+            [{ source: "Open <b>file</b>", target: "Dosya ac", status: "draft" }]
+          );
+        } catch (error) {
+          mismatchedXliff22MarkupRejected = error.message === "XLIFF 2.2 target inline markup does not match the source.";
+        }
+        assert(mismatchedXliff22MarkupRejected, "direct XLIFF 2.2 export rejects missing target inline markup");
 
         const reloaded = await window.CatHan.project.getProjectSegments(project.id);
         const tmEntries = await window.CatHan.storage.getAllByIndex("tmEntries", "languagePair", "en::tr");

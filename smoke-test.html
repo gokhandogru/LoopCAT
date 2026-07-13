@@ -564,6 +564,87 @@
         }
         assert(missingXliffStructureRejected, "XLIFF target export rejects missing reconstruction source data");
 
+        const xliff22Text = `<?xml version="1.0" encoding="UTF-8"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:2.2" xmlns:ext="urn:loopcat:test:extension" version="2.2" srcLang="en" trgLang="tr" xml:space="preserve">
+  <file id="f1" original="inline-22.html">
+    <group id="g1" name="Main group">
+      <unit id="u1" ext:quality="gold">
+        <ext:context keep="yes">Preserve this extension<ext:unit id="shadow"><ext:target>Extension target</ext:target></ext:unit></ext:context>
+        <notes><note id="n1" ref="#s1">XLIFF 2.2 reviewer note</note></notes>
+        <originalData>
+          <data id="d1">&lt;b&gt;</data><data id="d2">&lt;/b&gt;</data><data id="d3">&lt;br/&gt;</data>
+          <data id="d4">&lt;span&gt;</data><data id="d5">&lt;/span&gt;</data>
+        </originalData>
+        <segment id="s1" state="translated" subState="ext:machine-translated">
+          <source>  Hello <pc id="c1" dataRefStart="d1" dataRefEnd="d2" type="fmt" subType="xlf:b">world</pc><ph id="c2" dataRef="d3" canCopy="no"/><mrk id="m1" type="term">term</mrk><cp hex="001A"/>  </source>
+          <target>  Merhaba <pc id="c1" dataRefStart="d1" dataRefEnd="d2" type="fmt" subType="xlf:b">dunya</pc><ph id="c2" dataRef="d3" canCopy="no"/><mrk id="m1" type="term">terim</mrk><cp hex="001A"/>  </target>
+        </segment>
+        <segment id="s2" state="reviewed">
+          <source><sc id="c3" dataRef="d4"/>open<ec startRef="c3" dataRef="d5"/><sm id="m2" type="comment"/>note<em startRef="m2"/></source>
+          <target><sc id="c3" dataRef="d4"/>ac<ec startRef="c3" dataRef="d5"/><sm id="m2" type="comment"/>not<em startRef="m2"/></target>
+        </segment>
+        <ignorable id="i1"><source>Ignored source</source><target>Ignored target</target></ignorable>
+      </unit>
+      <unit id="u2" translate="no"><segment id="s3"><source>Do not translate</source></segment></unit>
+    </group>
+  </file>
+</xliff>`;
+        const xliff22Parsed = window.CatHan.xliff.parseXliffText(xliff22Text, "inline-22.xlf");
+        assert(
+          xliff22Parsed.structure.version === "2.2" &&
+            xliff22Parsed.structure.namespace === "urn:oasis:names:tc:xliff:document:2.2" &&
+            xliff22Parsed.segments.length === 2 &&
+            xliff22Parsed.segments[0].text.startsWith("  Hello ") &&
+            xliff22Parsed.segments[0].text.endsWith("  ") &&
+            xliff22Parsed.segments[0].text.includes("<pc") &&
+            xliff22Parsed.segments[0].text.includes("<ph") &&
+            xliff22Parsed.segments[0].comment === "XLIFF 2.2 reviewer note" &&
+            xliff22Parsed.segments[0].status === "draft" &&
+            xliff22Parsed.segments[1].status === "confirmed" &&
+            xliff22Parsed.segments[1].reviewState === "reviewed" &&
+            xliff22Parsed.segments[0].structure.groupPath.join("/") === "g1" &&
+            xliff22Parsed.segments[0].structure.xmlSpace === "preserve",
+          "XLIFF 2.2 import preserves hierarchy, whitespace, inline codes, notes, and state"
+        );
+        xliff22Parsed.segments[0].target = xliff22Parsed.segments[0].text.replace("Hello", "Selam").replace("world", "evren").replace("term", "terim");
+        xliff22Parsed.segments[0].status = "confirmed";
+        xliff22Parsed.segments[0].reviewState = "reviewed";
+        const xliff22Target = window.CatHan.xliff.buildTargetXliff(project, xliff22Parsed.segments, xliff22Parsed.structure);
+        const xliff22RoundTrip = window.CatHan.xliff.parseXliffText(xliff22Target, "inline-22-target.xlf");
+        assert(
+          xliff22Target.includes('xmlns="urn:oasis:names:tc:xliff:document:2.2"') &&
+            xliff22Target.includes('state="reviewed"') &&
+            !xliff22Target.includes('target state=') &&
+            xliff22Target.includes('ext:quality="gold"') &&
+            xliff22Target.includes("Preserve this extension") &&
+            xliff22Target.includes("Extension target") &&
+            xliff22Target.includes("Ignored source") &&
+            xliff22Target.includes("Do not translate") &&
+            !xliff22Target.includes("data-lc-key") &&
+            xliff22RoundTrip.segments[0].target.includes("evren") &&
+            xliff22RoundTrip.segments[0].status === "confirmed" &&
+            xliff22RoundTrip.segments[0].reviewState === "reviewed",
+          "XLIFF 2.2 target export reconstructs Core structure and preserves extensions"
+        );
+        const genericXliff22 = window.CatHan.xliff.buildXliff22(project, [{
+          id: "generic-22",
+          source: "Open <b>file</b><br/>",
+          target: "Dosyayi <b>ac</b><br/>",
+          status: "confirmed"
+        }]);
+        const genericXliff22Parsed = window.CatHan.xliff.parseXliffText(genericXliff22, "generic-22.xlf");
+        assert(
+          genericXliff22.includes('xmlns="urn:oasis:names:tc:xliff:document:2.2"') &&
+            genericXliff22.includes('version="2.2"') &&
+            genericXliff22.includes("<originalData>") &&
+            genericXliff22.includes("<pc ") &&
+            genericXliff22.includes("<ph ") &&
+            genericXliff22.includes('state="final"') &&
+            genericXliff22Parsed.segments[0].target.includes("ac"),
+          "Generic XLIFF 2.2 handoff export uses Core 2.2 inline codes and round-trips"
+        );
+        assert(window.CatHan.xliff.xliffMimeType("2.2") === "application/xliff+xml" && window.CatHan.xliff.xliffMimeType("1.2") === "application/x-xliff+xml", "XLIFF MIME type follows the 2.x registration");
+
         const htmlFile = new File(["<!doctype html><html><head><title>Ignore me</title><style>.x{}</style></head><body><h1>Hello world</h1><p>Translate <strong>this</strong> sentence.</p><script>const hidden = 'skip';<\/script></body></html>"], "sample.html", { type: "text/html" });
         const htmlParsed = await window.CatHan.localization.parseLocalizationFile(htmlFile);
         assert(htmlParsed.segments.length === 3, "HTML import text extraction");
