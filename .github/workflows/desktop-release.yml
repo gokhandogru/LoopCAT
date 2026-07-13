@@ -99,6 +99,9 @@ jobs:
       - name: Verify release contract
         run: pnpm run verify:release
 
+      - name: Validate XLIFF 2.2 schema fixtures
+        run: pnpm run verify:xliff22-schema
+
       - name: Self-test release provenance verifier
         run: pnpm run verify:provenance-selftest
 
@@ -177,6 +180,9 @@ jobs:
 
       - name: Verify release contract
         run: pnpm run verify:release
+
+      - name: Validate XLIFF 2.2 schema fixtures
+        run: pnpm run verify:xliff22-schema
 
       - name: Build static HTML artifact
         run: pnpm run dist:web

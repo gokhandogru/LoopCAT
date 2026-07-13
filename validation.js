@@ -40,21 +40,28 @@ const LOCALIZATION_TYPES = new Set([
   "php", "properties", "ts", "resx", "wix", "strings",
   "srt", "vtt", "sbv", "txt"
 ]);
+
+function validXliffReconstruction(segment) {
+  if (structureFormat(segment) !== "xliff" || !hasStructureNumber(segment?.structure?.unitIndex)) return false;
+  if (!String(segment?.structure?.version || "1.2").startsWith("2")) return true;
+  return hasStructureNumber(segment?.structure?.fileIndex) && hasStructureNumber(segment?.structure?.segmentIndex);
+}
+
 const RECONSTRUCTION_SEGMENT_REQUIREMENTS = {
   xlf: {
     label: "XLIFF",
-    issue: "unit mapping data",
-    valid: (segment) => structureFormat(segment) === "xliff" && hasStructureNumber(segment?.structure?.unitIndex)
+    issue: "file, unit, or segment mapping data",
+    valid: validXliffReconstruction
   },
   xliff: {
     label: "XLIFF",
-    issue: "unit mapping data",
-    valid: (segment) => structureFormat(segment) === "xliff" && hasStructureNumber(segment?.structure?.unitIndex)
+    issue: "file, unit, or segment mapping data",
+    valid: validXliffReconstruction
   },
   sdlxliff: {
     label: "SDLXLIFF",
-    issue: "unit mapping data",
-    valid: (segment) => structureFormat(segment) === "xliff" && hasStructureNumber(segment?.structure?.unitIndex)
+    issue: "file, unit, or segment mapping data",
+    valid: validXliffReconstruction
   },
   po: {
     label: "PO",

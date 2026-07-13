@@ -53,6 +53,12 @@ Run the release contract verifier first:
 pnpm run verify:release
 ```
 
+Validate the XLIFF 2.2 fixture and a live generated handoff against the vendored OASIS schema:
+
+```bash
+pnpm run verify:xliff22-schema
+```
+
 Verify the desktop protocol wrapper and renderer hardening flags:
 
 ```bash
@@ -198,6 +204,7 @@ Before publishing desktop builds:
 - commit `pnpm-lock.yaml` and use `pnpm install --frozen-lockfile` for release builds;
 - run `pnpm run verify:provenance -- --allow-untagged` before packaging so dirty, mismatched, or metadata-incomplete release checkouts are rejected;
 - run `pnpm run verify:release`;
+- run `pnpm run verify:xliff22-schema` so both the XLIFF 2.2 fixture and live generated handoff pass the vendored OASIS Core schema;
 - run `pnpm run verify:provenance-selftest` so missing Git executables and missing or incomplete Git metadata rejection are tested before packaging;
 - run `pnpm run verify:browser-runner` to execute the browser test suite, including the app workflow and large-project fixture;
 - run `pnpm run verify:desktop-wrapper` to confirm the private desktop protocol exposes only the bundled runtime files and the desktop network gate blocks unapproved renderer requests;

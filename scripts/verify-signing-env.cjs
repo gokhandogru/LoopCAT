@@ -1,4 +1,4 @@
-const platform = (process.argv[2] || "").toLowerCase();
+const platform = (process.argv.slice(2).find((value) => value !== "--") || "").toLowerCase();
 
 const groupsByPlatform = {
   win: [

@@ -814,6 +814,7 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
           htmlTargetExported: false,
           xliffImported: false,
           xliffTargetExported: false,
+          xliff22HandoffExported: false,
           docxImported: false,
           docxTargetExported: false,
           bilingualDocxGenerated: false,
@@ -848,24 +849,24 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
         workflowProbe.htmlTargetExported = htmlTarget.includes("<p>Paketlenmis HTML hedefi.</p>") && !htmlTarget.includes("Desktop HTML source.");
 
         const xliffText = \`<?xml version="1.0" encoding="UTF-8"?>
-<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
-  <file original="desktop-smoke.html" source-language="en" target-language="tr" datatype="html">
-    <body>
-      <trans-unit id="u1">
-        <source>Desktop <g id="b" ctype="x-bold">XLIFF</g> source.</source>
-        <target></target>
-      </trans-unit>
-    </body>
+<xliff version="2.2" xmlns="urn:oasis:names:tc:xliff:document:2.2" srcLang="en" trgLang="tr">
+  <file id="f1" original="desktop-smoke.html">
+    <unit id="u1">
+      <originalData><data id="d1">&lt;b&gt;</data><data id="d2">&lt;/b&gt;</data></originalData>
+      <segment id="s1"><source>Desktop <pc id="c1" dataRefStart="d1" dataRefEnd="d2" type="fmt">XLIFF</pc> source.</source></segment>
+    </unit>
   </file>
 </xliff>\`;
         const xliffParsed = xliffApi.parseXliffText(xliffText, "desktop-smoke.xlf");
-        workflowProbe.xliffImported = xliffParsed.segments.length === 1 && xliffParsed.segments[0].text.includes("<b>XLIFF</b>");
-        xliffParsed.segments[0].target = "Paket <b>XLIFF</b> hedefi.";
+        workflowProbe.xliffImported = xliffParsed.structure.version === "2.2" && xliffParsed.segments.length === 1 && xliffParsed.segments[0].text.includes("<pc");
+        xliffParsed.segments[0].target = xliffParsed.segments[0].text.replace("Desktop", "Paket").replace("source", "hedefi");
         xliffParsed.segments[0].status = "confirmed";
         const xliffTarget = xliffApi.buildTargetXliff(project, xliffParsed.segments, xliffParsed.structure);
         const xliffRoundTrip = xliffApi.parseXliffText(xliffTarget, "desktop-smoke-target.xlf");
         workflowProbe.xliffTargetExported = xliffTarget.includes('original="desktop-smoke.html"') &&
-          xliffRoundTrip.segments[0]?.target.includes("<b>XLIFF</b>");
+          xliffTarget.includes('state="final"') && xliffRoundTrip.segments[0]?.target.includes("XLIFF");
+        const xliff22Handoff = xliffApi.buildXliff22(project, [{ source: "Desktop <b>handoff</b>.", target: "Masaustu <b>aktarimi</b>.", status: "confirmed" }]);
+        workflowProbe.xliff22HandoffExported = xliff22Handoff.includes('version="2.2"') && xliff22Handoff.includes("<originalData>") && xliff22Handoff.includes("<pc ");
 
         const docxBase64 = "UEsDBBQAAAAIANGDnVyKqQaC/AAAAL0BAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbH2QTU7DMBSE95G4g+UtShxYIITidMHPEliUAzzZL4mF/+TnlvZsLDgSV8BpoUiIdmnNfDPP8/n+0S02zrI1JjLBS37RtJyhV0EbP0r+snyorzmjDF6DDR4l3yLxRV91y21EYgX2JPmUc7wRgtSEDqgJEX1RhpAc5PJMo4igXmFEcdm2V0IFn9HnOs8ZvK8Y6+5wgJXN7H5TlP0tCS1xdrv3znWSQ4zWKMhFF2uv/xTV3yVNIXcemkyk82Lg4ljJLB7v+EWfykTJaGTPkPIjuGIUbyFpoYNauQI3p5P+uTYMg1F44Oe0mIJCorK9s81BcWD8zy86sRu+P6u+AFBLAwQUAAAACADRg51cEzBxk+UAAABZAQAAEQAAAHdvcmRcZG9jdW1lbnQueG1sbU9LTsMwEN1X4g4j7xsHFghVSbpAQhygHMDE0yaq7bFmpoSejQVH4grYFWUD0uhpvu+9+fr47LbvMcAbssyUenPbtAYwjeTndOjNy+5p/WBA1CXvAiXszRnFbIdVt2w8jaeISaEwJNksvZlU88ZaGSeMThrKmMpsTxydlpIPdiH2mWlEkSIQg71r23sb3ZzMUChfyZ8v3LlWXEGHZwyBoFwG38BumgVKOFAUhauHprN1tSJfMP+heaSYT4q8dkVbFD0ouyTBafkclCgITBjyb5tYquoR9q6s878S9sdzTa5ehpvVN1BLAwQUAAAACADRg51c/g3tSbwAAAAzAQAACwAAAF9yZWxzXC5yZWxzjc85DsIwEAXQPhJ3sKYnTigQQnHSIKS0KBzAsieLiBfZZsnZKDgSV8AFBUEUlLO90X/eH0V1UyO5oPOD0QzyNAOCWhg56I7BsdkvN0B84Fry0WhkMKGHqkyKA448xBvfD9aTiGjPoA/Bbin1okfFfWos6jhpjVM8xNJ11HJx4h3SVZatqfs0oEwImbGklgxcLXMgzWTxH9607SBwZ8RZoQ4/vnxtRJm7DgODq3GSync7jSzQmJLOYpaL5AVQSwECFAAUAAAACADRg51ciqkGgvwAAAC9AQAAEwAAAAAAAAAAAAAAAAAAAAAAW0NvbnRlbnRfVHlwZXNdLnhtbFBLAQIUABQAAAAIANGDnVwTMHGT5QAAAFkBAAARAAAAAAAAAAAAAAAAAC0BAAB3b3JkXGRvY3VtZW50LnhtbFBLAQIUABQAAAAIANGDnVz+De1JvAAAADMBAAALAAAAAAAAAAAAAAAAAEECAABfcmVsc1wucmVsc1BLBQYAAAAAAwADALkAAAAmAwAAAAA=";
         const docxBytes = Uint8Array.from(atob(docxBase64), (char) => char.charCodeAt(0));
@@ -1002,6 +1003,7 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
       if (!result?.workflowProbe?.htmlTargetExported) missing.push("HTML target export");
       if (!result?.workflowProbe?.xliffImported) missing.push("XLIFF import");
       if (!result?.workflowProbe?.xliffTargetExported) missing.push("XLIFF target export");
+      if (!result?.workflowProbe?.xliff22HandoffExported) missing.push("XLIFF 2.2 handoff export");
       if (!result?.workflowProbe?.docxImported) missing.push("DOCX source import");
       if (!result?.workflowProbe?.docxTargetExported) missing.push("DOCX target export");
       if (!result?.workflowProbe?.bilingualDocxGenerated) missing.push("bilingual DOCX generation");
