@@ -947,7 +947,6 @@ assertIncludes(regressionTest, "Hosted OpenAI-compatible provider handles provid
 assertIncludes(regressionTest, "Hosted OpenAI-compatible custom endpoints are blocked before network unless explicitly allowlisted", "regression-test.html must verify unsupported hosted OpenAI-compatible endpoints fail before fetch.");
 assertIncludes(regressionTest, "Local AI pretranslation skips protected segments, passes TM, glossary, and nearby context hints, writes successes, and records segment failures", "regression-test.html must verify Local AI pretranslation safety, TM/glossary/context hints, and failure handling.");
 assertIncludes(regressionTest, "Translate prompt includes nearby segment context while preserving the source-text separator", "regression-test.html must verify nearby context prompt structure.");
-
 const expectedCacheAssets = Array.from(requiredAssets)
   .filter((file) => !file.startsWith("desktop/") && file !== "README.md")
   .map((file) => `./${file}`);
@@ -1521,8 +1520,13 @@ assertIncludes(regressionTest, "direct backup restore preserves non-index app me
 assertIncludes(regressionTest, "full backup restore removes stale TM index metadata atomically", "regression-test.html must verify atomic backup restore removes stale TM index metadata.");
 assertIncludes(readText("tm.js"), "deleteTmEntries(ids)", "tm.js must support bulk TM entry deletion without record-by-record UI loops.");
 assertIncludes(readText("termbase.js"), "deleteTerms(ids)", "termbase.js must support bulk term deletion without record-by-record UI loops.");
-assertIncludes(appJs, "Export blocked: translate empty target segments first.", "app.js must block final delivery exports with untranslated target segments.");
-assertIncludes(appJs, "delivery export gate blocks empty target segments", "app workflow test must verify final delivery exports block untranslated segments.");
+assertIncludes(validationJs, "function planDeliveryExport", "validation.js must provide shared format-aware delivery export planning.");
+assertIncludes(validationJs, 'return "source-fallback"', "validation.js must classify monolingual delivery exports for source fallback.");
+assertIncludes(validationJs, 'return "preserve-empty"', "validation.js must preserve meaningful empty targets in bilingual interchange formats.");
+assertIncludes(validationJs, "finalized.canExport", "validation.js must expose a machine-readable delivery export decision.");
+assertIncludes(appJs, "delivery export gate permits empty target source fallback", "app workflow tests must verify final delivery exports permit source fallback for untranslated segments.");
+assertIncludes(appJs, "function confirmIncompleteExport", "app.js must require confirmation before incomplete delivery exports.");
+assertIncludes(appJs, "Export cancelled; no file was created.", "app.js must report cancelled incomplete exports without claiming success.");
 assertIncludes(validationJs, "original localization structure metadata is missing", "validation.js must block final localization delivery when original structure metadata is missing.");
 assert(!validationJs.includes("Export can continue, but original localization structure metadata is incomplete."), "validation.js must not allow simplified final localization delivery when reconstruction metadata is missing.");
 assertIncludes(regressionTest, "delivery export validation blocks missing localization reconstruction metadata", "regression-test.html must verify final localization delivery blocks missing reconstruction metadata.");
@@ -1542,10 +1546,10 @@ assertIncludes(regressionTest, "localization export rejects malformed direct seg
 assertIncludes(validationJs, "return typeof value === \"number\" && Number.isFinite(value);", "validation.js must require real numeric reconstruction indexes instead of accepting numeric-looking strings.");
 assertIncludes(regressionTest, "export validation rejects string reconstruction indexes before builder failure", "regression-test.html must verify malformed reconstruction indexes are blocked by export validation.");
 assertIncludes(regressionTest, "project package validation warns about string reconstruction indexes", "regression-test.html must verify malformed package reconstruction indexes are reported before handoff.");
-assert(!localizationJs.includes("segment.target || segment.source"), "localization.js final builders must not fall back to source text for empty target segments.");
-assert(!localizationJs.includes("segment.target || segment.text"), "localization.js final builders must not fall back to extracted source text for empty target segments.");
-assert(!localizationJs.includes("segment.target || row"), "localization.js delimited builders must not preserve stale target cells for empty target segments.");
-assertIncludes(regressionTest, "localization target exports do not fall back to source for empty target segments", "regression-test.html must verify localization builders do not source-fallback empty target segments.");
+assertIncludes(regressionTest, "format-aware localization export falls back only in monolingual delivery formats", "regression-test.html must verify format-aware localization source fallback.");
+assertIncludes(regressionTest, "monolingual CSV export retains source text without mutating the target", "regression-test.html must verify structure-aware CSV source fallback.");
+assertIncludes(regressionTest, "Qt TS export preserves empty translations and marks them unfinished", "regression-test.html must verify Qt TS empty-target semantics.");
+assertIncludes(regressionTest, "bilingual XML export preserves an empty target", "regression-test.html must verify bilingual XML empty-target semantics.");
 assertIncludes(regressionTest, "target export rejects missing reconstruction data", "regression-test.html must verify localization builders reject missing reconstruction data.");
 assertIncludes(localizationJs, "function replaceIdmlParagraphStyleRanges", "localization.js must rebuild IDML paragraph character-style ranges from semantic inline tags.");
 assertIncludes(regressionTest, "IDML localization export preserves real character style ranges for semantic inline tags", "regression-test.html must verify IDML semantic inline tags rebuild real character-style ranges.");
@@ -1581,10 +1585,12 @@ assertIncludes(regressionTest, "XLIFF 2.2 validation rejects", "regression-test.
 assertIncludes(regressionTest, "direct XLIFF export normalizes required project metadata", "regression-test.html must verify direct XLIFF export normalizes project metadata.");
 assertIncludes(regressionTest, "direct XLIFF export rejects missing project metadata", "regression-test.html must verify direct XLIFF export rejects incomplete project metadata.");
 assertIncludes(regressionTest, "direct XLIFF export rejects malformed segment metadata", "regression-test.html must verify direct XLIFF export rejects malformed segment metadata.");
+assertIncludes(regressionTest, "XLIFF 1.2 export emits an explicit empty target with new state", "regression-test.html must verify XLIFF 1.2 empty-target export.");
+assertIncludes(regressionTest, "XLIFF 2.2 export emits an explicit empty target with initial state", "regression-test.html must verify XLIFF 2.2 empty-target export.");
 assertIncludes(smokeTest, "XLIFF target export rejects missing reconstruction source data", "smoke-test.html must verify XLIFF target reconstruction rejects missing source data.");
-assert(!appJs.includes("sourceFallbackCount"), "app.js must not report source fallbacks for final DOCX delivery exports.");
-assert(!appJs.includes("source fallbacks"), "app.js must not present incomplete DOCX delivery exports as source-fallback exports.");
-assert(!appJs.includes("Exported with ${missing} empty target"), "app.js must not present incomplete final delivery exports as successful downloads.");
+assertIncludes(appJs, "sourceFallbackCount", "app.js must report source fallbacks for incomplete monolingual delivery exports.");
+assertIncludes(appJs, "preservedEmptyTargetCount", "app.js must report preserved empty targets for incomplete interchange exports.");
+assertIncludes(appJs, "draftTargetCount", "app.js must report non-empty unconfirmed targets without replacing them.");
 assertIncludes(docxJs, "function targetFor(segment, fallbackToSource = false)", "docx.js must default final DOCX reconstruction to target-only text.");
 assertIncludes(functionBody(docxJs, "function targetFor(segment, fallbackToSource = false)", "async function extractDocxSegments(file)"), "return target.trim() ? target", "docx.js must preserve exact non-empty target text, including leading/trailing Word controls, during DOCX reconstruction.");
 assertIncludes(docxJs, "WORD_VISIBLE_TEXT_CONTROL_NAMES", "docx.js must treat Word tabs, line breaks, and hyphen controls as visible translatable text controls.");
@@ -1594,8 +1600,8 @@ assertIncludes(docxJs, "SUPPORTED_TEXT_WRAPPERS = new Set([\"hyperlink\", \"fldS
 assertIncludes(docxJs, "if (first.localName === \"sdt\") return directChildByName(first, \"sdtContent\")", "docx.js must rebuild content-control text inside w:sdtContent while preserving w:sdtPr metadata.");
 assertIncludes(docxJs, "wrapInlineTagsWithStyleId", "docx.js must expose semantic inline tags for complex Word run properties without losing exact reconstruction metadata.");
 assertIncludes(docxJs, "SEMANTIC_INLINE_TAGS.has(type) && id && formats.has(id)", "docx.js target reconstruction must preserve exact run properties when semantic inline tags carry style ids.");
-assert(!docxJs.includes("targetFor(segment, true)"), "docx.js target DOCX export must not fall back to source text for empty target segments.");
-assertIncludes(regressionTest, "DOCX target export does not fall back to source for empty target segments", "regression-test.html must verify direct DOCX target reconstruction does not source-fallback empty targets.");
+assert(!docxJs.includes("targetFor(segment, true)"), "docx.js must receive transient planned targets instead of mutating or independently resolving segment state.");
+assertIncludes(regressionTest, "DOCX target export uses source fallback without mutating empty target segments", "regression-test.html must verify planned DOCX source fallback is immutable.");
 assertIncludes(regressionTest, "DOCX import keeps academic abbreviations and initials inside sentence segments", "regression-test.html must verify DOCX segmentation protects academic abbreviations and initials.");
 assertIncludes(regressionTest, "DOCX import labels complex bold run properties with semantic inline tags", "regression-test.html must verify complex Word formatting gets translator-friendly semantic tags.");
 assertIncludes(regressionTest, "DOCX export preserves exact complex run properties behind semantic inline tags", "regression-test.html must verify semantic style-id tags preserve exact DOCX formatting on reconstruction.");
@@ -1692,7 +1698,8 @@ assertIncludes(appJs, "WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG", "app workflow
 assertIncludes(appJs, "OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG", "app workflow tests must be able to simulate browser key-storage failure after project AI settings are written.");
 assertIncludes(appJs, "function writeOpenAiKeyStorage", "app.js must wrap OpenAI key writes so browser storage failures can be rolled back consistently.");
 assertIncludes(appJs, "OpenAI key could not be saved in this browser.", "app.js must report browser OpenAI key storage failures clearly.");
-assertIncludes(readText("regression-test.html"), "delivery export validation blocks empty target segments", "regression-test.html must verify final delivery validation blocks untranslated segments.");
+assertIncludes(readText("regression-test.html"), "delivery export validation permits source fallback for empty target segments", "regression-test.html must verify final delivery validation permits planned source fallback.");
+assertIncludes(readText("regression-test.html"), "XLIFF delivery validation permits meaningful empty targets", "regression-test.html must verify final XLIFF validation preserves empty targets.");
 assertIncludes(readText("regression-test.html"), "bilingual review export validation permits empty target segments as review notes", "regression-test.html must verify review exports can document untranslated segments.");
 assertIncludes(readText("regression-test.html"), "delivery export validation blocks zero-segment files", "regression-test.html must verify final delivery validation blocks empty files.");
 assertIncludes(readText("regression-test.html"), "review export validation reports zero-segment projects without delivery blocking", "regression-test.html must verify review/report flows can diagnose empty projects.");

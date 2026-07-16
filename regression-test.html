@@ -648,6 +648,31 @@
             normalizedXliff.includes("<target state=\"new\">  XLIFF target  </target>"),
           "direct XLIFF export normalizes required project metadata"
         );
+        const emptyXliff12 = window.CatHan.xliff.buildXliff({
+          name: "Empty XLIFF 1.2",
+          sourceLang: "en",
+          targetLang: "tr"
+        }, [{ id: "empty-12", source: "Empty target source", target: "", status: "draft" }]);
+        const emptyXliff12RoundTrip = window.CatHan.xliff.parseXliffText(emptyXliff12, "empty-12.xlf");
+        assert(
+          emptyXliff12.includes('<target state="new"></target>') &&
+            emptyXliff12RoundTrip.segments[0].target === "" &&
+            emptyXliff12RoundTrip.segments[0].status === "empty",
+          "XLIFF 1.2 export emits an explicit empty target with new state"
+        );
+        const emptyXliff22 = window.CatHan.xliff.buildXliff22({
+          name: "Empty XLIFF 2.2",
+          sourceLang: "en",
+          targetLang: "tr"
+        }, [{ id: "empty-22", source: "Open <b>file</b>", target: "", status: "draft" }]);
+        const emptyXliff22RoundTrip = window.CatHan.xliff.parseXliffText(emptyXliff22, "empty-22.xlf");
+        assert(
+          emptyXliff22.includes('state="initial"') &&
+            emptyXliff22.includes("<target></target>") &&
+            emptyXliff22RoundTrip.segments[0].target === "" &&
+            emptyXliff22RoundTrip.segments[0].status === "empty",
+          "XLIFF 2.2 export emits an explicit empty target with initial state"
+        );
         let malformedXliffProjectRejected = false;
         try {
           window.CatHan.xliff.buildXliff({ name: "Missing language", sourceLang: "", targetLang: "tr" }, [{ source: "Source", target: "Target" }]);
@@ -1088,7 +1113,46 @@
         assert(missingSourceAssetReport.warnings.some((warning) => warning.includes("has no source asset summary")), "project package validation warns when document source asset summary is missing");
 
         const exportReport = window.CatHan.validation.validateExportReadiness({ project: pkg.project, segments: reloaded, documentInfo: pkg.project.documents[0], format: "html" });
-        assert(exportReport.ok && Array.isArray(exportReport.risky), "export validation shape");
+        assert(exportReport.ok && typeof exportReport.canExport === "boolean" && Array.isArray(exportReport.risky), "export validation shape");
+        const plannerSegments = [
+          { id: "planner-empty", source: "Source <b>fallback</b>", target: "   ", status: "empty", targetHistory: [{ reason: "fixture" }] },
+          { id: "planner-draft", source: "Draft source", target: "  Draft target  ", status: "draft" },
+          { id: "planner-confirmed", source: "Confirmed source", target: "Confirmed target", status: "confirmed" }
+        ];
+        const fallbackExportPlan = window.CatHan.validation.planDeliveryExport({ format: "html", segments: plannerSegments });
+        assert(
+          fallbackExportPlan.policy === "source-fallback" &&
+            fallbackExportPlan.emptyTargetCount === 1 &&
+            fallbackExportPlan.sourceFallbackCount === 1 &&
+            fallbackExportPlan.preservedEmptyTargetCount === 0 &&
+            fallbackExportPlan.draftTargetCount === 1 &&
+            fallbackExportPlan.requiresConfirmation &&
+            fallbackExportPlan.segments[0].target === "Source <b>fallback</b>" &&
+            fallbackExportPlan.segments[1].target === "  Draft target  " &&
+            plannerSegments[0].target === "   " &&
+            plannerSegments[0].status === "empty" &&
+            plannerSegments[0].targetHistory[0].reason === "fixture",
+          "delivery export planning applies immutable source fallback and counts drafts"
+        );
+        const sourceFallbackFormats = [
+          "txt", "docx", "docm", "xlsx", "pptx", "odt", "ods", "odp", "html", "md", "json", "yaml", "xml", "strings",
+          "properties", "php", "resx", "dtd", "mif", "idml", "icml", "srt", "vtt", "sbv", "xhtml", "dita", "xini", "wix"
+        ];
+        assert(
+          sourceFallbackFormats.every((format) => window.CatHan.validation.planDeliveryExport({ format, segments: plannerSegments }).policy === "source-fallback"),
+          "delivery export planning classifies monolingual formats for source fallback"
+        );
+        const preserveEmptyFormats = ["xlf", "xliff", "sdlxliff", "po", "pot", "ttx", "txml"];
+        assert(
+          preserveEmptyFormats.every((format) => window.CatHan.validation.planDeliveryExport({ format, segments: plannerSegments }).policy === "preserve-empty") &&
+            window.CatHan.validation.planDeliveryExport({ format: "ts", structure: { format: "ts-xml" }, segments: plannerSegments }).policy === "preserve-empty" &&
+            window.CatHan.validation.planDeliveryExport({ format: "ts", structure: { format: "code-string" }, segments: plannerSegments }).policy === "source-fallback" &&
+            window.CatHan.validation.planDeliveryExport({ format: "csv", structure: { targetIndex: 2 }, segments: plannerSegments }).policy === "preserve-empty" &&
+            window.CatHan.validation.planDeliveryExport({ format: "csv", structure: { targetIndex: -1 }, segments: plannerSegments }).policy === "source-fallback" &&
+            window.CatHan.validation.planDeliveryExport({ documentInfo: { type: "xliff" }, segments: plannerSegments }).policy === "preserve-empty" &&
+            window.CatHan.validation.planDeliveryExport({ format: "bilingual-docx", segments: plannerSegments }).policy === "review",
+          "delivery export planning classifies bilingual and structure-dependent formats"
+        );
         const stringIndexSegment = {
           ...reloaded[0],
           structure: { ...reloaded[0].structure, elementIndex: String(reloaded[0].structure.elementIndex) }
@@ -1125,7 +1189,24 @@
           documentInfo: pkg.project.documents[0],
           format: "html"
         });
-        assert(emptyTargetDeliveryReport.risky.some((item) => item.includes("empty target segment")), "delivery export validation blocks empty target segments");
+        assert(
+          emptyTargetDeliveryReport.canExport &&
+            !emptyTargetDeliveryReport.risky.some((item) => item.includes("protected placeholders")) &&
+            emptyTargetDeliveryReport.warnings.some((item) => item.includes("will export source text")) &&
+            emptyTargetDeliveryReport.exportSummary.sourceFallbackCount === 1,
+          "delivery export validation permits source fallback for empty target segments"
+        );
+        const emptyXliffDeliveryReport = window.CatHan.validation.validateExportReadiness({
+          project: pkg.project,
+          segments: [{ ...reloaded[0], target: "", status: "empty" }],
+          format: "xliff"
+        });
+        assert(
+          emptyXliffDeliveryReport.canExport &&
+            emptyXliffDeliveryReport.warnings.some((item) => item.includes("remain empty")) &&
+            emptyXliffDeliveryReport.exportSummary.preservedEmptyTargetCount === 1,
+          "XLIFF delivery validation permits meaningful empty targets"
+        );
         const localeForbiddenDeliveryReport = window.CatHan.validation.validateExportReadiness({
           project: pkg.project,
           segments: [{ id: "locale-forbidden", source: "INSTALL this tool.", target: "YASAK TERIM kullanildi." }],
@@ -1144,7 +1225,7 @@
           documentInfo: pkg.project.documents[0],
           format: "bilingual-docx"
         });
-        assert(!emptyTargetReviewReport.risky.some((item) => item.includes("empty target segment")) && emptyTargetReviewReport.warnings.some((item) => item.includes("untranslated")), "bilingual review export validation permits empty target segments as review notes");
+        assert(emptyTargetReviewReport.canExport && !emptyTargetReviewReport.risky.some((item) => item.includes("empty target segment")) && emptyTargetReviewReport.warnings.some((item) => item.includes("untranslated")), "bilingual review export validation permits empty target segments as review notes");
         const missingIdmlPackageReport = window.CatHan.validation.validateExportReadiness({
           project: {
             ...pkg.project,
@@ -1425,17 +1506,21 @@
             rebuiltTextboxTexts.includes("Text box target."),
           "DOCX export preserves text-box paragraphs beside rebuilt inline formatting"
         );
-        const noSourceFallbackDocx = await window.CatHan.docx.buildTargetDocx(
+        const incompleteDocxSegments = textboxImport.segments.map((segment) => ({
+          ...segment,
+          target: segment.text === "Text box paragraph." ? "" : "Dis <b>paragraf.</b>"
+        }));
+        const incompleteDocxPlan = window.CatHan.validation.planDeliveryExport({ format: "docx", segments: incompleteDocxSegments });
+        const sourceFallbackDocx = await window.CatHan.docx.buildTargetDocx(
           { name: "No fallback fixture", docxStructure: textboxImport.structure },
-          textboxImport.segments.map((segment) => ({
-            ...segment,
-            target: segment.text === "Text box paragraph." ? "" : "Dis <b>paragraf.</b>"
-          }))
+          incompleteDocxPlan.segments
         );
-        const noSourceFallbackImport = await window.CatHan.docx.extractDocxSegments(new File([noSourceFallbackDocx], "no-source-fallback.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+        const sourceFallbackImport = await window.CatHan.docx.extractDocxSegments(new File([sourceFallbackDocx], "source-fallback.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
         assert(
-          !noSourceFallbackImport.segments.some((segment) => segment.text.includes("Text box paragraph.")),
-          "DOCX target export does not fall back to source for empty target segments"
+          incompleteDocxPlan.sourceFallbackCount === 1 &&
+            sourceFallbackImport.segments.some((segment) => segment.text.includes("Text box paragraph.")) &&
+            incompleteDocxSegments.some((segment) => segment.text === "Text box paragraph." && segment.target === ""),
+          "DOCX target export uses source fallback without mutating empty target segments"
         );
 
         const abbreviationDocx = storedZip({
@@ -2701,26 +2786,63 @@
           corruptCrcRejected = error.message.includes("failed CRC integrity validation");
         }
         assert(corruptCrcRejected, "IDML import rejects archive entries with invalid CRC integrity");
-        const noSourceFallbackHtml = window.CatHan.localization.buildLocalizationFile("html", parsed.segments.map((segment) => ({ ...segment, target: "" })), parsed.structure);
-        const noSourceFallbackMarkdown = window.CatHan.localization.buildLocalizationFile("md", parsedMarkdown.segments.map((segment) => ({ ...segment, target: "" })), parsedMarkdown.structure);
-        const noSourceFallbackCsv = window.CatHan.localization.buildLocalizationFile("csv", parsedCsv.segments.map((segment) => ({ ...segment, target: "" })), parsedCsv.structure);
-        const noSourceFallbackAndroid = window.CatHan.localization.buildLocalizationFile("xml", parsedAndroid.segments.map((segment) => ({ ...segment, target: "" })), parsedAndroid.structure);
-        const noSourceFallbackApple = window.CatHan.localization.buildLocalizationFile("strings", parsedApple.segments.map((segment) => ({ ...segment, target: "" })), parsedApple.structure);
-        const noSourceFallbackIdml = await window.CatHan.localization.buildLocalizationFile("idml", parsedIdml.segments.map((segment) => ({ ...segment, target: "" })), parsedIdml.structure);
-        const noSourceFallbackIdmlText = new TextDecoder().decode(noSourceFallbackIdml);
+        const emptyHtmlSegments = parsed.segments.map((segment) => ({ ...segment, target: "" }));
+        const emptyMarkdownSegments = parsedMarkdown.segments.map((segment) => ({ ...segment, target: "" }));
+        const emptyCsvSegments = parsedCsv.segments.map((segment) => ({ ...segment, target: "" }));
+        const emptyAndroidSegments = parsedAndroid.segments.map((segment) => ({ ...segment, target: "" }));
+        const emptyAppleSegments = parsedApple.segments.map((segment) => ({ ...segment, target: "" }));
+        const emptyIdmlSegments = parsedIdml.segments.map((segment) => ({ ...segment, target: "" }));
+        const htmlFallbackPlan = window.CatHan.validation.planDeliveryExport({ format: "html", structure: parsed.structure, segments: emptyHtmlSegments });
+        const markdownFallbackPlan = window.CatHan.validation.planDeliveryExport({ format: "md", structure: parsedMarkdown.structure, segments: emptyMarkdownSegments });
+        const csvEmptyPlan = window.CatHan.validation.planDeliveryExport({ format: "csv", structure: parsedCsv.structure, segments: emptyCsvSegments });
+        const androidFallbackPlan = window.CatHan.validation.planDeliveryExport({ format: "xml", structure: parsedAndroid.structure, segments: emptyAndroidSegments });
+        const appleFallbackPlan = window.CatHan.validation.planDeliveryExport({ format: "strings", structure: parsedApple.structure, segments: emptyAppleSegments });
+        const idmlFallbackPlan = window.CatHan.validation.planDeliveryExport({ format: "idml", structure: parsedIdml.structure, segments: emptyIdmlSegments });
+        const sourceFallbackHtml = window.CatHan.localization.buildLocalizationFile("html", htmlFallbackPlan.segments, parsed.structure);
+        const sourceFallbackMarkdown = window.CatHan.localization.buildLocalizationFile("md", markdownFallbackPlan.segments, parsedMarkdown.structure);
+        const preservedEmptyCsv = window.CatHan.localization.buildLocalizationFile("csv", csvEmptyPlan.segments, parsedCsv.structure);
+        const sourceFallbackAndroid = window.CatHan.localization.buildLocalizationFile("xml", androidFallbackPlan.segments, parsedAndroid.structure);
+        const sourceFallbackApple = window.CatHan.localization.buildLocalizationFile("strings", appleFallbackPlan.segments, parsedApple.structure);
+        const sourceFallbackIdml = await window.CatHan.localization.buildLocalizationFile("idml", idmlFallbackPlan.segments, parsedIdml.structure);
+        const reparsedSourceFallbackIdml = await window.CatHan.localization.parseLocalizationFile(new File([sourceFallbackIdml], "source-fallback.idml", { type: "application/vnd.adobe.indesign-idml-package" }));
+        assert(sourceFallbackHtml.includes("Hello") && sourceFallbackHtml.includes("Save file"), "HTML incomplete export uses source fallback");
+        assert(sourceFallbackMarkdown.includes("Project Overview") && sourceFallbackMarkdown.includes("Intro **bold** text with $variable."), "Markdown incomplete export uses source fallback");
         assert(
-          !noSourceFallbackHtml.includes(">Hello<") &&
-            !noSourceFallbackHtml.includes("Save file") &&
-            !noSourceFallbackMarkdown.includes("Project Overview") &&
-            !noSourceFallbackMarkdown.includes("Intro paragraph") &&
-            !noSourceFallbackCsv.includes("Existing target") &&
-            !noSourceFallbackCsv.includes('"Hello, world","Hello, world"') &&
-            !noSourceFallbackAndroid.includes("Hello <b>world</b>") &&
-            noSourceFallbackAndroid.includes("Skip me") &&
-            !noSourceFallbackApple.includes("Hello world") &&
-            !noSourceFallbackApple.includes('Say \\"hello\\"') &&
-            !noSourceFallbackIdmlText.includes("Hello <b>layout</b> text."),
-          "localization target exports do not fall back to source for empty target segments"
+          csvEmptyPlan.policy === "preserve-empty" && !preservedEmptyCsv.includes("Existing target") && !preservedEmptyCsv.includes('"Hello, world","Hello, world"'),
+          "bilingual CSV incomplete export preserves empty target cells"
+        );
+        assert(sourceFallbackAndroid.includes("Hello <b>world</b>") && sourceFallbackAndroid.includes("Skip me"), "Android XML incomplete export uses source fallback");
+        assert(sourceFallbackApple.includes("Hello world") && sourceFallbackApple.includes('Say \\"hello\\"'), "Apple strings incomplete export uses source fallback");
+        assert(reparsedSourceFallbackIdml.segments[0].text.includes("<b>layout</b>"), "IDML incomplete export uses source fallback");
+        assert(
+          emptyHtmlSegments.every((segment) => segment.target === "") && emptyIdmlSegments.every((segment) => segment.target === ""),
+          "format-aware localization export falls back only in monolingual delivery formats"
+        );
+        const monolingualCsvParsed = await window.CatHan.localization.parseLocalizationFile(new File(["key,source\nwelcome,Hello world"], "monolingual.csv", { type: "text/csv" }));
+        const monolingualCsvSegments = monolingualCsvParsed.segments.map((segment) => ({ ...segment, target: "" }));
+        const monolingualCsvPlan = window.CatHan.validation.planDeliveryExport({ format: "csv", structure: monolingualCsvParsed.structure, segments: monolingualCsvSegments });
+        const monolingualCsvOutput = window.CatHan.localization.buildLocalizationFile("csv", monolingualCsvPlan.segments, monolingualCsvParsed.structure);
+        assert(
+          monolingualCsvPlan.policy === "source-fallback" && monolingualCsvOutput.includes("welcome,Hello world") && monolingualCsvSegments[0].target === "",
+          "monolingual CSV export retains source text without mutating the target"
+        );
+        const qtTsText = '<?xml version="1.0"?><TS><context><message><source>Hello Qt</source><translation>Old Qt</translation></message></context></TS>';
+        const parsedQtTs = await window.CatHan.localization.parseLocalizationFile(new File([qtTsText], "messages.ts", { type: "application/xml" }));
+        const emptyQtSegments = parsedQtTs.segments.map((segment) => ({ ...segment, target: "", status: "empty" }));
+        const qtTsPlan = window.CatHan.validation.planDeliveryExport({ format: "ts", structure: parsedQtTs.structure, segments: emptyQtSegments });
+        const emptyQtOutput = window.CatHan.localization.buildLocalizationFile("ts", qtTsPlan.segments, parsedQtTs.structure);
+        assert(
+          qtTsPlan.policy === "preserve-empty" && /<translation[^>]*type="unfinished"[^>]*><\/translation>|<translation[^>]*type="unfinished"[^>]*\/>/.test(emptyQtOutput) && !emptyQtOutput.includes(">Hello Qt</translation>"),
+          "Qt TS export preserves empty translations and marks them unfinished"
+        );
+        const ttxText = '<?xml version="1.0"?><ttx><trans-unit id="1"><source>Hello TTX</source><target>Old TTX</target></trans-unit></ttx>';
+        const parsedTtx = await window.CatHan.localization.parseLocalizationFile(new File([ttxText], "messages.ttx", { type: "application/xml" }));
+        const emptyTtxSegments = parsedTtx.segments.map((segment) => ({ ...segment, target: "", status: "empty" }));
+        const ttxPlan = window.CatHan.validation.planDeliveryExport({ format: "ttx", structure: parsedTtx.structure, segments: emptyTtxSegments });
+        const emptyTtxOutput = window.CatHan.localization.buildLocalizationFile("ttx", ttxPlan.segments, parsedTtx.structure);
+        assert(
+          ttxPlan.policy === "preserve-empty" && !emptyTtxOutput.includes("Old TTX") && !emptyTtxOutput.includes(">Hello TTX</target>"),
+          "bilingual XML export preserves an empty target"
         );
         const missingLocalizationReconstructionChecks = [
           ["po", parsedPo.segments, "PO reconstruction data"],

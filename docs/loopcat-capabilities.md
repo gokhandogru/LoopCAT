@@ -264,7 +264,9 @@ Current export capabilities:
 
 Current export safety:
 
-- Delivery export is blocked when target segments are empty, protected tags are missing, XML-invalid characters exist, unsafe HTML exists, reconstruction metadata is missing, or forbidden terminology appears.
+- Incomplete delivery exports require confirmation and report empty and non-empty unconfirmed target counts.
+- Monolingual delivery formats use source text for empty targets without changing the editor; bilingual interchange formats preserve empty targets and untranslated states.
+- Delivery export remains blocked when authored targets lose protected tags, XML-invalid output would be produced, unsafe HTML exists, reconstruction metadata is missing, or forbidden terminology appears.
 - Exports obey the selected document instead of silently exporting another file.
 - Download filenames are sanitized for path separators, unsafe characters, reserved Windows device names, and credential-looking values.
 - Failed browser download clicks report visibly and clean up temporary links/object URLs.
@@ -280,7 +282,9 @@ XLIFF 2.2 scope:
 Suggested tests:
 
 - Export each imported file type after translating all segments.
-- Try exporting with an empty target and verify the export gate blocks it.
+- Export a partial DOCX and verify empty targets use source text only in the generated file.
+- Export partial XLIFF 1.2 and 2.2 files and verify their targets remain explicitly empty with `new`/`initial` state.
+- Cancel an incomplete export and verify that no file or activity record is created.
 - Try exporting a selected document while other documents remain unfinished.
 
 ## 10. Backup, Packages, And Workspace Folder Sync

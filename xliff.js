@@ -554,6 +554,7 @@ async function parseXliffFile(file, options = {}) {
 }
 
 function stateForXliff12(segment) {
+  if (!String(segment.target || "").trim()) return "new";
   if (segment.status === "confirmed") return "translated";
   if (segment.status === "draft") return "needs-review-translation";
   return "new";
@@ -695,9 +696,7 @@ function buildXliff22(project, segments) {
     .map((segment, index) => {
       const sourceInline = compileGenericXliff22Inline(segment.source);
       const targetInline = compileGenericXliff22Inline(segment.target || "", sourceInline.plan);
-      const target = String(segment.target || "").trim()
-        ? `\n        <target>${targetInline.output}</target>`
-        : "";
+      const target = `\n        <target>${targetInline.output}</target>`;
       return `    <unit id="u${index + 1}" name="${esc(segment.id || `segment-${index + 1}`)}">
       <notes>
         <note id="n${index + 1}" ref="#s${index + 1}">LoopCAT segment ${index + 1}</note>

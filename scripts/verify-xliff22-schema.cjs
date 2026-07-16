@@ -32,6 +32,11 @@ writeFileSync(generatedDocument, global.window.CatHan.xliff.buildXliff22({
   source: "Open <b>file</b><br/>",
   target: "Dosyayi <b>ac</b><br/>",
   status: "confirmed"
+}, {
+  id: "schema-generated-empty",
+  source: "Empty handoff target",
+  target: "",
+  status: "empty"
 }]), "utf8");
 const documents = [...fixtureDocuments, generatedDocument];
 

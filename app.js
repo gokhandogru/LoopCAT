@@ -9,7 +9,7 @@ const { buildTbx, parseTbx, parseTbxAsync } = window.CatHan.tbx;
 const { buildTargetXliff, buildXliff, buildXliff22, parseXliffFile, xliffMimeType } = window.CatHan.xliff;
 const { buildLocalizationFile, parseLocalizationFile } = window.CatHan.localization;
 const { runQaChecks } = window.CatHan.qa;
-const { validateProjectPackage: validatePackage, validateBackupFile, validateExportReadiness, reportCount, reportSummary } = window.CatHan.validation;
+const { validateProjectPackage: validatePackage, validateBackupFile, planDeliveryExport, validateExportReadiness, reportCount, reportSummary } = window.CatHan.validation;
 const { analyzeProject } = window.CatHan.analysis;
 const { buildQualityPassportData, buildRiskQueue, defaultQualityProfile, qualityCategoryLabel: baseQualityCategoryLabel, scoreSegment } = window.CatHan.quality;
 const {
@@ -786,6 +786,7 @@ const state = {
 const els = {
   saveStatus: document.querySelector("#saveStatus"),
   workspace: document.querySelector("#workspace"),
+  brandHomeLink: document.querySelector("#brandHomeLink"),
   projectsViewBtn: document.querySelector("#projectsViewBtn"),
   resourcesViewBtn: document.querySelector("#resourcesViewBtn"),
   aboutBtn: document.querySelector("#aboutBtn"),
@@ -818,7 +819,6 @@ const els = {
   workspaceBackupBtn: document.querySelector("#workspaceBackupBtn"),
   repairWorkspaceBtn: document.querySelector("#repairWorkspaceBtn"),
   newProjectBtn: document.querySelector("#newProjectBtn"),
-  newProjectFromDashboardBtn: document.querySelector("#newProjectFromDashboardBtn"),
   projectDialog: document.querySelector("#projectDialog"),
   projectDialogTitle: document.querySelector("#projectDialogTitle"),
   projectForm: document.querySelector("#projectForm"),
@@ -1078,8 +1078,8 @@ function translatedSourceHtml(text, values = {}) {
   return escapeHtml(translatedSourceText(text, values));
 }
 
-function uiConfirm(message) {
-  return window.confirm(uiSource(message));
+function uiConfirm(message, values = {}) {
+  return window.confirm(uiSource(message, values));
 }
 
 function uiAlert(message) {
@@ -2845,47 +2845,71 @@ function hasTagIssue(segment) {
 }
 
 function canRunDeliveryExport(report) {
-  if (!report?.ok) {
-    setSaveStatus(reportSummary(report), "dirty");
-    return false;
-  }
-  if (report.risky?.some((item) => item.includes("protected placeholders"))) {
-    setSaveStatus("Export blocked: fix missing protected placeholders first.", "dirty");
-    return false;
-  }
-  if (report.risky?.some((item) => item.includes("empty target segment"))) {
-    setSaveStatus("Export blocked: translate empty target segments first.", "dirty");
-    return false;
-  }
-  if (report.risky?.some((item) => item.includes("unbalanced inline markup"))) {
-    setSaveStatus("Export blocked: fix unbalanced inline markup first.", "dirty");
-    return false;
-  }
-  if (report.risky?.some((item) => item.includes("XML-invalid characters"))) {
-    setSaveStatus("Export blocked: remove XML-invalid characters first.", "dirty");
-    return false;
-  }
-  if (report.risky?.some((item) => item.includes("unsafe HTML markup"))) {
-    setSaveStatus("Export blocked: remove unsafe HTML markup first.", "dirty");
-    return false;
-  }
-  if (report.risky?.some((item) => item.includes("forbidden terminology"))) {
-    setSaveStatus("Export blocked: replace forbidden terminology first.", "dirty");
+  if (!report?.ok || report?.canExport === false) {
+    if (report?.ok) setSaveStatus("Export blocked: review the validation report.", "dirty");
+    else setSaveStatus(reportSummary(report), "dirty");
     return false;
   }
   return true;
 }
 
 function canRunBilingualDocxExport(report) {
-  if (!report?.ok) {
-    setSaveStatus(reportSummary(report), "dirty");
-    return false;
-  }
-  if (report.risky?.some((item) => item.includes("XML-invalid characters"))) {
-    setSaveStatus("Bilingual DOCX blocked: remove XML-invalid characters first.", "dirty");
+  if (!report?.ok || report?.canExport === false) {
+    if (report?.ok) setSaveStatus("Bilingual DOCX blocked: review the validation report.", "dirty");
+    else setSaveStatus(reportSummary(report), "dirty");
     return false;
   }
   return true;
+}
+
+function exportPlanActivityDetail(plan) {
+  return {
+    emptyTargetPolicy: plan.policy,
+    emptyTargetCount: plan.emptyTargetCount,
+    sourceFallbackCount: plan.sourceFallbackCount,
+    preservedEmptyTargetCount: plan.preservedEmptyTargetCount,
+    draftTargetCount: plan.draftTargetCount
+  };
+}
+
+function exportPlanHasWarnings(plan) {
+  return Boolean(plan.emptyTargetCount || plan.draftTargetCount);
+}
+
+function incompleteExportScopeLabel(documentInfo, fallbackLabel) {
+  return documentInfo?.name ? displaySafeText(documentInfo.name) : fallbackLabel;
+}
+
+function confirmIncompleteExport(plan, documentInfo, fallbackLabel) {
+  if (!plan.requiresConfirmation) return true;
+  const lines = [
+    uiSource("The export scope {value1} contains incomplete translation work.", {
+      value1: incompleteExportScopeLabel(documentInfo, fallbackLabel)
+    })
+  ];
+  if (plan.sourceFallbackCount) {
+    lines.push(uiSource("{value1} empty target segment(s) will export source text.", { value1: plan.sourceFallbackCount }));
+  }
+  if (plan.preservedEmptyTargetCount) {
+    lines.push(uiSource("{value1} empty target segment(s) will remain empty in the exported interchange file.", { value1: plan.preservedEmptyTargetCount }));
+  }
+  if (plan.draftTargetCount) {
+    lines.push(uiSource("{value1} non-empty unconfirmed target segment(s) will export as written.", { value1: plan.draftTargetCount }));
+  }
+  lines.push(uiSource("Export anyway?"));
+  return window.confirm(lines.join("\n\n"));
+}
+
+function incompleteExportMessage(baseMessage, plan) {
+  const notes = [];
+  if (plan.sourceFallbackCount) notes.push(`${plan.sourceFallbackCount} source fallback${plan.sourceFallbackCount === 1 ? "" : "s"}`);
+  if (plan.preservedEmptyTargetCount) notes.push(`${plan.preservedEmptyTargetCount} empty target${plan.preservedEmptyTargetCount === 1 ? "" : "s"}`);
+  if (plan.draftTargetCount) notes.push(`${plan.draftTargetCount} unconfirmed target${plan.draftTargetCount === 1 ? "" : "s"}`);
+  return notes.length ? `${baseMessage} with ${notes.join(" and ")}` : baseMessage;
+}
+
+function cancelIncompleteExport() {
+  setSaveStatus("Export cancelled; no file was created.", "dirty");
 }
 
 function reviewLabel(value) {
@@ -6327,7 +6351,7 @@ async function goToQualityRiskItem(item) {
   if (!segmentPassesFilters(segment)) {
     if (state.documentFilter && segment.documentId !== state.documentFilter) {
       state.documentFilter = "";
-      els.documentFilter.value = "";
+      els.documentFilter.value = state.documentFilter;
     }
     state.segmentQuery = "";
     els.segmentSearchInput.value = "";
@@ -9677,6 +9701,7 @@ async function extractBatchTermsWithLocalAi() {
     completed: 0,
     failed: 0,
     skipped: 0,
+    skippedSegments: 0,
     canceled: false
   };
   renderLocalAiCommandCentre();
@@ -11670,17 +11695,28 @@ async function exportTargetText() {
   try {
     await flushPendingSegmentSaves();
     const { documentInfo, segments } = deliveryExportScope();
-    const report = validateExportReadiness({ project: state.project, segments, format: "txt", terms: await projectTermsForValidation() });
+    const exportPlan = planDeliveryExport({ format: "txt", documentInfo, segments });
+    const report = validateExportReadiness({ project: state.project, segments, format: "txt", terms: await projectTermsForValidation(), exportPlan });
     addScopedExportReportNote(report, documentInfo, "Target TXT");
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    const content = segments
+    if (!confirmIncompleteExport(exportPlan, documentInfo, state.project.name || "project")) {
+      cancelIncompleteExport();
+      return;
+    }
+    const content = exportPlan.segments
       .map((segment) => segment.target.trim())
       .join("\n\n");
     const base = scopedExportBaseName(state.project.name || "project", documentInfo);
     download(`${base}_${state.project.targetLang}.txt`, content, "text/plain");
-    const activityLogged = await logOptionalProjectActivity("export", "Target TXT exported", { documentId: documentInfo?.id || "", fileName: documentInfo?.name || "", segmentCount: segments.length }, "Target TXT export");
-    setSaveStatus(appendActivityWarning("Target TXT exported", activityLogged), exportStatusMode("saved", activityLogged));
+    const activityLogged = await logOptionalProjectActivity("export", "Target TXT exported", {
+      documentId: documentInfo?.id || "",
+      fileName: documentInfo?.name || "",
+      segmentCount: segments.length,
+      ...exportPlanActivityDetail(exportPlan)
+    }, "Target TXT export");
+    const message = incompleteExportMessage("Target TXT exported", exportPlan);
+    setSaveStatus(appendActivityWarning(message, activityLogged), exportStatusMode(exportPlanHasWarnings(exportPlan) ? "dirty" : "saved", activityLogged));
   } catch (error) {
     setSaveStatus(error.message || "Target TXT export failed", "dirty");
   }
@@ -11693,15 +11729,26 @@ async function exportTargetDocx() {
     const documentInfo = exportDocumentForTypes(new Set(["docx"]), "The selected file is not a DOCX document.", "Select a DOCX document to export.");
     if (!documentInfo) return;
     const segments = state.segments.filter((segment) => segment.documentId === documentInfo.id);
-    const report = validateExportReadiness({ project: state.project, segments, documentInfo, format: "docx", terms: await projectTermsForValidation() });
+    const exportPlan = planDeliveryExport({ format: "docx", documentInfo, segments });
+    const report = validateExportReadiness({ project: state.project, segments, documentInfo, format: "docx", terms: await projectTermsForValidation(), exportPlan });
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
+    if (!confirmIncompleteExport(exportPlan, documentInfo, state.project.name || "project")) {
+      cancelIncompleteExport();
+      return;
+    }
     const docxStructure = state.project.docxStructures?.[documentInfo.id] || state.project.docxStructure;
     const base = fileSafeName(state.project.name || "project");
-    const bytes = await buildTargetDocx({ ...state.project, docxStructure }, segments);
+    const bytes = await buildTargetDocx({ ...state.project, docxStructure }, exportPlan.segments);
     download(`${base}_${fileSafeName(documentInfo.name)}_${state.project.targetLang}.docx`, bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    const activityLogged = await logOptionalProjectActivity("export", "Target DOCX exported", { documentId: documentInfo.id, fileName: documentInfo.name, segmentCount: segments.length }, "Target DOCX export");
-    setSaveStatus(appendActivityWarning("DOCX exported", activityLogged), exportStatusMode("saved", activityLogged));
+    const activityLogged = await logOptionalProjectActivity("export", "Target DOCX exported", {
+      documentId: documentInfo.id,
+      fileName: documentInfo.name,
+      segmentCount: segments.length,
+      ...exportPlanActivityDetail(exportPlan)
+    }, "Target DOCX export");
+    const message = incompleteExportMessage("DOCX exported", exportPlan);
+    setSaveStatus(appendActivityWarning(message, activityLogged), exportStatusMode(exportPlanHasWarnings(exportPlan) ? "dirty" : "saved", activityLogged));
   } catch (error) {
     setSaveStatus(error.message || "DOCX export failed", "dirty");
   }
@@ -11750,18 +11797,37 @@ async function exportLocalization() {
     const documentType = projectDocumentType(documentInfo);
     const exportDocumentInfo = { ...documentInfo, type: documentType };
     const segments = state.segments.filter((segment) => segment.documentId === documentInfo.id);
-    const report = validateExportReadiness({ project: state.project, segments, documentInfo: exportDocumentInfo, format: documentType, terms: await projectTermsForValidation() });
+    const structure = state.project.localizationStructures?.[documentInfo.id];
+    const exportPlan = planDeliveryExport({ format: documentType, documentInfo: exportDocumentInfo, structure, segments });
+    const report = validateExportReadiness({
+      project: state.project,
+      segments,
+      documentInfo: exportDocumentInfo,
+      format: documentType,
+      terms: await projectTermsForValidation(),
+      exportPlan,
+      structure
+    });
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    const structure = state.project.localizationStructures?.[documentInfo.id];
+    if (!confirmIncompleteExport(exportPlan, exportDocumentInfo, state.project.name || "project")) {
+      cancelIncompleteExport();
+      return;
+    }
     const content = XLIFF_DOCUMENT_TYPES.has(documentType)
-      ? buildTargetXliff(state.project, segments, structure)
-      : await buildLocalizationFile(documentType, segments, structure);
+      ? buildTargetXliff(state.project, exportPlan.segments, structure)
+      : await buildLocalizationFile(documentType, exportPlan.segments, structure);
     const ext = documentType === "yml" ? "yaml" : documentType === "markdown" ? "md" : documentType;
     const type = localizationDownloadMimeType(ext, structure);
     download(`${fileSafeName(documentInfo.name)}_${state.project.targetLang}.${ext}`, content, type);
-    const activityLogged = await logOptionalProjectActivity("export", "Localization file exported", { documentId: documentInfo.id, documentType, segmentCount: segments.length }, "Localization export");
-    setSaveStatus(appendActivityWarning("Localization file exported", activityLogged), exportStatusMode("saved", activityLogged));
+    const activityLogged = await logOptionalProjectActivity("export", "Localization file exported", {
+      documentId: documentInfo.id,
+      documentType,
+      segmentCount: segments.length,
+      ...exportPlanActivityDetail(exportPlan)
+    }, "Localization export");
+    const message = incompleteExportMessage("Localization file exported", exportPlan);
+    setSaveStatus(appendActivityWarning(message, activityLogged), exportStatusMode(exportPlanHasWarnings(exportPlan) ? "dirty" : "saved", activityLogged));
   } catch (error) {
     setSaveStatus(error.message || "Localization export failed", "dirty");
   }
@@ -11772,19 +11838,31 @@ async function exportXliff(version = "1.2") {
   try {
     await flushPendingSegmentSaves();
     const { documentInfo, segments } = deliveryExportScope();
-    const report = validateExportReadiness({ project: state.project, segments, format: "xliff", terms: await projectTermsForValidation() });
+    const exportPlan = planDeliveryExport({ format: "xliff", documentInfo, segments });
+    const report = validateExportReadiness({ project: state.project, segments, format: "xliff", terms: await projectTermsForValidation(), exportPlan });
     addScopedExportReportNote(report, documentInfo, "XLIFF");
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
+    if (!confirmIncompleteExport(exportPlan, documentInfo, state.project.name || "project")) {
+      cancelIncompleteExport();
+      return;
+    }
     const base = scopedExportBaseName(state.project.name || "project", documentInfo);
     const exportProject = documentInfo ? { ...state.project, sourceFileName: documentInfo.name } : state.project;
     const isXliff22 = version === "2.2";
-    const content = isXliff22 ? buildXliff22(exportProject, segments) : buildXliff(exportProject, segments);
+    const content = isXliff22 ? buildXliff22(exportProject, exportPlan.segments) : buildXliff(exportProject, exportPlan.segments);
     const label = isXliff22 ? "XLIFF 2.2" : "XLIFF";
     const exportedMessage = isXliff22 ? "XLIFF 2.2 exported" : "XLIFF exported";
     download(`${base}_${state.project.sourceLang}-${state.project.targetLang}.xlf`, content, xliffMimeType(version));
-    const activityLogged = await logOptionalProjectActivity("export", exportedMessage, { documentId: documentInfo?.id || "", fileName: documentInfo?.name || "", segmentCount: segments.length, xliffVersion: version }, `${label} export`);
-    setSaveStatus(appendActivityWarning(exportedMessage, activityLogged), exportStatusMode("saved", activityLogged));
+    const activityLogged = await logOptionalProjectActivity("export", exportedMessage, {
+      documentId: documentInfo?.id || "",
+      fileName: documentInfo?.name || "",
+      segmentCount: segments.length,
+      xliffVersion: version,
+      ...exportPlanActivityDetail(exportPlan)
+    }, `${label} export`);
+    const message = incompleteExportMessage(exportedMessage, exportPlan);
+    setSaveStatus(appendActivityWarning(message, activityLogged), exportStatusMode(exportPlanHasWarnings(exportPlan) ? "dirty" : "saved", activityLogged));
   } catch (error) {
     setSaveStatus(error.message || (version === "2.2" ? "XLIFF 2.2 export failed" : "XLIFF export failed"), "dirty");
   }
@@ -12098,6 +12176,10 @@ function wireEvents() {
     });
   });
 
+  els.brandHomeLink.addEventListener("click", (event) => {
+    event.preventDefault();
+    setView("projects");
+  });
   els.projectsViewBtn.addEventListener("click", () => setView("projects"));
   els.resourcesViewBtn.addEventListener("click", () => setView("resources"));
   els.aboutBtn.addEventListener("click", () => els.aboutDialog.showModal());
@@ -12194,7 +12276,6 @@ function wireEvents() {
     renderCommandPalette();
   });
   els.newProjectBtn.addEventListener("click", () => openProjectDialog("create"));
-  els.newProjectFromDashboardBtn.addEventListener("click", () => openProjectDialog("create"));
   els.projectSettingsBtn.addEventListener("click", () => openProjectDialog("edit"));
   els.editorProjectSettingsBtn.addEventListener("click", () => openProjectDialog("edit"));
   els.projectSearchInput.addEventListener("input", renderProjectsView);
@@ -12281,7 +12362,7 @@ function wireEvents() {
       if (!panel) return;
       const collapsed = panel.classList.toggle("collapsed");
       button.setAttribute("aria-expanded", String(!collapsed));
-      const title = panel.querySelector("h2")?.textContent || "panel";
+      const title = panel.querySelector("h2, h3")?.textContent || "panel";
       button.setAttribute("aria-label", `${collapsed ? "Expand" : "Minimize"} ${title}`);
     });
   });
@@ -12891,11 +12972,13 @@ async function runAppWorkflowTest() {
     const caseInsensitiveTypeDownloads = [];
     const originalCaseCreateObjectUrl = URL.createObjectURL.bind(URL);
     const originalCaseAnchorClick = HTMLAnchorElement.prototype.click;
+    const originalCaseConfirm = window.confirm;
     URL.createObjectURL = (blob) => {
       caseInsensitiveTypeDownloads.push({ type: blob.type, blob });
       return originalCaseCreateObjectUrl(blob);
     };
     HTMLAnchorElement.prototype.click = function noopCaseInsensitiveTypeClick() {};
+    window.confirm = () => true;
     try {
       await exportLocalization();
       assert(
@@ -12906,6 +12989,7 @@ async function runAppWorkflowTest() {
     } finally {
       URL.createObjectURL = originalCaseCreateObjectUrl;
       HTMLAnchorElement.prototype.click = originalCaseAnchorClick;
+      window.confirm = originalCaseConfirm;
     }
     state.project = await updateProject({
       ...state.project,
@@ -13189,6 +13273,47 @@ async function runAppWorkflowTest() {
         toolbarActionsBounds.bottom <= progressBounds.top + 1,
       "responsive editor toolbar keeps every action above the progress panel"
     );
+    const editorAreaBounds = document.querySelector(".editor-area")?.getBoundingClientRect();
+    const editorImportMenu = document.querySelector("#editorImportMenu");
+    editorImportMenu.open = true;
+    const editorImportPanelBounds = editorImportMenu.querySelector(":scope > .menu-panel")?.getBoundingClientRect();
+    editorImportMenu.open = false;
+    assert(
+      Boolean(editorAreaBounds && editorImportPanelBounds) &&
+        editorImportPanelBounds.left >= editorAreaBounds.left - 1 &&
+        editorImportPanelBounds.right <= editorAreaBounds.right + 1,
+      "editor Import menu opens fully inside the rounded editor surface"
+    );
+    assert(
+      document.querySelectorAll("#newProjectBtn").length === 1 && !document.querySelector("#newProjectFromDashboardBtn"),
+      "Projects view exposes one non-duplicated New project action"
+    );
+    const saveStatusStyle = getComputedStyle(els.saveStatus);
+    assert(
+      saveStatusStyle.display.endsWith("flex") && saveStatusStyle.alignItems === "center" && saveStatusStyle.justifyContent === "center",
+      "save status pill centers its label in both axes"
+    );
+    els.brandHomeLink.click();
+    assert(
+      state.view === "projects" && !els.projectsView.classList.contains("hidden"),
+      "LoopCAT brand navigates to the Projects view"
+    );
+    showProjectHome();
+    const analysisPanel = document.querySelector(".analysis-panel");
+    const analysisToggle = analysisPanel?.querySelector("[data-panel-toggle]");
+    analysisToggle?.click();
+    assert(
+      analysisPanel?.classList.contains("collapsed") &&
+        analysisToggle?.getAttribute("aria-expanded") === "false" &&
+        getComputedStyle(document.querySelector("#projectAnalysisContent")).display === "none",
+      "Project analysis can be collapsed"
+    );
+    analysisToggle?.click();
+    assert(
+      !analysisPanel?.classList.contains("collapsed") && analysisToggle?.getAttribute("aria-expanded") === "true",
+      "Project analysis can be expanded"
+    );
+    await openProjectFile(documentInfo.id);
     const activeTargetEditor = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
     assert(
       activeTargetEditor?.getAttribute("aria-label") === uiSource("Target translation for segment {value1}", { value1: segmentIndex + 1 }),
@@ -15199,14 +15324,19 @@ async function runAppWorkflowTest() {
       format: "txt",
       terms: [{ sourceTerm: "Hello", targetTerm: "forbidden-report-term", isForbidden: true }]
     });
-    assert(!canRunDeliveryExport(forbiddenDeliveryReport) && els.saveStatus.textContent.includes("forbidden terminology"), "delivery export gate blocks forbidden terminology");
+    assert(!canRunDeliveryExport(forbiddenDeliveryReport) && forbiddenDeliveryReport.risky.some((item) => item.includes("forbidden terminology")), "delivery export gate blocks forbidden terminology");
     const emptyTargetDeliveryReport = validateExportReadiness({
       project: state.project,
       segments: [{ ...state.segments[segmentIndex], target: "" }],
       format: "txt",
       terms: []
     });
-    assert(!canRunDeliveryExport(emptyTargetDeliveryReport) && els.saveStatus.textContent.includes("empty target"), "delivery export gate blocks empty target segments");
+    assert(
+      canRunDeliveryExport(emptyTargetDeliveryReport) &&
+        emptyTargetDeliveryReport.warnings.some((item) => item.includes("will export source text")) &&
+        emptyTargetDeliveryReport.exportSummary.sourceFallbackCount === 1,
+      "delivery export gate permits empty target source fallback"
+    );
     await setActiveSegment(segmentIndex);
     let confirmRollbackSegment = state.segments[segmentIndex];
     setHiddenSegmentField(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG, true);
@@ -16031,6 +16161,8 @@ async function runAppWorkflowTest() {
     const originalStatusCreateObjectUrl = URL.createObjectURL.bind(URL);
     const originalStatusRevokeObjectUrl = URL.revokeObjectURL.bind(URL);
     const originalStatusAnchorClick = HTMLAnchorElement.prototype.click;
+    const originalStatusConfirm = window.confirm;
+    const statusConfirmMessages = [];
     URL.createObjectURL = (blob) => {
       statusDownloads.push({ type: blob.type, blob });
       return originalStatusCreateObjectUrl(blob);
@@ -16041,6 +16173,10 @@ async function runAppWorkflowTest() {
     };
     HTMLAnchorElement.prototype.click = function noopStatusDownloadClick() {
       statusDownloadNames.push(this.download);
+    };
+    window.confirm = (message) => {
+      statusConfirmMessages.push(String(message || ""));
+      return true;
     };
     try {
       download("../CON.txt", "unsafe filename fixture", "text/plain");
@@ -16198,15 +16334,19 @@ async function runAppWorkflowTest() {
         renderResourcesView();
       }
       await exportTargetText();
-      assert(els.saveStatus.textContent === "Target TXT exported" && statusDownloads.some((item) => item.type === "text/plain"), "target TXT export reports clean success");
+      assert(els.saveStatus.textContent.startsWith("Target TXT exported") && statusDownloads.some((item) => item.type === "text/plain"), "target TXT export reports success");
       await exportBilingualDocx();
       assert(els.saveStatus.textContent.startsWith("Bilingual DOCX exported") && statusDownloads.some((item) => item.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), "bilingual DOCX export reports success");
       await exportLocalization();
-      assert(els.saveStatus.textContent === "Localization file exported" && statusDownloads.some((item) => item.type === "text/html"), "localization export reports clean success");
+      assert(els.saveStatus.textContent.startsWith("Localization file exported") && statusDownloads.some((item) => item.type === "text/html"), "localization export reports success");
       await exportXliff();
-      assert(els.saveStatus.textContent === "XLIFF exported" && statusDownloads.some((item) => item.type === "application/x-xliff+xml"), "XLIFF export reports clean success");
+      assert(els.saveStatus.textContent.startsWith("XLIFF exported") && statusDownloads.some((item) => item.type === "application/x-xliff+xml"), "XLIFF export reports success");
       await exportXliff22();
-      assert(els.saveStatus.textContent === "XLIFF 2.2 exported" && statusDownloads.some((item) => item.type === "application/xliff+xml"), "XLIFF 2.2 export reports clean success with the registered MIME type");
+      assert(els.saveStatus.textContent.startsWith("XLIFF 2.2 exported") && statusDownloads.some((item) => item.type === "application/xliff+xml"), "XLIFF 2.2 export reports success with the registered MIME type");
+      assert(
+        statusConfirmMessages.every((message) => message.includes("incomplete translation work") && message.includes("Export anyway?")),
+        "incomplete delivery export confirmations describe the scoped warning"
+      );
       await saveTmEntry({
         source: "TMX origin privacy source.",
         target: "TMX origin privacy target.",
@@ -16267,7 +16407,8 @@ async function runAppWorkflowTest() {
       setHiddenSegmentField(state.project, EXPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
       await exportTargetText();
       assert(
-        els.saveStatus.textContent.includes("Target TXT exported; activity log failed") &&
+        els.saveStatus.textContent.includes("Target TXT exported") &&
+          els.saveStatus.textContent.includes("activity log failed") &&
           statusDownloads.filter((item) => item.type === "text/plain").length > targetTxtDownloadCountBeforeActivityFailure &&
           state.workspaceDirtyProjectIds.has(project.id),
         "target TXT export activity log failure reports warning after successful download"
@@ -16305,6 +16446,7 @@ async function runAppWorkflowTest() {
       URL.createObjectURL = originalStatusCreateObjectUrl;
       URL.revokeObjectURL = originalStatusRevokeObjectUrl;
       HTMLAnchorElement.prototype.click = originalStatusAnchorClick;
+      window.confirm = originalStatusConfirm;
     }
 
     const resourceTmEntry = await saveTmEntry({
@@ -17514,11 +17656,13 @@ async function runAppWorkflowTest() {
     const deliveryDownloads = [];
     const originalDeliveryCreateObjectUrl = URL.createObjectURL.bind(URL);
     const originalDeliveryAnchorClick = HTMLAnchorElement.prototype.click;
+    const originalDeliveryConfirm = window.confirm;
     URL.createObjectURL = (blob) => {
       deliveryDownloads.push({ type: blob.type, blob });
       return originalDeliveryCreateObjectUrl(blob);
     };
     HTMLAnchorElement.prototype.click = function noopDeliveryClick() {};
+    window.confirm = () => true;
     try {
       const wrongDocxSelectionDownloadCount = deliveryDownloads.length;
       await exportTargetDocx();
@@ -17568,6 +17712,7 @@ async function runAppWorkflowTest() {
     } finally {
       URL.createObjectURL = originalDeliveryCreateObjectUrl;
       HTMLAnchorElement.prototype.click = originalDeliveryAnchorClick;
+      window.confirm = originalDeliveryConfirm;
     }
 
     const structuredMergeFile = new File(["<!doctype html><html><body><p>First block.</p><p>Second block.</p></body></html>"], "structured-merge.html", { type: "text/html" });
@@ -17605,11 +17750,13 @@ async function runAppWorkflowTest() {
     const duplicateDeliveryDownloads = [];
     const originalDuplicateCreateObjectUrl = URL.createObjectURL.bind(URL);
     const originalDuplicateAnchorClick = HTMLAnchorElement.prototype.click;
+    const originalDuplicateConfirm = window.confirm;
     URL.createObjectURL = (blob) => {
       duplicateDeliveryDownloads.push({ type: blob.type, blob });
       return originalDuplicateCreateObjectUrl(blob);
     };
     HTMLAnchorElement.prototype.click = function noopDuplicateDeliveryClick() {};
+    window.confirm = () => true;
     try {
       await exportLocalization();
       assert(!duplicateDeliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("protected placeholders")), "delivery export blocks incomplete duplicate protected tags");
@@ -17621,6 +17768,7 @@ async function runAppWorkflowTest() {
     } finally {
       URL.createObjectURL = originalDuplicateCreateObjectUrl;
       HTMLAnchorElement.prototype.click = originalDuplicateAnchorClick;
+      window.confirm = originalDuplicateConfirm;
     }
 
     const scopedCompleteFile = new File(["<!doctype html><html><body><p>Scoped completed segment.</p></body></html>"], "scoped-complete.html", { type: "text/html" });
@@ -17642,6 +17790,7 @@ async function runAppWorkflowTest() {
     const scopedExportDownloads = [];
     const originalScopedCreateObjectUrl = URL.createObjectURL.bind(URL);
     const originalScopedAnchorClick = HTMLAnchorElement.prototype.click;
+    const originalScopedConfirm = window.confirm;
     URL.createObjectURL = (blob) => {
       scopedExportDownloads.push({ type: blob.type, blob, name: "" });
       return originalScopedCreateObjectUrl(blob);
@@ -17649,6 +17798,7 @@ async function runAppWorkflowTest() {
     HTMLAnchorElement.prototype.click = function noopScopedExportClick() {
       if (scopedExportDownloads.length) scopedExportDownloads[scopedExportDownloads.length - 1].name = this.download;
     };
+    window.confirm = () => true;
     try {
       await exportTargetText();
       await exportXliff();
@@ -17669,19 +17819,76 @@ async function runAppWorkflowTest() {
           scopedXliffDownload.name.includes("scoped-complete_html"),
         "selected XLIFF export ignores unfinished unselected files"
       );
+
+      state.documentFilter = scopedEmptyDocument.id;
+      renderDocumentFilter();
+      renderSegments();
+      const scopedEmptySegment = state.segments.find((segment) => segment.documentId === scopedEmptyDocument.id);
+      const emptyTargetBeforeExports = scopedEmptySegment.target;
+      const emptyStatusBeforeExports = scopedEmptySegment.status;
+      const emptyHistoryLengthBeforeExports = scopedEmptySegment.targetHistory?.length || 0;
+      const downloadsBeforeCancelledExport = scopedExportDownloads.length;
+      const activityBeforeCancelledExport = (await listActivityEvents(project.id)).length;
+      const partialExportPrompts = [];
+      window.confirm = (message) => {
+        partialExportPrompts.push(String(message || ""));
+        return false;
+      };
+      await exportLocalization();
+      assert(
+        scopedExportDownloads.length === downloadsBeforeCancelledExport &&
+          (await listActivityEvents(project.id)).length === activityBeforeCancelledExport &&
+          els.saveStatus.textContent.includes("Export cancelled") &&
+          partialExportPrompts.at(-1)?.includes("1 empty target segment(s) will export source text"),
+        "cancelled incomplete export creates no download or activity record"
+      );
+
+      window.confirm = (message) => {
+        partialExportPrompts.push(String(message || ""));
+        return true;
+      };
+      await exportLocalization();
+      const partialHtmlDownload = scopedExportDownloads.filter((item) => item.type === "text/html").at(-1);
+      const partialHtml = await partialHtmlDownload?.blob.text();
+      const activityAfterFallbackExport = await listActivityEvents(project.id);
+      const fallbackActivity = activityAfterFallbackExport.find((event) => event.type === "export" && event.detail?.documentId === scopedEmptyDocument.id && event.detail?.sourceFallbackCount === 1);
+      assert(
+        partialHtml?.includes("Unselected unfinished segment.") &&
+          scopedEmptySegment.target === emptyTargetBeforeExports &&
+          scopedEmptySegment.status === emptyStatusBeforeExports &&
+          (scopedEmptySegment.targetHistory?.length || 0) === emptyHistoryLengthBeforeExports &&
+          Boolean(fallbackActivity) &&
+          els.saveStatus.textContent.includes("1 source fallback"),
+        "incomplete localization export uses source fallback without mutating editor state"
+      );
+
+      await exportXliff();
+      const partialXliffDownload = scopedExportDownloads.filter((item) => item.type === "application/x-xliff+xml").at(-1);
+      const partialXliff = await partialXliffDownload?.blob.text();
+      const parsedPartialXliff = window.CatHan.xliff.parseXliffText(partialXliff, "partial.xlf");
+      assert(
+        parsedPartialXliff.segments[0].target === "" &&
+          parsedPartialXliff.segments[0].status === "empty" &&
+          partialExportPrompts.at(-1)?.includes("1 empty target segment(s) will remain empty") &&
+          scopedEmptySegment.target === emptyTargetBeforeExports,
+        "incomplete XLIFF export preserves an explicit empty target after confirmation"
+      );
     } finally {
       URL.createObjectURL = originalScopedCreateObjectUrl;
       HTMLAnchorElement.prototype.click = originalScopedAnchorClick;
+      window.confirm = originalScopedConfirm;
     }
 
     const deliveryActivityDownloads = [];
     const originalActivityCreateObjectUrl = URL.createObjectURL.bind(URL);
     const originalActivityAnchorClick = HTMLAnchorElement.prototype.click;
+    const originalActivityConfirm = window.confirm;
     URL.createObjectURL = (blob) => {
       deliveryActivityDownloads.push({ type: blob.type, blob });
       return originalActivityCreateObjectUrl(blob);
     };
     HTMLAnchorElement.prototype.click = function noopActivityDeliveryClick() {};
+    window.confirm = () => true;
     try {
       const activityCountBeforeDeliveryExport = (await listActivityEvents(project.id)).length;
       const untranslatedForDelivery = state.segments.filter((segment) => !String(segment.target || "").trim());
@@ -17705,6 +17912,7 @@ async function runAppWorkflowTest() {
     } finally {
       URL.createObjectURL = originalActivityCreateObjectUrl;
       HTMLAnchorElement.prototype.click = originalActivityAnchorClick;
+      window.confirm = originalActivityConfirm;
     }
     publish(true);
   } catch (error) {
