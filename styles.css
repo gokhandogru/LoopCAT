@@ -146,6 +146,21 @@ input[type="file"] {
 
 .brand {
   gap: 12px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.brand:hover {
+  border-color: transparent;
+  background: transparent;
 }
 
 .brand-mark {
@@ -187,10 +202,15 @@ input[type="file"] {
 }
 
 .save-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 96px;
   font-size: 13px;
   color: var(--muted);
-  text-align: right;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .save-status.dirty {
@@ -349,7 +369,8 @@ input[type="file"] {
   transition: transform 160ms ease;
 }
 
-.side-panel.collapsed .toggle-arrow {
+.side-panel.collapsed .toggle-arrow,
+.analysis-panel.collapsed .toggle-arrow {
   transform: rotate(-45deg);
 }
 
@@ -358,6 +379,14 @@ input[type="file"] {
 }
 
 .side-panel.collapsed .panel-header {
+  margin-bottom: 0;
+}
+
+.analysis-panel.collapsed .analysis-content {
+  display: none;
+}
+
+.analysis-panel.collapsed .analysis-header {
   margin-bottom: 0;
 }
 
@@ -547,6 +576,13 @@ input[type="file"] {
   gap: 12px;
   align-items: baseline;
   margin-bottom: 10px;
+}
+
+.analysis-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .analysis-header h3 {
@@ -1068,6 +1104,14 @@ input[type="file"] {
   padding: 6px;
   display: grid;
   gap: 4px;
+}
+
+/* Import is the first wide toolbar menu, so it must open into the editor. */
+.project-toolbar .import-menu > .menu-panel {
+  left: 0;
+  right: auto;
+  width: min(360px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
 }
 
 .workspace-menu .menu-panel,
@@ -3005,6 +3049,19 @@ dialog::backdrop {
 
   .project-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .project-toolbar .toolbar-actions {
+    position: relative;
+  }
+
+  .project-toolbar .import-menu {
+    position: static;
+  }
+
+  .project-toolbar .import-menu > .menu-panel {
+    width: 100%;
+    max-width: 100%;
   }
 
   .workspace {

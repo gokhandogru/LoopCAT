@@ -58,8 +58,10 @@ Use this template for every public desktop release candidate. Keep the completed
 - Saves workspace package and clears dirty warning: pass / fail
 - Shows recovery warning for unsaved workspace package changes: pass / fail
 - Exports target DOCX: pass / fail
+- Exports incomplete DOCX with source fallback after confirmation: pass / fail
 - Exports current localization file: pass / fail
 - Exports XLIFF: pass / fail
+- Exports XLIFF with empty targets after confirmation: pass / fail
 - Exports bilingual DOCX: pass / fail
 - Exports normal report: pass / fail
 - Exports anonymized report: pass / fail
@@ -88,8 +90,10 @@ Use this template for every public desktop release candidate. Keep the completed
 - Saves workspace package and clears dirty warning: pass / fail
 - Shows recovery warning for unsaved workspace package changes: pass / fail
 - Exports target DOCX: pass / fail
+- Exports incomplete DOCX with source fallback after confirmation: pass / fail
 - Exports current localization file: pass / fail
 - Exports XLIFF: pass / fail
+- Exports XLIFF with empty targets after confirmation: pass / fail
 - Exports bilingual DOCX: pass / fail
 - Exports normal report: pass / fail
 - Exports anonymized report: pass / fail
@@ -118,8 +122,10 @@ Use this template for every public desktop release candidate. Keep the completed
 - Saves workspace package and clears dirty warning: pass / fail
 - Shows recovery warning for unsaved workspace package changes: pass / fail
 - Exports target DOCX: pass / fail
+- Exports incomplete DOCX with source fallback after confirmation: pass / fail
 - Exports current localization file: pass / fail
 - Exports XLIFF: pass / fail
+- Exports XLIFF with empty targets after confirmation: pass / fail
 - Exports bilingual DOCX: pass / fail
 - Exports normal report: pass / fail
 - Exports anonymized report: pass / fail

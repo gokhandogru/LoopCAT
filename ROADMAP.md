@@ -57,8 +57,8 @@ The core offline CAT workflow, recovery model, academic review features, broad f
 - XLIFF 2.2 Core import and target reconstruction support file/group/unit/segment hierarchy, notes, `xml:space`, Core states, `originalData`, and the `cp`/`ph`/`pc`/`sc`/`ec`/`mrk`/`sm`/`em` inline vocabulary. XLIFF 2.0 and 2.1 Core documents remain compatible.
 - Generic handoff can be exported as XLIFF 1.2 or XLIFF 2.2. The 2.2 path uses the registered `application/xliff+xml` MIME type and is checked against vendored OASIS schemas in the release workflow.
 - Current-file XLIFF 2.x reconstruction updates only mapped target content and Core segment state while retaining groups, notes, ignorable content, original data, skeletons, custom attributes, and Part 2/custom extension XML in the source shell.
-- Export gates for empty target segments, missing protected tags, unbalanced inline markup, invalid XML characters, unsafe HTML, entity-obfuscated scriptable HTML attributes, and CSS-escaped scriptable style attributes.
-- Final DOCX, XLIFF target, and localization target reconstruction use target text only and do not silently reinsert source text for empty target segments.
+- Format-aware incomplete export planning: monolingual delivery files use transient source fallback for empty targets, bilingual interchange files preserve meaningful empty targets, and non-empty drafts export unchanged after a scoped confirmation.
+- Export gates remain strict for missing protected tags in authored targets, unbalanced inline markup, invalid XML characters, unsafe HTML, entity-obfuscated scriptable HTML attributes, CSS-escaped scriptable style attributes, forbidden terminology, and missing reconstruction data.
 - Delivery exports obey the selected document and block visibly when the selected file type cannot produce that export.
 - Forbidden target terms in termbases are checked by QA, preserved in TBX, listed in offline project reports, and blocked in delivery export validation.
 - Failed browser download clicks report visibly, remove the temporary hidden link, and revoke the temporary object URL instead of leaving export debris in long desktop sessions.

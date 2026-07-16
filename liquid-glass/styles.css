@@ -189,6 +189,15 @@ body.liquid-glass-edition {
 .liquid-glass-edition .brand {
   min-width: 208px;
   gap: 11px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.liquid-glass-edition .brand:hover {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 .liquid-glass-edition .brand-mark {
@@ -251,6 +260,9 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .save-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 68px;
   min-height: 28px;
   padding: 5px 9px;
@@ -260,6 +272,8 @@ body.liquid-glass-edition {
   color: var(--glass-success);
   font-size: 11px;
   font-weight: 700;
+  line-height: 1;
+  text-align: center;
 }
 
 /* Main floating workbench */

@@ -14,13 +14,13 @@
   <body class="liquid-glass-edition">
     <div class="app-shell">
       <header class="topbar">
-        <div class="brand">
+        <a id="brandHomeLink" class="brand" href="#projects" aria-label="Projects" title="Projects">
           <div class="brand-mark"><img src="./icons/loopcat-icon.png" alt=""></div>
           <div>
             <h1>LoopCAT</h1>
             <p>Local translation editor</p>
           </div>
-        </div>
+        </a>
         <div class="topbar-actions">
           <span id="saveStatus" class="save-status">Saved</span>
           <button id="projectsViewBtn">Projects</button>
@@ -120,7 +120,6 @@
                 <h2>Projects</h2>
                 <p>Open a project or create one to start translating.</p>
               </div>
-              <button id="newProjectFromDashboardBtn" class="primary">New project</button>
             </div>
 
             <div class="project-filters">
@@ -208,12 +207,19 @@
             </div>
 
             <div id="projectHomeStats" class="project-home-stats"></div>
-            <section class="analysis-panel">
+            <section class="analysis-panel" data-collapsible-panel>
               <div class="analysis-header">
-                <h3>Project analysis</h3>
+                <div class="analysis-title">
+                  <button class="panel-toggle" type="button" data-panel-toggle aria-label="Project analysis" aria-expanded="true" aria-controls="projectAnalysisContent">
+                    <span class="toggle-arrow" aria-hidden="true"></span>
+                  </button>
+                  <h3>Project analysis</h3>
+                </div>
                 <span id="analysisMeta"></span>
               </div>
-              <div id="projectAnalysis" class="analysis-grid"></div>
+              <div id="projectAnalysisContent" class="analysis-content">
+                <div id="projectAnalysis" class="analysis-grid"></div>
+              </div>
             </section>
             <div class="file-list-header">
               <h3>Files</h3>
@@ -231,7 +237,7 @@
               <div class="toolbar-actions">
                 <button id="projectFilesBtn">Back to files</button>
                 <button id="editorProjectSettingsBtn" type="button">Settings</button>
-                <details class="menu">
+                <details id="editorImportMenu" class="menu import-menu">
                   <summary>Import</summary>
                   <div class="menu-panel">
                     <label class="menu-item encoding-menu-item">

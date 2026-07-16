@@ -2034,8 +2034,10 @@ function buildTsXml(segments, structure = null) {
       if (message.sourceElement.nextSibling) message.message.insertBefore(targetElement, message.sourceElement.nextSibling);
       else message.message.appendChild(targetElement);
     }
-    targetElement.removeAttribute("type");
-    replaceXmlChildren(doc, targetElement, targetText(segment));
+    const target = targetText(segment);
+    if (target.trim()) targetElement.removeAttribute("type");
+    else targetElement.setAttribute("type", "unfinished");
+    replaceXmlChildren(doc, targetElement, target);
   });
   return new XMLSerializer().serializeToString(doc);
 }

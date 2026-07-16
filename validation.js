@@ -1198,31 +1198,98 @@ function hasForbiddenTerm(segment, terms = []) {
   );
 }
 
-function validateExportReadiness({ project, segments = [], documentInfo = null, format = "project", terms = [] }) {
+const EMPTY_TARGET_INTERCHANGE_FORMATS = new Set(["xlf", "xliff", "sdlxliff", "po", "pot", "ttx", "txml"]);
+const REVIEW_EXPORT_FORMATS = new Set(["project", "project-report", "quality-passport", "bilingual-docx"]);
+
+function deliveryExportPolicy({ format = "project", structure = null } = {}) {
+  const exportFormat = String(format || "project").trim().toLowerCase();
+  if (REVIEW_EXPORT_FORMATS.has(exportFormat)) return "review";
+  if (EMPTY_TARGET_INTERCHANGE_FORMATS.has(exportFormat)) return "preserve-empty";
+  if (exportFormat === "ts" && String(structure?.format || "").toLowerCase() === "ts-xml") return "preserve-empty";
+  if (["csv", "tsv"].includes(exportFormat) && Number.isFinite(structure?.targetIndex) && structure.targetIndex >= 0) return "preserve-empty";
+  return "source-fallback";
+}
+
+function planDeliveryExport({ format = "", documentInfo = null, structure = null, segments = [] } = {}) {
+  const sourceSegments = Array.isArray(segments) ? segments : [];
+  const policy = deliveryExportPolicy({ format: format || documentInfo?.type || "project", structure });
+  let emptyTargetCount = 0;
+  let draftTargetCount = 0;
+  const exportSegments = sourceSegments.map((segment) => {
+    const target = String(segment?.target ?? "");
+    const empty = !target.trim();
+    if (empty) emptyTargetCount += 1;
+    else if (segment?.status !== "confirmed") draftTargetCount += 1;
+    return {
+      ...segment,
+      target: empty && policy === "source-fallback" ? String(segment?.source ?? segment?.text ?? "") : target
+    };
+  });
+  const sourceFallbackCount = policy === "source-fallback" ? emptyTargetCount : 0;
+  const preservedEmptyTargetCount = policy === "preserve-empty" ? emptyTargetCount : 0;
+  return {
+    policy,
+    segments: exportSegments,
+    totalSegmentCount: sourceSegments.length,
+    emptyTargetCount,
+    sourceFallbackCount,
+    preservedEmptyTargetCount,
+    draftTargetCount,
+    requiresConfirmation: policy !== "review" && Boolean(emptyTargetCount || draftTargetCount)
+  };
+}
+
+function exportPlanSummary(plan) {
+  return {
+    policy: plan.policy,
+    totalSegmentCount: plan.totalSegmentCount,
+    emptyTargetCount: plan.emptyTargetCount,
+    sourceFallbackCount: plan.sourceFallbackCount,
+    preservedEmptyTargetCount: plan.preservedEmptyTargetCount,
+    draftTargetCount: plan.draftTargetCount,
+    requiresConfirmation: plan.requiresConfirmation
+  };
+}
+
+function validateExportReadiness({ project, segments = [], documentInfo = null, format = "project", terms = [], exportPlan = null, structure = null }) {
   const report = emptyReport();
   const exportFormat = String(format || "project").toLowerCase();
   const documentType = String(documentInfo?.type || "").toLowerCase();
   const localizationStructure = documentInfo ? project?.localizationStructures?.[documentInfo.id] : null;
-  const requiresCompleteTargets = !["project", "project-report", "bilingual-docx"].includes(exportFormat);
+  const plan = exportPlan || planDeliveryExport({
+    format: exportFormat,
+    documentInfo,
+    structure: structure || localizationStructure,
+    segments
+  });
+  const effectiveSegments = Array.isArray(plan?.segments) ? plan.segments : segments;
+  const reviewExport = plan?.policy === "review";
+  const requiresCompleteTargets = !reviewExport;
+  report.exportSummary = exportPlanSummary(plan);
   if (!project) add(report, "errors", "No project is open.");
   if (!segments.length && requiresCompleteTargets) {
     add(report, "errors", "No segments are available for delivery export.");
   } else if (!segments.length) {
     add(report, "warnings", "No segments are available for export.");
   }
-  const emptyTargets = segments.filter((segment) => !String(segment.target || "").trim()).length;
-  const tagIssues = segments.filter((segment) => missingProtectedTags(segment).length).length;
-  const markupIssues = segments.filter((segment) => hasUnbalancedInlineMarkup(segment.target || "")).length;
+  const emptyTargets = plan.emptyTargetCount;
+  const draftTargets = plan.draftTargetCount;
+  const authoredTargetSegments = segments.filter((segment) => String(segment.target || "").trim());
+  const tagIssues = authoredTargetSegments.filter((segment) => missingProtectedTags(segment).length).length;
+  const markupIssues = authoredTargetSegments.filter((segment) => hasUnbalancedInlineMarkup(segment.target || "")).length;
   const xmlCharIssues = isXmlDeliveryFormat(format, documentInfo)
-    ? segments.filter((segment) => hasInvalidXmlCharacters(segment.source || "") || hasInvalidXmlCharacters(segment.target || "")).length
+    ? effectiveSegments.filter((segment) => hasInvalidXmlCharacters(segment.source || "") || hasInvalidXmlCharacters(segment.target || "")).length
     : 0;
-  const unsafeHtmlIssues = isHtmlDeliveryFormat(format, documentInfo) ? segments.filter((segment) => hasUnsafeHtmlMarkup(segment.target || "")).length : 0;
-  const forbiddenTermIssues = terms.length ? segments.filter((segment) => hasForbiddenTerm(segment, terms)).length : 0;
-  if (emptyTargets && requiresCompleteTargets) {
-    add(report, "risky", `${emptyTargets} empty target segment${emptyTargets === 1 ? "" : "s"} must be translated before delivery export.`);
+  const unsafeHtmlIssues = isHtmlDeliveryFormat(format, documentInfo) ? effectiveSegments.filter((segment) => hasUnsafeHtmlMarkup(segment.target || "")).length : 0;
+  const forbiddenTermIssues = terms.length ? authoredTargetSegments.filter((segment) => hasForbiddenTerm(segment, terms)).length : 0;
+  if (emptyTargets && plan.policy === "source-fallback") {
+    add(report, "warnings", `${emptyTargets} empty target segment${emptyTargets === 1 ? "" : "s"} will export source text.`);
+  } else if (emptyTargets && plan.policy === "preserve-empty") {
+    add(report, "warnings", `${emptyTargets} empty target segment${emptyTargets === 1 ? "" : "s"} will remain empty in the exported interchange file.`);
   } else if (emptyTargets) {
     add(report, "warnings", `${emptyTargets} empty target segment${emptyTargets === 1 ? "" : "s"} will be reported as untranslated.`);
   }
+  if (draftTargets) add(report, "warnings", `${draftTargets} non-empty unconfirmed target segment${draftTargets === 1 ? "" : "s"} will export as written.`);
   if (tagIssues) add(report, "risky", `${tagIssues} segment${tagIssues === 1 ? "" : "s"} may be missing protected placeholders.`);
   if (markupIssues) add(report, "risky", `${markupIssues} segment${markupIssues === 1 ? "" : "s"} have unbalanced inline markup.`);
   if (xmlCharIssues) add(report, "risky", `${xmlCharIssues} segment${xmlCharIssues === 1 ? "" : "s"} contain XML-invalid characters.`);
@@ -1249,7 +1316,11 @@ function validateExportReadiness({ project, segments = [], documentInfo = null, 
       add(report, "errors", `${missing.length} ${requirement.label} segment${missing.length === 1 ? "" : "s"} missing ${requirement.issue}.`);
     }
   }
-  return finalize(report);
+  const finalized = finalize(report);
+  const deliveryRisk = tagIssues || markupIssues || xmlCharIssues || unsafeHtmlIssues || forbiddenTermIssues;
+  const reviewRisk = xmlCharIssues;
+  finalized.canExport = finalized.ok && !(reviewExport ? reviewRisk : deliveryRisk);
+  return finalized;
 }
 
 function reportCount(report) {
@@ -1268,6 +1339,7 @@ window.CatHan.validation = {
   emptyReport,
   validateProjectPackage,
   validateBackupFile,
+  planDeliveryExport,
   validateExportReadiness,
   missingProtectedTags,
   hasUnbalancedInlineMarkup,
