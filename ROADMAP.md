@@ -22,7 +22,17 @@ The core offline CAT workflow, recovery model, academic review features, broad f
 4. Split the large UI coordinator after behavior and release gates are stable.
 5. Expand research-oriented revision-history exports without weakening the core workflow.
 
+Brand foundation is now part of the release baseline: the borderless Loopbird, product palette, category language, and platform icon pipeline are shared by LoopCAT Web and LoopCAT Desktop. Product copy and new UI should follow [the brand guidelines](docs/brand-guidelines.md).
+
 ## Shipped Release Baseline
+
+### Brand Foundation
+
+- Borderless full-colour and mono Loopbird SVG masters are versioned with the app.
+- Web/PWA, Windows, macOS, and Linux icon sources derive from the same full-colour SVG through a reproducible icon-generation command.
+- Product tokens use Deep Pine, Interface/Bright Teal, Seafoam, Warm Ivory, Clay, and the supporting semantic palette.
+- “Translation, in flow.” is the brand idea; “The local-first translation workspace” is the category descriptor; LoopCAT remains the product name across platforms.
+- New connection, AI, onboarding, empty-state, status, and recovery copy should reinforce human control, local-by-default behavior, low-friction power, and visible feedback.
 
 ### Offline Desktop And Network Boundaries
 
@@ -100,7 +110,7 @@ These are release-blocking requirements. A build is not production-ready merely 
 - Keep the generated `pnpm-lock.yaml` in sync with `package.json`; do not hand-write it.
 - Run `pnpm install --frozen-lockfile`, `pnpm run verify:release`, and the browser test runner on a clean machine.
 - Verify the desktop protocol wrapper with `pnpm run verify:desktop-wrapper` so only bundled runtime files are served through `loopcat://app/` and the renderer hardening flags stay locked down.
-- Build Windows, macOS, and Linux artifacts through `electron-builder`; unsigned builds are only for internal smoke, while public release candidates must use the documented signing/notarization credentials and pass platform signature verification.
+- Build Windows, macOS, and Linux artifacts through `electron-builder`; public release candidates must use the documented signing/notarization credentials and pass platform signature verification. Explicitly labeled unsigned preview prereleases may be shared for testing, but they do not satisfy production release qualification.
 - Verify packaged `app.asar` payloads with `pnpm run verify:artifact` so runtime files referenced by `index.html`, the service worker, and the desktop protocol are present, bundled source/docs files match the current source tree, network policy is preserved, integrity metadata checks pass, and test/debug files are excluded.
 - Generate SHA-256 checksums for public desktop download artifacts through `pnpm run checksums`, rejecting stale or unexpected public downloads whose filenames do not match the expected LoopCAT release names and current package version.
 - Reject undersized public desktop artifacts before checksum generation or publication so interrupted installer/portable builds cannot look release-ready.

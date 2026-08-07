@@ -24,6 +24,7 @@ const allowedFiles = new Set([
   "manifest.webmanifest",
   "service-worker.js",
   "icons/loopcat-icon.svg",
+  "icons/loopcat-loopbird-mono.svg",
   "icons/loopcat-icon.png",
   "storage.js",
   "workspace-storage.js",

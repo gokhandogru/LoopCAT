@@ -141,6 +141,14 @@ pnpm run verify:checksums
 
 Checksums are written to `dist/SHA256SUMS.txt`.
 
+After the current web bundle and Windows installer/portable ZIPs have all passed their artifact and checksum checks, refresh the installable copies tracked in the repository:
+
+```bash
+pnpm run downloads:prepare
+```
+
+This copies the three versioned ZIPs into `downloads/`, removes superseded generated downloads from that directory, writes the repository-facing SHA-256 checksum list, and updates `downloads/README.md`. Commit those generated files only when intentionally publishing a repository download mirror.
+
 Validate a completed release evidence copy before publishing. With no file argument, the command checks that the reusable template still contains the required sections and checks. For a release candidate, compare the completed evidence against the generated checksum file:
 
 ```bash
@@ -230,6 +238,7 @@ Before publishing desktop builds:
 - run `pnpm run verify:desktop-smoke` after platform packaging so the unpacked desktop app proves it can launch, render the bundled app shell, serve packaged app-shell assets through the private protocol, block test pages from that protocol, persist real project/segment data, rebuild HTML, XLIFF, and target DOCX exports, generate bilingual DOCX output, and export a backup containing saved targets inside a temporary profile;
 - generate `dist/SHA256SUMS.txt` with `pnpm run checksums` for the expected public download artifacts and keep it with the uploaded artifacts.
 - run `pnpm run verify:checksums` so stale, unexpected, or incomplete public-artifact checksum files are rejected before upload.
+- run `pnpm run downloads:prepare` after the verified web and Windows builds when the current prerelease also needs a versioned repository download mirror.
 - complete a copy of `docs/release-smoke-evidence-template.md` and run `pnpm run verify:evidence -- path/to/completed-release-evidence.md --checksum-file dist/SHA256SUMS.txt` so placeholders, failed checks, checksum mismatches, and private local details are rejected before publication.
 
 ## Platform Signing And Notarization

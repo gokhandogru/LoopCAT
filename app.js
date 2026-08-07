@@ -82,6 +82,7 @@ const OFFLINE_APP_SHELL_WARMUP_ASSETS = [
   "./manifest.webmanifest",
   "./service-worker.js",
   "./icons/loopcat-icon.svg",
+  "./icons/loopcat-loopbird-mono.svg",
   "./storage.js",
   "./workspace-storage.js",
   "./docx.js",

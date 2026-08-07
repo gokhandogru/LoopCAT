@@ -104,6 +104,7 @@ const ALLOWED_APP_FILES = new Set([
   "manifest.webmanifest",
   "service-worker.js",
   "icons/loopcat-icon.svg",
+  "icons/loopcat-loopbird-mono.svg",
   "icons/loopcat-icon.png",
   "app.js",
   "storage.js",
@@ -906,8 +907,8 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
           !(await storage.get("projects", project.id));
         const appShellAssetProbe = {
           index: await fetchAppShellAsset("./index.html", "LoopCAT"),
-          liquidGlassCss: await fetchAppShellAsset("./liquid-glass/styles.css", "--glass-accent: #109888"),
-          liquidGlassIcon: await fetchAppShellAsset("./icons/loopcat-icon.png"),
+          liquidGlassCss: await fetchAppShellAsset("./liquid-glass/styles.css", "--glass-accent: #0b8f83"),
+          liquidGlassIcon: await fetchAppShellAsset("./icons/loopcat-icon.svg"),
           app: await fetchAppShellAsset("./app.js", "registerOfflineAppShell"),
           serviceWorker: await fetchAppShellAsset("./service-worker.js", "loopcat-offline-"),
           i18nRuntime: await fetchAppShellAsset("./i18n.js", "window.CatHan.i18n"),
@@ -1036,13 +1037,13 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
       }
       if (result?.title !== "LoopCAT") missing.push("document title LoopCAT");
       if (result?.url !== `${APP_SCHEME}://${APP_HOST}/index.html`) missing.push("loopcat app-shell URL");
-      if (!String(result?.bodyText || "").includes("Local translation editor")) missing.push("brand text");
+      if (!String(result?.bodyText || "").includes("The local-first translation workspace")) missing.push("brand text");
       if (!result?.visualProbe?.liquidGlassBodyClass) missing.push("Liquid Glass body class");
       if (!result?.visualProbe?.liquidGlassStyleSheetLoaded) missing.push("Liquid Glass stylesheet application");
-      if (String(result?.visualProbe?.canvasColor || "").toLowerCase() !== "#dfe8f0") missing.push("Liquid Glass canvas token");
-      if (String(result?.visualProbe?.accentColor || "").toLowerCase() !== "#109888") missing.push("Liquid Glass accent token");
+      if (String(result?.visualProbe?.canvasColor || "").toLowerCase() !== "#fbf7ef") missing.push("Liquid Glass canvas token");
+      if (String(result?.visualProbe?.accentColor || "").toLowerCase() !== "#0b8f83") missing.push("Liquid Glass accent token");
       if (!String(result?.visualProbe?.topbarBackdropFilter || "").includes("blur")) missing.push("Liquid Glass topbar material");
-      if (result?.visualProbe?.newProjectBackground !== "rgb(8, 123, 112)") missing.push("Liquid Glass primary action color");
+      if (result?.visualProbe?.newProjectBackground !== "rgb(11, 117, 109)") missing.push("Liquid Glass primary action color");
       if (!result?.visualProbe?.noPageOverflow) missing.push("packaged app page overflow");
       let screenshotFile = "";
       if (!missing.length && DESKTOP_SMOKE_SCREENSHOT_FILE) {

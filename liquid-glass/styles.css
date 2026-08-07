@@ -1,24 +1,24 @@
 :root {
-  --glass-canvas: #dfe8f0;
-  --glass-canvas-deep: #d6e1eb;
-  --glass-panel: rgba(255, 255, 255, 0.68);
-  --glass-panel-strong: rgba(255, 255, 255, 0.84);
-  --glass-surface: #ffffff;
-  --glass-surface-soft: #f7f9fc;
-  --glass-text: #172033;
-  --glass-muted: #677186;
-  --glass-line: rgba(255, 255, 255, 0.82);
-  --glass-line-solid: #dce3ec;
-  --glass-accent: #109888;
-  --glass-accent-strong: #087b70;
-  --glass-accent-soft: #e2f6f1;
-  --glass-confirm: #087b70;
-  --glass-confirm-strong: #07645d;
-  --glass-success: #137f6d;
-  --glass-warning: #a96816;
-  --glass-danger: #b64949;
-  --glass-shadow: 0 24px 64px rgba(67, 82, 105, 0.16), 0 3px 12px rgba(67, 82, 105, 0.08);
-  --glass-shadow-soft: 0 16px 36px rgba(67, 82, 105, 0.12), 0 2px 8px rgba(67, 82, 105, 0.06);
+  --glass-canvas: #fbf7ef;
+  --glass-canvas-deep: #f2ece1;
+  --glass-panel: rgba(255, 253, 248, 0.72);
+  --glass-panel-strong: rgba(255, 253, 248, 0.88);
+  --glass-surface: #fffdf8;
+  --glass-surface-soft: #eef8f5;
+  --glass-text: #0b3f3a;
+  --glass-muted: #58716d;
+  --glass-line: rgba(201, 217, 211, 0.82);
+  --glass-line-solid: #c9d9d3;
+  --glass-accent: #0b8f83;
+  --glass-accent-strong: #0b756d;
+  --glass-accent-soft: #b7e4d8;
+  --glass-confirm: #0b756d;
+  --glass-confirm-strong: #0b3f3a;
+  --glass-success: #16745f;
+  --glass-warning: #a45a18;
+  --glass-danger: #b6434e;
+  --glass-shadow: 0 24px 64px rgba(11, 63, 58, 0.16), 0 3px 12px rgba(11, 63, 58, 0.08);
+  --glass-shadow-soft: 0 16px 36px rgba(11, 63, 58, 0.12), 0 2px 8px rgba(11, 63, 58, 0.06);
   --glass-radius-xl: 28px;
   --glass-radius-lg: 22px;
   --glass-radius-md: 15px;
@@ -49,7 +49,7 @@ body {
   min-width: 320px;
   background: var(--glass-canvas);
   color: var(--glass-text);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 body.liquid-glass-edition {
@@ -57,11 +57,11 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition ::selection {
-  background: rgba(16, 152, 136, 0.2);
+  background: rgba(11, 143, 131, 0.2);
 }
 
 .liquid-glass-edition :focus-visible {
-  outline: 3px solid rgba(16, 152, 136, 0.34);
+  outline: 3px solid rgba(11, 143, 131, 0.34);
   outline-offset: 2px;
 }
 
@@ -103,7 +103,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition button:hover,
 .liquid-glass-edition summary:hover,
 .liquid-glass-edition .file-button:hover {
-  border-color: rgba(16, 152, 136, 0.3);
+  border-color: rgba(11, 143, 131, 0.3);
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 6px 16px rgba(67, 82, 105, 0.1);
 }
@@ -124,7 +124,7 @@ body.liquid-glass-edition {
   border-color: var(--glass-confirm);
   background: var(--glass-confirm);
   color: #ffffff;
-  box-shadow: 0 9px 22px rgba(8, 123, 112, 0.24);
+  box-shadow: 0 9px 22px rgba(11, 117, 109, 0.24);
 }
 
 .liquid-glass-edition button.primary:hover,
@@ -149,7 +149,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition input:hover,
 .liquid-glass-edition select:hover,
 .liquid-glass-edition textarea:hover {
-  border-color: rgba(16, 152, 136, 0.34);
+  border-color: rgba(11, 143, 131, 0.34);
 }
 
 .liquid-glass-edition input:focus,
@@ -157,7 +157,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition textarea:focus {
   border-color: var(--glass-accent);
   background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(16, 152, 136, 0.1);
+  box-shadow: 0 0 0 4px rgba(11, 143, 131, 0.1);
   outline: none;
 }
 
@@ -201,20 +201,20 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .brand-mark {
-  width: 43px;
-  height: 43px;
+  width: 48px;
+  height: 40px;
   border: 0;
-  border-radius: 13px;
+  border-radius: 0;
   background: transparent;
-  box-shadow: 0 8px 20px rgba(16, 152, 136, 0.16);
-  overflow: hidden;
+  box-shadow: none;
+  overflow: visible;
 }
 
 .liquid-glass-edition .brand-mark img {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .liquid-glass-edition .brand h1 {
@@ -251,7 +251,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .topbar-actions > #newProjectBtn {
   border-color: var(--glass-confirm);
   background: var(--glass-confirm);
-  box-shadow: 0 9px 22px rgba(8, 123, 112, 0.22);
+  box-shadow: 0 9px 22px rgba(11, 117, 109, 0.22);
 }
 
 .liquid-glass-edition .topbar-actions > #newProjectBtn:hover {
@@ -341,7 +341,7 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .project-item.active {
-  border-color: rgba(16, 152, 136, 0.15);
+  border-color: rgba(11, 143, 131, 0.15);
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 8px 20px rgba(67, 82, 105, 0.1);
 }
@@ -425,7 +425,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .project-tile:hover,
 .liquid-glass-edition .file-card:hover,
 .liquid-glass-edition .resource-card:hover {
-  border-color: rgba(16, 152, 136, 0.26);
+  border-color: rgba(11, 143, 131, 0.26);
   box-shadow: 0 15px 34px rgba(67, 82, 105, 0.11);
   transform: translateY(-1px);
 }
@@ -453,7 +453,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .language-badge,
 .liquid-glass-edition .quality-category-pill,
 .liquid-glass-edition .severity-pill {
-  border-color: rgba(16, 152, 136, 0.14);
+  border-color: rgba(11, 143, 131, 0.14);
   background: var(--glass-accent-soft);
   color: var(--glass-accent-strong);
 }
@@ -609,7 +609,7 @@ body.liquid-glass-edition {
 
 .liquid-glass-edition #nextOpenBtn {
   margin-left: auto;
-  border-color: rgba(16, 152, 136, 0.18);
+  border-color: rgba(11, 143, 131, 0.18);
   background: var(--glass-accent-soft);
   color: var(--glass-accent-strong);
   font-weight: 700;
@@ -649,11 +649,11 @@ body.liquid-glass-edition {
 
 .liquid-glass-edition .segment-grid tr.active td {
   background: #f2fbf8;
-  box-shadow: inset 0 1px rgba(16, 152, 136, 0.15), inset 0 -1px rgba(16, 152, 136, 0.15);
+  box-shadow: inset 0 1px rgba(11, 143, 131, 0.15), inset 0 -1px rgba(11, 143, 131, 0.15);
 }
 
 .liquid-glass-edition .segment-grid tr.active td:first-child {
-  box-shadow: inset 3px 0 var(--glass-accent), inset 0 1px rgba(16, 152, 136, 0.15), inset 0 -1px rgba(16, 152, 136, 0.15);
+  box-shadow: inset 3px 0 var(--glass-accent), inset 0 1px rgba(11, 143, 131, 0.15), inset 0 -1px rgba(11, 143, 131, 0.15);
 }
 
 .liquid-glass-edition .source-cell {
@@ -899,7 +899,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .menu-panel button:hover,
 .liquid-glass-edition .menu-panel .menu-item:hover,
 .liquid-glass-edition .workspace-submenu > summary:hover {
-  background: rgba(16, 152, 136, 0.08);
+  background: rgba(11, 143, 131, 0.08);
 }
 
 /*
@@ -927,7 +927,7 @@ body.liquid-glass-edition {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   padding: 12px;
-  border-color: rgba(16, 152, 136, 0.16);
+  border-color: rgba(11, 143, 131, 0.16);
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 18px 48px rgba(55, 70, 92, 0.2);
 }
@@ -940,7 +940,7 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .replace-panel button {
-  border-color: rgba(16, 152, 136, 0.16);
+  border-color: rgba(11, 143, 131, 0.16);
   background: var(--glass-accent-soft);
   color: var(--glass-accent-strong);
   font-weight: 720;
@@ -975,7 +975,7 @@ body.liquid-glass-edition {
 
 .liquid-glass-edition .empty-state,
 .liquid-glass-edition .empty-file-state {
-  border: 1px dashed rgba(16, 152, 136, 0.28);
+  border: 1px dashed rgba(11, 143, 131, 0.28);
   border-radius: var(--glass-radius-md);
   background: #f8f7ff;
 }
@@ -1291,17 +1291,17 @@ body.liquid-glass-edition {
 
 @media (prefers-contrast: more) {
   :root {
-    --glass-muted: #4a5568;
-    --glass-line: #aab6c5;
-    --glass-line-solid: #aab6c5;
-    --glass-accent: #087b70;
-    --glass-accent-strong: #065d55;
-    --glass-confirm: #07645d;
-    --glass-confirm-strong: #054e49;
+    --glass-muted: #435d59;
+    --glass-line: #829f99;
+    --glass-line-solid: #829f99;
+    --glass-accent: #0b756d;
+    --glass-accent-strong: #0b3f3a;
+    --glass-confirm: #0b3f3a;
+    --glass-confirm-strong: #062e2a;
   }
 
   .liquid-glass-edition :focus-visible {
-    outline-color: #065d55;
+    outline-color: #0b3f3a;
     outline-width: 4px;
   }
 

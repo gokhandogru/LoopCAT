@@ -75,6 +75,7 @@ const expectedRuntimeFiles = [
   "manifest.webmanifest",
   "service-worker.js",
   "icons/loopcat-icon.svg",
+  "icons/loopcat-loopbird-mono.svg",
   "icons/loopcat-icon.png",
   "app.js",
   "storage.js",

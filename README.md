@@ -1,20 +1,24 @@
+<p align="center"><img src="icons/loopcat-icon.svg" width="128" alt="LoopCAT Loopbird logo"></p>
+
 # LoopCAT
+
+**Translation, in flow.** LoopCAT is the local-first translation workspace.
 
 LoopCAT is a local-first computer-assisted translation (CAT) tool for translators, post-editors, reviewers, and academic translation projects. It runs as a static browser app or an Electron desktop app and keeps projects, segments, translation memories, termbases, review data, and settings on the user's machine by default.
 
 LoopCAT is designed for a complete single-user workflow: create a project, import source files, translate or post-edit, use TM and terminology, run QA, review changes, recover from packages or backups, and export target files without requiring an internet connection. Local or hosted AI can be added explicitly, but it is optional and does not replace the offline workflow.
 
-[Install](#how-to-install) | [Current status](#current-project-status) | [What works today](#what-works-today) | [Limitations and remaining work](#current-limitations-and-remaining-work) | [AI providers](#local-ai-command-centre) | [Tests](#browser-tests) | [Roadmap](ROADMAP.md) | [License](#license)
+[Install](#how-to-install) | [Current status](#current-project-status) | [What works today](#what-works-today) | [Limitations and remaining work](#current-limitations-and-remaining-work) | [AI providers](#local-ai-command-centre) | [Tests](#browser-tests) | [Roadmap](ROADMAP.md) | [Brand](docs/brand-guidelines.md) | [License](#license)
 
 ## Current Project Status
 
-LoopCAT is beyond a proof-of-concept MVP: the core offline CAT workflow and recovery model are implemented. The `0.0.3` development line adds XLIFF 2.2 Core support, while version `0.0.2` remains the latest published web bundle plus Windows installer and portable download until the new Windows artifacts are signed and release-qualified. The project is still under active development and should not yet be described as a fully production-qualified cross-platform desktop release.
+LoopCAT is beyond a proof-of-concept MVP: the core offline CAT workflow and recovery model are implemented. Version `0.0.3` is the current public prerelease and adds the Loopbird brand system, XLIFF 2.2 Core support, and refreshed web plus Windows downloads. The Windows packages are unsigned, and the project is still under active development, so `0.0.3` should not yet be described as a fully production-qualified cross-platform desktop release.
 
 | Area | Current state |
 | --- | --- |
 | Core translation workflow | Implemented: multi-file projects, segmentation, CAT-grid editing, statuses, comments, revision history, QA, TM, terminology, analysis, and target export. |
 | Offline and recovery | Implemented: IndexedDB autosave, portable project packages, full browser backups, visible workspace-folder packages where supported, and offline web/desktop shells. |
-| Public downloads | Version `0.0.2` provides a web bundle, Windows installer, and Windows portable package with checksums. |
+| Public downloads | Version `0.0.3` provides a web bundle plus unsigned Windows installer and portable packages with SHA-256 checksums. The same files are mirrored in [`downloads/`](downloads/). |
 | Cross-platform desktop | Electron packaging targets Windows, macOS, and Linux. Signed/notarized public artifacts and recorded clean-machine evidence for every platform remain release-qualification work. |
 | Format support | Broad import/export coverage is implemented, including XLIFF 1.2 and XLIFF 2.0/2.1/2.2 Core, DOCX, localization formats, publishing formats, subtitles, resources, and terminology exchange. Perfect reconstruction of every complex Office, OpenDocument, and DTP structure is not claimed. |
 | Scale | Browser tests cover projects with thousands of segments and indexed TM lookup. True chunked document import, deeper persistent indexes, and long-duration autosave/memory profiling remain. |
@@ -25,13 +29,14 @@ The detailed distinction between shipped behavior, release blockers, near-term p
 
 ## How to Install
 
-Download LoopCAT from the [LoopCAT v0.0.2 release](https://github.com/gokhandogru/LoopCAT/releases/tag/v0.0.2). Use the release assets below instead of GitHub's automatic source-code ZIP:
+Download LoopCAT from the [LoopCAT 0.0.3 unsigned prerelease](https://github.com/gokhandogru/LoopCAT/releases/tag/draft-0.0.3). Use these release assets instead of GitHub's automatic source-code ZIP:
 
-- Web version: download [`LoopCAT.Web.0.0.2.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT.Web.0.0.2.zip), extract it, and open `index.html`. For installable offline PWA behavior, serve the extracted folder from a local or hosted HTTP/HTTPS origin; direct `file://` opening still runs the app, but browsers do not allow service-worker installation from local files.
-- Windows desktop installer: download [`LoopCAT.Windows.Setup.0.0.2.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT.Windows.Setup.0.0.2.zip), extract it, and run `LoopCAT Setup 0.0.2.exe`.
-- Windows portable desktop: download [`LoopCAT.0.0.2.Portable.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT.0.0.2.Portable.zip), extract it, and run `LoopCAT 0.0.2.exe` without installing.
+- Web version: download [`LoopCAT.Web.0.0.3.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/draft-0.0.3/LoopCAT.Web.0.0.3.zip), extract it, and open `index.html`. For installable offline PWA behavior, serve the extracted folder from a local or hosted HTTP/HTTPS origin; direct `file://` opening still runs the app, but browsers do not allow service-worker installation from local files.
+- Windows desktop installer: download [`LoopCAT.Windows.Setup.0.0.3.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/draft-0.0.3/LoopCAT.Windows.Setup.0.0.3.zip), extract it, and run `LoopCAT Setup 0.0.3.exe`.
+- Windows portable desktop: download [`LoopCAT.0.0.3.Portable.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/draft-0.0.3/LoopCAT.0.0.3.Portable.zip), extract it, and run `LoopCAT 0.0.3.exe` without installation.
+- Checksums: download [`LoopCAT.0.0.3.SHA256SUMS.txt`](https://github.com/gokhandogru/LoopCAT/releases/download/draft-0.0.3/LoopCAT.0.0.3.SHA256SUMS.txt) and verify the three ZIP files before opening them.
 
-The release also includes [`LoopCAT.0.0.2.SHA256SUMS.txt`](https://github.com/gokhandogru/LoopCAT/releases/download/v0.0.2/LoopCAT.0.0.2.SHA256SUMS.txt) so you can verify the downloaded ZIP files.
+The same verified files are stored in the repository's [`downloads/`](downloads/) directory. The Windows packages are currently unsigned, so Windows may display an unknown-publisher or SmartScreen warning. LoopCAT does not bypass that warning; verify the checksum and proceed only if you trust this repository. Earlier versions remain available from the [GitHub releases page](https://github.com/gokhandogru/LoopCAT/releases).
 
 ## License
 
@@ -141,7 +146,7 @@ The current implementation is usable for substantial single-user offline project
 
 ### Release Qualification
 
-- The repository can build Windows, macOS, and Linux desktop targets, but version `0.0.2` currently publishes the web and Windows downloads described above.
+- Version `0.0.3` currently publishes the web bundle and unsigned Windows installer/portable downloads described above. macOS and Linux packaging targets are implemented, but current native artifacts still require platform-specific builds, signing/notarization where applicable, checksum verification, and recorded clean-machine evidence before publication.
 - A public cross-platform desktop release still requires signed Windows artifacts, signed and notarized macOS artifacts, checksum-verified Linux artifacts, and completed clean-machine evidence for every public download.
 - Disk-full and permission-denied workspace-save results must be recorded for release candidates. The automated gates and evidence template exist, but they do not replace real platform testing.
 
@@ -170,6 +175,7 @@ Storage, format, validation, QA, AI, and worker responsibilities are split into 
 - `index.html` defines the static UI shell.
 - `manifest.webmanifest` and `service-worker.js` define the installable offline app shell.
 - `scripts/build-web.cjs` creates the static HTML distribution ZIP in `dist-web/`.
+- `scripts/publish-repository-downloads.cjs` copies the verified web, Windows installer, and Windows portable ZIPs into the versioned [`downloads/`](downloads/) mirror and generates its checksum file.
 - `scripts/opus-cat-web-bridge.cjs` is the optional local bridge for using OPUS-CAT from the plain web `index.html` build when the browser blocks OPUS-CAT's direct local HTTP response.
 - `i18n.js`, `i18n/source.en-US.json`, and `i18n/locales/*.json` own UI internationalization for the app shell and generated interface text; compiled `*.js` catalog files are bundled so the static app still works offline and from local files.
 - `scripts/i18n-extract.cjs`, `scripts/i18n-sync.cjs`, `scripts/i18n-validate.cjs`, and `scripts/i18n-compile.cjs` maintain the source catalog, create target locale files, validate placeholders/keys, and compile runtime catalogs. To add a locale, run `node scripts/i18n-sync.cjs --locale ca-ES`, translate `i18n/locales/ca-ES.json`, then run `node scripts/i18n-validate.cjs` and `node scripts/i18n-compile.cjs`.
@@ -554,7 +560,7 @@ If a browser or desktop download step fails, LoopCAT reports the export failure 
 
 When opened through a local web server, LoopCAT registers `service-worker.js` and caches the complete application shell for offline browser/PWA use. The service worker fails installation if any core app-shell file cannot be cached, navigation misses fall back to cached `index.html`, reads only the current LoopCAT versioned cache for app-shell responses, cleans up only old `loopcat-offline-*` caches, and the runtime cache is bounded to app-shell assets so unrelated local pages or other local-tool caches are not silently stored, deleted, or served as LoopCAT files. When opened directly as `file://`, browsers do not allow service workers, so the app still runs from local files but cannot use the installable web-app cache.
 
-For a distributable static HTML build, run `pnpm run dist:web` or `pnpm run dist:html`, then `pnpm run verify:web-artifact` and `pnpm run verify:web-smoke`. The generated ZIP and checksum file are written to `dist-web/` instead of desktop `dist/` so the HTML bundle cannot be confused with the macOS desktop ZIP during desktop release verification. Serve the extracted folder from a local or hosted HTTPS/HTTP origin for installable offline PWA behavior; direct `file://` opening remains useful for quick local use but cannot register the service worker.
+For a distributable static HTML build, run `pnpm run dist:web` or `pnpm run dist:html`, then `pnpm run verify:web-artifact` and `pnpm run verify:web-smoke`. The generated ZIP and checksum file are written to `dist-web/` instead of desktop `dist/` so the HTML bundle cannot be confused with the macOS desktop ZIP during desktop release verification. After building and verifying the Windows artifacts too, run `pnpm run downloads:prepare` to refresh the versioned repository download mirror and its checksums. Serve the extracted web folder from a local or hosted HTTPS/HTTP origin for installable offline PWA behavior; direct `file://` opening remains useful for quick local use but cannot register the service worker.
 
 For downloadable desktop builds, use the Electron wrapper documented in `docs/desktop-packaging.md`. It serves the bundled files offline through a private `loopcat://app/` protocol, keeps Node.js disabled in the renderer and in workers/subframes, keeps renderer web security enabled, disables insecure content, Electron webviews, legacy WebSQL, drag-and-drop navigation, and packaged DevTools, keeps top-level navigation pinned to the bundled `index.html` shell, denies renderer-created popup windows, blocks system-browser external opens by default, blocks renderer network requests except bundled app files, explicit local AI loopback API paths, exact hosted AI provider API paths used by the AI Command Centre, and the exact OpenAI Responses/Models endpoints, targets Windows, macOS, and Linux through `electron-builder`, uploads only public download artifacts plus checksums from CI, and includes signing, clean-machine smoke, per-artifact launch evidence, storage-failure, and upgrade checklists. Use `docs/release-smoke-evidence-template.md` to record platform evidence and public artifact SHA-256 hashes for each release candidate, then run `pnpm run verify:evidence -- path/to/completed-release-evidence.md --checksum-file dist/SHA256SUMS.txt` before publication.
 

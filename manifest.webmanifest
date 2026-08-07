@@ -2,19 +2,25 @@
   "name": "LoopCAT",
   "short_name": "LoopCAT",
   "version": "0.0.3",
-  "description": "Local-first offline CAT tool for translation and post-editing projects.",
+  "description": "The local-first translation workspace for professional editing, review, resources, and optional AI.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#dfe8f0",
-  "theme_color": "#dfe8f0",
+  "background_color": "#FBF7EF",
+  "theme_color": "#0B756D",
   "orientation": "any",
   "icons": [
+    {
+      "src": "./icons/loopcat-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "./icons/loopcat-icon.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
