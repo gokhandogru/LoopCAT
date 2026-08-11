@@ -1,0 +1,176 @@
+{
+  "app": "LoopCAT",
+  "version": 2,
+  "schemaVersion": 5,
+  "exportedAt": "2026-08-10T08:00:00.000Z",
+  "projects": [
+    {
+      "id": "modernization-project",
+      "workspaceId": "local-workspace",
+      "ownerId": "local-user",
+      "createdBy": "local-user",
+      "updatedBy": "local-user",
+      "name": "Antioch Translation Review",
+      "sourceLang": "en",
+      "targetLang": "tr",
+      "domain": "History and cultural heritage",
+      "creatorName": "LoopCAT baseline",
+      "creatorOrigin": "Synthetic fixture",
+      "tmName": "Antioch TM",
+      "mainTmName": "Antioch TM",
+      "termBaseName": "Antioch Terms",
+      "resourceLinks": [
+        { "id": "resource-tm", "type": "tm", "name": "Antioch TM", "role": "main" },
+        { "id": "resource-tb", "type": "termbase", "name": "Antioch Terms" }
+      ],
+      "documents": [
+        { "id": "modernization-document", "name": "antioch-review.html", "type": "html" }
+      ],
+      "sourceFileName": "antioch-review.html",
+      "createdAt": "2026-08-01T08:00:00.000Z",
+      "updatedAt": "2026-08-10T08:00:00.000Z"
+    }
+  ],
+  "segments": [
+    {
+      "id": "segment-1",
+      "projectId": "modernization-project",
+      "documentId": "modernization-document",
+      "documentName": "antioch-review.html",
+      "documentType": "html",
+      "index": 0,
+      "source": "Antioch was renowned for its avenues, colonnades, and public buildings.",
+      "target": "Antakya; caddeleri, sütunlu yolları ve kamu yapılarıyla ünlüydü.",
+      "status": "confirmed",
+      "reviewState": "reviewed",
+      "revision": 2,
+      "targetHistory": [],
+      "createdAt": "2026-08-01T08:05:00.000Z",
+      "updatedAt": "2026-08-10T08:00:00.000Z"
+    },
+    {
+      "id": "segment-2",
+      "projectId": "modernization-project",
+      "documentId": "modernization-document",
+      "documentName": "antioch-review.html",
+      "documentType": "html",
+      "index": 1,
+      "source": "The city drew merchants, students, and travellers from across the Mediterranean.",
+      "target": "Şehir, Akdeniz'in dört bir yanından tüccarları, öğrencileri ve yolcuları kendine çekiyordu.",
+      "status": "draft",
+      "reviewState": "needs-review",
+      "revision": 1,
+      "comments": [{ "id": "comment-1", "body": "Check the register of ‘drew’.", "state": "open", "createdAt": "2026-08-10T07:30:00.000Z", "updatedAt": "2026-08-10T07:30:00.000Z" }],
+      "targetHistory": [],
+      "createdAt": "2026-08-01T08:06:00.000Z",
+      "updatedAt": "2026-08-10T07:30:00.000Z"
+    },
+    {
+      "id": "segment-3",
+      "projectId": "modernization-project",
+      "documentId": "modernization-document",
+      "documentName": "antioch-review.html",
+      "documentType": "html",
+      "index": 2,
+      "source": "Its public life combined civic ceremony with everyday commerce.",
+      "target": "",
+      "status": "empty",
+      "reviewState": "",
+      "revision": 0,
+      "targetHistory": [],
+      "createdAt": "2026-08-01T08:07:00.000Z",
+      "updatedAt": "2026-08-01T08:07:00.000Z"
+    },
+    {
+      "id": "segment-4",
+      "projectId": "modernization-project",
+      "documentId": "modernization-document",
+      "documentName": "antioch-review.html",
+      "documentType": "html",
+      "index": 3,
+      "source": "Translation memory can preserve consistent choices across a long project.",
+      "target": "Çeviri belleği, uzun bir proje boyunca tutarlı tercihlerin korunmasını sağlayabilir.",
+      "status": "confirmed",
+      "reviewState": "reviewed",
+      "revision": 1,
+      "targetHistory": [],
+      "createdAt": "2026-08-01T08:08:00.000Z",
+      "updatedAt": "2026-08-09T10:00:00.000Z"
+    },
+    {
+      "id": "segment-5",
+      "projectId": "modernization-project",
+      "documentId": "modernization-document",
+      "documentName": "antioch-review.html",
+      "documentType": "html",
+      "index": 4,
+      "source": "Terminology and quality checks remain under the translator's control.",
+      "target": "Terminoloji ve kalite kontrolleri çevirmenin denetiminde kalır.",
+      "status": "draft",
+      "reviewState": "needs-review",
+      "revision": 1,
+      "aiOrigin": "local",
+      "aiProvider": "ollama",
+      "aiModel": "translategemma",
+      "targetHistory": [],
+      "createdAt": "2026-08-01T08:09:00.000Z",
+      "updatedAt": "2026-08-09T10:05:00.000Z"
+    },
+    {
+      "id": "segment-6",
+      "projectId": "modernization-project",
+      "documentId": "modernization-document",
+      "documentName": "antioch-review.html",
+      "documentType": "html",
+      "index": 5,
+      "source": "The final delivery must preserve structure as well as meaning.",
+      "target": "Nihai teslimat, anlamın yanı sıra yapıyı da korumalıdır.",
+      "status": "confirmed",
+      "reviewState": "reviewed",
+      "revision": 1,
+      "targetHistory": [],
+      "createdAt": "2026-08-01T08:10:00.000Z",
+      "updatedAt": "2026-08-09T10:10:00.000Z"
+    }
+  ],
+  "tmEntries": [
+    {
+      "id": "tm-entry-1",
+      "sourceLang": "en",
+      "targetLang": "tr",
+      "languagePair": "en::tr",
+      "tmName": "Antioch TM",
+      "source": "The final delivery must preserve structure as well as meaning.",
+      "target": "Nihai teslimat, anlamın yanı sıra yapıyı da korumalıdır.",
+      "createdAt": "2026-08-05T08:00:00.000Z",
+      "updatedAt": "2026-08-05T08:00:00.000Z"
+    }
+  ],
+  "terms": [
+    {
+      "id": "term-1",
+      "sourceLang": "en",
+      "targetLang": "tr",
+      "languagePair": "en::tr",
+      "termBaseName": "Antioch Terms",
+      "source": "translation memory",
+      "target": "çeviri belleği",
+      "forbidden": false,
+      "createdAt": "2026-08-05T08:00:00.000Z",
+      "updatedAt": "2026-08-05T08:00:00.000Z"
+    }
+  ],
+  "activityEvents": [
+    {
+      "id": "activity-1",
+      "workspaceId": "local-workspace",
+      "ownerId": "local-user",
+      "projectId": "modernization-project",
+      "type": "review",
+      "summary": "Synthetic review fixture prepared",
+      "detail": { "segmentId": "segment-2" },
+      "createdBy": "local-user",
+      "createdAt": "2026-08-10T07:30:00.000Z"
+    }
+  ]
+}

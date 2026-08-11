@@ -162,8 +162,12 @@ try {
   assertPlatformBuildHost(process.argv.slice(2));
   releaseBuildLock = acquireBuildLock();
   removeBuildScratch();
+  runNodeScript("verify-bundle-contract.cjs");
   runNodeScript("i18n-validate.cjs");
   runNodeScript("i18n-compile.cjs");
+  runNodeScript("build-renderer.cjs");
+  runNodeScript("verify-renderer-build.cjs");
+  runNodeScript("prepare-desktop-app.cjs");
 
   const invocation = electronBuilderInvocation(process.argv.slice(2));
   const result = spawnSync(invocation.command, invocation.args, {

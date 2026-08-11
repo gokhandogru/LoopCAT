@@ -61,8 +61,9 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition :focus-visible {
-  outline: 3px solid rgba(11, 143, 131, 0.34);
-  outline-offset: 2px;
+  outline: 3px solid #00665e !important;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 1px #fffdf8;
 }
 
 .liquid-glass-edition .app-shell {
@@ -1301,8 +1302,8 @@ body.liquid-glass-edition {
   }
 
   .liquid-glass-edition :focus-visible {
-    outline-color: #0b3f3a;
-    outline-width: 4px;
+    outline-color: #0b3f3a !important;
+    outline-width: 4px !important;
   }
 
   .liquid-glass-edition .topbar,
@@ -1326,7 +1327,8 @@ body.liquid-glass-edition {
   }
 
   .liquid-glass-edition :focus-visible {
-    outline: 3px solid Highlight;
+    outline: 3px solid Highlight !important;
+    box-shadow: none;
   }
 }
 

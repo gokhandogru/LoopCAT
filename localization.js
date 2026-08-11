@@ -1050,7 +1050,8 @@ function translatableHtmlElements(doc) {
 
 function parseHtml(text) {
   const parser = new DOMParser();
-  const doc = parser.parseFromString(text, "text/html");
+  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(text) || text;
+  const doc = parser.parseFromString(parserInput, "text/html");
   const elements = translatableHtmlElements(doc);
   return {
     structure: { format: "html", source: text },
@@ -1072,13 +1073,21 @@ function buildHtml(segments, structure = null) {
     return segments.map((segment) => targetText(segment)).join("\n\n");
   }
   const parser = new DOMParser();
-  const doc = parser.parseFromString(source, "text/html");
+  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(source) || source;
+  const doc = parser.parseFromString(parserInput, "text/html");
   const elements = translatableHtmlElements(doc);
   segments.forEach((segment) => {
     const elementIndex = segment.structure?.elementIndex;
     if (typeof elementIndex !== "number" || !elements[elementIndex]) return;
     const value = targetText(segment);
-    elements[elementIndex].innerHTML = value;
+    const safeFragment = window.CatHan?.appRuntime?.safeHtml?.fragment?.(value, doc);
+    if (safeFragment) {
+      elements[elementIndex].replaceChildren(safeFragment);
+      return;
+    }
+    const fragmentInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(`<body>${value}</body>`) || `<body>${value}</body>`;
+    const fragmentDocument = parser.parseFromString(fragmentInput, "text/html");
+    elements[elementIndex].replaceChildren(...Array.from(fragmentDocument.body.childNodes));
   });
   return `<!doctype html>\n${doc.documentElement.outerHTML}`;
 }
@@ -1409,7 +1418,8 @@ function xmlParseError(doc) {
 }
 
 function parseXmlDocument(text, label = "XML") {
-  const doc = new DOMParser().parseFromString(text, "application/xml");
+  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(text) || text;
+  const doc = new DOMParser().parseFromString(parserInput, "application/xml");
   if (xmlParseError(doc)) throw new Error(`${label} is not valid XML.`);
   return doc;
 }
@@ -1484,7 +1494,9 @@ function parseAndroidXml(text) {
 function replaceXmlChildren(doc, element, value) {
   while (element.firstChild) element.removeChild(element.firstChild);
   const text = String(value || "");
-  const wrapped = new DOMParser().parseFromString(`<wrapper>${text}</wrapper>`, "application/xml");
+  const wrappedText = `<wrapper>${text}</wrapper>`;
+  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(wrappedText) || wrappedText;
+  const wrapped = new DOMParser().parseFromString(parserInput, "application/xml");
   if (xmlParseError(wrapped)) {
     element.textContent = text;
     return;
@@ -1631,7 +1643,9 @@ function combineInlinePieces(pieces) {
 function parseSemanticInlinePieces(value) {
   const text = String(value || "");
   if (!text) return [{ tag: "", text: "" }];
-  const wrapped = new DOMParser().parseFromString(`<wrapper>${text}</wrapper>`, "application/xml");
+  const wrappedText = `<wrapper>${text}</wrapper>`;
+  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(wrappedText) || wrappedText;
+  const wrapped = new DOMParser().parseFromString(parserInput, "application/xml");
   if (xmlParseError(wrapped)) return [{ tag: "", text }];
   const serializer = new XMLSerializer();
   const pieces = [];

@@ -226,7 +226,8 @@ function docxPartLabel(path) {
 }
 
 function parseXml(text, label) {
-  const xml = new DOMParser().parseFromString(text, "application/xml");
+  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(text) || text;
+  const xml = new DOMParser().parseFromString(parserInput, "application/xml");
   const parserError = xml.querySelector("parsererror");
   if (parserError) throw new Error(`Could not parse the DOCX ${label} XML.`);
   return xml;

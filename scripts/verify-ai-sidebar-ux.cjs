@@ -7,6 +7,15 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 
 if (!process.versions.electron) {
+  const buildResult = spawnSync(process.execPath, [path.join(root, "scripts", "build-renderer.cjs")], {
+    cwd: root,
+    stdio: "inherit"
+  });
+  if (buildResult.error) {
+    console.error(buildResult.error.message);
+    process.exit(1);
+  }
+  if (buildResult.status !== 0) process.exit(buildResult.status ?? 1);
   let electronBinary = "";
   try {
     electronBinary = require("electron");
@@ -15,7 +24,9 @@ if (!process.versions.electron) {
     process.exit(1);
   }
   if (typeof electronBinary !== "string" || !electronBinary) {
-    console.error("Electron is not installed correctly. Run pnpm install --frozen-lockfile with install scripts enabled.");
+    console.error(
+      "Electron is not installed correctly. Run pnpm install --frozen-lockfile with install scripts enabled."
+    );
     process.exit(1);
   }
   const result = spawnSync(electronBinary, [__filename], {
@@ -35,6 +46,14 @@ if (!process.versions.electron) {
 
 const { app, BrowserWindow, ipcMain } = require("electron");
 const runnerUserDataDir = path.join(os.tmpdir(), `loopcat-ai-sidebar-ux-${process.pid}-${Date.now()}`);
+const rendererRoot = path.join(root, ".cache", "renderer", "production");
+const generatedAssets = JSON.parse(require("node:fs").readFileSync(path.join(rendererRoot, "assets.json"), "utf8"));
+const generatedFiles = new Map([
+  ["index.html", path.join(rendererRoot, "index.html")],
+  ["config/production-assets.js", path.join(rendererRoot, "config", "production-assets.js")],
+  ...generatedAssets.map((asset) => [asset, path.join(rendererRoot, asset)])
+]);
+const { runtimeAssets } = require(path.join(rendererRoot, "config", "production-assets.js"));
 const mimeTypes = new Map([
   [".html", "text/html; charset=utf-8"],
   [".js", "text/javascript; charset=utf-8"],
@@ -45,40 +64,7 @@ const mimeTypes = new Map([
   [".png", "image/png"],
   [".ico", "image/x-icon"]
 ]);
-const allowedFiles = new Set([
-  "index.html",
-  "styles.css",
-  "liquid-glass/styles.css",
-  "manifest.webmanifest",
-  "service-worker.js",
-  "icons/loopcat-icon.svg",
-  "icons/loopcat-loopbird-mono.svg",
-  "icons/loopcat-icon.png",
-  "storage.js",
-  "workspace-storage.js",
-  "docx.js",
-  "tm.js",
-  "termbase.js",
-  "tmx.js",
-  "tbx.js",
-  "encoding.js",
-  "xliff.js",
-  "localization.js",
-  "qa.js",
-  "validation.js",
-  "analysis.js",
-  "quality.js",
-  "ai.js",
-  "worker-client.js",
-  "cat-worker.js",
-  "project.js",
-  "i18n.js",
-  "i18n/source.en-US.js",
-  "i18n/locales/ca-ES.js",
-  "i18n/locales/en-US.js",
-  "i18n/locales/tr-TR.js",
-  "app.js"
-]);
+const allowedFiles = new Set(runtimeAssets);
 
 let server = null;
 let windowRef = null;
@@ -114,9 +100,10 @@ function safePathname(requestUrl) {
   if (pathname === "/") pathname = "/index.html";
   const relativePath = path.posix.normalize(pathname.replace(/^\/+/, "").replaceAll("\\", "/"));
   if (!allowedFiles.has(relativePath)) return "";
-  const resolved = path.resolve(root, relativePath);
-  const rootWithSeparator = `${root}${path.sep}`;
-  if (resolved !== root && !resolved.startsWith(rootWithSeparator)) return "";
+  const resolved = generatedFiles.get(relativePath) || path.resolve(root, relativePath);
+  const allowedRoot = generatedFiles.has(relativePath) ? rendererRoot : root;
+  const rootWithSeparator = `${allowedRoot}${path.sep}`;
+  if (resolved !== allowedRoot && !resolved.startsWith(rootWithSeparator)) return "";
   return resolved;
 }
 
@@ -202,10 +189,10 @@ function sidebarInspectionScript() {
         folder.checked = false;
         folder.dispatchEvent(new Event("change", { bubbles: true }));
       }
-      click("#projectDialog button.primary");
-      await waitFor(() => !document.querySelector("#projectDialog")?.open && document.querySelector(".ai-panel"), "created project");
-      click(".ai-panel [data-panel-toggle]");
-      await waitFor(() => !document.querySelector(".ai-panel")?.classList.contains("collapsed"), "expanded AI panel");
+      click("#saveProjectBtn");
+      await waitFor(() => !document.querySelector("#projectDialog")?.open, "created project");
+      click("#openProjectAiSettingsBtn");
+      await waitFor(() => document.querySelector("#projectDialog")?.open, "AI provider settings");
       await waitFor(() => document.querySelector('#localAiPresetSelect option[value="lm-studio"]'), "LM Studio preset option");
       setValue("#localAiPresetSelect", "lm-studio");
       await waitFor(() => document.querySelector("#localAiBaseUrlInput")?.value === "http://localhost:1234/v1", "LM Studio preset");
@@ -225,6 +212,9 @@ function sidebarInspectionScript() {
         }));
       return {
         groups,
+        adminParent: document.querySelector("#aiSettingsForm")?.parentElement?.id || "",
+        suggestionParent: document.querySelector("#aiSuggestionList")?.parentElement?.id || "",
+        contextualActions: Array.from(document.querySelectorAll(".ai-contextual-actions button")).map(text),
         overflowItems,
         startButtonVisibleWithBridge: notHidden("#localAiStartLmStudioBtn"),
         keyControlsVisible: visible("#localAiHostedKeyControls"),
@@ -235,70 +225,123 @@ function sidebarInspectionScript() {
         baseUrl: document.querySelector("#localAiBaseUrlInput")?.value,
         provider: document.querySelector("#localAiProviderSelect")?.value,
         model: document.querySelector("#localAiModelInput")?.value,
-        visiblePanelText: text(document.querySelector(".ai-panel .panel-content")).slice(0, 1200)
+        contextualCopy: text(document.querySelector(".ai-contextual-workflow")).slice(0, 1200)
       };
     };
     return run();
   })()`;
 }
 
-app.whenReady().then(async () => {
-  const port = await startServer();
-  const url = `http://127.0.0.1:${port}/index.html`;
-  const pageErrors = [];
-  ipcMain.handle("loopcat:start-lm-studio-server", async () => ({ ok: true, message: "Fake LM Studio server started." }));
-  ipcMain.handle("loopcat:get-creator-identity", async () => ({ displayName: "LoopCAT UX test" }));
-  ipcMain.handle("loopcat:set-spellchecker-languages", async (_event, languages = []) => ({
-    ok: true,
-    requestedLanguages: Array.isArray(languages) ? languages : [],
-    activeLanguages: Array.isArray(languages) ? languages : [],
-    reason: "test"
-  }));
-  ipcMain.handle("loopcat:get-spellchecker-info", async () => ({
-    supported: true,
-    enabled: true,
-    languages: [],
-    availableLanguages: []
-  }));
-  windowRef = new BrowserWindow({
-    width: 1440,
-    height: 1000,
-    show: false,
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: path.join(root, "desktop", "preload.cjs"),
-      sandbox: true
+app
+  .whenReady()
+  .then(async () => {
+    const port = await startServer();
+    const url = `http://127.0.0.1:${port}/index.html`;
+    const pageErrors = [];
+    ipcMain.handle("loopcat:start-lm-studio-server", async () => ({
+      ok: true,
+      message: "Fake LM Studio server started."
+    }));
+    ipcMain.handle("loopcat:get-creator-identity", async () => ({ displayName: "LoopCAT UX test" }));
+    ipcMain.handle("loopcat:set-spellchecker-languages", async (_event, languages = []) => ({
+      ok: true,
+      requestedLanguages: Array.isArray(languages) ? languages : [],
+      activeLanguages: Array.isArray(languages) ? languages : [],
+      reason: "test"
+    }));
+    ipcMain.handle("loopcat:get-spellchecker-info", async () => ({
+      supported: true,
+      enabled: true,
+      languages: [],
+      availableLanguages: []
+    }));
+    windowRef = new BrowserWindow({
+      width: 1440,
+      height: 1000,
+      show: false,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        preload: path.join(root, "desktop", "preload.cjs"),
+        sandbox: true
+      }
+    });
+    windowRef.webContents.on("console-message", (details) => {
+      if (details.level === "error") pageErrors.push(details.message);
+    });
+    windowRef.webContents.on("render-process-gone", (_event, details) => {
+      finish(1, `AI sidebar UX renderer exited unexpectedly: ${details.reason}`);
+    });
+    await windowRef.loadURL(url);
+    const info = await windowRef.webContents.executeJavaScript(sidebarInspectionScript(), true);
+    const titles = info.groups.map((group) => group.title);
+    assert(titles[0]?.includes("Connect provider"), "AI sidebar should start with provider connection.");
+    assert(titles[1]?.includes("Choose model"), "AI sidebar should put model selection second.");
+    assert(info.adminParent === "projectAiSettingsMount", "Provider administration should live in Project settings.");
+    assert(
+      info.suggestionParent === "contextualAiSuggestionMount",
+      "AI suggestions should live in the contextual inspector."
+    );
+    for (const action of [
+      "Translate selected",
+      "Review",
+      "Suggest tag repair",
+      "Polish draft",
+      "Suggest alternatives",
+      "Apply terminology",
+      "Cloud suggestion",
+      "Cancel"
+    ]) {
+      assert(info.contextualActions.includes(action), `Contextual AI should expose ${action}.`);
     }
+    assert(
+      info.contextualCopy.includes("inspectable"),
+      "Contextual AI should explain that suggestions remain inspectable."
+    );
+    assert(
+      titles.some((title) => title.includes("Prompt test")),
+      "Prompt testing should be available as a secondary drawer."
+    );
+    assert(
+      titles.some((title) => title.includes("Review and repair")),
+      "Review tools should be available as a secondary drawer."
+    );
+    assert(
+      titles.some((title) => title.includes("Draft editing")),
+      "Draft editing tools should be available as a secondary drawer."
+    );
+    assert(
+      titles.some((title) => title.includes("Terminology")),
+      "Terminology tools should be available as a secondary drawer."
+    );
+    assert(
+      titles.some((title) => title.includes("Project context")),
+      "Project context tools should be available as a secondary drawer."
+    );
+    assert(info.provider === "openai-compatible", "LM Studio preset should select the OpenAI-compatible provider.");
+    assert(
+      info.baseUrl === "http://localhost:1234/v1",
+      "LM Studio preset should use the local OpenAI-compatible base URL."
+    );
+    assert(info.model === "translategemma", "LM Studio preset should keep the configured translation model.");
+    assert(
+      info.startButtonVisibleWithBridge === true,
+      "LM Studio start button should appear when the desktop bridge is available."
+    );
+    assert(info.keyControlsVisible === false, "LM Studio local setup should hide hosted key controls.");
+    assert(info.pullVisible === false, "LM Studio local setup should hide Ollama pull controls.");
+    assert(
+      info.overflowItems.length === 0,
+      `AI sidebar language fields should not overflow their card: ${JSON.stringify(info.overflowItems)}`
+    );
+    assert(info.providerDetailsOpen === false, "Advanced provider options should stay collapsed by default.");
+    assert(info.advancedSettingsOpen === false, "Advanced batch settings should stay collapsed by default.");
+    assert(info.cloudOpen === false, "Cloud suggestion settings should stay collapsed by default.");
+    finish(
+      0,
+      `Contextual AI UX verification passed. Provider settings order: ${titles.join(" | ")}${pageErrors.length ? `\\nConsole notes: ${pageErrors.join("\\n")}` : ""}`
+    );
+  })
+  .catch((error) => {
+    finish(1, error.stack || error.message || String(error));
   });
-  windowRef.webContents.on("console-message", (_event, _level, message) => {
-    if (/error/i.test(message)) pageErrors.push(message);
-  });
-  windowRef.webContents.on("render-process-gone", (_event, details) => {
-    finish(1, `AI sidebar UX renderer exited unexpectedly: ${details.reason}`);
-  });
-  await windowRef.loadURL(url);
-  const info = await windowRef.webContents.executeJavaScript(sidebarInspectionScript(), true);
-  const titles = info.groups.map((group) => group.title);
-  assert(titles[0]?.includes("Connect provider"), "AI sidebar should start with provider connection.");
-  assert(titles[1]?.includes("Choose model"), "AI sidebar should put model selection second.");
-  assert(titles[2]?.includes("Pre-translate"), "AI sidebar should put pre-translation third.");
-  assert(titles.some((title) => title.includes("Prompt test")), "Prompt testing should be available as a secondary drawer.");
-  assert(titles.some((title) => title.includes("Review and repair")), "Review tools should be available as a secondary drawer.");
-  assert(titles.some((title) => title.includes("Draft editing")), "Draft editing tools should be available as a secondary drawer.");
-  assert(titles.some((title) => title.includes("Terminology")), "Terminology tools should be available as a secondary drawer.");
-  assert(titles.some((title) => title.includes("Project context")), "Project context tools should be available as a secondary drawer.");
-  assert(info.provider === "openai-compatible", "LM Studio preset should select the OpenAI-compatible provider.");
-  assert(info.baseUrl === "http://localhost:1234/v1", "LM Studio preset should use the local OpenAI-compatible base URL.");
-  assert(info.model === "translategemma", "LM Studio preset should keep the configured translation model.");
-  assert(info.startButtonVisibleWithBridge === true, "LM Studio start button should appear when the desktop bridge is available.");
-  assert(info.keyControlsVisible === false, "LM Studio local setup should hide hosted key controls.");
-  assert(info.pullVisible === false, "LM Studio local setup should hide Ollama pull controls.");
-  assert(info.overflowItems.length === 0, `AI sidebar language fields should not overflow their card: ${JSON.stringify(info.overflowItems)}`);
-  assert(info.providerDetailsOpen === false, "Advanced provider options should stay collapsed by default.");
-  assert(info.advancedSettingsOpen === false, "Advanced batch settings should stay collapsed by default.");
-  assert(info.cloudOpen === false, "Cloud suggestion settings should stay collapsed by default.");
-  finish(0, `AI sidebar UX verification passed. Visible order: ${titles.join(" | ")}${pageErrors.length ? `\\nConsole notes: ${pageErrors.join("\\n")}` : ""}`);
-}).catch((error) => {
-  finish(1, error.stack || error.message || String(error));
-});

@@ -1,0 +1,140 @@
+import { createAppStore } from "./app-store.js";
+import { createApplicationEvents } from "./events.js";
+import { createNavigationController } from "./navigation-controller.js";
+import { createProjectRepository } from "../data/project-repository.js";
+import { createPreferencesRepository } from "../data/preferences-repository.js";
+import { createStorageRepository } from "../data/storage-repository.js";
+import { createTrashRepository } from "../data/trash-repository.js";
+import { createCommandBus } from "../commands/command-bus.js";
+import { createCommandRegistry } from "../commands/command-registry.js";
+import { createUndoStore } from "../commands/undo-store.js";
+import { createEditTargetSessionStore } from "../commands/edit-target-session.js";
+import { createDeleteDocumentCommand, createDeleteProjectCommand } from "../commands/trash-commands.js";
+import { createApplyAiSuggestionCommand } from "../commands/ai-commands.js";
+import {
+  createAiPretranslationCommand,
+  createChangeReviewStateCommand,
+  createConfirmSegmentCommand,
+  createCopySourceToTargetCommand,
+  createEditTargetCommand,
+  createInsertProtectedTagCommand,
+  createInsertTmTargetCommand,
+  createMergeSegmentCommand,
+  createReplaceTargetsCommand,
+  createSplitSegmentCommand,
+  createTmPretranslationCommand
+} from "../commands/segment-commands.js";
+import { createBrowserPlatform } from "../platform/browser-platform.js";
+import { createElectronPlatform } from "../platform/electron-platform.js";
+import { createDashboardController } from "../features/projects/dashboard-controller.js";
+import { createProjectsController } from "../features/projects/projects-controller.js";
+import { createEditorController } from "../features/editor/editor-controller.js";
+import { createFilterStore } from "../features/editor/filter-store.js";
+import { createFilterPresetController } from "../features/editor/filter-preset-controller.js";
+import { createInspectorController } from "../features/editor/inspector-controller.js";
+import { createSegmentGridController } from "../features/editor/segment-grid-controller.js";
+import { createSelectionStore } from "../features/editor/selection-store.js";
+import { createPaletteController } from "../features/palette/palette-controller.js";
+import { createWorkspaceLayoutController } from "../features/workspace/workspace-layout-controller.js";
+import { createUpdateController } from "../features/update/update-controller.js";
+import { createDiagnosticsController } from "../features/diagnostics/diagnostics-controller.js";
+import { createDiagnosticsService } from "../features/diagnostics/diagnostics-service.js";
+import { createAiContextController } from "../features/ai/ai-context-controller.js";
+import {
+  asTrustedHtml,
+  asTrustedScriptUrl,
+  replaceWithSanitizedHtml,
+  sanitizedFragment
+} from "../security/safe-html.js";
+import { createThemeController } from "../ui/theme-controller.js";
+import { createDialogController } from "../ui/dialog-controller.js";
+import { createJobStore } from "../status/job-store.js";
+import { createNoticeStore } from "../status/notice-store.js";
+import { createSaveStore } from "../status/save-store.js";
+import { createStatusController } from "../status/status-controller.js";
+import { createAiProviderService } from "../ai/providers/legacy-registry-adapter.js";
+import { finalizeReportDocument } from "../reports/report-document.js";
+import { createLocaleLoader } from "../i18n/locale-loader.js";
+
+export function createApplicationRuntime({ browserWindow, projectApi, storageApi, desktopBridge }) {
+  const store = createAppStore();
+  const events = createApplicationEvents();
+  const storageRepository = createStorageRepository(storageApi);
+  const projectRepository = createProjectRepository(projectApi);
+  const preferencesRepository = createPreferencesRepository(storageRepository);
+  const trashRepository = createTrashRepository(storageRepository);
+  const undoStore = createUndoStore(100);
+  const commandBus = createCommandBus({ undoStore });
+  const editTargetSessions = createEditTargetSessionStore({ commandBus, createEditTargetCommand });
+  const saveStore = createSaveStore();
+  const jobStore = createJobStore();
+  const noticeStore = createNoticeStore();
+  const platform = desktopBridge?.getRuntimeStatus
+    ? createElectronPlatform(desktopBridge)
+    : createBrowserPlatform(browserWindow);
+  const localeLoader = createLocaleLoader({ i18n: browserWindow.CatHan.i18n, browserWindow });
+
+  return Object.freeze({
+    events,
+    commands: Object.freeze({
+      bus: commandBus,
+      createAiPretranslationCommand,
+      createApplyAiSuggestionCommand,
+      createChangeReviewStateCommand,
+      createConfirmSegmentCommand,
+      createCopySourceToTargetCommand,
+      createEditTargetCommand,
+      createInsertProtectedTagCommand,
+      createInsertTmTargetCommand,
+      createMergeSegmentCommand,
+      createReplaceTargetsCommand,
+      createSplitSegmentCommand,
+      createTmPretranslationCommand,
+      createDeleteDocumentCommand: (options) => createDeleteDocumentCommand({ ...options, trashRepository }),
+      createDeleteProjectCommand: (options) => createDeleteProjectCommand({ ...options, trashRepository }),
+      registry: createCommandRegistry(),
+      editTargetSessions,
+      undoStore
+    }),
+    featureFactories: Object.freeze({
+      createAiContextController,
+      createAiProviderService,
+      createDashboardController,
+      createDiagnosticsController,
+      createDiagnosticsService,
+      createDialogController,
+      createEditorController,
+      createFilterStore,
+      createFilterPresetController,
+      createInspectorController,
+      createProjectsController,
+      createPaletteController,
+      createThemeController,
+      createUpdateController,
+      createWorkspaceLayoutController,
+      createSegmentGridController,
+      createSelectionStore
+    }),
+    navigation: createNavigationController({ store, events }),
+    localeLoader,
+    platform,
+    safeHtml: Object.freeze({
+      replace: replaceWithSanitizedHtml,
+      fragment: sanitizedFragment,
+      trusted: asTrustedHtml,
+      trustedScriptUrl: asTrustedScriptUrl
+    }),
+    reports: Object.freeze({ finalize: finalizeReportDocument }),
+    preferencesRepository,
+    projectRepository,
+    status: Object.freeze({
+      controller: createStatusController({ saveStore, jobStore, noticeStore, events }),
+      jobs: jobStore,
+      notices: noticeStore,
+      save: saveStore
+    }),
+    storageRepository,
+    trashRepository,
+    store
+  });
+}

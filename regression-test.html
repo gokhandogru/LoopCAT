@@ -3506,7 +3506,7 @@
             leakedTmOriginBackupReport.errors.some((error) => error.includes("credential-looking TM origin metadata") && error.includes("tmEntries.0.projectName")),
           "backup validation rejects credential-looking TM origin metadata"
         );
-        const futureBackup = { ...backup, schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION + 1 };
+        const futureBackup = { ...backup, schemaVersion: window.CatHan.storage.constants.BACKUP_SCHEMA_VERSION + 1 };
         const futureBackupReport = window.CatHan.validation.validateBackupFile(futureBackup);
         assert(!futureBackupReport.ok && futureBackupReport.errors.some((error) => error.includes("newer than this LoopCAT build supports")), "backup validation rejects future schema versions");
         let futureBackupRestoreRejected = false;

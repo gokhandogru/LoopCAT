@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "noImplicitThis": false,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2024",
+    "lib": ["DOM", "DOM.Iterable", "ES2024"],
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/app/**/*.js", "src/commands/**/*.js", "src/data/**/*.js", "src/features/**/*.js", "src/platform/**/*.js", "src/status/**/*.js", "src/ui/**/*.js", "src/types/**/*.d.ts"]
+}

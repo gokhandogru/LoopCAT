@@ -446,7 +446,8 @@ function readZipText(entries, path) {
 }
 
 function parseXml(text, label) {
-  const xml = new DOMParser().parseFromString(text, "application/xml");
+  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(text) || text;
+  const xml = new DOMParser().parseFromString(parserInput, "application/xml");
   if (xml.querySelector("parsererror")) throw new Error(`Could not parse the XLSX ${label} XML.`);
   return xml;
 }

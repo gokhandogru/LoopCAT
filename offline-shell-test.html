@@ -7,6 +7,7 @@
   </head>
   <body>
     <pre id="results">Running...</pre>
+    <script src="./config/production-assets.js"></script>
     <script>
       (async () => {
         const out = [];
@@ -47,14 +48,15 @@
           assert(Boolean(await cache.match("./index.html")), "offline shell caches index page");
           assert(Boolean(await cache.match("./app.js")), "offline shell caches application coordinator");
           assert(!(await cache.match("./test-runner.html")), "offline shell does not pre-cache test pages");
-          const serviceWorkerSource = await (await fetch("./service-worker.js")).text();
-          const coreAssetsMatch = /const CORE_ASSETS = \[([\s\S]*?)\];/.exec(serviceWorkerSource);
-          assert(Boolean(coreAssetsMatch), "offline shell exposes core asset list");
-          const coreAssets = Array.from(coreAssetsMatch[1].matchAll(/"([^"]+)"/g)).map((match) => match[1]);
+          const coreAssets = ["./", ...window.LoopCATProductionAssets.offlineAssets.map((asset) => `./${asset}`)];
+          assert(coreAssets.includes("./config/production-assets.js"), "offline shell exposes canonical core asset list");
           for (const asset of coreAssets) {
             assert(Boolean(await cache.match(asset)), `offline shell caches core asset ${asset}`);
           }
-          assert(coreAssets.length >= 20, "offline shell caches every core app asset");
+          assert(
+            coreAssets.length === window.LoopCATProductionAssets.offlineAssets.length + 1,
+            "offline shell derives every core app asset from the canonical manifest"
+          );
           const appJsText = await (await fetch("./app.js")).text();
           assert(!appJsText.includes("__wrongLoopCatCache"), "offline shell serves core assets from the LoopCAT cache instead of unrelated caches");
 

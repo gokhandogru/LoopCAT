@@ -1,6 +1,6 @@
 (() => {
 const { buildBilingualDocx, buildTargetDocx, detectProtectedTags, extractDocxSegments } = window.CatHan.docx;
-const { appendProjectSegments, appendProjectSegmentsAndUpdateProject, createProject, deleteProject, deleteProjectDocument, deleteSegment, getProjectSegments, listProjects, replaceProjectSegments, saveSegment, saveSegments, updateProject } = window.CatHan.project;
+const { appendProjectSegments, appendProjectSegmentsAndUpdateProject, createProject, deleteProject, deleteProjectDocument, deleteSegment, getProjectSegments, listProjects, replaceProjectSegments, saveSegment, saveSegments, saveSegmentStructure, updateProject } = window.CatHan.project;
 const { bulkPut, constants: storageConstants, createPortableSanitizerContext, exportAllData, getAll, getAllByIndex, importAllData, importProjectPackageRecords, listActivityEvents, makeId, recordActivityEvent, sanitizePortableValue } = window.CatHan.storage;
 const { deleteTmEntry, deleteTmEntries, getTmMatchCandidates, getTmMatchCandidateBatches, importTmEntries, listTmEntries, rebuildAllTmIndexes, saveTmEntry, scoreTmEntries, updateTmEntry } = window.CatHan.tm;
 const { buildTmx, parseTmx, parseTmxAsync } = window.CatHan.tmx;
@@ -68,6 +68,13 @@ const {
 const workerClient = window.CatHan.workerClient;
 const workspaceStorage = window.CatHan.workspaceStorage;
 const uiI18n = window.CatHan.i18n;
+const focusController = window.CatHan.focusController?.createFocusController?.();
+const appRuntime = window.CatHan.appRuntime;
+const replaceSafeHtml = appRuntime.safeHtml.replace;
+const finalizeReportDocument = appRuntime.reports.finalize;
+const aiProviderService = appRuntime.featureFactories.createAiProviderService(aiProviderRegistry);
+const applicationStore = appRuntime?.store;
+const applicationNavigation = appRuntime?.navigation;
 const APP_NAME = "LoopCAT";
 const LEGACY_APP_NAME = "CatHan";
 const OPENAI_KEY_STORAGE = "loopcat.openai.apiKey";
@@ -76,38 +83,10 @@ const CREATOR_NAME_STORAGE = "loopcat.creatorName";
 const WORKSPACE_DIRTY_STORAGE = "loopcat.workspace.dirtyProjectIds";
 const BACKUP_REMINDER_STORAGE = "loopcat.backupReminder.dismissedUntil";
 const OFFLINE_APP_SHELL_CACHE_PREFIX = "loopcat-offline-";
-const OFFLINE_APP_SHELL_WARMUP_ASSETS = [
-  "./index.html",
-  "./styles.css",
-  "./manifest.webmanifest",
-  "./service-worker.js",
-  "./icons/loopcat-icon.svg",
-  "./icons/loopcat-loopbird-mono.svg",
-  "./storage.js",
-  "./workspace-storage.js",
-  "./docx.js",
-  "./tm.js",
-  "./termbase.js",
-  "./tmx.js",
-  "./tbx.js",
-  "./encoding.js",
-  "./xliff.js",
-  "./localization.js",
-  "./qa.js",
-  "./validation.js",
-  "./analysis.js",
-  "./quality.js",
-  "./ai.js",
-  "./worker-client.js",
-  "./cat-worker.js",
-  "./project.js",
-  "./i18n.js",
-  "./i18n/source.en-US.js",
-  "./i18n/locales/ca-ES.js",
-  "./i18n/locales/en-US.js",
-  "./i18n/locales/tr-TR.js",
-  "./app.js"
-];
+let offlineUpdateController = null;
+const OFFLINE_APP_SHELL_WARMUP_ASSETS = Object.freeze(
+  (window.LoopCATProductionAssets?.offlineAssets || []).map((asset) => `./${asset}`)
+);
 
 const SEGMENT_ROW_HEIGHT = 118;
 const SEGMENT_ROW_BUFFER = 8;
@@ -683,6 +662,8 @@ const LANGUAGE_ALIAS_CODES = {
   spanish: "es",
   turkish: "tr"
 };
+const LOOPCAT_TEST_BUILD = window.location.hash === "#app-workflow-test";
+if (LOOPCAT_TEST_BUILD) window.__loopcatTestBuild = true;
 const CONFIRM_FAILURE_TEST_FLAG = Symbol("confirm-failure-test");
 const CONFIRM_POST_SAVE_FAILURE_TEST_FLAG = Symbol("confirm-post-save-failure-test");
 const SAVE_TM_FAILURE_TEST_FLAG = Symbol("save-tm-failure-test");
@@ -731,6 +712,7 @@ const state = {
   saveTimers: new Map(),
   view: "projects",
   focusMode: false,
+  inspectorOpen: true,
   documentFilter: "",
   segmentQuery: "",
   segmentSearchScope: "both",
@@ -765,6 +747,7 @@ const state = {
   qualityRiskQueue: null,
   lastValidationReport: null,
   commandQuery: "",
+  commandProjectId: "",
   desktopSpellcheckTargetLang: null,
   projectDialogMode: "create",
   workspaceStatus: null,
@@ -784,15 +767,67 @@ const state = {
   }
 };
 
+function applicationNavigationPayload(overrides = {}) {
+  const activeSegment = state.segments[state.activeIndex] || null;
+  return {
+    view: state.view,
+    projectId: state.project?.id || null,
+    documentId: state.documentFilter || "",
+    segmentId: activeSegment?.id || "",
+    activeIndex: state.activeIndex,
+    ...overrides
+  };
+}
+
+function syncLegacyApplicationState(overrides = {}) {
+  const navigation = applicationNavigation?.syncLegacy?.(applicationNavigationPayload(overrides));
+  applicationStore?.dispatch?.({
+    type: "interface/focus-mode-changed",
+    payload: { enabled: state.focusMode }
+  });
+  applicationStore?.dispatch?.({
+    type: "interface/locale-changed",
+    payload: { locale: uiI18n?.getLocale?.() || "" }
+  });
+  return navigation;
+}
+
+function applyApplicationNavigation(navigation) {
+  if (!navigation) return;
+  state.view = navigation.view;
+  state.documentFilter = navigation.documentId || "";
+  state.activeIndex = Number.isInteger(navigation.activeIndex) ? navigation.activeIndex : state.activeIndex;
+}
+
 const els = {
   saveStatus: document.querySelector("#saveStatus"),
+  updateReadyBanner: document.querySelector("#updateReadyBanner"),
+  updateReadyTitle: document.querySelector("#updateReadyTitle"),
+  updateReadyMessage: document.querySelector("#updateReadyMessage"),
+  reloadUpdateBtn: document.querySelector("#reloadUpdateBtn"),
+  deferUpdateBtn: document.querySelector("#deferUpdateBtn"),
+  undoBtn: document.querySelector("#undoBtn"),
+  redoBtn: document.querySelector("#redoBtn"),
   workspace: document.querySelector("#workspace"),
   brandHomeLink: document.querySelector("#brandHomeLink"),
   projectsViewBtn: document.querySelector("#projectsViewBtn"),
   resourcesViewBtn: document.querySelector("#resourcesViewBtn"),
+  trashBtn: document.querySelector("#trashBtn"),
+  trashDialog: document.querySelector("#trashDialog"),
+  closeTrashBtn: document.querySelector("#closeTrashBtn"),
+  trashList: document.querySelector("#trashList"),
+  emptyTrashBtn: document.querySelector("#emptyTrashBtn"),
   aboutBtn: document.querySelector("#aboutBtn"),
   aboutDialog: document.querySelector("#aboutDialog"),
   closeAboutBtn: document.querySelector("#closeAboutBtn"),
+  diagnosticsBtn: document.querySelector("#diagnosticsBtn"),
+  diagnosticsDialog: document.querySelector("#diagnosticsDialog"),
+  closeDiagnosticsBtn: document.querySelector("#closeDiagnosticsBtn"),
+  diagnosticsSummary: document.querySelector("#diagnosticsSummary"),
+  diagnosticsPreview: document.querySelector("#diagnosticsPreview"),
+  diagnosticsMessage: document.querySelector("#diagnosticsMessage"),
+  exportDiagnosticsBtn: document.querySelector("#exportDiagnosticsBtn"),
+  diagnosticsHardwareBtn: document.querySelector("#diagnosticsHardwareBtn"),
   opusCatHelpDialog: document.querySelector("#opusCatHelpDialog"),
   closeOpusCatHelpBtn: document.querySelector("#closeOpusCatHelpBtn"),
   retryOpusCatConnectionBtn: document.querySelector("#retryOpusCatConnectionBtn"),
@@ -802,6 +837,9 @@ const els = {
   workspaceMenu: document.querySelector(".workspace-menu"),
   workspaceHealth: document.querySelector("#workspaceHealth"),
   uiLocaleSelect: document.querySelector("#uiLocaleSelect"),
+  themeSelect: document.querySelector("#themeSelect"),
+  densitySelect: document.querySelector("#densitySelect"),
+  resetLayoutBtn: document.querySelector("#resetLayoutBtn"),
   uiLocaleImportInput: document.querySelector("#uiLocaleImportInput"),
   exportUiSourceBtn: document.querySelector("#exportUiSourceBtn"),
   workspaceRecoveryPanel: document.querySelector("#workspaceRecoveryPanel"),
@@ -865,6 +903,7 @@ const els = {
   closeConcordanceBtn: document.querySelector("#closeConcordanceBtn"),
   projectDashboard: document.querySelector("#projectDashboard"),
   projectSearchInput: document.querySelector("#projectSearchInput"),
+  projectsImportProjectBtn: document.querySelector("#projectsImportProjectBtn"),
   languagePairFilter: document.querySelector("#languagePairFilter"),
   emptyState: document.querySelector("#emptyState"),
   editorView: document.querySelector("#editorView"),
@@ -902,6 +941,8 @@ const els = {
   exportQualityPassportMenuBtn: document.querySelector("#exportQualityPassportMenuBtn"),
   exportAnonymizedProjectReportBtn: document.querySelector("#exportAnonymizedProjectReportBtn"),
   focusModeBtn: document.querySelector("#focusModeBtn"),
+  inspectorToggleBtn: document.querySelector("#inspectorToggleBtn"),
+  inspectorResizer: document.querySelector("#inspectorResizer"),
   exitFocusModeBtn: document.querySelector("#exitFocusModeBtn"),
   commandPaletteBtn: document.querySelector("#commandPaletteBtn"),
   commandPaletteOverlay: document.querySelector("#commandPaletteOverlay"),
@@ -919,6 +960,7 @@ const els = {
   replaceVisibleBtn: document.querySelector("#replaceVisibleBtn"),
   replaceAllBtn: document.querySelector("#replaceAllBtn"),
   segmentStatusFilter: document.querySelector("#segmentStatusFilter"),
+  filterPresetSelect: document.querySelector("#filterPresetSelect"),
   reviewStateFilter: document.querySelector("#reviewStateFilter"),
   aiSegmentFilter: document.querySelector("#aiSegmentFilter"),
   copySourceBtn: document.querySelector("#copySourceBtn"),
@@ -971,6 +1013,21 @@ const els = {
   exportQualityPassportBtn: document.querySelector("#exportQualityPassportBtn"),
   qualityRiskList: document.querySelector("#qualityRiskList"),
   aiSettingsForm: document.querySelector("#aiSettingsForm"),
+  saveAiSettingsBtn: document.querySelector("#saveAiSettingsBtn"),
+  projectAiOptions: document.querySelector("#projectAiOptions"),
+  projectAiSettingsMount: document.querySelector("#projectAiSettingsMount"),
+  openProjectAiSettingsBtn: document.querySelector("#openProjectAiSettingsBtn"),
+  contextualAiStatus: document.querySelector("#contextualAiStatus"),
+  contextualAiTranslateBtn: document.querySelector("#contextualAiTranslateBtn"),
+  contextualAiReviewBtn: document.querySelector("#contextualAiReviewBtn"),
+  contextualAiRepairBtn: document.querySelector("#contextualAiRepairBtn"),
+  contextualAiPolishBtn: document.querySelector("#contextualAiPolishBtn"),
+  contextualAiVariantsBtn: document.querySelector("#contextualAiVariantsBtn"),
+  contextualAiApplyTermsBtn: document.querySelector("#contextualAiApplyTermsBtn"),
+  contextualOpenAiSuggestionBtn: document.querySelector("#contextualOpenAiSuggestionBtn"),
+  contextualAiCancelBtn: document.querySelector("#contextualAiCancelBtn"),
+  contextualAiSuggestionMount: document.querySelector("#contextualAiSuggestionMount"),
+  contextualAiOutputMount: document.querySelector("#contextualAiOutputMount"),
   aiEnabledInput: document.querySelector("#aiEnabledInput"),
   aiProviderInput: document.querySelector("#aiProviderInput"),
   aiModelInput: document.querySelector("#aiModelInput"),
@@ -1051,6 +1108,190 @@ const els = {
   backupExportBtn: document.querySelector("#backupExportBtn")
 };
 
+const aiContextController = appRuntime?.featureFactories?.createAiContextController?.({
+  adminSection: els.aiSettingsForm,
+  adminMount: els.projectAiSettingsMount,
+  suggestionList: els.aiSuggestionList,
+  suggestionMount: els.contextualAiSuggestionMount,
+  outputDrawer: els.localAiOutputDrawer,
+  outputMount: els.contextualAiOutputMount,
+  providerStatusText: els.localAiStatusText,
+  contextualStatus: els.contextualAiStatus
+});
+aiContextController?.mount?.();
+
+const verticalFeatureState = (() => {
+  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "creating vertical feature controllers";
+  const factories = appRuntime?.featureFactories;
+  if (!factories) return null;
+  const selectionStore = factories.createSelectionStore({
+    activeIndex: state.activeIndex,
+    segmentId: ""
+  });
+  const filterStore = factories.createFilterStore();
+  return Object.freeze({
+    dashboard: factories.createDashboardController({ root: els.projectHomeView }),
+    editor: factories.createEditorController({
+      workspace: els.workspace,
+      sidebar: els.sidebar,
+      projectsView: els.projectsView,
+      resourcesView: els.resourcesView,
+      dashboardView: els.projectHomeView,
+      emptyView: els.emptyState,
+      editorView: els.editorView
+    }),
+    filters: filterStore,
+    inspector: factories.createInspectorController({
+      root: els.sidebar,
+      preferencesRepository: appRuntime.preferencesRepository
+    }),
+    projects: factories.createProjectsController({ root: els.projectDashboard }),
+    segmentGrid: factories.createSegmentGridController({ selectionStore }),
+    selection: selectionStore
+  });
+})();
+verticalFeatureState?.inspector?.mount?.();
+
+const filterPresetController = appRuntime?.featureFactories?.createFilterPresetController?.({
+  select: els.filterPresetSelect,
+  preferencesRepository: appRuntime.preferencesRepository,
+  getProjectId: () => state.project?.id || "",
+  applyFilters: async (preset) => {
+    state.segmentStatusFilter = preset.status;
+    state.reviewStateFilter = preset.reviewState;
+    state.aiSegmentFilter = preset.aiState;
+    els.segmentStatusFilter.value = preset.status;
+    if (els.reviewStateFilter) els.reviewStateFilter.value = preset.reviewState;
+    if (els.aiSegmentFilter) els.aiSegmentFilter.value = preset.aiState;
+    invalidateSegmentFilterCache();
+    renderSegments();
+    const first = firstVisibleSegmentIndex();
+    if (first !== -1) await setActiveSegment(first);
+  },
+  setInspectorTab: (tab) => {
+    state.inspectorOpen = true;
+    void workspaceLayoutController?.setInspectorOpen?.(true);
+    verticalFeatureState?.inspector?.setContext?.({ tab });
+    renderEditor();
+  }
+});
+const filterPresetReady = filterPresetController?.initialize?.() || Promise.resolve();
+
+const paletteController = appRuntime?.featureFactories?.createPaletteController?.({
+  overlay: els.commandPaletteOverlay,
+  input: els.commandPaletteInput,
+  results: els.commandPaletteResults,
+  closeButton: els.closeCommandPaletteBtn,
+  appShell: document.querySelector(".app-shell"),
+  getCommands: commandList,
+  translate: uiSource,
+  focusController,
+  preferencesRepository: appRuntime.preferencesRepository,
+  onError: (error) => setSaveStatus(error?.message || "Command failed", "dirty")
+});
+if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "initializing palette controller";
+void paletteController?.initialize?.();
+
+const themeController = appRuntime?.featureFactories?.createThemeController?.({
+  documentRoot: document.documentElement,
+  themeColorMeta: document.querySelector('meta[name="theme-color"]'),
+  select: els.themeSelect,
+  preferencesRepository: appRuntime.preferencesRepository,
+  matchMedia: window.matchMedia?.bind(window)
+});
+
+const workspaceLayoutController = appRuntime?.featureFactories?.createWorkspaceLayoutController?.({
+  documentRoot: document.documentElement,
+  workspace: els.workspace,
+  densitySelect: els.densitySelect,
+  resetButton: els.resetLayoutBtn,
+  inspector: els.sidebar,
+  inspectorResizer: els.inspectorResizer,
+  preferencesRepository: appRuntime.preferencesRepository,
+  onInspectorPreference: (inspectorOpen) => {
+    state.inspectorOpen = inspectorOpen;
+    renderEditor();
+  }
+});
+
+const diagnosticsService = appRuntime?.featureFactories?.createDiagnosticsService?.({
+  platform: appRuntime.platform,
+  browserNavigator: navigator,
+  browserPerformance: performance,
+  appVersion: window.LoopCATProductionAssets?.appVersion || "",
+  getProjectSummary: async () => {
+    const segments = await appRuntime.storageRepository.getAll("segments");
+    const counts = new Map();
+    for (const segment of segments) counts.set(segment.projectId, (counts.get(segment.projectId) || 0) + 1);
+    return {
+      projectCount: state.projects.length,
+      segmentCount: segments.length,
+      largestProjectSegmentCount: Math.max(0, ...counts.values())
+    };
+  },
+  getInterfaceSummary: () => ({
+    locale: currentUiLocale(),
+    theme: themeController?.getPreference?.() || "light",
+    density: workspaceLayoutController?.getState?.().density || "balanced",
+    offlineUpdateAvailable: !els.updateReadyBanner?.classList.contains("hidden")
+  }),
+  getLastError: () => appRuntime.status.controller.getLastError()
+});
+
+const diagnosticsController = appRuntime?.featureFactories?.createDiagnosticsController?.({
+  dialog: els.diagnosticsDialog,
+  summaryList: els.diagnosticsSummary,
+  preview: els.diagnosticsPreview,
+  message: els.diagnosticsMessage,
+  exportButton: els.exportDiagnosticsBtn,
+  hardwareButton: els.diagnosticsHardwareBtn,
+  service: diagnosticsService,
+  platform: appRuntime.platform,
+  download: (text, filename, type) => download(filename, text, type),
+  translate: uiSource
+});
+
+const dialogLifecycleController = appRuntime?.featureFactories?.createDialogController?.({
+  focusController,
+  getActiveElement: () => document.activeElement,
+  onError: (error, context) => {
+    if (context?.id === "diagnostics" && els.diagnosticsMessage) {
+      els.diagnosticsMessage.textContent = uiSource(error?.message || "Diagnostics could not be collected.");
+      return;
+    }
+    setSaveStatus(error?.message || "Dialog could not be opened.", "dirty");
+  }
+});
+dialogLifecycleController?.register?.({
+  id: "about",
+  dialog: els.aboutDialog,
+  opener: els.aboutBtn,
+  closer: els.closeAboutBtn,
+  initialFocus: els.closeAboutBtn
+});
+dialogLifecycleController?.register?.({
+  id: "diagnostics",
+  dialog: els.diagnosticsDialog,
+  opener: els.diagnosticsBtn,
+  closer: els.closeDiagnosticsBtn,
+  initialFocus: els.closeDiagnosticsBtn,
+  returnTarget: els.workspaceMenuSummary,
+  afterOpen: () => {
+    void diagnosticsController?.refresh?.().catch((error) => {
+      els.diagnosticsMessage.textContent = uiSource(error?.message || "Diagnostics could not be collected.");
+    });
+  }
+});
+dialogLifecycleController?.register?.({
+  id: "trash",
+  dialog: els.trashDialog,
+  opener: els.trashBtn,
+  closer: els.closeTrashBtn,
+  initialFocus: els.closeTrashBtn,
+  beforeOpen: renderTrashList
+});
+dialogLifecycleController?.mount?.();
+
 function uiT(key, values = {}) {
   return uiI18n?.t ? uiI18n.t(key, values) : key;
 }
@@ -1100,7 +1341,12 @@ function renderUiLocaleOptions() {
 }
 
 function refreshLocalizedUi() {
+  applicationStore?.dispatch?.({
+    type: "interface/locale-changed",
+    payload: { locale: uiI18n?.getLocale?.() || "" }
+  });
   uiI18n?.localizeStaticDom?.(document.body);
+  syncAllPanelToggleStates();
   renderUiLocaleOptions();
   renderFocusMode();
   renderWorkspaceStatus();
@@ -1151,8 +1397,16 @@ function setSaveStatus(text, mode = "") {
     state.saveStatusTimer = 0;
   }
   const displayText = redactSensitiveText(text || "").trim();
+  appRuntime?.status?.controller?.fromLegacy?.({
+    text: displayText,
+    mode,
+    projectId: state.project?.id || null,
+    segmentId: state.segments[state.activeIndex]?.id || ""
+  });
   els.saveStatus.textContent = uiSource(displayText);
   els.saveStatus.className = `save-status ${mode}`;
+  const operationActive = /^(saving|starting|requesting|sending|running|generating|extracting|polishing|adapting|pretranslating|canceling)|:\s*(reading|parsing|importing|saving)/i.test(displayText);
+  els.saveStatus.setAttribute("aria-busy", String(operationActive));
   if ((mode === "saved" || displayText.startsWith("Saved to ")) && displayText !== "Saved") {
     state.saveStatusTimer = setTimeout(() => {
       els.saveStatus.textContent = uiT("app.status.saved");
@@ -1160,6 +1414,170 @@ function setSaveStatus(text, mode = "") {
       state.saveStatusTimer = 0;
     }, 5000);
   }
+}
+
+function renderUndoControls() {
+  const projectId = state.commandProjectId || state.project?.id || null;
+  if (els.undoBtn) els.undoBtn.disabled = !appRuntime?.commands?.bus?.canUndo?.(projectId);
+  if (els.redoBtn) els.redoBtn.disabled = !appRuntime?.commands?.bus?.canRedo?.(projectId);
+}
+
+async function undoLastCommand() {
+  const projectId = state.commandProjectId || state.project?.id || null;
+  finalizePendingEditCommands(projectId || "");
+  const result = await appRuntime?.commands?.bus?.undo?.(projectId);
+  if (!result) return false;
+  const requestedActiveSegmentId = result.result?.activeSegmentId || "";
+  await loadProjects(false);
+  if (state.project?.id === projectId) {
+    state.project = state.projects.find((project) => project.id === projectId) || state.project;
+    state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
+    const requestedIndex = requestedActiveSegmentId
+      ? state.segments.findIndex((segment) => segment.id === requestedActiveSegmentId)
+      : -1;
+    state.activeIndex = state.segments.length
+      ? requestedIndex >= 0
+        ? requestedIndex
+        : Math.max(0, Math.min(state.activeIndex, state.segments.length - 1))
+      : -1;
+    renderAll();
+  } else if (!state.project && projectId && state.projects.some((project) => project.id === projectId)) {
+    await openProject(projectId);
+  }
+  setSaveStatus(result.receipt.undoLabel, "saved");
+  renderUndoControls();
+  if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
+    focusActiveTextarea(result.result?.selection || null);
+  }
+  return result;
+}
+
+async function redoLastCommand() {
+  const projectId = state.commandProjectId || state.project?.id || null;
+  finalizePendingEditCommands(projectId || "");
+  const result = await appRuntime?.commands?.bus?.redo?.(projectId);
+  if (!result) return false;
+  const requestedActiveSegmentId = result.result?.activeSegmentId || "";
+  if (result.receipt.commandId === "delete-project" && state.project?.id === projectId) {
+    state.project = null;
+    state.segments = [];
+    setView("projects");
+  }
+  await loadProjects(false);
+  if (result.receipt.commandId === "delete-document" && state.project?.id === projectId) {
+    state.project = state.projects.find((project) => project.id === projectId) || state.project;
+    state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
+    state.activeIndex = state.segments.length ? Math.max(0, Math.min(state.activeIndex, state.segments.length - 1)) : -1;
+    renderAll();
+  } else if (state.project?.id === projectId && requestedActiveSegmentId) {
+    state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
+    const requestedIndex = state.segments.findIndex((segment) => segment.id === requestedActiveSegmentId);
+    if (requestedIndex >= 0) state.activeIndex = requestedIndex;
+    renderAll();
+  }
+  setSaveStatus(result.receipt.undoLabel.replace(/^Undo\s+/i, "Redid "), "saved");
+  renderUndoControls();
+  if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
+    focusActiveTextarea(result.result?.selection || null);
+  }
+  return result;
+}
+
+async function refreshTrashSummary() {
+  if (!els.trashBtn || !appRuntime?.trashRepository) return [];
+  const entries = await appRuntime.trashRepository.list();
+  els.trashBtn.textContent = entries.length ? uiSource("Trash ({value1})", { value1: entries.length }) : uiSource("Trash");
+  els.trashBtn.setAttribute("aria-label", uiSource("Trash, {value1} item(s)", { value1: entries.length }));
+  return entries;
+}
+
+async function restoreTrashEntry(entryId) {
+  try {
+    const entry = await appRuntime.trashRepository.restore(entryId);
+    await loadProjects(false);
+    await renderTrashList();
+    setSaveStatus(`${entry.label || "Item"} restored from Trash`, "saved");
+    renderUndoControls();
+    return true;
+  } catch (error) {
+    setSaveStatus(error.message || "Trash restore failed. Existing work was preserved.", "dirty");
+    return false;
+  }
+}
+
+async function renderTrashList() {
+  const entries = await refreshTrashSummary();
+  if (!els.trashList) return entries;
+  if (!entries.length) {
+    const empty = document.createElement("div");
+    empty.className = "muted";
+    empty.textContent = uiSource("Trash is empty. Deleted projects and files will appear here.");
+    els.trashList.replaceChildren(empty);
+    els.emptyTrashBtn.disabled = true;
+    return entries;
+  }
+  const fragment = document.createDocumentFragment();
+  entries.forEach((entry) => {
+    const item = document.createElement("article");
+    item.className = "trash-item";
+    const copy = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = displaySafeText(entry.label, uiSource("Deleted item"));
+    const meta = document.createElement("p");
+    meta.textContent = `${entry.entityType === "document" ? uiSource("Project file") : uiSource("Project")} · ${formatDate(entry.deletedAt)}`;
+    copy.append(title, meta);
+    const actions = document.createElement("div");
+    actions.className = "trash-item-actions";
+    const restore = document.createElement("button");
+    restore.type = "button";
+    restore.textContent = uiSource("Restore");
+    restore.setAttribute("aria-label", uiSource("Restore {value1}", { value1: displaySafeText(entry.label) }));
+    restore.addEventListener("click", () => restoreTrashEntry(entry.id));
+    actions.append(restore);
+    item.append(copy, actions);
+    fragment.append(item);
+  });
+  els.trashList.replaceChildren(fragment);
+  els.emptyTrashBtn.disabled = false;
+  return entries;
+}
+
+async function openTrash() {
+  return dialogLifecycleController?.open?.("trash") || false;
+}
+
+async function emptyTrashPermanently() {
+  const entries = await appRuntime.trashRepository.list();
+  if (!entries.length) return false;
+  const confirmed = uiConfirm("Permanently delete every item in Trash? This cannot be undone.");
+  if (!confirmed) return false;
+  await appRuntime.trashRepository.emptyAll();
+  await renderTrashList();
+  setSaveStatus("Trash emptied permanently", "saved");
+  return true;
+}
+
+function showManagedDialog(dialog, initialFocus) {
+  if (!dialog || dialog.open || typeof dialog.showModal !== "function") return false;
+  if (focusController?.showModal) return focusController.showModal(dialog, { initialFocus });
+  dialog.showModal();
+  queueMicrotask(() => initialFocus?.focus?.({ preventScroll: true }));
+  return true;
+}
+
+function syncPanelToggleState(button) {
+  const panel = button?.closest?.("[data-collapsible-panel]");
+  if (!panel) return;
+  const collapsed = panel.classList.contains("collapsed");
+  const existingLabel = String(button.getAttribute("aria-label") || "").trim();
+  const panelLabel = button.dataset.panelLabel || existingLabel.replace(/^(?:Expand|Minimize|Collapse)\s+/i, "") || panel.querySelector("h2, h3")?.textContent || "panel";
+  button.dataset.panelLabel = panelLabel;
+  button.setAttribute("aria-expanded", String(!collapsed));
+  button.setAttribute("aria-label", uiSource(`${collapsed ? "Expand" : "Minimize"} ${panelLabel}`));
+}
+
+function syncAllPanelToggleStates() {
+  document.querySelectorAll("[data-panel-toggle]").forEach(syncPanelToggleState);
 }
 
 function renderFocusMode() {
@@ -1179,6 +1597,10 @@ function renderFocusMode() {
 
 function setFocusMode(enabled) {
   state.focusMode = Boolean(enabled && state.view === "editor" && state.project);
+  applicationStore?.dispatch?.({
+    type: "interface/focus-mode-changed",
+    payload: { enabled: state.focusMode }
+  });
   renderFocusMode();
   document.querySelectorAll(".menu[open]").forEach((menu) => menu.removeAttribute("open"));
   if (!state.project) return;
@@ -1527,6 +1949,45 @@ function setSegmentTargetAndStatus(segment, target, status, reason = "edit") {
   if (reason !== "pretranslate") delete segment.tmPretranslation;
 }
 
+function targetCommandOptionalField(segment, field) {
+  const present = Object.prototype.hasOwnProperty.call(segment, field);
+  return { present, value: present ? structuredClone(segment[field]) : null };
+}
+
+function targetCommandPatch(segment) {
+  return {
+    target: String(segment?.target || ""),
+    status: segment?.status || "empty",
+    targetHistory: structuredClone(Array.isArray(segment?.targetHistory) ? segment.targetHistory : []),
+    revision: Number(segment?.revision || 0),
+    updatedAt: segment?.updatedAt || "",
+    tmPretranslation: targetCommandOptionalField(segment, "tmPretranslation"),
+    aiPretranslation: targetCommandOptionalField(segment, "aiPretranslation"),
+    reviewState: targetCommandOptionalField(segment, "reviewState"),
+    aiApplication: targetCommandOptionalField(segment, "aiApplication")
+  };
+}
+
+function applyTargetCommandOptionalField(segment, field, patch) {
+  if (patch?.present) segment[field] = structuredClone(patch.value);
+  else Reflect.deleteProperty(segment, field);
+}
+
+function applyTargetCommandPatch(segment, patch) {
+  segment.target = String(patch?.target || "");
+  segment.status = patch?.status || (segment.target.trim() ? "draft" : "empty");
+  segment.targetHistory = structuredClone(Array.isArray(patch?.targetHistory) ? patch.targetHistory : []);
+  segment.revision = Number(patch?.revision || 0);
+  segment.updatedAt = patch?.updatedAt || new Date().toISOString();
+  applyTargetCommandOptionalField(segment, "tmPretranslation", patch?.tmPretranslation);
+  applyTargetCommandOptionalField(segment, "aiPretranslation", patch?.aiPretranslation);
+  applyTargetCommandOptionalField(segment, "reviewState", patch?.reviewState);
+  applyTargetCommandOptionalField(segment, "aiApplication", patch?.aiApplication);
+  setHiddenSegmentField(segment, "__historyTarget", segment.target);
+  setHiddenSegmentField(segment, "__historyStatus", segment.status);
+  return segment;
+}
+
 function touchSegment(segment, options = {}) {
   if (!segment) return segment;
   const revision = Number(segment.revision || 0);
@@ -1675,7 +2136,7 @@ function saveOpenAiKey(value, remember) {
   const previousKey = openAiKeySnapshot();
   try {
     restoreOpenAiKeySnapshot({ local: null, session: null });
-    const forcedKeyStorageFailure = state[OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG];
+    const forcedKeyStorageFailure = LOOPCAT_TEST_BUILD && state[OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG];
     if (forcedKeyStorageFailure) throw new Error(typeof forcedKeyStorageFailure === "string" ? forcedKeyStorageFailure : "Simulated OpenAI key storage failure");
     if (!key) return;
     const saved = remember ? writeOpenAiKeyStorage("local", key) : writeOpenAiKeyStorage("session", key);
@@ -1933,6 +2394,27 @@ async function warmOfflineAppShellCache() {
   }
 }
 
+function renderOfflineUpdateState(update) {
+  if (!els.updateReadyBanner) return;
+  const hidden = !update || update.state === "deferred";
+  els.updateReadyBanner.classList.toggle("hidden", hidden);
+  if (hidden) return;
+  const messages = {
+    ready: ["Update ready", "Reload when convenient. LoopCAT will save pending local work first."],
+    saving: ["Saving before update", "Pending segment and workspace changes are being saved locally."],
+    activating: ["Applying update", "The new offline app shell is ready. LoopCAT will reload shortly."],
+    reloading: ["Reloading LoopCAT", "Your saved project and workspace state will be restored."],
+    error: ["Update paused", update.message || "Your current version is still active and your work was preserved."]
+  };
+  const [title, message] = messages[update.state] || messages.ready;
+  els.updateReadyTitle.textContent = uiSource(title);
+  els.updateReadyMessage.textContent = uiSource(message);
+  const busy = ["saving", "activating", "reloading"].includes(update.state);
+  els.reloadUpdateBtn.disabled = busy;
+  els.deferUpdateBtn.disabled = busy;
+  els.reloadUpdateBtn.textContent = update.state === "error" ? uiSource("Try again") : uiSource("Reload now");
+}
+
 function registerOfflineAppShell() {
   if (!("serviceWorker" in navigator)) return;
   if (window.location.protocol === "loopcat:") {
@@ -1944,16 +2426,22 @@ function registerOfflineAppShell() {
     return;
   }
   if (!["http:", "https:"].includes(window.location.protocol)) return;
-  let offlineAppShellHadController = Boolean(navigator.serviceWorker.controller);
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (offlineAppShellHadController) {
-      setSaveStatus("Offline app shell updated. Reload to use the latest files.", "saved");
-    }
-    offlineAppShellHadController = true;
+  offlineUpdateController = appRuntime?.featureFactories?.createUpdateController?.({
+    serviceWorker: navigator.serviceWorker,
+    location: window.location,
+    trustScriptUrl: appRuntime.safeHtml.trustedScriptUrl,
+    beforeActivate: async () => {
+      await flushPendingSegmentSaves();
+      if (state.workspaceStatus?.connected && state.workspaceDirtyProjectIds.size) {
+        await saveWorkspaceRecoveryPackages();
+      }
+    },
+    onStateChange: renderOfflineUpdateState,
+    onError: (error) => setSaveStatus(error?.message || "Offline update failed; current version remains active", "dirty")
   });
-  navigator.serviceWorker.register("./service-worker.js")
+  offlineUpdateController
+    ?.initialize?.("./service-worker.js")
     .then(async (registration) => {
-      await registration.update?.();
       await warmOfflineAppShellCache();
     })
     .catch((error) => {
@@ -2606,28 +3094,38 @@ function languagePairDisplay(sourceLang, targetLang) {
 
 function renderLanguageDatalists() {
   if (els.languageOptions) {
-    els.languageOptions.innerHTML = languageCatalog()
-      .map((item) => `<option value="${escapeHtml(item.label)}"></option>`)
-      .join("");
+    replaceSafeHtml(
+      els.languageOptions,
+      languageCatalog()
+        .map((item) => `<option value="${escapeHtml(item.label)}"></option>`)
+        .join("")
+    );
   }
   if (els.languageCodeOptions) {
-    els.languageCodeOptions.innerHTML = languageCatalog()
-      .map((item) => `<option value="${escapeHtml(item.code)}" label="${escapeHtml(item.name)}"></option>`)
-      .join("");
+    replaceSafeHtml(
+      els.languageCodeOptions,
+      languageCatalog()
+        .map((item) => `<option value="${escapeHtml(item.code)}" label="${escapeHtml(item.name)}"></option>`)
+        .join("")
+    );
   }
   if (els.languageNameOptions) {
-    els.languageNameOptions.innerHTML = languageCatalog()
-      .map((item) => `<option value="${escapeHtml(item.name)}" label="${escapeHtml(item.code)}"></option>`)
-      .join("");
+    replaceSafeHtml(
+      els.languageNameOptions,
+      languageCatalog()
+        .map((item) => `<option value="${escapeHtml(item.name)}" label="${escapeHtml(item.code)}"></option>`)
+        .join("")
+    );
   }
 }
 
 function renderTextEncodingOptions() {
   if (!els.fileEncodingSelect) return;
   const options = window.CatHan.encoding?.TEXT_ENCODING_OPTIONS || [["auto", "Auto"], ["utf-8", "UTF-8"]];
-  els.fileEncodingSelect.innerHTML = options
-    .map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`)
-    .join("");
+  replaceSafeHtml(
+    els.fileEncodingSelect,
+    options.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("")
+  );
   els.fileEncodingSelect.value = "auto";
 }
 
@@ -2654,10 +3152,10 @@ function renderFrequentLanguagePairs() {
     .filter(([source, target], index, values) => source && target && values.findIndex(([a, b]) => a === source && b === target) === index)
     .slice(0, 6);
   const current = projectDialogValues();
-  els.frequentLanguagePairs.innerHTML = pairs.map(([source, target]) => {
+  replaceSafeHtml(els.frequentLanguagePairs, pairs.map(([source, target]) => {
     const active = source === current.sourceLang && target === current.targetLang;
     return `<button type="button" class="${active ? "active" : ""}" data-source-lang="${escapeHtml(source)}" data-target-lang="${escapeHtml(target)}">${escapeHtml(languagePairDisplay(source, target))}</button>`;
-  }).join("");
+  }).join(""));
   els.frequentLanguagePairs.querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
       setLanguageInputValue(document.querySelector("#sourceLangInput"), button.dataset.sourceLang);
@@ -2777,6 +3275,15 @@ function canMergeSegmentStructures(segment, next) {
   return (
     (segment.structure.partPath || "word/document.xml") === (next.structure.partPath || "word/document.xml") &&
     segment.structure.paragraphIndex === next.structure.paragraphIndex
+  );
+}
+
+function nextSegmentForMerge(segment = currentSegment()) {
+  if (!segment) return null;
+  return (
+    state.segments.find(
+      (item) => item.index > segment.index && item.documentId === segment.documentId
+    ) || null
   );
 }
 
@@ -2930,11 +3437,17 @@ function segmentStatusLabel(status) {
 }
 
 function commandList() {
-  return [
+  const commandProjectId = state.commandProjectId || state.project?.id || null;
+  const commands = [
+    { id: "undo", label: "Undo last action", run: undoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canUndo?.(commandProjectId)) },
+    { id: "redo", label: "Redo last action", run: redoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canRedo?.(commandProjectId)) },
+    { id: "trash", label: "Open Trash", run: openTrash, enabled: Boolean(appRuntime?.trashRepository) },
     { id: "confirm", label: "Confirm segment", run: confirmCurrentSegment, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(state.segments.length) },
     { id: "focus-mode", label: state.focusMode ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(state.view === "editor" && state.project) },
     { id: "copy-source", label: "Copy source", run: copySourceToTarget, enabled: Boolean(currentSegment()) },
+    { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: splitCurrentSegment, enabled: Boolean(currentSegment() && canSplitSegmentStructure(currentSegment())) },
+    { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: mergeWithNextSegment, enabled: Boolean(currentSegment() && canMergeSegmentStructures(currentSegment(), nextSegmentForMerge(currentSegment()))) },
     { id: "save-tm", label: "Save segment to TM", run: saveActiveSegmentToTm, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(state.project) },
     { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(state.project) },
@@ -2942,6 +3455,10 @@ function commandList() {
     { id: "next-quality-risk", label: "Next quality risk", run: goToNextQualityRisk, enabled: Boolean(state.project) },
     { id: "concordance", label: "Open concordance", run: openConcordanceSearch, enabled: Boolean(state.project) },
     { id: "replace-target", label: "Find and replace target text", run: openReplacePanel, enabled: Boolean(state.project) },
+    { id: "preset-translate", label: "Use Translate filter preset", group: "Filters", keywords: ["open", "segments", "matches"], run: () => filterPresetController?.applyPreset?.("translate"), enabled: Boolean(state.project) },
+    { id: "preset-review", label: "Use Review filter preset", group: "Filters", keywords: ["needs review", "comments"], run: () => filterPresetController?.applyPreset?.("review"), enabled: Boolean(state.project) },
+    { id: "preset-qa-fixes", label: "Use QA fixes filter preset", group: "Filters", keywords: ["quality", "blocked", "fixes"], run: () => filterPresetController?.applyPreset?.("qa-fixes"), enabled: Boolean(state.project) },
+    { id: "preset-ai-review", label: "Use AI review filter preset", group: "Filters", keywords: ["AI", "risk", "suggestions"], run: () => filterPresetController?.applyPreset?.("ai-review"), enabled: Boolean(state.project) },
     { id: "project-report", label: "Export project report", run: exportProjectReport, enabled: Boolean(state.project) },
     { id: "anonymized-report", label: "Export anonymized report", run: () => exportProjectReport({ anonymized: true }), enabled: Boolean(state.project) },
     { id: "local-ai-pretranslate", label: "Local AI pre-translate", run: pretranslateWithLocalAi, enabled: Boolean(state.project && !state.localAi.running) },
@@ -2962,10 +3479,37 @@ function commandList() {
     { id: "local-ai-project-brief", label: "Generate AI project brief", run: generateProjectBriefWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "openai-ai", label: "Create OpenAI suggestion", run: createOpenAiSuggestion, enabled: Boolean(currentSegment()) }
   ];
+  const shortcuts = {
+    undo: "Ctrl/Cmd+Z",
+    redo: "Ctrl/Cmd+Shift+Z",
+    concordance: "Ctrl/Cmd+Alt+K",
+    "focus-mode": "Ctrl/Cmd+Shift+F"
+  };
+  return commands.map((command) => ({
+    ...command,
+    shortcut: shortcuts[command.id] || "",
+    disabledReason: command.enabled ? "" : "Unavailable in the current context."
+  }));
 }
 
-function clearPendingSave(segment) {
+function finalizePendingEditCommand(segmentId) {
+  if (!segmentId) return null;
+  const recorded = appRuntime?.commands?.editTargetSessions?.finalize?.(segmentId) || null;
+  if (recorded) renderUndoControls();
+  return recorded;
+}
+
+function finalizePendingEditCommands(projectId = "") {
+  const recorded = projectId
+    ? appRuntime?.commands?.editTargetSessions?.finalizeProject?.(projectId) || []
+    : appRuntime?.commands?.editTargetSessions?.finalizeAll?.() || [];
+  if (recorded.length) renderUndoControls();
+  return recorded;
+}
+
+function clearPendingSave(segment, options = {}) {
   if (!segment?.id) return;
+  if (options.finalizeEdit !== false) finalizePendingEditCommand(segment.id);
   const record = state.saveTimers.get(segment.id);
   if (!record) return;
   clearTimeout(record.timer || record);
@@ -2973,6 +3517,7 @@ function clearPendingSave(segment) {
 }
 
 function clearAllPendingSaves() {
+  finalizePendingEditCommands();
   state.saveTimers.forEach((record) => clearTimeout(record.timer || record));
   state.saveTimers.clear();
 }
@@ -2981,10 +3526,11 @@ function queueSegmentSave(segment, delay = 450) {
   if (!segment?.id) return;
   const timer = setTimeout(async () => {
     try {
+      finalizePendingEditCommand(segment.id);
       setSaveStatus("Saving...");
       const record = state.saveTimers.get(segment.id);
       const latest = state.segments.find((item) => item.id === segment.id) || record?.segment || segment;
-      if (latest[AUTOSAVE_SAVE_FAILURE_TEST_FLAG]) {
+      if (LOOPCAT_TEST_BUILD && latest[AUTOSAVE_SAVE_FAILURE_TEST_FLAG]) {
         Reflect.deleteProperty(latest, AUTOSAVE_SAVE_FAILURE_TEST_FLAG);
         throw new Error("Simulated autosave save failure");
       }
@@ -3015,12 +3561,14 @@ function clearPendingDocumentSaves(projectId, documentId) {
   pendingSaveRecords(projectId)
     .filter((record) => record.segment.documentId === documentId)
     .forEach((record) => {
+      finalizePendingEditCommand(record.id);
       clearTimeout(record.timer);
       state.saveTimers.delete(record.id);
     });
 }
 
 async function flushPendingSegmentSaves(projectId = "") {
+  finalizePendingEditCommands(projectId);
   const records = pendingSaveRecords(projectId);
   if (!records.length) return [];
   records.forEach((record) => {
@@ -3029,7 +3577,7 @@ async function flushPendingSegmentSaves(projectId = "") {
   });
   const pendingSegments = records.map((record) => record.segment);
   try {
-    if (pendingSegments.some((segment) => segment[FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG])) {
+    if (LOOPCAT_TEST_BUILD && pendingSegments.some((segment) => segment[FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG])) {
       throw new Error("Simulated pending save flush failure");
     }
     if (pendingSegments.length) await saveSegments(pendingSegments);
@@ -3195,7 +3743,7 @@ function renderWorkspaceStatus() {
       backups: status.backupCount || 0
     })
     : "";
-  els.workspaceHealth.innerHTML = `
+  replaceSafeHtml(els.workspaceHealth, `
     <strong>${escapeHtml(mode)}</strong>
     <span>${status.connected ? escapeHtml(uiT("workspace.status.folderDetail", { name: folderName })) : escapeHtml(folderSupport)}</span>
     <span>${escapeHtml(uiSource(storageDurabilityLine(state.storageDurability)))}</span>
@@ -3204,7 +3752,7 @@ function renderWorkspaceStatus() {
     ${dirtyCount ? `<span class="workspace-warning">${escapeHtml(uiT("workspace.status.dirtyWarning", { count: dirtyCount }))}</span>` : ""}
     ${storageWarnings.map((warning) => `<span class="workspace-warning">${escapeHtml(uiSource(warning))}</span>`).join("")}
     ${(status.warnings || []).length ? `<span class="workspace-warning">${escapeHtml(status.warnings[0])}${status.warnings.length > 1 ? ` (${status.warnings.length} total)` : ""}</span>` : ""}
-  `;
+  `);
   els.chooseWorkspaceBtn.disabled = !status.supported;
   els.saveWorkspaceProjectBtn.disabled = !status.supported || !status.connected || !state.project;
   els.syncWorkspaceBtn.disabled = Boolean(state.importTask) || !status.supported || !status.connected;
@@ -3229,12 +3777,12 @@ function renderWorkspaceRecoveryPanel() {
   els.workspaceRecoveryMessage.textContent = connected
     ? "Your edits are saved in LoopCAT but have not yet been copied to your workspace folder."
     : "Your edits are saved in this browser. Choose your workspace folder to keep a visible recovery copy.";
-  els.workspaceRecoveryList.innerHTML = ids
+  replaceSafeHtml(els.workspaceRecoveryList, ids
     .map((id) => {
       const project = knownProjectById(id);
       return `<li>${displaySafeHtml(project?.name || id)}</li>`;
     })
-    .join("");
+    .join(""));
   els.workspaceRecoverySaveBtn.disabled = !supported || state.workspaceAutosaving;
 }
 
@@ -3417,13 +3965,20 @@ async function loadProjects(selectFirst = false) {
   await refreshProjectSummaries();
   renderProjectList();
   renderEditor();
+  void refreshTrashSummary();
   if (selectFirst && !state.project && state.projects[0]) {
     await openProject(state.projects[0].id);
   }
 }
 
 function setView(view) {
-  state.view = view;
+  const navigation = view === "projects"
+    ? applicationNavigation?.openProjects?.()
+    : view === "resources"
+      ? applicationNavigation?.openResources?.()
+      : applicationNavigation?.syncLegacy?.(applicationNavigationPayload({ view }));
+  if (navigation) applyApplicationNavigation(navigation);
+  else state.view = view;
   if (view !== "editor") state.focusMode = false;
   renderEditor();
   if (view === "projects") refreshProjectSummaries();
@@ -3433,9 +3988,11 @@ function setView(view) {
 function showProjectHome() {
   if (!state.project) return;
   state.focusMode = false;
-  state.view = "project";
   state.documentFilter = "";
   state.activeIndex = state.segments.length ? 0 : -1;
+  const navigation = applicationNavigation?.openProject?.(state.project.id, state.activeIndex);
+  if (navigation) applyApplicationNavigation(navigation);
+  else state.view = "project";
   renderAll();
 }
 
@@ -3529,12 +4086,12 @@ function renderProjectResourcePickers(project = state.project) {
   const main = state.projectDialogMode === "edit" ? mainTmName(project) : "";
   const tmResources = matchingResourceSummaries("tm", sourceLang, targetLang, selectedTmNames);
   const tbResources = matchingResourceSummaries("tb", sourceLang, targetLang, selectedTbNames);
-  els.projectTmResourceList.innerHTML = tmResources.length
+  replaceSafeHtml(els.projectTmResourceList, tmResources.length
     ? tmResources.map((resource) => resourceOptionHtml(resource, "tm", selectedTmNames.includes(resource.name), resource.name === main)).join("")
-    : `<div class="muted">${uiLabelHtml("noMatchingTms")}</div>`;
-  els.projectTbResourceList.innerHTML = tbResources.length
+    : `<div class="muted">${uiLabelHtml("noMatchingTms")}</div>`);
+  replaceSafeHtml(els.projectTbResourceList, tbResources.length
     ? tbResources.map((resource) => resourceOptionHtml(resource, "tb", selectedTbNames.includes(resource.name), false)).join("")
-    : `<div class="muted">${uiLabelHtml("noMatchingTbs")}</div>`;
+    : `<div class="muted">${uiLabelHtml("noMatchingTbs")}</div>`);
   els.projectTmResourceList.querySelectorAll('[data-main-tm]').forEach((radio) => {
     radio.addEventListener("change", () => {
       const name = radio.dataset.mainTm;
@@ -3557,7 +4114,7 @@ async function openProjectDialog(mode = "create") {
   await refreshResources();
   const editing = mode === "edit" && state.project;
   els.projectDialogTitle.textContent = editing ? uiSource("Project settings") : uiSource("New project");
-  els.projectForm.querySelector(".primary").textContent = editing ? uiSource("Save settings") : uiSource("Create");
+  els.projectForm.querySelector("#saveProjectBtn").textContent = editing ? uiSource("Save settings") : uiSource("Create");
   if (els.projectCreatorInput) {
     els.projectCreatorInput.value = editing ? cleanCreatorName(state.project.creatorName) : await suggestedCreatorName();
   }
@@ -3574,7 +4131,15 @@ async function openProjectDialog(mode = "create") {
   renderProjectStorageStatus();
   renderProjectResourcePickers(editing ? state.project : null);
   renderFrequentLanguagePairs();
-  els.projectDialog.showModal();
+  showManagedDialog(els.projectDialog, document.querySelector("#projectNameInput"));
+}
+
+async function openProjectAiSettings() {
+  if (!state.project) return;
+  await openProjectDialog("edit");
+  if (els.projectAdvancedOptions) els.projectAdvancedOptions.open = true;
+  if (els.projectAiOptions) els.projectAiOptions.open = true;
+  requestAnimationFrame(() => els.localAiPresetSelect?.focus());
 }
 
 function collectCheckedResourceNames(type) {
@@ -3685,10 +4250,10 @@ function draftProjectActivityEvent(project, type, summary, detail = {}) {
 
 async function logOptionalProjectActivity(type, summary, detail = {}, label = summary || type) {
   try {
-    if (["export", "resource-export"].includes(type) && state.project?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]) {
+    if (LOOPCAT_TEST_BUILD && ["export", "resource-export"].includes(type) && state.project?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]) {
       throw new Error("Simulated export activity log failure");
     }
-    if (["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || state.project?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
+    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || state.project?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
       throw new Error("Simulated import activity log failure");
     }
     await logProjectActivity(type, summary, detail);
@@ -3702,7 +4267,7 @@ async function logOptionalProjectActivity(type, summary, detail = {}, label = su
 
 async function logOptionalActivityForProject(projectId, type, summary, detail = {}, label = summary || type) {
   try {
-    if (["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || state.project?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
+    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || state.project?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
       throw new Error("Simulated import activity log failure");
     }
     const event = await recordActivityEvent({ projectId, type, summary, detail });
@@ -3754,10 +4319,10 @@ function renderValidationReport(report) {
   state.lastValidationReport = displayReport;
   els.validationReportPanel.classList.toggle("hidden", !displayReport);
   if (!displayReport) return;
-  els.validationReportMeta.innerHTML = `
+  replaceSafeHtml(els.validationReportMeta, `
     <span>${escapeHtml(reportSummary(displayReport))}</span>
     <button class="validation-dismiss" type="button" aria-label="${translatedSourceHtml("Dismiss validation report")}">${translatedSourceHtml("Dismiss")}</button>
-  `;
+  `);
   els.validationReportMeta.querySelector(".validation-dismiss").addEventListener("click", () => renderValidationReport(null));
   const groups = [
     ["errors", uiLabel("errors")],
@@ -3770,7 +4335,7 @@ function renderValidationReport(report) {
   const html = groups
     .flatMap(([key, label]) => (displayReport[key] || []).map((message) => `<div class="validation-item"><strong>${label}</strong>: ${escapeHtml(message)}</div>`))
     .join("");
-  els.validationReportList.innerHTML = html ? `<div class="validation-items">${html}</div>` : `<div class="muted">${translatedSourceHtml("No validation issues.")}</div>`;
+  replaceSafeHtml(els.validationReportList, html ? `<div class="validation-items">${html}</div>` : `<div class="muted">${translatedSourceHtml("No validation issues.")}</div>`);
   if (displayReport.ok) {
     state.validationReportTimer = setTimeout(() => {
       renderValidationReport(null);
@@ -3789,7 +4354,7 @@ async function renderProjectAnalysis() {
   const analysis = analyzeProject(project, segments, tmEntries.filter((entry) => tmNames.has(entry.tmName)));
   const ai = analysis.ai || {};
   els.analysisMeta.textContent = uiLabel("generatedAt", { date: formatDate(analysis.generatedAt) });
-  els.projectAnalysis.innerHTML = `
+  replaceSafeHtml(els.projectAnalysis, `
     <div><strong>${analysis.totals.confirmedPercent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
     <div><strong>${analysis.totals.untranslated}</strong><span>${translatedSourceHtml("empty targets")}</span></div>
     <div><strong>${analysis.totals.repetitions}</strong><span>${uiLabelHtml("repetitions")}</span></div>
@@ -3801,19 +4366,19 @@ async function renderProjectAnalysis() {
     <div><strong>${ai.drafts || 0}</strong><span>${translatedSourceHtml("AI initiated")}</span></div>
     <div><strong>${ai.suggestionSegments || 0}</strong><span>${uiLabelHtml("aiSuggestionRows")}</span></div>
     <div><strong>${ai.highRisk || 0}</strong><span>${uiLabelHtml("highAiRisk")}</span></div>
-  `;
+  `);
 }
 
 function renderProjectList() {
   if (!state.projects.length) {
-    els.projectList.innerHTML = `<div class="muted">${translatedSourceHtml("No projects yet.")}</div>`;
+    replaceSafeHtml(els.projectList, `<div class="muted">${translatedSourceHtml("No projects yet.")}</div>`);
     return;
   }
   const fragment = document.createDocumentFragment();
   state.projects.forEach((project) => {
     const button = document.createElement("button");
     button.className = `project-item ${state.project?.id === project.id ? "active" : ""}`;
-    button.innerHTML = `<strong>${displaySafeHtml(project.name)}</strong><span>${escapeHtml(languagePair(project))}</span><span>${project.sourceFileName ? displaySafeHtml(project.sourceFileName) : uiLabelHtml("noSourceFile")}</span>`;
+    replaceSafeHtml(button, `<strong>${displaySafeHtml(project.name)}</strong><span>${escapeHtml(languagePair(project))}</span><span>${project.sourceFileName ? displaySafeHtml(project.sourceFileName) : uiLabelHtml("noSourceFile")}</span>`);
     button.addEventListener("click", () => openProject(project.id));
     fragment.append(button);
   });
@@ -3823,12 +4388,17 @@ function renderProjectList() {
 async function openProject(projectId) {
   await flushPendingSegmentSaves();
   state.project = state.projects.find((project) => project.id === projectId) || null;
+  state.commandProjectId = state.project?.id || projectId || "";
   state.segments = prepareSegmentHistoryStates(state.project ? await getProjectSegments(projectId) : []);
   state.activityEvents = state.project ? await listActivityEvents(projectId) : [];
   await refreshProjectTerms();
   state.activeIndex = state.segments.length ? 0 : -1;
   state.documentFilter = "";
-  state.view = "project";
+  await filterPresetReady;
+  await filterPresetController?.restoreForProject?.(state.project?.id || projectId);
+  const navigation = applicationNavigation?.openProject?.(state.project?.id || projectId, state.activeIndex);
+  if (navigation) applyApplicationNavigation(navigation);
+  else state.view = "project";
   renderAll();
   if (state.view === "editor") await refreshSidebar();
 }
@@ -3836,9 +4406,16 @@ async function openProject(projectId) {
 async function openProjectFile(documentId) {
   if (!state.project) return;
   state.documentFilter = documentId;
-  state.view = "editor";
   const first = state.segments.findIndex((segment) => segment.documentId === documentId);
   state.activeIndex = first;
+  const navigation = applicationNavigation?.openEditor?.({
+    projectId: state.project.id,
+    documentId,
+    segmentId: state.segments[first]?.id || "",
+    activeIndex: first
+  });
+  if (navigation) applyApplicationNavigation(navigation);
+  else state.view = "editor";
   renderAll();
   await refreshSidebar();
 }
@@ -3932,7 +4509,7 @@ function renderLocalAiModelOptions(settings) {
   if (!els.localAiModelSelect) return;
   const currentModel = settings.model || DEFAULT_LOCAL_AI_MODEL;
   const models = state.localAi.models || [];
-  els.localAiModelSelect.innerHTML = "";
+  els.localAiModelSelect.replaceChildren();
   if (!models.length) {
     const option = document.createElement("option");
     option.value = "";
@@ -4278,7 +4855,7 @@ function localAiProviderCapabilityLabels(settings, provider) {
 
 function renderLocalAiProviderSummary(settings) {
   if (!els.localAiProviderSummary) return;
-  const provider = aiProviderRegistry.get(settings.providerId);
+  const provider = aiProviderService.get(settings.providerId);
   const preset = localAiProviderPresetForSettings(settings);
   const sharesExternally = localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model);
   const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
@@ -4292,7 +4869,7 @@ function renderLocalAiProviderSummary(settings) {
     canPull ? uiLabel("pullSupported") : uiLabel("manualModel"),
     settings.includeNearbyContext !== false ? uiLabel("nearbyContextOn") : uiLabel("nearbyContextOff")
   ];
-  els.localAiProviderSummary.innerHTML = `
+  replaceSafeHtml(els.localAiProviderSummary, `
     <div class="local-ai-provider-summary-head">
       <strong>${displaySafeHtml(preset?.label || provider?.name || settings.providerId || "AI provider")}</strong>
       <span>${displaySafeHtml(settings.model || DEFAULT_LOCAL_AI_MODEL)}</span>
@@ -4307,13 +4884,13 @@ function renderLocalAiProviderSummary(settings) {
       <div><dt>${uiLabelHtml("models")}</dt><dd>${escapeHtml(endpoints.models)}</dd></div>
       <div><dt>${uiLabelHtml("translate")}</dt><dd>${escapeHtml(endpoints.translate)}</dd></div>
     </dl>
-  `;
+  `);
 }
 
 function renderLocalAiProviderControls(settings) {
   renderLocalAiPrivacyNote(settings);
   renderLocalAiProviderSummary(settings);
-  const provider = aiProviderRegistry.get(settings.providerId);
+  const provider = aiProviderService.get(settings.providerId);
   const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
   if (els.localAiPullModelBtn) {
     const canPull = localAiCanPullModel(settings, provider);
@@ -4344,7 +4921,7 @@ function renderLocalAiPresetOptions(settings) {
   if (!els.localAiPresetSelect) return;
   const currentPreset = localAiProviderPresetForSettings(settings);
   const currentValue = currentPreset?.id || "custom";
-  els.localAiPresetSelect.innerHTML = "";
+  els.localAiPresetSelect.replaceChildren();
   const customOption = document.createElement("option");
   customOption.value = "custom";
   customOption.textContent = uiSource("Custom provider");
@@ -4428,6 +5005,15 @@ function renderLocalAiCommandCentre() {
   if (els.localAiExtractTermsBtn) els.localAiExtractTermsBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
   if (els.localAiExtractTermsBatchBtn) els.localAiExtractTermsBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
   if (els.localAiProjectBriefBtn) els.localAiProjectBriefBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
+  const contextualBusy = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
+  if (els.contextualAiTranslateBtn) els.contextualAiTranslateBtn.disabled = state.localAi.running || !state.project || !currentSegment();
+  if (els.contextualAiReviewBtn) els.contextualAiReviewBtn.disabled = contextualBusy;
+  if (els.contextualAiRepairBtn) els.contextualAiRepairBtn.disabled = contextualBusy;
+  if (els.contextualAiPolishBtn) els.contextualAiPolishBtn.disabled = contextualBusy;
+  if (els.contextualAiVariantsBtn) els.contextualAiVariantsBtn.disabled = contextualBusy;
+  if (els.contextualAiApplyTermsBtn) els.contextualAiApplyTermsBtn.disabled = contextualBusy;
+  if (els.contextualOpenAiSuggestionBtn) els.contextualOpenAiSuggestionBtn.disabled = contextualBusy;
+  if (els.contextualAiCancelBtn) els.contextualAiCancelBtn.disabled = !state.localAi.running;
 }
 
 async function persistLocalAiSettings(options = {}) {
@@ -4451,18 +5037,39 @@ async function persistLocalAiSettings(options = {}) {
 }
 
 function renderEditor() {
+  syncLegacyApplicationState();
   const hasProject = Boolean(state.project);
   void syncDesktopSpellcheckLanguage();
   renderWorkspaceStatus();
   renderBackupReminder();
-  els.workspace.classList.toggle("projects-mode", state.view !== "editor");
-  els.sidebar.classList.toggle("hidden", state.view !== "editor");
-  els.projectsView.classList.toggle("hidden", state.view !== "projects");
-  els.resourcesView.classList.toggle("hidden", state.view !== "resources");
-  els.projectHomeView.classList.toggle("hidden", state.view !== "project" || !hasProject);
-  els.emptyState.classList.toggle("hidden", state.view !== "editor" || hasProject);
-  els.editorView.classList.toggle("hidden", state.view !== "editor" || !hasProject);
+  if (verticalFeatureState?.editor) {
+    verticalFeatureState.editor.renderShell({ view: state.view, hasProject, inspectorOpen: state.inspectorOpen });
+    verticalFeatureState.inspector.setVisible(state.view === "editor" && state.inspectorOpen);
+    verticalFeatureState.dashboard.setVisible(state.view === "project" && hasProject);
+    verticalFeatureState.filters.update({
+      documentId: state.documentFilter,
+      query: state.segmentQuery,
+      scope: state.segmentSearchScope,
+      regex: state.segmentRegex,
+      caseSensitive: state.segmentCaseSensitive,
+      status: state.segmentStatusFilter,
+      reviewState: state.reviewStateFilter,
+      aiState: state.aiSegmentFilter
+    });
+  } else {
+    els.workspace.classList.toggle("projects-mode", state.view !== "editor");
+    els.sidebar.classList.toggle("hidden", state.view !== "editor");
+    els.projectsView.classList.toggle("hidden", state.view !== "projects");
+    els.resourcesView.classList.toggle("hidden", state.view !== "resources");
+    els.projectHomeView.classList.toggle("hidden", state.view !== "project" || !hasProject);
+    els.emptyState.classList.toggle("hidden", state.view !== "editor" || hasProject);
+    els.editorView.classList.toggle("hidden", state.view !== "editor" || !hasProject);
+  }
   renderFocusMode();
+  if (els.inspectorToggleBtn) {
+    els.inspectorToggleBtn.setAttribute("aria-expanded", String(state.inspectorOpen));
+    els.inspectorToggleBtn.textContent = state.inspectorOpen ? uiSource("Hide inspector") : uiSource("Show inspector");
+  }
   if (!state.project) return;
 
   const resources = projectResourceSummary();
@@ -4471,7 +5078,7 @@ function renderEditor() {
   els.projectDomainEditInput.value = state.project.domain || "";
   els.domainForm.classList.add("clean");
   els.domainForm.classList.toggle("hidden", Boolean((state.project.domain || "").trim()));
-  els.projectInfo.innerHTML = `
+  replaceSafeHtml(els.projectInfo, `
     <dt>${uiLabelHtml("name")}</dt><dd>${displaySafeHtml(state.project.name)}</dd>
     <dt>${translatedSourceHtml("Creator")}</dt><dd>${displaySafeHtml(state.project.creatorName || uiLabel("notSet"))}</dd>
     <dt>${translatedSourceHtml("Domain")}</dt><dd>${displaySafeHtml(state.project.domain || uiLabel("notSet"))}</dd>
@@ -4484,7 +5091,7 @@ function renderEditor() {
     <dt>${translatedSourceHtml("Documents")}</dt><dd>${projectDocuments().length || 0}</dd>
     <dt>${uiLabelHtml("segmentsTitle")}</dt><dd>${state.segments.length}</dd>
     <dt>${uiLabelHtml("activity")}</dt><dd>${uiLabelHtml("eventCount", { count: state.activityEvents.length })}</dd>
-  `;
+  `);
   const ai = defaultAiSettings(state.project.aiSettings);
   els.aiEnabledInput.checked = Boolean(ai.enabled);
   els.aiProviderInput.value = ai.provider || "";
@@ -4531,15 +5138,15 @@ function renderProjectHome() {
   const resources = projectResourceSummary();
   els.projectHomeTitle.textContent = displaySafeText(state.project.name);
   els.projectHomeMeta.textContent = `${languagePair()} - ${displaySafeText(state.project.domain || uiLabel("noDomain"))} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
-  els.projectHomeStats.innerHTML = `
+  replaceSafeHtml(els.projectHomeStats, `
     <div><strong>${total.percent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
     <div><strong>${documents.length}</strong><span>${uiLabelHtml("files")}</span></div>
     <div><strong>${state.segments.length}</strong><span>${uiLabelHtml("segments")}</span></div>
     <div><strong>${sourceWords}</strong><span>${uiLabelHtml("sourceWords")}</span></div>
-  `;
+  `);
   els.fileCountText.textContent = documents.length ? uiLabel("fileCount", { count: documents.length }) : uiSource("No files imported");
   if (!documents.length) {
-    els.projectFileList.innerHTML = `<div class="empty-file-state">${translatedSourceHtml("Import a DOCX or other format file to start translating this project.")}</div>`;
+    replaceSafeHtml(els.projectFileList, `<div class="empty-file-state">${translatedSourceHtml("Import a DOCX or other format file to start translating this project.")}</div>`);
     return;
   }
   const fragment = document.createDocumentFragment();
@@ -4547,7 +5154,7 @@ function renderProjectHome() {
     const stats = documentStatsById.get(documentInfo.id) || emptyDocumentStats();
     const card = document.createElement("article");
     card.className = "file-card";
-    card.innerHTML = `
+    replaceSafeHtml(card, `
       <header>
         <div>
           <h4>${displaySafeHtml(documentInfo.name)}</h4>
@@ -4564,7 +5171,8 @@ function renderProjectHome() {
         <span>${uiLabelHtml("emptyDraftCount", { empty: stats.empty, draft: stats.draft })}</span>
         <div class="file-card-actions"></div>
       </footer>
-    `;
+    `);
+    card.querySelector(".progress-bar > div").style.width = `${stats.percent}%`;
     const deleteButton = document.createElement("button");
     const fileLabel = displaySafeText(documentInfo.name, uiSource("file"));
     deleteButton.className = "danger-small";
@@ -4622,74 +5230,106 @@ function renderLanguagePairFilter() {
   els.languagePairFilter.value = pairs.includes(current) ? current : "";
 }
 
+function createProjectTile(project) {
+  const tile = document.createElement("article");
+  tile.className = "project-tile";
+  replaceSafeHtml(tile, `
+    <header>
+      <div>
+        <h3>${displaySafeHtml(project.name)}</h3>
+        <p>${displaySafeHtml(project.domain ? `${project.domain} - ${project.sourceFileName || uiLabel("noSourceFileImported")}` : project.sourceFileName || uiLabel("noSourceFileImported"))}</p>
+      </div>
+      <span class="language-badge">${escapeHtml(languagePair(project))}</span>
+    </header>
+    <div class="project-stats">
+      <div><strong>${project.progress.percent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
+      <div><strong>${project.progress.total}</strong><span>${uiLabelHtml("segments")}</span></div>
+      <div><strong>${project.wordCount}</strong><span>${uiLabelHtml("words")}</span></div>
+    </div>
+    <div class="progress-bar"><div style="width:${project.progress.percent}%"></div></div>
+    <footer>
+      <span>${uiLabelHtml("updatedAt", { date: formatDate(project.updatedAt) })}</span>
+    </footer>
+  `);
+  tile.querySelector(".progress-bar > div").style.width = `${project.progress.percent}%`;
+  const deleteButton = document.createElement("button");
+  const projectLabel = displaySafeText(project.name, uiSource("project"));
+  deleteButton.className = "danger-small";
+  deleteButton.type = "button";
+  deleteButton.textContent = uiSource("Delete");
+  deleteButton.setAttribute("aria-label", uiSource("Delete project {value1}", { value1: projectLabel }));
+  deleteButton.addEventListener("click", () => confirmDeleteProject(project.id));
+  const openButton = document.createElement("button");
+  openButton.className = "primary";
+  openButton.type = "button";
+  openButton.textContent = uiSource("Open");
+  openButton.setAttribute("aria-label", uiSource("Open project {value1}", { value1: projectLabel }));
+  openButton.addEventListener("click", () => openProject(project.id));
+  tile.querySelector("footer").append(deleteButton, openButton);
+  return tile;
+}
+
+function projectEmptyState({ hasProjects }) {
+  const empty = document.createElement("div");
+  empty.className = "actionable-empty-state";
+  const heading = document.createElement("h3");
+  const message = document.createElement("p");
+  const action = document.createElement("button");
+  action.type = "button";
+  if (hasProjects) {
+    heading.textContent = uiSource("No matching projects");
+    message.textContent = uiSource("Clear the search and language filters to see every local project.");
+    action.textContent = uiSource("Clear filters");
+    action.addEventListener("click", () => {
+      els.projectSearchInput.value = "";
+      els.languagePairFilter.value = "";
+      renderProjectsView();
+      els.projectSearchInput.focus();
+    });
+  } else {
+    heading.textContent = uiSource("Start your first translation");
+    message.textContent = uiSource("Choose New project above, or bring in an existing LoopCAT project package.");
+    action.textContent = uiSource("Import project package");
+    action.addEventListener("click", () => els.projectPackageImportInput.click());
+  }
+  empty.append(heading, message, action);
+  return empty;
+}
+
 function renderProjectsView() {
   const query = stableLower(els.projectSearchInput.value.trim());
   const pair = els.languagePairFilter.value;
-  if (!state.projectSummaries.length) {
-    els.projectDashboard.innerHTML = `<div class="muted">${translatedSourceHtml("No projects yet. Create one to begin.")}</div>`;
+  const summaries = state.projectSummaries.map((project) => ({
+    ...project,
+    searchText: project.searchText || stableLower(`${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`),
+    languagePairKey: project.languagePairKey || languagePairKey(project)
+  }));
+  if (verticalFeatureState?.projects) {
+    verticalFeatureState.projects.render({
+      projects: summaries,
+      query,
+      languagePair: pair,
+      createItem: createProjectTile,
+      createEmptyState: projectEmptyState
+    });
     return;
   }
-  const summaries = state.projectSummaries.filter((project) => {
-    const searchable = project.searchText || stableLower(`${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`);
-    const projectPair = project.languagePairKey || languagePairKey(project);
-    return (!query || searchable.includes(query)) && (!pair || projectPair === pair);
-  });
-
-  if (!summaries.length) {
-    els.projectDashboard.innerHTML = `<div class="muted">${translatedSourceHtml("No projects match this view.")}</div>`;
-    return;
-  }
-
-  const fragment = document.createDocumentFragment();
-  summaries.forEach((project) => {
-    const tile = document.createElement("article");
-    tile.className = "project-tile";
-    tile.innerHTML = `
-      <header>
-        <div>
-          <h3>${displaySafeHtml(project.name)}</h3>
-          <p>${displaySafeHtml(project.domain ? `${project.domain} - ${project.sourceFileName || uiLabel("noSourceFileImported")}` : project.sourceFileName || uiLabel("noSourceFileImported"))}</p>
-        </div>
-        <span class="language-badge">${escapeHtml(languagePair(project))}</span>
-      </header>
-      <div class="project-stats">
-        <div><strong>${project.progress.percent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
-        <div><strong>${project.progress.total}</strong><span>${uiLabelHtml("segments")}</span></div>
-        <div><strong>${project.wordCount}</strong><span>${uiLabelHtml("words")}</span></div>
-      </div>
-      <div class="progress-bar"><div style="width:${project.progress.percent}%"></div></div>
-      <footer>
-        <span>${uiLabelHtml("updatedAt", { date: formatDate(project.updatedAt) })}</span>
-      </footer>
-    `;
-    const deleteButton = document.createElement("button");
-    const projectLabel = displaySafeText(project.name, uiSource("project"));
-    deleteButton.className = "danger-small";
-    deleteButton.type = "button";
-    deleteButton.textContent = uiSource("Delete");
-    deleteButton.setAttribute("aria-label", uiSource("Delete project {value1}", { value1: projectLabel }));
-    deleteButton.addEventListener("click", () => confirmDeleteProject(project.id));
-    const openButton = document.createElement("button");
-    openButton.className = "primary";
-    openButton.type = "button";
-    openButton.textContent = uiSource("Open");
-    openButton.setAttribute("aria-label", uiSource("Open project {value1}", { value1: projectLabel }));
-    openButton.addEventListener("click", () => openProject(project.id));
-    tile.querySelector("footer").append(deleteButton, openButton);
-    fragment.append(tile);
-  });
-  els.projectDashboard.replaceChildren(fragment);
+  const visible = summaries.filter((project) => (!query || project.searchText.includes(query)) && (!pair || project.languagePairKey === pair));
+  els.projectDashboard.replaceChildren(...(visible.length ? visible.map(createProjectTile) : [projectEmptyState({ hasProjects: summaries.length > 0 })]));
 }
 
 async function confirmDeleteProject(projectId = state.project?.id) {
   const project = state.projects.find((item) => item.id === projectId);
   if (!project) return false;
-  const ok = uiConfirm(`Delete project "${displaySafeText(project.name)}" and all of its files? This cannot be undone.`);
+  const ok = uiConfirm(`Move project "${displaySafeText(project.name)}" and all of its files to Trash?`);
   if (!ok) return false;
   try {
     await flushPendingSegmentSaves(project.id);
-    if (project[PROJECT_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated project delete failure");
-    await deleteProject(project.id);
+    if (LOOPCAT_TEST_BUILD && project[PROJECT_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated project delete failure");
+    const command = appRuntime?.commands?.createDeleteProjectCommand?.({ projectId: project.id });
+    if (!command) throw new Error("The reversible project deletion service is unavailable.");
+    await appRuntime.commands.bus.execute(command);
+    state.commandProjectId = project.id;
     clearWorkspaceDirty(project.id);
     if (state.project?.id === project.id) {
       state.project = null;
@@ -4699,7 +5339,8 @@ async function confirmDeleteProject(projectId = state.project?.id) {
       state.view = "projects";
     }
     await loadProjects(false);
-    setSaveStatus("Project deleted", "saved");
+    setSaveStatus("Project moved to Trash. Undo is available.", "saved");
+    renderUndoControls();
     return true;
   } catch (error) {
     setSaveStatus(error.message || "Project delete failed", "dirty");
@@ -4709,26 +5350,19 @@ async function confirmDeleteProject(projectId = state.project?.id) {
 
 async function confirmDeleteFile(documentInfo) {
   if (!state.project || !documentInfo) return false;
-  const ok = uiConfirm(`Delete file "${displaySafeText(documentInfo.name)}" from this project? This cannot be undone.`);
+  const ok = uiConfirm(`Move file "${displaySafeText(documentInfo.name)}" to Trash?`);
   if (!ok) return false;
   try {
     await flushPendingSegmentSaves(state.project.id);
-    if (documentInfo[FILE_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated file delete failure");
-    const documents = projectDocumentManifest(state.project).filter((item) => item.id !== documentInfo.id);
-    const docxStructures = { ...(state.project.docxStructures || {}) };
-    const localizationStructures = { ...(state.project.localizationStructures || {}) };
-    delete docxStructures[documentInfo.id];
-    delete localizationStructures[documentInfo.id];
-    const remainingSegments = state.segments.filter((segment) => segment.documentId !== documentInfo.id);
-    const sourceFileName = remainingSegments[0]?.documentName || "";
-    const updatedProject = {
-      ...state.project,
-      documents,
-      sourceFileName,
-      docxStructures,
-      localizationStructures
-    };
-    state.project = await deleteProjectDocument(updatedProject, documentInfo.id);
+    if (LOOPCAT_TEST_BUILD && documentInfo[FILE_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated file delete failure");
+    const command = appRuntime?.commands?.createDeleteDocumentCommand?.({
+      project: state.project,
+      documentId: documentInfo.id
+    });
+    if (!command) throw new Error("The reversible file deletion service is unavailable.");
+    const commandResult = await appRuntime.commands.bus.execute(command);
+    state.commandProjectId = state.project.id;
+    state.project = commandResult.result.project;
     state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
     state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
     state.documentFilter = "";
@@ -4736,7 +5370,7 @@ async function confirmDeleteFile(documentInfo) {
     markWorkspaceDirty();
     let fileDeleteActivityFailed = false;
     try {
-      if (documentInfo[FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated file delete activity failure");
+      if (LOOPCAT_TEST_BUILD && documentInfo[FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated file delete activity failure");
       await logProjectActivity("delete-file", "Project file deleted", { documentId: documentInfo.id, fileName: documentInfo.name });
     } catch (activityError) {
       fileDeleteActivityFailed = true;
@@ -4745,7 +5379,8 @@ async function confirmDeleteFile(documentInfo) {
     }
     await refreshProjectSummaries();
     showProjectHome();
-    setSaveStatus(fileDeleteActivityFailed ? "File deleted; activity log failed" : "File deleted", "saved");
+    setSaveStatus(fileDeleteActivityFailed ? "File moved to Trash; activity log failed" : "File moved to Trash. Undo is available.", "saved");
+    renderUndoControls();
     return true;
   } catch (error) {
     setSaveStatus(error.message || "File delete failed", "dirty");
@@ -4774,14 +5409,24 @@ function renderResourceDashboard(type) {
   const dashboard = isTm ? els.tmResourceDashboard : els.tbResourceDashboard;
   const summaries = summarizeResources(isTm ? state.resourceTmEntries : state.resourceTerms, isTm ? "tmName" : "termBaseName");
   if (!summaries.length) {
-    dashboard.innerHTML = `<div class="empty-file-state">${uiLabelHtml(isTm ? "noTranslationMemories" : "noTermbases")}</div>`;
+    const empty = document.createElement("div");
+    empty.className = "empty-file-state actionable-empty-state";
+    const message = document.createElement("p");
+    message.textContent = uiLabel(isTm ? "noTranslationMemories" : "noTermbases");
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = "primary";
+    action.textContent = uiSource(isTm ? "Import a TMX file" : "Import a TBX or term-list file");
+    action.addEventListener("click", () => (isTm ? els.tmxImportInput : els.tbxImportInput).click());
+    empty.append(message, action);
+    dashboard.replaceChildren(empty);
     return;
   }
   const fragment = document.createDocumentFragment();
   summaries.forEach((resource) => {
     const card = document.createElement("article");
     card.className = "resource-card";
-    card.innerHTML = `
+    replaceSafeHtml(card, `
       <header>
         <div>
           <h3>${displaySafeHtml(resource.name)}</h3>
@@ -4798,7 +5443,7 @@ function renderResourceDashboard(type) {
         <span>${uiLabelHtml("updatedAt", { date: formatDate(resource.updatedAt) })}</span>
         <div class="resource-card-actions"></div>
       </footer>
-    `;
+    `);
     const deleteButton = document.createElement("button");
     const resourceLabel = displaySafeText(resource.name, uiSource("resource"));
     deleteButton.className = "danger-small";
@@ -4876,7 +5521,7 @@ function replaceResourceTableRows(table, items, renderRow) {
 
 async function saveEditedTmResourceEntry(entry, values) {
   try {
-    if (entry[RESOURCE_TM_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated TM resource save failure");
+    if (LOOPCAT_TEST_BUILD && entry[RESOURCE_TM_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated TM resource save failure");
     await updateTmEntry({
       ...entry,
       source: values.source,
@@ -4894,7 +5539,7 @@ async function saveEditedTmResourceEntry(entry, values) {
 
 async function saveEditedTermResourceEntry(term, values) {
   try {
-    if (term[RESOURCE_TERM_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated term resource save failure");
+    if (LOOPCAT_TEST_BUILD && term[RESOURCE_TERM_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated term resource save failure");
     await updateTerm({
       ...term,
       sourceTerm: values.sourceTerm,
@@ -4915,7 +5560,7 @@ async function saveEditedTermResourceEntry(term, values) {
 
 async function deleteTmResourceEntry(entry) {
   try {
-    if (entry[RESOURCE_TM_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated TM resource delete failure");
+    if (LOOPCAT_TEST_BUILD && entry[RESOURCE_TM_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated TM resource delete failure");
     await deleteTmEntry(entry.id);
     markProjectsUsingResourceDirty("tm", entry.tmName, entry.sourceLang, entry.targetLang);
     await refreshResources();
@@ -4930,7 +5575,7 @@ async function deleteTmResourceEntry(entry) {
 async function deleteTermResourceEntry(term, options = {}) {
   const { refreshResourceView = true, refreshSuggestions = false } = options;
   try {
-    if (term[RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated term resource delete failure");
+    if (LOOPCAT_TEST_BUILD && term[RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated term resource delete failure");
     await deleteTerm(term.id);
     markProjectsUsingResourceDirty("termbase", term.termBaseName, term.sourceLang, term.targetLang);
     if (refreshResourceView) await refreshResources();
@@ -4952,7 +5597,7 @@ function renderTmResourceDetail() {
   const info = resourceLabelFromKey(state.openResource);
   const entries = resourceItems("tm");
   els.tmResourceDetail.classList.remove("hidden");
-  els.tmResourceDetail.innerHTML = `
+  replaceSafeHtml(els.tmResourceDetail, `
     <div class="resource-detail-header">
       <div>
         <h3>${displaySafeHtml(info.name)}</h3>
@@ -4961,7 +5606,7 @@ function renderTmResourceDetail() {
       <button id="closeTmResourceBtn" type="button">${translatedSourceHtml("Close")}</button>
     </div>
     <div class="resource-table"></div>
-  `;
+  `);
   els.tmResourceDetail.querySelector("#closeTmResourceBtn").addEventListener("click", () => {
     state.openResource = null;
     renderResourcesView();
@@ -4978,7 +5623,7 @@ function renderTbResourceDetail() {
   const info = resourceLabelFromKey(state.openResource);
   const terms = resourceItems("tb");
   els.tbResourceDetail.classList.remove("hidden");
-  els.tbResourceDetail.innerHTML = `
+  replaceSafeHtml(els.tbResourceDetail, `
     <div class="resource-detail-header">
       <div>
         <h3>${displaySafeHtml(info.name)}</h3>
@@ -4987,7 +5632,7 @@ function renderTbResourceDetail() {
       <button id="closeTbResourceBtn" type="button">${translatedSourceHtml("Close")}</button>
     </div>
     <div class="resource-table"></div>
-  `;
+  `);
   els.tbResourceDetail.querySelector("#closeTbResourceBtn").addEventListener("click", () => {
     state.openResource = null;
     renderResourcesView();
@@ -4999,11 +5644,11 @@ function renderTbResourceDetail() {
 function renderTmEntryRow(entry) {
   const row = document.createElement("article");
   row.className = "resource-row";
-  row.innerHTML = `
+  replaceSafeHtml(row, `
     <textarea data-field="source" aria-label="${translatedSourceHtml("Source")}">${escapeHtml(entry.source)}</textarea>
     <textarea data-field="target" aria-label="${translatedSourceHtml("Target")}">${escapeHtml(entry.target)}</textarea>
     <div class="resource-row-actions"></div>
-  `;
+  `);
   const actions = row.querySelector(".resource-row-actions");
   const saveButton = document.createElement("button");
   saveButton.type = "button";
@@ -5029,13 +5674,13 @@ function renderTmEntryRow(entry) {
 function renderTermRow(term) {
   const row = document.createElement("article");
   row.className = "resource-row term-resource-row";
-  row.innerHTML = `
+  replaceSafeHtml(row, `
     <input data-field="sourceTerm" aria-label="${translatedSourceHtml("Source term")}" value="${escapeHtml(term.sourceTerm)}">
     <input data-field="targetTerm" aria-label="${translatedSourceHtml("Target term")}" value="${escapeHtml(term.targetTerm)}">
     <input data-field="notes" aria-label="${translatedSourceHtml("Notes")}" value="${escapeHtml(term.notes || "")}">
     <label class="checkbox-row resource-checkbox"><input data-field="isForbidden" type="checkbox" ${term.isForbidden ? "checked" : ""}>${uiLabelHtml("forbidden")}</label>
     <div class="resource-row-actions"></div>
-  `;
+  `);
   const actions = row.querySelector(".resource-row-actions");
   const saveButton = document.createElement("button");
   saveButton.type = "button";
@@ -5065,7 +5710,7 @@ async function confirmDeleteResource(type, key) {
   const label = type === "tm" ? uiLabel("translationMemory") : uiLabel("termbase");
   if (!window.confirm(uiLabel("deleteResourceConfirm", { type: label, name: displaySafeText(info.name), pair: languagePairDisplay(info.sourceLang, info.targetLang) }))) return false;
   try {
-    if (RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.has(`${type}:${key}`)) throw new Error(`Simulated ${type === "tm" ? "TM" : "termbase"} resource delete failure`);
+    if (LOOPCAT_TEST_BUILD && RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.has(`${type}:${key}`)) throw new Error(`Simulated ${type === "tm" ? "TM" : "termbase"} resource delete failure`);
     const items = resourceItems(type, key);
     const itemIds = items.map((item) => item.id);
     if (type === "tm") await deleteTmEntries(itemIds);
@@ -5248,6 +5893,7 @@ function renderSegmentRow(index) {
   });
   textarea.addEventListener("blur", () => {
     row.querySelector(".target-cell")?.classList.remove("editing");
+    finalizePendingEditCommand(segment.id);
   });
   textarea.addEventListener("input", () => updateSegmentDraft(index, textarea.value));
   textarea.addEventListener("keydown", (event) => handleEditorKeydown(event, index));
@@ -5452,6 +6098,13 @@ async function setActiveSegment(index) {
   if (index === state.activeIndex) return;
   const oldIndex = state.activeIndex;
   state.activeIndex = index;
+  verticalFeatureState?.segmentGrid?.selectSegment(index, state.segments[index]?.id || "");
+  verticalFeatureState?.inspector?.setContext({ segmentId: state.segments[index]?.id || "" });
+  const navigation = applicationNavigation?.selectSegment?.({
+    segmentId: state.segments[index]?.id || "",
+    activeIndex: index
+  });
+  if (navigation) applyApplicationNavigation(navigation);
   renderConfirmBusyState();
   ensureSegmentVisible(index);
   updateRow(oldIndex);
@@ -5479,6 +6132,15 @@ async function goToNextOpenSegment() {
 function updateSegmentDraft(index, target) {
   const segment = state.segments[index];
   if (!segment) return;
+  const editTargetSessions = appRuntime?.commands?.editTargetSessions;
+  if (editTargetSessions && !editTargetSessions.has(segment.id)) {
+    editTargetSessions.begin({
+      projectId: segment.projectId || state.project?.id,
+      segmentId: segment.id,
+      beforePatch: targetCommandPatch(segment),
+      restorePatch: (patch, context) => restoreSegmentEditCommandPatch(segment.id, patch, context)
+    });
+  }
   const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
   const passedFiltersBefore = segmentPassesFilters(segment);
   setSegmentTargetAndStatus(segment, target, target.trim() ? "draft" : "empty", "edit");
@@ -5495,12 +6157,276 @@ function updateSegmentDraft(index, target) {
   renderProgress({ previousStatus, nextStatus: segment.status });
   scheduleRevisionHistoryRender();
   markWorkspaceDirty();
+  editTargetSessions?.capture?.(segment.id, targetCommandPatch(segment), { activeSegmentId: segment.id });
   debounceSave(segment);
 }
 
 function openReplacePanel() {
   els.replaceMenu.open = true;
   els.replaceFindInput.focus();
+}
+
+function prepareCommandRestoreSegmentSnapshot(snapshot, current) {
+  const restored = prepareSegmentHistoryState(structuredClone(snapshot));
+  const currentRevision = Number(current?.revision || 0);
+  const snapshotRevision = Number(restored.revision || 0);
+  restored.revision = Math.max(
+    Number.isFinite(currentRevision) ? currentRevision : 0,
+    Number.isFinite(snapshotRevision) ? snapshotRevision : 0
+  ) + 1;
+  restored.updatedAt = new Date().toISOString();
+  return restored;
+}
+
+async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}) {
+  const index = state.segments.findIndex((item) => item.id === segmentId);
+  if (index < 0) throw new Error("The affected segment is no longer available.");
+  const segment = state.segments[index];
+  const currentPatch = targetCommandPatch(segment);
+  const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
+  try {
+    const restoredPatch = structuredClone(nextPatch);
+    restoredPatch.revision = Math.max(Number(currentPatch.revision || 0), Number(restoredPatch.revision || 0)) + 1;
+    restoredPatch.updatedAt = new Date().toISOString();
+    applyTargetCommandPatch(segment, restoredPatch);
+    clearPendingSave(segment);
+    await saveSegment(segment);
+    state.activeIndex = index;
+    verticalFeatureState?.segmentGrid?.selectSegment(index, segment.id);
+    verticalFeatureState?.inspector?.setContext({ segmentId: segment.id });
+    invalidateSegmentFilterCache();
+    renderSegments({ preserveScroll: true });
+    renderProgress({ previousStatus, nextStatus: segment.status });
+    renderRevisionHistory();
+    await refreshSidebar();
+    markWorkspaceDirty();
+    const selection = options.selection ? normalizedTargetSelection(options.selection, segment.target.length) : null;
+    focusActiveTextarea(selection);
+    return {
+      recoveryToken: segmentId,
+      activeSegmentId: segment.id,
+      focusTarget: Boolean(options.focusTarget || selection),
+      selection
+    };
+  } catch (error) {
+    applyTargetCommandPatch(segment, currentPatch);
+    invalidateSegmentFilterCache();
+    renderSegments({ preserveScroll: true });
+    renderProgress();
+    renderRevisionHistory();
+    throw error;
+  }
+}
+
+async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
+  const segmentIds = Array.isArray(options.segmentIds) ? options.segmentIds : [];
+  const patches = Array.isArray(nextPatches) ? nextPatches : [];
+  if (!segmentIds.length || segmentIds.length !== patches.length) {
+    throw new Error("Batch target restoration requires matching segment IDs and patches.");
+  }
+  const currentById = new Map();
+  const indexes = segmentIds.map((segmentId) => {
+    const index = state.segments.findIndex((segment) => segment.id === segmentId);
+    if (index < 0) throw new Error("An affected pretranslation segment is no longer available.");
+    currentById.set(segmentId, targetCommandPatch(state.segments[index]));
+    return index;
+  });
+  const previousActiveId = currentSegment()?.id || "";
+  try {
+    const restored = patches.map((patch, offset) => {
+      const segment = state.segments[indexes[offset]];
+      const currentPatch = currentById.get(segment.id);
+      const restoredPatch = structuredClone(patch);
+      restoredPatch.revision = Math.max(
+        Number(currentPatch?.revision || 0),
+        Number(restoredPatch.revision || 0)
+      ) + 1;
+      restoredPatch.updatedAt = new Date().toISOString();
+      applyTargetCommandPatch(segment, restoredPatch);
+      clearPendingSave(segment);
+      return segment;
+    });
+    await saveSegments(restored);
+    const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
+    const requestedIndex = state.segments.findIndex((segment) => segment.id === requestedActiveId);
+    if (requestedIndex >= 0) state.activeIndex = requestedIndex;
+    invalidateSegmentFilterCache();
+    markWorkspaceDirty();
+    renderAll();
+    await refreshSidebar();
+    focusActiveTextarea();
+    return {
+      patches: restored.map((segment) => targetCommandPatch(segment)),
+      activeSegmentId: currentSegment()?.id || restored[0]?.id || "",
+      affectedCount: restored.length,
+      focusTarget: true
+    };
+  } catch (error) {
+    currentById.forEach((patch, segmentId) => {
+      const index = state.segments.findIndex((segment) => segment.id === segmentId);
+      if (index >= 0) applyTargetCommandPatch(state.segments[index], patch);
+    });
+    invalidateSegmentFilterCache();
+    renderAll();
+    throw error;
+  }
+}
+
+async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
+  const snapshots = Array.isArray(nextSnapshots) ? nextSnapshots : [];
+  const currentById = new Map();
+  const indexes = [];
+  for (const snapshot of snapshots) {
+    const index = state.segments.findIndex((segment) => segment.id === snapshot?.id);
+    if (index < 0) throw new Error("An affected segment is no longer available.");
+    indexes.push(index);
+    currentById.set(snapshot.id, structuredClone(state.segments[index]));
+  }
+  const previousActiveId = currentSegment()?.id || "";
+  try {
+    const restored = snapshots.map((snapshot, offset) => {
+      const next = prepareCommandRestoreSegmentSnapshot(snapshot, currentById.get(snapshot.id));
+      state.segments[indexes[offset]] = next;
+      clearPendingSave(next);
+      return next;
+    });
+    await saveSegments(restored);
+    const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
+    const requestedIndex = state.segments.findIndex((segment) => segment.id === requestedActiveId);
+    if (requestedIndex >= 0) state.activeIndex = requestedIndex;
+    markWorkspaceDirty();
+    renderAll();
+    await refreshSidebar();
+    focusActiveTextarea();
+    return {
+      snapshots: restored.map((segment) => structuredClone(segment)),
+      activeSegmentId: currentSegment()?.id || restored[0]?.id || ""
+    };
+  } catch (error) {
+    for (const [segmentId, snapshot] of currentById) {
+      const index = state.segments.findIndex((segment) => segment.id === segmentId);
+      if (index >= 0) state.segments[index] = prepareSegmentHistoryState(snapshot);
+    }
+    renderAll();
+    throw error;
+  }
+}
+
+function normalizeStructuralSegmentOrder(segments) {
+  const ordered = segments
+    .map((segment, order) => ({ segment, order }))
+    .sort((left, right) => Number(left.segment.index || 0) - Number(right.segment.index || 0) || left.order - right.order)
+    .map(({ segment }) => segment);
+  const documentCounts = new Map();
+  ordered.forEach((segment, index) => {
+    segment.index = index;
+    const documentIndex = documentCounts.get(segment.documentId) || 0;
+    segment.documentIndex = documentIndex;
+    documentCounts.set(segment.documentId, documentIndex + 1);
+  });
+  return ordered;
+}
+
+async function restoreSplitSegmentCommandSegments(nextSnapshots, options = {}) {
+  if (!state.project?.id) throw new Error("The split segment project is no longer open.");
+  const snapshots = Array.isArray(nextSnapshots) ? nextSnapshots : [];
+  const snapshotIds = new Set();
+  snapshots.forEach((snapshot) => {
+    if (!snapshot?.id || snapshot.projectId !== state.project.id || snapshotIds.has(snapshot.id)) {
+      throw new Error("The split segment snapshot is invalid for the current project.");
+    }
+    snapshotIds.add(snapshot.id);
+  });
+  if (!snapshots.length || !snapshotIds.has(options.originalSegmentId)) {
+    throw new Error("The split segment snapshot does not contain the original segment.");
+  }
+
+  const currentSegments = state.segments.map((segment) => structuredClone(segment));
+  const currentById = new Map(currentSegments.map((segment) => [segment.id, segment]));
+  if (!currentById.has(options.originalSegmentId)) {
+    throw new Error("The original split segment is no longer available.");
+  }
+  const preservedCurrentSegments = currentSegments.filter(
+    (segment) => !snapshotIds.has(segment.id) && segment.id !== options.createdSegmentId
+  );
+  const restored = normalizeStructuralSegmentOrder(
+    [...snapshots, ...preservedCurrentSegments].map((snapshot) =>
+      prepareCommandRestoreSegmentSnapshot(snapshot, currentById.get(snapshot.id))
+    )
+  );
+  const deleteSegmentIds =
+    options.direction === "undo" && currentById.has(options.createdSegmentId) ? [options.createdSegmentId] : [];
+  const savedSegments = await saveSegmentStructure(restored, deleteSegmentIds);
+
+  deleteSegmentIds.forEach((segmentId) => {
+    const record = state.saveTimers.get(segmentId);
+    if (record) clearTimeout(record.timer || record);
+    state.saveTimers.delete(segmentId);
+  });
+  state.segments = prepareSegmentHistoryStates(savedSegments);
+  const requestedIndex = state.segments.findIndex((segment) => segment.id === options.activeSegmentId);
+  state.activeIndex = requestedIndex >= 0 ? requestedIndex : Math.max(0, state.activeIndex);
+  invalidateSegmentFilterCache();
+  markWorkspaceDirty();
+  return {
+    segments: state.segments.map((segment) => structuredClone(segment)),
+    activeSegmentId: currentSegment()?.id || options.activeSegmentId || options.originalSegmentId,
+    affectedCount: 2,
+    focusTarget: true
+  };
+}
+
+async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
+  if (!state.project?.id) throw new Error("The merged segment project is no longer open.");
+  const snapshots = Array.isArray(nextSnapshots) ? nextSnapshots : [];
+  const snapshotIds = new Set();
+  snapshots.forEach((snapshot) => {
+    if (!snapshot?.id || snapshot.projectId !== state.project.id || snapshotIds.has(snapshot.id)) {
+      throw new Error("The merged segment snapshot is invalid for the current project.");
+    }
+    snapshotIds.add(snapshot.id);
+  });
+  if (!snapshots.length || !snapshotIds.has(options.segmentId)) {
+    throw new Error("The merged segment snapshot does not contain the surviving segment.");
+  }
+  const expectsMergedSegment = options.direction === "undo";
+  if (snapshotIds.has(options.mergedSegmentId) !== expectsMergedSegment) {
+    throw new Error("The merged segment snapshot does not match the requested restore direction.");
+  }
+
+  const currentSegments = state.segments.map((segment) => structuredClone(segment));
+  const currentById = new Map(currentSegments.map((segment) => [segment.id, segment]));
+  if (!currentById.has(options.segmentId)) {
+    throw new Error("The surviving merged segment is no longer available.");
+  }
+  const preservedCurrentSegments = currentSegments.filter(
+    (segment) => !snapshotIds.has(segment.id) && segment.id !== options.mergedSegmentId
+  );
+  const restored = normalizeStructuralSegmentOrder(
+    [...snapshots, ...preservedCurrentSegments].map((snapshot) =>
+      prepareCommandRestoreSegmentSnapshot(snapshot, currentById.get(snapshot.id))
+    )
+  );
+  const deleteSegmentIds =
+    options.direction === "redo" && currentById.has(options.mergedSegmentId) ? [options.mergedSegmentId] : [];
+  const savedSegments = await saveSegmentStructure(restored, deleteSegmentIds);
+
+  deleteSegmentIds.forEach((segmentId) => {
+    const record = state.saveTimers.get(segmentId);
+    if (record) clearTimeout(record.timer || record);
+    state.saveTimers.delete(segmentId);
+  });
+  state.segments = prepareSegmentHistoryStates(savedSegments);
+  const requestedIndex = state.segments.findIndex((segment) => segment.id === options.activeSegmentId);
+  state.activeIndex = requestedIndex >= 0 ? requestedIndex : Math.max(0, state.activeIndex);
+  invalidateSegmentFilterCache();
+  markWorkspaceDirty();
+  return {
+    segments: state.segments.map((segment) => structuredClone(segment)),
+    activeSegmentId: currentSegment()?.id || options.activeSegmentId || options.segmentId,
+    affectedCount: 2,
+    focusTarget: true
+  };
 }
 
 async function replaceTargetText(scope = "visible") {
@@ -5540,32 +6466,52 @@ async function replaceTargetText(scope = "visible") {
   const updated = [];
   try {
     await flushPendingSegmentSaves(state.project.id);
-    proposals.forEach(({ segment, text }) => {
-      snapshots.set(segment.id, structuredClone(segment));
-      setSegmentTargetAndStatus(segment, text, text.trim() ? "draft" : "empty", "replace");
-      touchSegment(segment);
-      updated.push(segment);
+    proposals.forEach(({ segment }) => snapshots.set(segment.id, structuredClone(segment)));
+    const command = appRuntime.commands.createReplaceTargetsCommand({
+      projectId: state.project.id,
+      segmentIds: proposals.map(({ segment }) => segment.id),
+      beforeSnapshots: proposals.map(({ segment }) => snapshots.get(segment.id)),
+      restoreSnapshots: (nextSnapshots) =>
+        restoreSegmentCommandSnapshots(nextSnapshots, { activeSegmentId: currentSegment()?.id || "" }),
+      applyFirst: async () => {
+        proposals.forEach(({ segment, text }) => {
+          setSegmentTargetAndStatus(segment, text, text.trim() ? "draft" : "empty", "replace");
+          touchSegment(segment);
+          updated.push(segment);
+        });
+        updated.forEach(clearPendingSave);
+        if (LOOPCAT_TEST_BUILD && updated.some((segment) => segment[REPLACE_SAVE_FAILURE_TEST_FLAG])) {
+          throw new Error("Simulated replace save failure");
+        }
+        await saveSegments(updated);
+        renderSegments({ preserveScroll: true });
+        renderProgress();
+        await refreshSidebar();
+        try {
+          await logProjectActivity("replace-target", "Target text replaced", {
+            scope,
+            segmentCount: updated.length,
+            replacementCount,
+            regex: options.regex,
+            caseSensitive: options.caseSensitive
+          });
+        } catch (activityError) {
+          console.warn("Replace activity log failed.", activityError);
+        }
+        return {
+          snapshots: updated.map((segment) => structuredClone(segment)),
+          activeSegmentId: currentSegment()?.id || updated[0]?.id || ""
+        };
+      }
     });
-    updated.forEach(clearPendingSave);
-    if (updated.some((segment) => segment[REPLACE_SAVE_FAILURE_TEST_FLAG])) throw new Error("Simulated replace save failure");
-    await saveSegments(updated);
-    renderSegments({ preserveScroll: true });
-    renderProgress();
-    await refreshSidebar();
-    try {
-      await logProjectActivity("replace-target", "Target text replaced", {
-        scope,
-        segmentCount: updated.length,
-        replacementCount,
-        regex: options.regex,
-        caseSensitive: options.caseSensitive
-      });
-    } catch (activityError) {
-      console.warn("Replace activity log failed.", activityError);
-    }
+    await appRuntime.commands.bus.execute(command);
+    renderUndoControls();
     const tagIssueCount = updated.filter(hasTagIssue).length;
     const warning = tagIssueCount ? ` ${tagIssueCount} segment${tagIssueCount === 1 ? "" : "s"} still need tag QA.` : "";
-    setSaveStatus(`Replaced ${replacementCount} match${replacementCount === 1 ? "" : "es"} in ${updated.length} target segment${updated.length === 1 ? "" : "s"}.${warning}`, tagIssueCount ? "dirty" : "saved");
+    setSaveStatus(
+      `Replaced ${replacementCount} match${replacementCount === 1 ? "" : "es"} in ${updated.length} target segment${updated.length === 1 ? "" : "s"}.${warning} Undo is available.`,
+      tagIssueCount ? "dirty" : "saved"
+    );
     return { segmentCount: updated.length, replacementCount };
   } catch (error) {
     updated.forEach((segment) => {
@@ -5586,7 +6532,7 @@ async function replaceTargetText(scope = "visible") {
 
 function debounceSave(segment) {
   setSaveStatus("Unsaved changes", "dirty");
-  clearPendingSave(segment);
+  clearPendingSave(segment, { finalizeEdit: false });
   queueSegmentSave(segment);
 }
 
@@ -5594,6 +6540,36 @@ function renderConfirmBusyState() {
   const busy = Boolean(currentSegment()?.id && state.confirmingSegmentIds.has(currentSegment().id));
   els.confirmBtn.disabled = busy;
   els.confirmBtn.setAttribute("aria-busy", String(busy));
+}
+
+async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = {}) {
+  const index = state.segments.findIndex((item) => item.id === segmentId);
+  if (index < 0) throw new Error("The affected segment is no longer available.");
+  const currentSnapshot = structuredClone(state.segments[index]);
+  try {
+    const restored = prepareCommandRestoreSegmentSnapshot(nextSnapshot, currentSnapshot);
+    state.segments[index] = restored;
+    clearPendingSave(restored);
+    await saveSegment(restored);
+    state.activeIndex = index;
+    verticalFeatureState?.segmentGrid?.selectSegment(index, restored.id);
+    verticalFeatureState?.inspector?.setContext({ segmentId: restored.id });
+    const navigation = applicationNavigation?.selectSegment?.({ segmentId: restored.id, activeIndex: index });
+    if (navigation) applyApplicationNavigation(navigation);
+    markWorkspaceDirty();
+    renderAll();
+    await refreshSidebar();
+    if (options.navigateNext) await goToNextOpenSegment();
+    else focusActiveTextarea();
+    return {
+      snapshot: structuredClone(restored),
+      activeSegmentId: currentSegment()?.id || restored.id
+    };
+  } catch (error) {
+    state.segments[index] = prepareSegmentHistoryState(currentSnapshot);
+    renderAll();
+    throw error;
+  }
 }
 
 async function confirmCurrentSegment() {
@@ -5613,52 +6589,78 @@ async function confirmCurrentSegment() {
   const passedFiltersBefore = segmentPassesFilters(segment);
   const previous = structuredClone(segment);
   let savedConfirmedRevision = 0;
+  const warnings = [];
   state.confirmingSegmentIds.add(segment.id);
   renderConfirmBusyState();
   try {
-    recordSegmentTargetHistory(segment, segment.target, "confirmed", "confirm");
-    segment.status = "confirmed";
-    if (segment.reviewState === "needs-review") segment.reviewState = "";
-    touchSegment(segment);
-    clearPendingSave(segment);
-    setSaveStatus("Saving...");
-    if (passedFiltersBefore !== segmentPassesFilters(segment)) renderSegments({ preserveScroll: true });
-    else updateRow(segmentIndex);
-    renderProgress({ previousStatus, nextStatus: segment.status });
-    scheduleRevisionHistoryRender();
-    if (segment[CONFIRM_FAILURE_TEST_FLAG]) throw new Error("Simulated confirm save failure");
-    await saveSegment(segment);
-    savedConfirmedRevision = Number(segment.revision || 0);
-    if (segment[CONFIRM_POST_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated post-save confirm failure");
-    markWorkspaceDirty();
-    const navigation = goToNextOpenSegment().catch((navigationError) => {
-      console.warn("Confirm navigation refresh failed.", navigationError);
-      focusActiveTextarea();
+    const command = appRuntime.commands.createConfirmSegmentCommand({
+      projectId: project.id,
+      segmentId: segment.id,
+      beforeSnapshot: previous,
+      restoreSnapshot: (snapshot, context) =>
+        restoreSegmentCommandSnapshot(segment.id, snapshot, { navigateNext: context.direction === "redo" }),
+      applyFirst: async () => {
+        recordSegmentTargetHistory(segment, segment.target, "confirmed", "confirm");
+        segment.status = "confirmed";
+        if (segment.reviewState === "needs-review") segment.reviewState = "";
+        touchSegment(segment);
+        clearPendingSave(segment);
+        setSaveStatus("Saving...");
+        if (passedFiltersBefore !== segmentPassesFilters(segment)) renderSegments({ preserveScroll: true });
+        else updateRow(segmentIndex);
+        renderProgress({ previousStatus, nextStatus: segment.status });
+        scheduleRevisionHistoryRender();
+        if (LOOPCAT_TEST_BUILD && segment[CONFIRM_FAILURE_TEST_FLAG]) throw new Error("Simulated confirm save failure");
+        await saveSegment(segment);
+        savedConfirmedRevision = Number(segment.revision || 0);
+        if (LOOPCAT_TEST_BUILD && segment[CONFIRM_POST_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated post-save confirm failure");
+        markWorkspaceDirty();
+        const navigation = goToNextOpenSegment().catch((navigationError) => {
+          console.warn("Confirm navigation refresh failed.", navigationError);
+          focusActiveTextarea();
+        });
+        renderConfirmBusyState();
+        const [tmResult, activityResult] = await Promise.all([
+          saveSegmentToTm(segment, project)
+            .then(() => true)
+            .catch((tmError) => {
+              console.warn("Confirm TM save failed.", tmError);
+              return false;
+            }),
+          Promise.resolve()
+            .then(() => {
+              if (LOOPCAT_TEST_BUILD && segment[CONFIRM_ACTIVITY_FAILURE_TEST_FLAG]) {
+                throw new Error("Simulated confirm activity failure");
+              }
+              return logProjectActivity(
+                "confirm-segment",
+                "Segment confirmed",
+                { segmentId: segment.id, documentId: segment.documentId },
+                project
+              );
+            })
+            .then(() => true)
+            .catch((activityError) => {
+              console.warn("Confirm activity log failed.", activityError);
+              return false;
+            }),
+          navigation
+        ]);
+        if (!tmResult) warnings.push("TM save failed");
+        if (!activityResult) warnings.push("activity log failed");
+        return {
+          snapshot: structuredClone(segment),
+          activeSegmentId: currentSegment()?.id || segment.id
+        };
+      }
     });
-    renderConfirmBusyState();
-    const [tmResult, activityResult] = await Promise.all([
-      saveSegmentToTm(segment, project)
-        .then(() => true)
-        .catch((tmError) => {
-          console.warn("Confirm TM save failed.", tmError);
-          return false;
-        }),
-      Promise.resolve()
-        .then(() => {
-          if (segment[CONFIRM_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated confirm activity failure");
-          return logProjectActivity("confirm-segment", "Segment confirmed", { segmentId: segment.id, documentId: segment.documentId }, project);
-        })
-        .then(() => true)
-        .catch((activityError) => {
-          console.warn("Confirm activity log failed.", activityError);
-          return false;
-        }),
-      navigation
-    ]);
-    const warnings = [];
-    if (!tmResult) warnings.push("TM save failed");
-    if (!activityResult) warnings.push("activity log failed");
-    setSaveStatus(warnings.length ? `Saved; ${warnings.join("; ")}` : "Saved", warnings.length ? "dirty" : "saved");
+    await appRuntime.commands.bus.execute(command);
+    renderUndoControls();
+    setSaveStatus(
+      warnings.length ? `Saved; ${warnings.join("; ")}; Undo is available` : "Saved; Undo is available",
+      warnings.length ? "dirty" : "saved"
+    );
+    return true;
   } catch (error) {
     Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
     Object.assign(segment, previous);
@@ -5673,7 +6675,7 @@ async function confirmCurrentSegment() {
         renderProgress();
         renderRevisionHistory();
         focusActiveTextarea();
-        return;
+        return false;
       }
     }
     setSaveStatus(error.message || "Confirm segment failed", "dirty");
@@ -5681,6 +6683,7 @@ async function confirmCurrentSegment() {
     renderProgress();
     renderRevisionHistory();
     focusActiveTextarea();
+    return false;
   } finally {
     state.confirmingSegmentIds.delete(segment.id);
     renderConfirmBusyState();
@@ -5689,7 +6692,7 @@ async function confirmCurrentSegment() {
 
 async function saveSegmentToTm(segment, project = state.project) {
   if (!segment || !project || !segment.source.trim() || !segment.target.trim()) return null;
-  if (segment[SAVE_TM_FAILURE_TEST_FLAG]) throw new Error("Simulated TM save failure");
+      if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG]) throw new Error("Simulated TM save failure");
   const entry = await saveTmEntry({
     source: segment.source,
     target: segment.target,
@@ -5730,7 +6733,7 @@ function requestTmPretranslationThreshold() {
     dialog.addEventListener("close", () => {
       resolve(dialog.returnValue === "apply" ? input.value : null);
     }, { once: true });
-    dialog.showModal();
+    showManagedDialog(dialog, input);
     requestAnimationFrame(() => {
       input.focus();
       input.select();
@@ -5739,24 +6742,31 @@ function requestTmPretranslationThreshold() {
 }
 
 async function pretranslateFromTm() {
-  if (!state.project || state.tmPretranslating) return;
-  const snapshots = new Map();
+  if (!state.project || state.tmPretranslating) return null;
+  const beforePatches = new Map();
+  const beforeSnapshots = new Map();
   const updated = [];
   state.tmPretranslating = true;
   els.pretranslateBtn.disabled = true;
   els.pretranslateBtn.setAttribute("aria-busy", "true");
   try {
     const raw = await requestTmPretranslationThreshold();
-    if (raw === null) return;
+    if (raw === null) return null;
     const threshold = Number(raw);
     if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) {
       setSaveStatus("Enter a match percentage between 0 and 100.", "dirty");
-      return;
+      return null;
     }
-    const candidates = currentDocumentSegments().filter((segment) => !segment.target.trim() && segment.source.trim());
+    const candidates = currentDocumentSegments().filter(
+      (segment) =>
+        !segment.target.trim() &&
+        segment.source.trim() &&
+        segment.status !== "confirmed" &&
+        !preTranslationService.isLockedSegment?.(segment)
+    );
     if (!candidates.length) {
       setSaveStatus("No empty segments to pretranslate.", "saved");
-      return;
+      return null;
     }
     setSaveStatus("Pretranslating...");
     await yieldToUi();
@@ -5786,24 +6796,52 @@ async function pretranslateFromTm() {
     }
     if (!proposals.length) {
       setSaveStatus(`No TM matches at ${threshold}% or higher.`, "saved");
-      return;
+      return null;
     }
-    for (const { segment, match } of proposals) {
-      snapshots.set(segment.id, structuredClone(segment));
-      setSegmentTargetAndStatus(segment, match.target, "draft", "pretranslate");
-      segment.tmPretranslation = {
-        score: Math.max(0, Math.min(100, Math.round(Number(match.score || 0)))),
-        tmName: String(match.tmName || "").trim(),
-        matchId: String(match.id || "").trim(),
-        appliedAt: new Date().toISOString()
-      };
-      touchSegment(segment);
-      updated.push(segment);
-    }
-    if (updated.some((segment) => segment[PRETRANSLATE_SAVE_FAILURE_TEST_FLAG])) {
-      throw new Error("Simulated pretranslation save failure");
-    }
-    await saveSegments(updated);
+    await flushPendingSegmentSaves(state.project.id);
+    const activeSegmentId = currentSegment()?.id || proposals[0].segment.id;
+    proposals.forEach(({ segment }) => {
+      beforePatches.set(segment.id, targetCommandPatch(segment));
+      beforeSnapshots.set(segment.id, structuredClone(segment));
+    });
+    const command = appRuntime.commands.createTmPretranslationCommand({
+      projectId: state.project.id,
+      segmentIds: proposals.map(({ segment }) => segment.id),
+      beforePatches: proposals.map(({ segment }) => beforePatches.get(segment.id)),
+      provenance: {
+        origin: "translation-memory",
+        producer: "pretranslation",
+        threshold,
+        matchCount: proposals.length
+      },
+      restorePatches: (patches, context) =>
+        restoreBatchTargetCommandPatches(patches, { ...context, activeSegmentId }),
+      applyFirst: async () => {
+        for (const { segment, match } of proposals) {
+          setSegmentTargetAndStatus(segment, match.target, "draft", "pretranslate");
+          segment.tmPretranslation = {
+            score: Math.max(0, Math.min(100, Math.round(Number(match.score || 0)))),
+            tmName: String(match.tmName || "").trim(),
+            matchId: String(match.id || "").trim(),
+            appliedAt: new Date().toISOString()
+          };
+          Reflect.deleteProperty(segment, "aiPretranslation");
+          touchSegment(segment);
+          updated.push(segment);
+        }
+        if (LOOPCAT_TEST_BUILD && updated.some((segment) => segment[PRETRANSLATE_SAVE_FAILURE_TEST_FLAG])) {
+          throw new Error("Simulated pretranslation save failure");
+        }
+        await saveSegments(updated);
+        return {
+          patches: updated.map((segment) => targetCommandPatch(segment)),
+          activeSegmentId,
+          affectedCount: updated.length
+        };
+      }
+    });
+    const commandExecution = await appRuntime.commands.bus.execute(command);
+    renderUndoControls();
     try {
       await logProjectActivity("pretranslate", "TM pretranslation applied", { threshold, updatedCount: updated.length });
     } catch (activityError) {
@@ -5811,13 +6849,21 @@ async function pretranslateFromTm() {
     }
     renderSegments({ preserveScroll: true });
     renderProgress();
-    await refreshSidebar();
+    try {
+      await refreshSidebar();
+    } catch (refreshError) {
+      console.warn("TM pretranslation sidebar refresh failed.", refreshError);
+    }
     markWorkspaceDirty();
-    setSaveStatus(`Pretranslated ${updated.length} segment${updated.length === 1 ? "" : "s"} at ${threshold}%+`, "saved");
+    setSaveStatus(
+      `Pretranslated ${updated.length} segment${updated.length === 1 ? "" : "s"} at ${threshold}%+; Undo is available`,
+      "saved"
+    );
+    return commandExecution;
   } catch (error) {
-    updated.forEach((segment) => {
-      const snapshot = snapshots.get(segment.id);
-      if (!snapshot) return;
+    beforeSnapshots.forEach((snapshot, segmentId) => {
+      const segment = state.segments.find((item) => item.id === segmentId);
+      if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
       prepareSegmentHistoryState(segment);
@@ -5827,6 +6873,7 @@ async function pretranslateFromTm() {
     renderRevisionHistory();
     focusActiveTextarea();
     setSaveStatus(error.message || "TM pretranslation failed", "dirty");
+    return null;
   } finally {
     state.tmPretranslating = false;
     els.pretranslateBtn.disabled = false;
@@ -5854,51 +6901,44 @@ function highlightKeyword(text, keyword) {
 
 function closeConcordance() {
   els.concordanceOverlay.classList.add("hidden");
-  els.concordanceResults.innerHTML = "";
+  els.concordanceResults.replaceChildren();
 }
 
 function closeCommandPalette() {
-  els.commandPaletteOverlay.classList.add("hidden");
-  state.commandQuery = "";
-  els.commandPaletteInput.value = "";
+  paletteController?.close?.();
 }
 
 function renderCommandPalette() {
-  const query = stableLower(state.commandQuery);
-  const commands = commandList().filter((command) => {
-    const label = uiSource(command.label);
-    return !query || stableLower(label).includes(query) || stableLower(command.label).includes(query);
-  });
-  if (!commands.length) {
-    els.commandPaletteResults.innerHTML = `<div class="muted">${translatedSourceHtml("No commands match.")}</div>`;
-    return;
-  }
-  const fragment = document.createDocumentFragment();
-  commands.forEach((command) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "command-item";
-    button.disabled = !command.enabled;
-    button.innerHTML = `<span>${escapeHtml(uiSource(command.label))}</span>`;
-    button.addEventListener("click", async () => {
-      if (!command.enabled) return;
-      closeCommandPalette();
-      await command.run();
-    });
-    fragment.append(button);
-  });
-  els.commandPaletteResults.replaceChildren(fragment);
+  paletteController?.render?.();
 }
 
 function openCommandPalette() {
-  renderCommandPalette();
-  els.commandPaletteOverlay.classList.remove("hidden");
-  els.commandPaletteInput.focus();
+  paletteController?.open?.();
 }
 
 function handleGlobalKeydown(event) {
   const key = stableLower(event.key);
+  const editableTarget = event.target?.matches?.("input, textarea, [contenteditable='true']");
+  if ((event.ctrlKey || event.metaKey) && key === "z" && !editableTarget) {
+    const projectId = state.commandProjectId || state.project?.id || null;
+    const canRun = event.shiftKey
+      ? appRuntime?.commands?.bus?.canRedo?.(projectId)
+      : appRuntime?.commands?.bus?.canUndo?.(projectId);
+    if (canRun) {
+      event.preventDefault();
+      event.stopPropagation();
+      void (event.shiftKey ? redoLastCommand() : undoLastCommand());
+      return;
+    }
+  }
   if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "p") {
+    event.preventDefault();
+    event.stopPropagation();
+    openCommandPalette();
+    return;
+  }
+  const isK = key === "k" || event.code === "KeyK";
+  if (isK && (event.ctrlKey || event.metaKey) && !event.altKey) {
     event.preventDefault();
     event.stopPropagation();
     openCommandPalette();
@@ -5910,8 +6950,7 @@ function handleGlobalKeydown(event) {
     toggleFocusMode();
     return;
   }
-  const isK = key === "k" || event.code === "KeyK";
-  const concordanceShortcut = isK && ((event.ctrlKey || event.metaKey) || event.altKey);
+  const concordanceShortcut = isK && (event.ctrlKey || event.metaKey) && event.altKey;
   if (concordanceShortcut && state.view === "editor") {
     event.preventDefault();
     event.stopPropagation();
@@ -5956,22 +6995,25 @@ async function openConcordanceSearch() {
     count: results.length
   });
   if (!results.length) {
-    els.concordanceResults.innerHTML = `<div class="muted">${translatedSourceHtml("No TM units contain this keyword.")}</div>`;
+    replaceSafeHtml(els.concordanceResults, `<div class="muted">${translatedSourceHtml("No TM units contain this keyword.")}</div>`);
   } else {
     const fragment = document.createDocumentFragment();
     results.forEach((entry) => {
       const card = document.createElement("article");
       card.className = "concordance-card";
-      card.innerHTML = `
+      replaceSafeHtml(card, `
         <p class="concordance-source">${highlightKeyword(entry.source, keyword)}</p>
         <p class="concordance-target">${highlightKeyword(entry.target, keyword)}</p>
         <footer><span>${escapeHtml(entry.projectName || entry.tmName || "")}</span></footer>
-      `;
+      `);
       const insertButton = document.createElement("button");
       insertButton.type = "button";
       insertButton.textContent = uiSource("Insert target");
       insertButton.addEventListener("click", () => {
-        insertTarget(entry.target);
+        insertTarget(entry.target, {
+          channel: "concordance",
+          resourceId: entry.id || ""
+        });
         closeConcordance();
       });
       card.querySelector("footer").append(insertButton);
@@ -5982,13 +7024,31 @@ async function openConcordanceSearch() {
   els.concordanceOverlay.classList.remove("hidden");
 }
 
-function focusActiveTextarea() {
+function focusActiveTextarea(selection = null) {
   ensureSegmentVisible(state.activeIndex);
   const textarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
   textarea?.focus();
+  if (textarea && selection) {
+    const normalized = normalizedTargetSelection(selection, textarea.value.length);
+    textarea.setSelectionRange(normalized.start, normalized.end);
+  }
 }
 
 function handleEditorKeydown(event, index) {
+  const key = stableLower(event.key);
+  if ((event.ctrlKey || event.metaKey) && key === "z" && !event.altKey) {
+    finalizePendingEditCommand(state.segments[index]?.id || "");
+    const projectId = state.commandProjectId || state.project?.id || null;
+    const canRun = event.shiftKey
+      ? appRuntime?.commands?.bus?.canRedo?.(projectId)
+      : appRuntime?.commands?.bus?.canUndo?.(projectId);
+    if (canRun) {
+      event.preventDefault();
+      event.stopPropagation();
+      void (event.shiftKey ? redoLastCommand() : undoLastCommand());
+      return;
+    }
+  }
   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
     event.preventDefault();
     confirmCurrentSegment();
@@ -6025,7 +7085,7 @@ function renderReviewPanel() {
     els.reviewStateSelect.value = "";
     els.reviewNoteInput.value = "";
     els.reviewCommentInput.value = "";
-    els.reviewCommentsList.innerHTML = "";
+    els.reviewCommentsList.replaceChildren();
     els.reviewForm.classList.add("empty-review");
     return;
   }
@@ -6034,14 +7094,14 @@ function renderReviewPanel() {
   els.reviewNoteInput.value = segment.reviewNote || "";
   els.reviewCommentInput.value = "";
   const comments = segment.comments || [];
-  els.reviewCommentsList.innerHTML = comments.length
+  replaceSafeHtml(els.reviewCommentsList, comments.length
     ? comments.map((comment) => `
       <article class="comment-card">
         <header><strong>${escapeHtml(uiSource(comment.state || "open"))}</strong><span>${escapeHtml(formatDate(comment.updatedAt || comment.createdAt))}</span></header>
         <div>${escapeHtml(comment.body)}</div>
       </article>
     `).join("")
-    : `<div class="muted">${uiLabelHtml("noStructuredComments")}</div>`;
+    : `<div class="muted">${uiLabelHtml("noStructuredComments")}</div>`);
 }
 
 function qualityProfileFromForm() {
@@ -6187,14 +7247,14 @@ function renderQualityActiveEvidence(queue) {
     `<li>${escapeHtml(qualityCategoryName(reason.category))}: ${escapeHtml(reason.label)}</li>`
   )).join("");
   els.qualityActiveEvidence.classList.remove("muted");
-  els.qualityActiveEvidence.innerHTML = `
+  replaceSafeHtml(els.qualityActiveEvidence, `
     <header>
       <strong>#${escapeHtml(String((evidence?.index ?? state.activeIndex) + 1))}</strong>
       <span>${escapeHtml(qualityRiskLevelLabel(evidence?.level))} ${evidence?.score || 0}</span>
     </header>
     <div class="quality-category-row">${categoryPills}</div>
     ${reasonItems ? `<ul>${reasonItems}</ul>` : `<p class="muted">${uiLabelHtml("noActiveQualitySignals")}</p>`}
-  `;
+  `);
 }
 
 function renderQualityWorkbench() {
@@ -6212,14 +7272,14 @@ function renderQualityWorkbench() {
   state.qualityRiskQueue = queue;
   const profile = defaultQualityProfile(state.project.qualityProfile);
   els.qualitySummary.classList.remove("muted");
-  els.qualitySummary.innerHTML = `
+  replaceSafeHtml(els.qualitySummary, `
     <div class="quality-summary-grid">
       <div><strong>${queue.totalRiskItems}</strong><span>${uiLabelHtml("riskItems")}</span></div>
       <div><strong>${queue.highRiskCount}</strong><span>${uiLabelHtml("highRisk")}</span></div>
       <div><strong>${queue.averageScore}</strong><span>${uiLabelHtml("avgRisk")}</span></div>
     </div>
     <p>${escapeHtml(qualityLabel(profile.standard))} - ${escapeHtml(qualityLabel(profile.reviewDepth))} - ${escapeHtml(qualityLabel(profile.riskTolerance))}</p>
-  `;
+  `);
   renderQualityActiveEvidence(queue);
   if (!queue.items.length) {
     els.qualityRiskList.textContent = uiSource("No unresolved quality risks in this scope.");
@@ -6237,14 +7297,14 @@ function renderQualityWorkbench() {
       .map(([category]) => qualityCategoryName(category))
       .slice(0, 3)
       .join(", ") || qualityCategoryName(item.category);
-    card.innerHTML = `
+    replaceSafeHtml(card, `
       <header>
         <strong>${escapeHtml(qualityRiskLevelLabel(item.level))} ${item.score}</strong>
         <span>#${escapeHtml(item.label)}</span>
       </header>
       <p>${escapeHtml(item.documentName || uiLabel("document"))}</p>
       <p class="muted">${escapeHtml(categoryText)}: ${escapeHtml(reasonText || uiLabel("riskSignalRecorded"))}</p>
-    `;
+    `);
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = uiLabel("go");
@@ -6421,7 +7481,7 @@ function renderRevisionHistory() {
     return;
   }
   els.revisionHistoryList.classList.remove("muted");
-  els.revisionHistoryList.innerHTML = history.slice(0, 8).map((entry) => `
+  replaceSafeHtml(els.revisionHistoryList, history.slice(0, 8).map((entry) => `
     <article class="revision-card">
       <header><strong>${escapeHtml(revisionReasonLabel(entry.reason))}</strong><span>${escapeHtml(formatDateTime(entry.updatedAt || entry.createdAt))}</span></header>
       <div class="revision-status">${escapeHtml(segmentStatusLabel(entry.fromStatus || "empty"))} -> ${escapeHtml(segmentStatusLabel(entry.toStatus || "empty"))}</div>
@@ -6430,7 +7490,7 @@ function renderRevisionHistory() {
         <div><span>${uiLabelHtml("after")}</span><p>${escapeHtml(entry.toTarget || "") || "&nbsp;"}</p></div>
       </div>
     </article>
-  `).join("");
+  `).join(""));
 }
 
 async function saveActiveReviewMetadata() {
@@ -6456,7 +7516,7 @@ async function saveActiveReviewMetadata() {
     }
     touchSegment(segment);
     clearPendingSave(segment);
-    if (segment[REVIEW_METADATA_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated review metadata save failure");
+    if (LOOPCAT_TEST_BUILD && segment[REVIEW_METADATA_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated review metadata save failure");
     await saveSegment(segment);
     try {
       await logProjectActivity("review", "Review metadata saved", { segmentId: segment.id, reviewState: segment.reviewState });
@@ -6483,20 +7543,40 @@ async function setActiveReviewState(reviewState) {
   if (!segment || !els.reviewStateSelect) return;
   const snapshot = structuredClone(segment);
   try {
-    segment.reviewState = segment.reviewState === reviewState ? "" : reviewState;
-    touchSegment(segment);
-    els.reviewStateSelect.value = segment.reviewState;
-    clearPendingSave(segment);
-    if (segment[REVIEW_STATE_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated review state save failure");
-    await saveSegment(segment);
-    try {
-      await logProjectActivity("review", segment.reviewState ? `Marked ${stableLower(reviewLabel(segment.reviewState))}` : "Review state cleared", { segmentId: segment.id, reviewState: segment.reviewState });
-    } catch (activityError) {
-      console.warn("Review activity log failed.", activityError);
-    }
-    updateRow(state.activeIndex);
-    markWorkspaceDirty();
-    setSaveStatus(segment.reviewState ? `Marked ${stableLower(reviewLabel(segment.reviewState))}` : "Review state cleared", "saved");
+    const command = appRuntime.commands.createChangeReviewStateCommand({
+      projectId: state.project.id,
+      segmentId: segment.id,
+      beforeSnapshot: snapshot,
+      restoreSnapshot: (nextSnapshot) => restoreSegmentCommandSnapshot(segment.id, nextSnapshot),
+      applyFirst: async () => {
+        segment.reviewState = segment.reviewState === reviewState ? "" : reviewState;
+        touchSegment(segment);
+        els.reviewStateSelect.value = segment.reviewState;
+        clearPendingSave(segment);
+        if (LOOPCAT_TEST_BUILD && segment[REVIEW_STATE_SAVE_FAILURE_TEST_FLAG]) {
+          throw new Error("Simulated review state save failure");
+        }
+        await saveSegment(segment);
+        try {
+          await logProjectActivity(
+            "review",
+            segment.reviewState ? `Marked ${stableLower(reviewLabel(segment.reviewState))}` : "Review state cleared",
+            { segmentId: segment.id, reviewState: segment.reviewState }
+          );
+        } catch (activityError) {
+          console.warn("Review activity log failed.", activityError);
+        }
+        updateRow(state.activeIndex);
+        markWorkspaceDirty();
+        return { snapshot: structuredClone(segment), activeSegmentId: segment.id };
+      }
+    });
+    await appRuntime.commands.bus.execute(command);
+    renderUndoControls();
+    setSaveStatus(
+      `${segment.reviewState ? `Marked ${stableLower(reviewLabel(segment.reviewState))}` : "Review state cleared"}; Undo is available`,
+      "saved"
+    );
   } catch (error) {
     Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
     Object.assign(segment, snapshot);
@@ -6561,7 +7641,7 @@ function renderQaResults() {
     const card = document.createElement("article");
     card.className = "qa-card";
     const fixHint = qaCheckFixHint(check);
-    card.innerHTML = `<header><strong>${escapeHtml(uiSource(check.type))}</strong><span class="severity-pill ${escapeHtml(check.severity || "info")}">${escapeHtml(uiSource(check.severity || "info"))}</span><span>#${escapeHtml(check.label)}</span></header><p>${escapeHtml(qaCheckMessage(check))}</p>${fixHint ? `<p class="muted">${escapeHtml(fixHint)}</p>` : ""}`;
+    replaceSafeHtml(card, `<header><strong>${escapeHtml(uiSource(check.type))}</strong><span class="severity-pill ${escapeHtml(check.severity || "info")}">${escapeHtml(uiSource(check.severity || "info"))}</span><span>#${escapeHtml(check.label)}</span></header><p>${escapeHtml(qaCheckMessage(check))}</p>${fixHint ? `<p class="muted">${escapeHtml(fixHint)}</p>` : ""}`);
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = uiLabel("go");
@@ -6604,13 +7684,18 @@ async function refreshTmMatches() {
   matches.forEach((match) => {
     const card = document.createElement("article");
     card.className = "match-card";
-    card.innerHTML = `<header><strong>${uiLabelHtml("matchPercent", { score: match.score })}</strong><span>${escapeHtml(match.tmName || "")}</span></header>
+    replaceSafeHtml(card, `<header><strong>${uiLabelHtml("matchPercent", { score: match.score })}</strong><span>${escapeHtml(match.tmName || "")}</span></header>
       <p>${escapeHtml(match.source)}</p>
       <p><strong>${escapeHtml(match.target)}</strong></p>
-      ${match.projectName ? `<p class="muted">${escapeHtml(match.projectName)}</p>` : ""}`;
+      ${match.projectName ? `<p class="muted">${escapeHtml(match.projectName)}</p>` : ""}`);
     const button = document.createElement("button");
     button.textContent = uiLabel("insert");
-    button.addEventListener("click", () => insertTarget(match.target));
+    button.addEventListener("click", () =>
+      insertTarget(match.target, {
+        channel: "match",
+        resourceId: match.id || ""
+      })
+    );
     card.append(button);
     fragment.append(card);
   });
@@ -6642,8 +7727,8 @@ async function refreshTerms() {
   suggestions.forEach((term) => {
     const card = document.createElement("article");
     card.className = `term-card${term.isForbidden ? " forbidden-term-card" : ""}`;
-    card.innerHTML = `<header><strong>${escapeHtml(term.sourceTerm)}</strong><span>${escapeHtml(term.targetTerm)}</span><span>${uiLabelHtml(term.isForbidden ? "forbidden" : "approved")}</span><span>${escapeHtml(term.termBaseName || "")}</span></header>
-      ${term.notes ? `<p>${escapeHtml(term.notes)}</p>` : ""}`;
+    replaceSafeHtml(card, `<header><strong>${escapeHtml(term.sourceTerm)}</strong><span>${escapeHtml(term.targetTerm)}</span><span>${uiLabelHtml(term.isForbidden ? "forbidden" : "approved")}</span><span>${escapeHtml(term.termBaseName || "")}</span></header>
+      ${term.notes ? `<p>${escapeHtml(term.notes)}</p>` : ""}`);
     const button = document.createElement("button");
     button.textContent = uiSource("Delete");
     button.addEventListener("click", async () => {
@@ -6659,7 +7744,7 @@ async function saveTermFromForm() {
   if (!state.project || !els.sourceTermInput.value.trim() || !els.targetTermInput.value.trim()) return null;
   const termBaseName = els.termBaseSelect.value || primaryTermBaseName();
   try {
-    if (els.termForm[TERM_FORM_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated term form save failure");
+    if (LOOPCAT_TEST_BUILD && els.termForm[TERM_FORM_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated term form save failure");
     const term = await saveTerm({
       sourceTerm: els.sourceTermInput.value,
       targetTerm: els.targetTermInput.value,
@@ -6689,7 +7774,7 @@ async function saveTermFromForm() {
 async function runProjectQa() {
   if (!state.project) return null;
   try {
-    if (state.project[QA_RUN_FAILURE_TEST_FLAG]) throw new Error("Simulated QA run failure");
+    if (LOOPCAT_TEST_BUILD && state.project[QA_RUN_FAILURE_TEST_FLAG]) throw new Error("Simulated QA run failure");
     const terms = await listTerms({
       sourceLang: state.project.sourceLang,
       targetLang: state.project.targetLang,
@@ -6709,7 +7794,7 @@ async function runProjectQa() {
     state.qualityRiskQueue = currentQualityRiskQueue(checks);
     renderQualityWorkbench();
     try {
-      if (state.project[QA_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated QA activity log failure");
+    if (LOOPCAT_TEST_BUILD && state.project[QA_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated QA activity log failure");
       await logProjectActivity("qa-run", "QA checks run", { issueCount: checks.length, documentId: state.documentFilter || "" });
     } catch (activityError) {
       console.warn("QA activity log failed.", activityError);
@@ -6723,49 +7808,135 @@ async function runProjectQa() {
   }
 }
 
-function insertTarget(target) {
+function normalizedTargetSelection(selection, targetLength) {
+  if (!selection) return null;
+  const length = Math.max(0, Number(targetLength) || 0);
+  const start = Math.max(0, Math.min(length, Number(selection.start) || 0));
+  const end = Math.max(start, Math.min(length, Number(selection.end) || start));
+  return { start, end };
+}
+
+function activeTargetSelection(segment) {
+  const textarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+  const length = String(segment?.target || "").length;
+  return normalizedTargetSelection(
+    textarea
+      ? { start: textarea.selectionStart ?? length, end: textarea.selectionEnd ?? length }
+      : { start: length, end: length },
+    length
+  );
+}
+
+async function runTargetProducerCommand({
+  createCommand,
+  target,
+  reason,
+  provenance,
+  selection,
+  successMessage
+}) {
   const segment = currentSegment();
-  if (!segment) return;
-  setSegmentTargetAndStatus(segment, target, "draft", "insert-target");
-  touchSegment(segment);
-  markWorkspaceDirty();
-  renderSegments();
-  renderRevisionHistory();
-  debounceSave(segment);
-  focusActiveTextarea();
+  const projectId = state.project?.id || segment?.projectId || "";
+  if (!segment || !projectId || typeof createCommand !== "function") return null;
+
+  finalizePendingEditCommand(segment.id);
+  clearPendingSave(segment, { finalizeEdit: false });
+  const beforePatch = targetCommandPatch(segment);
+  const beforeSelection = activeTargetSelection(segment);
+  const nextTarget = String(target || "");
+  const nextSelection = normalizedTargetSelection(selection, nextTarget.length) || {
+    start: nextTarget.length,
+    end: nextTarget.length
+  };
+  const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
+  const passedFiltersBefore = segmentPassesFilters(segment);
+
+  try {
+    const command = createCommand({
+      projectId,
+      segmentId: segment.id,
+      beforePatch,
+      beforeSelection,
+      provenance,
+      restorePatch: (patch, context) =>
+        restoreSegmentEditCommandPatch(segment.id, patch, { ...context, focusTarget: true }),
+      applyFirst: () => {
+        setSegmentTargetAndStatus(segment, nextTarget, nextTarget.trim() ? "draft" : "empty", reason);
+        touchSegment(segment);
+        const passedFiltersAfter = segmentPassesFilters(segment);
+        if (passedFiltersBefore !== passedFiltersAfter) renderSegments({ preserveScroll: true });
+        else renderSegments();
+        renderProgress({ previousStatus, nextStatus: segment.status });
+        renderRevisionHistory();
+        markWorkspaceDirty();
+        debounceSave(segment);
+        focusActiveTextarea(nextSelection);
+        return {
+          patch: targetCommandPatch(segment),
+          activeSegmentId: segment.id,
+          focusTarget: true,
+          selection: nextSelection
+        };
+      }
+    });
+    const result = await appRuntime.commands.bus.execute(command);
+    renderUndoControls();
+    if (successMessage) setSaveStatus(`${successMessage}; Undo is available`, "dirty");
+    return result;
+  } catch (error) {
+    applyTargetCommandPatch(segment, beforePatch);
+    invalidateSegmentFilterCache();
+    renderSegments({ preserveScroll: true });
+    renderProgress();
+    renderRevisionHistory();
+    focusActiveTextarea(beforeSelection);
+    setSaveStatus(`${error.message || "Target change failed"}; existing work was preserved`, "dirty");
+    return null;
+  }
+}
+
+function insertTarget(target, options = {}) {
+  const channel = options.channel === "concordance" ? "concordance" : "match";
+  return runTargetProducerCommand({
+    createCommand: appRuntime?.commands?.createInsertTmTargetCommand,
+    target,
+    reason: "insert-target",
+    provenance: {
+      origin: "translation-memory",
+      channel,
+      ...(options.resourceId ? { resourceId: String(options.resourceId) } : {})
+    },
+    successMessage: channel === "concordance" ? "Concordance target inserted" : "TM target inserted"
+  });
 }
 
 function copySourceToTarget() {
   const segment = currentSegment();
-  if (!segment) return;
-  setSegmentTargetAndStatus(segment, segment.source, "draft", "copy-source");
-  touchSegment(segment);
-  markWorkspaceDirty();
-  renderSegments();
-  renderProgress();
-  renderRevisionHistory();
-  debounceSave(segment);
-  focusActiveTextarea();
+  if (!segment) return Promise.resolve(null);
+  return runTargetProducerCommand({
+    createCommand: appRuntime?.commands?.createCopySourceToTargetCommand,
+    target: segment.source,
+    reason: "copy-source",
+    provenance: { origin: "user", producer: "copy-source" },
+    successMessage: "Source copied to target"
+  });
 }
 
 function insertTagIntoTarget(tagText) {
   const segment = currentSegment();
-  if (!segment) return;
-  const textarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+  if (!segment) return Promise.resolve(null);
   const current = segment.target || "";
-  const start = textarea?.selectionStart ?? current.length;
-  const end = textarea?.selectionEnd ?? current.length;
-  const nextTarget = `${current.slice(0, start)}${tagText}${current.slice(end)}`;
-  setSegmentTargetAndStatus(segment, nextTarget, "draft", "insert-tag");
-  touchSegment(segment);
-  renderSegments();
-  renderProgress();
-  renderRevisionHistory();
-  debounceSave(segment);
-  focusActiveTextarea();
-  const nextPosition = start + tagText.length;
-  const nextTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
-  nextTextarea?.setSelectionRange(nextPosition, nextPosition);
+  const selected = activeTargetSelection(segment) || { start: current.length, end: current.length };
+  const nextTarget = `${current.slice(0, selected.start)}${tagText}${current.slice(selected.end)}`;
+  const nextPosition = selected.start + String(tagText || "").length;
+  return runTargetProducerCommand({
+    createCommand: appRuntime?.commands?.createInsertProtectedTagCommand,
+    target: nextTarget,
+    reason: "insert-tag",
+    provenance: { origin: "user", producer: "protected-tag" },
+    selection: { start: nextPosition, end: nextPosition },
+    successMessage: "Protected tag inserted"
+  });
 }
 
 async function saveProjectDomainFromForm() {
@@ -6774,7 +7945,7 @@ async function saveProjectDomainFromForm() {
   const previousProjects = state.projects.map((project) => structuredClone(project));
   const domain = els.projectDomainEditInput.value.trim();
   try {
-    if (state.project[PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated project domain save failure");
+    if (LOOPCAT_TEST_BUILD && state.project[PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated project domain save failure");
     state.project = await updateProject({ ...state.project, domain });
     state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
     await refreshProjectSummaries();
@@ -6819,8 +7990,8 @@ async function saveAiSettings() {
   const shouldUpdateLocalAiKey = Boolean(String(localAiKeyInput || "").trim());
   try {
     assertLocalAiEndpointAllowed(localAiSettings);
-    const shouldSimulateActivityFailure = Boolean(state.project[AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG]);
-    if (state.project[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
+  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && state.project[AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG]);
+  if (LOOPCAT_TEST_BUILD && state.project[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
     state.project = await updateProject({ ...state.project, aiSettings });
     projectPersisted = true;
     state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
@@ -6863,19 +8034,68 @@ function renderAiSuggestions() {
     return;
   }
   els.aiSuggestionList.classList.remove("muted");
-  els.aiSuggestionList.innerHTML = suggestions.slice().reverse().slice(0, 4).map((suggestion) => `
-    <article class="ai-suggestion-card">
-      <header><strong>${escapeHtml(suggestion.provider || "AI")}</strong><span>${escapeHtml(suggestion.model || (suggestion.confidence ? `${suggestion.confidence}%` : uiSource("review")))}</span></header>
-      <p>${escapeHtml(suggestion.suggestedTarget || "")}</p>
-      <ul>${(suggestion.explanation || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
-      <footer><button type="button" data-apply-ai-suggestion="${escapeHtml(suggestion.id)}">${uiLabelHtml("applyToTarget")}</button></footer>
-    </article>
-  `).join("");
-  els.aiSuggestionList.querySelectorAll("[data-apply-ai-suggestion]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      await applyAiSuggestion(button.dataset.applyAiSuggestion);
+  const fragment = document.createDocumentFragment();
+  suggestions.slice().reverse().slice(0, 4).forEach((suggestion) => {
+    const card = document.createElement("article");
+    card.className = "ai-suggestion-card";
+    const header = document.createElement("header");
+    const provider = document.createElement("strong");
+    provider.textContent = suggestion.provider || "AI";
+    const model = document.createElement("span");
+    model.textContent = suggestion.model || (suggestion.confidence ? `${suggestion.confidence}%` : uiSource("review"));
+    header.append(provider, model);
+
+    const provenance = document.createElement("p");
+    provenance.className = "ai-suggestion-provenance muted";
+    provenance.textContent = uiSource("{origin} suggestion · {scope} · {date}", {
+      origin: suggestion.origin || suggestion.provider || "AI",
+      scope: suggestion.scope || "active segment",
+      date: formatDateTime(suggestion.createdAt)
     });
+
+    const inspection = document.createElement("details");
+    inspection.className = "ai-suggestion-inspection";
+    const summary = document.createElement("summary");
+    summary.textContent = uiSource("Inspect proposed change");
+    const diff = document.createElement("div");
+    diff.className = "ai-suggestion-diff";
+    const before = document.createElement("div");
+    const beforeLabel = document.createElement("strong");
+    beforeLabel.textContent = uiSource("Current target");
+    const beforeText = document.createElement("p");
+    beforeText.textContent = segment?.target || uiSource("Empty target");
+    before.append(beforeLabel, beforeText);
+    const after = document.createElement("div");
+    const afterLabel = document.createElement("strong");
+    afterLabel.textContent = uiSource("Suggested target");
+    const afterText = document.createElement("p");
+    afterText.textContent = suggestion.suggestedTarget || "";
+    after.append(afterLabel, afterText);
+    diff.append(before, after);
+    inspection.append(summary, diff);
+
+    const explanation = document.createElement("ul");
+    for (const item of suggestion.explanation || []) {
+      const entry = document.createElement("li");
+      entry.textContent = item;
+      explanation.append(entry);
+    }
+
+    const footer = document.createElement("footer");
+    const applyButton = document.createElement("button");
+    applyButton.type = "button";
+    applyButton.textContent = uiLabel("applyToTarget");
+    applyButton.addEventListener("click", () => void applyAiSuggestion(suggestion.id));
+    const applyNextButton = document.createElement("button");
+    applyNextButton.type = "button";
+    applyNextButton.className = "primary";
+    applyNextButton.textContent = uiSource("Apply and next");
+    applyNextButton.addEventListener("click", () => void applyAiSuggestion(suggestion.id, { andNext: true }));
+    footer.append(applyButton, applyNextButton);
+    card.append(header, provenance, inspection, explanation, footer);
+    fragment.append(card);
   });
+  els.aiSuggestionList.replaceChildren(fragment);
 }
 
 async function aiContextForSegment(segment, ai) {
@@ -6909,6 +8129,12 @@ function savedAiSuggestionRecord(suggestion = {}) {
       ? source.explanation.map((item) => redactSensitiveText(item || "").trim()).filter(Boolean).slice(0, 8)
       : [],
     status: redactSensitiveText(source.status || "review").trim() || "review",
+    origin: redactSensitiveText(source.origin || source.provider || "AI").trim() || "AI",
+    scope: redactSensitiveText(source.scope || "active segment").trim() || "active segment",
+    reviewState: redactSensitiveText(source.reviewState || "suggested").trim() || "suggested",
+    contextDisclosure: Array.isArray(source.contextDisclosure)
+      ? source.contextDisclosure.map((item) => redactSensitiveText(item || "").trim()).filter(Boolean).slice(0, 8)
+      : [],
     createdAt: String(source.createdAt || new Date().toISOString()).trim()
   };
 }
@@ -6922,10 +8148,10 @@ async function appendAiSuggestion(segment, suggestion, activityType, activityMes
     segment.aiSuggestions = [...(segment.aiSuggestions || []), safeSuggestion];
     touchSegment(segment);
     clearPendingSave(segment);
-    if (segment[AI_APPEND_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI suggestion save failure");
+    if (LOOPCAT_TEST_BUILD && segment[AI_APPEND_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI suggestion save failure");
     await saveSegment(segment);
     try {
-      if (segment[AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated AI suggestion activity failure");
+      if (LOOPCAT_TEST_BUILD && segment[AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated AI suggestion activity failure");
       await logProjectActivity(activityType, activityMessage, {
         segmentId: segment.id,
         provider: safeSuggestion.provider,
@@ -6951,42 +8177,99 @@ async function appendAiSuggestion(segment, suggestion, activityType, activityMes
   }
 }
 
-async function applyAiSuggestion(suggestionId) {
+async function applyAiSuggestion(suggestionId, options = {}) {
   const segment = currentSegment();
   const suggestion = (segment?.aiSuggestions || []).find((item) => item.id === suggestionId);
-  if (!segment || !suggestion?.suggestedTarget) return;
+  if (!segment || !suggestion?.suggestedTarget) return false;
+  if (segment.locked || segment.status === "confirmed") {
+    setSaveStatus("Confirmed or locked segments must be reopened before applying an AI suggestion", "dirty");
+    return false;
+  }
   try {
     await flushPendingSegmentSaves(state.project.id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before applying AI suggestion failed", "dirty");
     return false;
   }
+
   const snapshot = structuredClone(segment);
+  const segmentId = segment.id;
+  const restoreSnapshot = async (nextSnapshot) => {
+    const index = state.segments.findIndex((item) => item.id === segmentId);
+    if (index < 0) throw new Error("The affected segment is no longer available.");
+    const currentSnapshot = structuredClone(state.segments[index]);
+    try {
+      const restored = prepareCommandRestoreSegmentSnapshot(nextSnapshot, currentSnapshot);
+      state.segments[index] = restored;
+      clearPendingSave(restored);
+      await saveSegment(restored);
+      renderSegments();
+      renderProgress();
+      renderRevisionHistory();
+      renderAiSuggestions();
+      await refreshSidebar();
+      markWorkspaceDirty();
+      return restored;
+    } catch (error) {
+      state.segments[index] = prepareSegmentHistoryState(currentSnapshot);
+      renderAll();
+      throw error;
+    }
+  };
+
   let activityLogged = true;
   try {
-    setSegmentTargetAndStatus(segment, suggestion.suggestedTarget, "draft", "ai-suggestion");
-    touchSegment(segment);
-    clearPendingSave(segment);
-    if (segment[AI_APPLY_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI apply save failure");
-    await saveSegment(segment);
-    try {
-      if (segment[AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated AI suggestion activity failure");
-      await logProjectActivity("ai-apply-suggestion", "AI suggestion applied to target", {
-        segmentId: segment.id,
-        provider: suggestion.provider || "",
-        model: suggestion.model || ""
-      });
-    } catch (activityError) {
-      activityLogged = false;
-      console.warn("AI suggestion activity log failed.", activityError);
-      if (state.project?.id) markWorkspaceDirty(state.project.id);
-    }
-    renderSegments();
-    renderProgress();
-    renderRevisionHistory();
-    await refreshSidebar();
-    markWorkspaceDirty();
-    setSaveStatus(activityLogged ? "AI suggestion applied" : "AI suggestion applied; activity log failed", activityLogged ? "saved" : "dirty");
+    const command = appRuntime.commands.createApplyAiSuggestionCommand({
+      projectId: state.project.id,
+      segmentId,
+      suggestion,
+      beforeSnapshot: snapshot,
+      restoreSnapshot,
+      applyFirst: async () => {
+        setSegmentTargetAndStatus(segment, suggestion.suggestedTarget, "draft", "ai-suggestion");
+        segment.aiApplication = {
+          suggestionId: suggestion.id,
+          origin: suggestion.origin || suggestion.provider || "AI",
+          provider: suggestion.provider || "",
+          model: suggestion.model || "",
+          appliedAt: new Date().toISOString(),
+          reviewState: "needs-review"
+        };
+        segment.reviewState = "needs-review";
+        touchSegment(segment);
+        clearPendingSave(segment);
+        if (LOOPCAT_TEST_BUILD && segment[AI_APPLY_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI apply save failure");
+        await saveSegment(segment);
+        try {
+          if (LOOPCAT_TEST_BUILD && segment[AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated AI suggestion activity failure");
+          await logProjectActivity("ai-apply-suggestion", "AI suggestion applied to target", {
+            segmentId: segment.id,
+            provider: suggestion.provider || "",
+            model: suggestion.model || "",
+            suggestionId: suggestion.id
+          });
+        } catch (activityError) {
+          activityLogged = false;
+          console.warn("AI suggestion activity log failed.", activityError);
+          if (state.project?.id) markWorkspaceDirty(state.project.id);
+        }
+        renderSegments();
+        renderProgress();
+        renderRevisionHistory();
+        await refreshSidebar();
+        markWorkspaceDirty();
+        return { snapshot: structuredClone(segment) };
+      }
+    });
+    await appRuntime.commands.bus.execute(command);
+    renderUndoControls();
+    setSaveStatus(
+      activityLogged
+        ? "AI suggestion applied; Undo is available"
+        : "AI suggestion applied; activity log failed; Undo is available",
+      activityLogged ? "saved" : "dirty"
+    );
+    if (options.andNext) goToNextOpenSegment();
     return true;
   } catch (error) {
     Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
@@ -7054,7 +8337,7 @@ async function createOpenAiSuggestion() {
   const previousOpenAiKey = openAiKeySnapshot();
   let projectPersisted = false;
   try {
-    if (state.project[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
+    if (LOOPCAT_TEST_BUILD && state.project[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
     state.project = await updateProject({ ...state.project, aiSettings });
     projectPersisted = true;
     state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
@@ -7082,7 +8365,7 @@ async function createOpenAiSuggestion() {
 }
 
 function currentLocalAiProvider(settings = localAiSettingsFromForm()) {
-  return aiProviderRegistry.get(settings.providerId);
+  return aiProviderService.get(settings.providerId);
 }
 
 function localAiDesktopBridge() {
@@ -7111,7 +8394,7 @@ function setOpusCatConnectionHelpVisible(visible) {
 function showOpusCatConnectionHelp() {
   setOpusCatConnectionHelpVisible(true);
   if (!els.opusCatHelpDialog || typeof els.opusCatHelpDialog.showModal !== "function" || els.opusCatHelpDialog.open) return;
-  els.opusCatHelpDialog.showModal();
+  showManagedDialog(els.opusCatHelpDialog, els.closeOpusCatHelpBtn);
 }
 
 async function finishLocalAiConnection(settings, provider, result, saveMessage = "AI provider connection works") {
@@ -10058,7 +11341,9 @@ async function pretranslateWithLocalAi() {
     setSaveStatus(selection.skipped.length ? "No eligible segments for local AI pre-translation." : "No segments to pre-translate.", "saved");
     return;
   }
-  const snapshots = new Map(selection.candidates.map((segment) => [segment.id, structuredClone(segment)]));
+  const beforePatches = new Map(selection.candidates.map((segment) => [segment.id, targetCommandPatch(segment)]));
+  const beforeSnapshots = new Map(selection.candidates.map((segment) => [segment.id, structuredClone(segment)]));
+  const activeSegmentId = currentSegment()?.id || selection.candidates[0].id;
   state.localAi.running = true;
   state.localAi.abortController = new AbortController();
   renderLocalAiCommandCentre();
@@ -10091,14 +11376,56 @@ async function pretranslateWithLocalAi() {
     const updated = summary.updatedSegmentIds
       .map((id) => state.segments.find((segment) => segment.id === id))
       .filter(Boolean);
+    if (summary.canceled) {
+      beforePatches.forEach((patch, segmentId) => {
+        const segment = state.segments.find((item) => item.id === segmentId);
+        if (segment) applyTargetCommandPatch(segment, patch);
+      });
+      invalidateSegmentFilterCache();
+      renderAll();
+      setSaveStatus("Local AI pre-translation canceled; no target changes were applied", "saved");
+      return null;
+    }
     updated.forEach((segment) => {
       clearPendingSave(segment);
+      recordSegmentTargetHistory(segment, segment.target, segment.status, "ai-pretranslate");
       touchSegment(segment);
     });
-    if (updated.some((segment) => segment[PRETRANSLATE_SAVE_FAILURE_TEST_FLAG])) {
-      throw new Error("Simulated pretranslation save failure");
+    if (!updated.length) {
+      const failureText = summary.failed ? `; ${summary.failed} failed` : "";
+      const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
+      setSaveStatus(`Local AI pre-translation: no segments updated${failureText}${skippedText}`, summary.failed ? "dirty" : "saved");
+      return null;
     }
-    if (updated.length) await saveSegments(updated);
+    const command = appRuntime.commands.createAiPretranslationCommand({
+      projectId: state.project.id,
+      segmentIds: updated.map((segment) => segment.id),
+      beforePatches: updated.map((segment) => beforePatches.get(segment.id)),
+      provenance: {
+        origin: "ai",
+        producer: "pretranslation",
+        provider: provider.name || settings.providerId,
+        providerId: settings.providerId,
+        model: settings.model,
+        failedCount: summary.failed,
+        skippedCount: summary.skipped
+      },
+      restorePatches: (patches, context) =>
+        restoreBatchTargetCommandPatches(patches, { ...context, activeSegmentId }),
+      applyFirst: async () => {
+        if (LOOPCAT_TEST_BUILD && updated.some((segment) => segment[PRETRANSLATE_SAVE_FAILURE_TEST_FLAG])) {
+          throw new Error("Simulated pretranslation save failure");
+        }
+        await saveSegments(updated);
+        return {
+          patches: updated.map((segment) => targetCommandPatch(segment)),
+          activeSegmentId,
+          affectedCount: updated.length
+        };
+      }
+    });
+    const commandExecution = await appRuntime.commands.bus.execute(command);
+    renderUndoControls();
     try {
       await logProjectActivity("ai-pretranslate", "Local AI pretranslation applied", {
         provider: provider.name || settings.providerId,
@@ -10111,26 +11438,36 @@ async function pretranslateWithLocalAi() {
     } catch (activityError) {
       console.warn("Local AI pretranslation activity log failed.", activityError);
     }
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
-    renderAll();
-    await refreshSidebar();
+    try {
+      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      renderAll();
+      await refreshSidebar();
+    } catch (refreshError) {
+      console.warn("Local AI pretranslation refresh failed.", refreshError);
+      renderAll();
+    }
     markWorkspaceDirty();
     const failureText = summary.failed ? `; ${summary.failed} failed` : "";
     const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
-    const canceledText = summary.canceled ? " canceled" : "";
-    setSaveStatus(`Local AI pre-translation${canceledText}: ${updated.length} segment${updated.length === 1 ? "" : "s"} updated${failureText}${skippedText}`, summary.failed ? "dirty" : "saved");
+    setSaveStatus(
+      `Local AI pre-translation: ${updated.length} segment${updated.length === 1 ? "" : "s"} updated${failureText}${skippedText}; Undo is available`,
+      summary.failed ? "dirty" : "saved"
+    );
+    return { ...commandExecution, summary };
   } catch (error) {
-    snapshots.forEach((snapshot, id) => {
-      const segment = state.segments.find((item) => item.id === id);
+    beforeSnapshots.forEach((snapshot, segmentId) => {
+      const segment = state.segments.find((item) => item.id === segmentId);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
       prepareSegmentHistoryState(segment);
     });
+    invalidateSegmentFilterCache();
     renderSegments();
     renderProgress();
     renderRevisionHistory();
     setSaveStatus(error.message || "Local AI pre-translation failed", "dirty");
+    return null;
   } finally {
     state.localAi.running = false;
     state.localAi.abortController = null;
@@ -10168,10 +11505,10 @@ function confirmExternalAiPromptShare({ provider, includesSourceText, contextLab
 async function splitCurrentSegment() {
   const segment = currentSegment();
   const textarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
-  if (!segment || !textarea) return;
+  if (!segment || !textarea) return null;
   if (!canSplitSegmentStructure(segment)) {
     setSaveStatus("Split is unavailable for structure-preserving localization files.", "dirty");
-    return;
+    return null;
   }
   const source = segment.source || "";
   const target = segment.target || "";
@@ -10179,11 +11516,11 @@ async function splitCurrentSegment() {
   const sourceCursor = mappedSourceSplitIndex(source, target, targetCursor);
   if (sourceCursor <= 0 || sourceCursor >= source.length) {
     setSaveStatus("Place the cursor in the target/source-equivalent position before splitting.", "dirty");
-    return;
+    return null;
   }
   const firstSource = source.slice(0, sourceCursor).trim();
   const secondSource = source.slice(sourceCursor).trim();
-  if (!firstSource || !secondSource) return;
+  if (!firstSource || !secondSource) return null;
   const targetSplit = target.trim() ? Math.min(targetCursor, target.length) : 0;
   const firstTarget = target.slice(0, targetSplit).trim();
   const secondTarget = target.slice(targetSplit).trim();
@@ -10191,133 +11528,163 @@ async function splitCurrentSegment() {
     await flushPendingSegmentSaves(state.project.id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before splitting failed", "dirty");
-    return;
+    return null;
   }
-  const previousSegments = state.segments.map((item) => structuredClone(item));
-  const previousActiveId = segment.id;
-  let newSegment = null;
-  let savedSplit = false;
-  try {
-    newSegment = {
-      ...segment,
-      id: `segment-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`,
-      index: segment.index + 0.5,
-      documentIndex: (segment.documentIndex || 0) + 0.5,
-      source: secondSource,
-      target: secondTarget,
-      status: secondTarget ? "draft" : "empty",
-      tags: detectProtectedTags(secondSource),
-      revision: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    segment.source = firstSource;
-    setSegmentTargetAndStatus(segment, firstTarget, firstTarget ? "draft" : "empty", "split");
-    segment.tags = detectProtectedTags(firstSource);
-    touchSegment(segment);
-    clearPendingSave(segment);
-    const ordered = [...state.segments, newSegment].sort((a, b) => a.index - b.index);
-    ordered.forEach((item, index) => {
-      item.index = index;
-      if (item.documentId === segment.documentId) item.documentIndex = ordered.filter((candidate) => candidate.documentId === item.documentId && candidate.index <= item.index).length - 1;
-    });
-    if (segment[SPLIT_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated split save failure");
-    await saveSegments(ordered);
-    savedSplit = true;
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
-    state.activeIndex = state.segments.findIndex((item) => item.id === newSegment.id);
-    renderAll();
-    markWorkspaceDirty();
-    setSaveStatus("Segment split", "saved");
-    focusActiveTextarea();
-  } catch (error) {
-    let restoredSegments = previousSegments;
-    if (savedSplit && newSegment) {
-      try {
-        await deleteSegment(newSegment.id);
-        const rollbackSegments = previousSegments.map((item) => ({
-          ...item,
-          revision: Number(item.revision || 0) + 2,
-          updatedAt: new Date().toISOString()
-        }));
-        await saveSegments(rollbackSegments);
-        restoredSegments = rollbackSegments;
-      } catch (rollbackError) {
-        setSaveStatus(`${error.message || "Segment split failed"}; rollback save failed: ${rollbackError.message || rollbackError}`, "dirty");
-        return;
+  const beforeSegments = state.segments.map((item) => structuredClone(item));
+  const createdSegmentId = `segment-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
+  const createdAt = new Date().toISOString();
+  const command = appRuntime?.commands?.createSplitSegmentCommand?.({
+    projectId: state.project.id,
+    segmentId: segment.id,
+    createdSegmentId,
+    beforeSegments,
+    restoreSegments: restoreSplitSegmentCommandSegments,
+    applyFirst: async () => {
+      const nextSegments = beforeSegments.map((item) => structuredClone(item));
+      const firstSegment = nextSegments.find((item) => item.id === segment.id);
+      if (!firstSegment) throw new Error("The segment to split is no longer available.");
+      const secondSegment = {
+        ...structuredClone(firstSegment),
+        id: createdSegmentId,
+        index: Number(firstSegment.index || 0) + 0.5,
+        documentIndex: Number(firstSegment.documentIndex || 0) + 0.5,
+        source: secondSource,
+        target: secondTarget,
+        status: secondTarget ? "draft" : "empty",
+        tags: detectProtectedTags(secondSource),
+        revision: 1,
+        createdAt,
+        updatedAt: createdAt
+      };
+      firstSegment.source = firstSource;
+      setSegmentTargetAndStatus(firstSegment, firstTarget, firstTarget ? "draft" : "empty", "split");
+      firstSegment.tags = detectProtectedTags(firstSource);
+      touchSegment(firstSegment);
+      const ordered = normalizeStructuralSegmentOrder([...nextSegments, secondSegment]);
+      if (LOOPCAT_TEST_BUILD && segment[SPLIT_SAVE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated split save failure");
       }
+      const savedSegments = await saveSegmentStructure(ordered);
+      state.segments = prepareSegmentHistoryStates(savedSegments);
+      state.activeIndex = state.segments.findIndex((item) => item.id === createdSegmentId);
+      invalidateSegmentFilterCache();
+      markWorkspaceDirty();
+      return {
+        segments: state.segments.map((item) => structuredClone(item)),
+        activeSegmentId: createdSegmentId,
+        affectedCount: 2,
+        focusTarget: true
+      };
     }
-    state.segments = prepareSegmentHistoryStates(restoredSegments);
-    state.activeIndex = Math.max(0, state.segments.findIndex((item) => item.id === previousActiveId));
+  });
+  if (!command) {
+    setSaveStatus("The reversible segment split service is unavailable.", "dirty");
+    return null;
+  }
+
+  let commandExecution;
+  try {
+    commandExecution = await appRuntime.commands.bus.execute(command);
+  } catch (error) {
+    state.segments = prepareSegmentHistoryStates(beforeSegments);
+    state.activeIndex = Math.max(0, state.segments.findIndex((item) => item.id === segment.id));
+    invalidateSegmentFilterCache();
     renderAll();
     focusActiveTextarea();
     setSaveStatus(error.message || "Segment split failed", "dirty");
+    return null;
   }
+  state.commandProjectId = state.project.id;
+  renderAll();
+  renderUndoControls();
+  setSaveStatus("Segment split; Undo is available", "saved");
+  focusActiveTextarea();
+  return commandExecution;
 }
 
 async function mergeWithNextSegment() {
   const segment = currentSegment();
-  if (!segment) return;
-  const next = state.segments.find((item) => item.index > segment.index && item.documentId === segment.documentId);
-  if (!next) return;
+  if (!segment) return null;
+  const next = nextSegmentForMerge(segment);
+  if (!next) return null;
   if (!canMergeSegmentStructures(segment, next)) {
     setSaveStatus("Merge is available only for unstructured text or DOCX segments from the same paragraph.", "dirty");
-    return;
+    return null;
   }
   try {
     await flushPendingSegmentSaves(state.project.id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before merging failed", "dirty");
-    return;
+    return null;
   }
-  const previousSegments = state.segments.map((item) => structuredClone(item));
-  const previousActiveId = segment.id;
-  let persistedMerge = false;
-  try {
-    segment.source = `${segment.source} ${next.source}`.trim();
-    const mergedTarget = `${segment.target || ""} ${next.target || ""}`.trim();
-    setSegmentTargetAndStatus(segment, mergedTarget, mergedTarget ? "draft" : "empty", "merge");
-    segment.tags = detectProtectedTags(segment.source);
-    touchSegment(segment);
-    clearPendingSave(segment);
-    clearPendingSave(next);
-    await saveSegment(segment);
-    persistedMerge = true;
-    await deleteSegment(next.id);
-    if (segment[MERGE_POST_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated merge post-delete failure");
-    const remaining = (await getProjectSegments(state.project.id)).sort((a, b) => a.index - b.index);
-    remaining.forEach((item, index) => {
-      item.index = index;
-    });
-    await saveSegments(remaining);
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
-    state.activeIndex = state.segments.findIndex((item) => item.id === segment.id);
-    renderAll();
-    markWorkspaceDirty();
-    setSaveStatus("Segments merged", "saved");
-    focusActiveTextarea();
-  } catch (error) {
-    let restoredSegments = previousSegments;
-    if (persistedMerge) {
-      try {
-        const rollbackSegments = previousSegments.map((item) => ({
-          ...item,
-          revision: Number(item.revision || 0) + 2,
-          updatedAt: new Date().toISOString()
-        }));
-        await saveSegments(rollbackSegments);
-        restoredSegments = rollbackSegments;
-      } catch (rollbackError) {
-        setSaveStatus(`${error.message || "Segment merge failed"}; rollback save failed: ${rollbackError.message || rollbackError}`, "dirty");
-        return;
+  const beforeSegments = state.segments.map((item) => structuredClone(item));
+  const segmentId = segment.id;
+  const mergedSegmentId = next.id;
+  const command = appRuntime?.commands?.createMergeSegmentCommand?.({
+    projectId: state.project.id,
+    segmentId,
+    mergedSegmentId,
+    beforeSegments,
+    restoreSegments: restoreMergeSegmentCommandSegments,
+    applyFirst: async () => {
+      const nextSegments = beforeSegments.map((item) => structuredClone(item));
+      const survivingSegment = nextSegments.find((item) => item.id === segmentId);
+      const mergedSegment = nextSegments.find((item) => item.id === mergedSegmentId);
+      if (!survivingSegment || !mergedSegment || !canMergeSegmentStructures(survivingSegment, mergedSegment)) {
+        throw new Error("The segments to merge are no longer available in a compatible structure.");
       }
+      survivingSegment.source = `${survivingSegment.source} ${mergedSegment.source}`.trim();
+      const mergedTarget = `${survivingSegment.target || ""} ${mergedSegment.target || ""}`.trim();
+      setSegmentTargetAndStatus(
+        survivingSegment,
+        mergedTarget,
+        mergedTarget ? "draft" : "empty",
+        "merge"
+      );
+      survivingSegment.tags = detectProtectedTags(survivingSegment.source);
+      touchSegment(survivingSegment);
+      const ordered = normalizeStructuralSegmentOrder(
+        nextSegments.filter((item) => item.id !== mergedSegmentId)
+      );
+      if (LOOPCAT_TEST_BUILD && segment[MERGE_POST_DELETE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated merge transaction failure");
+      }
+      const savedSegments = await saveSegmentStructure(ordered, [mergedSegmentId]);
+      state.segments = prepareSegmentHistoryStates(savedSegments);
+      state.activeIndex = state.segments.findIndex((item) => item.id === segmentId);
+      invalidateSegmentFilterCache();
+      markWorkspaceDirty();
+      return {
+        segments: state.segments.map((item) => structuredClone(item)),
+        activeSegmentId: segmentId,
+        affectedCount: 2,
+        focusTarget: true
+      };
     }
-    state.segments = prepareSegmentHistoryStates(restoredSegments);
-    state.activeIndex = Math.max(0, state.segments.findIndex((item) => item.id === previousActiveId));
+  });
+  if (!command) {
+    setSaveStatus("The reversible segment merge service is unavailable.", "dirty");
+    return null;
+  }
+
+  let commandExecution;
+  try {
+    commandExecution = await appRuntime.commands.bus.execute(command);
+  } catch (error) {
+    state.segments = prepareSegmentHistoryStates(beforeSegments);
+    state.activeIndex = Math.max(0, state.segments.findIndex((item) => item.id === segmentId));
+    invalidateSegmentFilterCache();
     renderAll();
     focusActiveTextarea();
     setSaveStatus(error.message || "Segment merge failed", "dirty");
+    return null;
   }
+  state.commandProjectId = state.project.id;
+  renderAll();
+  renderUndoControls();
+  setSaveStatus("Segments merged; Undo is available", "saved");
+  focusActiveTextarea();
+  return commandExecution;
 }
 
 async function importDocx(file) {
@@ -10612,7 +11979,7 @@ async function buildProjectPackage(project = state.project, segmentRecords = nul
     app: APP_NAME,
     type: "project-package",
     version: 1,
-    schemaVersion: storageConstants?.SCHEMA_VERSION || 4,
+    schemaVersion: storageConstants.PROJECT_PACKAGE_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
     packageMetadata: {
       format: "loopcat-project-package",
@@ -10708,7 +12075,7 @@ async function exportProjectPackage() {
     ].slice(-25)
   };
   const activityDetail = { filename, warningCount: warnings };
-  const shouldSimulateActivityFailure = Boolean(state.project?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]);
+  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && state.project?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]);
   const pendingActivityEvent = shouldSimulateActivityFailure
     ? null
     : draftProjectActivityEvent(state.project, "export", "Project package exported", activityDetail);
@@ -10903,7 +12270,7 @@ async function saveCurrentProjectPackageToWorkspace() {
   if (!state.workspaceStatus?.connected) return;
   const previewPackage = await buildProjectPackage(state.project);
   assertValidProjectPackageForWrite(previewPackage, "save project package to workspace");
-  const shouldSimulateActivityFailure = Boolean(state[WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG]);
+  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && state[WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG]);
   const pendingActivityEvent = shouldSimulateActivityFailure
     ? null
     : draftProjectActivityEvent(state.project, "workspace-save", "Project package saved to workspace folder");
@@ -11045,7 +12412,7 @@ async function saveProjectFromDialog() {
     markWorkspaceDirty();
     let activityLogged = true;
     try {
-      if (els.projectForm[PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated project settings activity failure");
+      if (LOOPCAT_TEST_BUILD && els.projectForm[PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated project settings activity failure");
       await logProjectActivity("project-settings", "Project resource settings updated", {
         mainTmName: mainTmName(),
         creatorName,
@@ -11083,7 +12450,7 @@ async function saveProjectFromDialog() {
   els.projectDialog.close();
   let activityLogged = true;
   try {
-    if (els.projectForm[CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated project creation activity failure");
+      if (LOOPCAT_TEST_BUILD && els.projectForm[CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated project creation activity failure");
     await recordActivityEvent({ projectId: project.id, type: "create-project", summary: "Project created" });
   } catch (activityError) {
     activityLogged = false;
@@ -11649,7 +13016,7 @@ async function exportQualityPassport() {
     renderQualityWorkbench();
     renderValidationReport(data.validation);
     const base = fileSafeName(state.project.name || "project");
-    download(`${base}_quality-passport.html`, qualityPassportHtml(data), "text/html");
+    download(`${base}_quality-passport.html`, finalizeReportDocument(qualityPassportHtml(data)), "text/html");
     const activityLogged = await logOptionalProjectActivity("export", "Quality Passport exported", {
       segmentCount: data.analysis.totals.segments,
       wordCount: data.analysis.totals.words,
@@ -11675,7 +13042,11 @@ async function exportProjectReport(options = {}) {
     renderQaResults();
     renderValidationReport(data.validation);
     const base = fileSafeName(state.project.name || "project");
-    download(`${base}_${anonymized ? "anonymized-" : ""}project-report.html`, projectReportHtml(data, { anonymized }), "text/html");
+    download(
+      `${base}_${anonymized ? "anonymized-" : ""}project-report.html`,
+      finalizeReportDocument(projectReportHtml(data, { anonymized })),
+      "text/html"
+    );
     const label = anonymized ? "Anonymized report" : "Project report";
     const activityLogged = await logOptionalProjectActivity("export", anonymized ? "Anonymized project report exported" : "Project report exported", {
       segmentCount: data.analysis.totals.segments,
@@ -12151,8 +13522,11 @@ async function handleResourceTermListImport(file) {
 }
 
 function wireEvents() {
+  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "rendering language datalists";
   renderLanguageDatalists();
+  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "rendering text encodings";
   renderTextEncodingOptions();
+  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "attaching event listeners";
   document.querySelectorAll(".menu").forEach((menu) => {
     menu.addEventListener("toggle", () => {
       if (!menu.open) return;
@@ -12183,15 +13557,19 @@ function wireEvents() {
   });
   els.projectsViewBtn.addEventListener("click", () => setView("projects"));
   els.resourcesViewBtn.addEventListener("click", () => setView("resources"));
-  els.aboutBtn.addEventListener("click", () => els.aboutDialog.showModal());
-  els.closeAboutBtn.addEventListener("click", () => els.aboutDialog.close());
+  els.emptyTrashBtn?.addEventListener("click", emptyTrashPermanently);
+  els.undoBtn?.addEventListener("click", undoLastCommand);
+  els.redoBtn?.addEventListener("click", redoLastCommand);
+  els.reloadUpdateBtn?.addEventListener("click", () => void offlineUpdateController?.activate?.());
+  els.deferUpdateBtn?.addEventListener("click", () => offlineUpdateController?.defer?.());
   els.localAiOpusCatHelpBtn?.addEventListener("click", showOpusCatConnectionHelp);
   els.closeOpusCatHelpBtn?.addEventListener("click", () => els.opusCatHelpDialog?.close());
   els.retryOpusCatConnectionBtn?.addEventListener("click", async () => {
     els.opusCatHelpDialog?.close();
     await testLocalAiConnection();
   });
-  els.uiLocaleSelect?.addEventListener("change", () => {
+  els.uiLocaleSelect?.addEventListener("change", async () => {
+    await appRuntime.localeLoader.ensure(els.uiLocaleSelect.value);
     uiI18n?.setLocale?.(els.uiLocaleSelect.value);
     refreshLocalizedUi();
   });
@@ -12267,19 +13645,23 @@ function wireEvents() {
   els.projectHomeDeleteBtn.addEventListener("click", () => confirmDeleteProject());
   els.focusModeBtn?.addEventListener("click", toggleFocusMode);
   els.exitFocusModeBtn?.addEventListener("click", () => setFocusMode(false));
+  els.inspectorToggleBtn?.addEventListener("click", () => {
+    state.inspectorOpen = !state.inspectorOpen;
+    void workspaceLayoutController?.setInspectorOpen?.(state.inspectorOpen);
+    renderEditor();
+    if (state.inspectorOpen) {
+      requestAnimationFrame(() => document.querySelector("[data-inspector-tab][aria-selected='true']")?.focus());
+    } else {
+      els.inspectorToggleBtn.focus();
+    }
+  });
   els.commandPaletteBtn.addEventListener("click", openCommandPalette);
-  els.closeCommandPaletteBtn.addEventListener("click", closeCommandPalette);
-  els.commandPaletteOverlay.addEventListener("click", (event) => {
-    if (event.target === els.commandPaletteOverlay) closeCommandPalette();
-  });
-  els.commandPaletteInput.addEventListener("input", () => {
-    state.commandQuery = els.commandPaletteInput.value.trim();
-    renderCommandPalette();
-  });
   els.newProjectBtn.addEventListener("click", () => openProjectDialog("create"));
   els.projectSettingsBtn.addEventListener("click", () => openProjectDialog("edit"));
   els.editorProjectSettingsBtn.addEventListener("click", () => openProjectDialog("edit"));
+  els.openProjectAiSettingsBtn?.addEventListener("click", openProjectAiSettings);
   els.projectSearchInput.addEventListener("input", renderProjectsView);
+  els.projectsImportProjectBtn?.addEventListener("click", () => els.projectPackageImportInput.click());
   els.languagePairFilter.addEventListener("change", renderProjectsView);
   els.cancelProjectBtn.addEventListener("click", () => els.projectDialog.close());
   const sourceLangInput = document.querySelector("#sourceLangInput");
@@ -12309,6 +13691,12 @@ function wireEvents() {
   els.projectForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     await saveProjectFromDialog();
+  });
+  els.aiSettingsForm?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+      // Provider fields live inside the project form, but Enter should not save the project implicitly.
+      event.preventDefault();
+    }
   });
 
   els.docxInput.addEventListener("change", async () => {
@@ -12358,13 +13746,17 @@ function wireEvents() {
   els.mergeNextBtn.addEventListener("click", mergeWithNextSegment);
   els.runQaBtn.addEventListener("click", runProjectQa);
   document.querySelectorAll("[data-panel-toggle]").forEach((button) => {
+    syncPanelToggleState(button);
     button.addEventListener("click", () => {
       const panel = button.closest("[data-collapsible-panel]");
       if (!panel) return;
-      const collapsed = panel.classList.toggle("collapsed");
-      button.setAttribute("aria-expanded", String(!collapsed));
-      const title = panel.querySelector("h2, h3")?.textContent || "panel";
-      button.setAttribute("aria-label", `${collapsed ? "Expand" : "Minimize"} ${title}`);
+      if (panel.dataset.inspectorSection) {
+        state.inspectorOpen = true;
+        void workspaceLayoutController?.setInspectorOpen?.(true);
+        verticalFeatureState?.inspector?.setContext({ tab: panel.dataset.inspectorSection });
+      }
+      panel.classList.toggle("collapsed");
+      syncPanelToggleState(button);
     });
   });
   els.documentFilter.addEventListener("change", async () => {
@@ -12401,18 +13793,21 @@ function wireEvents() {
   els.replaceVisibleBtn.addEventListener("click", () => replaceTargetText("visible"));
   els.replaceAllBtn.addEventListener("click", () => replaceTargetText("all"));
   els.segmentStatusFilter.addEventListener("change", async () => {
+    filterPresetController?.markCustom?.();
     state.segmentStatusFilter = els.segmentStatusFilter.value;
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
   els.reviewStateFilter?.addEventListener("change", async () => {
+    filterPresetController?.markCustom?.();
     state.reviewStateFilter = els.reviewStateFilter.value;
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
   els.aiSegmentFilter?.addEventListener("change", async () => {
+    filterPresetController?.markCustom?.();
     state.aiSegmentFilter = els.aiSegmentFilter.value;
     renderSegments();
     const first = firstVisibleSegmentIndex();
@@ -12443,10 +13838,18 @@ function wireEvents() {
   els.refreshQualityRiskBtn?.addEventListener("click", refreshQualityRiskQueue);
   els.nextQualityRiskBtn?.addEventListener("click", goToNextQualityRisk);
   els.exportQualityPassportBtn?.addEventListener("click", exportQualityPassport);
-  els.aiSettingsForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await saveAiSettings();
+  els.saveAiSettingsBtn?.addEventListener("click", saveAiSettings);
+  els.contextualAiTranslateBtn?.addEventListener("click", () => {
+    if (els.localAiModeSelect) els.localAiModeSelect.value = "selected";
+    void pretranslateWithLocalAi();
   });
+  els.contextualAiReviewBtn?.addEventListener("click", reviewActiveSegmentWithLocalAi);
+  els.contextualAiRepairBtn?.addEventListener("click", repairActiveSegmentTagsWithLocalAi);
+  els.contextualAiPolishBtn?.addEventListener("click", polishActiveSegmentDraftWithLocalAi);
+  els.contextualAiVariantsBtn?.addEventListener("click", suggestActiveSegmentVariantsWithLocalAi);
+  els.contextualAiApplyTermsBtn?.addEventListener("click", applyActiveSegmentTerminologyWithLocalAi);
+  els.contextualOpenAiSuggestionBtn?.addEventListener("click", createOpenAiSuggestion);
+  els.contextualAiCancelBtn?.addEventListener("click", cancelLocalAiBatch);
   els.openAiSuggestionBtn.addEventListener("click", createOpenAiSuggestion);
   els.localAiPresetSelect?.addEventListener("change", () => {
     if (els.localAiPresetSelect.value !== "custom") {
@@ -12457,7 +13860,7 @@ function wireEvents() {
     renderLocalAiPromptPreview();
   });
   els.localAiProviderSelect?.addEventListener("change", () => {
-    const provider = aiProviderRegistry.get(els.localAiProviderSelect.value);
+    const provider = aiProviderService.get(els.localAiProviderSelect.value);
     els.localAiBaseUrlInput.value = provider?.defaultBaseUrl || OLLAMA_DEFAULT_BASE_URL;
     if (els.localAiModelInput) els.localAiModelInput.value = provider?.defaultModel || (els.localAiProviderSelect.value === "openai" ? OPENAI_DEFAULT_MODEL : els.localAiProviderSelect.value === "gemini" ? GEMINI_DEFAULT_MODEL : DEFAULT_LOCAL_AI_MODEL);
     state.localAi.models = [];
@@ -12668,7 +14071,7 @@ function wireEvents() {
   });
 }
 
-async function runAppWorkflowTest() {
+const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTest() {
   if (window.location.hash !== "#app-workflow-test") return;
   const out = [];
   const publishProgress = () => {
@@ -12719,6 +14122,14 @@ async function runAppWorkflowTest() {
 
   try {
     assert(Boolean(document.querySelector('link[rel="manifest"]')), "installable app manifest linked");
+    const workflowDatabase = await window.CatHan.storage.openDatabase();
+    assert(
+      workflowDatabase.version === 6 &&
+        workflowDatabase.objectStoreNames.contains("trashEntries") &&
+        storageConstants.PROJECT_PACKAGE_SCHEMA_VERSION === 5 &&
+        storageConstants.BACKUP_SCHEMA_VERSION === 6,
+      "schema 6 adds Trash while project packages remain schema 5"
+    );
     const productionMockAiSelector = "#mock" + "AiSuggestionBtn";
     assert(!document.querySelector(productionMockAiSelector), "production UI does not expose mock AI suggestions");
     assert(
@@ -12797,7 +14208,9 @@ async function runAppWorkflowTest() {
     const splitFixture = "First <b>bold part</b> continues. Second sentence.";
     const splitFixtureIndex = mappedSourceSplitIndex(splitFixture, "Hedef metin burada daha uzun olabilir.", 16);
     assert(splitFixtureIndex > 0 && splitFixtureIndex < splitFixture.length && !splitProtectedRanges(splitFixture).some((range) => splitFixtureIndex > range.start && splitFixtureIndex < range.end), "segment split maps target cursor to safe source boundary");
+    els.newProjectBtn.focus();
     await openProjectDialog("create");
+    assert(document.activeElement === document.querySelector("#projectNameInput"), "project dialog moves focus to its first required field");
     const catalanTurkishQuickPair = Array.from(els.frequentLanguagePairs.querySelectorAll("button"))
       .find((button) => button.dataset.sourceLang === "ca" && button.dataset.targetLang === "tr");
     const languageOptionValues = Array.from(els.languageOptions.querySelectorAll("option")).map((option) => option.value);
@@ -12835,6 +14248,54 @@ async function runAppWorkflowTest() {
       "project dialog blocks missing required fields before creation"
     );
     els.projectDialog.close();
+    await Promise.resolve();
+    assert(document.activeElement === els.newProjectBtn, "project dialog restores focus to its opener");
+
+    els.aboutBtn.focus();
+    els.aboutBtn.click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    assert(
+      els.aboutDialog.open && document.activeElement === els.closeAboutBtn,
+      "dialog lifecycle controller opens About with contained initial focus"
+    );
+    els.closeAboutBtn.click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    assert(
+      !els.aboutDialog.open && document.activeElement === els.aboutBtn,
+      "dialog lifecycle controller restores the About opener after close"
+    );
+
+    els.diagnosticsBtn.focus();
+    els.diagnosticsBtn.click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    assert(
+      els.diagnosticsDialog.open && document.activeElement === els.closeDiagnosticsBtn,
+      "dialog lifecycle controller opens Diagnostics without taking ownership of feature data"
+    );
+    els.closeDiagnosticsBtn.click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    assert(
+      !els.diagnosticsDialog.open && document.activeElement === els.workspaceMenuSummary,
+      "dialog lifecycle controller restores the visible Diagnostics menu trigger after close"
+    );
+
+    els.trashBtn.focus();
+    const trashOpenResult = await openTrash();
+    assert(
+      trashOpenResult &&
+        els.trashDialog.open &&
+        document.activeElement === els.closeTrashBtn &&
+        Boolean(els.trashList.textContent.trim()),
+      "dialog lifecycle controller prepares Trash before opening with contained focus"
+    );
+    els.trashDialog.dispatchEvent(new Event("cancel"));
+    els.trashDialog.close();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    assert(
+      !els.trashDialog.open && document.activeElement === els.trashBtn,
+      "dialog lifecycle controller restores the Trash opener after cancel and close"
+    );
+
     const project = await createProject({
       name: `Workflow ${Date.now()}`,
       domain: "Regression",
@@ -13261,7 +14722,7 @@ async function runAppWorkflowTest() {
       .map((segment) => ({ ...segment, target: segment.source || "DOCX landing target", status: "draft" }));
     await saveSegments(completedDocxLandingSegments);
     state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
-    updateSegmentDraft(importActivityFailureSegmentIndex, "IÃ§e aktarma etkinlik uyarisi hedefi");
+    updateSegmentDraft(importActivityFailureSegmentIndex, "İçe aktarma etkinlik uyarısı hedefi");
     await flushPendingSegmentSaves(project.id);
     await openProjectFile(documentInfo.id);
     const segmentIndex = state.segments.findIndex((segment) => segment.documentId === documentInfo.id);
@@ -13294,6 +14755,24 @@ async function runAppWorkflowTest() {
       saveStatusStyle.display.endsWith("flex") && saveStatusStyle.alignItems === "center" && saveStatusStyle.justifyContent === "center",
       "save status pill centers its label in both axes"
     );
+    assert(
+      els.saveStatus.getAttribute("role") === "status" &&
+        els.saveStatus.getAttribute("aria-live") === "polite" &&
+        els.saveStatus.getAttribute("aria-atomic") === "true",
+      "save and operation status exposes one polite atomic live region"
+    );
+    els.confirmBtn.focus();
+    openCommandPalette();
+    await Promise.resolve();
+    const paletteFocusable = focusController?.visibleFocusableElements?.(els.commandPaletteOverlay) || [];
+    const paletteLast = paletteFocusable.at(-1);
+    assert(document.activeElement === els.commandPaletteInput, "command palette moves focus to command search");
+    paletteLast?.focus();
+    paletteLast?.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
+    assert(document.activeElement === paletteFocusable[0], "command palette contains forward Tab focus");
+    closeCommandPalette();
+    await Promise.resolve();
+    assert(document.activeElement === els.confirmBtn, "command palette restores focus to its opener");
     els.brandHomeLink.click();
     assert(
       state.view === "projects" && !els.projectsView.classList.contains("hidden"),
@@ -13306,12 +14785,15 @@ async function runAppWorkflowTest() {
     assert(
       analysisPanel?.classList.contains("collapsed") &&
         analysisToggle?.getAttribute("aria-expanded") === "false" &&
+        analysisToggle?.getAttribute("aria-label")?.startsWith(uiSource("Expand")) &&
         getComputedStyle(document.querySelector("#projectAnalysisContent")).display === "none",
       "Project analysis can be collapsed"
     );
     analysisToggle?.click();
     assert(
-      !analysisPanel?.classList.contains("collapsed") && analysisToggle?.getAttribute("aria-expanded") === "true",
+      !analysisPanel?.classList.contains("collapsed") &&
+        analysisToggle?.getAttribute("aria-expanded") === "true" &&
+        analysisToggle?.getAttribute("aria-label")?.startsWith(uiSource("Minimize")),
       "Project analysis can be expanded"
     );
     await openProjectFile(documentInfo.id);
@@ -13352,6 +14834,109 @@ async function runAppWorkflowTest() {
     await waitFor(() => !state.saveTimers.has(state.segments[segmentIndex].id), "autosave retry saved target");
     const autosaveRetryStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
     assert(autosaveRetryStored?.target === autosaveRetryText, "timed autosave retry persists target after transient failure");
+    const editTargetBefore = targetCommandPatch(state.segments[segmentIndex]);
+    const editTargetSteps = [
+      `Birlesik duzenleme ilk ${Date.now()}`,
+      `Birlesik duzenleme ikinci ${Date.now()}`,
+      `Birlesik duzenleme son ${Date.now()}`
+    ];
+    editTargetSteps.forEach((value) => updateSegmentDraft(segmentIndex, value));
+    assert(
+      appRuntime.commands.editTargetSessions.has(state.segments[segmentIndex].id),
+      "continuous target typing keeps one in-memory EditTarget session"
+    );
+    await flushPendingSegmentSaves(project.id);
+    assert(
+      !appRuntime.commands.editTargetSessions.has(state.segments[segmentIndex].id),
+      "pending-save flush finalizes the coalesced EditTarget session"
+    );
+    const editTargetApplied = targetCommandPatch(state.segments[segmentIndex]);
+    const editTargetUndo = await undoLastCommand();
+    const editTargetStoredAfterUndo = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[segmentIndex].id
+    );
+    assert(
+      editTargetUndo?.receipt?.commandId === "edit-target" &&
+        state.segments[segmentIndex].target === editTargetBefore.target &&
+        state.segments[segmentIndex].status === editTargetBefore.status &&
+        JSON.stringify(state.segments[segmentIndex].targetHistory) === JSON.stringify(editTargetBefore.targetHistory) &&
+        JSON.stringify(targetCommandPatch(state.segments[segmentIndex]).tmPretranslation) ===
+          JSON.stringify(editTargetBefore.tmPretranslation) &&
+        JSON.stringify(targetCommandPatch(state.segments[segmentIndex]).aiApplication) ===
+          JSON.stringify(editTargetBefore.aiApplication) &&
+        editTargetStoredAfterUndo?.target === editTargetBefore.target &&
+        state.activeIndex === segmentIndex,
+      "one coalesced EditTarget Undo restores target state, history, provenance, persistence, and selection"
+    );
+    const editTargetUndoRevision = Number(state.segments[segmentIndex].revision || 0);
+    await redoLastCommand();
+    const editTargetStoredAfterRedo = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[segmentIndex].id
+    );
+    assert(
+      state.segments[segmentIndex].target === editTargetApplied.target &&
+        state.segments[segmentIndex].status === editTargetApplied.status &&
+        JSON.stringify(state.segments[segmentIndex].targetHistory) === JSON.stringify(editTargetApplied.targetHistory) &&
+        Number(state.segments[segmentIndex].revision || 0) > editTargetUndoRevision &&
+        editTargetStoredAfterRedo?.target === editTargetApplied.target &&
+        state.activeIndex === segmentIndex,
+      "EditTarget Redo reapplies the coalesced patch with a monotonic revision"
+    );
+    const keyboardEditBefore = targetCommandPatch(state.segments[segmentIndex]);
+    const keyboardEditTarget = `Klavye geri alma hedefi ${Date.now()}`;
+    const keyboardEditTextarea = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
+    keyboardEditTextarea.value = keyboardEditTarget;
+    keyboardEditTextarea.dispatchEvent(new Event("input", { bubbles: true }));
+    const keyboardUndoEvent = new KeyboardEvent("keydown", {
+      key: "z",
+      code: "KeyZ",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true
+    });
+    keyboardEditTextarea.dispatchEvent(keyboardUndoEvent);
+    await waitFor(
+      () =>
+        state.segments[segmentIndex]?.target === keyboardEditBefore.target &&
+        els.saveStatus.textContent.includes("Undo target edit") &&
+        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] textarea`),
+      "coalesced EditTarget keyboard Undo"
+    );
+    const keyboardUndoStored = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[segmentIndex].id
+    );
+    assert(
+      keyboardUndoEvent.defaultPrevented &&
+        keyboardUndoStored?.target === keyboardEditBefore.target &&
+        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] textarea`),
+      "Ctrl/Cmd+Z inside the target editor uses coalesced EditTarget Undo and restores focus"
+    );
+    const keyboardRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
+    const keyboardRedoEvent = new KeyboardEvent("keydown", {
+      key: "z",
+      code: "KeyZ",
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true
+    });
+    keyboardRedoTextarea.dispatchEvent(keyboardRedoEvent);
+    await waitFor(
+      () =>
+        state.segments[segmentIndex]?.target === keyboardEditTarget &&
+        els.saveStatus.textContent.includes("Redid target edit") &&
+        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] textarea`),
+      "coalesced EditTarget keyboard Redo"
+    );
+    const keyboardRedoStored = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[segmentIndex].id
+    );
+    assert(
+      keyboardRedoEvent.defaultPrevented &&
+        keyboardRedoStored?.target === keyboardEditTarget &&
+        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] textarea`),
+      "Ctrl/Cmd+Shift+Z inside the target editor redoes the coalesced EditTarget command"
+    );
     const targetText = `Aninda yedeklenen hedef ${Date.now()}`;
     updateSegmentDraft(segmentIndex, targetText);
     assert(state.saveTimers.size > 0, "pending save created");
@@ -13433,12 +15018,38 @@ async function runAppWorkflowTest() {
 
     els.replaceFindInput.value = "Aninda";
     els.replaceWithInput.value = "AnÄ±nda";
+    const targetBeforeReplaceCommand = state.segments[segmentIndex].target;
     clearWorkspaceDirtyMarkers();
     const replaceResult = await replaceTargetText("visible");
     assert(state.segments[segmentIndex].targetHistory?.some((entry) => entry.reason === "replace"), "replace records target revision history");
     assert(replaceResult.replacementCount === 1 && state.segments[segmentIndex].target.startsWith("AnÄ±nda"), "visible target replace updates matching segment");
     const replacedSegments = await getProjectSegments(project.id);
     assert(replacedSegments.some((segment) => segment.target.startsWith("AnÄ±nda")), "target replace saves immediately");
+    const undoReplaceCommand = await undoLastCommand();
+    const undoReplaceStored = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[segmentIndex].id
+    );
+    assert(
+      state.segments[segmentIndex].target === targetBeforeReplaceCommand &&
+        undoReplaceStored?.target === targetBeforeReplaceCommand &&
+        state.activeIndex === segmentIndex,
+      `Undo restores target replacement atomically and preserves selection (${JSON.stringify({
+        visible: state.segments[segmentIndex].target,
+        stored: undoReplaceStored?.target,
+        expected: targetBeforeReplaceCommand,
+        activeIndex: state.activeIndex,
+        segmentIndex,
+        commandId: undoReplaceCommand?.receipt?.commandId || "none"
+      })})`
+    );
+    await redoLastCommand();
+    const redoReplaceStored = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[segmentIndex].id
+    );
+    assert(
+      state.segments[segmentIndex].target.startsWith("AnÄ±nda") && redoReplaceStored?.target.startsWith("AnÄ±nda"),
+      "Redo reapplies target replacement atomically"
+    );
     assert(state.workspaceDirtyProjectIds.has(project.id), "target replace marks workspace package dirty");
     assert(state.activityEvents.some((event) => event.type === "replace-target"), "target replace records project activity");
     const beforeFailedReplaceTarget = state.segments[segmentIndex].target;
@@ -13507,8 +15118,28 @@ async function runAppWorkflowTest() {
         savedReviewStateStored?.reviewState === "reviewed",
       "quick review state saves selected review state"
     );
+    await undoLastCommand();
+    const undoneReviewStateStored = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[segmentIndex].id
+    );
+    assert(
+      state.activeIndex === segmentIndex &&
+        state.segments[segmentIndex].reviewState === "needs-review" &&
+        undoneReviewStateStored?.reviewState === "needs-review",
+      "Undo restores quick review state and active segment"
+    );
+    await redoLastCommand();
+    const redoneReviewStateStored = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[segmentIndex].id
+    );
+    assert(
+      state.activeIndex === segmentIndex &&
+        state.segments[segmentIndex].reviewState === "reviewed" &&
+        redoneReviewStateStored?.reviewState === "reviewed",
+      "Redo reapplies quick review state and active segment"
+    );
 
-    const aiReviewProvider = aiProviderRegistry.get("ollama");
+    const aiReviewProvider = aiProviderService.get("ollama");
     const originalAiReviewCompletePrompt = aiReviewProvider.completePrompt;
     const originalAiReviewSegmentFilter = state.aiSegmentFilter;
     try {
@@ -13683,7 +15314,7 @@ async function runAppWorkflowTest() {
       renderAll();
     }
 
-    const aiRepairProvider = aiProviderRegistry.get("ollama");
+    const aiRepairProvider = aiProviderService.get("ollama");
     const originalAiRepairCompletePrompt = aiRepairProvider.completePrompt;
     const aiRepairSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
     try {
@@ -13859,7 +15490,7 @@ async function runAppWorkflowTest() {
       renderAll();
     }
 
-    const aiVariantsProvider = aiProviderRegistry.get("ollama");
+    const aiVariantsProvider = aiProviderService.get("ollama");
     const originalAiVariantsCompletePrompt = aiVariantsProvider.completePrompt;
     const aiVariantsSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
     const aiVariantsProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
@@ -14039,7 +15670,7 @@ async function runAppWorkflowTest() {
       updateRow(segmentIndex);
     }
 
-    const aiApplyTermsProvider = aiProviderRegistry.get("ollama");
+    const aiApplyTermsProvider = aiProviderService.get("ollama");
     const originalAiApplyTermsCompletePrompt = aiApplyTermsProvider.completePrompt;
     const aiApplyTermsSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
     let aiApplyTermsTerm = null;
@@ -14247,7 +15878,7 @@ async function runAppWorkflowTest() {
       renderAll();
     }
 
-    const aiPolishProvider = aiProviderRegistry.get("ollama");
+    const aiPolishProvider = aiProviderService.get("ollama");
     const originalAiPolishCompletePrompt = aiPolishProvider.completePrompt;
     const aiPolishSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
     const aiPolishProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
@@ -14423,7 +16054,7 @@ async function runAppWorkflowTest() {
       updateRow(segmentIndex);
     }
 
-    const aiAdaptProvider = aiProviderRegistry.get("ollama");
+    const aiAdaptProvider = aiProviderService.get("ollama");
     const originalAiAdaptCompletePrompt = aiAdaptProvider.completePrompt;
     const aiAdaptSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
     const aiAdaptProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
@@ -14523,7 +16154,7 @@ async function runAppWorkflowTest() {
       updateRow(segmentIndex);
     }
 
-    const aiBatchAdaptProvider = aiProviderRegistry.get("ollama");
+    const aiBatchAdaptProvider = aiProviderService.get("ollama");
     const originalAiBatchAdaptCompletePrompt = aiBatchAdaptProvider.completePrompt;
     const aiBatchAdaptProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
     const originalAiBatchAdaptFilters = {
@@ -14672,7 +16303,7 @@ async function runAppWorkflowTest() {
       if (restoreBatchAdaptIndex >= 0) await setActiveSegment(restoreBatchAdaptIndex);
     }
 
-    const aiTermsProvider = aiProviderRegistry.get("ollama");
+    const aiTermsProvider = aiProviderService.get("ollama");
     const originalAiTermsCompletePrompt = aiTermsProvider.completePrompt;
     const originalAiTermsMode = els.localAiModeSelect?.value || "";
     const originalAiTermsDocumentFilter = state.documentFilter;
@@ -14756,7 +16387,7 @@ async function runAppWorkflowTest() {
       }
     }
 
-    const aiBriefProvider = aiProviderRegistry.get("ollama");
+    const aiBriefProvider = aiProviderService.get("ollama");
     const originalAiBriefCompletePrompt = aiBriefProvider.completePrompt;
     const originalAiBriefSettings = structuredClone(state.project.aiSettings || {});
     try {
@@ -15300,16 +16931,107 @@ async function runAppWorkflowTest() {
       renderEditor();
     }
     await setActiveSegment(segmentIndex);
-    copySourceToTarget();
-    assert(state.workspaceDirtyProjectIds.has(project.id), "copy source marks workspace package dirty");
-    await flushPendingSegmentSaves(project.id);
+    const producerBeforeTyping = targetCommandPatch(state.segments[segmentIndex]);
+    const producerPendingTyping = `Pending typing before copy ${Date.now()}`;
+    updateSegmentDraft(segmentIndex, producerPendingTyping);
+    assert(
+      appRuntime.commands.editTargetSessions.has(state.segments[segmentIndex].id),
+      "non-typing target producer starts with a pending EditTarget session"
+    );
+    clearWorkspaceDirtyMarkers();
+    const copySourceCommand = await copySourceToTarget();
+    const copiedSourcePatch = targetCommandPatch(state.segments[segmentIndex]);
+    assert(
+      copySourceCommand?.receipt?.commandId === "copy-source-to-target" &&
+        copySourceCommand.receipt.provenance?.producer === "copy-source" &&
+        !JSON.stringify(copySourceCommand.receipt).includes(state.segments[segmentIndex].source) &&
+        !appRuntime.commands.editTargetSessions.has(state.segments[segmentIndex].id) &&
+        state.workspaceDirtyProjectIds.has(project.id),
+      "copy source finalizes pending typing, records a redacted command, and marks the workspace dirty"
+    );
+    const undoCopySource = await undoLastCommand();
+    const storedAfterUndoCopy = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[segmentIndex].id
+    );
+    assert(
+      undoCopySource?.receipt?.commandId === "copy-source-to-target" &&
+        state.segments[segmentIndex].target === producerPendingTyping &&
+        storedAfterUndoCopy?.target === producerPendingTyping,
+      "first Undo after copy source restores the pending typed target and persistence"
+    );
+    const undoProducerTyping = await undoLastCommand();
+    assert(
+      undoProducerTyping?.receipt?.commandId === "edit-target" &&
+        state.segments[segmentIndex].target === producerBeforeTyping.target,
+      "second Undo after copy source restores the state before pending typing"
+    );
+    await redoLastCommand();
+    const copyRedoRevisionBefore = Number(state.segments[segmentIndex].revision || 0);
+    await redoLastCommand();
+    const storedAfterRedoCopy = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[segmentIndex].id
+    );
+    assert(
+      state.segments[segmentIndex].target === copiedSourcePatch.target &&
+        JSON.stringify(state.segments[segmentIndex].targetHistory) === JSON.stringify(copiedSourcePatch.targetHistory) &&
+        Number(state.segments[segmentIndex].revision || 0) > copyRedoRevisionBefore &&
+        storedAfterRedoCopy?.target === copiedSourcePatch.target,
+      "copy-source Redo restores target history and persistence with a monotonic revision"
+    );
 
     clearWorkspaceDirtyMarkers();
     await setActiveSegment(segmentIndex);
-    insertTarget(`TM inserted target ${Date.now()}`);
-    assert(state.workspaceDirtyProjectIds.has(project.id), "TM/concordance target insert marks workspace package dirty");
-    assert(state.segments[segmentIndex].targetHistory?.some((entry) => entry.reason === "insert-target" && entry.toTarget.startsWith("TM inserted target")), "TM/concordance insert records target revision history");
-    await flushPendingSegmentSaves(project.id);
+    const beforeTmInsert = targetCommandPatch(state.segments[segmentIndex]);
+    const tmInsertedTarget = `TM inserted target ${Date.now()}`;
+    const tmInsertCommand = await insertTarget(tmInsertedTarget, { channel: "match", resourceId: "workflow-tm-match" });
+    assert(
+      tmInsertCommand?.receipt?.commandId === "insert-tm-target" &&
+        tmInsertCommand.receipt.provenance?.channel === "match" &&
+        tmInsertCommand.receipt.provenance?.resourceId === "workflow-tm-match" &&
+        !JSON.stringify(tmInsertCommand.receipt).includes(tmInsertedTarget) &&
+        state.workspaceDirtyProjectIds.has(project.id),
+      "TM match insertion records a redacted reversible command and marks the workspace dirty"
+    );
+    assert(
+      state.segments[segmentIndex].targetHistory?.some(
+        (entry) => entry.reason === "insert-target" && entry.toTarget === tmInsertedTarget
+      ),
+      "TM target insertion records target revision history"
+    );
+    const undoTmInsert = await undoLastCommand();
+    const tmUndoRevision = Number(state.segments[segmentIndex].revision || 0);
+    const storedAfterTmUndo = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[segmentIndex].id
+    );
+    assert(
+      undoTmInsert?.receipt?.commandId === "insert-tm-target" &&
+        state.segments[segmentIndex].target === beforeTmInsert.target &&
+        storedAfterTmUndo?.target === beforeTmInsert.target,
+      "TM target Undo restores target state and persistence"
+    );
+    await redoLastCommand();
+    const storedAfterTmRedo = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[segmentIndex].id
+    );
+    assert(
+      state.segments[segmentIndex].target === tmInsertedTarget &&
+        Number(state.segments[segmentIndex].revision || 0) > tmUndoRevision &&
+        storedAfterTmRedo?.target === tmInsertedTarget,
+      "TM target Redo persists the insertion with a monotonic revision"
+    );
+    const concordanceTarget = `Concordance inserted target ${Date.now()}`;
+    const concordanceCommand = await insertTarget(concordanceTarget, {
+      channel: "concordance",
+      resourceId: "workflow-concordance-entry"
+    });
+    const undoConcordance = await undoLastCommand();
+    assert(
+      concordanceCommand?.receipt?.provenance?.channel === "concordance" &&
+        undoConcordance?.receipt?.commandId === "insert-tm-target" &&
+        state.segments[segmentIndex].target === tmInsertedTarget,
+      "concordance insertion uses the same reversible target command with distinct provenance"
+    );
+    await redoLastCommand();
     await saveTerm({
       sourceTerm: "Hello",
       targetTerm: "forbidden-report-term",
@@ -15349,7 +17071,15 @@ async function runAppWorkflowTest() {
 
     const pretranslateSource = "Pretranslate source phrase.";
     const pretranslateTarget = `TM onayli hedef ${Date.now()}`;
-    await importLocalization(new File([`<!doctype html><html><body><p>${pretranslateSource}</p></body></html>`], "workflow-pretranslate.html", { type: "text/html" }));
+    const secondPretranslateSource = "Second pretranslate source phrase.";
+    const secondPretranslateTarget = `Ikinci TM hedefi ${Date.now()}`;
+    await importLocalization(
+      new File(
+        [`<!doctype html><html><body><p>${pretranslateSource}</p><p>${secondPretranslateSource}</p></body></html>`],
+        "workflow-pretranslate.html",
+        { type: "text/html" }
+      )
+    );
     const pretranslateDocument = state.project.documents.find((item) => item.name === "workflow-pretranslate.html");
     await saveTmEntry({
       source: pretranslateSource,
@@ -15359,8 +17089,19 @@ async function runAppWorkflowTest() {
       projectName: state.project.name,
       tmName: mainTmName()
     });
+    await saveTmEntry({
+      source: secondPretranslateSource,
+      target: secondPretranslateTarget,
+      sourceLang: state.project.sourceLang,
+      targetLang: state.project.targetLang,
+      projectName: state.project.name,
+      tmName: mainTmName()
+    });
     await openProjectFile(pretranslateDocument.id);
     const pretranslateSegmentIndex = state.segments.findIndex((segment) => segment.documentId === pretranslateDocument.id);
+    const secondPretranslateSegmentIndex = state.segments.findIndex(
+      (segment) => segment.documentId === pretranslateDocument.id && segment.source === secondPretranslateSource
+    );
     const pretranslateSegment = state.segments[pretranslateSegmentIndex];
     const originalPrompt = window.prompt;
     let browserPromptCalls = 0;
@@ -15376,35 +17117,79 @@ async function runAppWorkflowTest() {
       );
       els.tmPretranslateThresholdInput.value = "80";
       els.tmPretranslateDialog.close("apply");
-      await pending;
+      return pending;
     };
+    let tmPretranslationCommand = null;
     try {
       setHiddenSegmentField(pretranslateSegment, PRETRANSLATE_SAVE_FAILURE_TEST_FLAG, true);
       await runTmPretranslationFromDialog();
-      const failedPretranslation = (await getProjectSegments(project.id)).find((segment) => segment.id === pretranslateSegment.id);
+      const failedPretranslationSegments = (await getProjectSegments(project.id)).filter(
+        (segment) => segment.documentId === pretranslateDocument.id
+      );
       assert(
         els.saveStatus.textContent.includes("Simulated pretranslation save failure") &&
           state.segments[pretranslateSegmentIndex].target === "" &&
-          failedPretranslation?.target === "",
-        "pretranslation save failure restores empty target state"
+          state.segments[secondPretranslateSegmentIndex].target === "" &&
+          failedPretranslationSegments.every((segment) => segment.target === ""),
+        "TM pretranslation transaction failure restores every visible and persisted target"
       );
-      await runTmPretranslationFromDialog();
+      tmPretranslationCommand = await runTmPretranslationFromDialog();
     } finally {
       window.prompt = originalPrompt;
     }
-    const successfulPretranslation = (await getProjectSegments(project.id)).find((segment) => segment.id === pretranslateSegment.id);
+    const successfulPretranslationSegments = (await getProjectSegments(project.id)).filter(
+      (segment) => segment.documentId === pretranslateDocument.id
+    );
     assert(
-      els.saveStatus.textContent.includes("Pretranslated 1 segment") &&
-        successfulPretranslation?.target === pretranslateTarget &&
-        successfulPretranslation?.tmPretranslation?.score === 100,
-      "pretranslation success saves target from TM"
+      tmPretranslationCommand?.receipt?.commandId === "tm-pretranslate" &&
+        tmPretranslationCommand.receipt.provenance?.affectedCount === 2 &&
+        !JSON.stringify(tmPretranslationCommand.receipt).includes(pretranslateTarget) &&
+        els.saveStatus.textContent.includes("Pretranslated 2 segments") &&
+        successfulPretranslationSegments.some(
+          (segment) => segment.target === pretranslateTarget && segment.tmPretranslation?.score === 100
+        ) &&
+        successfulPretranslationSegments.some(
+          (segment) => segment.target === secondPretranslateTarget && segment.tmPretranslation?.score === 100
+        ),
+      "TM pretranslation saves one redacted atomic command for every matched target"
+    );
+    const undoTmPretranslation = await undoLastCommand();
+    const tmPretranslationUndoRevisions = state.segments
+      .filter((segment) => segment.documentId === pretranslateDocument.id)
+      .map((segment) => Number(segment.revision || 0));
+    const storedAfterTmPretranslationUndo = (await getProjectSegments(project.id)).filter(
+      (segment) => segment.documentId === pretranslateDocument.id
+    );
+    assert(
+      undoTmPretranslation?.receipt?.commandId === "tm-pretranslate" &&
+        state.segments
+          .filter((segment) => segment.documentId === pretranslateDocument.id)
+          .every((segment) => !segment.target && !segment.tmPretranslation) &&
+        storedAfterTmPretranslationUndo.every((segment) => !segment.target && !segment.tmPretranslation),
+      "TM pretranslation Undo restores every target, history provenance, persistence, and selection"
+    );
+    await redoLastCommand();
+    const storedAfterTmPretranslationRedo = (await getProjectSegments(project.id)).filter(
+      (segment) => segment.documentId === pretranslateDocument.id
+    );
+    assert(
+      state.segments
+        .filter((segment) => segment.documentId === pretranslateDocument.id)
+        .every(
+          (segment, index) =>
+            segment.targetHistory?.some((entry) => entry.reason === "pretranslate") &&
+            Number(segment.revision || 0) > tmPretranslationUndoRevisions[index]
+        ) &&
+        storedAfterTmPretranslationRedo.some((segment) => segment.target === pretranslateTarget) &&
+        storedAfterTmPretranslationRedo.some((segment) => segment.target === secondPretranslateTarget),
+      "TM pretranslation Redo restores every target patch with monotonic revisions"
     );
     assert(
       Array.from(els.segmentBody.querySelectorAll(".tm-match-badge")).some((badge) => badge.textContent.includes("TM 100%")),
       "pretranslation success shows TM match rate badge near segment status"
     );
 
-    const localAiGlossaryProvider = aiProviderRegistry.get("ollama");
+    const localAiGlossaryProvider = aiProviderService.get("ollama");
     const originalLocalAiGlossaryTranslateSegment = localAiGlossaryProvider.translateSegment;
     const originalLocalAiGlossaryCompletePrompt = localAiGlossaryProvider.completePrompt;
     const originalLocalAiGlossaryMode = els.localAiModeSelect?.value || "";
@@ -15531,9 +17316,51 @@ async function runAppWorkflowTest() {
           model: config.model || "workflow-glossary-pretranslate-model"
         };
       };
-      await pretranslateWithLocalAi();
-      const localAiGlossarySegment = state.segments.find((segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource);
-      const localAiGlossaryStored = (await getProjectSegments(project.id)).find((segment) => segment.id === localAiGlossarySegment?.id);
+      const localAiPretranslationBefore = targetCommandPatch(state.segments[localAiGlossarySegmentIndex]);
+      const localAiPretranslationCommand = await pretranslateWithLocalAi();
+      let localAiGlossarySegment = state.segments.find(
+        (segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource
+      );
+      let localAiGlossaryStored = (await getProjectSegments(project.id)).find(
+        (segment) => segment.id === localAiGlossarySegment?.id
+      );
+      assert(
+        localAiPretranslationCommand?.receipt?.commandId === "ai-pretranslate" &&
+          localAiPretranslationCommand.receipt.provenance?.provider === "Ollama" &&
+          localAiPretranslationCommand.receipt.provenance?.affectedCount === 1 &&
+          !JSON.stringify(localAiPretranslationCommand.receipt).includes("Workflow context-informed AI target") &&
+          localAiGlossarySegment?.targetHistory?.some((entry) => entry.reason === "ai-pretranslate"),
+        "Local AI pretranslation records redacted provider provenance and target history"
+      );
+      const undoLocalAiPretranslation = await undoLastCommand();
+      const localAiPretranslationUndoRevision = Number(state.segments[localAiGlossarySegmentIndex].revision || 0);
+      const storedAfterLocalAiPretranslationUndo = (await getProjectSegments(project.id)).find(
+        (segment) => segment.id === localAiGlossarySegment?.id
+      );
+      assert(
+        undoLocalAiPretranslation?.receipt?.commandId === "ai-pretranslate" &&
+          state.segments[localAiGlossarySegmentIndex].target === localAiPretranslationBefore.target &&
+          JSON.stringify(state.segments[localAiGlossarySegmentIndex].targetHistory) ===
+            JSON.stringify(localAiPretranslationBefore.targetHistory) &&
+          !state.segments[localAiGlossarySegmentIndex].aiPretranslation &&
+          storedAfterLocalAiPretranslationUndo?.target === localAiPretranslationBefore.target &&
+          !storedAfterLocalAiPretranslationUndo?.aiPretranslation,
+        "Local AI pretranslation Undo restores target, history, AI provenance, review state, and persistence"
+      );
+      const redoLocalAiPretranslation = await redoLastCommand();
+      localAiGlossarySegment = state.segments.find(
+        (segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource
+      );
+      localAiGlossaryStored = (await getProjectSegments(project.id)).find(
+        (segment) => segment.id === localAiGlossarySegment?.id
+      );
+      assert(
+        localAiGlossaryStored?.target === "Workflow context-informed AI target" &&
+          localAiGlossaryStored?.reviewState === "needs-review" &&
+          localAiGlossaryStored?.aiPretranslation?.model === "workflow-glossary-pretranslate-model" &&
+          Number(localAiGlossarySegment?.revision || 0) > localAiPretranslationUndoRevision,
+        "Local AI pretranslation Redo restores review/provenance patches with a monotonic revision"
+      );
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = "ai-draft";
       state.aiSegmentFilter = "ai-draft";
       renderSegments();
@@ -15567,6 +17394,37 @@ async function runAppWorkflowTest() {
       state.aiSegmentFilter = originalLocalAiGlossaryAiFilter;
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalLocalAiGlossaryAiFilter;
       renderSegments();
+      setSegmentTargetAndStatus(localAiGlossarySegment, "", "draft", "ai-cancel-fixture");
+      Reflect.deleteProperty(localAiGlossarySegment, "aiPretranslation");
+      localAiGlossarySegment.reviewState = "";
+      touchSegment(localAiGlossarySegment);
+      await saveSegment(localAiGlossarySegment);
+      localAiGlossaryProvider.translateSegment = async (config) => {
+        state.localAi.abortController?.abort();
+        return {
+          translatedText: "Target that must be rolled back after cancellation",
+          provider: "Mock Canceled AI",
+          providerId: "ollama",
+          model: config.model || "workflow-glossary-pretranslate-model"
+        };
+      };
+      const canceledLocalAiPretranslation = await pretranslateWithLocalAi();
+      const storedAfterMidBatchCancellation = (await getProjectSegments(project.id)).find(
+        (segment) => segment.id === localAiGlossarySegment.id
+      );
+      const midBatchCancellationStatus = els.saveStatus.textContent;
+      const cancellationStackUndo = await undoLastCommand();
+      assert(
+        canceledLocalAiPretranslation === null &&
+          storedAfterMidBatchCancellation?.target === "" &&
+          !storedAfterMidBatchCancellation?.aiPretranslation &&
+          midBatchCancellationStatus.includes("canceled; no target changes were applied") &&
+          cancellationStackUndo?.receipt?.id === redoLocalAiPretranslation?.receipt?.id,
+        "mid-batch AI cancellation rolls back provider output and records no partial command"
+      );
+      localAiGlossarySegment = state.segments.find(
+        (segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource
+      );
       const originalLocalAiCloudConfirm = window.confirm;
       const localAiCloudConfirmMessages = [];
       let localAiCloudProviderCalls = 0;
@@ -15852,6 +17710,27 @@ async function runAppWorkflowTest() {
         !confirmedReviewedAiRow?.textContent.includes("Needs review") &&
         !confirmedReviewedAiRow?.textContent.includes("AI draft"),
       "confirming reviewed AI-pretranslated segment clears needs-review and shows AI initiated"
+    );
+    await undoLastCommand();
+    const undoneConfirmedSegment = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === confirmedReviewedAiSegment.id
+    );
+    assert(
+      state.segments[segmentIndex].status === "draft" &&
+        state.segments[segmentIndex].reviewState === "needs-review" &&
+        undoneConfirmedSegment?.status === "draft" &&
+        undoneConfirmedSegment?.reviewState === "needs-review" &&
+        state.activeIndex === segmentIndex,
+      "Undo restores confirmed segment status, review state, persistence, and selection"
+    );
+    await redoLastCommand();
+    const redoneConfirmedSegment = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === confirmedReviewedAiSegment.id
+    );
+    assert(
+      redoneConfirmedSegment?.status === "confirmed" &&
+        (redoneConfirmedSegment?.reviewState || "") === "",
+      "Redo reapplies confirmed segment state"
     );
     state.segmentStatusFilter = originalConfirmReviewedFilters.segmentStatusFilter;
     state.reviewStateFilter = originalConfirmReviewedFilters.reviewStateFilter;
@@ -16791,7 +18670,21 @@ async function runAppWorkflowTest() {
       );
       Reflect.deleteProperty(deleteProjectListEntry, PROJECT_DELETE_FAILURE_TEST_FLAG);
       const successfulProjectDelete = await confirmDeleteProject(deleteProjectFixture.id);
-      assert(successfulProjectDelete, "project delete reports success after recovered failure");
+      const projectTrashEntry = (await appRuntime.trashRepository.list()).find(
+        (entry) => entry.entityType === "project" && entry.projectId === deleteProjectFixture.id
+      );
+      assert(successfulProjectDelete && projectTrashEntry, "project delete moves records to persistent Trash after recovered failure");
+      await undoLastCommand();
+      assert(
+        Boolean(await getAllByIndex("segments", "projectId", deleteProjectFixture.id).then((segments) => segments.length)) &&
+          state.projects.some((item) => item.id === deleteProjectFixture.id),
+        "Undo restores a trashed project and its segments"
+      );
+      await redoLastCommand();
+      assert(
+        !state.projects.some((item) => item.id === deleteProjectFixture.id),
+        "Redo returns a restored project to Trash"
+      );
     } finally {
       window.confirm = originalConfirm;
     }
@@ -16827,19 +18720,35 @@ async function runAppWorkflowTest() {
       Reflect.deleteProperty(deleteFileDocument, FILE_DELETE_FAILURE_TEST_FLAG);
       setHiddenSegmentField(deleteFileDocument, FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG, true);
       const successfulFileDelete = await confirmDeleteFile(deleteFileDocument);
+      const fileTrashEntry = (await appRuntime.trashRepository.list()).find(
+        (entry) => entry.entityType === "document" && entry.entityId === deleteFileDocument.id
+      );
       assert(
         successfulFileDelete &&
+          fileTrashEntry &&
           !state.project.documents.some((item) => item.id === deleteFileDocument.id) &&
           els.saveStatus.textContent.includes("activity log failed"),
-        "file delete activity log failure reports warning without undoing successful delete"
+        "file delete activity log failure reports warning while preserving the file in Trash"
       );
       Reflect.deleteProperty(deleteFileDocument, FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG);
+      await undoLastCommand();
+      assert(
+        state.project.documents.some((item) => item.id === deleteFileDocument.id) &&
+          (await getProjectSegments(deleteFileFixture.id)).some((segment) => segment.documentId === deleteFileDocument.id),
+        "Undo restores a trashed file and its segments"
+      );
+      await redoLastCommand();
+      assert(
+        !state.project.documents.some((item) => item.id === deleteFileDocument.id),
+        "Redo returns a restored file to Trash"
+      );
     } finally {
       window.confirm = originalConfirm;
     }
     await delay(650);
     const deletedFileSegments = await getProjectSegments(deleteFileFixture.id);
     assert(!deletedFileSegments.length && !pendingSaveRecords(deleteFileFixture.id).length, "file delete clears pending saves without orphan segments");
+    await appRuntime.trashRepository.emptyAll();
     await deleteProject(deleteFileFixture.id);
     clearWorkspaceDirty(deleteFileFixture.id);
     state.project = null;
@@ -17099,7 +19008,7 @@ async function runAppWorkflowTest() {
 
     let invalidBackupWriteRejected = false;
     try {
-      assertValidBackupForWrite({ app: "LoopCAT", schemaVersion: storageConstants?.SCHEMA_VERSION || 4, projects: {}, segments: [], tmEntries: [], terms: [], activityEvents: [] }, "export backup");
+      assertValidBackupForWrite({ app: "LoopCAT", schemaVersion: storageConstants.BACKUP_SCHEMA_VERSION, projects: {}, segments: [], tmEntries: [], terms: [], activityEvents: [], trashEntries: [] }, "export backup");
     } catch (error) {
       invalidBackupWriteRejected = error.validation?.errors?.some((item) => item.includes("Projects must be an array")) && error.message.includes("Cannot export backup");
     }
@@ -17283,7 +19192,7 @@ async function runAppWorkflowTest() {
     }
     assert(malformedBackupRejected && state.lastValidationReport?.errors?.[0] === "Backup file is not valid JSON.", "malformed backup JSON fails with validation report");
 
-    const invalidBackupResult = await restoreBackupData({ app: "LoopCAT", schemaVersion: storageConstants?.SCHEMA_VERSION || 4, projects: {}, segments: [], tmEntries: [], terms: [], activityEvents: [] });
+    const invalidBackupResult = await restoreBackupData({ app: "LoopCAT", schemaVersion: storageConstants.BACKUP_SCHEMA_VERSION, projects: {}, segments: [], tmEntries: [], terms: [], activityEvents: [], trashEntries: [] });
     assert(!invalidBackupResult && state.lastValidationReport?.errors?.some((error) => error.includes("Projects must be an array")), "invalid backup shape is rejected without restore");
 
     let oversizedBackupRejected = false;
@@ -17579,6 +19488,8 @@ async function runAppWorkflowTest() {
     const structuralSegmentsBefore = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
     assert(structuralSegmentsBefore.length === 3, "plain structural edit fixture has three segments");
     const structuralSplitOriginalSource = structuralSegmentsBefore[0].source;
+    const structuralSplitOriginalTarget = structuralSegmentsBefore[0].target;
+    const structuralSegmentIdsBeforeSplit = new Set(structuralSegmentsBefore.map((segment) => segment.id));
     let splitIndex = state.segments.findIndex((segment) => segment.id === structuralSegmentsBefore[0].id);
     await setActiveSegment(splitIndex);
     let splitTextarea = els.segmentBody.querySelector(`tr[data-index="${splitIndex}"] textarea`);
@@ -17597,9 +19508,70 @@ async function runAppWorkflowTest() {
     await setActiveSegment(splitIndex);
     splitTextarea = els.segmentBody.querySelector(`tr[data-index="${splitIndex}"] textarea`);
     splitTextarea?.setSelectionRange(24, 24);
-    await splitCurrentSegment();
-    const splitSuccessStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
-    assert(els.saveStatus.textContent === "Segment split" && splitSuccessStored.length === 4, "segment split persists structural edit");
+    const splitCommandResult = await splitCurrentSegment();
+    const splitAppliedVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
+    const splitCreatedSegment = splitAppliedVisible.find((segment) => !structuralSegmentIdsBeforeSplit.has(segment.id));
+    const splitSuccessStored = (await getProjectSegments(project.id)).filter(
+      (segment) => segment.documentId === structuralDocument.id
+    );
+    const splitAppliedRevisionById = new Map(splitAppliedVisible.map((segment) => [segment.id, segment.revision]));
+    assert(
+      els.saveStatus.textContent === "Segment split; Undo is available" &&
+        splitCommandResult?.receipt?.commandId === "split-segment" &&
+        splitCommandResult.receipt.affectedIds.includes(structuralSegmentsBefore[0].id) &&
+        splitCommandResult.receipt.affectedIds.includes(splitCreatedSegment?.id) &&
+        !JSON.stringify(splitCommandResult.receipt).includes(structuralSplitOriginalSource) &&
+        !JSON.stringify(splitCommandResult.receipt).includes(structuralSplitOriginalTarget) &&
+        splitAppliedVisible.length === 4 &&
+        splitSuccessStored.length === 4 &&
+        splitAppliedVisible.every((segment, index) => segment.documentIndex === index) &&
+        currentSegment()?.id === splitCreatedSegment?.id,
+      "segment split saves one redacted structural command with contiguous order and stable focus"
+    );
+
+    await undoLastCommand();
+    const splitUndoVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
+    const splitUndoStored = (await getProjectSegments(project.id)).filter(
+      (segment) => segment.documentId === structuralDocument.id
+    );
+    const splitUndoOriginal = splitUndoVisible.find((segment) => segment.id === structuralSegmentsBefore[0].id);
+    const splitUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+    assert(
+      splitUndoVisible.length === 3 &&
+        splitUndoStored.length === 3 &&
+        !splitUndoVisible.some((segment) => segment.id === splitCreatedSegment?.id) &&
+        !splitUndoStored.some((segment) => segment.id === splitCreatedSegment?.id) &&
+        splitUndoOriginal?.source === structuralSplitOriginalSource &&
+        splitUndoOriginal?.target === structuralSplitOriginalTarget &&
+        splitUndoVisible.every((segment, index) => segment.documentIndex === index) &&
+        currentSegment()?.id === structuralSegmentsBefore[0].id &&
+        document.activeElement === splitUndoTextarea,
+      "SplitSegment Undo atomically restores the original segment, order, persistence, and focus"
+    );
+    const splitUndoOriginalRevision = Number(splitUndoOriginal?.revision || 0);
+
+    await redoLastCommand();
+    const splitRedoVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
+    const splitRedoStored = (await getProjectSegments(project.id)).filter(
+      (segment) => segment.documentId === structuralDocument.id
+    );
+    const splitRedoCreated = splitRedoVisible.find((segment) => segment.id === splitCreatedSegment?.id);
+    const splitRedoOriginal = splitRedoVisible.find((segment) => segment.id === structuralSegmentsBefore[0].id);
+    const splitRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+    assert(
+      splitRedoVisible.length === 4 &&
+        splitRedoStored.length === 4 &&
+        splitRedoCreated?.source === splitCreatedSegment?.source &&
+        splitRedoCreated?.target === splitCreatedSegment?.target &&
+        splitRedoOriginal?.source === splitAppliedVisible[0].source &&
+        splitRedoOriginal?.target === splitAppliedVisible[0].target &&
+        Number(splitRedoOriginal?.revision || 0) > splitUndoOriginalRevision &&
+        Number(splitRedoCreated?.revision || 0) > Number(splitAppliedRevisionById.get(splitCreatedSegment?.id) || 0) &&
+        splitRedoVisible.every((segment, index) => segment.documentIndex === index) &&
+        currentSegment()?.id === splitCreatedSegment?.id &&
+        document.activeElement === splitRedoTextarea,
+      "SplitSegment Redo recreates the stable segment, order, targets, monotonic revisions, persistence, and focus"
+    );
 
     state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
     await openProjectFile(structuralDocument.id);
@@ -17607,16 +19579,32 @@ async function runAppWorkflowTest() {
       .map((segment, index) => ({ segment, index }))
       .filter((item) => item.segment.documentId === structuralDocument.id)
       .slice(-2);
+    const mergeFailureIds = mergeCandidates.map((item) => item.segment.id);
+    const mergeFailureSources = mergeCandidates.map((item) => item.segment.source);
+    const mergeFailureTargets = mergeCandidates.map((item) => item.segment.target);
     await setActiveSegment(mergeCandidates[0].index);
     setHiddenSegmentField(state.segments[mergeCandidates[0].index], MERGE_POST_DELETE_FAILURE_TEST_FLAG, true);
-    await mergeWithNextSegment();
+    const failedMergeCommand = await mergeWithNextSegment();
+    const mergeFailureVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
     const mergeFailureStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
     assert(
-      els.saveStatus.textContent.includes("Simulated merge post-delete failure") &&
-        state.segments.filter((segment) => segment.documentId === structuralDocument.id).length === 4 &&
+      failedMergeCommand === null &&
+        els.saveStatus.textContent.includes("Simulated merge transaction failure") &&
+        mergeFailureVisible.length === 4 &&
         mergeFailureStored.length === 4 &&
-        mergeFailureStored.some((segment) => segment.id === mergeCandidates[1].segment.id),
-      "merge post-delete failure restores visible and persisted segment list"
+        mergeFailureIds.every((id, index) => {
+          const visible = mergeFailureVisible.find((segment) => segment.id === id);
+          const stored = mergeFailureStored.find((segment) => segment.id === id);
+          return (
+            visible?.source === mergeFailureSources[index] &&
+            visible?.target === mergeFailureTargets[index] &&
+            stored?.source === mergeFailureSources[index] &&
+            stored?.target === mergeFailureTargets[index]
+          );
+        }) &&
+        mergeFailureVisible.every((item, index) => item.documentIndex === index) &&
+        state.segments.every((item, index) => item.index === index),
+      "MergeSegment transaction failure leaves no missing, duplicate, reordered, or partially persisted segment"
     );
     state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
     await openProjectFile(structuralDocument.id);
@@ -17624,14 +19612,89 @@ async function runAppWorkflowTest() {
       .map((segment, index) => ({ segment, index }))
       .filter((item) => item.segment.documentId === structuralDocument.id)
       .slice(-2);
+    const mergeFirstBefore = structuredClone(mergeCandidates[0].segment);
+    const mergeSecondBefore = structuredClone(mergeCandidates[1].segment);
+    const expectedMergedSource = `${mergeFirstBefore.source} ${mergeSecondBefore.source}`.trim();
+    const expectedMergedTarget = `${mergeFirstBefore.target || ""} ${mergeSecondBefore.target || ""}`.trim();
     await setActiveSegment(mergeCandidates[0].index);
-    await mergeWithNextSegment();
+    const mergeCommandResult = await mergeWithNextSegment();
+    const mergeAppliedVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
     const mergeSuccessStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
+    const mergeAppliedSurvivor = mergeAppliedVisible.find((segment) => segment.id === mergeFirstBefore.id);
+    const mergeAppliedTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+    const mergeAppliedRevision = Number(mergeAppliedSurvivor?.revision || 0);
+    const mergeAppliedHistory = structuredClone(mergeAppliedSurvivor?.targetHistory || []);
     assert(
-      els.saveStatus.textContent === "Segments merged" &&
+      els.saveStatus.textContent === "Segments merged; Undo is available" &&
+        mergeCommandResult?.receipt?.commandId === "merge-segments" &&
+        mergeCommandResult.receipt.affectedIds.includes(mergeFirstBefore.id) &&
+        mergeCommandResult.receipt.affectedIds.includes(mergeSecondBefore.id) &&
+        !JSON.stringify(mergeCommandResult.receipt).includes(mergeFirstBefore.source) &&
+        !JSON.stringify(mergeCommandResult.receipt).includes(mergeFirstBefore.target) &&
+        mergeAppliedVisible.length === 3 &&
         mergeSuccessStored.length === 3 &&
-        mergeSuccessStored.some((segment) => segment.target.includes("Merge first target.") && segment.target.includes("Merge second target.")),
-      "segment merge persists structural edit"
+        mergeAppliedSurvivor?.source === expectedMergedSource &&
+        mergeAppliedSurvivor?.target === expectedMergedTarget &&
+        mergeAppliedSurvivor?.targetHistory?.some((entry) => entry.reason === "merge") &&
+        !mergeAppliedVisible.some((segment) => segment.id === mergeSecondBefore.id) &&
+        !mergeSuccessStored.some((segment) => segment.id === mergeSecondBefore.id) &&
+        mergeAppliedVisible.every((item, index) => item.documentIndex === index) &&
+        state.segments.every((item, index) => item.index === index) &&
+        currentSegment()?.id === mergeFirstBefore.id &&
+        document.activeElement === mergeAppliedTextarea,
+      "MergeSegment persists one redacted atomic command with contiguous order, history, and focus"
+    );
+
+    const mergeUndoResult = await undoLastCommand();
+    const mergeUndoVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
+    const mergeUndoStored = (await getProjectSegments(project.id)).filter(
+      (segment) => segment.documentId === structuralDocument.id
+    );
+    const mergeUndoFirst = mergeUndoVisible.find((segment) => segment.id === mergeFirstBefore.id);
+    const mergeUndoSecond = mergeUndoVisible.find((segment) => segment.id === mergeSecondBefore.id);
+    const mergeUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+    const mergeUndoFirstRevision = Number(mergeUndoFirst?.revision || 0);
+    assert(
+      mergeUndoResult?.receipt?.commandId === "merge-segments" &&
+        mergeUndoVisible.length === 4 &&
+        mergeUndoStored.length === 4 &&
+        mergeUndoFirst?.source === mergeFirstBefore.source &&
+        mergeUndoFirst?.target === mergeFirstBefore.target &&
+        JSON.stringify(mergeUndoFirst?.targetHistory || []) === JSON.stringify(mergeFirstBefore.targetHistory || []) &&
+        mergeUndoSecond?.source === mergeSecondBefore.source &&
+        mergeUndoSecond?.target === mergeSecondBefore.target &&
+        JSON.stringify(mergeUndoSecond?.targetHistory || []) === JSON.stringify(mergeSecondBefore.targetHistory || []) &&
+        Number(mergeUndoFirst?.revision || 0) > mergeAppliedRevision &&
+        Number(mergeUndoSecond?.revision || 0) > Number(mergeSecondBefore.revision || 0) &&
+        mergeUndoVisible.every((item, index) => item.documentIndex === index) &&
+        state.segments.every((item, index) => item.index === index) &&
+        currentSegment()?.id === mergeFirstBefore.id &&
+        document.activeElement === mergeUndoTextarea,
+      "MergeSegment Undo atomically restores both stable segment IDs, order, history, persistence, and focus"
+    );
+
+    const mergeRedoResult = await redoLastCommand();
+    const mergeRedoVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
+    const mergeRedoStored = (await getProjectSegments(project.id)).filter(
+      (segment) => segment.documentId === structuralDocument.id
+    );
+    const mergeRedoSurvivor = mergeRedoVisible.find((segment) => segment.id === mergeFirstBefore.id);
+    const mergeRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+    assert(
+      mergeRedoResult?.receipt?.commandId === "merge-segments" &&
+        mergeRedoVisible.length === 3 &&
+        mergeRedoStored.length === 3 &&
+        mergeRedoSurvivor?.source === expectedMergedSource &&
+        mergeRedoSurvivor?.target === expectedMergedTarget &&
+        JSON.stringify(mergeRedoSurvivor?.targetHistory || []) === JSON.stringify(mergeAppliedHistory) &&
+        Number(mergeRedoSurvivor?.revision || 0) > mergeUndoFirstRevision &&
+        !mergeRedoVisible.some((segment) => segment.id === mergeSecondBefore.id) &&
+        !mergeRedoStored.some((segment) => segment.id === mergeSecondBefore.id) &&
+        mergeRedoVisible.every((item, index) => item.documentIndex === index) &&
+        state.segments.every((item, index) => item.index === index) &&
+        currentSegment()?.id === mergeFirstBefore.id &&
+        document.activeElement === mergeRedoTextarea,
+      "MergeSegment Redo recreates the merge with monotonic revisions and deletes only the merged-away segment"
     );
 
     const taggedFile = new File(["<!doctype html><html><body><p>Keep <strong>this</strong> tag.</p></body></html>"], "tagged.html", { type: "text/html" });
@@ -17645,7 +19708,56 @@ async function runAppWorkflowTest() {
     const sourceChipLabels = Array.from(taggedRow?.querySelectorAll(".source-cell .tag-chip") || []).map((chip) => chip.textContent);
     assert(sourceChipLabels.includes("<b>") && sourceChipLabels.includes("</b>") && !sourceChipLabels.includes("<strong>"), "editor displays semantic inline tag labels for HTML formatting");
     await setActiveSegment(taggedIndex);
-    const taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
+    let taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
+    taggedTextarea?.focus();
+    taggedTextarea?.setSelectionRange(0, 0);
+    const beforeProtectedTagInsert = targetCommandPatch(state.segments[taggedIndex]);
+    clearWorkspaceDirtyMarkers();
+    const protectedTagCommand = await insertTagIntoTarget("<strong>");
+    await flushPendingSegmentSaves(project.id);
+    const protectedTagApplied = targetCommandPatch(state.segments[taggedIndex]);
+    taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
+    assert(
+      protectedTagCommand?.receipt?.commandId === "insert-protected-tag" &&
+        protectedTagCommand.receipt.provenance?.producer === "protected-tag" &&
+        !JSON.stringify(protectedTagCommand.receipt).includes("<strong>") &&
+        state.segments[taggedIndex].target.startsWith("<strong>") &&
+        state.segments[taggedIndex].targetHistory?.some((entry) => entry.reason === "insert-tag") &&
+        taggedTextarea?.selectionStart === "<strong>".length &&
+        taggedTextarea?.selectionEnd === "<strong>".length &&
+        state.workspaceDirtyProjectIds.has(project.id),
+      "protected-tag insertion records one redacted command, history, caret placement, and workspace dirtiness"
+    );
+    const undoProtectedTag = await undoLastCommand();
+    const protectedTagUndoRevision = Number(state.segments[taggedIndex].revision || 0);
+    const storedAfterProtectedTagUndo = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[taggedIndex].id
+    );
+    taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
+    assert(
+      undoProtectedTag?.receipt?.commandId === "insert-protected-tag" &&
+        state.segments[taggedIndex].target === beforeProtectedTagInsert.target &&
+        JSON.stringify(state.segments[taggedIndex].targetHistory) ===
+          JSON.stringify(beforeProtectedTagInsert.targetHistory) &&
+        storedAfterProtectedTagUndo?.target === beforeProtectedTagInsert.target &&
+        taggedTextarea?.selectionStart === 0 &&
+        taggedTextarea?.selectionEnd === 0,
+      "protected-tag Undo restores target state, persistence, selection, and the original caret"
+    );
+    await redoLastCommand();
+    const storedAfterProtectedTagRedo = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === state.segments[taggedIndex].id
+    );
+    taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
+    assert(
+      state.segments[taggedIndex].target === protectedTagApplied.target &&
+        JSON.stringify(state.segments[taggedIndex].targetHistory) === JSON.stringify(protectedTagApplied.targetHistory) &&
+        Number(state.segments[taggedIndex].revision || 0) > protectedTagUndoRevision &&
+        storedAfterProtectedTagRedo?.target === protectedTagApplied.target &&
+        taggedTextarea?.selectionStart === "<strong>".length &&
+        taggedTextarea?.selectionEnd === "<strong>".length,
+      "protected-tag Redo restores the target patch and post-insert caret with a monotonic revision"
+    );
     taggedTextarea?.setSelectionRange(4, 4);
     const beforeBlockedSplitCount = state.segments.length;
     await splitCurrentSegment();
@@ -17919,21 +20031,39 @@ async function runAppWorkflowTest() {
   } catch (error) {
     publish(false, error);
   }
-}
+} : async function runAppWorkflowTestDisabled() {};
 
-uiI18n?.init?.();
-renderUiLocaleOptions();
-bindLocalAiOutputDrawer();
-wireEvents();
-startWorkspaceAutosave();
 (async () => {
+  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "loading active interface locale";
+  await appRuntime.localeLoader.initialize();
+  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "initializing UI and event wiring";
+  uiI18n?.init?.();
+  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "rendering UI locale options";
+  renderUiLocaleOptions();
+  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "binding local AI drawer";
+  bindLocalAiOutputDrawer();
+  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "wiring UI events";
+  wireEvents();
+  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "starting workspace autosave";
+  startWorkspaceAutosave();
+  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "starting application bootstrap";
+  if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: restoring workspace state";
   restoreWorkspaceDirtyIds();
+  if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: checking storage durability";
   await refreshStorageDurability();
   if (workspaceStorage) {
+    if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: reconnecting workspace";
     state.workspaceStatus = await workspaceStorage.reconnectSavedWorkspace();
     renderWorkspaceStatus();
   }
+  if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: loading projects";
   await loadProjects(false);
+  if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: loading interface preferences";
+  await Promise.all([
+    themeController?.initialize?.({ freshProfile: state.projects.length === 0 }),
+    workspaceLayoutController?.initialize?.()
+  ]);
+  if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: starting workflow characterization";
   await runAppWorkflowTest();
   registerOfflineAppShell();
 })().catch((error) => {

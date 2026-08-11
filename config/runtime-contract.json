@@ -1,0 +1,8 @@
+{
+  "nodeMajor": 24,
+  "electronVersion": "43.3.0",
+  "electronMajor": 43,
+  "electronEndOfLife": "2027-01-05",
+  "electronScheduleVerifiedOn": "2026-08-10",
+  "electronScheduleUrl": "https://releases.electronjs.org/schedule"
+}

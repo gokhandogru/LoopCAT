@@ -1,30 +1,41 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self' https://api.openai.com/v1/responses https://api.openai.com/v1/models https://generativelanguage.googleapis.com https://api.anthropic.com https://api.cohere.com https://*.openai.azure.com https://*.services.ai.azure.com https://ollama.com https://api.deepseek.com https://api.mistral.ai https://api.x.ai https://api.perplexity.ai https://api.groq.com https://api.together.ai https://openrouter.ai https://router.huggingface.co https://api.deepinfra.com https://api.fireworks.ai http://localhost:11434 http://127.0.0.1:11434 http://localhost:1234 http://127.0.0.1:1234 http://localhost:8500 http://127.0.0.1:8500 http://localhost:8502 http://127.0.0.1:8502; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self' https://api.openai.com/v1/responses https://api.openai.com/v1/models https://generativelanguage.googleapis.com https://api.anthropic.com https://api.cohere.com https://*.openai.azure.com https://*.services.ai.azure.com https://ollama.com https://api.deepseek.com https://api.mistral.ai https://api.x.ai https://api.perplexity.ai https://api.groq.com https://api.together.ai https://openrouter.ai https://router.huggingface.co https://api.deepinfra.com https://api.fireworks.ai http://localhost:11434 http://127.0.0.1:11434 http://localhost:1234 http://127.0.0.1:1234 http://localhost:8500 http://127.0.0.1:8500 http://localhost:8502 http://127.0.0.1:8502; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'; trusted-types loopcat-bootstrap loopcat-sanitized-ui; require-trusted-types-for 'script'"
+    />
     <title>LoopCAT</title>
-    <meta name="theme-color" content="#0B756D">
-    <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="icon" href="./icons/loopcat-icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="./styles.css">
-    <link rel="stylesheet" href="./liquid-glass/styles.css">
+    <meta name="theme-color" content="#0B756D" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/loopcat-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./liquid-glass/styles.css" />
+    <link rel="stylesheet" href="./src/ui/tokens.css" />
+    <link rel="stylesheet" href="./src/ui/themes.css" />
+    <link rel="stylesheet" href="./src/ui/base.css" />
+    <link rel="stylesheet" href="./src/ui/components.css" />
+    <link rel="stylesheet" href="./src/ui/layouts.css" />
   </head>
   <body class="liquid-glass-edition">
     <div class="app-shell">
       <header class="topbar">
         <a id="brandHomeLink" class="brand" href="#projects" aria-label="Projects" title="Projects">
-          <div class="brand-mark"><img src="./icons/loopcat-icon.svg" alt=""></div>
+          <div class="brand-mark"><img src="./icons/loopcat-icon.svg" alt="" /></div>
           <div>
             <h1>LoopCAT</h1>
             <p>The local-first translation workspace</p>
           </div>
         </a>
         <div class="topbar-actions">
-          <span id="saveStatus" class="save-status">Saved</span>
+          <span id="saveStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true">Saved</span>
+          <button id="undoBtn" type="button" title="Undo last reversible action" disabled>Undo</button>
+          <button id="redoBtn" type="button" title="Redo last reverted action" disabled>Redo</button>
           <button id="projectsViewBtn">Projects</button>
           <button id="resourcesViewBtn">Resources</button>
+          <button id="trashBtn" type="button">Trash</button>
           <button id="aboutBtn" type="button">About</button>
           <details class="menu workspace-menu">
             <summary id="workspaceMenuSummary">Workspace</summary>
@@ -39,7 +50,11 @@
                 <div class="workspace-submenu-body">
                   <label class="menu-item">
                     Import project package
-                    <input id="projectPackageImportInput" type="file" accept="application/json,.json,.loopcat,.cathan">
+                    <input
+                      id="projectPackageImportInput"
+                      type="file"
+                      accept="application/json,.json,.loopcat,.cathan"
+                    />
                   </label>
                   <button id="syncWorkspaceBtn" type="button">Sync from folder</button>
                 </div>
@@ -50,7 +65,7 @@
                   <button id="backupExportBtn" type="button">Export browser backup</button>
                   <label class="menu-item">
                     Restore browser backup
-                    <input id="backupImportInput" type="file" accept="application/json,.json">
+                    <input id="backupImportInput" type="file" accept="application/json,.json" />
                   </label>
                   <button id="workspaceBackupBtn" type="button">Export folder backup</button>
                 </div>
@@ -64,15 +79,37 @@
                   </label>
                   <label class="menu-item">
                     Import UI translation
-                    <input id="uiLocaleImportInput" type="file" accept="application/json,.json">
+                    <input id="uiLocaleImportInput" type="file" accept="application/json,.json" />
                   </label>
                   <button id="exportUiSourceBtn" type="button">Export UI source</button>
+                </div>
+              </details>
+              <details class="workspace-submenu">
+                <summary>Appearance</summary>
+                <div class="workspace-submenu-body">
+                  <label class="menu-item locale-menu-item">
+                    <span>Theme</span>
+                    <select id="themeSelect" aria-label="Theme">
+                      <option value="system">System</option>
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                    </select>
+                  </label>
+                  <label class="menu-item locale-menu-item">
+                    <span>Editor density</span>
+                    <select id="densitySelect" aria-label="Editor density">
+                      <option value="balanced">Balanced</option>
+                      <option value="compact">Compact</option>
+                    </select>
+                  </label>
+                  <button id="resetLayoutBtn" type="button">Reset workspace layout</button>
                 </div>
               </details>
               <details class="workspace-submenu">
                 <summary>Advanced</summary>
                 <div class="workspace-submenu-body">
                   <button id="repairWorkspaceBtn" type="button">Repair folder links</button>
+                  <button id="diagnosticsBtn" type="button">Local diagnostics</button>
                 </div>
               </details>
             </div>
@@ -80,6 +117,17 @@
           <button id="newProjectBtn" class="primary">New project</button>
         </div>
       </header>
+
+      <aside id="updateReadyBanner" class="update-ready-banner hidden" role="status" aria-live="polite">
+        <div>
+          <strong id="updateReadyTitle">Update ready</strong>
+          <p id="updateReadyMessage">Reload when convenient. LoopCAT will save pending local work first.</p>
+        </div>
+        <div class="toolbar-actions">
+          <button id="reloadUpdateBtn" class="primary" type="button">Reload now</button>
+          <button id="deferUpdateBtn" type="button">Later</button>
+        </div>
+      </aside>
 
       <main id="workspace" class="workspace projects-mode">
         <aside class="project-rail">
@@ -120,10 +168,13 @@
                 <h2>Projects</h2>
                 <p>Open a project or create one to start translating.</p>
               </div>
+              <div class="toolbar-actions">
+                <button id="projectsImportProjectBtn" type="button">Import project package</button>
+              </div>
             </div>
 
             <div class="project-filters">
-              <input id="projectSearchInput" placeholder="Search projects" aria-label="Search projects">
+              <input id="projectSearchInput" placeholder="Search projects" aria-label="Search projects" />
               <select id="languagePairFilter" aria-label="Filter projects by language pair">
                 <option value="">All language pairs</option>
               </select>
@@ -147,12 +198,30 @@
 
             <section id="tmResourcesPanel" class="resource-panel">
               <div class="resource-import-row">
-                <label class="compact-field"><span>Memory name</span><input id="tmResourceNameInput" placeholder="TM name"></label>
-                <label class="compact-field"><span>Source language</span><input id="tmResourceSourceLangInput" placeholder="Source" value="en" list="languageOptions" autocomplete="off"></label>
-                <label class="compact-field"><span>Target language</span><input id="tmResourceTargetLangInput" placeholder="Target" value="tr" list="languageOptions" autocomplete="off"></label>
+                <label class="compact-field"
+                  ><span>Memory name</span><input id="tmResourceNameInput" placeholder="TM name"
+                /></label>
+                <label class="compact-field"
+                  ><span>Source language</span
+                  ><input
+                    id="tmResourceSourceLangInput"
+                    placeholder="Source"
+                    value="en"
+                    list="languageOptions"
+                    autocomplete="off"
+                /></label>
+                <label class="compact-field"
+                  ><span>Target language</span
+                  ><input
+                    id="tmResourceTargetLangInput"
+                    placeholder="Target"
+                    value="tr"
+                    list="languageOptions"
+                    autocomplete="off"
+                /></label>
                 <label class="file-button">
                   Import TMX
-                  <input id="resourceTmxImportInput" type="file" accept=".tmx,application/xml,text/xml">
+                  <input id="resourceTmxImportInput" type="file" accept=".tmx,application/xml,text/xml" />
                 </label>
               </div>
               <div id="tmResourceDashboard" class="resource-dashboard"></div>
@@ -161,16 +230,38 @@
 
             <section id="tbResourcesPanel" class="resource-panel hidden">
               <div class="resource-import-row">
-                <label class="compact-field"><span>Termbase name</span><input id="tbResourceNameInput" placeholder="TB name"></label>
-                <label class="compact-field"><span>Source language</span><input id="tbResourceSourceLangInput" placeholder="Source" value="en" list="languageOptions" autocomplete="off"></label>
-                <label class="compact-field"><span>Target language</span><input id="tbResourceTargetLangInput" placeholder="Target" value="tr" list="languageOptions" autocomplete="off"></label>
+                <label class="compact-field"
+                  ><span>Termbase name</span><input id="tbResourceNameInput" placeholder="TB name"
+                /></label>
+                <label class="compact-field"
+                  ><span>Source language</span
+                  ><input
+                    id="tbResourceSourceLangInput"
+                    placeholder="Source"
+                    value="en"
+                    list="languageOptions"
+                    autocomplete="off"
+                /></label>
+                <label class="compact-field"
+                  ><span>Target language</span
+                  ><input
+                    id="tbResourceTargetLangInput"
+                    placeholder="Target"
+                    value="tr"
+                    list="languageOptions"
+                    autocomplete="off"
+                /></label>
                 <label class="file-button">
                   Import TBX
-                  <input id="resourceTbxImportInput" type="file" accept=".tbx,application/xml,text/xml">
+                  <input id="resourceTbxImportInput" type="file" accept=".tbx,application/xml,text/xml" />
                 </label>
                 <label class="file-button">
                   Import CSV/TSV/XLSX
-                  <input id="resourceTermListImportInput" type="file" accept=".csv,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+                  <input
+                    id="resourceTermListImportInput"
+                    type="file"
+                    accept=".csv,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  />
                 </label>
               </div>
               <div id="tbResourceDashboard" class="resource-dashboard"></div>
@@ -200,7 +291,12 @@
               <div class="toolbar-actions">
                 <button id="projectSettingsBtn" type="button">Project settings</button>
                 <button id="projectFileImportBtn">Import files</button>
-                <input id="projectFileImportInput" type="file" multiple accept=".docx,.docm,.dotx,.dotm,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.xlsx,.xlsm,.xltx,.xltm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.pptx,.pptm,.ppsx,.ppsm,.potx,.potm,application/vnd.openxmlformats-officedocument.presentationml.presentation,.odp,.otp,.ods,.ots,.odt,.ott,application/vnd.oasis.opendocument.text,application/vnd.oasis.opendocument.spreadsheetml.sheet,application/vnd.oasis.opendocument.presentation,.html,.htm,.xhtml,text/html,application/xhtml+xml,.md,.markdown,text/markdown,text/x-markdown,.xlf,.xliff,.sdlxliff,application/xliff+xml,application/x-xliff+xml,.po,.pot,.ttx,.txml,.xini,.mif,.idml,.icml,.dita,application/vnd.adobe.indesign-idml-package,.csv,text/csv,.tsv,text/tab-separated-values,.xml,.dtd,application/xml,text/xml,.json,.yaml,.yml,.php,.properties,.ts,.resx,.wix,.strings,.srt,.vtt,.sbv,.txt,text/plain">
+                <input
+                  id="projectFileImportInput"
+                  type="file"
+                  multiple
+                  accept=".docx,.docm,.dotx,.dotm,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.xlsx,.xlsm,.xltx,.xltm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.pptx,.pptm,.ppsx,.ppsm,.potx,.potm,application/vnd.openxmlformats-officedocument.presentationml.presentation,.odp,.otp,.ods,.ots,.odt,.ott,application/vnd.oasis.opendocument.text,application/vnd.oasis.opendocument.spreadsheetml.sheet,application/vnd.oasis.opendocument.presentation,.html,.htm,.xhtml,text/html,application/xhtml+xml,.md,.markdown,text/markdown,text/x-markdown,.xlf,.xliff,.sdlxliff,application/xliff+xml,application/x-xliff+xml,.po,.pot,.ttx,.txml,.xini,.mif,.idml,.icml,.dita,application/vnd.adobe.indesign-idml-package,.csv,text/csv,.tsv,text/tab-separated-values,.xml,.dtd,application/xml,text/xml,.json,.yaml,.yml,.php,.properties,.ts,.resx,.wix,.strings,.srt,.vtt,.sbv,.txt,text/plain"
+                />
                 <button id="projectPackageExportBtn">Export project</button>
                 <button id="projectHomeDeleteBtn" class="danger-small">Delete project</button>
               </div>
@@ -210,7 +306,14 @@
             <section class="analysis-panel" data-collapsible-panel>
               <div class="analysis-header">
                 <div class="analysis-title">
-                  <button class="panel-toggle" type="button" data-panel-toggle aria-label="Project analysis" aria-expanded="true" aria-controls="projectAnalysisContent">
+                  <button
+                    class="panel-toggle"
+                    type="button"
+                    data-panel-toggle
+                    aria-label="Project analysis"
+                    aria-expanded="true"
+                    aria-controls="projectAnalysisContent"
+                  >
                     <span class="toggle-arrow" aria-hidden="true"></span>
                   </button>
                   <h3>Project analysis</h3>
@@ -246,9 +349,16 @@
                     </label>
                     <label class="menu-item">
                       DOCX source
-                      <input id="docxInput" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                      <input
+                        id="docxInput"
+                        type="file"
+                        accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      />
                     </label>
-                    <label class="menu-item import-format-card" title="Office, OpenDocument, HTML/XHTML, Markdown, XLIFF/SDLXLIFF, PO, TTX, TXML, XINI, IDML, ICML, MIF, DITA, CSV/TSV, XML, DTD, JSON, YAML, PHP, properties, TS, RESX, WiX, strings, SRT, VTT, SBV, TXT">
+                    <label
+                      class="menu-item import-format-card"
+                      title="Office, OpenDocument, HTML/XHTML, Markdown, XLIFF/SDLXLIFF, PO, TTX, TXML, XINI, IDML, ICML, MIF, DITA, CSV/TSV, XML, DTD, JSON, YAML, PHP, properties, TS, RESX, WiX, strings, SRT, VTT, SBV, TXT"
+                    >
                       <span class="import-format-main">Other formats</span>
                       <span class="import-format-sub">Office, OpenDocument, XML, resources, subtitles, text</span>
                       <span class="import-format-chips" aria-hidden="true">
@@ -258,12 +368,19 @@
                         <span>Code</span>
                         <span>Subs</span>
                       </span>
-                      <input id="localizationInput" type="file" accept=".docm,.dotx,.dotm,.xlsx,.xlsm,.xltx,.xltm,.pptx,.pptm,.ppsx,.ppsm,.potx,.potm,.odp,.otp,.ods,.ots,.odt,.ott,.html,.htm,.xhtml,text/html,application/xhtml+xml,.md,.markdown,text/markdown,text/x-markdown,.xlf,.xliff,.sdlxliff,application/xliff+xml,application/x-xliff+xml,.po,.pot,.ttx,.txml,.xini,.mif,.idml,.icml,.dita,application/vnd.adobe.indesign-idml-package,.csv,text/csv,.tsv,text/tab-separated-values,.xml,.dtd,application/xml,text/xml,.json,.yaml,.yml,.php,.properties,.ts,.resx,.wix,.strings,.srt,.vtt,.sbv,.txt,text/plain">
+                      <input
+                        id="localizationInput"
+                        type="file"
+                        accept=".docm,.dotx,.dotm,.xlsx,.xlsm,.xltx,.xltm,.pptx,.pptm,.ppsx,.ppsm,.potx,.potm,.odp,.otp,.ods,.ots,.odt,.ott,.html,.htm,.xhtml,text/html,application/xhtml+xml,.md,.markdown,text/markdown,text/x-markdown,.xlf,.xliff,.sdlxliff,application/xliff+xml,application/x-xliff+xml,.po,.pot,.ttx,.txml,.xini,.mif,.idml,.icml,.dita,application/vnd.adobe.indesign-idml-package,.csv,text/csv,.tsv,text/tab-separated-values,.xml,.dtd,application/xml,text/xml,.json,.yaml,.yml,.php,.properties,.ts,.resx,.wix,.strings,.srt,.vtt,.sbv,.txt,text/plain"
+                      />
                     </label>
                   </div>
                 </details>
                 <button id="confirmBtn" class="primary" title="Confirm current segment">Confirm</button>
                 <button id="focusModeBtn" type="button" title="Show only translation segments">Focus mode</button>
+                <button id="inspectorToggleBtn" type="button" aria-controls="editorInspector" aria-expanded="true">
+                  Inspector
+                </button>
                 <details class="menu">
                   <summary>Segment tools</summary>
                   <div class="menu-panel">
@@ -305,29 +422,40 @@
               <select id="documentFilter" aria-label="Document">
                 <option value="">All documents</option>
               </select>
-              <input id="segmentSearchInput" placeholder="Find in source or target" aria-label="Find in source or target">
+              <input
+                id="segmentSearchInput"
+                placeholder="Find in source or target"
+                aria-label="Find in source or target"
+              />
               <select id="segmentSearchScope" aria-label="Search scope">
                 <option value="both">Source and target</option>
                 <option value="source">Source only</option>
                 <option value="target">Target only</option>
               </select>
               <label class="checkbox-row compact-checkbox">
-                <input id="segmentRegexInput" type="checkbox">
+                <input id="segmentRegexInput" type="checkbox" />
                 Use regular expressions
               </label>
               <label class="checkbox-row compact-checkbox">
-                <input id="segmentCaseInput" type="checkbox">
+                <input id="segmentCaseInput" type="checkbox" />
                 Match case
               </label>
               <details id="replaceMenu" class="menu replace-menu">
                 <summary>Replace</summary>
                 <div class="menu-panel replace-panel">
-                  <input id="replaceFindInput" placeholder="Find target text">
-                  <input id="replaceWithInput" placeholder="Replace with">
+                  <input id="replaceFindInput" placeholder="Find target text" />
+                  <input id="replaceWithInput" placeholder="Replace with" />
                   <button id="replaceVisibleBtn" type="button">Replace visible targets</button>
                   <button id="replaceAllBtn" type="button">Replace all targets</button>
                 </div>
               </details>
+              <select id="filterPresetSelect" aria-label="Workflow preset">
+                <option value="">Custom filters</option>
+                <option value="translate">Translate</option>
+                <option value="review">Review</option>
+                <option value="qa-fixes">QA fixes</option>
+                <option value="ai-review">AI review</option>
+              </select>
               <select id="segmentStatusFilter" aria-label="Segment status">
                 <option value="all">All segments</option>
                 <option value="open">Open segments</option>
@@ -368,11 +496,88 @@
           </div>
         </section>
 
-        <aside class="sidebar">
-          <section class="side-panel tm-panel" data-collapsible-panel>
+        <aside id="editorInspector" class="sidebar" aria-label="Translation inspector">
+          <div
+            id="inspectorResizer"
+            class="inspector-resizer"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize translation inspector"
+            tabindex="0"
+          ></div>
+          <div class="inspector-tabs" role="tablist" aria-label="Inspector views">
+            <button
+              id="inspectorTabMatches"
+              type="button"
+              role="tab"
+              data-inspector-tab="matches"
+              aria-controls="inspectorTmPanel inspectorTbPanel"
+              aria-selected="true"
+            >
+              Matches
+            </button>
+            <button
+              id="inspectorTabQuality"
+              type="button"
+              role="tab"
+              data-inspector-tab="quality"
+              aria-controls="inspectorQualityPanel inspectorQaPanel"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              Quality
+            </button>
+            <button
+              id="inspectorTabReview"
+              type="button"
+              role="tab"
+              data-inspector-tab="review"
+              aria-controls="inspectorReviewPanel inspectorRevisionPanel"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              Review
+            </button>
+            <button
+              id="inspectorTabAi"
+              type="button"
+              role="tab"
+              data-inspector-tab="ai"
+              aria-controls="inspectorAiPanel"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              AI
+            </button>
+            <button
+              id="inspectorTabInfo"
+              type="button"
+              role="tab"
+              data-inspector-tab="info"
+              aria-controls="inspectorInfoPanel"
+              aria-selected="false"
+              tabindex="-1"
+            >
+              Info
+            </button>
+          </div>
+          <section
+            id="inspectorTmPanel"
+            class="side-panel tm-panel"
+            role="tabpanel"
+            aria-labelledby="inspectorTabMatches"
+            data-collapsible-panel
+            data-inspector-section="matches"
+          >
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize TM Matches" aria-expanded="true">
+                <button
+                  class="panel-toggle"
+                  type="button"
+                  data-panel-toggle
+                  aria-label="Minimize TM Matches"
+                  aria-expanded="true"
+                >
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
                 <h2>TM Matches</h2>
@@ -383,7 +588,7 @@
                   <div class="menu-panel">
                     <label class="menu-item">
                       Import TMX
-                      <input id="tmxImportInput" type="file" accept=".tmx,application/xml,text/xml">
+                      <input id="tmxImportInput" type="file" accept=".tmx,application/xml,text/xml" />
                     </label>
                     <button id="tmxExportBtn" type="button">Export TMX</button>
                   </div>
@@ -395,10 +600,23 @@
             </div>
           </section>
 
-          <section class="side-panel tb-panel" data-collapsible-panel>
+          <section
+            id="inspectorTbPanel"
+            class="side-panel tb-panel"
+            role="tabpanel"
+            aria-labelledby="inspectorTabMatches"
+            data-collapsible-panel
+            data-inspector-section="matches"
+          >
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize Termbases" aria-expanded="true">
+                <button
+                  class="panel-toggle"
+                  type="button"
+                  data-panel-toggle
+                  aria-label="Minimize Termbases"
+                  aria-expanded="true"
+                >
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
                 <h2>Termbases</h2>
@@ -409,11 +627,15 @@
                   <div class="menu-panel">
                     <label class="menu-item">
                       Import TBX
-                      <input id="tbxImportInput" type="file" accept=".tbx,application/xml,text/xml">
+                      <input id="tbxImportInput" type="file" accept=".tbx,application/xml,text/xml" />
                     </label>
                     <label class="menu-item">
                       Import CSV/TSV/XLSX
-                      <input id="termListImportInput" type="file" accept=".csv,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+                      <input
+                        id="termListImportInput"
+                        type="file"
+                        accept=".csv,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      />
                     </label>
                     <button id="tbxExportBtn" type="button">Export TBX</button>
                   </div>
@@ -424,11 +646,11 @@
               <div id="termSuggestions" class="result-list muted">No terms yet.</div>
               <form id="termForm" class="term-form">
                 <select id="termBaseSelect" aria-label="Termbase"></select>
-                <input id="sourceTermInput" placeholder="Source term" aria-label="Source term">
-                <input id="targetTermInput" placeholder="Target term" aria-label="Target term">
-                <input id="termNotesInput" placeholder="Notes" aria-label="Term notes">
+                <input id="sourceTermInput" placeholder="Source term" aria-label="Source term" />
+                <input id="targetTermInput" placeholder="Target term" aria-label="Target term" />
+                <input id="termNotesInput" placeholder="Notes" aria-label="Term notes" />
                 <label class="checkbox-row term-forbidden-row">
-                  <input id="termForbiddenInput" type="checkbox">
+                  <input id="termForbiddenInput" type="checkbox" />
                   Forbidden target
                 </label>
                 <button type="submit">Add term</button>
@@ -436,10 +658,23 @@
             </div>
           </section>
 
-          <section class="side-panel review-panel" data-collapsible-panel>
+          <section
+            id="inspectorReviewPanel"
+            class="side-panel review-panel"
+            role="tabpanel"
+            aria-labelledby="inspectorTabReview"
+            data-collapsible-panel
+            data-inspector-section="review"
+          >
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize comments" aria-expanded="true">
+                <button
+                  class="panel-toggle"
+                  type="button"
+                  data-panel-toggle
+                  aria-label="Minimize comments"
+                  aria-expanded="true"
+                >
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
                 <h2>Comments</h2>
@@ -461,10 +696,23 @@
             </div>
           </section>
 
-          <section class="side-panel quality-panel utility-panel collapsed" data-collapsible-panel>
+          <section
+            id="inspectorQualityPanel"
+            class="side-panel quality-panel utility-panel collapsed"
+            role="tabpanel"
+            aria-labelledby="inspectorTabQuality"
+            data-collapsible-panel
+            data-inspector-section="quality"
+          >
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Expand Quality Workbench" aria-expanded="false">
+                <button
+                  class="panel-toggle"
+                  type="button"
+                  data-panel-toggle
+                  aria-label="Expand Quality Workbench"
+                  aria-expanded="false"
+                >
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
                 <h2>Quality Workbench</h2>
@@ -513,8 +761,8 @@
                     <option value="client-approved">Client approved</option>
                   </select>
                 </label>
-                <input id="qualityAudienceInput" placeholder="Audience">
-                <input id="qualityToneInput" placeholder="Tone">
+                <input id="qualityAudienceInput" placeholder="Audience" />
+                <input id="qualityToneInput" placeholder="Tone" />
                 <button type="submit">Save profile</button>
               </form>
               <div id="qualitySummary" class="quality-summary muted">No quality profile loaded.</div>
@@ -554,10 +802,23 @@
             </div>
           </section>
 
-          <section class="side-panel project-card utility-panel collapsed" data-collapsible-panel>
+          <section
+            id="inspectorInfoPanel"
+            class="side-panel project-card utility-panel collapsed"
+            role="tabpanel"
+            aria-labelledby="inspectorTabInfo"
+            data-collapsible-panel
+            data-inspector-section="info"
+          >
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Expand Project Info" aria-expanded="false">
+                <button
+                  class="panel-toggle"
+                  type="button"
+                  data-panel-toggle
+                  aria-label="Expand Project Info"
+                  aria-expanded="false"
+                >
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
                 <h2>Project Info</h2>
@@ -565,17 +826,30 @@
             </div>
             <div class="panel-content">
               <form id="domainForm" class="domain-form">
-                <input id="projectDomainEditInput" placeholder="Domain">
+                <input id="projectDomainEditInput" placeholder="Domain" />
                 <button type="submit">Save</button>
               </form>
               <dl id="projectInfo"></dl>
             </div>
           </section>
 
-          <section class="side-panel revision-panel utility-panel collapsed" data-collapsible-panel>
+          <section
+            id="inspectorRevisionPanel"
+            class="side-panel revision-panel utility-panel collapsed"
+            role="tabpanel"
+            aria-labelledby="inspectorTabReview"
+            data-collapsible-panel
+            data-inspector-section="review"
+          >
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Expand Revision History" aria-expanded="false">
+                <button
+                  class="panel-toggle"
+                  type="button"
+                  data-panel-toggle
+                  aria-label="Expand Revision History"
+                  aria-expanded="false"
+                >
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
                 <h2>Revision History</h2>
@@ -586,19 +860,58 @@
             </div>
           </section>
 
-          <section class="side-panel ai-panel utility-panel collapsed" data-collapsible-panel>
+          <section
+            id="inspectorAiPanel"
+            class="side-panel ai-panel utility-panel"
+            role="tabpanel"
+            aria-labelledby="inspectorTabAi"
+            data-collapsible-panel
+            data-inspector-section="ai"
+          >
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Expand AI settings" aria-expanded="false">
+                <button
+                  class="panel-toggle"
+                  type="button"
+                  data-panel-toggle
+                  aria-label="Minimize contextual AI"
+                  aria-expanded="true"
+                >
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
-                <h2>AI Command Centre</h2>
+                <h2>AI</h2>
               </div>
             </div>
             <div class="panel-content">
-              <form id="aiSettingsForm" class="ai-settings-form">
+              <section class="ai-contextual-workflow" aria-labelledby="aiContextualTitle">
+                <div class="ai-contextual-heading">
+                  <div>
+                    <h3 id="aiContextualTitle">AI for this segment</h3>
+                    <p>Suggestions stay inspectable and do not replace confirmed or locked text.</p>
+                  </div>
+                  <button id="openProjectAiSettingsBtn" type="button">Provider settings</button>
+                </div>
+                <p id="contextualAiStatus" class="ai-privacy-note" role="status" aria-live="polite">
+                  Provider not connected
+                </p>
+                <div class="ai-contextual-actions" aria-label="Contextual AI actions">
+                  <button id="contextualAiTranslateBtn" class="primary" type="button">Translate selected</button>
+                  <button id="contextualAiReviewBtn" type="button">Review</button>
+                  <button id="contextualAiRepairBtn" type="button">Suggest tag repair</button>
+                  <button id="contextualAiPolishBtn" type="button">Polish draft</button>
+                  <button id="contextualAiVariantsBtn" type="button">Suggest alternatives</button>
+                  <button id="contextualAiApplyTermsBtn" type="button">Apply terminology</button>
+                  <button id="contextualOpenAiSuggestionBtn" type="button">Cloud suggestion</button>
+                  <button id="contextualAiCancelBtn" type="button" disabled>Cancel</button>
+                </div>
+                <div id="contextualAiSuggestionMount" class="ai-contextual-results"></div>
+                <div id="contextualAiOutputMount" class="ai-contextual-results"></div>
+              </section>
+              <section id="aiSettingsForm" class="ai-settings-form">
                 <section class="local-ai-centre">
-                  <p id="localAiPrivacyNote" class="ai-privacy-note">Local AI requests are sent only to the provider URL below. Ollama is the default local provider.</p>
+                  <p id="localAiPrivacyNote" class="ai-privacy-note">
+                    Local AI requests are sent only to the provider URL below. Ollama is the default local provider.
+                  </p>
                   <div class="local-ai-group local-ai-primary-group">
                     <h3><span class="local-ai-section-number">1</span> Connect provider</h3>
                     <label>
@@ -609,7 +922,7 @@
                     </label>
                     <label>
                       Base URL
-                      <input id="localAiBaseUrlInput" value="http://localhost:11434" autocomplete="off">
+                      <input id="localAiBaseUrlInput" value="http://localhost:11434" autocomplete="off" />
                     </label>
                     <div class="local-ai-actions">
                       <button id="localAiTestBtn" type="button">Test connection</button>
@@ -617,56 +930,66 @@
                       <button id="localAiRefreshModelsBtn" type="button">Refresh models</button>
                       <button id="localAiOpusCatHelpBtn" class="hidden" type="button">Connection help</button>
                     </div>
-                    <div id="localAiStatus" class="local-ai-status disconnected">
+                    <div
+                      id="localAiStatus"
+                      class="local-ai-status disconnected"
+                      role="status"
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
                       <span class="local-ai-status-dot" aria-hidden="true"></span>
                       <span id="localAiStatusText">Disconnected</span>
                     </div>
                     <details class="local-ai-inline-details" id="localAiProviderDetails">
                       <summary>Advanced provider options</summary>
-                    <label>
-                      Provider
-                      <select id="localAiProviderSelect">
-                        <optgroup label="Local and Ollama">
-                          <option value="ollama">Ollama</option>
-                          <option value="openai-compatible">LM Studio / OpenAI-compatible</option>
-                          <option value="opus-cat">OPUS-CAT MT Engine</option>
-                        </optgroup>
-                        <optgroup label="Hosted providers">
-                          <option value="openai">OpenAI</option>
-                          <option value="deepseek">DeepSeek</option>
-                          <option value="gemini">Google Gemini</option>
-                          <option value="anthropic">Anthropic Claude</option>
-                          <option value="cohere">Cohere Command</option>
-                          <option value="mistral">Mistral AI</option>
-                          <option value="xai">xAI Grok</option>
-                          <option value="perplexity">Perplexity Sonar</option>
-                        </optgroup>
-                        <optgroup label="Hosted routers">
-                          <option value="groq">Groq</option>
-                          <option value="together">Together AI</option>
-                          <option value="openrouter">OpenRouter</option>
-                          <option value="huggingface">Hugging Face Inference Providers</option>
-                          <option value="deepinfra">DeepInfra</option>
-                          <option value="fireworks">Fireworks AI</option>
-                        </optgroup>
-                        <optgroup label="Managed deployments">
-                          <option value="azure-openai">Azure OpenAI</option>
-                        </optgroup>
-                      </select>
-                    </label>
-                    <div class="local-ai-actions">
-                      <button id="localAiLocalCloudPresetBtn" type="button">Use local cloud model</button>
-                      <button id="localAiCloudPresetBtn" type="button">Use hosted Ollama</button>
-                    </div>
-                    <div id="localAiProviderSummary" class="local-ai-provider-summary" aria-live="polite"></div>
+                      <label>
+                        Provider
+                        <select id="localAiProviderSelect">
+                          <optgroup label="Local and Ollama">
+                            <option value="ollama">Ollama</option>
+                            <option value="openai-compatible">LM Studio / OpenAI-compatible</option>
+                            <option value="opus-cat">OPUS-CAT MT Engine</option>
+                          </optgroup>
+                          <optgroup label="Hosted providers">
+                            <option value="openai">OpenAI</option>
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="gemini">Google Gemini</option>
+                            <option value="anthropic">Anthropic Claude</option>
+                            <option value="cohere">Cohere Command</option>
+                            <option value="mistral">Mistral AI</option>
+                            <option value="xai">xAI Grok</option>
+                            <option value="perplexity">Perplexity Sonar</option>
+                          </optgroup>
+                          <optgroup label="Hosted routers">
+                            <option value="groq">Groq</option>
+                            <option value="together">Together AI</option>
+                            <option value="openrouter">OpenRouter</option>
+                            <option value="huggingface">Hugging Face Inference Providers</option>
+                            <option value="deepinfra">DeepInfra</option>
+                            <option value="fireworks">Fireworks AI</option>
+                          </optgroup>
+                          <optgroup label="Managed deployments">
+                            <option value="azure-openai">Azure OpenAI</option>
+                          </optgroup>
+                        </select>
+                      </label>
+                      <div class="local-ai-actions">
+                        <button id="localAiLocalCloudPresetBtn" type="button">Use local cloud model</button>
+                        <button id="localAiCloudPresetBtn" type="button">Use hosted Ollama</button>
+                      </div>
+                      <div id="localAiProviderSummary" class="local-ai-provider-summary" aria-live="polite"></div>
                     </details>
                     <div id="localAiHostedKeyControls" class="local-ai-key-controls hidden">
-                    <input id="localAiApiKeyInput" type="password" placeholder="Hosted provider API key; OpenAI can reuse saved OpenAI key">
-                    <label class="checkbox-row">
-                      <input id="rememberLocalAiKeyInput" type="checkbox">
-                      Remember hosted key in this browser
-                    </label>
-                    <button id="clearLocalAiKeyBtn" type="button">Clear hosted key</button>
+                      <input
+                        id="localAiApiKeyInput"
+                        type="password"
+                        placeholder="Hosted provider API key; OpenAI can reuse saved OpenAI key"
+                      />
+                      <label class="checkbox-row">
+                        <input id="rememberLocalAiKeyInput" type="checkbox" />
+                        Remember hosted key in this browser
+                      </label>
+                      <button id="clearLocalAiKeyBtn" type="button">Clear hosted key</button>
                     </div>
                   </div>
                   <div class="local-ai-group local-ai-primary-group">
@@ -679,10 +1002,10 @@
                     </label>
                     <label>
                       Model name
-                      <input id="localAiModelInput" value="translategemma" autocomplete="off">
+                      <input id="localAiModelInput" value="translategemma" autocomplete="off" />
                     </label>
                     <div id="localAiPullModelWrap" class="local-ai-actions">
-                    <button id="localAiPullModelBtn" type="button">Pull translategemma</button>
+                      <button id="localAiPullModelBtn" type="button">Pull translategemma</button>
                     </div>
                   </div>
                   <div class="local-ai-group local-ai-primary-group">
@@ -690,19 +1013,19 @@
                     <div class="local-ai-language-grid">
                       <label>
                         Source language
-                        <input id="localAiSourceLangInput" autocomplete="off" list="languageNameOptions">
+                        <input id="localAiSourceLangInput" autocomplete="off" list="languageNameOptions" />
                       </label>
                       <label>
                         Source code
-                        <input id="localAiSourceCodeInput" autocomplete="off" list="languageCodeOptions">
+                        <input id="localAiSourceCodeInput" autocomplete="off" list="languageCodeOptions" />
                       </label>
                       <label>
                         Target language
-                        <input id="localAiTargetLangInput" autocomplete="off" list="languageNameOptions">
+                        <input id="localAiTargetLangInput" autocomplete="off" list="languageNameOptions" />
                       </label>
                       <label>
                         Target code
-                        <input id="localAiTargetCodeInput" autocomplete="off" list="languageCodeOptions">
+                        <input id="localAiTargetCodeInput" autocomplete="off" list="languageCodeOptions" />
                       </label>
                     </div>
                     <label>
@@ -714,36 +1037,47 @@
                         <option value="project">All project segments</option>
                       </select>
                     </label>
-                    <p class="local-ai-safeguard">Confirmed and locked segments are preserved. Existing target text is skipped unless overwrite is enabled.</p>
+                    <p class="local-ai-safeguard">
+                      Confirmed and locked segments are preserved. Existing target text is skipped unless overwrite is
+                      enabled.
+                    </p>
                     <div class="local-ai-actions local-ai-run-actions">
                       <button id="localAiPretranslateBtn" class="primary" type="button">Pre-translate</button>
                       <button id="localAiCancelBtn" type="button" disabled>Cancel</button>
                     </div>
-                    <div id="localAiProgress" class="local-ai-progress">No local AI batch running.</div>
+                    <div
+                      id="localAiProgress"
+                      class="local-ai-progress"
+                      role="status"
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
+                      No local AI batch running.
+                    </div>
                     <details class="local-ai-inline-details" id="localAiAdvancedSettings">
                       <summary>Advanced batch settings</summary>
-                    <div class="local-ai-language-grid">
-                      <label>
-                        Concurrency
-                        <input id="localAiConcurrencyInput" type="number" min="1" max="2" step="1">
+                      <div class="local-ai-language-grid">
+                        <label>
+                          Concurrency
+                          <input id="localAiConcurrencyInput" type="number" min="1" max="2" step="1" />
+                        </label>
+                        <label>
+                          Timeout ms
+                          <input id="localAiTimeoutInput" type="number" min="5000" step="1000" />
+                        </label>
+                      </div>
+                      <label class="checkbox-row">
+                        <input id="localAiOverwriteInput" type="checkbox" />
+                        Overwrite existing target text
                       </label>
-                      <label>
-                        Timeout ms
-                        <input id="localAiTimeoutInput" type="number" min="5000" step="1000">
+                      <label class="checkbox-row">
+                        <input id="localAiIncludeContextInput" type="checkbox" checked />
+                        Include nearby segment context
                       </label>
-                    </div>
-                    <label class="checkbox-row">
-                      <input id="localAiOverwriteInput" type="checkbox">
-                      Overwrite existing target text
-                    </label>
-                    <label class="checkbox-row">
-                      <input id="localAiIncludeContextInput" type="checkbox" checked>
-                      Include nearby segment context
-                    </label>
-                    <label class="checkbox-row">
-                      <input id="localAiPreserveConfirmedInput" type="checkbox" checked disabled>
-                      Confirmed and locked segments are always preserved
-                    </label>
+                      <label class="checkbox-row">
+                        <input id="localAiPreserveConfirmedInput" type="checkbox" checked disabled />
+                        Confirmed and locked segments are always preserved
+                      </label>
                     </details>
                   </div>
                   <details class="local-ai-group local-ai-drawer">
@@ -848,7 +1182,7 @@
                       <span>Latest AI output</span>
                       <small>Results from optional tools</small>
                     </summary>
-                  <div id="localAiPromptOutput" class="ai-suggestion-list muted">No local AI output yet.</div>
+                    <div id="localAiPromptOutput" class="ai-suggestion-list muted">No local AI output yet.</div>
                   </details>
                 </section>
                 <details class="cloud-ai-settings local-ai-group local-ai-drawer">
@@ -856,44 +1190,59 @@
                     <span>Cloud suggestion</span>
                     <small>Optional OpenAI helper</small>
                   </summary>
-                <label class="checkbox-row">
-                  <input id="aiEnabledInput" type="checkbox">
-                  Enable AI helpers for this project
-                </label>
-                <input id="aiProviderInput" placeholder="Provider, e.g. OpenAI, Anthropic, local">
-                <input id="aiModelInput" placeholder="Model name" value="gpt-5.5">
-                <input id="openAiApiKeyInput" type="password" placeholder="OpenAI API key">
-                <label class="checkbox-row">
-                  <input id="rememberOpenAiKeyInput" type="checkbox">
-                  Remember key in this browser
-                </label>
-                <button id="clearOpenAiKeyBtn" type="button">Clear saved key</button>
-                <p id="aiConnectionStatus" class="ai-privacy-note">API keys stay in this browser and are never exported with project packages.</p>
-                <label class="checkbox-row">
-                  <input id="aiSendSourceInput" type="checkbox">
-                  Allow source text to be sent to AI
-                </label>
-                <label class="checkbox-row">
-                  <input id="aiUseTmInput" type="checkbox">
-                  Include TM context
-                </label>
-                <label class="checkbox-row">
-                  <input id="aiUseTbInput" type="checkbox">
-                  Include termbase context
-                </label>
-                <textarea id="aiStyleGuideInput" rows="4" placeholder="Project style instructions"></textarea>
-                <button id="openAiSuggestionBtn" type="button">OpenAI suggestion</button>
-                <div id="aiSuggestionList" class="ai-suggestion-list muted">No AI suggestions yet.</div>
+                  <label class="checkbox-row">
+                    <input id="aiEnabledInput" type="checkbox" />
+                    Enable AI helpers for this project
+                  </label>
+                  <input id="aiProviderInput" placeholder="Provider, e.g. OpenAI, Anthropic, local" />
+                  <input id="aiModelInput" placeholder="Model name" value="gpt-5.5" />
+                  <input id="openAiApiKeyInput" type="password" placeholder="OpenAI API key" />
+                  <label class="checkbox-row">
+                    <input id="rememberOpenAiKeyInput" type="checkbox" />
+                    Remember key in this browser
+                  </label>
+                  <button id="clearOpenAiKeyBtn" type="button">Clear saved key</button>
+                  <p id="aiConnectionStatus" class="ai-privacy-note">
+                    API keys stay in this browser and are never exported with project packages.
+                  </p>
+                  <label class="checkbox-row">
+                    <input id="aiSendSourceInput" type="checkbox" />
+                    Allow source text to be sent to AI
+                  </label>
+                  <label class="checkbox-row">
+                    <input id="aiUseTmInput" type="checkbox" />
+                    Include TM context
+                  </label>
+                  <label class="checkbox-row">
+                    <input id="aiUseTbInput" type="checkbox" />
+                    Include termbase context
+                  </label>
+                  <textarea id="aiStyleGuideInput" rows="4" placeholder="Project style instructions"></textarea>
+                  <button id="openAiSuggestionBtn" type="button">OpenAI suggestion</button>
+                  <div id="aiSuggestionList" class="ai-suggestion-list muted">No AI suggestions yet.</div>
                 </details>
-                <button type="submit">Save AI settings</button>
-              </form>
+                <button id="saveAiSettingsBtn" type="button">Save AI settings</button>
+              </section>
             </div>
           </section>
 
-          <section class="side-panel qa-panel" data-collapsible-panel>
+          <section
+            id="inspectorQaPanel"
+            class="side-panel qa-panel"
+            role="tabpanel"
+            aria-labelledby="inspectorTabQuality"
+            data-collapsible-panel
+            data-inspector-section="quality"
+          >
             <div class="panel-header">
               <div class="panel-title">
-                <button class="panel-toggle" type="button" data-panel-toggle aria-label="Minimize QA Checks" aria-expanded="true">
+                <button
+                  class="panel-toggle"
+                  type="button"
+                  data-panel-toggle
+                  aria-label="Minimize QA Checks"
+                  aria-expanded="true"
+                >
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
                 <h2>QA Checks</h2>
@@ -922,22 +1271,34 @@
       </section>
     </div>
 
-    <div id="commandPaletteOverlay" class="command-palette-overlay hidden">
+    <div id="commandPaletteOverlay" class="command-palette-overlay hidden" aria-hidden="true">
       <section class="command-palette" role="dialog" aria-modal="true" aria-labelledby="commandPaletteTitle">
         <header>
           <h2 id="commandPaletteTitle">Commands</h2>
           <button id="closeCommandPaletteBtn" type="button" aria-label="Close commands">Close</button>
         </header>
-        <input id="commandPaletteInput" placeholder="Find command">
-        <div id="commandPaletteResults" class="command-results"></div>
+        <input
+          id="commandPaletteInput"
+          role="combobox"
+          aria-label="Find command"
+          aria-autocomplete="list"
+          aria-expanded="false"
+          aria-controls="commandPaletteResults"
+          placeholder="Find command"
+          autocomplete="off"
+        />
+        <div id="commandPaletteResults" class="command-results" role="listbox" aria-label="Available commands"></div>
       </section>
     </div>
 
-    <dialog id="aboutDialog">
+    <dialog id="aboutDialog" aria-labelledby="aboutDialogTitle">
       <section class="dialog-card about-card" aria-labelledby="aboutDialogTitle">
         <div>
           <h2 id="aboutDialogTitle">About LoopCAT</h2>
-          <p class="about-lede">The local-first translation workspace for project packages, translation memories, termbases, and offline-first review workflows.</p>
+          <p class="about-lede">
+            The local-first translation workspace for project packages, translation memories, termbases, and
+            offline-first review workflows.
+          </p>
         </div>
         <dl class="about-meta">
           <div>
@@ -950,7 +1311,11 @@
           </div>
           <div>
             <dt>Profile</dt>
-            <dd><a href="https://www.linkedin.com/in/gokhan-dogru-localization/" target="_blank" rel="noopener noreferrer">LinkedIn: gokhan-dogru-localization</a></dd>
+            <dd>
+              <a href="https://www.linkedin.com/in/gokhan-dogru-localization/" target="_blank" rel="noopener noreferrer"
+                >LinkedIn: gokhan-dogru-localization</a
+              >
+            </dd>
           </div>
         </dl>
         <p class="about-credit">Co-created by Dr. Gokhan Dogru and Codex.</p>
@@ -960,41 +1325,70 @@
       </section>
     </dialog>
 
-    <dialog id="opusCatHelpDialog">
+    <dialog id="opusCatHelpDialog" aria-labelledby="opusCatHelpDialogTitle">
       <section class="dialog-card opus-cat-help-card" aria-labelledby="opusCatHelpDialogTitle">
         <header>
           <h2 id="opusCatHelpDialogTitle">Connect OPUS-CAT to LoopCAT Web</h2>
-          <p class="opus-cat-help-intro">LoopCAT tried the standard OPUS-CAT addresses but the browser could not read a response. Use these checks in order.</p>
+          <p class="opus-cat-help-intro">
+            LoopCAT tried the standard OPUS-CAT addresses but the browser could not read a response. Use these checks in
+            order.
+          </p>
         </header>
         <ol class="opus-cat-help-steps">
           <li>
             <span class="opus-cat-help-number" aria-hidden="true">1</span>
             <div>
               <h3>Check the OPUS-CAT engine</h3>
-              <p>Keep OPUS-CAT open, then open the engine check. A working engine shows a language-pair list such as <code>["en-tr"]</code>.</p>
-              <a href="http://localhost:8500/MTRestService/ListSupportedLanguagePairs?tokenCode=0" target="_blank" rel="noopener noreferrer">Open engine check</a>
-              <p class="muted">If the page does not load, start OPUS-CAT MT Engine and load the required model before testing again.</p>
+              <p>
+                Keep OPUS-CAT open, then open the engine check. A working engine shows a language-pair list such as
+                <code>["en-tr"]</code>.
+              </p>
+              <a
+                href="http://localhost:8500/MTRestService/ListSupportedLanguagePairs?tokenCode=0"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Open engine check</a
+              >
+              <p class="muted">
+                If the page does not load, start OPUS-CAT MT Engine and load the required model before testing again.
+              </p>
             </div>
           </li>
           <li>
             <span class="opus-cat-help-number" aria-hidden="true">2</span>
             <div>
               <h3>Use a browser-readable OPUS-CAT build</h3>
-              <p>If the engine check works but LoopCAT still fails, the OPUS-CAT build is probably not sending the CORS permission required by browsers. Install or update OPUS-CAT from its official installation page.</p>
-              <a href="https://helsinki-nlp.github.io/OPUS-CAT/install" target="_blank" rel="noopener noreferrer">Open OPUS-CAT installation guide</a>
+              <p>
+                If the engine check works but LoopCAT still fails, the OPUS-CAT build is probably not sending the CORS
+                permission required by browsers. Install or update OPUS-CAT from its official installation page.
+              </p>
+              <a href="https://helsinki-nlp.github.io/OPUS-CAT/install" target="_blank" rel="noopener noreferrer"
+                >Open OPUS-CAT installation guide</a
+              >
             </div>
           </li>
           <li>
             <span class="opus-cat-help-number" aria-hidden="true">3</span>
             <div>
               <h3>For an older engine, start the LoopCAT bridge</h3>
-              <p>From the extracted LoopCAT Web folder, run this command in PowerShell or Terminal and keep that window open:</p>
+              <p>
+                From the extracted LoopCAT Web folder, run this command in PowerShell or Terminal and keep that window
+                open:
+              </p>
               <code class="opus-cat-help-command">node scripts/opus-cat-web-bridge.cjs</code>
-              <p class="muted">The bridge requires <a href="https://nodejs.org/en/download" target="_blank" rel="noopener noreferrer">Node.js</a>. If <code>node</code> is not recognized, install Node.js first. Leave LoopCAT's Base URL at <code>http://localhost:8500</code>; LoopCAT finds the bridge on port 8502 automatically.</p>
+              <p class="muted">
+                The bridge requires
+                <a href="https://nodejs.org/en/download" target="_blank" rel="noopener noreferrer">Node.js</a>. If
+                <code>node</code> is not recognized, install Node.js first. Leave LoopCAT's Base URL at
+                <code>http://localhost:8500</code>; LoopCAT finds the bridge on port 8502 automatically.
+              </p>
             </div>
           </li>
         </ol>
-        <p class="opus-cat-help-note"><strong>Fastest alternative:</strong> use LoopCAT Desktop, which includes the local compatibility layer and does not require the separate web bridge.</p>
+        <p class="opus-cat-help-note">
+          <strong>Fastest alternative:</strong> use LoopCAT Desktop, which includes the local compatibility layer and
+          does not require the separate web bridge.
+        </p>
         <div class="dialog-actions">
           <button id="closeOpusCatHelpBtn" type="button">Close</button>
           <button id="retryOpusCatConnectionBtn" class="primary" type="button">Try connection again</button>
@@ -1002,7 +1396,7 @@
       </section>
     </dialog>
 
-    <dialog id="tmPretranslateDialog">
+    <dialog id="tmPretranslateDialog" aria-labelledby="tmPretranslateDialogTitle">
       <form id="tmPretranslateForm" method="dialog" class="dialog-card" aria-labelledby="tmPretranslateDialogTitle">
         <div>
           <h2 id="tmPretranslateDialogTitle">Pretranslate from TM</h2>
@@ -1010,7 +1404,17 @@
         </div>
         <label>
           Minimum match percentage
-          <input id="tmPretranslateThresholdInput" type="number" min="0" max="100" step="1" value="85" inputmode="decimal" required autocomplete="off">
+          <input
+            id="tmPretranslateThresholdInput"
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            value="85"
+            inputmode="decimal"
+            required
+            autocomplete="off"
+          />
         </label>
         <div class="dialog-actions">
           <button type="submit" value="cancel" formnovalidate>Cancel</button>
@@ -1019,20 +1423,58 @@
       </form>
     </dialog>
 
-    <dialog id="projectDialog">
-      <form id="projectForm" method="dialog" class="dialog-card">
+    <dialog id="trashDialog" aria-labelledby="trashDialogTitle">
+      <section class="dialog-card trash-dialog-card">
+        <header class="dialog-heading-row">
+          <div>
+            <h2 id="trashDialogTitle">Trash</h2>
+            <p>Deleted local items stay here until you empty Trash.</p>
+          </div>
+          <button id="closeTrashBtn" type="button">Close</button>
+        </header>
+        <div id="trashList" class="trash-list"></div>
+        <div class="dialog-actions">
+          <button id="emptyTrashBtn" class="danger-small" type="button">Empty Trash permanently</button>
+        </div>
+      </section>
+    </dialog>
+
+    <dialog id="diagnosticsDialog" aria-labelledby="diagnosticsDialogTitle">
+      <section class="dialog-card diagnostics-card">
+        <header class="dialog-heading-row">
+          <div>
+            <h2 id="diagnosticsDialogTitle">Local diagnostics</h2>
+            <p>Inspect a redacted support snapshot. Nothing is transmitted automatically.</p>
+          </div>
+          <button id="closeDiagnosticsBtn" type="button">Close</button>
+        </header>
+        <dl id="diagnosticsSummary" class="diagnostics-summary"></dl>
+        <details>
+          <summary>Included fields</summary>
+          <pre id="diagnosticsPreview" class="diagnostics-preview" tabindex="0"></pre>
+        </details>
+        <p id="diagnosticsMessage" class="muted" role="status" aria-live="polite"></p>
+        <div class="dialog-actions">
+          <button id="diagnosticsHardwareBtn" type="button" hidden></button>
+          <button id="exportDiagnosticsBtn" class="primary" type="button">Export redacted diagnostics</button>
+        </div>
+      </section>
+    </dialog>
+
+    <dialog id="projectDialog" aria-labelledby="projectDialogTitle">
+      <form id="projectForm" method="dialog" class="dialog-card" aria-labelledby="projectDialogTitle">
         <h2 id="projectDialogTitle">New project</h2>
         <label>
           Project name
-          <input id="projectNameInput" required autocomplete="off">
+          <input id="projectNameInput" required autocomplete="off" />
         </label>
         <label>
           Creator
-          <input id="projectCreatorInput" autocomplete="off" placeholder="Who created this project">
+          <input id="projectCreatorInput" autocomplete="off" placeholder="Who created this project" />
         </label>
         <label>
           Domain
-          <input id="projectDomainInput" autocomplete="off" placeholder="Legal, medical, technical...">
+          <input id="projectDomainInput" autocomplete="off" placeholder="Legal, medical, technical..." />
         </label>
         <section class="language-pair-quick-picks" aria-label="Frequent language pairs">
           <div class="resource-config-header">
@@ -1043,11 +1485,11 @@
         <div class="two-col">
           <label>
             Source language
-            <input id="sourceLangInput" value="en" required list="languageOptions" autocomplete="off">
+            <input id="sourceLangInput" value="en" required list="languageOptions" autocomplete="off" />
           </label>
           <label>
             Target language
-            <input id="targetLangInput" value="tr" required list="languageOptions" autocomplete="off">
+            <input id="targetLangInput" value="tr" required list="languageOptions" autocomplete="off" />
           </label>
         </div>
         <details id="projectAdvancedOptions" class="project-advanced-options">
@@ -1063,7 +1505,7 @@
               </div>
               <div class="project-storage-row">
                 <label class="checkbox-row">
-                  <input id="saveProjectToFolderInput" type="checkbox">
+                  <input id="saveProjectToFolderInput" type="checkbox" />
                   Save this project as a visible package folder
                 </label>
                 <button id="projectChooseWorkspaceBtn" type="button">Choose folder</button>
@@ -1082,7 +1524,7 @@
                 <div id="projectTmResourceList" class="resource-option-list"></div>
                 <label>
                   New main TM
-                  <input id="newTmNameInput" autocomplete="off" placeholder="Create a new project TM">
+                  <input id="newTmNameInput" autocomplete="off" placeholder="Create a new project TM" />
                 </label>
               </div>
               <div class="resource-picker-block">
@@ -1092,15 +1534,22 @@
                 <div id="projectTbResourceList" class="resource-option-list"></div>
                 <label>
                   New termbase
-                  <input id="newTermBaseNameInput" autocomplete="off" placeholder="Create a new project termbase">
+                  <input id="newTermBaseNameInput" autocomplete="off" placeholder="Create a new project termbase" />
                 </label>
               </div>
             </section>
+            <details id="projectAiOptions" class="project-resource-config project-ai-options">
+              <summary>
+                <span>AI providers and models</span>
+                <small>Optional project settings</small>
+              </summary>
+              <div id="projectAiSettingsMount" class="project-ai-settings-mount"></div>
+            </details>
           </div>
         </details>
         <div class="dialog-actions">
           <button type="button" id="cancelProjectBtn">Cancel</button>
-          <button class="primary" value="default">Create</button>
+          <button id="saveProjectBtn" class="primary" value="default">Create</button>
         </div>
       </form>
     </dialog>
@@ -1121,6 +1570,7 @@
       </tr>
     </template>
 
+    <script src="./config/production-assets.js"></script>
     <script src="./storage.js"></script>
     <script src="./workspace-storage.js"></script>
     <script src="./docx.js"></script>
@@ -1143,6 +1593,7 @@
     <script src="./i18n/locales/ca-ES.js"></script>
     <script src="./i18n/locales/en-US.js"></script>
     <script src="./i18n/locales/tr-TR.js"></script>
+    <script src="./src/ui/focus-controller.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

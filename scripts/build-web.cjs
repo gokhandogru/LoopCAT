@@ -6,54 +6,15 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
 const distFlagIndex = args.indexOf("--dist");
-const distDir = distFlagIndex >= 0 && args[distFlagIndex + 1]
-  ? path.resolve(process.cwd(), args[distFlagIndex + 1])
-  : path.join(root, "dist-web");
+const distDir =
+  distFlagIndex >= 0 && args[distFlagIndex + 1]
+    ? path.resolve(process.cwd(), args[distFlagIndex + 1])
+    : path.join(root, "dist-web");
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const productName = packageJson.build?.productName || "LoopCAT";
 const artifactName = `${productName} Web ${packageJson.version}.zip`;
 const artifactPath = path.join(distDir, artifactName);
 const checksumPath = path.join(distDir, "SHA256SUMS.txt");
-
-const WEB_ASSETS = [
-  "index.html",
-  "styles.css",
-  "liquid-glass/styles.css",
-  "manifest.webmanifest",
-  "service-worker.js",
-  "icons/loopcat-icon.svg",
-  "icons/loopcat-loopbird-mono.svg",
-  "icons/loopcat-icon.png",
-  "storage.js",
-  "workspace-storage.js",
-  "docx.js",
-  "tm.js",
-  "termbase.js",
-  "tmx.js",
-  "tbx.js",
-  "encoding.js",
-  "xliff.js",
-  "localization.js",
-  "qa.js",
-  "validation.js",
-  "analysis.js",
-  "quality.js",
-  "ai.js",
-  "worker-client.js",
-  "cat-worker.js",
-  "project.js",
-  "i18n.js",
-  "i18n/source.en-US.js",
-  "i18n/locales/ca-ES.js",
-  "i18n/locales/en-US.js",
-  "i18n/locales/tr-TR.js",
-  "app.js",
-  "package.json",
-  "scripts/opus-cat-web-bridge.cjs",
-  "README.md",
-  "LICENSE",
-  "NOTICE"
-];
 
 function runNodeScript(scriptName) {
   const result = spawnSync(process.execPath, [path.join(root, "scripts", scriptName)], {
@@ -155,14 +116,14 @@ function endOfCentralDirectory(entryCount, centralSize, centralOffset) {
   ]);
 }
 
-function assertAssetPath(relativePath) {
+function assertAssetPath(relativePath, sourceRoot = root) {
   const normalized = relativePath.replaceAll("\\", "/");
   if (!normalized || normalized.startsWith("/") || normalized.includes(":") || normalized.split("/").includes("..")) {
     throw new Error(`Unsafe web asset path: ${relativePath}`);
   }
-  const resolved = path.resolve(root, normalized);
-  const rootWithSeparator = `${root}${path.sep}`;
-  if (resolved !== root && !resolved.startsWith(rootWithSeparator)) {
+  const resolved = path.resolve(sourceRoot, normalized);
+  const rootWithSeparator = `${path.resolve(sourceRoot)}${path.sep}`;
+  if (resolved !== path.resolve(sourceRoot) && !resolved.startsWith(rootWithSeparator)) {
     throw new Error(`Web asset escapes project root: ${relativePath}`);
   }
   if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
@@ -175,14 +136,28 @@ function sha256(filePath) {
   return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 }
 
+runNodeScript("verify-bundle-contract.cjs");
 runNodeScript("i18n-validate.cjs");
 runNodeScript("i18n-compile.cjs");
+runNodeScript("build-renderer.cjs");
+runNodeScript("verify-renderer-build.cjs");
+
+const rendererRoot = path.join(root, ".cache", "renderer", "production");
+const generatedProductionAssetsPath = path.join(rendererRoot, "config", "production-assets.js");
+delete require.cache[require.resolve(generatedProductionAssetsPath)];
+const { webDistributionAssets: WEB_ASSETS } = require(generatedProductionAssetsPath);
+const rendererAssets = new Set([
+  "index.html",
+  "config/production-assets.js",
+  ...JSON.parse(fs.readFileSync(path.join(rendererRoot, "assets.json"), "utf8"))
+]);
 
 fs.rmSync(distDir, { recursive: true, force: true });
 fs.mkdirSync(distDir, { recursive: true });
 
-const entries = WEB_ASSETS
-  .map(assertAssetPath)
+const entries = WEB_ASSETS.map((relativePath) =>
+  assertAssetPath(relativePath, rendererAssets.has(relativePath) ? rendererRoot : root)
+)
   .sort((a, b) => a.normalized.localeCompare(b.normalized))
   .map(({ normalized, resolved }) => {
     const data = fs.readFileSync(resolved);

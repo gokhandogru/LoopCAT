@@ -5,6 +5,15 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 let electronBinary = "";
 
+function runNodeScript(relativePath) {
+  const result = spawnSync(process.execPath, [path.join(root, relativePath)], {
+    cwd: root,
+    stdio: "inherit"
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
 function resolveElectronBinary() {
   try {
     return require("electron");
@@ -37,6 +46,9 @@ if (typeof electronBinary !== "string" || !electronBinary) {
   console.error("Electron is not installed correctly and could not be repaired. Run pnpm install --frozen-lockfile with install scripts enabled.");
   process.exit(1);
 }
+
+runNodeScript("scripts/build-renderer.cjs");
+runNodeScript("scripts/verify-renderer-build.cjs");
 
 const runner = path.join(root, "scripts", "browser-runner-electron.cjs");
 const result = spawnSync(electronBinary, [runner], {

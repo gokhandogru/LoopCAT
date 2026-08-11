@@ -23,7 +23,8 @@ function getWorker() {
   if (disabledReason || !canUseWorker()) return null;
   if (worker) return worker;
   try {
-    worker = new Worker(WORKER_URL);
+    const trustedWorkerUrl = window.CatHan?.appRuntime?.safeHtml?.trustedScriptUrl?.(WORKER_URL) || WORKER_URL;
+    worker = new Worker(trustedWorkerUrl);
     worker.addEventListener("message", (event) => {
       const { id, ok, result, error } = event.data || {};
       const request = pending.get(id);

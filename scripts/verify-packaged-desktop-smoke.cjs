@@ -90,14 +90,8 @@ async function waitForResult(filePath, child) {
   return null;
 }
 
-async function main() {
-  const executable = findExecutable();
-  if (!executable) {
-    console.error(`No unpacked ${productName} executable was found under dist/. Build the desktop artifact first.`);
-    for (const candidate of candidateExecutables()) console.error(`- checked ${path.relative(root, candidate).replaceAll("\\", "/")}`);
-    process.exit(1);
-  }
-
+async function runPackagedSmoke(executable, options = {}) {
+  const disableHardwareAcceleration = options.disableHardwareAcceleration === true;
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "loopcat-packaged-smoke-"));
   const resultFile = path.join(tmpDir, "result.json");
   const userDataDir = path.join(tmpDir, "user-data");
@@ -112,6 +106,7 @@ async function main() {
         LOOPCAT_DESKTOP_SMOKE_RESULT_FILE: resultFile,
         LOOPCAT_DESKTOP_SMOKE_USER_DATA_DIR: userDataDir,
         ...(useNoSandboxDiagnostic ? { LOOPCAT_DESKTOP_SMOKE_NO_SANDBOX: "1" } : {}),
+        LOOPCAT_DISABLE_HARDWARE_ACCELERATION: disableHardwareAcceleration ? "1" : "",
         LOOPCAT_DESKTOP_SMOKE_TIMEOUT_MS: String(Math.max(10000, timeoutMs - 5000))
       },
       stdio: "ignore",
@@ -123,26 +118,39 @@ async function main() {
       const exitDetail = child.exitCode === null
         ? "child was still running"
         : `child exited with code ${child.exitCode}${child.signalCode ? ` and signal ${child.signalCode}` : ""}`;
-      console.error(`Packaged desktop smoke timed out after ${timeoutMs} ms or ended without writing a result file (${exitDetail}).`);
-      process.exit(1);
+      throw new Error(`Packaged desktop smoke timed out after ${timeoutMs} ms or ended without writing a result file (${exitDetail}).`);
     }
     if (!result.ok) {
-      console.error("Packaged desktop smoke failed:");
-      console.error(JSON.stringify(result, null, 2));
-      process.exit(1);
+      throw new Error(`Packaged desktop smoke failed:\n${JSON.stringify(result, null, 2)}`);
     }
-    const runtimeNote = result.desktopRuntime?.sandboxFallbackUsed
-      ? " using renderer sandbox fallback"
-      : result.desktopRuntime?.chromiumNoSandbox
-        ? " with Chromium no-sandbox launch mode"
-      : result.desktopRuntime?.rendererSandbox === false
-        ? " without renderer OS sandbox"
-        : "";
+    if (!useNoSandboxDiagnostic && (result.desktopRuntime?.rendererSandbox !== true || result.desktopRuntime?.chromiumNoSandbox === true)) {
+      throw new Error(`Packaged desktop smoke requires the renderer OS sandbox for release evidence.\n${JSON.stringify(result.desktopRuntime || {}, null, 2)}`);
+    }
+    const expectedHardwareAcceleration = !disableHardwareAcceleration;
+    if (!useNoSandboxDiagnostic && result.desktopRuntime?.hardwareAccelerationEnabled !== expectedHardwareAcceleration) {
+      throw new Error(`Packaged desktop smoke did not honor the explicit hardware acceleration policy.\n${JSON.stringify(result.desktopRuntime || {}, null, 2)}`);
+    }
+    const runtimeNote = result.desktopRuntime?.chromiumNoSandbox
+      ? " with Chromium no-sandbox launch mode"
+      : result.desktopRuntime?.hardwareAccelerationEnabled === false
+        ? " with hardware acceleration disabled"
+        : " with renderer OS sandbox and hardware acceleration";
     console.log(`Packaged desktop smoke passed${runtimeNote} for ${path.relative(root, executable).replaceAll("\\", "/")}.`);
   } finally {
     await stopChild(child);
     await removeDirWithRetries(tmpDir);
   }
+}
+
+async function main() {
+  const executable = findExecutable();
+  if (!executable) {
+    console.error(`No unpacked ${productName} executable was found under dist/. Build the desktop artifact first.`);
+    for (const candidate of candidateExecutables()) console.error(`- checked ${path.relative(root, candidate).replaceAll("\\", "/")}`);
+    process.exit(1);
+  }
+  await runPackagedSmoke(executable);
+  if (!useNoSandboxDiagnostic) await runPackagedSmoke(executable, { disableHardwareAcceleration: true });
 }
 
 main().catch((error) => {

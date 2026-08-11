@@ -4,6 +4,7 @@ const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { pathToFileURL } = require("node:url");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -49,7 +50,9 @@ if (!process.versions.electron) {
     }
   }
   if (typeof electronBinary !== "string" || !electronBinary) {
-    console.error("Electron is not installed correctly. Run pnpm install --frozen-lockfile with install scripts enabled.");
+    console.error(
+      "Electron is not installed correctly. Run pnpm install --frozen-lockfile with install scripts enabled."
+    );
     process.exit(1);
   }
   const result = spawnSync(electronBinary, [__filename, ...args], {
@@ -95,6 +98,9 @@ if (process.env.LOOPCAT_WEB_SMOKE_NO_SANDBOX === "1") {
 app.commandLine.appendSwitch("disable-gpu");
 app.commandLine.appendSwitch("disable-dev-shm-usage");
 app.setPath("userData", runnerUserDataDir);
+app.on("window-all-closed", () => {
+  // Keep the verifier alive long enough to report renderer load failures.
+});
 app.once("will-quit", () => {
   fs.rm(tempRoot, { recursive: true, force: true }).catch(() => {});
 });
@@ -220,7 +226,9 @@ function startServer() {
       });
       response.end(data);
     } catch (error) {
-      serverRequests.push(`${request.method || "GET"} ${request.url || "/"} -> ${error?.code === "ENOENT" ? 404 : 500}`);
+      serverRequests.push(
+        `${request.method || "GET"} ${request.url || "/"} -> ${error?.code === "ENOENT" ? 404 : 500}`
+      );
       response.writeHead(error?.code === "ENOENT" ? 404 : 500).end(error?.message || "Server error");
     }
   });
@@ -306,6 +314,7 @@ function layoutScript() {
         url: location.href,
         meaningfulText: bodyText.slice(0, 300),
         saveStatusText: text(document.querySelector("#saveStatus")),
+        updateReadyVisible: visible("#updateReadyBanner"),
         frameworkOverlay,
         viewportOverflow,
         controlOverflow,
@@ -463,7 +472,14 @@ async function capture(windowRef, fileName) {
 }
 
 async function settlePaint(windowRef) {
-  await windowRef.webContents.executeJavaScript("new Promise((resolve) => setTimeout(resolve, 100))", true);
+  if (windowRef.isDestroyed() || windowRef.webContents.isDestroyed()) return false;
+  try {
+    await windowRef.webContents.executeJavaScript("new Promise((resolve) => setTimeout(resolve, 100))", true);
+    return true;
+  } catch (error) {
+    if (windowRef.isDestroyed() || windowRef.webContents.isDestroyed()) return false;
+    throw error;
+  }
 }
 
 function createSmokeWindow(pageMessages) {
@@ -497,16 +513,21 @@ async function inspectViewport(windowRef, url, viewport, pageMessages, loadError
     windowRef.setContentSize(viewport.width, viewport.height);
     await settlePaint(windowRef);
   }
-  if (windowRef.isDestroyed()) {
-    throw new Error(`${viewport.name} window was destroyed before inspection.${loadError ? ` loadURL reported: ${loadError}.` : ""} Server requests: ${serverRequests.slice(-20).join(" | ") || "(none)"}`);
+  if (windowRef.isDestroyed() || windowRef.webContents.isDestroyed()) {
+    throw new Error(
+      `${viewport.name} window was destroyed before inspection.${loadError ? ` loadURL reported: ${loadError}.` : ""} Page messages: ${pageMessages.join(" | ") || "(none)"}. Server requests: ${serverRequests.slice(-20).join(" | ") || "(none)"}`
+    );
   }
-  await windowRef.webContents.executeJavaScript(`(() => {
+  await windowRef.webContents.executeJavaScript(
+    `(() => {
     for (const selector of ["#projectDialog", "#aboutDialog"]) {
       const dialog = document.querySelector(selector);
       if (dialog?.open) dialog.close();
     }
     return true;
-  })()`, true);
+  })()`,
+    true
+  );
   await settlePaint(windowRef);
   const shell = await windowRef.webContents.executeJavaScript(layoutScript(), true);
   await settlePaint(windowRef);
@@ -514,43 +535,91 @@ async function inspectViewport(windowRef, url, viewport, pageMessages, loadError
   const dialog = await windowRef.webContents.executeJavaScript(dialogScript(), true);
   await settlePaint(windowRef);
   const dialogScreenshot = await capture(windowRef, `web-smoke-${viewport.name}-dialog.png`);
-  await windowRef.webContents.executeJavaScript(`(() => {
+  await windowRef.webContents.executeJavaScript(
+    `(() => {
     const dialog = document.querySelector("#projectDialog");
     if (dialog?.open) dialog.close();
     return true;
-  })()`, true);
+  })()`,
+    true
+  );
   await settlePaint(windowRef);
   const aboutDialog = await windowRef.webContents.executeJavaScript(aboutDialogScript(), true);
   await settlePaint(windowRef);
   const aboutScreenshot = await capture(windowRef, `web-smoke-${viewport.name}-about.png`);
 
   assert(shell.title === "LoopCAT", `${viewport.name} page title should be LoopCAT, got "${shell.title}".`);
-  assert(shell.url === url, `${viewport.name} page URL should stay on ${url}, got "${shell.url}".${loadError ? ` loadURL reported: ${loadError}.` : ""}`);
+  assert(
+    shell.url === url,
+    `${viewport.name} page URL should stay on ${url}, got "${shell.url}".${loadError ? ` loadURL reported: ${loadError}.` : ""}`
+  );
   assert(shell.hasShell, `${viewport.name} app shell is not visible.`);
   assert(shell.newProjectVisible, `${viewport.name} New project button is not visible.`);
-  assert(shell.mobileProjectRailHidden, `${viewport.name} first screen shows the duplicate project rail above the dashboard controls.`);
+  assert(
+    shell.mobileProjectRailHidden,
+    `${viewport.name} first screen shows the duplicate project rail above the dashboard controls.`
+  );
   assert(shell.projectsModeSidebarHidden, `${viewport.name} first screen shows the editor sidebar in Projects mode.`);
-  assert(!/Offline app shell updated/i.test(shell.saveStatusText), `${viewport.name} first fresh web load should not show an offline app shell update notice.`);
+  assert(!shell.updateReadyVisible, `${viewport.name} first fresh web load should not show an update-ready notice.`);
   assert(!shell.frameworkOverlay, `${viewport.name} shows a framework/runtime error overlay.`);
-  assert(shell.viewportOverflow.length === 0, `${viewport.name} first screen has horizontal viewport overflow: ${JSON.stringify(shell.viewportOverflow)}.`);
-  assert(shell.controlOverflow.length === 0, `${viewport.name} first screen has overflowing controls: ${JSON.stringify(shell.controlOverflow)}.`);
+  assert(
+    shell.viewportOverflow.length === 0,
+    `${viewport.name} first screen has horizontal viewport overflow: ${JSON.stringify(shell.viewportOverflow)}.`
+  );
+  assert(
+    shell.controlOverflow.length === 0,
+    `${viewport.name} first screen has overflowing controls: ${JSON.stringify(shell.controlOverflow)}.`
+  );
   assert(dialog.dialogOpen, `${viewport.name} New project dialog did not open.`);
-  assert(dialog.activeId === "projectNameInput", `${viewport.name} New project dialog should focus projectNameInput, got "${dialog.activeId}".`);
-  assert(dialog.projectNameValue === "Static web smoke", `${viewport.name} project name field did not accept typed text.`);
-  assert(dialog.dialogFitsWidth, `${viewport.name} New project dialog exceeds viewport width: ${JSON.stringify(dialog.dialogRect)}.`);
-  assert(dialog.viewportOverflow.length === 0, `${viewport.name} dialog has horizontal viewport overflow: ${JSON.stringify(dialog.viewportOverflow)}.`);
-  assert(dialog.controlOverflow.length === 0, `${viewport.name} dialog has overflowing controls: ${JSON.stringify(dialog.controlOverflow)}.`);
+  assert(
+    dialog.activeId === "projectNameInput",
+    `${viewport.name} New project dialog should focus projectNameInput, got "${dialog.activeId}".`
+  );
+  assert(
+    dialog.projectNameValue === "Static web smoke",
+    `${viewport.name} project name field did not accept typed text.`
+  );
+  assert(
+    dialog.dialogFitsWidth,
+    `${viewport.name} New project dialog exceeds viewport width: ${JSON.stringify(dialog.dialogRect)}.`
+  );
+  assert(
+    dialog.viewportOverflow.length === 0,
+    `${viewport.name} dialog has horizontal viewport overflow: ${JSON.stringify(dialog.viewportOverflow)}.`
+  );
+  assert(
+    dialog.controlOverflow.length === 0,
+    `${viewport.name} dialog has overflowing controls: ${JSON.stringify(dialog.controlOverflow)}.`
+  );
   assert(aboutDialog.dialogOpen, `${viewport.name} About dialog did not open.`);
-  assert(aboutDialog.bodyText.includes("Co-created by Dr. Gokhan Dogru and Codex"), `${viewport.name} About dialog is missing co-creation credit.`);
-  assert(aboutDialog.linkTarget === "https://www.linkedin.com/in/gokhan-dogru-localization/", `${viewport.name} About dialog LinkedIn link is incorrect: "${aboutDialog.linkTarget}".`);
-  assert(aboutDialog.dialogFitsWidth, `${viewport.name} About dialog exceeds viewport width: ${JSON.stringify(aboutDialog.dialogRect)}.`);
-  assert(aboutDialog.viewportOverflow.length === 0, `${viewport.name} About dialog has horizontal viewport overflow: ${JSON.stringify(aboutDialog.viewportOverflow)}.`);
-  assert(aboutDialog.controlOverflow.length === 0, `${viewport.name} About dialog has overflowing controls: ${JSON.stringify(aboutDialog.controlOverflow)}.`);
+  assert(
+    aboutDialog.bodyText.includes("Co-created by Dr. Gokhan Dogru and Codex"),
+    `${viewport.name} About dialog is missing co-creation credit.`
+  );
+  assert(
+    aboutDialog.linkTarget === "https://www.linkedin.com/in/gokhan-dogru-localization/",
+    `${viewport.name} About dialog LinkedIn link is incorrect: "${aboutDialog.linkTarget}".`
+  );
+  assert(
+    aboutDialog.dialogFitsWidth,
+    `${viewport.name} About dialog exceeds viewport width: ${JSON.stringify(aboutDialog.dialogRect)}.`
+  );
+  assert(
+    aboutDialog.viewportOverflow.length === 0,
+    `${viewport.name} About dialog has horizontal viewport overflow: ${JSON.stringify(aboutDialog.viewportOverflow)}.`
+  );
+  assert(
+    aboutDialog.controlOverflow.length === 0,
+    `${viewport.name} About dialog has overflowing controls: ${JSON.stringify(aboutDialog.controlOverflow)}.`
+  );
   const relevantPageMessages = pageMessages.filter((message) => {
     if (loadError && message.includes(url) && message.includes("-2")) return false;
     return true;
   });
-  assert(relevantPageMessages.length === 0, `${viewport.name} console/load issues: ${relevantPageMessages.join(" | ")}`);
+  assert(
+    relevantPageMessages.length === 0,
+    `${viewport.name} console/load issues: ${relevantPageMessages.join(" | ")}`
+  );
 
   return {
     viewport: viewport.name,
@@ -583,6 +652,29 @@ async function inspectViewports(url) {
   }
 }
 
+async function inspectDirectFile() {
+  const pageMessages = [];
+  const windowRef = createSmokeWindow(pageMessages);
+  const url = pathToFileURL(path.join(extractedRoot, "index.html")).href;
+  try {
+    let loadError = "";
+    try {
+      await windowRef.loadFile(path.join(extractedRoot, "index.html"));
+    } catch (error) {
+      loadError = `${error.message || error}`;
+    }
+    return await inspectViewport(
+      windowRef,
+      url,
+      { name: "direct-file", width: 1280, height: 720 },
+      pageMessages,
+      loadError
+    );
+  } finally {
+    if (!windowRef.isDestroyed()) windowRef.destroy();
+  }
+}
+
 async function closeServer() {
   if (!server) return;
   const closingServer = server;
@@ -593,10 +685,11 @@ async function closeServer() {
 app.whenReady().then(async () => {
   try {
     await extractWebArtifact();
+    const screenshots = [await inspectDirectFile()];
     const port = await startServer();
     const url = `http://127.0.0.1:${port}/index.html`;
     await probeUrl(url);
-    const screenshots = await inspectViewports(url);
+    screenshots.push(...(await inspectViewports(url)));
 
     if (failures.length) {
       writeLine("stderr", "Static web smoke verification failed:");
@@ -607,7 +700,10 @@ app.whenReady().then(async () => {
         .flatMap((item) => [item.shellScreenshot, item.dialogScreenshot, item.aboutScreenshot])
         .filter(Boolean)
         .map((item) => `\n- ${item}`);
-      writeLine("stdout", `Static web smoke verification passed for ${artifactName}.${screenshotLines.length ? ` Screenshots:${screenshotLines.join("")}` : ""}`);
+      writeLine(
+        "stdout",
+        `Static web smoke verification passed for ${artifactName}.${screenshotLines.length ? ` Screenshots:${screenshotLines.join("")}` : ""}`
+      );
       process.exitCode = 0;
     }
   } catch (error) {
