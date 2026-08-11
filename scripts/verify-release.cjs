@@ -157,9 +157,11 @@ const requiredReleaseFiles = [
   "src/ui/dialog-controller.js",
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
+  "src/features/resources/resources-controller.js",
   "src/features/resources/tm-pretranslation-dialog-controller.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
+  "tests/unit/resources-controller.test.cjs",
   "scripts/generate-brand-icons.cjs",
   "scripts/publish-repository-downloads.cjs",
   "scripts/verify-web-artifact.cjs",
@@ -224,6 +226,8 @@ const tmPretranslationDialogControllerJs = readText(
   "src/features/resources/tm-pretranslation-dialog-controller.js"
 );
 const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
+const resourcesControllerJs = readText("src/features/resources/resources-controller.js");
+const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
 const paletteControllerJs = readText("src/features/palette/palette-controller.js");
 const updateControllerJs = readText("src/features/update/update-controller.js");
 const safeHtmlJs = readText("src/security/safe-html.js");
@@ -980,6 +984,76 @@ assertIncludes(
   appJs,
   "OPUS-CAT help close restores focus to the visible connection-help entry point",
   "the app workflow must characterize OPUS-CAT help focus return above Project settings."
+);
+assertIncludes(
+  indexHtml,
+  'class="resource-tabs" role="tablist" aria-label="Resource type"',
+  "Resources must expose one semantic keyboard-operated tab list."
+);
+assertIncludes(
+  resourcesControllerJs,
+  'listen(viewButton, "click"',
+  "the checked Resources controller must own Resources navigation event lifecycle."
+);
+assertIncludes(
+  resourcesControllerJs,
+  'listen(tmDashboard, "click"',
+  "the checked Resources controller must delegate dynamic dashboard actions from one stable listener."
+);
+assertIncludes(
+  resourcesControllerJs,
+  'listen(tmDetail, "click"',
+  "the checked Resources controller must delegate dynamic row actions from one stable listener."
+);
+assertIncludes(
+  resourcesControllerJs,
+  'handleImport(tmImportInput, "TMX resource import"',
+  "the checked Resources controller must route empty-state and file-input TMX imports through the resource input."
+);
+assertIncludes(
+  appJs,
+  "createResourcesController",
+  "app.js must compose the checked Resources controller with injected domain actions."
+);
+assert(
+  !appJs.includes('  resourceType: "tm",') &&
+    !appJs.includes("  openResource: null,") &&
+    !appJs.includes("  resourceTmEntries: [],") &&
+    !appJs.includes("  resourceTerms: [],") &&
+    !appJs.includes('els.resourcesViewBtn.addEventListener("click"') &&
+    !appJs.includes('els.tmResourceTab.addEventListener("click"') &&
+    !appJs.includes('els.resourceTmxImportInput.addEventListener("change"'),
+  "the migrated Resources family must not retain view-local state or superseded static listeners in app.js."
+);
+assert(
+  !functionBody(appJs, "function renderResourceDashboard", "function canAddResourceToCurrentProject").includes(
+    "addEventListener"
+  ) &&
+    !functionBody(appJs, "function renderTmEntryRow", "function renderTermRow").includes("addEventListener") &&
+    !functionBody(appJs, "function renderTermRow", "async function confirmDeleteResource").includes(
+      "addEventListener"
+    ),
+  "Resources dashboards and rows must use controller-owned event delegation rather than per-render listeners."
+);
+assertIncludes(
+  resourcesControllerUnitTests,
+  "ResourcesController owns tab state, selection, rendering, and keyboard navigation",
+  "focused tests must characterize Resources view state and keyboard tab behavior."
+);
+assertIncludes(
+  resourcesControllerUnitTests,
+  "ResourcesController delegates imports, resource cards, rows, and cleanup without owning domain data",
+  "focused tests must characterize Resources event delegation and unmount cleanup."
+);
+assertIncludes(
+  appJs,
+  "checked Resources controller owns navigation, dashboard open intent, detail rendering, and initial focus",
+  "the app workflow must characterize the checked Resources controller in the real application."
+);
+assertIncludes(
+  appJs,
+  "Resources detail close restores focus to the originating resource card action",
+  "the app workflow must characterize visible focus return after closing resource detail."
 );
 assertIncludes(
   indexHtml,

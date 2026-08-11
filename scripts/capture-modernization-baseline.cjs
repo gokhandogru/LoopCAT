@@ -230,6 +230,26 @@ app
     await waitFor("document.querySelector('.project-tile button.primary')", "populated projects");
     await captureState("01", "projects-populated");
 
+    await windowRef.webContents.executeJavaScript("document.querySelector('#resourcesViewBtn').click()", true);
+    await waitFor("document.querySelector('#tmResourceDashboard .resource-card')", "TM resources dashboard");
+    await captureState("02", "resources-translation-memories");
+    await windowRef.webContents.executeJavaScript(
+      "document.querySelector('#tmResourceDashboard [data-resource-action=\"open\"]').click()",
+      true
+    );
+    await waitFor("!document.querySelector('#tmResourceDetail').classList.contains('hidden')", "TM resource detail");
+    await captureState("02", "resource-translation-memory-detail");
+    await windowRef.webContents.executeJavaScript(
+      "document.querySelector('#tmResourceDetail [data-resource-action=\"close-detail\"]').click()",
+      true
+    );
+    await windowRef.webContents.executeJavaScript("document.querySelector('#tbResourceTab').click()", true);
+    await waitFor("document.querySelector('#tbResourceTab').getAttribute('aria-selected') === 'true'", "Termbase tab");
+    await waitFor("document.querySelector('#tbResourceDashboard .resource-card')", "Termbase resources dashboard");
+    await captureState("02", "resources-termbases");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#projectsViewBtn').click()", true);
+    await waitFor("document.querySelector('.project-tile button.primary')", "populated projects return");
+
     await windowRef.webContents.executeJavaScript(
       "document.querySelector('.project-tile button.primary').click()",
       true
@@ -406,7 +426,7 @@ app
     };
     await fsPromises.writeFile(path.join(outputDir, "baseline.json"), `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 
-    const expectedScreenshotCount = 48;
+    const expectedScreenshotCount = 57;
     if (screenshots.length !== expectedScreenshotCount) {
       throw new Error(`Expected ${expectedScreenshotCount} screenshots, captured ${screenshots.length}.`);
     }

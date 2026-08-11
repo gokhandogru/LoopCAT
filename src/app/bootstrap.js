@@ -43,6 +43,7 @@ import { createDiagnosticsService } from "../features/diagnostics/diagnostics-se
 import { createAiContextController } from "../features/ai/ai-context-controller.js";
 import { createOpusCatHelpController } from "../features/ai/opus-cat-help-controller.js";
 import { createTmPretranslationDialogController } from "../features/resources/tm-pretranslation-dialog-controller.js";
+import { createResourcesController } from "../features/resources/resources-controller.js";
 import {
   asTrustedHtml,
   asTrustedScriptUrl,
@@ -113,6 +114,7 @@ export function createApplicationRuntime({ browserWindow, projectApi, storageApi
       createInspectorController,
       createProjectDialogController,
       createProjectsController,
+      createResourcesController,
       createPaletteController,
       createThemeController,
       createTmPretranslationDialogController,

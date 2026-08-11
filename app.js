@@ -721,10 +721,6 @@ const state = {
   segmentStatusFilter: "all",
   reviewStateFilter: "",
   aiSegmentFilter: "",
-  resourceType: "tm",
-  openResource: null,
-  resourceTmEntries: [],
-  resourceTerms: [],
   projectTerms: [],
   segmentFilterRevision: 0,
   segmentFilterCache: { key: "", indexes: [], positions: new Map() },
@@ -1366,6 +1362,45 @@ const opusCatHelpController = appRuntime?.featureFactories?.createOpusCatHelpCon
   onError: (error) => setSaveStatus(error?.message || "OPUS-CAT connection help could not complete the action.", "dirty")
 });
 opusCatHelpController?.mount?.();
+const resourcesController = appRuntime?.featureFactories?.createResourcesController?.({
+  elements: {
+    viewButton: els.resourcesViewBtn,
+    tmTab: els.tmResourceTab,
+    tbTab: els.tbResourceTab,
+    tmPanel: els.tmResourcesPanel,
+    tbPanel: els.tbResourcesPanel,
+    tmDashboard: els.tmResourceDashboard,
+    tbDashboard: els.tbResourceDashboard,
+    tmDetail: els.tmResourceDetail,
+    tbDetail: els.tbResourceDetail,
+    tmSourceLanguageInput: els.tmResourceSourceLangInput,
+    tmTargetLanguageInput: els.tmResourceTargetLangInput,
+    tbSourceLanguageInput: els.tbResourceSourceLangInput,
+    tbTargetLanguageInput: els.tbResourceTargetLangInput,
+    tmImportInput: els.resourceTmxImportInput,
+    tbImportInput: els.resourceTbxImportInput,
+    termListImportInput: els.resourceTermListImportInput
+  },
+  navigate: () => setView("resources"),
+  render: renderResourcesContent,
+  keyForItem: (item, type) => resourceKey(item, type === "tm" ? "tmName" : "termBaseName"),
+  normalizeLanguageInput: normalizeLanguageInputElement,
+  runImportTask: runFileImportTask,
+  importTm: handleResourceTmxImport,
+  importTb: handleResourceTbxImport,
+  importTermList: handleResourceTermListImport,
+  deleteResource: confirmDeleteResource,
+  exportResource,
+  saveTmEntry: saveEditedTmResourceEntry,
+  deleteTmEntry: deleteTmResourceEntry,
+  saveTerm: saveEditedTermResourceEntry,
+  deleteTerm: deleteTermResourceEntry,
+  confirmEntryDelete: (type) =>
+    uiConfirm(type === "tm" ? "Delete this TM entry? This cannot be undone." : "Delete this term? This cannot be undone."),
+  scheduleFrame: requestAnimationFrame,
+  onError: (error) => setSaveStatus(error?.message || "Resource action failed.", "dirty")
+});
+resourcesController?.mount?.();
 dialogLifecycleController?.mount?.();
 
 function uiT(key, values = {}) {
@@ -4094,7 +4129,8 @@ function summarizeResources(items, nameField) {
 
 function matchingResourceSummaries(type, sourceLang, targetLang, selectedNames = []) {
   const isTm = type === "tm";
-  const summaries = summarizeResources(isTm ? state.resourceTmEntries : state.resourceTerms, isTm ? "tmName" : "termBaseName")
+  const resourceState = resourcesController?.getState?.() || { tmEntries: [], terms: [] };
+  const summaries = summarizeResources(isTm ? resourceState.tmEntries : resourceState.terms, isTm ? "tmName" : "termBaseName")
     .filter((resource) => resource.sourceLang === sourceLang && resource.targetLang === targetLang);
   selectedNames.forEach((name) => {
     if (summaries.some((resource) => resource.name === name)) return;
@@ -4209,9 +4245,7 @@ function collectProjectResourceSettings(existingProject = null) {
 
 async function refreshResources() {
   const [tmEntries, terms] = await Promise.all([listTmEntries(), getAll("terms")]);
-  state.resourceTmEntries = tmEntries;
-  state.resourceTerms = terms;
-  renderResourcesView();
+  return resourcesController?.setResources?.({ tmEntries, terms }) || { tmEntries, terms };
 }
 
 async function refreshProjectTerms({ rerender = false } = {}) {
@@ -5405,26 +5439,20 @@ async function confirmDeleteFile(documentInfo) {
   }
 }
 
-function setResourceType(type) {
-  state.resourceType = type;
-  state.openResource = null;
-  renderResourcesView();
-}
-
 function renderResourcesView() {
-  els.tmResourceTab.classList.toggle("active", state.resourceType === "tm");
-  els.tbResourceTab.classList.toggle("active", state.resourceType === "tb");
-  els.tmResourcesPanel.classList.toggle("hidden", state.resourceType !== "tm");
-  els.tbResourcesPanel.classList.toggle("hidden", state.resourceType !== "tb");
-  renderResourceDashboard("tm");
-  renderResourceDashboard("tb");
-  renderResourceDetail();
+  resourcesController?.render?.();
 }
 
-function renderResourceDashboard(type) {
+function renderResourcesContent(resourceState) {
+  renderResourceDashboard("tm", resourceState);
+  renderResourceDashboard("tb", resourceState);
+  renderResourceDetail(resourceState);
+}
+
+function renderResourceDashboard(type, resourceState) {
   const isTm = type === "tm";
   const dashboard = isTm ? els.tmResourceDashboard : els.tbResourceDashboard;
-  const summaries = summarizeResources(isTm ? state.resourceTmEntries : state.resourceTerms, isTm ? "tmName" : "termBaseName");
+  const summaries = summarizeResources(isTm ? resourceState.tmEntries : resourceState.terms, isTm ? "tmName" : "termBaseName");
   if (!summaries.length) {
     const empty = document.createElement("div");
     empty.className = "empty-file-state actionable-empty-state";
@@ -5434,7 +5462,8 @@ function renderResourceDashboard(type) {
     action.type = "button";
     action.className = "primary";
     action.textContent = uiSource(isTm ? "Import a TMX file" : "Import a TBX or term-list file");
-    action.addEventListener("click", () => (isTm ? els.tmxImportInput : els.tbxImportInput).click());
+    action.dataset.resourceAction = "import";
+    action.dataset.resourceType = type;
     empty.append(message, action);
     dashboard.replaceChildren(empty);
     return;
@@ -5467,22 +5496,24 @@ function renderResourceDashboard(type) {
     deleteButton.type = "button";
     deleteButton.textContent = uiSource("Delete");
     deleteButton.setAttribute("aria-label", uiSource("Delete resource {value1}", { value1: resourceLabel }));
-    deleteButton.addEventListener("click", () => confirmDeleteResource(type, resource.key));
+    deleteButton.dataset.resourceAction = "delete-resource";
+    deleteButton.dataset.resourceType = type;
+    deleteButton.dataset.resourceKey = resource.key;
     const exportButton = document.createElement("button");
     exportButton.type = "button";
     exportButton.textContent = uiSource("Export");
     exportButton.setAttribute("aria-label", uiSource("Export resource {value1}", { value1: resourceLabel }));
-    exportButton.addEventListener("click", () => exportResource(type, resource.key));
+    exportButton.dataset.resourceAction = "export";
+    exportButton.dataset.resourceType = type;
+    exportButton.dataset.resourceKey = resource.key;
     const openButton = document.createElement("button");
     openButton.className = "primary";
     openButton.type = "button";
     openButton.textContent = uiSource("Open");
     openButton.setAttribute("aria-label", uiSource("Open resource {value1}", { value1: resourceLabel }));
-    openButton.addEventListener("click", () => {
-      state.resourceType = type;
-      state.openResource = resource.key;
-      renderResourcesView();
-    });
+    openButton.dataset.resourceAction = "open";
+    openButton.dataset.resourceType = type;
+    openButton.dataset.resourceKey = resource.key;
     card.querySelector(".resource-card-actions").append(deleteButton, exportButton, openButton);
     fragment.append(card);
   });
@@ -5516,18 +5547,13 @@ async function addResourceToCurrentProject(type, resource) {
   setSaveStatus(`${type === "tm" ? "TM" : "TB"} added to project`, "saved");
 }
 
-function resourceItems(type, key = state.openResource) {
-  if (!key) return [];
-  const isTm = type === "tm";
-  const nameField = isTm ? "tmName" : "termBaseName";
-  return (isTm ? state.resourceTmEntries : state.resourceTerms)
-    .filter((item) => resourceKey(item, nameField) === key)
-    .sort((a, b) => (a.source || a.sourceTerm || "").localeCompare(b.source || b.sourceTerm || ""));
+function resourceItems(type, key) {
+  return resourcesController?.getItems?.(type, key) || [];
 }
 
-function renderResourceDetail() {
-  renderTmResourceDetail();
-  renderTbResourceDetail();
+function renderResourceDetail(resourceState) {
+  renderTmResourceDetail(resourceState);
+  renderTbResourceDetail(resourceState);
 }
 
 function replaceResourceTableRows(table, items, renderRow) {
@@ -5606,13 +5632,13 @@ async function deleteTermResourceEntry(term, options = {}) {
   }
 }
 
-function renderTmResourceDetail() {
-  if (state.resourceType !== "tm" || !state.openResource) {
+function renderTmResourceDetail(resourceState) {
+  if (resourceState.type !== "tm" || !resourceState.openKey) {
     els.tmResourceDetail.classList.add("hidden");
     return;
   }
-  const info = resourceLabelFromKey(state.openResource);
-  const entries = resourceItems("tm");
+  const info = resourceLabelFromKey(resourceState.openKey);
+  const entries = resourceItems("tm", resourceState.openKey);
   els.tmResourceDetail.classList.remove("hidden");
   replaceSafeHtml(els.tmResourceDetail, `
     <div class="resource-detail-header">
@@ -5620,25 +5646,21 @@ function renderTmResourceDetail() {
         <h3>${displaySafeHtml(info.name)}</h3>
         <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${uiLabelHtml("entryCount", { count: entries.length })}</p>
       </div>
-      <button id="closeTmResourceBtn" type="button">${translatedSourceHtml("Close")}</button>
+      <button id="closeTmResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tm">${translatedSourceHtml("Close")}</button>
     </div>
     <div class="resource-table"></div>
   `);
-  els.tmResourceDetail.querySelector("#closeTmResourceBtn").addEventListener("click", () => {
-    state.openResource = null;
-    renderResourcesView();
-  });
   const table = els.tmResourceDetail.querySelector(".resource-table");
   replaceResourceTableRows(table, entries, renderTmEntryRow);
 }
 
-function renderTbResourceDetail() {
-  if (state.resourceType !== "tb" || !state.openResource) {
+function renderTbResourceDetail(resourceState) {
+  if (resourceState.type !== "tb" || !resourceState.openKey) {
     els.tbResourceDetail.classList.add("hidden");
     return;
   }
-  const info = resourceLabelFromKey(state.openResource);
-  const terms = resourceItems("tb");
+  const info = resourceLabelFromKey(resourceState.openKey);
+  const terms = resourceItems("tb", resourceState.openKey);
   els.tbResourceDetail.classList.remove("hidden");
   replaceSafeHtml(els.tbResourceDetail, `
     <div class="resource-detail-header">
@@ -5646,14 +5668,10 @@ function renderTbResourceDetail() {
         <h3>${displaySafeHtml(info.name)}</h3>
         <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${uiLabelHtml("termCount", { count: terms.length })}</p>
       </div>
-      <button id="closeTbResourceBtn" type="button">${translatedSourceHtml("Close")}</button>
+      <button id="closeTbResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tb">${translatedSourceHtml("Close")}</button>
     </div>
     <div class="resource-table"></div>
   `);
-  els.tbResourceDetail.querySelector("#closeTbResourceBtn").addEventListener("click", () => {
-    state.openResource = null;
-    renderResourcesView();
-  });
   const table = els.tbResourceDetail.querySelector(".resource-table");
   replaceResourceTableRows(table, terms, renderTermRow);
 }
@@ -5661,6 +5679,8 @@ function renderTbResourceDetail() {
 function renderTmEntryRow(entry) {
   const row = document.createElement("article");
   row.className = "resource-row";
+  row.dataset.resourceRow = "tm";
+  row.dataset.resourceId = entry.id;
   replaceSafeHtml(row, `
     <textarea data-field="source" aria-label="${translatedSourceHtml("Source")}">${escapeHtml(entry.source)}</textarea>
     <textarea data-field="target" aria-label="${translatedSourceHtml("Target")}">${escapeHtml(entry.target)}</textarea>
@@ -5670,20 +5690,16 @@ function renderTmEntryRow(entry) {
   const saveButton = document.createElement("button");
   saveButton.type = "button";
   saveButton.textContent = uiSource("Save");
-  saveButton.addEventListener("click", async () => {
-    await saveEditedTmResourceEntry(entry, {
-      source: row.querySelector('[data-field="source"]').value,
-      target: row.querySelector('[data-field="target"]').value
-    });
-  });
+  saveButton.dataset.resourceAction = "save-entry";
+  saveButton.dataset.resourceType = "tm";
+  saveButton.dataset.resourceId = entry.id;
   const deleteButton = document.createElement("button");
   deleteButton.className = "danger-small";
   deleteButton.type = "button";
   deleteButton.textContent = uiSource("Delete");
-  deleteButton.addEventListener("click", async () => {
-    if (!uiConfirm("Delete this TM entry? This cannot be undone.")) return;
-    await deleteTmResourceEntry(entry);
-  });
+  deleteButton.dataset.resourceAction = "delete-entry";
+  deleteButton.dataset.resourceType = "tm";
+  deleteButton.dataset.resourceId = entry.id;
   actions.append(saveButton, deleteButton);
   return row;
 }
@@ -5691,6 +5707,8 @@ function renderTmEntryRow(entry) {
 function renderTermRow(term) {
   const row = document.createElement("article");
   row.className = "resource-row term-resource-row";
+  row.dataset.resourceRow = "tb";
+  row.dataset.resourceId = term.id;
   replaceSafeHtml(row, `
     <input data-field="sourceTerm" aria-label="${translatedSourceHtml("Source term")}" value="${escapeHtml(term.sourceTerm)}">
     <input data-field="targetTerm" aria-label="${translatedSourceHtml("Target term")}" value="${escapeHtml(term.targetTerm)}">
@@ -5702,22 +5720,16 @@ function renderTermRow(term) {
   const saveButton = document.createElement("button");
   saveButton.type = "button";
   saveButton.textContent = uiSource("Save");
-  saveButton.addEventListener("click", async () => {
-    await saveEditedTermResourceEntry(term, {
-      sourceTerm: row.querySelector('[data-field="sourceTerm"]').value,
-      targetTerm: row.querySelector('[data-field="targetTerm"]').value,
-      notes: row.querySelector('[data-field="notes"]').value,
-      isForbidden: row.querySelector('[data-field="isForbidden"]').checked
-    });
-  });
+  saveButton.dataset.resourceAction = "save-entry";
+  saveButton.dataset.resourceType = "tb";
+  saveButton.dataset.resourceId = term.id;
   const deleteButton = document.createElement("button");
   deleteButton.className = "danger-small";
   deleteButton.type = "button";
   deleteButton.textContent = uiSource("Delete");
-  deleteButton.addEventListener("click", async () => {
-    if (!uiConfirm("Delete this term? This cannot be undone.")) return;
-    await deleteTermResourceEntry(term);
-  });
+  deleteButton.dataset.resourceAction = "delete-entry";
+  deleteButton.dataset.resourceType = "tb";
+  deleteButton.dataset.resourceId = term.id;
   actions.append(saveButton, deleteButton);
   return row;
 }
@@ -5733,7 +5745,7 @@ async function confirmDeleteResource(type, key) {
     if (type === "tm") await deleteTmEntries(itemIds);
     else await deleteTerms(itemIds);
     markProjectsUsingResourceDirty(type === "tm" ? "tm" : "termbase", info.name, info.sourceLang, info.targetLang);
-    state.openResource = null;
+    resourcesController?.closeResource?.({ render: false, focus: false });
     await refreshResources();
     if (type === "tb") await refreshProjectTerms({ rerender: true });
     setSaveStatus(`${type === "tm" ? "TM" : "TB"} deleted`, "saved");
@@ -13434,8 +13446,10 @@ async function handleResourceTmxImport(file) {
   });
   markProjectsUsingResourceDirty("tm", tmName, sourceLang, targetLang);
   await reportImportProgress("Refreshing resources", file);
-  state.resourceType = "tm";
-  state.openResource = `${tmName}::${sourceLang}::${targetLang}`;
+  resourcesController?.openResource?.("tm", `${tmName}::${sourceLang}::${targetLang}`, {
+    render: false,
+    focus: false
+  });
   await refreshResources();
   setSaveStatus(`Imported ${entries.length} TM entries`, "saved");
 }
@@ -13479,8 +13493,10 @@ async function handleResourceTbxImport(file) {
   });
   markProjectsUsingResourceDirty("termbase", termBaseName, sourceLang, targetLang);
   await reportImportProgress("Refreshing resources", file);
-  state.resourceType = "tb";
-  state.openResource = `${termBaseName}::${sourceLang}::${targetLang}`;
+  resourcesController?.openResource?.("tb", `${termBaseName}::${sourceLang}::${targetLang}`, {
+    render: false,
+    focus: false
+  });
   await refreshResources();
   await refreshProjectTerms({ rerender: true });
   setSaveStatus(`Imported ${terms.length} terms`, "saved");
@@ -13517,8 +13533,10 @@ async function handleResourceTermListImport(file) {
   });
   markProjectsUsingResourceDirty("termbase", termBaseName, sourceLang, targetLang);
   await reportImportProgress("Refreshing resources", file);
-  state.resourceType = "tb";
-  state.openResource = `${termBaseName}::${sourceLang}::${targetLang}`;
+  resourcesController?.openResource?.("tb", `${termBaseName}::${sourceLang}::${targetLang}`, {
+    render: false,
+    focus: false
+  });
   await refreshResources();
   await refreshProjectTerms({ rerender: true });
   setSaveStatus(`Imported ${terms.length} term${terms.length === 1 ? "" : "s"}`, "saved");
@@ -13559,7 +13577,6 @@ function wireEvents() {
     setView("projects");
   });
   els.projectsViewBtn.addEventListener("click", () => setView("projects"));
-  els.resourcesViewBtn.addEventListener("click", () => setView("resources"));
   els.emptyTrashBtn?.addEventListener("click", emptyTrashPermanently);
   els.undoBtn?.addEventListener("click", undoLastCommand);
   els.redoBtn?.addEventListener("click", redoLastCommand);
@@ -13625,8 +13642,6 @@ function wireEvents() {
       setSaveStatus(error.message || "Workspace repair check failed", "dirty");
     }
   });
-  els.tmResourceTab.addEventListener("click", () => setResourceType("tm"));
-  els.tbResourceTab.addEventListener("click", () => setResourceType("tb"));
   els.projectFilesBtn.addEventListener("click", showProjectHome);
   els.projectFileImportBtn.addEventListener("click", () => els.projectFileImportInput.click());
   els.projectPackageExportBtn.addEventListener("click", exportProjectPackage);
@@ -13647,15 +13662,6 @@ function wireEvents() {
   els.projectSearchInput.addEventListener("input", renderProjectsView);
   els.projectsImportProjectBtn?.addEventListener("click", () => els.projectPackageImportInput.click());
   els.languagePairFilter.addEventListener("change", renderProjectsView);
-  [
-    els.tmResourceSourceLangInput,
-    els.tmResourceTargetLangInput,
-    els.tbResourceSourceLangInput,
-    els.tbResourceTargetLangInput
-  ].filter(Boolean).forEach((input) => {
-    input.addEventListener("change", () => normalizeLanguageInputElement(input));
-    input.addEventListener("blur", () => normalizeLanguageInputElement(input));
-  });
 
   els.docxInput.addEventListener("change", async () => {
     const file = els.docxInput.files?.[0];
@@ -13947,32 +13953,6 @@ function wireEvents() {
   els.closeConcordanceBtn.addEventListener("click", closeConcordance);
   els.concordanceOverlay.addEventListener("click", (event) => {
     if (event.target === els.concordanceOverlay) closeConcordance();
-  });
-
-  els.resourceTmxImportInput.addEventListener("change", async () => {
-    const file = els.resourceTmxImportInput.files?.[0];
-    try {
-      if (file) await runFileImportTask("TMX resource import", () => handleResourceTmxImport(file));
-    } finally {
-      els.resourceTmxImportInput.value = "";
-    }
-  });
-
-  els.resourceTbxImportInput.addEventListener("change", async () => {
-    const file = els.resourceTbxImportInput.files?.[0];
-    try {
-      if (file) await runFileImportTask("TBX resource import", () => handleResourceTbxImport(file));
-    } finally {
-      els.resourceTbxImportInput.value = "";
-    }
-  });
-  els.resourceTermListImportInput.addEventListener("change", async () => {
-    const file = els.resourceTermListImportInput.files?.[0];
-    try {
-      if (file) await runFileImportTask("Term list resource import", () => handleResourceTermListImport(file));
-    } finally {
-      els.resourceTermListImportInput.value = "";
-    }
   });
 
   els.backupExportBtn.addEventListener("click", async () => {
@@ -18168,8 +18148,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const originalLabelProject = state.project;
       const originalLabelProjects = state.projects;
       const originalLabelProjectSummaries = state.projectSummaries;
-      const originalLabelResourceTmEntries = state.resourceTmEntries;
-      const originalLabelResourceType = state.resourceType;
+      const originalLabelResourceState = resourcesController.getState();
       const originalLabelConfirm = window.confirm;
       const originalDocuments = projectDocumentManifest(state.project);
       const labelDocumentName = "Bearer ui-document-label-token-that-must-not-appear";
@@ -18208,8 +18187,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
             !labelUiText.includes("ui-document-label-token-that-must-not-appear"),
           "project and document labels redact credential-looking text in visible UI and prompts"
         );
-        state.resourceType = "tm";
-        state.resourceTmEntries = [{
+        resourcesController.selectType("tm", { render: false });
+        resourcesController.setResources({ tmEntries: [{
           id: "ui-resource-label-entry",
           tmName: "Bearer ui-resource-label-token-that-must-not-appear",
           source: "Resource source",
@@ -18219,8 +18198,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           languagePair: `${state.project.sourceLang}::${state.project.targetLang}`,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
-        }];
-        renderResourceDashboard("tm");
+        }], terms: originalLabelResourceState.terms }, false);
+        renderResourcesView();
         assert(
           els.tmResourceDashboard.textContent.includes("[redacted secret]") &&
             !els.tmResourceDashboard.textContent.includes("ui-resource-label-token-that-must-not-appear"),
@@ -18231,8 +18210,17 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         state.project = originalLabelProject;
         state.projects = originalLabelProjects;
         state.projectSummaries = originalLabelProjectSummaries;
-        state.resourceTmEntries = originalLabelResourceTmEntries;
-        state.resourceType = originalLabelResourceType;
+        resourcesController.selectType(originalLabelResourceState.type, { render: false });
+        resourcesController.setResources({
+          tmEntries: originalLabelResourceState.tmEntries,
+          terms: originalLabelResourceState.terms
+        }, false);
+        if (originalLabelResourceState.openKey) {
+          resourcesController.openResource(originalLabelResourceState.type, originalLabelResourceState.openKey, {
+            render: false,
+            focus: false
+          });
+        }
         renderAll();
         renderProjectsView();
         renderResourcesView();
@@ -18371,8 +18359,60 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       isForbidden: false
     });
     await refreshResources();
-    const editableTmEntry = state.resourceTmEntries.find((entry) => entry.id === resourceTmEntry.id);
-    const editableTerm = state.resourceTerms.find((term) => term.id === resourceTerm.id);
+    els.resourcesViewBtn.click();
+    await yieldToUi();
+    const workflowTmCard = Array.from(els.tmResourceDashboard.querySelectorAll(".resource-card")).find((card) =>
+      card.textContent.includes(mainTmName())
+    );
+    const workflowTmOpenButton = workflowTmCard?.querySelector('[data-resource-action="open"]');
+    workflowTmOpenButton?.click();
+    await yieldToUi();
+    const resourceOpenFocusState = {
+      view: state.view,
+      detailHidden: els.tmResourceDetail.classList.contains("hidden"),
+      activeAction: document.activeElement?.dataset?.resourceAction || "",
+      activeKey: document.activeElement?.dataset?.resourceKey || "",
+      expectedKey: workflowTmOpenButton?.dataset?.resourceKey || "",
+      controllerType: resourcesController?.getState?.().type || "",
+      controllerOpenKey: resourcesController?.getState?.().openKey || ""
+    };
+    assert(
+      resourceOpenFocusState.view === "resources" &&
+        !resourceOpenFocusState.detailHidden &&
+        document.activeElement === els.tmResourceDetail.querySelector('[data-resource-action="close-detail"]'),
+      `checked Resources controller owns navigation, dashboard open intent, detail rendering, and initial focus (${JSON.stringify(resourceOpenFocusState)})`
+    );
+    els.tmResourceDetail.querySelector('[data-resource-action="close-detail"]').click();
+    await yieldToUi();
+    const resourceCloseFocusState = {
+      detailHidden: els.tmResourceDetail.classList.contains("hidden"),
+      activeAction: document.activeElement?.dataset?.resourceAction || "",
+      activeKey: document.activeElement?.dataset?.resourceKey || "",
+      expectedKey: workflowTmOpenButton.dataset.resourceKey,
+      availableKeys: Array.from(els.tmResourceDashboard.querySelectorAll('[data-resource-action="open"]')).map(
+        (button) => button.dataset.resourceKey || ""
+      )
+    };
+    assert(
+      resourceCloseFocusState.detailHidden &&
+        resourceCloseFocusState.activeAction === "open" &&
+        resourceCloseFocusState.activeKey === resourceCloseFocusState.expectedKey,
+      `Resources detail close restores focus to the originating resource card action (${JSON.stringify(resourceCloseFocusState)})`
+    );
+    els.tmResourceTab.focus();
+    els.tmResourceTab.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    await yieldToUi();
+    assert(
+      els.tbResourceTab.getAttribute("aria-selected") === "true" &&
+        document.activeElement === els.tbResourceTab &&
+        !els.tbResourcesPanel.hasAttribute("hidden"),
+      "Resources tabs expose one keyboard-operated tab state and matching panel"
+    );
+    setView("editor");
+    await yieldToUi();
+    const editableResourceState = resourcesController.getState();
+    const editableTmEntry = editableResourceState.tmEntries.find((entry) => entry.id === resourceTmEntry.id);
+    const editableTerm = editableResourceState.terms.find((term) => term.id === resourceTerm.id);
     assert(Boolean(editableTmEntry && editableTerm), "resource row edit fixtures are visible in resource state");
     setHiddenSegmentField(editableTmEntry, RESOURCE_TM_SAVE_FAILURE_TEST_FLAG, true);
     const failedResourceTmSave = await saveEditedTmResourceEntry(editableTmEntry, {
@@ -19098,9 +19138,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "linked TM resource import normalizes friendly language labels before memory lookup"
     );
     clearWorkspaceDirtyMarkers();
-    const linkedTmRow = renderTmEntryRow(linkedTmEntry);
+    const linkedTmRow = Array.from(els.tmResourceDetail.querySelectorAll("[data-resource-row]")).find(
+      (row) => row.dataset.resourceId === linkedTmEntry.id
+    );
+    assert(Boolean(linkedTmRow), "linked TM resource edit renders through the Resources controller detail root");
     linkedTmRow.querySelector('[data-field="target"]').value = "Linked resource TM target updated";
-    linkedTmRow.querySelector("button").click();
+    linkedTmRow.querySelector('[data-resource-action="save-entry"]').click();
     await waitFor(() => state.workspaceDirtyProjectIds.has(project.id), "linked TM row save dirty marker");
     assert(state.workspaceDirtyProjectIds.has(project.id), "TM resource row save marks linked project package dirty");
 
@@ -19153,9 +19196,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const linkedCsvTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] });
     assert(linkedCsvTerms.some((term) => term.sourceTerm === "linked csv term") && linkedCsvTerms.some((term) => term.sourceTerm === "linked forbidden csv term" && term.isForbidden), "CSV term resource import creates editable approved and forbidden terms");
     clearWorkspaceDirtyMarkers();
-    const linkedTermRow = renderTermRow(linkedTerm);
+    const linkedTermRow = Array.from(els.tbResourceDetail.querySelectorAll("[data-resource-row]")).find(
+      (row) => row.dataset.resourceId === linkedTerm.id
+    );
+    assert(Boolean(linkedTermRow), "linked term resource edit renders through the Resources controller detail root");
     linkedTermRow.querySelector('[data-field="targetTerm"]').value = "guncel bagli kaynak terimi";
-    linkedTermRow.querySelector("button").click();
+    linkedTermRow.querySelector('[data-resource-action="save-entry"]').click();
     await waitFor(() => state.workspaceDirtyProjectIds.has(project.id), "linked TB row save dirty marker");
     assert(state.workspaceDirtyProjectIds.has(project.id), "TB resource row save marks linked project package dirty");
 

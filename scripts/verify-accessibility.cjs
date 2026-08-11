@@ -166,6 +166,25 @@ app
       }
       await audit("Projects empty");
 
+      await windowRef.webContents.executeJavaScript("document.querySelector('#resourcesViewBtn').click()", true);
+      await waitFor("!document.querySelector('#resourcesView').classList.contains('hidden')", "Resources view");
+      await audit("Resources translation memories empty");
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const tab = document.querySelector("#tmResourceTab");
+          tab.focus();
+          tab.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+        })()`,
+        true
+      );
+      await waitFor(
+        "document.querySelector('#tbResourceTab').getAttribute('aria-selected') === 'true'",
+        "Resources keyboard tab navigation"
+      );
+      await audit("Resources termbases empty");
+      await windowRef.webContents.executeJavaScript("document.querySelector('#projectsViewBtn').click()", true);
+      await waitFor("!document.querySelector('#projectsView').classList.contains('hidden')", "Projects return");
+
       await windowRef.webContents.executeJavaScript(
         `(() => {
           const opener = document.querySelector("#newProjectBtn");
