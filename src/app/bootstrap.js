@@ -28,6 +28,7 @@ import { createBrowserPlatform } from "../platform/browser-platform.js";
 import { createElectronPlatform } from "../platform/electron-platform.js";
 import { createDashboardController } from "../features/projects/dashboard-controller.js";
 import { createProjectsController } from "../features/projects/projects-controller.js";
+import { createProjectDialogController } from "../features/projects/project-dialog-controller.js";
 import { createEditorController } from "../features/editor/editor-controller.js";
 import { createFilterStore } from "../features/editor/filter-store.js";
 import { createFilterPresetController } from "../features/editor/filter-preset-controller.js";
@@ -107,6 +108,7 @@ export function createApplicationRuntime({ browserWindow, projectApi, storageApi
       createFilterStore,
       createFilterPresetController,
       createInspectorController,
+      createProjectDialogController,
       createProjectsController,
       createPaletteController,
       createThemeController,

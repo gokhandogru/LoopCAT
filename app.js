@@ -749,7 +749,6 @@ const state = {
   commandQuery: "",
   commandProjectId: "",
   desktopSpellcheckTargetLang: null,
-  projectDialogMode: "create",
   workspaceStatus: null,
   storageDurability: { checked: false, supported: false, persisted: false, requested: false, usageBytes: 0, quotaBytes: 0 },
   workspaceDirtyProjectIds: new Set(),
@@ -861,6 +860,11 @@ const els = {
   projectDialog: document.querySelector("#projectDialog"),
   projectDialogTitle: document.querySelector("#projectDialogTitle"),
   projectForm: document.querySelector("#projectForm"),
+  projectNameInput: document.querySelector("#projectNameInput"),
+  projectDomainInput: document.querySelector("#projectDomainInput"),
+  sourceLangInput: document.querySelector("#sourceLangInput"),
+  targetLangInput: document.querySelector("#targetLangInput"),
+  saveProjectBtn: document.querySelector("#saveProjectBtn"),
   projectAdvancedOptions: document.querySelector("#projectAdvancedOptions"),
   cancelProjectBtn: document.querySelector("#cancelProjectBtn"),
   projectCreatorInput: document.querySelector("#projectCreatorInput"),
@@ -1290,6 +1294,55 @@ dialogLifecycleController?.register?.({
   initialFocus: els.closeTrashBtn,
   beforeOpen: renderTrashList
 });
+const projectDialogController = appRuntime?.featureFactories?.createProjectDialogController?.({
+  dialogLifecycle: dialogLifecycleController,
+  elements: {
+    dialog: els.projectDialog,
+    form: els.projectForm,
+    title: els.projectDialogTitle,
+    saveButton: els.saveProjectBtn,
+    cancelButton: els.cancelProjectBtn,
+    nameInput: els.projectNameInput,
+    creatorInput: els.projectCreatorInput,
+    domainInput: els.projectDomainInput,
+    sourceLanguageInput: els.sourceLangInput,
+    targetLanguageInput: els.targetLangInput,
+    advancedOptions: els.projectAdvancedOptions,
+    saveToFolderInput: els.saveProjectToFolderInput,
+    chooseWorkspaceButton: els.projectChooseWorkspaceBtn,
+    storageStatus: els.projectStorageStatus,
+    tmResourceList: els.projectTmResourceList,
+    tbResourceList: els.projectTbResourceList,
+    newTmNameInput: els.newTmNameInput,
+    newTermBaseNameInput: els.newTermBaseNameInput,
+    frequentPairs: els.frequentLanguagePairs,
+    aiSettingsForm: els.aiSettingsForm,
+    aiOptions: els.projectAiOptions,
+    aiPresetSelect: els.localAiPresetSelect
+  },
+  openers: [
+    { element: els.newProjectBtn, mode: "create" },
+    { element: els.projectSettingsBtn, mode: "edit" },
+    { element: els.editorProjectSettingsBtn, mode: "edit" },
+    { element: els.openProjectAiSettingsBtn, mode: "edit", focusAi: true }
+  ],
+  getProject: () => state.project,
+  refreshResources,
+  suggestedCreatorName,
+  cleanCreatorName,
+  setLanguageValue: setLanguageInputValue,
+  normalizeLanguageValue: normalizeLanguageInputElement,
+  renderStorageStatus: renderProjectStorageStatus,
+  renderResourcePickers: renderProjectResourcePickers,
+  renderFrequentPairs: renderFrequentLanguagePairs,
+  save: saveProjectFromDialog,
+  chooseWorkspace: chooseWorkspaceFolder,
+  workspaceSupported: () => Boolean(workspaceStorage?.isSupported()),
+  translate: uiSource,
+  scheduleFrame: requestAnimationFrame,
+  onError: (error) => setSaveStatus(error?.message || "Dialog could not be opened.", "dirty")
+});
+projectDialogController?.mount?.();
 dialogLifecycleController?.mount?.();
 
 function uiT(key, values = {}) {
@@ -3156,14 +3209,6 @@ function renderFrequentLanguagePairs() {
     const active = source === current.sourceLang && target === current.targetLang;
     return `<button type="button" class="${active ? "active" : ""}" data-source-lang="${escapeHtml(source)}" data-target-lang="${escapeHtml(target)}">${escapeHtml(languagePairDisplay(source, target))}</button>`;
   }).join(""));
-  els.frequentLanguagePairs.querySelectorAll("button").forEach((button) => {
-    button.addEventListener("click", () => {
-      setLanguageInputValue(document.querySelector("#sourceLangInput"), button.dataset.sourceLang);
-      setLanguageInputValue(document.querySelector("#targetLangInput"), button.dataset.targetLang);
-      renderProjectResourcePickers(state.projectDialogMode === "edit" ? state.project : null);
-      renderFrequentLanguagePairs();
-    });
-  });
 }
 
 function syncLocalAiLanguageFields(changedInput = null) {
@@ -4053,8 +4098,8 @@ function matchingResourceSummaries(type, sourceLang, targetLang, selectedNames =
 
 function projectDialogValues() {
   return {
-    sourceLang: normalizeLanguageInputValue(document.querySelector("#sourceLangInput").value),
-    targetLang: normalizeLanguageInputValue(document.querySelector("#targetLangInput").value)
+    sourceLang: normalizeLanguageInputValue(els.sourceLangInput.value),
+    targetLang: normalizeLanguageInputValue(els.targetLangInput.value)
   };
 }
 
@@ -4081,9 +4126,10 @@ function resourceOptionHtml(resource, type, selected, main) {
 function renderProjectResourcePickers(project = state.project) {
   const { sourceLang, targetLang } = projectDialogValues();
   if (!sourceLang || !targetLang) return;
-  const selectedTmNames = state.projectDialogMode === "edit" ? projectTmNames(project) : [];
-  const selectedTbNames = state.projectDialogMode === "edit" ? projectTermBaseNames(project) : [];
-  const main = state.projectDialogMode === "edit" ? mainTmName(project) : "";
+  const editing = projectDialogController?.getMode?.() === "edit";
+  const selectedTmNames = editing ? projectTmNames(project) : [];
+  const selectedTbNames = editing ? projectTermBaseNames(project) : [];
+  const main = editing ? mainTmName(project) : "";
   const tmResources = matchingResourceSummaries("tm", sourceLang, targetLang, selectedTmNames);
   const tbResources = matchingResourceSummaries("tb", sourceLang, targetLang, selectedTbNames);
   replaceSafeHtml(els.projectTmResourceList, tmResources.length
@@ -4092,54 +4138,10 @@ function renderProjectResourcePickers(project = state.project) {
   replaceSafeHtml(els.projectTbResourceList, tbResources.length
     ? tbResources.map((resource) => resourceOptionHtml(resource, "tb", selectedTbNames.includes(resource.name), false)).join("")
     : `<div class="muted">${uiLabelHtml("noMatchingTbs")}</div>`);
-  els.projectTmResourceList.querySelectorAll('[data-main-tm]').forEach((radio) => {
-    radio.addEventListener("change", () => {
-      const name = radio.dataset.mainTm;
-      const checkbox = Array.from(els.projectTmResourceList.querySelectorAll('[data-resource-type="tm"]')).find((input) => input.dataset.resourceName === name);
-      if (checkbox) checkbox.checked = true;
-      els.newTmNameInput.value = "";
-    });
-  });
-  els.projectTmResourceList.querySelectorAll('[data-resource-type="tm"]').forEach((checkbox) => {
-    checkbox.addEventListener("change", () => {
-      if (checkbox.checked) return;
-      const radio = Array.from(els.projectTmResourceList.querySelectorAll('[data-main-tm]')).find((input) => input.dataset.mainTm === checkbox.dataset.resourceName);
-      if (radio?.checked) radio.checked = false;
-    });
-  });
 }
 
-async function openProjectDialog(mode = "create") {
-  state.projectDialogMode = mode;
-  await refreshResources();
-  const editing = mode === "edit" && state.project;
-  els.projectDialogTitle.textContent = editing ? uiSource("Project settings") : uiSource("New project");
-  els.projectForm.querySelector("#saveProjectBtn").textContent = editing ? uiSource("Save settings") : uiSource("Create");
-  if (els.projectCreatorInput) {
-    els.projectCreatorInput.value = editing ? cleanCreatorName(state.project.creatorName) : await suggestedCreatorName();
-  }
-  document.querySelector("#projectNameInput").value = editing ? state.project.name : "";
-  document.querySelector("#projectDomainInput").value = editing ? state.project.domain || "" : "";
-  setLanguageInputValue(document.querySelector("#sourceLangInput"), editing ? state.project.sourceLang : "en");
-  setLanguageInputValue(document.querySelector("#targetLangInput"), editing ? state.project.targetLang : "tr");
-  els.newTmNameInput.value = editing ? "" : "";
-  els.newTermBaseNameInput.value = editing ? "" : "";
-  if (els.projectAdvancedOptions) els.projectAdvancedOptions.open = Boolean(editing);
-  if (els.saveProjectToFolderInput) {
-    els.saveProjectToFolderInput.checked = Boolean(editing && workspaceStorage?.isSupported());
-  }
-  renderProjectStorageStatus();
-  renderProjectResourcePickers(editing ? state.project : null);
-  renderFrequentLanguagePairs();
-  showManagedDialog(els.projectDialog, document.querySelector("#projectNameInput"));
-}
-
-async function openProjectAiSettings() {
-  if (!state.project) return;
-  await openProjectDialog("edit");
-  if (els.projectAdvancedOptions) els.projectAdvancedOptions.open = true;
-  if (els.projectAiOptions) els.projectAiOptions.open = true;
-  requestAnimationFrame(() => els.localAiPresetSelect?.focus());
+function openProjectDialog(mode = "create") {
+  return projectDialogController?.open?.(mode, { returnTarget: document.activeElement }) || Promise.resolve(false);
 }
 
 function collectCheckedResourceNames(type) {
@@ -4147,8 +4149,8 @@ function collectCheckedResourceNames(type) {
 }
 
 function collectProjectResourceSettings(existingProject = null) {
-  const sourceLang = normalizeLanguageInputElement(document.querySelector("#sourceLangInput"));
-  const targetLang = normalizeLanguageInputElement(document.querySelector("#targetLangInput"));
+  const sourceLang = normalizeLanguageInputElement(els.sourceLangInput);
+  const targetLang = normalizeLanguageInputElement(els.targetLangInput);
   const existingLinks = projectResourceLinks(existingProject);
   let tmNames = uniqueNames(collectCheckedResourceNames("tm"));
   let tbNames = uniqueNames(collectCheckedResourceNames("tb"));
@@ -12382,7 +12384,8 @@ async function saveProjectFromDialog() {
     setSaveStatus("Complete required project fields.", "dirty");
     return false;
   }
-  const settings = collectProjectResourceSettings(state.projectDialogMode === "edit" ? state.project : null);
+  const editing = projectDialogController?.getMode?.() === "edit" && Boolean(state.project);
+  const settings = collectProjectResourceSettings(editing ? state.project : null);
   const shouldSaveToFolder = Boolean(els.saveProjectToFolderInput?.checked);
   if (shouldSaveToFolder && workspaceStorage?.isSupported() && !state.workspaceStatus?.connected) {
     try {
@@ -12393,14 +12396,14 @@ async function saveProjectFromDialog() {
       renderProjectStorageStatus();
     }
   }
-  if (state.projectDialogMode === "edit" && state.project) {
+  if (editing && state.project) {
     const creatorName = rememberCreatorName(els.projectCreatorInput?.value || "");
     state.project = await updateProject({
       ...state.project,
-      name: document.querySelector("#projectNameInput").value.trim(),
+      name: els.projectNameInput.value.trim(),
       creatorName,
       creatorOrigin: state.project.creatorOrigin || "manual",
-      domain: document.querySelector("#projectDomainInput").value.trim(),
+      domain: els.projectDomainInput.value.trim(),
       ...settings
     });
     state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
@@ -12436,15 +12439,15 @@ async function saveProjectFromDialog() {
 
   const creatorName = rememberCreatorName(els.projectCreatorInput?.value || "");
   const project = await createProject({
-    name: document.querySelector("#projectNameInput").value,
+    name: els.projectNameInput.value,
     creatorName,
     creatorOrigin: "manual",
-    domain: document.querySelector("#projectDomainInput").value,
+    domain: els.projectDomainInput.value,
     ...settings
   });
   els.projectForm.reset();
-  setLanguageInputValue(document.querySelector("#sourceLangInput"), "en");
-  setLanguageInputValue(document.querySelector("#targetLangInput"), "tr");
+  setLanguageInputValue(els.sourceLangInput, "en");
+  setLanguageInputValue(els.targetLangInput, "tr");
   els.newTmNameInput.value = "";
   els.newTermBaseNameInput.value = "";
   els.projectDialog.close();
@@ -13628,15 +13631,6 @@ function wireEvents() {
       setSaveStatus(error.message || "Workspace repair check failed", "dirty");
     }
   });
-  els.projectChooseWorkspaceBtn.addEventListener("click", async () => {
-    try {
-      await chooseWorkspaceFolder();
-      els.saveProjectToFolderInput.checked = true;
-      renderProjectStorageStatus();
-    } catch (error) {
-      if (error.name !== "AbortError") setSaveStatus(error.message || "Could not choose workspace folder", "dirty");
-    }
-  });
   els.tmResourceTab.addEventListener("click", () => setResourceType("tm"));
   els.tbResourceTab.addEventListener("click", () => setResourceType("tb"));
   els.projectFilesBtn.addEventListener("click", showProjectHome);
@@ -13656,29 +13650,9 @@ function wireEvents() {
     }
   });
   els.commandPaletteBtn.addEventListener("click", openCommandPalette);
-  els.newProjectBtn.addEventListener("click", () => openProjectDialog("create"));
-  els.projectSettingsBtn.addEventListener("click", () => openProjectDialog("edit"));
-  els.editorProjectSettingsBtn.addEventListener("click", () => openProjectDialog("edit"));
-  els.openProjectAiSettingsBtn?.addEventListener("click", openProjectAiSettings);
   els.projectSearchInput.addEventListener("input", renderProjectsView);
   els.projectsImportProjectBtn?.addEventListener("click", () => els.projectPackageImportInput.click());
   els.languagePairFilter.addEventListener("change", renderProjectsView);
-  els.cancelProjectBtn.addEventListener("click", () => els.projectDialog.close());
-  const sourceLangInput = document.querySelector("#sourceLangInput");
-  const targetLangInput = document.querySelector("#targetLangInput");
-  const updateProjectLanguageControls = (normalize = false) => {
-    if (normalize) {
-      normalizeLanguageInputElement(sourceLangInput);
-      normalizeLanguageInputElement(targetLangInput);
-    }
-    renderProjectResourcePickers(state.projectDialogMode === "edit" ? state.project : null);
-    renderFrequentLanguagePairs();
-  };
-  [sourceLangInput, targetLangInput].forEach((input) => {
-    input.addEventListener("input", () => updateProjectLanguageControls(false));
-    input.addEventListener("change", () => updateProjectLanguageControls(true));
-    input.addEventListener("blur", () => updateProjectLanguageControls(true));
-  });
   [
     els.tmResourceSourceLangInput,
     els.tmResourceTargetLangInput,
@@ -13687,16 +13661,6 @@ function wireEvents() {
   ].filter(Boolean).forEach((input) => {
     input.addEventListener("change", () => normalizeLanguageInputElement(input));
     input.addEventListener("blur", () => normalizeLanguageInputElement(input));
-  });
-  els.projectForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await saveProjectFromDialog();
-  });
-  els.aiSettingsForm?.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
-      // Provider fields live inside the project form, but Enter should not save the project implicitly.
-      event.preventDefault();
-    }
   });
 
   els.docxInput.addEventListener("change", async () => {
@@ -14210,6 +14174,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(splitFixtureIndex > 0 && splitFixtureIndex < splitFixture.length && !splitProtectedRanges(splitFixture).some((range) => splitFixtureIndex > range.start && splitFixtureIndex < range.end), "segment split maps target cursor to safe source boundary");
     els.newProjectBtn.focus();
     await openProjectDialog("create");
+    assert(
+      projectDialogController?.getMode?.() === "create" &&
+        els.projectDialogTitle.textContent === "New project" &&
+        els.saveProjectBtn.textContent === "Create",
+      "checked project dialog controller prepares create mode before opening"
+    );
     assert(document.activeElement === document.querySelector("#projectNameInput"), "project dialog moves focus to its first required field");
     const catalanTurkishQuickPair = Array.from(els.frequentLanguagePairs.querySelectorAll("button"))
       .find((button) => button.dataset.sourceLang === "ca" && button.dataset.targetLang === "tr");
@@ -14388,6 +14358,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const successfulDomainSave = await saveProjectDomainFromForm();
     assert(successfulDomainSave && state.project.domain === "Workflow saved domain", "project domain save persists metadata");
     await openProjectDialog("edit");
+    assert(
+      projectDialogController?.isEditing?.() &&
+        els.projectDialogTitle.textContent === "Project settings" &&
+        els.saveProjectBtn.textContent === "Save settings" &&
+        els.projectAdvancedOptions.open,
+      "checked project dialog controller prepares edit mode from current project state"
+    );
     const legacyDialogSettings = collectProjectResourceSettings({
       ...state.project,
       resourceLinks: [
@@ -14725,6 +14702,27 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     updateSegmentDraft(importActivityFailureSegmentIndex, "İçe aktarma etkinlik uyarısı hedefi");
     await flushPendingSegmentSaves(project.id);
     await openProjectFile(documentInfo.id);
+    state.inspectorOpen = true;
+    verticalFeatureState?.inspector?.setContext?.({ tab: "ai" });
+    renderEditor();
+    els.openProjectAiSettingsBtn.focus();
+    els.openProjectAiSettingsBtn.click();
+    await waitFor(
+      () => els.projectDialog.open && els.projectAiOptions.open && document.activeElement === els.localAiPresetSelect,
+      "project AI settings deep link"
+    );
+    assert(
+      projectDialogController?.isEditing?.() && els.projectAdvancedOptions.open,
+      "project dialog controller opens the requested AI settings context"
+    );
+    els.cancelProjectBtn.click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    assert(
+      document.activeElement === els.openProjectAiSettingsBtn,
+      "project dialog controller restores the AI settings opener after close"
+    );
+    verticalFeatureState?.inspector?.setContext?.({ tab: "matches" });
+    renderEditor();
     const segmentIndex = state.segments.findIndex((segment) => segment.documentId === documentInfo.id);
     const projectToolbarBounds = document.querySelector(".project-toolbar")?.getBoundingClientRect();
     const toolbarActionsBounds = document.querySelector(".project-toolbar .toolbar-actions")?.getBoundingClientRect();

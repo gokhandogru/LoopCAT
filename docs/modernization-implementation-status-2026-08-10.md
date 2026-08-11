@@ -14,6 +14,7 @@ This document records what the current working tree implements from the 2026 mod
 - Electron 43.3.0, electron-builder 26.15.3, Node 24 tooling, renderer sandboxing, context isolation, secure fuses, hardware acceleration by default, and an explicit restart-based GPU fallback.
 - Immediate accessibility repairs for live status, focus visibility, modal focus containment/restoration, disclosure state, and command-palette keyboard behavior.
 - A checked shared dialog-lifecycle controller now owns open, close, native cancel, initial focus, and explicit focus return for About, Diagnostics, and Trash. Feature controllers retain their data/actions, Diagnostics returns to the visible Workspace trigger, and the older compatibility path remains only for dialogs not yet migrated.
+- A checked project-dialog controller owns create/edit mode, asynchronous resource preparation, field and delegated dynamic listeners, workspace-folder interaction, AI-settings deep linking, and lifecycle delegation. The existing domain save service remains the only persistence/validation boundary, and no project/resource/workspace data moved into UI state.
 - Checked JavaScript/JSDoc, ESLint, Prettier, Stylelint/token enforcement, import-boundary checks, Node focused tests, axe checks, and visual regression checks.
 - Explicit app store, navigation, platform, repository, preference, status/job/error, feature-controller, command, palette, theme, layout, update, diagnostics, safe-DOM, and report-template boundaries under `src/`.
 - A quiet semantic design system with restrained surfaces, no persistent blur, semantic light/dark roles, Balanced/Compact density, remembered inspector/layout preferences, and responsive Projects → dashboard → editor layouts.
@@ -32,12 +33,12 @@ This document records what the current working tree implements from the 2026 mod
 
 ## Measured results
 
-- Packaged production JavaScript graph: 2,330,204 bytes across five modules, including both mutually exclusive startup paths.
-- Hosted/desktop initial production `app.js`: 923,606 bytes minified and 245,896 bytes gzip. Its two locale chunks remain lazy.
-- Direct-file web fallback `app-file.js`: 1,165,080 bytes minified and 329,036 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
+- Packaged production JavaScript graph: 2,335,716 bytes across five modules, including both mutually exclusive startup paths.
+- Hosted/desktop initial production `app.js`: 926,362 bytes minified and 247,029 bytes gzip. Its two locale chunks remain lazy.
+- Direct-file web fallback `app-file.js`: 1,167,836 bytes minified and 330,165 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
 - Initial synchronous JavaScript is more than 40% below the recorded approximately 2.62 MB baseline. The roadmap's 250 KB gzip target is met; the 750 KB minified stretch target is not yet met.
 - Visual verification passes 42 deterministic screenshots covering 1440×900, 1366×768, and 1024×768, including light/dark, inspector open/closed, Focus mode, AI, status, and compact-density states.
-- Automated accessibility checks pass the deterministic Projects, About dialog, and command-palette states with zero blocking findings. This is not a WCAG conformance claim.
+- Automated accessibility checks pass the deterministic Projects, New project dialog, About dialog, and command-palette states with zero blocking findings. This is not a WCAG conformance claim.
 - The full Electron browser suite passes security, offline shell, smoke, regression, application workflow, workspace storage, package round trip, and large-project coverage.
 - The packaged Windows desktop passes artifact inspection, fuse verification, renderer OS sandbox verification, GPU-enabled startup, and the explicit GPU-disabled fallback.
 
@@ -47,16 +48,16 @@ This document records what the current working tree implements from the 2026 mod
 
 The new checked boundaries are active, but `app.js` remains the compatibility coordinator and is still approximately 20,000 source lines, including the isolated workflow-test source section. Production strips the test driver, but the roadmap's source goal of a bootstrap under 300 lines is not met.
 
-The first synchronous dialog-lifecycle slice is complete. Still required before this package is complete:
+The synchronous dialog-lifecycle and async project-dialog slices are complete. Still required before this package is complete:
 
-1. Extract the async project dialog, the remaining TM/OPUS-CAT dialog paths and event ownership, resources, quality/review, recovery/workspace, import/export/reports, and the remaining AI UI orchestration one family at a time.
+1. Extract the remaining TM/OPUS-CAT dialog paths and event ownership, resources, quality/review, recovery/workspace, import/export/reports, and the remaining AI UI orchestration one family at a time.
 2. Move provider implementations from the `ai.js` façade into independently tested adapters without changing provider behavior or consent rules.
 3. Replace remaining mutable compatibility state with injected repositories/controllers and remove new code's reliance on `window.CatHan`.
 4. Keep each extraction behavior-preserving and run the focused feature suite plus the full browser/release suite at each family boundary.
 
 ### P2-05 — Performance stretch target
 
-Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and gzip targets but remains 173,606 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
+Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and gzip targets but remains 176,362 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
 
 ## Manual and external release gates still required
 
@@ -83,20 +84,19 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 with the async project-dialog extraction only.
+Continue P1-08 with the remaining TM-threshold and OPUS-CAT dialog/event ownership only.
 
 Entry criteria:
 
-- Keep schema-6 readers, project-package schema 5, all completed command/Undo boundaries, autosave/recovery, CSP, sanitization, the shared dialog controller, and current project-dialog visuals unchanged.
-- Characterize create/edit modes, async resource-picker preparation, language chips, domain and client fields, AI settings deep-linking, workspace-folder controls, validation failures, activity-log failures, native cancel, and focus return to each opener.
-- Introduce a checked project-dialog feature controller under `src/features/projects/` that receives its form root, dialog lifecycle, repositories/services, and callbacks. It owns project-form UI state and orchestration, but not persisted project/resource/workspace data.
-- Migrate project-dialog preparation and event ownership before moving its save transaction. Keep `showManagedDialog` available for the remaining TM/OPUS-CAT compatibility dialogs.
+- Preserve the checked shared/project dialog controllers, all save/command boundaries, CSP, sanitization, and current dialog visuals.
+- Characterize the temporary TM threshold prompt, its numeric validation and focus return, plus OPUS-CAT help open/close/Escape/focus behavior and all current entry points.
+- Register both dialog families through the shared lifecycle and move their stable event ownership into one small checked controller or explicit feature-local adapters.
+- Keep TM threshold decisions and OPUS-CAT engine/help data in their existing feature services; the dialog layer may only coordinate UI and return user intent.
 
 Exit criteria:
 
-- The project-dialog controller owns create/edit form preparation, field/listener lifecycle, validation presentation, and delegation to existing domain save services without duplicating persistence logic.
-- New project, Project settings, Editor project settings, and the AI-settings deep link preserve current mouse/keyboard, Escape, initial-focus, focus-return, live-status, localization, and workspace-folder behavior.
-- `app.js` loses the migrated project-form preparation/listener code without adding globals, cross-root queries, or a second project state source; the compatibility path remains for TM/OPUS-CAT dialogs.
-- Focused controller/form tests, accessibility/visual checks at all three viewports, web/desktop smoke, project-package/workspace recovery, app workflow, and FULL-SUITE gates pass.
+- `showManagedDialog` is no longer used by TM-threshold or OPUS-CAT paths, and their superseded direct lifecycle listeners are removed from `app.js`.
+- Numeric TM threshold validation, OPUS-CAT help actions, keyboard Escape, initial focus, and visible focus return remain unchanged.
+- Focused lifecycle/intent tests, accessibility and visual checks, AI-sidebar UX, web/desktop smoke, app workflow, and FULL-SUITE gates pass.
 
-After that slice, continue P1-08 with the remaining TM/OPUS-CAT dialogs and event ownership, then the remaining feature families one behavior-preserving boundary at a time.
+After that slice, continue P1-08 with Resources, then the remaining feature families one behavior-preserving boundary at a time.

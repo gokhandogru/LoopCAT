@@ -155,6 +155,8 @@ const requiredReleaseFiles = [
   "src/entry/test.js",
   "src/commands/edit-target-session.js",
   "src/ui/dialog-controller.js",
+  "src/features/projects/project-dialog-controller.js",
+  "tests/unit/project-dialog-controller.test.cjs",
   "scripts/generate-brand-icons.cjs",
   "scripts/publish-repository-downloads.cjs",
   "scripts/verify-web-artifact.cjs",
@@ -212,6 +214,8 @@ const segmentCommandsJs = readText("src/commands/segment-commands.js");
 const commandUnitTests = readText("tests/unit/commands.test.cjs");
 const dialogControllerJs = readText("src/ui/dialog-controller.js");
 const dialogControllerUnitTests = readText("tests/unit/dialog-controller.test.cjs");
+const projectDialogControllerJs = readText("src/features/projects/project-dialog-controller.js");
+const projectDialogControllerUnitTests = readText("tests/unit/project-dialog-controller.test.cjs");
 const paletteControllerJs = readText("src/features/palette/palette-controller.js");
 const updateControllerJs = readText("src/features/update/update-controller.js");
 const safeHtmlJs = readText("src/security/safe-html.js");
@@ -861,6 +865,43 @@ assertIncludes(
   appJs,
   "dialog lifecycle controller restores the Trash opener after cancel and close",
   "the app workflow must characterize native cancel/close focus restoration for migrated dialogs."
+);
+assertIncludes(
+  projectDialogControllerJs,
+  "dialogLifecycle.register({",
+  "the checked project dialog controller must register through the shared dialog lifecycle."
+);
+assertIncludes(
+  projectDialogControllerJs,
+  'id: "project"',
+  "the checked project dialog controller must own the canonical project dialog registration."
+);
+assertIncludes(
+  projectDialogControllerJs,
+  "beforeOpen: prepare",
+  "project dialog data and UI preparation must complete before the modal opens."
+);
+assertIncludes(
+  projectDialogControllerJs,
+  "options.renderResourcePickers?.(project)",
+  "project resource rendering must remain an injected feature boundary."
+);
+assert(
+  !appJs.includes('els.newProjectBtn.addEventListener("click"') &&
+    !appJs.includes('els.projectChooseWorkspaceBtn.addEventListener("click"') &&
+    !appJs.includes('els.projectForm.addEventListener("submit"') &&
+    !appJs.includes("state.projectDialogMode"),
+  "the migrated project dialog must not retain superseded app.js listener or mode ownership."
+);
+assertIncludes(
+  projectDialogControllerUnitTests,
+  "ProjectDialogController prepares create mode asynchronously and delegates form save",
+  "focused tests must characterize async create preparation and persistence delegation."
+);
+assertIncludes(
+  appJs,
+  "project dialog controller opens the requested AI settings context",
+  "the application workflow must characterize the AI settings project-dialog deep link."
 );
 assertIncludes(
   indexHtml,

@@ -166,6 +166,28 @@ app
       }
       await audit("Projects empty");
 
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const opener = document.querySelector("#newProjectBtn");
+          opener.focus();
+          opener.click();
+        })()`,
+        true
+      );
+      await waitFor("document.querySelector('#projectDialog').open", "New project dialog");
+      await waitFor(
+        "document.activeElement === document.querySelector('#projectNameInput')",
+        "New project dialog initial focus"
+      );
+      await audit("New project dialog");
+      windowRef.webContents.sendInputEvent({ type: "keyDown", keyCode: "ESC" });
+      windowRef.webContents.sendInputEvent({ type: "keyUp", keyCode: "ESC" });
+      await waitFor("!document.querySelector('#projectDialog').open", "New project dialog Escape close");
+      await waitFor(
+        "document.activeElement === document.querySelector('#newProjectBtn')",
+        "New project dialog focus return"
+      );
+
       await windowRef.webContents.executeJavaScript("document.querySelector('#aboutBtn').click()", true);
       await waitFor("document.querySelector('#aboutDialog').open", "About dialog");
       await waitFor(
