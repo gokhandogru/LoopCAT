@@ -201,6 +201,34 @@ app
 
       await windowRef.webContents.executeJavaScript(
         `(() => {
+          const dialog = document.querySelector("#tmPretranslateDialog");
+          dialog.showModal();
+          document.querySelector("#tmPretranslateThresholdInput").focus();
+        })()`,
+        true
+      );
+      await waitFor("document.querySelector('#tmPretranslateDialog').open", "TM threshold dialog");
+      await audit("TM pretranslation threshold dialog");
+      windowRef.webContents.sendInputEvent({ type: "keyDown", keyCode: "ESC" });
+      windowRef.webContents.sendInputEvent({ type: "keyUp", keyCode: "ESC" });
+      await waitFor("!document.querySelector('#tmPretranslateDialog').open", "TM threshold dialog Escape close");
+
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const dialog = document.querySelector("#opusCatHelpDialog");
+          dialog.showModal();
+          document.querySelector("#closeOpusCatHelpBtn").focus();
+        })()`,
+        true
+      );
+      await waitFor("document.querySelector('#opusCatHelpDialog').open", "OPUS-CAT help dialog");
+      await audit("OPUS-CAT connection help dialog");
+      windowRef.webContents.sendInputEvent({ type: "keyDown", keyCode: "ESC" });
+      windowRef.webContents.sendInputEvent({ type: "keyUp", keyCode: "ESC" });
+      await waitFor("!document.querySelector('#opusCatHelpDialog').open", "OPUS-CAT help dialog Escape close");
+
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
         const overlay = document.querySelector("#commandPaletteOverlay");
         overlay.classList.remove("hidden");
         overlay.setAttribute("aria-hidden", "false");

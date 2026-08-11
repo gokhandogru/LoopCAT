@@ -13,9 +13,9 @@ This document records what the current working tree implements from the 2026 mod
 - One generated production asset manifest used by renderer staging, web packaging, desktop packaging/protocol allowlisting, service-worker caching, and artifact verification.
 - Electron 43.3.0, electron-builder 26.15.3, Node 24 tooling, renderer sandboxing, context isolation, secure fuses, hardware acceleration by default, and an explicit restart-based GPU fallback.
 - Immediate accessibility repairs for live status, focus visibility, modal focus containment/restoration, disclosure state, and command-palette keyboard behavior.
-- A checked shared dialog-lifecycle controller now owns open, close, native cancel, initial focus, and explicit focus return for About, Diagnostics, and Trash. Feature controllers retain their data/actions, Diagnostics returns to the visible Workspace trigger, and the older compatibility path remains only for dialogs not yet migrated.
+- A checked shared dialog-lifecycle controller now owns open, close, native cancel, initial focus, and explicit focus return for About, Diagnostics, Trash, the TM pretranslation threshold prompt, and OPUS-CAT connection help. Feature-local adapters return only user intent: TM matching and provider/network ownership remain in their existing services. TM cancel returns to the visible Segment tools trigger; OPUS-CAT help returns to its visible Project settings entry point. The superseded `showManagedDialog` helper and direct TM/OPUS lifecycle listeners are removed.
 - A checked project-dialog controller owns create/edit mode, asynchronous resource preparation, field and delegated dynamic listeners, workspace-folder interaction, AI-settings deep linking, and lifecycle delegation. The existing domain save service remains the only persistence/validation boundary, and no project/resource/workspace data moved into UI state.
-- Checked JavaScript/JSDoc, ESLint, Prettier, Stylelint/token enforcement, import-boundary checks, Node focused tests, axe checks, and visual regression checks.
+- Checked JavaScript/JSDoc, ESLint, Prettier, Stylelint/token enforcement, import-boundary checks, Node focused tests, axe checks, and visual regression checks. Prettier now follows the repository's `.gitattributes` LF contract, so the formatting gate is reproducible on a clean checkout.
 - Explicit app store, navigation, platform, repository, preference, status/job/error, feature-controller, command, palette, theme, layout, update, diagnostics, safe-DOM, and report-template boundaries under `src/`.
 - A quiet semantic design system with restrained surfaces, no persistent blur, semantic light/dark roles, Balanced/Compact density, remembered inspector/layout preferences, and responsive Projects → dashboard → editor layouts.
 - Contextual inspector tabs, fuzzy/grouped `Ctrl/Cmd+K` palette, recent commands, filter presets, contextual AI suggestions, separated provider administration, inspectable provenance, AI apply-and-next, and reversible AI application.
@@ -33,12 +33,12 @@ This document records what the current working tree implements from the 2026 mod
 
 ## Measured results
 
-- Packaged production JavaScript graph: 2,335,716 bytes across five modules, including both mutually exclusive startup paths.
-- Hosted/desktop initial production `app.js`: 926,362 bytes minified and 247,029 bytes gzip. Its two locale chunks remain lazy.
-- Direct-file web fallback `app-file.js`: 1,167,836 bytes minified and 330,165 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
+- Packaged production JavaScript graph: 2,340,830 bytes across five modules, including both mutually exclusive startup paths.
+- Hosted/desktop initial production `app.js`: 928,919 bytes minified and 247,589 bytes gzip. Its two locale chunks remain lazy.
+- Direct-file web fallback `app-file.js`: 1,170,393 bytes minified and 330,146 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
 - Initial synchronous JavaScript is more than 40% below the recorded approximately 2.62 MB baseline. The roadmap's 250 KB gzip target is met; the 750 KB minified stretch target is not yet met.
-- Visual verification passes 42 deterministic screenshots covering 1440×900, 1366×768, and 1024×768, including light/dark, inspector open/closed, Focus mode, AI, status, and compact-density states.
-- Automated accessibility checks pass the deterministic Projects, New project dialog, About dialog, and command-palette states with zero blocking findings. This is not a WCAG conformance claim.
+- Visual verification passes 48 deterministic screenshots covering 1440×900, 1366×768, and 1024×768, including the TM threshold and OPUS-CAT help dialogs plus light/dark, inspector open/closed, Focus mode, AI, status, and compact-density states.
+- Automated accessibility checks pass the deterministic Projects, New project dialog, About dialog, TM threshold dialog, OPUS-CAT help dialog, and command-palette states with zero blocking findings. This is not a WCAG conformance claim.
 - The full Electron browser suite passes security, offline shell, smoke, regression, application workflow, workspace storage, package round trip, and large-project coverage.
 - The packaged Windows desktop passes artifact inspection, fuse verification, renderer OS sandbox verification, GPU-enabled startup, and the explicit GPU-disabled fallback.
 
@@ -48,16 +48,16 @@ This document records what the current working tree implements from the 2026 mod
 
 The new checked boundaries are active, but `app.js` remains the compatibility coordinator and is still approximately 20,000 source lines, including the isolated workflow-test source section. Production strips the test driver, but the roadmap's source goal of a bootstrap under 300 lines is not met.
 
-The synchronous dialog-lifecycle and async project-dialog slices are complete. Still required before this package is complete:
+The synchronous dialog-lifecycle, async project-dialog, TM-threshold, and OPUS-CAT help slices are complete. Still required before this package is complete:
 
-1. Extract the remaining TM/OPUS-CAT dialog paths and event ownership, resources, quality/review, recovery/workspace, import/export/reports, and the remaining AI UI orchestration one family at a time.
+1. Extract resources, quality/review, recovery/workspace, import/export/reports, and the remaining AI UI orchestration one family at a time.
 2. Move provider implementations from the `ai.js` façade into independently tested adapters without changing provider behavior or consent rules.
 3. Replace remaining mutable compatibility state with injected repositories/controllers and remove new code's reliance on `window.CatHan`.
 4. Keep each extraction behavior-preserving and run the focused feature suite plus the full browser/release suite at each family boundary.
 
 ### P2-05 — Performance stretch target
 
-Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and gzip targets but remains 176,362 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
+Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and gzip targets but remains 178,919 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
 
 ## Manual and external release gates still required
 
@@ -84,19 +84,19 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 with the remaining TM-threshold and OPUS-CAT dialog/event ownership only.
+Continue P1-08 with the Resources feature family only.
 
 Entry criteria:
 
-- Preserve the checked shared/project dialog controllers, all save/command boundaries, CSP, sanitization, and current dialog visuals.
-- Characterize the temporary TM threshold prompt, its numeric validation and focus return, plus OPUS-CAT help open/close/Escape/focus behavior and all current entry points.
-- Register both dialog families through the shared lifecycle and move their stable event ownership into one small checked controller or explicit feature-local adapters.
-- Keep TM threshold decisions and OPUS-CAT engine/help data in their existing feature services; the dialog layer may only coordinate UI and return user intent.
+- Preserve the checked dialog/intent controllers, storage/repository boundaries, project-package schema 5, database schema 6, current resource visuals, and linked-project workspace-dirty behavior.
+- Characterize Resources navigation, TM/termbase tabs, filtering, row editing, resource import/export, whole-resource deletion, language normalization, and linked-project refresh/dirtiness before moving ownership.
+- Extract the Resources view/controller state and stable event ownership without moving TM/termbase persistence, parsing, validation, package, or recovery behavior into UI state.
+- Keep raw imported content behind existing validation, sanitization, size, and redaction boundaries.
 
 Exit criteria:
 
-- `showManagedDialog` is no longer used by TM-threshold or OPUS-CAT paths, and their superseded direct lifecycle listeners are removed from `app.js`.
-- Numeric TM threshold validation, OPUS-CAT help actions, keyboard Escape, initial focus, and visible focus return remain unchanged.
-- Focused lifecycle/intent tests, accessibility and visual checks, AI-sidebar UX, web/desktop smoke, app workflow, and FULL-SUITE gates pass.
+- Resource navigation, filters, row operations, imports/exports, deletion, empty/error states, and linked-project dirtiness match the characterization baseline.
+- `app.js` no longer owns Resources DOM event wiring or view-local mutable state; feature services retain persistence and format ownership.
+- Focused controller tests, resource security/failure fixtures, accessibility/visual checks, web/desktop smoke, app workflow, package/workspace round trips, and FULL-SUITE gates pass.
 
-After that slice, continue P1-08 with Resources, then the remaining feature families one behavior-preserving boundary at a time.
+After that slice, continue P1-08 with quality/review, then the remaining feature families one behavior-preserving boundary at a time.

@@ -245,6 +245,33 @@ app
     await captureState("04", "new-project-dialog");
     await windowRef.webContents.executeJavaScript("document.querySelector('#projectDialog').close()", true);
 
+    await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const dialog = document.querySelector("#tmPretranslateDialog");
+        dialog.showModal();
+        document.querySelector("#tmPretranslateThresholdInput").focus();
+      })()`,
+      true
+    );
+    await waitFor("document.querySelector('#tmPretranslateDialog').open", "TM threshold dialog");
+    await captureState("05", "tm-pretranslation-threshold-dialog");
+    await windowRef.webContents.executeJavaScript(
+      "document.querySelector('#tmPretranslateDialog').close('cancel')",
+      true
+    );
+
+    await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const dialog = document.querySelector("#opusCatHelpDialog");
+        dialog.showModal();
+        document.querySelector("#closeOpusCatHelpBtn").focus();
+      })()`,
+      true
+    );
+    await waitFor("document.querySelector('#opusCatHelpDialog').open", "OPUS-CAT help dialog");
+    await captureState("06", "opus-cat-help-dialog");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#opusCatHelpDialog').close()", true);
+
     await windowRef.webContents.executeJavaScript("document.querySelector('.file-card button.primary').click()", true);
     await waitFor(
       "!document.querySelector('#editorView').classList.contains('hidden') && document.querySelector('#segmentBody textarea')",
@@ -379,7 +406,7 @@ app
     };
     await fsPromises.writeFile(path.join(outputDir, "baseline.json"), `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 
-    const expectedScreenshotCount = 42;
+    const expectedScreenshotCount = 48;
     if (screenshots.length !== expectedScreenshotCount) {
       throw new Error(`Expected ${expectedScreenshotCount} screenshots, captured ${screenshots.length}.`);
     }

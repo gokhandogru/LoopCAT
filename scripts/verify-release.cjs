@@ -155,7 +155,10 @@ const requiredReleaseFiles = [
   "src/entry/test.js",
   "src/commands/edit-target-session.js",
   "src/ui/dialog-controller.js",
+  "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
+  "src/features/resources/tm-pretranslation-dialog-controller.js",
+  "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "scripts/generate-brand-icons.cjs",
   "scripts/publish-repository-downloads.cjs",
@@ -216,6 +219,11 @@ const dialogControllerJs = readText("src/ui/dialog-controller.js");
 const dialogControllerUnitTests = readText("tests/unit/dialog-controller.test.cjs");
 const projectDialogControllerJs = readText("src/features/projects/project-dialog-controller.js");
 const projectDialogControllerUnitTests = readText("tests/unit/project-dialog-controller.test.cjs");
+const opusCatHelpControllerJs = readText("src/features/ai/opus-cat-help-controller.js");
+const tmPretranslationDialogControllerJs = readText(
+  "src/features/resources/tm-pretranslation-dialog-controller.js"
+);
+const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
 const paletteControllerJs = readText("src/features/palette/palette-controller.js");
 const updateControllerJs = readText("src/features/update/update-controller.js");
 const safeHtmlJs = readText("src/security/safe-html.js");
@@ -802,6 +810,11 @@ for (const requiredWebAsset of ["LICENSE", "NOTICE", "scripts/opus-cat-web-bridg
 }
 assertIncludes(indexHtml, `id="aboutBtn"`, "index.html must expose the product About button.");
 assertIncludes(indexHtml, `id="aboutDialog"`, "index.html must expose the product About dialog.");
+assertIncludes(
+  indexHtml,
+  `id="segmentToolsMenuSummary"`,
+  "the editor must expose a stable visible focus-return target for Segment tools dialogs."
+);
 assertIncludes(indexHtml, `id="opusCatHelpDialog"`, "index.html must expose actionable OPUS-CAT web connection help.");
 assertIncludes(
   indexHtml,
@@ -902,6 +915,71 @@ assertIncludes(
   appJs,
   "project dialog controller opens the requested AI settings context",
   "the application workflow must characterize the AI settings project-dialog deep link."
+);
+assertIncludes(
+  tmPretranslationDialogControllerJs,
+  'id: "tm-pretranslation"',
+  "the checked TM prompt controller must register through the shared dialog lifecycle."
+);
+assertIncludes(
+  tmPretranslationDialogControllerJs,
+  'dialog.returnValue === "apply" ? thresholdInput.value : null',
+  "the checked TM prompt controller must preserve apply-versus-cancel intent without owning TM data."
+);
+assertIncludes(
+  opusCatHelpControllerJs,
+  'id: "opus-cat-help"',
+  "the checked OPUS-CAT help controller must register through the shared dialog lifecycle."
+);
+assertIncludes(
+  opusCatHelpControllerJs,
+  "await retryConnection()",
+  "the checked OPUS-CAT help controller must delegate connection retry instead of owning provider logic."
+);
+assertIncludes(
+  appJs,
+  "createTmPretranslationDialogController",
+  "app.js must compose the checked TM threshold prompt controller."
+);
+assertIncludes(
+  functionBody(appJs, "function requestTmPretranslationThreshold", "async function pretranslateFromTm"),
+  "returnTarget: els.segmentToolsMenuSummary",
+  "the TM prompt must restore focus to the visible Segment tools trigger rather than its collapsed menu item."
+);
+assertIncludes(
+  appJs,
+  "createOpusCatHelpController",
+  "app.js must compose the checked OPUS-CAT help controller."
+);
+assert(
+  !appJs.includes("function showManagedDialog") &&
+    !appJs.includes('els.localAiOpusCatHelpBtn?.addEventListener("click"') &&
+    !appJs.includes('els.closeOpusCatHelpBtn?.addEventListener("click"') &&
+    !appJs.includes('els.retryOpusCatConnectionBtn?.addEventListener("click"') &&
+    !functionBody(appJs, "function requestTmPretranslationThreshold", "async function pretranslateFromTm").includes(
+      'addEventListener("close"'
+    ),
+  "migrated TM and OPUS-CAT dialogs must not retain superseded app.js lifecycle listeners."
+);
+assertIncludes(
+  dialogIntentControllerUnitTests,
+  "TM pretranslation dialog controller resolves apply and cancel intent through the shared lifecycle",
+  "focused tests must characterize TM threshold intent and lifecycle behavior."
+);
+assertIncludes(
+  dialogIntentControllerUnitTests,
+  "OPUS-CAT help controller owns visibility, dialog registration, retry, and listener cleanup",
+  "focused tests must characterize OPUS-CAT help entry points and retry ownership."
+);
+assertIncludes(
+  appJs,
+  "TM threshold cancellation restores focus to the visible Segment tools control",
+  "the app workflow must characterize TM prompt cancellation and focus return to the visible menu trigger."
+);
+assertIncludes(
+  appJs,
+  "OPUS-CAT help close restores focus to the visible connection-help entry point",
+  "the app workflow must characterize OPUS-CAT help focus return above Project settings."
 );
 assertIncludes(
   indexHtml,

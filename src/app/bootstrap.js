@@ -41,6 +41,8 @@ import { createUpdateController } from "../features/update/update-controller.js"
 import { createDiagnosticsController } from "../features/diagnostics/diagnostics-controller.js";
 import { createDiagnosticsService } from "../features/diagnostics/diagnostics-service.js";
 import { createAiContextController } from "../features/ai/ai-context-controller.js";
+import { createOpusCatHelpController } from "../features/ai/opus-cat-help-controller.js";
+import { createTmPretranslationDialogController } from "../features/resources/tm-pretranslation-dialog-controller.js";
 import {
   asTrustedHtml,
   asTrustedScriptUrl,
@@ -99,6 +101,7 @@ export function createApplicationRuntime({ browserWindow, projectApi, storageApi
     }),
     featureFactories: Object.freeze({
       createAiContextController,
+      createOpusCatHelpController,
       createAiProviderService,
       createDashboardController,
       createDiagnosticsController,
@@ -112,6 +115,7 @@ export function createApplicationRuntime({ browserWindow, projectApi, storageApi
       createProjectsController,
       createPaletteController,
       createThemeController,
+      createTmPretranslationDialogController,
       createUpdateController,
       createWorkspaceLayoutController,
       createSegmentGridController,

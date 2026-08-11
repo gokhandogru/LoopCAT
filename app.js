@@ -978,6 +978,7 @@ const els = {
   confirmBtn: document.querySelector("#confirmBtn"),
   saveTmBtn: document.querySelector("#saveTmBtn"),
   pretranslateBtn: document.querySelector("#pretranslateBtn"),
+  segmentToolsMenuSummary: document.querySelector("#segmentToolsMenuSummary"),
   tmMatches: document.querySelector("#tmMatches"),
   termSuggestions: document.querySelector("#termSuggestions"),
   progressText: document.querySelector("#progressText"),
@@ -1343,6 +1344,28 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
   onError: (error) => setSaveStatus(error?.message || "Dialog could not be opened.", "dirty")
 });
 projectDialogController?.mount?.();
+const tmPretranslationDialogController = appRuntime?.featureFactories?.createTmPretranslationDialogController?.({
+  dialogLifecycle: dialogLifecycleController,
+  elements: {
+    dialog: els.tmPretranslateDialog,
+    thresholdInput: els.tmPretranslateThresholdInput
+  },
+  defaultThreshold: 85,
+  scheduleFrame: requestAnimationFrame,
+  onError: (error) => setSaveStatus(error?.message || "TM pretranslation settings could not be opened.", "dirty")
+});
+const opusCatHelpController = appRuntime?.featureFactories?.createOpusCatHelpController?.({
+  dialogLifecycle: dialogLifecycleController,
+  elements: {
+    dialog: els.opusCatHelpDialog,
+    opener: els.localAiOpusCatHelpBtn,
+    closer: els.closeOpusCatHelpBtn,
+    retryButton: els.retryOpusCatConnectionBtn
+  },
+  retryConnection: testLocalAiConnection,
+  onError: (error) => setSaveStatus(error?.message || "OPUS-CAT connection help could not complete the action.", "dirty")
+});
+opusCatHelpController?.mount?.();
 dialogLifecycleController?.mount?.();
 
 function uiT(key, values = {}) {
@@ -1607,14 +1630,6 @@ async function emptyTrashPermanently() {
   await appRuntime.trashRepository.emptyAll();
   await renderTrashList();
   setSaveStatus("Trash emptied permanently", "saved");
-  return true;
-}
-
-function showManagedDialog(dialog, initialFocus) {
-  if (!dialog || dialog.open || typeof dialog.showModal !== "function") return false;
-  if (focusController?.showModal) return focusController.showModal(dialog, { initialFocus });
-  dialog.showModal();
-  queueMicrotask(() => initialFocus?.focus?.({ preventScroll: true }));
   return true;
 }
 
@@ -6724,23 +6739,10 @@ async function saveActiveSegmentToTm(options = {}) {
 }
 
 function requestTmPretranslationThreshold() {
-  const dialog = els.tmPretranslateDialog;
-  const input = els.tmPretranslateThresholdInput;
-  if (!dialog || !input || typeof dialog.showModal !== "function") {
+  if (!tmPretranslationDialogController?.request) {
     throw new Error("TM pretranslation settings are unavailable in this browser.");
   }
-  input.value = "85";
-  dialog.returnValue = "";
-  return new Promise((resolve) => {
-    dialog.addEventListener("close", () => {
-      resolve(dialog.returnValue === "apply" ? input.value : null);
-    }, { once: true });
-    showManagedDialog(dialog, input);
-    requestAnimationFrame(() => {
-      input.focus();
-      input.select();
-    });
-  });
+  return tmPretranslationDialogController.request({ returnTarget: els.segmentToolsMenuSummary });
 }
 
 async function pretranslateFromTm() {
@@ -6749,8 +6751,6 @@ async function pretranslateFromTm() {
   const beforeSnapshots = new Map();
   const updated = [];
   state.tmPretranslating = true;
-  els.pretranslateBtn.disabled = true;
-  els.pretranslateBtn.setAttribute("aria-busy", "true");
   try {
     const raw = await requestTmPretranslationThreshold();
     if (raw === null) return null;
@@ -6770,6 +6770,8 @@ async function pretranslateFromTm() {
       setSaveStatus("No empty segments to pretranslate.", "saved");
       return null;
     }
+    els.pretranslateBtn.disabled = true;
+    els.pretranslateBtn.setAttribute("aria-busy", "true");
     setSaveStatus("Pretranslating...");
     await yieldToUi();
     const tmNames = projectTmNames();
@@ -8390,13 +8392,11 @@ function localAiConnectionErrorLooksStartable(error) {
 }
 
 function setOpusCatConnectionHelpVisible(visible) {
-  els.localAiOpusCatHelpBtn?.classList.toggle("hidden", !visible);
+  opusCatHelpController?.setVisible?.(visible);
 }
 
 function showOpusCatConnectionHelp() {
-  setOpusCatConnectionHelpVisible(true);
-  if (!els.opusCatHelpDialog || typeof els.opusCatHelpDialog.showModal !== "function" || els.opusCatHelpDialog.open) return;
-  showManagedDialog(els.opusCatHelpDialog, els.closeOpusCatHelpBtn);
+  return opusCatHelpController?.open?.();
 }
 
 async function finishLocalAiConnection(settings, provider, result, saveMessage = "AI provider connection works") {
@@ -13565,12 +13565,6 @@ function wireEvents() {
   els.redoBtn?.addEventListener("click", redoLastCommand);
   els.reloadUpdateBtn?.addEventListener("click", () => void offlineUpdateController?.activate?.());
   els.deferUpdateBtn?.addEventListener("click", () => offlineUpdateController?.defer?.());
-  els.localAiOpusCatHelpBtn?.addEventListener("click", showOpusCatConnectionHelp);
-  els.closeOpusCatHelpBtn?.addEventListener("click", () => els.opusCatHelpDialog?.close());
-  els.retryOpusCatConnectionBtn?.addEventListener("click", async () => {
-    els.opusCatHelpDialog?.close();
-    await testLocalAiConnection();
-  });
   els.uiLocaleSelect?.addEventListener("change", async () => {
     await appRuntime.localeLoader.ensure(els.uiLocaleSelect.value);
     uiI18n?.setLocale?.(els.uiLocaleSelect.value);
@@ -14365,6 +14359,26 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         els.projectAdvancedOptions.open,
       "checked project dialog controller prepares edit mode from current project state"
     );
+    els.projectAiOptions.open = true;
+    setOpusCatConnectionHelpVisible(true);
+    els.localAiOpusCatHelpBtn.focus();
+    els.localAiOpusCatHelpBtn.click();
+    await yieldToUi();
+    assert(
+      els.opusCatHelpDialog.open &&
+        document.activeElement === els.closeOpusCatHelpBtn &&
+        els.projectDialog.open,
+      "OPUS-CAT help opens through the shared lifecycle with initial focus above Project settings"
+    );
+    els.closeOpusCatHelpBtn.click();
+    await yieldToUi();
+    assert(
+      !els.opusCatHelpDialog.open &&
+        els.projectDialog.open &&
+        document.activeElement === els.localAiOpusCatHelpBtn,
+      "OPUS-CAT help close restores focus to the visible connection-help entry point"
+    );
+    setOpusCatConnectionHelpVisible(false);
     const legacyDialogSettings = collectProjectResourceSettings({
       ...state.project,
       resourceLinks: [
@@ -17108,10 +17122,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       return "80";
     };
     const runTmPretranslationFromDialog = async () => {
+      els.segmentToolsMenuSummary.focus();
       const pending = pretranslateFromTm();
+      await yieldToUi();
       assert(
-        els.tmPretranslateDialog.open && browserPromptCalls === 0,
-        "TM pretranslation uses the in-app threshold dialog instead of a browser prompt"
+        els.tmPretranslateDialog.open &&
+          document.activeElement === els.tmPretranslateThresholdInput &&
+          browserPromptCalls === 0,
+        "TM pretranslation uses the shared in-app threshold dialog with initial focus instead of a browser prompt"
       );
       els.tmPretranslateThresholdInput.value = "80";
       els.tmPretranslateDialog.close("apply");
@@ -17119,6 +17137,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     };
     let tmPretranslationCommand = null;
     try {
+      els.segmentToolsMenuSummary.focus();
+      const canceledPretranslation = pretranslateFromTm();
+      await yieldToUi();
+      els.tmPretranslateDialog.close("cancel");
+      assert(
+        (await canceledPretranslation) === null && document.activeElement === els.segmentToolsMenuSummary,
+        "TM threshold cancellation restores focus to the visible Segment tools control"
+      );
       setHiddenSegmentField(pretranslateSegment, PRETRANSLATE_SAVE_FAILURE_TEST_FLAG, true);
       await runTmPretranslationFromDialog();
       const failedPretranslationSegments = (await getProjectSegments(project.id)).filter(
