@@ -3,6 +3,7 @@ const path = require("node:path");
 const os = require("node:os");
 const { spawn } = require("node:child_process");
 const { fileURLToPath, pathToFileURL } = require("node:url");
+const { loadRuntimeSettings, saveRuntimeSettings } = require("./runtime-settings.cjs");
 
 let electron = {};
 try {
@@ -37,35 +38,22 @@ const OPUS_CAT_RUNTIME_ACTION_QUERY_KEYS = new Map([
   ["/mtrestservice/listsupportedlanguagepairs", new Set(["tokenCode"])],
   ["/mtrestservice/getlanguagepairmodeltags", new Set(["tokenCode", "srcLangCode", "trgLangCode"])],
   ["/mtrestservice/checkmodelstatus", new Set(["tokenCode", "srcLangCode", "trgLangCode", "modelTag"])],
-  ["/mtrestservice/translatejson", new Set(["tokenCode", "input", "srcLangCode", "trgLangCode", "modelTag", "inputIsSingleSentence"])],
+  [
+    "/mtrestservice/translatejson",
+    new Set(["tokenCode", "input", "srcLangCode", "trgLangCode", "modelTag", "inputIsSingleSentence"])
+  ],
   ["/mtrestservice/translatepost", new Set(["tokenCode", "input", "srcLangCode", "trgLangCode", "modelTag"])]
 ]);
 const OLLAMA_CLOUD_HOST = "ollama.com";
-const OLLAMA_CLOUD_API_PATHS = new Set([
-  "/api/tags",
-  "/api/chat"
-]);
+const OLLAMA_CLOUD_API_PATHS = new Set(["/api/tags", "/api/chat"]);
 const GEMINI_HOST = "generativelanguage.googleapis.com";
-const GEMINI_API_PATHS = new Set([
-  "/v1beta/models",
-  "/v1beta/interactions"
-]);
+const GEMINI_API_PATHS = new Set(["/v1beta/models", "/v1beta/interactions"]);
 const ANTHROPIC_HOST = "api.anthropic.com";
-const ANTHROPIC_API_PATHS = new Set([
-  "/v1/models",
-  "/v1/messages"
-]);
+const ANTHROPIC_API_PATHS = new Set(["/v1/models", "/v1/messages"]);
 const COHERE_HOST = "api.cohere.com";
-const COHERE_API_PATHS = new Set([
-  "/v1/models",
-  "/v2/chat"
-]);
+const COHERE_API_PATHS = new Set(["/v1/models", "/v2/chat"]);
 const AZURE_OPENAI_HOST_SUFFIXES = [".openai.azure.com", ".services.ai.azure.com"];
-const AZURE_OPENAI_API_PATHS = new Set([
-  "/openai/v1/models",
-  "/openai/v1/responses",
-  "/openai/v1/chat/completions"
-]);
+const AZURE_OPENAI_API_PATHS = new Set(["/openai/v1/models", "/openai/v1/responses", "/openai/v1/chat/completions"]);
 const HOSTED_OPENAI_COMPATIBLE_API_PATHS = new Map([
   ["api.deepseek.com", new Set(["/models", "/chat/completions"])],
   ["api.mistral.ai", new Set(["/v1/models", "/v1/chat/completions"])],
@@ -89,48 +77,9 @@ const DESKTOP_SMOKE_RESULT_FILE = process.env.LOOPCAT_DESKTOP_SMOKE_RESULT_FILE 
 const DESKTOP_SMOKE_SCREENSHOT_FILE = process.env.LOOPCAT_DESKTOP_SMOKE_SCREENSHOT_FILE || "";
 const DESKTOP_SMOKE_USER_DATA_DIR = process.env.LOOPCAT_DESKTOP_SMOKE_USER_DATA_DIR || "";
 const DESKTOP_SMOKE_NO_SANDBOX = DESKTOP_SMOKE_MODE && process.env.LOOPCAT_DESKTOP_SMOKE_NO_SANDBOX === "1";
-const DESKTOP_CHROMIUM_NO_SANDBOX = process.env.LOOPCAT_DESKTOP_NO_SANDBOX
-  ? process.env.LOOPCAT_DESKTOP_NO_SANDBOX === "1"
-  : process.platform === "win32";
-const DESKTOP_SANDBOX_FALLBACK_DISABLED = process.env.LOOPCAT_DISABLE_DESKTOP_SANDBOX_FALLBACK === "1";
-const DESKTOP_RENDERER_SANDBOX_DEFAULT = process.env.LOOPCAT_DESKTOP_RENDERER_SANDBOX
-  ? process.env.LOOPCAT_DESKTOP_RENDERER_SANDBOX === "1"
-  : !DESKTOP_CHROMIUM_NO_SANDBOX && process.platform !== "win32";
-let desktopSandboxFallbackUsed = false;
-const ALLOWED_APP_FILES = new Set([
-  "index.html",
-  "styles.css",
-  "liquid-glass/styles.css",
-  "manifest.webmanifest",
-  "service-worker.js",
-  "icons/loopcat-icon.svg",
-  "icons/loopcat-loopbird-mono.svg",
-  "icons/loopcat-icon.png",
-  "app.js",
-  "storage.js",
-  "workspace-storage.js",
-  "docx.js",
-  "tm.js",
-  "termbase.js",
-  "tmx.js",
-  "tbx.js",
-  "encoding.js",
-  "xliff.js",
-  "localization.js",
-  "qa.js",
-  "validation.js",
-  "analysis.js",
-  "quality.js",
-  "ai.js",
-  "worker-client.js",
-  "cat-worker.js",
-  "project.js",
-  "i18n.js",
-  "i18n/source.en-US.js",
-  "i18n/locales/ca-ES.js",
-  "i18n/locales/en-US.js",
-  "i18n/locales/tr-TR.js"
-]);
+const DESKTOP_RENDERER_SANDBOX_DEFAULT = true;
+const { runtimeAssets: LOOPCAT_RUNTIME_ASSETS } = require("../config/production-assets.js");
+const ALLOWED_APP_FILES = new Set(LOOPCAT_RUNTIME_ASSETS);
 
 function registerPrivilegedSchemes() {
   protocol.registerSchemesAsPrivileged([
@@ -152,12 +101,21 @@ function normalizeAppRelativePath(relativePath) {
   if (raw.includes(":")) return "";
   if (raw.split("/").some((part) => part === "..")) return "";
   const normalized = path.posix.normalize(raw);
-  if (!normalized || normalized === "." || normalized.startsWith("../") || normalized === ".." || path.posix.isAbsolute(normalized)) return "";
+  if (
+    !normalized ||
+    normalized === "." ||
+    normalized.startsWith("../") ||
+    normalized === ".." ||
+    path.posix.isAbsolute(normalized)
+  )
+    return "";
   return normalized;
 }
 
 function canonicalSpellCheckerLanguageCode(value) {
-  const clean = String(value || "").trim().replaceAll("_", "-");
+  const clean = String(value || "")
+    .trim()
+    .replaceAll("_", "-");
   if (!/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/.test(clean)) return "";
   try {
     if (typeof Intl.getCanonicalLocales === "function") return Intl.getCanonicalLocales(clean)[0] || clean;
@@ -177,20 +135,19 @@ function spellCheckerLanguageCandidates(languageCode) {
   const canonical = canonicalSpellCheckerLanguageCode(languageCode);
   if (!canonical) return [];
   const primary = canonical.split("-")[0];
-  return Array.from(new Set([
-    canonical,
-    primary,
-    ...(SPELLCHECKER_LANGUAGE_FALLBACKS.get(primary) || [])
-  ]));
+  return Array.from(new Set([canonical, primary, ...(SPELLCHECKER_LANGUAGE_FALLBACKS.get(primary) || [])]));
 }
 
 function selectSpellCheckerLanguages(preferredLanguages = [], availableLanguages = []) {
   const available = Array.isArray(availableLanguages) ? availableLanguages.filter(Boolean) : [];
   const availableSet = new Set(available);
-  const candidates = Array.from(new Set(
-    (Array.isArray(preferredLanguages) ? preferredLanguages : [preferredLanguages])
-      .flatMap((language) => spellCheckerLanguageCandidates(language))
-  ));
+  const candidates = Array.from(
+    new Set(
+      (Array.isArray(preferredLanguages) ? preferredLanguages : [preferredLanguages]).flatMap((language) =>
+        spellCheckerLanguageCandidates(language)
+      )
+    )
+  );
   if (!available.length) return candidates.slice(0, 1);
   for (const candidate of candidates) {
     if (availableSet.has(candidate)) return [candidate];
@@ -249,14 +206,16 @@ function isAllowedOpenAiResponsesUrl(requestUrl) {
 function isAllowedLocalAiRuntimeUrl(requestUrl) {
   try {
     const url = new URL(requestUrl);
-    return url.protocol === "http:" &&
+    return (
+      url.protocol === "http:" &&
       !url.username &&
       !url.password &&
       !url.search &&
       !url.hash &&
       LOCAL_AI_RUNTIME_HOSTS.has(url.hostname.toLowerCase()) &&
       LOCAL_AI_RUNTIME_PORTS.has(url.port) &&
-      LOCAL_AI_RUNTIME_PATHS.has(url.pathname);
+      LOCAL_AI_RUNTIME_PATHS.has(url.pathname)
+    );
   } catch {
     return false;
   }
@@ -288,13 +247,15 @@ function isAllowedOpusCatRuntimeUrl(requestUrl) {
 function isAllowedOllamaCloudUrl(requestUrl) {
   try {
     const url = new URL(requestUrl);
-    return url.protocol === "https:" &&
+    return (
+      url.protocol === "https:" &&
       !url.username &&
       !url.password &&
       !url.search &&
       !url.hash &&
       url.hostname.toLowerCase() === OLLAMA_CLOUD_HOST &&
-      OLLAMA_CLOUD_API_PATHS.has(url.pathname);
+      OLLAMA_CLOUD_API_PATHS.has(url.pathname)
+    );
   } catch {
     return false;
   }
@@ -303,14 +264,16 @@ function isAllowedOllamaCloudUrl(requestUrl) {
 function isAllowedGeminiUrl(requestUrl) {
   try {
     const url = new URL(requestUrl);
-    return url.protocol === "https:" &&
+    return (
+      url.protocol === "https:" &&
       !url.username &&
       !url.password &&
       !url.search &&
       !url.hash &&
       !url.port &&
       url.hostname.toLowerCase() === GEMINI_HOST &&
-      GEMINI_API_PATHS.has(url.pathname);
+      GEMINI_API_PATHS.has(url.pathname)
+    );
   } catch {
     return false;
   }
@@ -319,14 +282,16 @@ function isAllowedGeminiUrl(requestUrl) {
 function isAllowedAnthropicUrl(requestUrl) {
   try {
     const url = new URL(requestUrl);
-    return url.protocol === "https:" &&
+    return (
+      url.protocol === "https:" &&
       !url.username &&
       !url.password &&
       !url.search &&
       !url.hash &&
       !url.port &&
       url.hostname.toLowerCase() === ANTHROPIC_HOST &&
-      ANTHROPIC_API_PATHS.has(url.pathname);
+      ANTHROPIC_API_PATHS.has(url.pathname)
+    );
   } catch {
     return false;
   }
@@ -335,14 +300,16 @@ function isAllowedAnthropicUrl(requestUrl) {
 function isAllowedCohereUrl(requestUrl) {
   try {
     const url = new URL(requestUrl);
-    return url.protocol === "https:" &&
+    return (
+      url.protocol === "https:" &&
       !url.username &&
       !url.password &&
       !url.search &&
       !url.hash &&
       !url.port &&
       url.hostname.toLowerCase() === COHERE_HOST &&
-      COHERE_API_PATHS.has(url.pathname);
+      COHERE_API_PATHS.has(url.pathname)
+    );
   } catch {
     return false;
   }
@@ -356,14 +323,16 @@ function isAllowedAzureOpenAiHost(hostname) {
 function isAllowedAzureOpenAiUrl(requestUrl) {
   try {
     const url = new URL(requestUrl);
-    return url.protocol === "https:" &&
+    return (
+      url.protocol === "https:" &&
       !url.username &&
       !url.password &&
       !url.search &&
       !url.hash &&
       !url.port &&
       isAllowedAzureOpenAiHost(url.hostname) &&
-      AZURE_OPENAI_API_PATHS.has(url.pathname);
+      AZURE_OPENAI_API_PATHS.has(url.pathname)
+    );
   } catch {
     return false;
   }
@@ -373,13 +342,15 @@ function isAllowedHostedOpenAiCompatibleUrl(requestUrl) {
   try {
     const url = new URL(requestUrl);
     const allowedPaths = HOSTED_OPENAI_COMPATIBLE_API_PATHS.get(url.hostname.toLowerCase());
-    return url.protocol === "https:" &&
+    return (
+      url.protocol === "https:" &&
       !url.username &&
       !url.password &&
       !url.search &&
       !url.hash &&
       !url.port &&
-      Boolean(allowedPaths?.has(url.pathname));
+      Boolean(allowedPaths?.has(url.pathname))
+    );
   } catch {
     return false;
   }
@@ -430,9 +401,7 @@ function createApplicationMenu() {
   const template = [
     {
       label: "File",
-      submenu: [
-        { role: "close" }
-      ]
+      submenu: [{ role: "close" }]
     },
     {
       label: "Edit",
@@ -459,10 +428,7 @@ function createApplicationMenu() {
     },
     {
       label: "Window",
-      submenu: [
-        { role: "minimize" },
-        { role: "zoom" }
-      ]
+      submenu: [{ role: "minimize" }, { role: "zoom" }]
     }
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -504,18 +470,21 @@ function isExternalHttpsUrl(url) {
     const parsed = new URL(url);
     const searchKeys = [...parsed.searchParams.keys()];
     const hasNoSearch = !parsed.search;
-    const hasSinglePromptSearch = searchKeys.length === 1 &&
+    const hasSinglePromptSearch =
+      searchKeys.length === 1 &&
       parsed.searchParams.has("q") &&
       parsed.searchParams.getAll("q").length === 1 &&
       Boolean(String(parsed.searchParams.get("q") || "").trim());
-    return parsed.protocol === "https:" &&
+    return (
+      parsed.protocol === "https:" &&
       !parsed.username &&
       !parsed.password &&
       !parsed.port &&
       parsed.pathname === "/" &&
       !parsed.hash &&
       (hasNoSearch || hasSinglePromptSearch) &&
-      ALLOWED_EXTERNAL_HOSTS.has(parsed.hostname.toLowerCase());
+      ALLOWED_EXTERNAL_HOSTS.has(parsed.hostname.toLowerCase())
+    );
   } catch {
     return false;
   }
@@ -526,7 +495,10 @@ function lmStudioCliCandidates(platform = process.platform, env = process.env, h
   if (env.LOOPCAT_LMS_CLI) candidates.push(env.LOOPCAT_LMS_CLI);
   if (platform === "win32") {
     candidates.push(path.join(homeDir, ".lmstudio", "bin", "lms.exe"));
-    if (env.LOCALAPPDATA) candidates.push(path.join(env.LOCALAPPDATA, "Programs", "LM Studio", "resources", "app", ".webpack", "main", "lms.exe"));
+    if (env.LOCALAPPDATA)
+      candidates.push(
+        path.join(env.LOCALAPPDATA, "Programs", "LM Studio", "resources", "app", ".webpack", "main", "lms.exe")
+      );
     candidates.push("lms.exe");
   } else {
     candidates.push(path.join(homeDir, ".lmstudio", "bin", "lms"));
@@ -610,7 +582,8 @@ async function startLmStudioServerFromDesktop(options = {}) {
   }
   return {
     ok: false,
-    message: "Could not start the LM Studio server. Open LM Studio and enable the local server, or install the LM Studio CLI.",
+    message:
+      "Could not start the LM Studio server. Open LM Studio and enable the local server, or install the LM Studio CLI.",
     attempted
   };
 }
@@ -640,11 +613,29 @@ function configureDesktopBridge() {
     }
     return startLmStudioServerFromDesktop();
   });
-  ipcMain.handle("loopcat:get-creator-identity", (event) => (
+  ipcMain.handle("loopcat:get-creator-identity", (event) =>
     isAllowedDesktopBridgeRequest(event)
       ? desktopCreatorIdentity()
       : { displayName: "This computer", hostName: "", origin: "rejected-origin" }
-  ));
+  );
+  ipcMain.handle("loopcat:get-runtime-status", (event) =>
+    isAllowedDesktopBridgeRequest(event) ? desktopRuntimeStatus() : { rejected: true }
+  );
+  ipcMain.handle("loopcat:set-hardware-acceleration", (event, enabled) => {
+    if (!isAllowedDesktopBridgeRequest(event) || typeof enabled !== "boolean") {
+      return { ok: false, message: "LoopCAT rejected an invalid runtime-settings request." };
+    }
+    try {
+      const saved = saveRuntimeSettings(app, { hardwareAccelerationEnabled: enabled });
+      return {
+        ok: true,
+        hardwareAccelerationEnabled: saved.hardwareAccelerationEnabled,
+        restartRequired: saved.hardwareAccelerationEnabled !== DESKTOP_HARDWARE_ACCELERATION_ENABLED
+      };
+    } catch {
+      return { ok: false, message: "LoopCAT could not save the local runtime setting." };
+    }
+  });
 }
 
 function openExternalUrl(url) {
@@ -657,12 +648,34 @@ if (DESKTOP_SMOKE_MODE && DESKTOP_SMOKE_USER_DATA_DIR && app?.setPath) {
   app.setPath("userData", DESKTOP_SMOKE_USER_DATA_DIR);
 }
 
-if (app?.disableHardwareAcceleration) {
+const desktopRuntimeSettings = loadRuntimeSettings(app);
+const DESKTOP_HARDWARE_ACCELERATION_ENABLED = desktopRuntimeSettings.hardwareAccelerationEnabled;
+
+if (!DESKTOP_HARDWARE_ACCELERATION_ENABLED && app?.disableHardwareAcceleration) {
   app.disableHardwareAcceleration();
 }
 
-if ((DESKTOP_CHROMIUM_NO_SANDBOX || DESKTOP_SMOKE_NO_SANDBOX) && app?.commandLine?.appendSwitch) {
+if (DESKTOP_SMOKE_NO_SANDBOX && app?.commandLine?.appendSwitch) {
   app.commandLine.appendSwitch("no-sandbox");
+}
+
+if (!DESKTOP_SMOKE_NO_SANDBOX && app?.enableSandbox) {
+  app.enableSandbox();
+}
+
+function desktopRuntimeStatus() {
+  return {
+    electronVersion: process.versions.electron || "",
+    chromiumVersion: process.versions.chrome || "",
+    nodeVersion: process.versions.node || "",
+    platform: process.platform,
+    rendererSandbox: !DESKTOP_SMOKE_NO_SANDBOX,
+    chromiumNoSandbox: DESKTOP_SMOKE_NO_SANDBOX,
+    sandboxFallbackUsed: false,
+    hardwareAccelerationEnabled: DESKTOP_HARDWARE_ACCELERATION_ENABLED,
+    hardwareAccelerationSettingSource: desktopRuntimeSettings.source,
+    gpuFeatureStatus: typeof app?.getGPUFeatureStatus === "function" ? app.getGPUFeatureStatus() : {}
+  };
 }
 
 function writeDesktopSmokeResult(payload) {
@@ -683,15 +696,8 @@ function finishDesktopSmoke(code, payload) {
 
 function attachDesktopSmokeProbe(mainWindow, options = {}) {
   if (!DESKTOP_SMOKE_MODE) return;
-  const rendererSandbox = options.rendererSandbox !== false;
-  const sandboxFallbackUsed = Boolean(options.sandboxFallbackUsed);
-  const onSandboxLaunchFailed = typeof options.onSandboxLaunchFailed === "function" ? options.onSandboxLaunchFailed : null;
   let finished = false;
-  const desktopRuntime = () => ({
-    rendererSandbox,
-    sandboxFallbackUsed,
-    chromiumNoSandbox: Boolean(DESKTOP_CHROMIUM_NO_SANDBOX || DESKTOP_SMOKE_NO_SANDBOX)
-  });
+  const desktopRuntime = () => desktopRuntimeStatus();
   const finishOnce = (code, payload) => {
     if (finished) return;
     finished = true;
@@ -721,7 +727,8 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
 
   mainWindow.webContents.once("did-finish-load", async () => {
     try {
-      const result = await mainWindow.webContents.executeJavaScript(`(async () => {
+      const result = await mainWindow.webContents.executeJavaScript(
+        `(async () => {
         const waitFor = async (predicate, label, timeoutMs = 10000) => {
           const deadline = Date.now() + timeoutMs;
           while (Date.now() < deadline) {
@@ -907,13 +914,13 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
           !(await storage.get("projects", project.id));
         const appShellAssetProbe = {
           index: await fetchAppShellAsset("./index.html", "LoopCAT"),
-          liquidGlassCss: await fetchAppShellAsset("./liquid-glass/styles.css", "--glass-accent: #0b8f83"),
+          liquidGlassCss: await fetchAppShellAsset("./liquid-glass/styles.css", "liquid-glass-edition"),
+          semanticTokens: await fetchAppShellAsset("./src/ui/tokens.css", "--color-accent: #087b71"),
           liquidGlassIcon: await fetchAppShellAsset("./icons/loopcat-icon.svg"),
-          app: await fetchAppShellAsset("./app.js", "registerOfflineAppShell"),
+          app: await fetchAppShellAsset("./app.js", "cathan-local-cat"),
           serviceWorker: await fetchAppShellAsset("./service-worker.js", "loopcat-offline-"),
-          i18nRuntime: await fetchAppShellAsset("./i18n.js", "window.CatHan.i18n"),
-          i18nSource: await fetchAppShellAsset("./i18n/source.en-US.js", "workspace.menu.summary"),
-          i18nLocale: await fetchAppShellAsset("./i18n/locales/en-US.js", "ui.label.confirmed"),
+          assetManifest: await fetchAppShellAsset("./config/production-assets.js", "webDistributionAssets"),
+          catWorker: await fetchAppShellAsset("./cat-worker.js", "scoreTmEntries"),
           testRunnerBlocked: false
         };
         try {
@@ -963,8 +970,8 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
           visualProbe: {
             liquidGlassBodyClass: document.body?.classList.contains("liquid-glass-edition") || false,
             liquidGlassStyleSheetLoaded: loadedStyleSheets.some((href) => href.includes("/liquid-glass/styles.css")),
-            canvasColor: getComputedStyle(document.documentElement).getPropertyValue("--glass-canvas").trim(),
-            accentColor: getComputedStyle(document.documentElement).getPropertyValue("--glass-accent").trim(),
+            canvasColor: getComputedStyle(document.documentElement).getPropertyValue("--color-canvas").trim(),
+            accentColor: getComputedStyle(document.documentElement).getPropertyValue("--color-accent").trim(),
             topbarBackdropFilter: topbarStyle?.backdropFilter || topbarStyle?.webkitBackdropFilter || "",
             newProjectBackground: newProjectStyle?.backgroundColor || "",
             viewportWidth: window.innerWidth,
@@ -980,7 +987,9 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
           tmPretranslateDialogProbe,
           bodyText: document.body ? document.body.innerText.slice(0, 400) : ""
         };
-      })()`, true);
+      })()`,
+        true
+      );
       const missing = [];
       for (const [key, label] of [
         ["hasAppShell", ".app-shell"],
@@ -1012,24 +1021,31 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
       if (!result?.appShellAssetProbe?.index?.fetchOk) missing.push("packaged index.html fetch");
       if (!result?.appShellAssetProbe?.index?.includesExpectedText) missing.push("packaged index.html content");
       if (!result?.appShellAssetProbe?.liquidGlassCss?.fetchOk) missing.push("packaged Liquid Glass stylesheet fetch");
-      if (!result?.appShellAssetProbe?.liquidGlassCss?.includesExpectedText) missing.push("packaged Liquid Glass stylesheet content");
-      if (!result?.appShellAssetProbe?.liquidGlassIcon?.fetchOk) missing.push("packaged LoopCAT PNG icon fetch");
+      if (!result?.appShellAssetProbe?.liquidGlassCss?.includesExpectedText)
+        missing.push("packaged Liquid Glass stylesheet content");
+      if (!result?.appShellAssetProbe?.semanticTokens?.fetchOk)
+        missing.push("packaged semantic token stylesheet fetch");
+      if (!result?.appShellAssetProbe?.semanticTokens?.includesExpectedText)
+        missing.push("packaged semantic token stylesheet content");
+      if (!result?.appShellAssetProbe?.liquidGlassIcon?.fetchOk) missing.push("packaged LoopCAT SVG icon fetch");
       if (!result?.appShellAssetProbe?.app?.fetchOk) missing.push("packaged app.js fetch");
       if (!result?.appShellAssetProbe?.app?.includesExpectedText) missing.push("packaged app.js content");
       if (!result?.appShellAssetProbe?.serviceWorker?.fetchOk) missing.push("packaged service-worker.js fetch");
-      if (!result?.appShellAssetProbe?.serviceWorker?.includesExpectedText) missing.push("packaged service-worker.js content");
-      if (!result?.appShellAssetProbe?.i18nRuntime?.fetchOk) missing.push("packaged i18n.js fetch");
-      if (!result?.appShellAssetProbe?.i18nRuntime?.includesExpectedText) missing.push("packaged i18n.js content");
-      if (!result?.appShellAssetProbe?.i18nSource?.fetchOk) missing.push("packaged i18n source catalog fetch");
-      if (!result?.appShellAssetProbe?.i18nSource?.includesExpectedText) missing.push("packaged i18n source catalog content");
-      if (!result?.appShellAssetProbe?.i18nLocale?.fetchOk) missing.push("packaged i18n locale catalog fetch");
-      if (!result?.appShellAssetProbe?.i18nLocale?.includesExpectedText) missing.push("packaged i18n locale catalog content");
+      if (!result?.appShellAssetProbe?.serviceWorker?.includesExpectedText)
+        missing.push("packaged service-worker.js content");
+      if (!result?.appShellAssetProbe?.assetManifest?.fetchOk) missing.push("packaged production asset manifest fetch");
+      if (!result?.appShellAssetProbe?.assetManifest?.includesExpectedText)
+        missing.push("packaged production asset manifest content");
+      if (!result?.appShellAssetProbe?.catWorker?.fetchOk) missing.push("packaged CAT worker fetch");
+      if (!result?.appShellAssetProbe?.catWorker?.includesExpectedText) missing.push("packaged CAT worker content");
       if (!result?.appShellAssetProbe?.testRunnerBlocked) missing.push("test runner excluded from desktop protocol");
       if (!result?.i18nProbe?.runtimeReady) missing.push("i18n runtime");
       if (result?.i18nProbe?.storageLabel !== "Storage") missing.push("workspace storage i18n label");
       if (result?.i18nProbe?.confirmedLabel !== "confirmed") missing.push("confirmed i18n label");
-      if (result?.i18nProbe?.workspaceSummaryText === "workspace.menu.summary") missing.push("raw workspace i18n key hidden");
-      if (!result?.tmPretranslateDialogProbe?.available) missing.push("TM pretranslation threshold dialog availability");
+      if (result?.i18nProbe?.workspaceSummaryText === "workspace.menu.summary")
+        missing.push("raw workspace i18n key hidden");
+      if (!result?.tmPretranslateDialogProbe?.available)
+        missing.push("TM pretranslation threshold dialog availability");
       if (!result?.tmPretranslateDialogProbe?.opened) missing.push("TM pretranslation threshold dialog open");
       if (!result?.tmPretranslateDialogProbe?.closed) missing.push("TM pretranslation threshold dialog close");
       for (const storeName of ["projects", "segments", "appMeta"]) {
@@ -1040,10 +1056,14 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
       if (!String(result?.bodyText || "").includes("The local-first translation workspace")) missing.push("brand text");
       if (!result?.visualProbe?.liquidGlassBodyClass) missing.push("Liquid Glass body class");
       if (!result?.visualProbe?.liquidGlassStyleSheetLoaded) missing.push("Liquid Glass stylesheet application");
-      if (String(result?.visualProbe?.canvasColor || "").toLowerCase() !== "#fbf7ef") missing.push("Liquid Glass canvas token");
-      if (String(result?.visualProbe?.accentColor || "").toLowerCase() !== "#0b8f83") missing.push("Liquid Glass accent token");
-      if (!String(result?.visualProbe?.topbarBackdropFilter || "").includes("blur")) missing.push("Liquid Glass topbar material");
-      if (result?.visualProbe?.newProjectBackground !== "rgb(11, 117, 109)") missing.push("Liquid Glass primary action color");
+      if (String(result?.visualProbe?.canvasColor || "").toLowerCase() !== "#f6f7f6")
+        missing.push("semantic canvas token");
+      if (String(result?.visualProbe?.accentColor || "").toLowerCase() !== "#087b71")
+        missing.push("semantic accent token");
+      if (String(result?.visualProbe?.topbarBackdropFilter || "").toLowerCase() !== "none")
+        missing.push("restrained topbar material");
+      if (result?.visualProbe?.newProjectBackground !== "rgb(8, 123, 113)")
+        missing.push("semantic primary action color");
       if (!result?.visualProbe?.noPageOverflow) missing.push("packaged app page overflow");
       let screenshotFile = "";
       if (!missing.length && DESKTOP_SMOKE_SCREENSHOT_FILE) {
@@ -1074,9 +1094,6 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
 
   mainWindow.webContents.once("render-process-gone", (_event, details) => {
     clearTimeout(timeout);
-    if (details?.reason === "launch-failed" && rendererSandbox && onSandboxLaunchFailed?.()) {
-      return;
-    }
     finishOnce(1, {
       ok: false,
       reason: "render-process-gone",
@@ -1102,7 +1119,9 @@ function configureNetworkBoundaries() {
 function configurePermissions() {
   const allowedPermissions = new Set(["fileSystem"]);
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details = {}) => {
-    callback(Boolean(isLoopcatOrigin(details.requestingUrl || webContents.getURL()) && allowedPermissions.has(permission)));
+    callback(
+      Boolean(isLoopcatOrigin(details.requestingUrl || webContents.getURL()) && allowedPermissions.has(permission))
+    );
   });
   session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin) => {
     return Boolean(isLoopcatOrigin(requestingOrigin || webContents.getURL()) && allowedPermissions.has(permission));
@@ -1142,7 +1161,8 @@ function spellCheckerInfo(ses = session?.defaultSession) {
   if (!ses) return { supported: false, enabled: false, languages: [], availableLanguages: [] };
   return {
     supported: true,
-    enabled: typeof ses.isSpellCheckerEnabled === "function" ? ses.isSpellCheckerEnabled() : Boolean(ses.spellCheckerEnabled),
+    enabled:
+      typeof ses.isSpellCheckerEnabled === "function" ? ses.isSpellCheckerEnabled() : Boolean(ses.spellCheckerEnabled),
     languages: typeof ses.getSpellCheckerLanguages === "function" ? ses.getSpellCheckerLanguages() : [],
     availableLanguages: Array.isArray(ses.availableSpellCheckerLanguages) ? ses.availableSpellCheckerLanguages : []
   };
@@ -1167,11 +1187,11 @@ function configureSpellCheckerBridge() {
     if (!isAllowedDesktopBridgeRequest(event)) return { ok: false, activeLanguages: [], reason: "rejected-origin" };
     return setProjectSpellCheckerLanguages(languages);
   });
-  ipcMain.handle("loopcat:get-spellchecker-info", (event) => (
+  ipcMain.handle("loopcat:get-spellchecker-info", (event) =>
     isAllowedDesktopBridgeRequest(event)
       ? spellCheckerInfo()
       : { supported: false, enabled: false, languages: [], availableLanguages: [] }
-  ));
+  );
 }
 
 function buildSpellCheckerContextMenuTemplate(params = {}) {
@@ -1190,7 +1210,10 @@ function buildSpellCheckerContextMenuTemplate(params = {}) {
       template.push({ label: "No spelling suggestions", enabled: false });
     }
     template.push({ type: "separator" });
-    template.push({ label: `Add "${String(params.misspelledWord).slice(0, 40)}" to dictionary`, spellcheckAddWord: String(params.misspelledWord) });
+    template.push({
+      label: `Add "${String(params.misspelledWord).slice(0, 40)}" to dictionary`,
+      spellcheckAddWord: String(params.misspelledWord)
+    });
     template.push({ type: "separator" });
   }
   template.push(
@@ -1229,7 +1252,6 @@ function attachSpellCheckerContextMenu(mainWindow) {
 }
 
 function createRendererWebPreferences(options = {}) {
-  const rendererSandbox = options.rendererSandbox !== false;
   const isPackaged = Boolean(options.isPackaged);
   return {
     contextIsolation: true,
@@ -1237,7 +1259,7 @@ function createRendererWebPreferences(options = {}) {
     nodeIntegration: false,
     nodeIntegrationInWorker: false,
     nodeIntegrationInSubFrames: false,
-    sandbox: rendererSandbox,
+    sandbox: DESKTOP_RENDERER_SANDBOX_DEFAULT,
     webSecurity: true,
     allowRunningInsecureContent: false,
     webviewTag: false,
@@ -1248,10 +1270,7 @@ function createRendererWebPreferences(options = {}) {
   };
 }
 
-function createWindow(options = {}) {
-  const rendererSandbox = Object.hasOwn(options, "rendererSandbox")
-    ? options.rendererSandbox !== false
-    : DESKTOP_RENDERER_SANDBOX_DEFAULT;
+function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -1260,18 +1279,8 @@ function createWindow(options = {}) {
     show: !DESKTOP_SMOKE_MODE,
     backgroundColor: "#f7f9fb",
     title: "LoopCAT",
-    webPreferences: createRendererWebPreferences({ rendererSandbox, isPackaged: Boolean(app?.isPackaged) })
+    webPreferences: createRendererWebPreferences({ isPackaged: Boolean(app?.isPackaged) })
   });
-
-  const retryWithoutRendererSandbox = () => {
-    if (!rendererSandbox || DESKTOP_SANDBOX_FALLBACK_DISABLED) return false;
-    desktopSandboxFallbackUsed = true;
-    createWindow({ rendererSandbox: false });
-    setTimeout(() => {
-      if (!mainWindow.isDestroyed()) mainWindow.destroy();
-    }, 1000).unref?.();
-    return true;
-  };
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     openExternalUrl(url);
@@ -1286,14 +1295,9 @@ function createWindow(options = {}) {
   attachSpellCheckerContextMenu(mainWindow);
 
   if (DESKTOP_SMOKE_MODE) {
-    attachDesktopSmokeProbe(mainWindow, {
-      rendererSandbox,
-      sandboxFallbackUsed: desktopSandboxFallbackUsed,
-      onSandboxLaunchFailed: retryWithoutRendererSandbox
-    });
+    attachDesktopSmokeProbe(mainWindow);
   } else {
     mainWindow.webContents.once("render-process-gone", (_event, details) => {
-      if (details?.reason === "launch-failed" && retryWithoutRendererSandbox()) return;
       console.error("LoopCAT renderer exited unexpectedly.", details);
     });
   }
@@ -1379,5 +1383,6 @@ module.exports = {
   runLmStudioStartCommand,
   startLmStudioServerFromDesktop,
   desktopCreatorIdentity,
+  desktopRuntimeStatus,
   createRendererWebPreferences
 };

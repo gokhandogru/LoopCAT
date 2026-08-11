@@ -11,8 +11,9 @@ The desktop wrapper:
 - loads the bundled app from `loopcat://app/index.html`;
 - keeps Node.js disabled in the renderer;
 - keeps renderer web security enabled, disables insecure content, Electron webviews, legacy WebSQL, drag-and-drop navigation, Node.js in workers/subframes, and packaged DevTools;
-- starts with hardware acceleration disabled before renderer startup to reduce driver/GPU launch failures on managed desktops;
-- uses a platform-aware Chromium sandbox policy: macOS and Linux default to Chromium's renderer OS sandbox, while Windows starts Chromium with no-sandbox launch mode because managed Windows desktops can fail renderer startup with `launch-failed`; in every mode Node.js remains disabled and context isolation remains enabled;
+- starts with hardware acceleration enabled; affected machines can opt into the local next-launch troubleshooting setting or set `LOOPCAT_DISABLE_HARDWARE_ACCELERATION=1` without weakening renderer isolation;
+- enables Chromium's renderer OS sandbox on Windows, macOS, and Linux and never retries an ordinary app launch without it; Node.js remains disabled and context isolation remains enabled;
+- disables Electron's RunAsNode, Node options, and inspector fuses, enables embedded ASAR integrity and ASAR-only loading, and removes extra `file:` protocol privileges;
 - keeps top-level navigation pinned to the bundled `index.html` app shell;
 - serves the bundled app shell from packaged files through `loopcat://app/`;
 - keeps service workers disabled on the private desktop protocol; browser/PWA service-worker caching is tested separately on an HTTP origin and must cache the complete core app shell before activation;
@@ -79,7 +80,7 @@ Run the full browser test suite in a hidden Electron window:
 pnpm run verify:browser-runner
 ```
 
-The hidden browser runner sets an automation-only Chromium `--no-sandbox` mode by default because some CI or managed desktop sessions cannot launch Chromium's OS sandbox. The desktop wrapper keeps Node.js disabled, context isolation enabled, and the private protocol/network allowlists in force on every platform; macOS and Linux use Chromium's renderer OS sandbox by default, while Windows uses Chromium no-sandbox launch mode by default to avoid `launch-failed` startup errors seen on managed PCs. Set `LOOPCAT_DESKTOP_NO_SANDBOX=0` plus `LOOPCAT_DESKTOP_RENDERER_SANDBOX=1` to force sandboxed-renderer verification on Windows, or `LOOPCAT_DESKTOP_RENDERER_SANDBOX=0` to disable renderer sandboxing elsewhere for diagnostics. Packaged desktop smoke is strict by default and should prove the normal app launch path; it reports when the current platform launched with Chromium no-sandbox mode, without the renderer OS sandbox, or with a fallback. If a managed test host blocks Chromium's sandbox before the normal app can run, set `LOOPCAT_DESKTOP_SMOKE_NO_SANDBOX=1` only as a diagnostic fallback to separate host launch problems from LoopCAT app logic; do not treat that diagnostic mode as public release launch evidence.
+The hidden source-browser runner can use an automation-only Chromium `--no-sandbox` mode on constrained CI hosts. The public desktop wrapper is sandboxed on every platform and has no automatic unsandboxed retry. Packaged desktop smoke is strict by default and must prove the normal sandboxed, GPU-enabled launch path. `LOOPCAT_DESKTOP_SMOKE_NO_SANDBOX=1` remains a diagnostic-only way to distinguish a broken test host from application logic and is never valid release evidence. `LOOPCAT_DISABLE_HARDWARE_ACCELERATION=1` is the separate graphics troubleshooting fallback; it does not disable the sandbox. The preload bridge also exposes the frozen, origin-checked runtime status and a local next-launch hardware-acceleration preference for the diagnostics UI.
 
 Build unpacked app folders:
 
@@ -91,6 +92,12 @@ Verify the packaged app payload. This checks the files inside `app.asar`, includ
 
 ```bash
 pnpm run verify:artifact
+```
+
+Verify that the packaged executable has the required Electron security fuses applied:
+
+```bash
+pnpm run verify:fuses
 ```
 
 Verify the public download artifacts for the platform. This fails if the build produced only an unpacked app folder, if the expected public download files are missing, if a public artifact is unrealistically small after an interrupted or failed build, or if duplicate artifacts make the release download set ambiguous:

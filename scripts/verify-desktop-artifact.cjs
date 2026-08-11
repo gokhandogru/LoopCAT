@@ -6,86 +6,42 @@ const root = path.resolve(__dirname, "..");
 const distDir = path.join(root, "dist");
 const failures = [];
 const sourcePackageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+const rendererRoot = path.join(root, ".cache", "renderer", "production");
+const generatedAssetsPath = path.join(rendererRoot, "config", "production-assets.js");
+const productionAssetsPath = fs.existsSync(generatedAssetsPath)
+  ? generatedAssetsPath
+  : path.join(root, "config", "production-assets.js");
+const productionAssets = require(productionAssetsPath);
+const webOnlyRendererAssets = new Set(["app-file.js", "bootstrap.js"]);
+const offlineAssets = productionAssets.offlineAssets.filter((asset) => !webOnlyRendererAssets.has(asset));
+const expectedDesktopProtocolFiles = productionAssets.runtimeAssets.filter(
+  (asset) => !webOnlyRendererAssets.has(asset)
+);
+const rendererFiles = new Set(
+  fs.existsSync(path.join(rendererRoot, "assets.json"))
+    ? [
+        "index.html",
+        "config/production-assets.js",
+        ...JSON.parse(fs.readFileSync(path.join(rendererRoot, "assets.json"), "utf8"))
+      ]
+    : ["index.html", "app.js"]
+);
 
 const requiredFiles = [
   "README.md",
   "LICENSE",
   "NOTICE",
   "package.json",
-  "index.html",
-  "styles.css",
-  "liquid-glass/styles.css",
-  "manifest.webmanifest",
-  "service-worker.js",
-  "icons/loopcat-icon.svg",
-  "icons/loopcat-loopbird-mono.svg",
-  "icons/loopcat-icon.png",
-  "app.js",
-  "storage.js",
-  "workspace-storage.js",
-  "docx.js",
-  "tm.js",
-  "termbase.js",
-  "tmx.js",
-  "tbx.js",
-  "encoding.js",
-  "xliff.js",
-  "localization.js",
-  "qa.js",
-  "validation.js",
-  "analysis.js",
-  "quality.js",
-  "ai.js",
-  "worker-client.js",
-  "cat-worker.js",
-  "project.js",
-  "i18n.js",
-  "i18n/source.en-US.js",
-  "i18n/locales/ca-ES.js",
-  "i18n/locales/en-US.js",
-  "i18n/locales/tr-TR.js",
+  ...expectedDesktopProtocolFiles,
   "desktop/main.cjs",
   "docs/desktop-packaging.md",
   "docs/loopcat-package-format-v1.md",
   "docs/release-smoke-evidence-template.md"
 ];
 
-const sourceMirrorFiles = requiredFiles.filter((relativePath) => relativePath !== "package.json");
-
-const expectedDesktopProtocolFiles = [
-  "index.html",
-  "styles.css",
-  "liquid-glass/styles.css",
-  "manifest.webmanifest",
-  "service-worker.js",
-  "icons/loopcat-icon.svg",
-  "icons/loopcat-loopbird-mono.svg",
-  "icons/loopcat-icon.png",
-  "app.js",
-  "storage.js",
-  "workspace-storage.js",
-  "docx.js",
-  "tm.js",
-  "termbase.js",
-  "tmx.js",
-  "tbx.js",
-  "encoding.js",
-  "xliff.js",
-  "localization.js",
-  "qa.js",
-  "validation.js",
-  "analysis.js",
-  "quality.js",
-  "ai.js",
-  "worker-client.js",
-  "cat-worker.js",
-  "project.js",
-  "i18n.js",
-  "i18n/source.en-US.js",
-  "i18n/locales/ca-ES.js",
-  "i18n/locales/en-US.js",
-  "i18n/locales/tr-TR.js"
-];
+const sourceMirrorFiles = requiredFiles.filter(
+  (relativePath) => relativePath !== "package.json" && !rendererFiles.has(relativePath)
+);
 
 const forbiddenPatterns = [
   /(^|\/)(test-runner|security-policy-test|smoke-test|regression-test|offline-shell-test|workspace-storage-test|package-roundtrip-test|large-project-test)\.html$/i,
@@ -139,7 +95,9 @@ function walkAsarEntries(files, prefix = "") {
 }
 
 function normalizeLocalAsset(value) {
-  const cleaned = String(value || "").split("#")[0].split("?")[0];
+  const cleaned = String(value || "")
+    .split("#")[0]
+    .split("?")[0];
   if (!cleaned || cleaned === "." || cleaned === "./") return "";
   if (cleaned.startsWith("data:") || /^[a-z]+:/i.test(cleaned) || cleaned.startsWith("//")) return "";
   return cleaned.replace(/^\.\//, "").replace(/^\/+/, "");
@@ -157,26 +115,33 @@ function localAssetsFromIndex(html) {
 }
 
 function serviceWorkerCoreAssets(serviceWorker) {
-  const match = /const\s+CORE_ASSETS\s*=\s*\[([\s\S]*?)\];/m.exec(serviceWorker);
-  if (!match) return [];
-  return Array.from(match[1].matchAll(/["']([^"']+)["']/g))
-    .map((item) => normalizeLocalAsset(item[1]))
-    .filter(Boolean);
+  return serviceWorker.includes('importScripts("./config/production-assets.js")') ? offlineAssets : [];
 }
 
-function desktopProtocolAllowlist(desktopMain) {
+function desktopProtocolAllowlist(desktopMain, packagedProductionAssets) {
+  if (desktopMain.includes('require("../config/production-assets.js")')) {
+    return packagedProductionAssets.runtimeAssets || [];
+  }
   const match = /const\s+ALLOWED_APP_FILES\s*=\s*new\s+Set\(\s*\[([\s\S]*?)\]\s*\);/m.exec(desktopMain);
   if (!match) return [];
   return Array.from(match[1].matchAll(/["']([^"']+)["']/g)).map((item) => item[1]);
 }
 
+function parseProductionAssetsSource(source) {
+  const match = /\}\)\((\{[\s\S]*\})\);\s*$/.exec(source);
+  if (!match) throw new Error("production asset manifest wrapper could not be parsed");
+  return JSON.parse(match[1]);
+}
+
 function readAsarFile(archive, item) {
   const offset = Number(item.entry.offset);
   const size = Number(item.entry.size);
-  if (!Number.isFinite(offset) || !Number.isFinite(size)) throw new Error(`${item.relativePath} has invalid size or offset.`);
+  if (!Number.isFinite(offset) || !Number.isFinite(size))
+    throw new Error(`${item.relativePath} has invalid size or offset.`);
   const start = archive.dataStart + offset;
   const end = start + size;
-  if (start < archive.dataStart || end > archive.bytes.length) throw new Error(`${item.relativePath} points outside the asar payload.`);
+  if (start < archive.dataStart || end > archive.bytes.length)
+    throw new Error(`${item.relativePath} points outside the asar payload.`);
   return archive.bytes.slice(start, end);
 }
 
@@ -218,7 +183,19 @@ function verifyArchive(asarPath) {
     const packagedHash = sha256(readAsarFile(archive, item));
     const sourceHash = sha256(fs.readFileSync(sourcePath));
     if (packagedHash !== sourceHash) {
-      fail(`${path.relative(root, asarPath)} ${relativePath} does not match current source file. Rebuild desktop artifacts before publishing.`);
+      fail(
+        `${path.relative(root, asarPath)} ${relativePath} does not match current source file. Rebuild desktop artifacts before publishing.`
+      );
+    }
+  }
+  for (const relativePath of rendererFiles) {
+    const item = byPath.get(relativePath);
+    if (relativePath === "config/production-assets.js") continue;
+    const builtRelativePath = relativePath === "index.html" ? "desktop-index.html" : relativePath;
+    const builtPath = path.join(root, ".cache", "renderer", "production", builtRelativePath);
+    if (!item || !fs.existsSync(builtPath)) continue;
+    if (sha256(readAsarFile(archive, item)) !== sha256(fs.readFileSync(builtPath))) {
+      fail(`${path.relative(root, asarPath)} ${relativePath} does not match the production renderer build.`);
     }
   }
   for (const item of items) {
@@ -237,33 +214,69 @@ function verifyArchive(asarPath) {
   const indexHtml = textFile(archive, byPath, "index.html");
   const serviceWorker = textFile(archive, byPath, "service-worker.js");
   const desktopMain = textFile(archive, byPath, "desktop/main.cjs");
+  const productionApp = textFile(archive, byPath, "app.js");
+  const productionAssetsSource = textFile(archive, byPath, "config/production-assets.js");
+  let packagedProductionAssets = { runtimeAssets: [], offlineAssets: [], webDistributionAssets: [] };
+  try {
+    packagedProductionAssets = parseProductionAssetsSource(productionAssetsSource);
+  } catch (error) {
+    fail(`${path.relative(root, asarPath)} packaged production asset manifest is invalid: ${error.message}.`);
+  }
   const expectedProtocolSet = new Set(expectedDesktopProtocolFiles);
 
-  if (!packagedPackageJson.includes(`"name": "loopcat"`)) fail(`${path.relative(root, asarPath)} package.json has the wrong app package name.`);
-  if (!packagedPackageJson.includes(`"version": "${sourcePackageJson.version}"`)) fail(`${path.relative(root, asarPath)} package.json version does not match the source release version.`);
-  if (manifest.version !== sourcePackageJson.version) fail(`${path.relative(root, asarPath)} manifest version does not match source package.json.`);
-  if (!indexHtml.includes(`http-equiv="Content-Security-Policy"`)) fail(`${path.relative(root, asarPath)} packaged index.html has no CSP.`);
-  if (/<(script|link)\b[^>]+(?:src|href)=["']https?:\/\//i.test(indexHtml)) fail(`${path.relative(root, asarPath)} packaged index.html loads a remote script or style.`);
-  if (!serviceWorker.includes(`const APP_VERSION = "${sourcePackageJson.version}"`)) fail(`${path.relative(root, asarPath)} service worker version does not match source package.json.`);
+  if (JSON.stringify(packagedProductionAssets.runtimeAssets) !== JSON.stringify(expectedDesktopProtocolFiles)) {
+    fail(`${path.relative(root, asarPath)} packaged runtime asset manifest does not match the desktop boundary.`);
+  }
+  if (JSON.stringify(packagedProductionAssets.offlineAssets) !== JSON.stringify(offlineAssets)) {
+    fail(`${path.relative(root, asarPath)} packaged offline asset manifest does not match the desktop boundary.`);
+  }
+  for (const asset of webOnlyRendererAssets) {
+    if (
+      packagedProductionAssets.runtimeAssets.includes(asset) ||
+      packagedProductionAssets.offlineAssets.includes(asset)
+    ) {
+      fail(`${path.relative(root, asarPath)} packaged desktop manifest includes web-only asset ${asset}.`);
+    }
+  }
+
+  if (!packagedPackageJson.includes(`"name": "loopcat"`))
+    fail(`${path.relative(root, asarPath)} package.json has the wrong app package name.`);
+  if (!packagedPackageJson.includes(`"version": "${sourcePackageJson.version}"`))
+    fail(`${path.relative(root, asarPath)} package.json version does not match the source release version.`);
+  for (const marker of ["runAppWorkflowTest", "app-workflow-test", "_TEST_FLAG", "Simulated autosave save failure"]) {
+    if (productionApp.includes(marker))
+      fail(`${path.relative(root, asarPath)} production renderer contains test-only marker ${marker}.`);
+  }
+  if (manifest.version !== sourcePackageJson.version)
+    fail(`${path.relative(root, asarPath)} manifest version does not match source package.json.`);
+  if (!indexHtml.includes(`http-equiv="Content-Security-Policy"`))
+    fail(`${path.relative(root, asarPath)} packaged index.html has no CSP.`);
+  if (/<(script|link)\b[^>]+(?:src|href)=["']https?:\/\//i.test(indexHtml))
+    fail(`${path.relative(root, asarPath)} packaged index.html loads a remote script or style.`);
+  if (!serviceWorker.includes(`const APP_VERSION = "${sourcePackageJson.version}"`))
+    fail(`${path.relative(root, asarPath)} service worker version does not match source package.json.`);
   if (
     !desktopMain.includes("nodeIntegration: false") ||
     !desktopMain.includes("contextIsolation: true") ||
-    !desktopMain.includes("DESKTOP_CHROMIUM_NO_SANDBOX") ||
-    !desktopMain.includes("LOOPCAT_DESKTOP_NO_SANDBOX") ||
     !desktopMain.includes("DESKTOP_RENDERER_SANDBOX_DEFAULT") ||
-    !desktopMain.includes("LOOPCAT_DESKTOP_RENDERER_SANDBOX") ||
-    !desktopMain.includes("process.platform !== \"win32\"") ||
-    !desktopMain.includes("sandbox: rendererSandbox")
+    !desktopMain.includes("app.enableSandbox()") ||
+    !desktopMain.includes("sandbox: DESKTOP_RENDERER_SANDBOX_DEFAULT")
   ) {
     fail(`${path.relative(root, asarPath)} desktop wrapper is missing renderer isolation settings.`);
   }
-  if (!desktopMain.includes("retryWithoutRendererSandbox") || !desktopMain.includes('details?.reason === "launch-failed"')) {
-    fail(`${path.relative(root, asarPath)} desktop wrapper is missing the renderer sandbox launch fallback.`);
+  if (desktopMain.includes("retryWithoutRendererSandbox") || desktopMain.includes("LOOPCAT_DESKTOP_NO_SANDBOX")) {
+    fail(`${path.relative(root, asarPath)} desktop wrapper contains an automatic renderer sandbox fallback.`);
   }
-  if (!desktopMain.includes("webRequest.onBeforeRequest") || !desktopMain.includes("isAllowedNetworkRequest(details.url)")) {
+  if (
+    !desktopMain.includes("webRequest.onBeforeRequest") ||
+    !desktopMain.includes("isAllowedNetworkRequest(details.url)")
+  ) {
     fail(`${path.relative(root, asarPath)} desktop wrapper is missing the renderer network request gate.`);
   }
-  if (!desktopMain.includes("isAllowedAppNavigationUrl(url)") || !desktopMain.includes('relativePath === "index.html"')) {
+  if (
+    !desktopMain.includes("isAllowedAppNavigationUrl(url)") ||
+    !desktopMain.includes('relativePath === "index.html"')
+  ) {
     fail(`${path.relative(root, asarPath)} desktop wrapper must restrict top-level app navigation to index.html.`);
   }
   if (!desktopMain.includes("setWindowOpenHandler") || !desktopMain.includes('return { action: "deny" }')) {
@@ -273,10 +286,14 @@ function verifyArchive(asarPath) {
     fail(`${path.relative(root, asarPath)} desktop wrapper must restrict external link handling to HTTPS URLs.`);
   }
   if (!indexHtml.includes(`connect-src 'self' https://api.openai.com/v1/responses`)) {
-    fail(`${path.relative(root, asarPath)} packaged index.html does not narrow connect-src to the OpenAI Responses endpoint.`);
+    fail(
+      `${path.relative(root, asarPath)} packaged index.html does not narrow connect-src to the OpenAI Responses endpoint.`
+    );
   }
   if (!indexHtml.includes(`https://api.openai.com/v1/models`)) {
-    fail(`${path.relative(root, asarPath)} packaged index.html does not allow the exact OpenAI Models endpoint for model refresh.`);
+    fail(
+      `${path.relative(root, asarPath)} packaged index.html does not allow the exact OpenAI Models endpoint for model refresh.`
+    );
   }
   const hostedAiOrigins = [
     "https://generativelanguage.googleapis.com",
@@ -296,12 +313,16 @@ function verifyArchive(asarPath) {
   ];
   const missingHostedAiOrigins = hostedAiOrigins.filter((origin) => !indexHtml.includes(origin));
   if (missingHostedAiOrigins.length) {
-    fail(`${path.relative(root, asarPath)} packaged index.html does not allow hosted AI provider origins: ${missingHostedAiOrigins.join(", ")}.`);
+    fail(
+      `${path.relative(root, asarPath)} packaged index.html does not allow hosted AI provider origins: ${missingHostedAiOrigins.join(", ")}.`
+    );
   }
   const hostedAiHosts = hostedAiOrigins.map((origin) => new URL(origin).hostname);
   const missingDesktopHostedAiHosts = hostedAiHosts.filter((host) => !desktopMain.includes(`"${host}"`));
   if (missingDesktopHostedAiHosts.length) {
-    fail(`${path.relative(root, asarPath)} desktop wrapper does not allow hosted AI provider hosts: ${missingDesktopHostedAiHosts.join(", ")}.`);
+    fail(
+      `${path.relative(root, asarPath)} desktop wrapper does not allow hosted AI provider hosts: ${missingDesktopHostedAiHosts.join(", ")}.`
+    );
   }
   if (!indexHtml.includes(`https://*.openai.azure.com`) || !indexHtml.includes(`https://*.services.ai.azure.com`)) {
     fail(`${path.relative(root, asarPath)} packaged index.html does not allow Azure OpenAI resource domains.`);
@@ -309,29 +330,40 @@ function verifyArchive(asarPath) {
   if (!desktopMain.includes(`".openai.azure.com"`) || !desktopMain.includes(`".services.ai.azure.com"`)) {
     fail(`${path.relative(root, asarPath)} desktop wrapper does not allow Azure OpenAI resource domains.`);
   }
-  if (!indexHtml.includes(`http://localhost:11434`) || !indexHtml.includes(`http://127.0.0.1:1234`) || !indexHtml.includes(`http://localhost:8500`) || !indexHtml.includes(`http://127.0.0.1:8502`)) {
+  if (
+    !indexHtml.includes(`http://localhost:11434`) ||
+    !indexHtml.includes(`http://127.0.0.1:1234`) ||
+    !indexHtml.includes(`http://localhost:8500`) ||
+    !indexHtml.includes(`http://127.0.0.1:8502`)
+  ) {
     fail(`${path.relative(root, asarPath)} packaged index.html does not allow explicit local AI loopback endpoints.`);
   }
 
   for (const asset of localAssetsFromIndex(indexHtml)) {
-    if (!byPath.has(asset)) fail(`${path.relative(root, asarPath)} packaged index.html references missing asset ${asset}.`);
+    if (!byPath.has(asset))
+      fail(`${path.relative(root, asarPath)} packaged index.html references missing asset ${asset}.`);
   }
   for (const icon of manifest.icons || []) {
     const asset = normalizeLocalAsset(icon.src);
-    if (asset && !byPath.has(asset)) fail(`${path.relative(root, asarPath)} packaged manifest references missing icon ${asset}.`);
+    if (asset && !byPath.has(asset))
+      fail(`${path.relative(root, asarPath)} packaged manifest references missing icon ${asset}.`);
   }
   for (const asset of serviceWorkerCoreAssets(serviceWorker)) {
-    if (!byPath.has(asset)) fail(`${path.relative(root, asarPath)} packaged service worker caches missing asset ${asset}.`);
+    if (!byPath.has(asset))
+      fail(`${path.relative(root, asarPath)} packaged service worker caches missing asset ${asset}.`);
   }
 
-  const allowlist = desktopProtocolAllowlist(desktopMain);
+  const allowlist = desktopProtocolAllowlist(desktopMain, packagedProductionAssets);
   if (!allowlist.length) fail(`${path.relative(root, asarPath)} desktop protocol allowlist could not be parsed.`);
   for (const asset of expectedDesktopProtocolFiles) {
-    if (!allowlist.includes(asset)) fail(`${path.relative(root, asarPath)} desktop protocol allowlist is missing runtime file ${asset}.`);
+    if (!allowlist.includes(asset))
+      fail(`${path.relative(root, asarPath)} desktop protocol allowlist is missing runtime file ${asset}.`);
   }
   for (const asset of allowlist) {
-    if (!expectedProtocolSet.has(asset)) fail(`${path.relative(root, asarPath)} desktop protocol allowlist exposes unexpected file ${asset}.`);
-    if (!byPath.has(asset)) fail(`${path.relative(root, asarPath)} desktop protocol allowlist references missing asset ${asset}.`);
+    if (!expectedProtocolSet.has(asset))
+      fail(`${path.relative(root, asarPath)} desktop protocol allowlist exposes unexpected file ${asset}.`);
+    if (!byPath.has(asset))
+      fail(`${path.relative(root, asarPath)} desktop protocol allowlist references missing asset ${asset}.`);
   }
 }
 
@@ -345,4 +377,6 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Desktop artifact verification passed for ${asarFiles.length} app.asar payload${asarFiles.length === 1 ? "" : "s"}.`);
+console.log(
+  `Desktop artifact verification passed for ${asarFiles.length} app.asar payload${asarFiles.length === 1 ? "" : "s"}.`
+);

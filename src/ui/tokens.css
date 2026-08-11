@@ -1,0 +1,89 @@
+:root {
+  --color-canvas: #f6f7f6;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f0f3f2;
+  --color-surface-raised: #ffffff;
+  --color-text: #15322f;
+  --color-text-muted: #5b6f6c;
+  --color-line: #d5dedc;
+  --color-line-strong: #aabbb7;
+  --color-accent: #087b71;
+  --color-accent-hover: #075f58;
+  --color-accent-soft: #dcefeb;
+  --color-success: #19705d;
+  --color-warning: #925516;
+  --color-danger: #a63f49;
+  --color-focus: #00665e;
+  --color-on-accent: #ffffff;
+  --color-overlay: rgba(16, 31, 29, 0.32);
+
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-md: 0.9375rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.5rem;
+  --line-height-tight: 1.25;
+  --line-height-body: 1.5;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-pill: 999px;
+
+  --elevation-none: none;
+  --elevation-transient: 0 12px 32px rgba(16, 31, 29, 0.16);
+  --motion-fast: 120ms;
+  --motion-standard: 180ms;
+  --focus-ring: 0 0 0 1px #ffffff;
+
+  /* Compatibility bridge. New component CSS uses semantic roles above. */
+  --bg: var(--color-canvas);
+  --surface: var(--color-surface);
+  --surface-2: var(--color-surface-subtle);
+  --text: var(--color-text);
+  --muted: var(--color-text-muted);
+  --line: var(--color-line);
+  --accent: var(--color-accent);
+  --accent-strong: var(--color-accent-hover);
+  --accent-bright: var(--color-accent);
+  --accent-soft: var(--color-accent-soft);
+  --warn: var(--color-warning);
+  --ok: var(--color-success);
+  --error: var(--color-danger);
+  --focus: var(--color-focus);
+  --shadow: var(--elevation-transient);
+
+  --glass-canvas: var(--color-canvas);
+  --glass-canvas-deep: var(--color-surface-subtle);
+  --glass-panel: var(--color-surface);
+  --glass-panel-strong: var(--color-surface);
+  --glass-surface: var(--color-surface);
+  --glass-surface-soft: var(--color-surface-subtle);
+  --glass-text: var(--color-text);
+  --glass-muted: var(--color-text-muted);
+  --glass-line: var(--color-line);
+  --glass-line-solid: var(--color-line);
+  --glass-accent: var(--color-accent);
+  --glass-accent-strong: var(--color-accent-hover);
+  --glass-accent-soft: var(--color-accent-soft);
+  --glass-confirm: var(--color-accent);
+  --glass-confirm-strong: var(--color-accent-hover);
+  --glass-success: var(--color-success);
+  --glass-warning: var(--color-warning);
+  --glass-danger: var(--color-danger);
+  --glass-shadow: var(--elevation-transient);
+  --glass-shadow-soft: var(--elevation-none);
+  --glass-radius-xl: var(--radius-lg);
+  --glass-radius-lg: var(--radius-lg);
+  --glass-radius-md: var(--radius-md);
+  --glass-radius-sm: var(--radius-sm);
+  --glass-blur: 0px;
+}

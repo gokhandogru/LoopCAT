@@ -1,13 +1,15 @@
 const crypto = require("node:crypto");
+const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
 const distFlagIndex = args.indexOf("--dist");
-const distDir = distFlagIndex >= 0 && args[distFlagIndex + 1]
-  ? path.resolve(process.cwd(), args[distFlagIndex + 1])
-  : path.join(root, "dist-web");
+const distDir =
+  distFlagIndex >= 0 && args[distFlagIndex + 1]
+    ? path.resolve(process.cwd(), args[distFlagIndex + 1])
+    : path.join(root, "dist-web");
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const productName = packageJson.build?.productName || "LoopCAT";
 const artifactName = `${productName} Web ${packageJson.version}.zip`;
@@ -15,45 +17,14 @@ const artifactPath = path.join(distDir, artifactName);
 const checksumPath = path.join(distDir, "SHA256SUMS.txt");
 const failures = [];
 
-const REQUIRED_WEB_ASSETS = [
-  "index.html",
-  "styles.css",
-  "liquid-glass/styles.css",
-  "manifest.webmanifest",
-  "service-worker.js",
-  "icons/loopcat-icon.svg",
-  "icons/loopcat-loopbird-mono.svg",
-  "icons/loopcat-icon.png",
-  "storage.js",
-  "workspace-storage.js",
-  "docx.js",
-  "tm.js",
-  "termbase.js",
-  "tmx.js",
-  "tbx.js",
-  "encoding.js",
-  "xliff.js",
-  "localization.js",
-  "qa.js",
-  "validation.js",
-  "analysis.js",
-  "quality.js",
-  "ai.js",
-  "worker-client.js",
-  "cat-worker.js",
-  "project.js",
-  "i18n.js",
-  "i18n/source.en-US.js",
-  "i18n/locales/ca-ES.js",
-  "i18n/locales/en-US.js",
-  "i18n/locales/tr-TR.js",
-  "app.js",
-  "package.json",
-  "scripts/opus-cat-web-bridge.cjs",
-  "README.md",
-  "LICENSE",
-  "NOTICE"
-];
+function runNodeScript(scriptName) {
+  const result = spawnSync(process.execPath, [path.join(root, "scripts", scriptName)], {
+    cwd: root,
+    stdio: "inherit"
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`${scriptName} failed.`);
+}
 
 function fail(message) {
   failures.push(message);
@@ -120,21 +91,14 @@ function parseZipEntries(buffer) {
   return entries;
 }
 
-function serviceWorkerAssets(text) {
-  const match = text.match(/const CORE_ASSETS = \[([\s\S]*?)\];/);
-  if (!match) return [];
-  return Array.from(match[1].matchAll(/"([^"]+)"/g))
-    .map((item) => item[1])
-    .filter((asset) => asset !== "./")
-    .map((asset) => asset.replace(/^\.\//, ""));
-}
-
 function indexLocalAssets(text) {
   const assets = [];
   const assetPattern = /<(script|link)\b[^>]+(?:src|href)=["']([^"']+)["']/gi;
   let match;
   while ((match = assetPattern.exec(text))) {
-    const asset = String(match[2] || "").split("#")[0].split("?")[0];
+    const asset = String(match[2] || "")
+      .split("#")[0]
+      .split("?")[0];
     if (!asset || asset.startsWith("data:") || /^[a-z]+:/i.test(asset) || asset.startsWith("//")) continue;
     assets.push(asset.replace(/^\.\//, "").replace(/^\/+/, ""));
   }
@@ -145,6 +109,17 @@ if (!fs.existsSync(artifactPath)) fail(`Missing static web artifact: ${path.rela
 if (!fs.existsSync(checksumPath)) fail(`Missing static web checksum file: ${path.relative(root, checksumPath)}`);
 
 let entries = new Map();
+runNodeScript("build-renderer.cjs");
+runNodeScript("verify-renderer-build.cjs");
+const rendererRoot = path.join(root, ".cache", "renderer", "production");
+const generatedManifestPath = path.join(rendererRoot, "config", "production-assets.js");
+delete require.cache[require.resolve(generatedManifestPath)];
+const { offlineAssets: OFFLINE_ASSETS, webDistributionAssets: REQUIRED_WEB_ASSETS } = require(generatedManifestPath);
+const rendererAssets = new Set([
+  "index.html",
+  "config/production-assets.js",
+  ...JSON.parse(fs.readFileSync(path.join(rendererRoot, "assets.json"), "utf8"))
+]);
 if (fs.existsSync(artifactPath)) {
   try {
     entries = parseZipEntries(fs.readFileSync(artifactPath));
@@ -158,7 +133,7 @@ if (!artifactName.includes(packageJson.version)) {
 }
 
 for (const asset of REQUIRED_WEB_ASSETS) {
-  const sourcePath = path.join(root, asset);
+  const sourcePath = rendererAssets.has(asset) ? path.join(rendererRoot, asset) : path.join(root, asset);
   if (!fs.existsSync(sourcePath)) {
     fail(`Required web source asset is missing: ${asset}`);
     continue;
@@ -173,9 +148,18 @@ for (const asset of REQUIRED_WEB_ASSETS) {
   if (sourceHash !== artifactHash) fail(`${asset} inside the static web artifact does not match the workspace source.`);
 }
 
+const productionApp = entries.get("app.js")?.toString("utf8") || "";
+for (const marker of ["runAppWorkflowTest", "app-workflow-test", "_TEST_FLAG", "Simulated autosave save failure"]) {
+  if (productionApp.includes(marker)) fail(`Static web production renderer contains test-only marker: ${marker}`);
+}
+
 for (const entry of entries.keys()) {
   const allowedScript = entry === "scripts/opus-cat-web-bridge.cjs";
-  if (/^(desktop|docs|dist|dist-web|test-artifacts)\//i.test(entry) || (/^scripts\//i.test(entry) && !allowedScript) || /(?:test|runner|fixture)\.html$/i.test(entry)) {
+  if (
+    /^(desktop|docs|dist|dist-web|test-artifacts)\//i.test(entry) ||
+    (/^scripts\//i.test(entry) && !allowedScript) ||
+    /(?:test|runner|fixture)\.html$/i.test(entry)
+  ) {
     fail(`Static web artifact includes non-runtime file: ${entry}`);
   }
 }
@@ -189,8 +173,8 @@ if (!serviceWorker.includes(`const APP_VERSION = "${packageJson.version}"`)) {
 }
 
 const expectedAssets = new Set([
-  ...indexLocalAssets(fs.readFileSync(path.join(root, "index.html"), "utf8")),
-  ...serviceWorkerAssets(serviceWorker)
+  ...indexLocalAssets(fs.readFileSync(path.join(root, ".cache", "renderer", "production", "index.html"), "utf8")),
+  ...OFFLINE_ASSETS
 ]);
 for (const asset of expectedAssets) {
   if (!entries.has(asset)) fail(`Static web artifact is missing referenced app-shell asset ${asset}.`);

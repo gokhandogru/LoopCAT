@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
+    <meta charset="utf-8" />
     <title>LoopCAT Browser Test Runner</title>
-    <link rel="icon" href="data:,">
+    <link rel="icon" href="data:," />
     <style>
       body {
         margin: 20px;
@@ -41,16 +41,54 @@
     <pre id="summary">Running...</pre>
     <div id="frames"></div>
     <script>
+      const requestedTest = new URLSearchParams(window.location.search).get("test");
+      const requestedTimeout = Number(new URLSearchParams(window.location.search).get("timeout")) || 0;
       const tests = [
-        { name: "Security policy", url: "./security-policy-test.html", pass: "SECURITY POLICY TEST PASS", fail: "SECURITY POLICY TEST FAIL" },
-        { name: "Offline shell", url: "./offline-shell-test.html", pass: "OFFLINE SHELL TEST PASS", fail: "OFFLINE SHELL TEST FAIL" },
+        {
+          name: "Security policy",
+          url: "./security-policy-test.html",
+          pass: "SECURITY POLICY TEST PASS",
+          fail: "SECURITY POLICY TEST FAIL"
+        },
+        {
+          name: "Offline shell",
+          url: "./offline-shell-test.html",
+          pass: "OFFLINE SHELL TEST PASS",
+          fail: "OFFLINE SHELL TEST FAIL"
+        },
         { name: "Smoke", url: "./smoke-test.html", pass: "SMOKE TEST PASS", fail: "SMOKE TEST FAIL" },
-        { name: "Regression", url: "./regression-test.html", pass: "REGRESSION TEST PASS", fail: "REGRESSION TEST FAIL" },
-        { name: "App workflow", url: "./index.html#app-workflow-test", pass: "APP WORKFLOW TEST PASS", fail: "APP WORKFLOW TEST FAIL" },
-        { name: "Workspace storage", url: "./workspace-storage-test.html", pass: "WORKSPACE STORAGE TEST PASS", fail: "WORKSPACE STORAGE TEST FAIL" },
-        { name: "Package round trip", url: "./package-roundtrip-test.html", pass: "PACKAGE ROUNDTRIP TEST PASS", fail: "PACKAGE ROUNDTRIP TEST FAIL" },
-        { name: "Large project", url: "./large-project-test.html", pass: "LARGE PROJECT TEST PASS", fail: "LARGE PROJECT TEST FAIL", timeout: 300000 }
-      ];
+        {
+          name: "Regression",
+          url: "./regression-test.html",
+          pass: "REGRESSION TEST PASS",
+          fail: "REGRESSION TEST FAIL"
+        },
+        {
+          name: "App workflow",
+          url: "./renderer-test/index.html#app-workflow-test",
+          pass: "APP WORKFLOW TEST PASS",
+          fail: "APP WORKFLOW TEST FAIL"
+        },
+        {
+          name: "Workspace storage",
+          url: "./workspace-storage-test.html",
+          pass: "WORKSPACE STORAGE TEST PASS",
+          fail: "WORKSPACE STORAGE TEST FAIL"
+        },
+        {
+          name: "Package round trip",
+          url: "./package-roundtrip-test.html",
+          pass: "PACKAGE ROUNDTRIP TEST PASS",
+          fail: "PACKAGE ROUNDTRIP TEST FAIL"
+        },
+        {
+          name: "Large project",
+          url: "./large-project-test.html",
+          pass: "LARGE PROJECT TEST PASS",
+          fail: "LARGE PROJECT TEST FAIL",
+          timeout: 300000
+        }
+      ].filter((test) => !requestedTest || test.name === requestedTest);
 
       const summary = document.querySelector("#summary");
       const frames = document.querySelector("#frames");
@@ -66,9 +104,17 @@
 
       function readFrameResult(frame) {
         try {
-          return frame.contentDocument?.querySelector("#results")?.textContent ||
+          const result =
+            frame.contentDocument?.querySelector("#results")?.textContent ||
             frame.contentDocument?.querySelector("#appWorkflowTestResults")?.textContent ||
             "";
+          if (result) return result;
+          const childWindow = frame.contentWindow;
+          const status = frame.contentDocument?.querySelector("#saveStatus")?.textContent || "";
+          const progress = childWindow?.__loopcatAppWorkflowProgress || "not started";
+          const startupError = childWindow?.__loopcatStartupError || "none";
+          const checkpoint = childWindow?.__loopcatTopLevelCheckpoint || "none";
+          return `Frame location: ${childWindow?.location?.href || "unknown"}; hash: ${childWindow?.location?.hash || "none"}; test build: ${String(Boolean(childWindow?.__loopcatTestBuild))}; readyState: ${frame.contentDocument?.readyState || "unknown"}; top-level checkpoint: ${checkpoint}; workflow progress: ${progress}; status: ${status || "none"}; startup error: ${startupError}`;
         } catch (error) {
           return `Could not read test frame: ${error.message}`;
         }
@@ -105,7 +151,7 @@
               finish({ ok: true, text });
             } else if (text.includes(test.fail)) {
               finish({ ok: false, text });
-            } else if (Date.now() - startedAt > (test.timeout || 120000)) {
+            } else if (Date.now() - startedAt > (requestedTimeout || test.timeout || 120000)) {
               finish({ ok: false, text: text || "Timed out waiting for test result." });
             }
           }, 250);

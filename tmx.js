@@ -266,7 +266,8 @@ async function parseTmxAsync(text, options = {}, progress = {}) {
 
 function parseTmxDom(text, options = {}) {
   const { sourceLang, targetLang, tmName, projectName } = tmxResourceOptions(options, { requireTmName: true });
-  const xml = new DOMParser().parseFromString(text, "application/xml");
+  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(text) || text;
+  const xml = new DOMParser().parseFromString(parserInput, "application/xml");
   if (xml.querySelector("parsererror")) throw new Error("The TMX file could not be parsed.");
   const now = new Date().toISOString();
   const entries = [];

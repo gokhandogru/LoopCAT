@@ -1,0 +1,355 @@
+.liquid-glass-edition button,
+.liquid-glass-edition summary,
+.liquid-glass-edition .file-button {
+  min-height: 36px;
+  border-color: var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--elevation-none);
+  transition:
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease;
+}
+
+.liquid-glass-edition button:hover,
+.liquid-glass-edition summary:hover,
+.liquid-glass-edition .file-button:hover {
+  border-color: var(--color-line-strong);
+  background: var(--color-surface-subtle);
+  box-shadow: var(--elevation-none);
+  transform: none;
+}
+
+.liquid-glass-edition button.primary,
+.liquid-glass-edition .primary,
+.liquid-glass-edition #confirmBtn {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  box-shadow: var(--elevation-none);
+}
+
+.liquid-glass-edition input,
+.liquid-glass-edition select,
+.liquid-glass-edition textarea {
+  min-height: 38px;
+  border-color: var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--elevation-none);
+}
+
+.liquid-glass-edition input:focus,
+.liquid-glass-edition select:focus,
+.liquid-glass-edition textarea:focus {
+  border-color: var(--color-focus);
+  background: var(--color-surface);
+  box-shadow: var(--elevation-none);
+}
+
+.liquid-glass-edition .project-tile,
+.liquid-glass-edition .file-card,
+.liquid-glass-edition .resource-card,
+.liquid-glass-edition .resource-detail,
+.liquid-glass-edition .analysis-panel,
+.liquid-glass-edition .file-list-header,
+.liquid-glass-edition .side-panel,
+.liquid-glass-edition .match-card,
+.liquid-glass-edition .term-card,
+.liquid-glass-edition .qa-card,
+.liquid-glass-edition .comment-card,
+.liquid-glass-edition .revision-card,
+.liquid-glass-edition .ai-suggestion-card,
+.liquid-glass-edition .quality-category-row {
+  border-color: var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--elevation-none);
+}
+
+.liquid-glass-edition .project-tile:hover,
+.liquid-glass-edition .file-card:hover,
+.liquid-glass-edition .resource-card:hover {
+  border-color: var(--color-line-strong);
+  box-shadow: var(--elevation-none);
+  transform: none;
+}
+
+.liquid-glass-edition .menu-panel,
+.liquid-glass-edition .concordance-popover,
+.liquid-glass-edition .command-palette,
+.liquid-glass-edition dialog {
+  border-color: var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  box-shadow: var(--elevation-transient);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.liquid-glass-edition .concordance-overlay,
+.liquid-glass-edition .command-palette-overlay,
+.liquid-glass-edition dialog::backdrop {
+  background: var(--color-overlay);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.liquid-glass-edition .trash-dialog-card {
+  width: min(620px, calc(100vw - var(--space-8)));
+}
+
+.liquid-glass-edition .dialog-heading-row,
+.liquid-glass-edition .trash-item,
+.liquid-glass-edition .trash-item-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.liquid-glass-edition .dialog-heading-row p,
+.liquid-glass-edition .trash-item p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+}
+
+.liquid-glass-edition .trash-list {
+  display: grid;
+  gap: var(--space-2);
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.liquid-glass-edition .trash-item {
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+.liquid-glass-edition .command-results {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.liquid-glass-edition .command-group {
+  display: grid;
+  gap: 2px;
+}
+
+.liquid-glass-edition .command-group-label {
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.liquid-glass-edition .command-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+}
+
+.liquid-glass-edition .command-item.active:not(:disabled),
+.liquid-glass-edition .command-item[aria-selected="true"]:not(:disabled) {
+  border-color: var(--color-line);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.liquid-glass-edition .command-item kbd {
+  padding: 2px var(--space-1);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-size-xs);
+}
+
+.liquid-glass-edition .command-empty {
+  padding: var(--space-4);
+  text-align: center;
+}
+
+.liquid-glass-edition .update-ready-banner {
+  position: fixed;
+  z-index: 40;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: min(560px, calc(100vw - var(--space-8)));
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  box-shadow: var(--elevation-transient);
+}
+
+.liquid-glass-edition .update-ready-banner.hidden {
+  display: none;
+}
+
+.liquid-glass-edition .update-ready-banner p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+}
+
+.liquid-glass-edition .diagnostics-card {
+  width: min(720px, calc(100vw - var(--space-8)));
+}
+
+.liquid-glass-edition .diagnostics-summary {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.7fr) minmax(0, 1.3fr);
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.liquid-glass-edition .diagnostics-summary dt {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.liquid-glass-edition .diagnostics-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.liquid-glass-edition .diagnostics-preview {
+  max-height: 280px;
+  overflow: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.liquid-glass-edition .ai-suggestion-provenance {
+  margin-block: var(--space-2);
+  font-size: var(--font-size-xs);
+}
+
+.liquid-glass-edition .ai-suggestion-inspection {
+  margin-block: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+
+.liquid-glass-edition .ai-suggestion-inspection > summary {
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.liquid-glass-edition .ai-suggestion-diff {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  border-top: 1px solid var(--color-line);
+  background: var(--color-line);
+}
+
+.liquid-glass-edition .ai-suggestion-diff > div {
+  padding: var(--space-3);
+  background: var(--color-surface);
+}
+
+.liquid-glass-edition .ai-suggestion-diff p {
+  margin: var(--space-1) 0 0;
+  white-space: pre-wrap;
+}
+
+.liquid-glass-edition .ai-suggestion-card footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.liquid-glass-edition .ai-contextual-workflow,
+.liquid-glass-edition .ai-contextual-results,
+.liquid-glass-edition .project-ai-settings-mount {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.liquid-glass-edition .ai-contextual-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.liquid-glass-edition .ai-contextual-heading h3,
+.liquid-glass-edition .ai-contextual-heading p {
+  margin: 0;
+}
+
+.liquid-glass-edition .ai-contextual-heading p {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.liquid-glass-edition .ai-contextual-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.liquid-glass-edition .ai-contextual-actions button {
+  min-width: 0;
+  text-align: left;
+}
+
+.liquid-glass-edition .project-ai-options > summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+
+.liquid-glass-edition .project-ai-options > summary small {
+  color: var(--color-text-muted);
+}
+
+.liquid-glass-edition .project-ai-settings-mount {
+  margin-top: var(--space-3);
+}
+
+.liquid-glass-edition .actionable-empty-state {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  max-width: 520px;
+  padding: var(--space-8) 0;
+}
+
+.liquid-glass-edition .actionable-empty-state h3,
+.liquid-glass-edition .actionable-empty-state p {
+  margin: 0;
+}
+
+.liquid-glass-edition .actionable-empty-state p {
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 799px) {
+  .liquid-glass-edition .ai-suggestion-diff {
+    grid-template-columns: 1fr;
+  }
+}

@@ -17,7 +17,7 @@ Required fields:
 - `app`: Must be `"LoopCAT"` for new exports. Older `"CatHan"` packages may be imported as legacy packages.
 - `type`: Must be `"project-package"`.
 - `version`: Package contract version. Current value: `1`.
-- `schemaVersion`: Local data schema version. Current version: `4`. Current accepted range for package import: `3` through `4`; packages from newer schemas must be opened with a newer LoopCAT build.
+- `schemaVersion`: Project-package schema version. Current version: `5`. Current accepted range for package import: `3` through `5`; packages from newer schemas must be opened with a newer LoopCAT build. This contract is validated independently from the workspace-manifest version and from any future local-only storage schema.
 - `exportedAt`: ISO timestamp for package creation.
 - `packageMetadata`: Metadata about the package and storage mode.
 - `project`: Project metadata and settings.

@@ -1,0 +1,24 @@
+{
+  "mode": "source-test-isolated",
+  "productionFiles": [
+    "app.js",
+    "ai.js",
+    "storage.js",
+    "workspace-storage.js",
+    "project.js"
+  ],
+  "knownMarkers": {
+    "app.js": {
+      "runAppWorkflowTest": 4,
+      "#app-workflow-test": 2,
+      "_TEST_FLAG": 154,
+      "Simulated ": 85
+    }
+  },
+  "forbiddenMarkers": [
+    "window.__LOOPCAT_TEST__",
+    "window.__LOOPCAT_DEBUG__",
+    "src/testing/",
+    "tests/app-workflow/"
+  ]
+}

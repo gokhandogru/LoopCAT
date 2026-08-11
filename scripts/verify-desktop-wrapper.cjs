@@ -23,6 +23,7 @@ function normalizeFilePath(value) {
 }
 
 const wrapper = require(desktopMainPath);
+const { runtimeAssets: expectedRuntimeFiles } = require(path.join(root, "config", "production-assets.js"));
 
 const requiredExports = [
   "APP_SCHEME",
@@ -67,41 +68,6 @@ assert(wrapper.ALLOWED_APP_FILES instanceof Set, "ALLOWED_APP_FILES must be a Se
 assert(wrapper.ALLOWED_EXTERNAL_HOSTS instanceof Set, "ALLOWED_EXTERNAL_HOSTS must be a Set.");
 assert(!wrapper.ALLOWED_EXTERNAL_HOSTS.has("chatgpt.com"), "Desktop external host allowlist must not include the removed ChatGPT action host.");
 assert(!wrapper.ALLOWED_EXTERNAL_HOSTS.has("example.com"), "Desktop external host allowlist must not include generic HTTPS hosts.");
-
-const expectedRuntimeFiles = [
-  "index.html",
-  "styles.css",
-  "liquid-glass/styles.css",
-  "manifest.webmanifest",
-  "service-worker.js",
-  "icons/loopcat-icon.svg",
-  "icons/loopcat-loopbird-mono.svg",
-  "icons/loopcat-icon.png",
-  "app.js",
-  "storage.js",
-  "workspace-storage.js",
-  "docx.js",
-  "tm.js",
-  "termbase.js",
-  "tmx.js",
-  "tbx.js",
-  "encoding.js",
-  "xliff.js",
-  "localization.js",
-  "qa.js",
-  "validation.js",
-  "analysis.js",
-  "quality.js",
-  "ai.js",
-  "worker-client.js",
-  "cat-worker.js",
-  "project.js",
-  "i18n.js",
-  "i18n/source.en-US.js",
-  "i18n/locales/ca-ES.js",
-  "i18n/locales/en-US.js",
-  "i18n/locales/tr-TR.js"
-];
 
 for (const relativePath of expectedRuntimeFiles) {
   assert(wrapper.ALLOWED_APP_FILES.has(relativePath), `Desktop protocol allowlist is missing ${relativePath}.`);
@@ -160,7 +126,7 @@ for (const [url, expectedFile] of [
   ["loopcat://app/index.html", "index.html"],
   ["loopcat://app/styles.css", "styles.css"],
   ["loopcat://app/liquid-glass/styles.css", "liquid-glass/styles.css"],
-  ["loopcat://app/i18n/locales/en-US.js", "i18n/locales/en-US.js"],
+  ["loopcat://app/config/production-assets.js", "config/production-assets.js"],
   ["loopcat://app/icons/loopcat-icon.svg", "icons/loopcat-icon.svg"],
   ["loopcat://app/icons/loopcat-icon.png", "icons/loopcat-icon.png"]
 ]) {
@@ -493,7 +459,7 @@ assertEqual(devRendererPreferences.spellcheck, true, "Desktop renderer must keep
 assertEqual(devRendererPreferences.navigateOnDragDrop, false, "Desktop renderer must not navigate when a file is dragged onto the app.");
 assertEqual(devRendererPreferences.devTools, true, "Development desktop runs may keep DevTools available.");
 assertEqual(packagedRendererPreferences.devTools, false, "Packaged desktop runs must not expose DevTools.");
-assertEqual(fallbackRendererPreferences.sandbox, false, "Desktop renderer fallback preferences must preserve explicit sandbox disablement.");
+assertEqual(fallbackRendererPreferences.sandbox, true, "Desktop renderer preferences must reject attempts to disable the OS sandbox.");
 
 const windowsLmStudioCandidates = wrapper.lmStudioCliCandidates("win32", {
   LOCALAPPDATA: "C:\\Users\\translator\\AppData\\Local"

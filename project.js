@@ -13,6 +13,7 @@ const {
   putIfRevisionNotOlder,
   updateProjectAndDeleteDocumentSegments,
   updateProjectAndPutSegments,
+  writeSegmentStructureAtomically,
   constants
 } = window.CatHan.storage;
 const LOCAL_WORKSPACE_ID = constants?.LOCAL_WORKSPACE_ID || "local-workspace";
@@ -407,6 +408,21 @@ async function saveSegments(segments) {
   return result.values;
 }
 
+async function saveSegmentStructure(segments = [], deleteSegmentIds = []) {
+  if (typeof writeSegmentStructureAtomically !== "function") {
+    throw new Error("Atomic structural segment storage is unavailable.");
+  }
+  const now = new Date().toISOString();
+  const next = segments.map((segment) => ({
+    ...segment,
+    revision: segmentRevision(segment),
+    updatedBy: LOCAL_USER_ID,
+    updatedAt: now
+  }));
+  await writeSegmentStructureAtomically({ segments: next, deleteSegmentIds });
+  return next;
+}
+
 async function saveSegment(segment) {
   const next = {
     ...segment,
@@ -451,6 +467,7 @@ window.CatHan.project = {
   appendProjectSegments,
   appendProjectSegmentsAndUpdateProject,
   saveSegments,
+  saveSegmentStructure,
   deleteSegment,
   saveSegment,
   deleteProject,

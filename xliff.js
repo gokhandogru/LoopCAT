@@ -100,7 +100,8 @@ function detectTags(text) {
 }
 
 function parseXml(text) {
-  const xml = new DOMParser().parseFromString(text, "application/xml");
+  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(text) || text;
+  const xml = new DOMParser().parseFromString(parserInput, "application/xml");
   const parserError = xml.getElementsByTagName("parsererror")[0];
   if (parserError) throw new Error("The XLIFF file is not valid XML.");
   return xml;

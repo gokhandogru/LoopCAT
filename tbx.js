@@ -296,7 +296,8 @@ async function parseTbxAsync(text, options = {}, progress = {}) {
 
 function parseTbxDom(text, options = {}) {
   const { sourceLang, targetLang, termBaseName } = tbxResourceOptions(options, { requireTermBaseName: true });
-  const xml = new DOMParser().parseFromString(text, "application/xml");
+  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(text) || text;
+  const xml = new DOMParser().parseFromString(parserInput, "application/xml");
   if (xml.querySelector("parsererror")) throw new Error("The TBX file could not be parsed.");
   const now = new Date().toISOString();
   const terms = [];

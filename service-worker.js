@@ -4,74 +4,46 @@ const STATIC_ASSET_REVISION = "2026-08-07-loopbird-branding";
 const CACHE_PREFIX = "loopcat-offline-";
 const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}-${STATIC_ASSET_REVISION}`;
 
-const CORE_ASSETS = [
-  "./",
-  "./index.html",
-  "./styles.css",
-  "./liquid-glass/styles.css",
-  "./manifest.webmanifest",
-  "./service-worker.js",
-  "./icons/loopcat-icon.svg",
-  "./icons/loopcat-loopbird-mono.svg",
-  "./icons/loopcat-icon.png",
-  "./storage.js",
-  "./workspace-storage.js",
-  "./docx.js",
-  "./tm.js",
-  "./termbase.js",
-  "./tmx.js",
-  "./tbx.js",
-  "./encoding.js",
-  "./xliff.js",
-  "./localization.js",
-  "./qa.js",
-  "./validation.js",
-  "./analysis.js",
-  "./quality.js",
-  "./ai.js",
-  "./worker-client.js",
-  "./cat-worker.js",
-  "./project.js",
-  "./i18n.js",
-  "./i18n/source.en-US.js",
-  "./i18n/locales/ca-ES.js",
-  "./i18n/locales/en-US.js",
-  "./i18n/locales/tr-TR.js",
-  "./app.js",
-  "./LICENSE",
-  "./NOTICE"
-];
+importScripts("./config/production-assets.js");
+const CORE_ASSETS = Object.freeze(["./", ...self.LoopCATProductionAssets.offlineAssets.map((asset) => `./${asset}`)]);
 
 const CORE_ASSET_URLS = new Set(CORE_ASSETS.map((asset) => new URL(asset, self.location.href).href));
 const INDEX_URL = new URL("./index.html", self.location.href).href;
 
 async function cacheCoreAssets(cache) {
   const failedAssets = [];
-  await Promise.all(CORE_ASSETS.map(async (asset) => {
-    try {
-      await cache.add(asset);
-    } catch (error) {
-      failedAssets.push(`${asset}: ${error?.message || error}`);
-      console.warn("Offline shell asset cache failed.", asset, error);
-    }
-  }));
+  await Promise.all(
+    CORE_ASSETS.map(async (asset) => {
+      try {
+        await cache.add(asset);
+      } catch (error) {
+        failedAssets.push(`${asset}: ${error?.message || error}`);
+        console.warn("Offline shell asset cache failed.", asset, error);
+      }
+    })
+  );
   if (failedAssets.length) {
     throw new Error(`Offline shell core asset cache failed: ${failedAssets.join("; ")}`);
   }
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cacheCoreAssets(cache))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cacheCoreAssets(cache)));
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME).map((key) => caches.delete(key))))
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME).map((key) => caches.delete(key))
+        )
+      )
       .then(() => self.clients.claim())
   );
 });
@@ -118,10 +90,9 @@ self.addEventListener("fetch", (event) => {
         if (isCoreAssetRequest(event.request)) {
           const copy = response.clone();
           event.waitUntil(
-            cache.put(event.request, copy)
-              .catch((error) => {
-                console.warn("Offline shell runtime cache write failed.", event.request.url, error);
-              })
+            cache.put(event.request, copy).catch((error) => {
+              console.warn("Offline shell runtime cache write failed.", event.request.url, error);
+            })
           );
         }
         return response;

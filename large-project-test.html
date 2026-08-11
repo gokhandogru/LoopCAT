@@ -327,7 +327,7 @@
           app: "LoopCAT",
           type: "project-package",
           version: 1,
-          schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION,
+          schemaVersion: window.CatHan.storage.constants.PROJECT_PACKAGE_SCHEMA_VERSION,
           exportedAt: now,
           packageMetadata: {
             format: "loopcat-project-package",
@@ -379,7 +379,7 @@
 
         const backupData = {
           app: "LoopCAT",
-          schemaVersion: window.CatHan.storage.constants.SCHEMA_VERSION,
+          schemaVersion: window.CatHan.storage.constants.PROJECT_PACKAGE_SCHEMA_VERSION,
           exportedAt: now,
           projects: [project],
           segments: finalSegments,
