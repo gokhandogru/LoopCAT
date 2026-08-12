@@ -1927,152 +1927,6 @@ const OpusCatProvider = {
   }
 };
 
-function perplexityProviderAuthError() {
-  return "Add a Perplexity API key before using Perplexity Sonar for pre-translation.";
-}
-
-function perplexityStatusError(data, status, model = "") {
-  const raw = redactSensitiveText(data?.error?.message || data?.message || data?.error || "").trim();
-  if (status === 401 || status === 403) return "Perplexity rejected the request. Add or check the Perplexity API key.";
-  if ((status === 404 || /model/i.test(raw)) && model) return `Model ${model} was not found by Perplexity.`;
-  return raw || `Perplexity request failed with status ${status}.`;
-}
-
-async function perplexityJson(endpoint, options = {}, config = {}) {
-  const url = perplexityApiUrl(config.baseUrl || PERPLEXITY_DEFAULT_BASE_URL, endpoint);
-  let result = null;
-  try {
-    result = await fetchJsonWithTimeout(url, options, config);
-  } catch (error) {
-    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
-    throw new Error(`Perplexity is not reachable at ${normalizePerplexityBaseUrl(config.baseUrl || PERPLEXITY_DEFAULT_BASE_URL)}.`);
-  }
-  if (!result.response?.ok) {
-    throw new Error(perplexityStatusError(result.data, result.response?.status, config.model));
-  }
-  return result.data;
-}
-
-function extractPerplexityResponseText(data) {
-  if (typeof data?.output_text === "string") return data.output_text;
-  if (typeof data?.text === "string") return data.text;
-  const messageContent = data?.choices?.[0]?.message?.content;
-  if (typeof messageContent === "string") return messageContent;
-  if (Array.isArray(messageContent)) {
-    return messageContent.map((part) => {
-      if (typeof part === "string") return part;
-      if (typeof part?.text === "string") return part.text;
-      if (typeof part?.content === "string") return part.content;
-      return "";
-    }).join("");
-  }
-  return "";
-}
-
-const PERPLEXITY_TRANSLATION_INSTRUCTIONS = "You are a professional translation assistant inside LoopCAT. Produce only the requested target-language translation for one CAT-tool segment. Do not browse or cite sources.";
-const PERPLEXITY_SONAR_MODELS = ["sonar", "sonar-pro", "sonar-deep-research", "sonar-reasoning-pro"];
-
-function perplexityModelRecords(data) {
-  const records = Array.isArray(data?.data) ? data.data : Array.isArray(data?.models) ? data.models : [];
-  const apiModels = records.map((model) => {
-    const created = Number(model.created);
-    return {
-      name: String(model.id || model.name || "").trim(),
-      size: model.size || 0,
-      modifiedAt: Number.isFinite(created) ? new Date(created * 1000).toISOString() : ""
-    };
-  }).filter((model) => model.name);
-  const seen = new Set(apiModels.map((model) => model.name));
-  PERPLEXITY_SONAR_MODELS.forEach((modelName) => {
-    if (!seen.has(modelName)) {
-      apiModels.push({ name: modelName, size: 0, modifiedAt: "" });
-      seen.add(modelName);
-    }
-  });
-  return apiModels;
-}
-
-const PerplexityProvider = {
-  id: "perplexity",
-  name: "Perplexity Sonar",
-  defaultBaseUrl: PERPLEXITY_DEFAULT_BASE_URL,
-  defaultModel: PERPLEXITY_DEFAULT_MODEL,
-  async testConnection(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(perplexityProviderAuthError());
-    const baseUrl = normalizePerplexityBaseUrl(config.baseUrl || PERPLEXITY_DEFAULT_BASE_URL);
-    const data = await perplexityJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    return {
-      ok: true,
-      provider: "Perplexity Sonar",
-      baseUrl,
-      modelCount: perplexityModelRecords(data).length
-    };
-  },
-  async listModels(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(perplexityProviderAuthError());
-    const baseUrl = normalizePerplexityBaseUrl(config.baseUrl || PERPLEXITY_DEFAULT_BASE_URL);
-    const data = await perplexityJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    return { models: perplexityModelRecords(data), raw: data };
-  },
-  async translateSegment(config = {}, request = {}) {
-    const settings = defaultLocalAiSettings({ ...config, providerId: "perplexity", model: config.model || request.model }, request.project);
-    const baseUrl = normalizePerplexityBaseUrl(config.baseUrl || settings.baseUrl || PERPLEXITY_DEFAULT_BASE_URL);
-    const model = String(config.model || request.model || settings.model || PERPLEXITY_DEFAULT_MODEL).trim() || PERPLEXITY_DEFAULT_MODEL;
-    const sourceText = String(request.text ?? request.segment?.source ?? "");
-    if (!sourceText.trim()) throw new Error("The segment has no source text.");
-    if (!String(config.apiKey || "").trim()) throw new Error(perplexityProviderAuthError());
-    const prompt = request.prompt || buildTranslateGemmaPrompt({
-      sourceLanguage: request.sourceLanguage || settings.sourceLanguage,
-      sourceCode: request.sourceCode || settings.sourceCode,
-      targetLanguage: request.targetLanguage || settings.targetLanguage,
-      targetCode: request.targetCode || settings.targetCode,
-      text: sourceText,
-      segment: request.segment,
-      glossaryTerms: request.glossaryTerms,
-      tmMatches: request.tmMatches,
-      surroundingSegments: request.surroundingSegments
-    });
-    const startedAt = localAiStartedAt();
-    const data = await perplexityJson("/sonar", {
-      method: "POST",
-      headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: PERPLEXITY_TRANSLATION_INSTRUCTIONS },
-          { role: "user", content: prompt }
-        ],
-        stream: false,
-        temperature: 0.1,
-        max_tokens: 1200,
-        disable_search: true,
-        return_images: false,
-        return_related_questions: false
-      })
-    }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-    const rawOutput = extractPerplexityResponseText(data);
-    if (typeof rawOutput !== "string") throw new Error("Perplexity returned a malformed Sonar response.");
-    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
-    if (!translatedText.trim()) throw new Error("Perplexity returned an empty translation for this segment.");
-    return {
-      translatedText,
-      rawOutput,
-      provider: "Perplexity Sonar",
-      providerId: "perplexity",
-      model,
-      durationMs: requestDurationMs(startedAt),
-      prompt,
-      metadata: {
-        promptTokens: data?.usage?.prompt_tokens || 0,
-        completionTokens: data?.usage?.completion_tokens || 0,
-        totalTokens: data?.usage?.total_tokens || 0,
-        citationCount: Array.isArray(data?.citations) ? data.citations.length : 0
-      }
-    };
-  }
-};
-
-
 function geminiProviderAuthError() {
   return "Add a Gemini API key before using Gemini for pre-translation.";
 }
@@ -2610,6 +2464,8 @@ const providerAdapterRuntime = Object.freeze({
   OPENAI_DEFAULT_MODEL,
   XAI_DEFAULT_BASE_URL,
   XAI_DEFAULT_MODEL,
+  PERPLEXITY_DEFAULT_BASE_URL,
+  PERPLEXITY_DEFAULT_MODEL,
   AZURE_OPENAI_DEFAULT_BASE_URL,
   AZURE_OPENAI_DEFAULT_MODEL,
   DEEPSEEK_DEFAULT_BASE_URL,
@@ -2638,6 +2494,7 @@ const providerAdapterRuntime = Object.freeze({
   genericPromptSystem,
   openAiApiUrl,
   xAiApiUrl,
+  perplexityApiUrl,
   azureOpenAiApiUrl,
   deepSeekApiUrl,
   mistralApiUrl,
@@ -2650,6 +2507,7 @@ const providerAdapterRuntime = Object.freeze({
   localAiStartedAt,
   normalizeOpenAiBaseUrl,
   normalizeXAiBaseUrl,
+  normalizePerplexityBaseUrl,
   normalizeAzureOpenAiBaseUrl,
   normalizeDeepSeekBaseUrl,
   normalizeMistralBaseUrl,
@@ -2691,39 +2549,6 @@ OllamaProvider.completePrompt = async function completePrompt(config = {}, reque
     evalCount: data.eval_count || 0
   });
 };
-
-PerplexityProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
-  const settings = defaultLocalAiSettings({ ...config, providerId: "perplexity", model: config.model || request.model }, request.project);
-  const baseUrl = normalizePerplexityBaseUrl(config.baseUrl || settings.baseUrl || PERPLEXITY_DEFAULT_BASE_URL);
-  const model = String(config.model || request.model || settings.model || PERPLEXITY_DEFAULT_MODEL).trim() || PERPLEXITY_DEFAULT_MODEL;
-  if (!String(config.apiKey || "").trim()) throw new Error(perplexityProviderAuthError());
-  const prompt = promptTextOrThrow(request);
-  const startedAt = localAiStartedAt();
-  const data = await perplexityJson("/sonar", {
-    method: "POST",
-    headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: request.system || genericPromptSystem() },
-        { role: "user", content: prompt }
-      ],
-      stream: false,
-      temperature: 0.1,
-      max_tokens: 1200,
-      disable_search: true,
-      return_images: false,
-      return_related_questions: false
-    })
-  }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-  return genericPromptResult("Perplexity Sonar", "perplexity", model, prompt, extractPerplexityResponseText(data), startedAt, {
-    promptTokens: data?.usage?.prompt_tokens || 0,
-    completionTokens: data?.usage?.completion_tokens || 0,
-    totalTokens: data?.usage?.total_tokens || 0,
-    citationCount: Array.isArray(data?.citations) ? data.citations.length : 0
-  });
-};
-
 
 GeminiProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
   const settings = defaultLocalAiSettings({ ...config, providerId: "gemini", model: config.model || request.model }, request.project);
@@ -2862,7 +2687,7 @@ aiProviderRegistry.register(OllamaProvider);
 aiProviderRegistry.reserve("openai");
 aiProviderRegistry.reserve("deepseek");
 aiProviderRegistry.reserve("xai");
-aiProviderRegistry.register(PerplexityProvider);
+aiProviderRegistry.reserve("perplexity");
 aiProviderRegistry.reserve("groq");
 aiProviderRegistry.reserve("together");
 aiProviderRegistry.reserve("openrouter");
@@ -3514,7 +3339,6 @@ window.CatHan.ai = {
   defaultLocalAiSettings,
   localAISettingsStore,
   OllamaProvider,
-  PerplexityProvider,
   GeminiProvider,
   AnthropicProvider,
   CohereProvider,

@@ -76,7 +76,7 @@ The provider map was rechecked against official provider documentation on 2026-0
 | DeepSeek | DeepSeek chat completion API | `GET /models` | `POST /chat/completions` | Existing `DeepSeekProvider` without automatic `/v1` base-path insertion |
 | Cohere | Cohere Chat API v2 | `GET /v1/models` | `POST /v2/chat` | Existing `CohereProvider` |
 | xAI | xAI Responses API | `GET /v1/models` | `POST /v1/responses` | Existing `XAIProvider` with `store: false` |
-| Perplexity | Sonar API | `GET /v1/models` | `POST /v1/sonar` | Existing `PerplexityProvider` with search disabled |
+| Perplexity | Sonar API | `GET /v1/models` | `POST /v1/sonar` | Checked Perplexity adapter with search disabled |
 | Groq | OpenAI-compatible chat API | `GET /openai/v1/models` | `POST /openai/v1/chat/completions` | Existing `GroqProvider` |
 | Together AI | OpenAI-compatible chat API | `GET /v1/models` | `POST /v1/chat/completions` | Existing `TogetherProvider` |
 | OpenRouter | OpenAI-compatible routing API | `GET /api/v1/models` | `POST /api/v1/chat/completions` | Existing `OpenRouterProvider` |

@@ -160,6 +160,7 @@ const requiredReleaseFiles = [
   "src/ai/providers/native-openai-provider-adapters.js",
   "src/ai/providers/openai-compatible-hosted-provider-adapter.js",
   "src/ai/providers/openai-responses-provider-adapter.js",
+  "src/ai/providers/perplexity-provider-adapter.js",
   "src/commands/edit-target-session.js",
   "src/ui/dialog-controller.js",
   "src/features/ai/ai-administration-controller.js",
@@ -176,6 +177,7 @@ const requiredReleaseFiles = [
   "tests/unit/hosted-provider-adapters.test.cjs",
   "tests/unit/native-chat-provider-adapters.test.cjs",
   "tests/unit/native-openai-provider-adapters.test.cjs",
+  "tests/unit/perplexity-provider-adapter.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
   "tests/unit/import-export-controller.test.cjs",
@@ -252,11 +254,13 @@ const hostedProviderAdapterCoreJs = readText("src/ai/providers/openai-compatible
 const nativeChatProviderAdaptersJs = readText("src/ai/providers/native-chat-provider-adapters.js");
 const nativeOpenAiProviderAdaptersJs = readText("src/ai/providers/native-openai-provider-adapters.js");
 const openAiResponsesProviderAdapterJs = readText("src/ai/providers/openai-responses-provider-adapter.js");
+const perplexityProviderAdapterJs = readText("src/ai/providers/perplexity-provider-adapter.js");
 const extractedProviderInstallerJs = readText("src/ai/providers/install-extracted-providers.js");
 const groqProviderAdapterUnitTests = readText("tests/unit/groq-provider-adapter.test.cjs");
 const hostedProviderAdaptersUnitTests = readText("tests/unit/hosted-provider-adapters.test.cjs");
 const nativeChatProviderAdaptersUnitTests = readText("tests/unit/native-chat-provider-adapters.test.cjs");
 const nativeOpenAiProviderAdaptersUnitTests = readText("tests/unit/native-openai-provider-adapters.test.cjs");
+const perplexityProviderAdapterUnitTests = readText("tests/unit/perplexity-provider-adapter.test.cjs");
 const productionEntryJs = readText("src/entry/production.js");
 const qualityReviewControllerJs = readText("src/features/quality/quality-review-controller.js");
 const qualityReviewControllerUnitTests = readText("tests/unit/quality-review-controller.test.cjs");
@@ -2402,11 +2406,6 @@ const defaultLocalAiSettingsFunction = functionBody(
   "function defaultLocalAiSettings",
   "function readLocalAiSettings"
 );
-const perplexityProviderFunction = functionBody(
-  aiJs,
-  "const PerplexityProvider = {",
-  "function geminiProviderAuthError"
-);
 const geminiProviderFunction = functionBody(aiJs, "const GeminiProvider = {", "function openAiCompatibleStatusError");
 const anthropicProviderFunction = functionBody(
   aiJs,
@@ -2414,7 +2413,7 @@ const anthropicProviderFunction = functionBody(
   "function openAiCompatibleStatusError"
 );
 const cohereProviderFunction = functionBody(aiJs, "const CohereProvider = {", "function openAiCompatibleStatusError");
-const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function perplexityProviderAuthError");
+const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function geminiProviderAuthError");
 assertIncludes(
   aiJs,
   `const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"`,
@@ -2645,7 +2644,6 @@ assertIncludes(
   "max_output_tokens: 1200",
   "Native OpenAI-family Responses requests must include bounded max_output_tokens."
 );
-assertIncludes(aiJs, "const PerplexityProvider = {", "ai.js must implement the native Perplexity Sonar provider.");
 assertIncludes(aiJs, "perplexityApiUrl", "ai.js must normalize Perplexity Sonar model-list and Sonar endpoints.");
 assertIncludes(
   defaultLocalAiSettingsFunction,
@@ -2653,14 +2651,28 @@ assertIncludes(
   "ai.js must default native Perplexity settings to the Perplexity base URL/model, not Ollama."
 );
 assertIncludes(
-  perplexityProviderFunction,
+  perplexityProviderAdapterJs,
   "disable_search: true",
-  "ai.js Perplexity Sonar requests must disable web search for CAT-tool translation commands."
+  "The checked Perplexity adapter must disable web search for CAT-tool translation commands."
 );
 assertIncludes(
-  perplexityProviderFunction,
+  hostedProviderAdapterCoreJs,
   "max_tokens: 1200",
-  "ai.js Perplexity Sonar requests must include bounded max_tokens."
+  "The shared native chat transport must keep Perplexity Sonar output bounded."
+);
+assertIncludes(
+  perplexityProviderAdapterJs,
+  'chatEndpoint: "/sonar"',
+  "The checked Perplexity adapter must use the native Sonar endpoint."
+);
+assertIncludes(
+  perplexityProviderAdapterJs,
+  "citationCount",
+  "The checked Perplexity adapter must preserve citation metadata."
+);
+assert(
+  !aiJs.includes("const PerplexityProvider = {") && !aiJs.includes("function perplexityProviderAuthError"),
+  "ai.js must not retain the extracted Perplexity provider implementation."
 );
 assertIncludes(
   groqProviderAdapterJs,
@@ -2899,14 +2911,29 @@ assertIncludes(
   "The native OpenAI adapter family must route AI-native commands through Responses."
 );
 assertIncludes(
-  aiJs,
-  "PerplexityProvider.completePrompt = async function completePrompt",
-  "ai.js must route Perplexity AI-native commands through the native provider."
+  perplexityProviderAdapterJs,
+  "createOpenAiCompatibleHostedProviderAdapter",
+  "The Perplexity adapter must route translations and AI-native commands through the checked provider core."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installPerplexityProviderAdapter",
+  "The extracted-provider installer must register the Perplexity provider."
 );
 assertIncludes(
   aiJs,
-  "aiProviderRegistry.register(PerplexityProvider)",
-  "ai.js must register the native Perplexity provider."
+  'aiProviderRegistry.reserve("perplexity")',
+  "The legacy registry must preserve Perplexity's provider order while its adapter installs."
+);
+assertIncludes(
+  perplexityProviderAdapterJs,
+  "ai.PerplexityProvider = provider",
+  "The Perplexity adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  perplexityProviderAdapterUnitTests,
+  "preserves Sonar no-search translation payload, abort, parsing, provenance, and citations",
+  "The Perplexity adapter must retain focused payload, abort, parsing, provenance, and citation characterization."
 );
 assertIncludes(
   hostedProviderAdapterCoreJs,

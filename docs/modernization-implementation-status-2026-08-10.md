@@ -39,10 +39,10 @@ This document records what the current working tree implements from the 2026 mod
 
 ## Measured results
 
-- Packaged production JavaScript graph: 2,417,344 bytes across five modules, including both mutually exclusive startup paths.
-- Hosted/desktop initial production `app.js`: 964,101 bytes minified and 259,841 bytes gzip. Its two locale chunks remain lazy.
-- Direct-file web fallback `app-file.js`: 1,208,650 bytes minified and 342,986 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
-- Initial synchronous JavaScript is more than 40% below the recorded approximately 2.62 MB baseline. Hosted gzip remains within the 250 KiB-class budget but is 9,841 bytes above a strict 250,000-byte interpretation; the 750 KB minified stretch target is not yet met.
+- Packaged production JavaScript graph: 2,371,030 bytes across five modules, including both mutually exclusive startup paths.
+- Hosted/desktop initial production `app.js`: 940,944 bytes minified and 260,780 bytes gzip. Its two locale chunks remain lazy.
+- Direct-file web fallback `app-file.js`: 1,185,493 bytes minified and 343,796 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
+- Initial synchronous JavaScript is more than 40% below the recorded approximately 2.62 MB baseline. Hosted gzip remains within the 250 KiB-class budget but is 10,780 bytes above a strict 250,000-byte interpretation; the 750 KB minified stretch target is not yet met.
 - Visual verification passes 81 deterministic screenshots covering 1440×900, 1366×768, and 1024×768, including an actionable import-validation failure, visible focus recovery, the local recovery panel and open workspace-status menu, populated Comments and Quality Workbench inspectors, Resources TM dashboard/detail, termbase dashboard, populated resource Trash, post-restore empty Trash, the TM threshold and OPUS-CAT help dialogs, provider administration/AI Command Centre, light/dark, inspector open/closed, Focus mode, AI, status, and compact-density states.
 - Automated accessibility checks pass the deterministic Projects, import-validation error and focus-return path, actionable local recovery panel, open workspace-status menu, Resources translation-memory/termbase empty states, populated resource Trash, populated Comments and Quality Workbench states, AI provider administration/Command Centre and focus-return path, New project dialog, About dialog, TM threshold dialog, OPUS-CAT help dialog, and command-palette states with zero blocking findings. This is not a WCAG conformance claim.
 - The full Electron browser suite passes security, offline shell, smoke, regression, application workflow, workspace storage, package round trip, and large-project coverage.
@@ -54,7 +54,7 @@ This document records what the current working tree implements from the 2026 mod
 
 The new checked boundaries are active, but `app.js` remains the compatibility coordinator and is still approximately 20,000 source lines, including the isolated workflow-test source section. Production strips the test driver, but the roadmap's source goal of a bootstrap under 300 lines is not met.
 
-The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT help, Resources, quality/review, recovery/workspace, import/export/report, and AI provider-administration/command-centre UI slices are complete. The hosted OpenAI-compatible provider-adapter family is also complete: Groq, Together AI, OpenRouter, Hugging Face Inference Providers, DeepInfra, and Fireworks AI now use independently checked adapters over one shared transport/prompt core. The native Responses family is complete as well: OpenAI, xAI, and Azure OpenAI use a separate checked Responses core while retaining OpenAI's connection/status wording, xAI's bearer/model behavior, Azure's `api-key`/deployment behavior, original registry positions, and temporary compatibility exports. DeepSeek and Mistral now use the checked chat-completion core too, with their distinct multipart response parsing and model-metadata precedence retained in explicit descriptors. The explicit-consent direct OpenAI suggestion flow remains separate and unchanged in the AI façade. Still required before this package is complete:
+The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT help, Resources, quality/review, recovery/workspace, import/export/report, and AI provider-administration/command-centre UI slices are complete. The hosted OpenAI-compatible provider-adapter family is also complete: Groq, Together AI, OpenRouter, Hugging Face Inference Providers, DeepInfra, and Fireworks AI now use independently checked adapters over one shared transport/prompt core. The native Responses family is complete as well: OpenAI, xAI, and Azure OpenAI use a separate checked Responses core while retaining OpenAI's connection/status wording, xAI's bearer/model behavior, Azure's `api-key`/deployment behavior, original registry positions, and temporary compatibility exports. DeepSeek and Mistral now use the checked chat-completion core too, with their distinct multipart response parsing and model-metadata precedence retained in explicit descriptors. Perplexity Sonar now uses the same checked chat transport through a distinct adapter that preserves its `/sonar` route, synthesized Sonar model list, mandatory no-search/image/related-question request flags, citation metadata, registry position, and temporary compatibility export. The explicit-consent direct OpenAI suggestion flow remains separate and unchanged in the AI façade. Still required before this package is complete:
 
 1. Move the remaining distinct native/local provider implementations from the `ai.js` façade into independently tested adapters without changing provider behavior or consent rules.
 2. Replace remaining mutable compatibility state with injected repositories/controllers and remove new code's reliance on `window.CatHan`.
@@ -62,7 +62,7 @@ The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT h
 
 ### P2-05 — Performance stretch target
 
-Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 214,101 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
+Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 190,944 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
 
 ## Manual and external release gates still required
 
@@ -89,13 +89,13 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 with the distinct Perplexity Sonar provider behind the existing checked provider service.
+Continue P1-08 with the distinct Google Gemini Interactions provider behind an independently checked provider adapter.
 
 Entry criteria:
 
-- Preserve every provider identifier, default URL/model, route and payload contract, response normalization, timeout/abort behavior, key handling, endpoint allowlist, consent/redaction rule, cancellation path, and local-first/offline behavior.
+- Preserve Gemini's provider identifier, default URL/model, `/v1beta/models` and `/v1beta/interactions` routes, `x-goog-api-key` authentication, `store: false`, response-step parsing, token metadata, timeout/abort behavior, endpoint allowlist, consent/redaction rule, cancellation path, and local-first/offline behavior.
 - Characterize each adapter with focused request/response, failure, redaction, abort, and capability tests before moving its implementation from `ai.js`.
-- Move one provider family at a time behind the existing registry/service interface. Keep provider selection, administration UI, prompt policy, consent, key storage, jobs, commands, persistence, and status outside adapters.
+- Move Gemini alone behind the existing registry/service interface before combining any other distinct provider protocols. Keep provider selection, administration UI, prompt policy, consent, key storage, jobs, commands, persistence, and status outside the adapter.
 - Keep the extraction behavior-preserving: no provider additions, route changes, UI redesign, or consent-policy changes in this slice.
 
 Exit criteria:

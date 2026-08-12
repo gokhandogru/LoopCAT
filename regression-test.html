@@ -4775,7 +4775,8 @@
         });
         const perplexityDefaultSettings = window.CatHan.ai.localAISettingsStore.defaults({ providerId: "perplexity" });
         assert(
-          window.CatHan.ai.normalizePerplexityBaseUrl("https://api.perplexity.ai") === "https://api.perplexity.ai/v1" &&
+          window.CatHan.ai.PerplexityProvider === perplexityProvider &&
+            window.CatHan.ai.normalizePerplexityBaseUrl("https://api.perplexity.ai") === "https://api.perplexity.ai/v1" &&
             window.CatHan.ai.perplexityApiUrl("https://api.perplexity.ai/v1", "/sonar") === "https://api.perplexity.ai/v1/sonar" &&
             perplexityModelsRequest?.url === "https://api.perplexity.ai/v1/models" &&
             perplexityModelsRequest.authorization === "Bearer perplexity-api-key" &&

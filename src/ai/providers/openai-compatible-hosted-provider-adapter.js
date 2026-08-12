@@ -116,6 +116,17 @@ function tokenMetadata(data) {
   };
 }
 
+function responseMetadata(definition, data) {
+  return definition.metadata ? definition.metadata(data) : tokenMetadata(data);
+}
+
+function mappedModels(definition, data) {
+  if (definition.models) return definition.models(data);
+  return hostedProviderModelRecords(data, definition.acceptRootModelArray)
+    .map((model) => definition.mapModel(model))
+    .filter((model) => model.name);
+}
+
 function rawStatusText(runtime, definition, data) {
   const rawValue = definition.rawError
     ? definition.rawError(data)
@@ -151,7 +162,7 @@ async function requestJson(runtime, definition, endpoint, options = {}, config =
   return result.data;
 }
 
-function chatRequest(runtime, config, model, prompt, system) {
+function chatRequest(runtime, definition, config, model, prompt, system) {
   return {
     method: "POST",
     headers: runtime.bearerAuthHeaders(config, { "Content-Type": "application/json" }),
@@ -163,7 +174,8 @@ function chatRequest(runtime, config, model, prompt, system) {
       ],
       stream: false,
       temperature: 0.1,
-      max_tokens: 1200
+      max_tokens: 1200,
+      ...(definition.requestExtras || {})
     })
   };
 }
@@ -207,7 +219,7 @@ export function createOpenAiCompatibleHostedProviderAdapter(injectedRuntime, inj
         ok: true,
         provider: definition.name,
         baseUrl,
-        modelCount: hostedProviderModelRecords(data, definition.acceptRootModelArray).length
+        modelCount: mappedModels(definition, data).length
       };
     },
     async listModels(config = {}) {
@@ -220,9 +232,7 @@ export function createOpenAiCompatibleHostedProviderAdapter(injectedRuntime, inj
         { method: "GET", headers: runtime.bearerAuthHeaders(config) },
         { ...config, baseUrl }
       );
-      const models = hostedProviderModelRecords(data, definition.acceptRootModelArray)
-        .map((model) => definition.mapModel(model))
-        .filter((model) => model.name);
+      const models = mappedModels(definition, data);
       return { models, raw: data };
     },
     async translateSegment(config = {}, request = {}) {
@@ -247,13 +257,22 @@ export function createOpenAiCompatibleHostedProviderAdapter(injectedRuntime, inj
       const data = await requestJson(
         runtime,
         definition,
-        "/chat/completions",
-        chatRequest(runtime, config, model, prompt, TRANSLATION_SYSTEM_PROMPT),
+        definition.chatEndpoint || "/chat/completions",
+        chatRequest(
+          runtime,
+          definition,
+          config,
+          model,
+          prompt,
+          definition.translationSystemPrompt || TRANSLATION_SYSTEM_PROMPT
+        ),
         { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal }
       );
       const rawOutput = responseText(definition, data);
       if (typeof rawOutput !== "string") {
-        throw new Error(`${definition.translationErrorName} returned a malformed chat response.`);
+        throw new Error(
+          definition.malformedResponseError || `${definition.translationErrorName} returned a malformed chat response.`
+        );
       }
       const translatedText = runtime.cleanModelTranslationOutput(rawOutput, sourceText);
       if (!translatedText.trim()) {
@@ -267,7 +286,7 @@ export function createOpenAiCompatibleHostedProviderAdapter(injectedRuntime, inj
         model,
         durationMs: runtime.requestDurationMs(startedAt),
         prompt,
-        metadata: tokenMetadata(data)
+        metadata: responseMetadata(definition, data)
       };
     },
     async completePrompt(config = {}, request = {}) {
@@ -278,8 +297,8 @@ export function createOpenAiCompatibleHostedProviderAdapter(injectedRuntime, inj
       const data = await requestJson(
         runtime,
         definition,
-        "/chat/completions",
-        chatRequest(runtime, config, model, prompt, request.system || runtime.genericPromptSystem()),
+        definition.chatEndpoint || "/chat/completions",
+        chatRequest(runtime, definition, config, model, prompt, request.system || runtime.genericPromptSystem()),
         { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal }
       );
       return runtime.genericPromptResult(
@@ -289,7 +308,7 @@ export function createOpenAiCompatibleHostedProviderAdapter(injectedRuntime, inj
         prompt,
         responseText(definition, data),
         startedAt,
-        tokenMetadata(data)
+        responseMetadata(definition, data)
       );
     }
   };
