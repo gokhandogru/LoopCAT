@@ -51,6 +51,7 @@ import { createTmPretranslationDialogController } from "../features/resources/tm
 import { createResourcesController } from "../features/resources/resources-controller.js";
 import { createQualityReviewController } from "../features/quality/quality-review-controller.js";
 import { createRecoveryWorkspaceController } from "../features/workspace/recovery-workspace-controller.js";
+import { createImportExportController } from "../features/import-export/import-export-controller.js";
 import {
   asTrustedHtml,
   asTrustedScriptUrl,
@@ -121,6 +122,7 @@ export function createApplicationRuntime({ browserWindow, projectApi, storageApi
       createFilterStore,
       createFilterPresetController,
       createInspectorController,
+      createImportExportController,
       createProjectDialogController,
       createProjectsController,
       createQualityReviewController,

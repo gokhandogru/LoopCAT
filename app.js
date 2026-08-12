@@ -734,7 +734,6 @@ const state = {
   tmPretranslating: false,
   revisionHistoryFrame: 0,
   saveStatusTimer: 0,
-  validationReportTimer: 0,
   workspaceAutosaveTimer: 0,
   workspaceAutosaving: false,
   activityEvents: [],
@@ -1345,6 +1344,76 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
   }
 });
 recoveryWorkspaceController?.mount?.();
+const importExportController = appRuntime?.featureFactories?.createImportExportController?.({
+  elements: {
+    projectFileImportButton: els.projectFileImportBtn,
+    projectsImportProjectButton: els.projectsImportProjectBtn,
+    projectFileImportInput: els.projectFileImportInput,
+    docxInput: els.docxInput,
+    localizationInput: els.localizationInput,
+    projectPackageImportInput: els.projectPackageImportInput,
+    backupImportInput: els.backupImportInput,
+    tmxImportInput: els.tmxImportInput,
+    tbxImportInput: els.tbxImportInput,
+    termListImportInput: els.termListImportInput,
+    projectPackageExportButton: els.projectPackageExportBtn,
+    exportTargetDocxButton: els.exportDocxBtn,
+    exportBilingualDocxButton: els.exportBilingualDocxBtn,
+    exportTargetTextButton: els.exportTargetBtn,
+    exportLocalizationButton: els.exportLocalizationBtn,
+    exportXliff12Button: els.exportXliffBtn,
+    exportXliff22Button: els.exportXliff22Btn,
+    exportProjectReportButton: els.exportProjectReportBtn,
+    exportQualityPassportButton: els.exportQualityPassportMenuBtn,
+    exportAnonymizedReportButton: els.exportAnonymizedProjectReportBtn,
+    tmxExportButton: els.tmxExportBtn,
+    tbxExportButton: els.tbxExportBtn,
+    backupExportButton: els.backupExportBtn,
+    validationPanel: els.validationReportPanel,
+    validationMeta: els.validationReportMeta,
+    validationList: els.validationReportList,
+    fileEncodingSelect: els.fileEncodingSelect,
+    resourceTmxImportInput: els.resourceTmxImportInput,
+    resourceTbxImportInput: els.resourceTbxImportInput,
+    resourceTermListImportInput: els.resourceTermListImportInput
+  },
+  hasProject: () => Boolean(state.project),
+  runImportTask: runFileImportTask,
+  importProjectFile: importProjectDocument,
+  importProjectPackage: async (file) => {
+    await flushPendingSegmentSaves();
+    return importProjectPackage(file);
+  },
+  restoreBackup: async (file) => {
+    await flushPendingSegmentSaves();
+    return restoreBackupFile(file);
+  },
+  importTmx: handleTmxImport,
+  importTbx: handleTbxImport,
+  importTermList: handleTermListImport,
+  exportProjectPackage,
+  exportTargetDocx,
+  exportBilingualDocx,
+  exportTargetText,
+  exportLocalization,
+  exportXliff12: () => exportXliff(),
+  exportXliff22,
+  exportProjectReport: () => exportProjectReport(),
+  exportQualityPassport,
+  exportAnonymizedReport: () => exportProjectReport({ anonymized: true }),
+  exportTmx: handleTmxExport,
+  exportTbx: handleTbxExport,
+  exportBackup: exportBrowserBackup,
+  onValidationDismiss: () => {
+    state.lastValidationReport = null;
+  },
+  scheduleFrame: requestAnimationFrame,
+  onError: (error, context) => {
+    console.warn(`Import/export action failed (${context?.phase || "unknown"}).`, error);
+    setSaveStatus(error?.message || uiSource("Import or export action failed."), "dirty");
+  }
+});
+importExportController?.mount?.();
 const projectDialogController = appRuntime?.featureFactories?.createProjectDialogController?.({
   dialogLifecycle: dialogLifecycleController,
   elements: {
@@ -1860,24 +1929,7 @@ function invalidateSegmentFilterCache() {
 
 function renderImportBusyState() {
   const busy = Boolean(state.importTask);
-  [
-    els.projectFileImportBtn,
-    els.docxInput,
-    els.localizationInput,
-    els.projectFileImportInput,
-    els.fileEncodingSelect,
-    els.tmxImportInput,
-    els.tbxImportInput,
-    els.termListImportInput,
-    els.resourceTmxImportInput,
-    els.resourceTbxImportInput,
-    els.resourceTermListImportInput,
-    els.projectPackageImportInput,
-    els.backupImportInput
-  ].filter(Boolean).forEach((control) => {
-    control.disabled = busy;
-    control.setAttribute("aria-busy", String(busy));
-  });
+  importExportController?.renderBusy?.(busy);
   recoveryWorkspaceController?.renderBusy?.({ busy, status: state.workspaceStatus || {} });
 }
 
@@ -4444,36 +4496,24 @@ function validationAlertText(report, fallback = "Validation failed.") {
 }
 
 function renderValidationReport(report) {
-  if (state.validationReportTimer) {
-    clearTimeout(state.validationReportTimer);
-    state.validationReportTimer = 0;
-  }
   const displayReport = sanitizeValidationReportForDisplay(report);
   state.lastValidationReport = displayReport;
-  els.validationReportPanel.classList.toggle("hidden", !displayReport);
-  if (!displayReport) return;
-  replaceSafeHtml(els.validationReportMeta, `
-    <span>${escapeHtml(reportSummary(displayReport))}</span>
-    <button class="validation-dismiss" type="button" aria-label="${translatedSourceHtml("Dismiss validation report")}">${translatedSourceHtml("Dismiss")}</button>
-  `);
-  els.validationReportMeta.querySelector(".validation-dismiss").addEventListener("click", () => renderValidationReport(null));
-  const groups = [
-    ["errors", uiLabel("errors")],
-    ["risky", uiLabel("risk")],
-    ["warnings", uiSource("Warnings")],
-    ["simplified", uiLabel("simplified")],
-    ["skipped", uiLabel("skipped")],
-    ["preserved", uiLabel("preserved")]
-  ];
-  const html = groups
-    .flatMap(([key, label]) => (displayReport[key] || []).map((message) => `<div class="validation-item"><strong>${label}</strong>: ${escapeHtml(message)}</div>`))
-    .join("");
-  replaceSafeHtml(els.validationReportList, html ? `<div class="validation-items">${html}</div>` : `<div class="muted">${translatedSourceHtml("No validation issues.")}</div>`);
-  if (displayReport.ok) {
-    state.validationReportTimer = setTimeout(() => {
-      renderValidationReport(null);
-    }, reportCount(displayReport) ? 12000 : 7000);
-  }
+  importExportController?.renderValidation?.({
+    report: displayReport,
+    summary: displayReport ? reportSummary(displayReport) : "",
+    groups: [
+      { key: "errors", label: uiLabel("errors") },
+      { key: "risky", label: uiLabel("risk") },
+      { key: "warnings", label: uiSource("Warnings") },
+      { key: "simplified", label: uiLabel("simplified") },
+      { key: "skipped", label: uiLabel("skipped") },
+      { key: "preserved", label: uiLabel("preserved") }
+    ],
+    dismissLabel: uiSource("Dismiss validation report"),
+    dismissText: uiSource("Dismiss"),
+    emptyLabel: uiSource("No validation issues."),
+    autoDismissMs: displayReport?.ok ? (reportCount(displayReport) ? 12000 : 7000) : 0
+  });
 }
 
 async function renderProjectAnalysis() {
@@ -12068,6 +12108,31 @@ async function buildBackupExport() {
   return { backup, validation };
 }
 
+async function exportBrowserBackup() {
+  try {
+    const { backup, validation } = await buildBackupExport();
+    download(
+      `loopcat-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      JSON.stringify(backup, null, 2),
+      "application/json"
+    );
+    renderValidationReport(validation);
+    const noteCount = reportCount(validation);
+    setSaveStatus(
+      noteCount
+        ? `Backup exported with ${noteCount} validation note${noteCount === 1 ? "" : "s"}`
+        : "Backup exported",
+      noteCount ? "dirty" : "saved"
+    );
+    return true;
+  } catch (error) {
+    const message = error.message || "Backup export failed.";
+    renderValidationReport(error.validation || portableFileErrorReport(message));
+    setSaveStatus(message, "dirty");
+    return false;
+  }
+}
+
 function reportProjectPackageExportFailure(error, pkg = null) {
   const message = error?.message || "Project package export failed";
   renderValidationReport(error?.validation || pkg?.validation || portableFileErrorReport(message));
@@ -13597,8 +13662,6 @@ function wireEvents() {
   els.uiLocaleImportInput?.addEventListener("change", importUiLocaleFile);
   els.exportUiSourceBtn?.addEventListener("click", exportUiSourceCatalog);
   els.projectFilesBtn.addEventListener("click", showProjectHome);
-  els.projectFileImportBtn.addEventListener("click", () => els.projectFileImportInput.click());
-  els.projectPackageExportBtn.addEventListener("click", exportProjectPackage);
   els.projectHomeDeleteBtn.addEventListener("click", () => confirmDeleteProject());
   els.focusModeBtn?.addEventListener("click", toggleFocusMode);
   els.exitFocusModeBtn?.addEventListener("click", () => setFocusMode(false));
@@ -13614,50 +13677,11 @@ function wireEvents() {
   });
   els.commandPaletteBtn.addEventListener("click", openCommandPalette);
   els.projectSearchInput.addEventListener("input", renderProjectsView);
-  els.projectsImportProjectBtn?.addEventListener("click", () => els.projectPackageImportInput.click());
   els.languagePairFilter.addEventListener("change", renderProjectsView);
-
-  els.docxInput.addEventListener("change", async () => {
-    const file = els.docxInput.files?.[0];
-    try {
-      if (file && state.project) await runFileImportTask("Project file import", () => importProjectDocument(file));
-    } finally {
-      els.docxInput.value = "";
-    }
-  });
-
-  els.localizationInput.addEventListener("change", async () => {
-    const file = els.localizationInput.files?.[0];
-    try {
-      if (file && state.project) await runFileImportTask("Project file import", () => importProjectDocument(file));
-    } finally {
-      els.localizationInput.value = "";
-    }
-  });
-
-  els.projectFileImportInput.addEventListener("change", async () => {
-    const files = Array.from(els.projectFileImportInput.files || []);
-    try {
-      for (const file of files) {
-        if (state.project) await runFileImportTask("Project file import", () => importProjectDocument(file));
-      }
-    } finally {
-      els.projectFileImportInput.value = "";
-    }
-  });
 
   els.confirmBtn.addEventListener("click", confirmCurrentSegment);
   els.saveTmBtn.addEventListener("click", saveActiveSegmentToTm);
   els.pretranslateBtn.addEventListener("click", pretranslateFromTm);
-  els.exportDocxBtn.addEventListener("click", exportTargetDocx);
-  els.exportBilingualDocxBtn.addEventListener("click", exportBilingualDocx);
-  els.exportTargetBtn.addEventListener("click", exportTargetText);
-  els.exportLocalizationBtn.addEventListener("click", exportLocalization);
-  els.exportXliffBtn.addEventListener("click", exportXliff);
-  els.exportXliff22Btn.addEventListener("click", exportXliff22);
-  els.exportProjectReportBtn.addEventListener("click", exportProjectReport);
-  els.exportQualityPassportMenuBtn?.addEventListener("click", exportQualityPassport);
-  els.exportAnonymizedProjectReportBtn.addEventListener("click", () => exportProjectReport({ anonymized: true }));
   els.copySourceBtn.addEventListener("click", copySourceToTarget);
   els.nextOpenBtn.addEventListener("click", goToNextOpenSegment);
   els.splitSegmentBtn.addEventListener("click", splitCurrentSegment);
@@ -13862,75 +13886,9 @@ function wireEvents() {
     els.domainForm.classList.toggle("clean", els.projectDomainEditInput.value.trim() === current);
   });
 
-  els.tmxImportInput.addEventListener("change", async () => {
-    const file = els.tmxImportInput.files?.[0];
-    try {
-      if (file) await runFileImportTask("TMX import", () => handleTmxImport(file));
-    } finally {
-      els.tmxImportInput.value = "";
-    }
-  });
-  els.tmxExportBtn.addEventListener("click", handleTmxExport);
-
-  els.tbxImportInput.addEventListener("change", async () => {
-    const file = els.tbxImportInput.files?.[0];
-    try {
-      if (file) await runFileImportTask("TBX import", () => handleTbxImport(file));
-    } finally {
-      els.tbxImportInput.value = "";
-    }
-  });
-  els.termListImportInput.addEventListener("change", async () => {
-    const file = els.termListImportInput.files?.[0];
-    try {
-      if (file) await runFileImportTask("Term list import", () => handleTermListImport(file));
-    } finally {
-      els.termListImportInput.value = "";
-    }
-  });
-  els.tbxExportBtn.addEventListener("click", handleTbxExport);
   els.closeConcordanceBtn.addEventListener("click", closeConcordance);
   els.concordanceOverlay.addEventListener("click", (event) => {
     if (event.target === els.concordanceOverlay) closeConcordance();
-  });
-
-  els.backupExportBtn.addEventListener("click", async () => {
-    try {
-      const { backup, validation } = await buildBackupExport();
-      download(`loopcat-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup, null, 2), "application/json");
-      renderValidationReport(validation);
-      setSaveStatus(reportCount(validation) ? `Backup exported with ${reportCount(validation)} validation note${reportCount(validation) === 1 ? "" : "s"}` : "Backup exported", reportCount(validation) ? "dirty" : "saved");
-    } catch (error) {
-      const message = error.message || "Backup export failed.";
-      renderValidationReport(error.validation || portableFileErrorReport(message));
-      setSaveStatus(message, "dirty");
-    }
-  });
-
-  els.backupImportInput.addEventListener("change", async () => {
-    const file = els.backupImportInput.files?.[0];
-    if (!file) return;
-    try {
-      await runFileImportTask("Backup restore", async () => {
-        await flushPendingSegmentSaves();
-        return restoreBackupFile(file);
-      });
-    } finally {
-      els.backupImportInput.value = "";
-    }
-  });
-
-  els.projectPackageImportInput.addEventListener("change", async () => {
-    const file = els.projectPackageImportInput.files?.[0];
-    if (!file) return;
-    try {
-      await runFileImportTask("Project package import", async () => {
-        await flushPendingSegmentSaves();
-        return importProjectPackage(file);
-      });
-    } finally {
-      els.projectPackageImportInput.value = "";
-    }
   });
 
   window.addEventListener("beforeunload", handleBeforeUnload);
@@ -14039,13 +13997,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       finishLongImport = resolve;
     }));
     assert(
-      els.projectFileImportBtn.disabled &&
+      importExportController?.getState?.().busy &&
+        els.projectFileImportBtn.disabled &&
         els.docxInput.disabled &&
         els.localizationInput.disabled &&
         els.projectPackageImportInput.disabled &&
         els.backupImportInput.disabled &&
         els.syncWorkspaceBtn.disabled,
-      "import, restore, and workspace sync controls are disabled while an import task runs"
+      "checked import/export controller owns shared busy state while an import task runs"
     );
     assert(
       els.saveStatus.textContent.includes("Project file import: Reading large project file") &&
@@ -14075,12 +14034,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     finishLongImport?.();
     assert(
       (await longImportTask) &&
+        !importExportController?.getState?.().busy &&
         !els.projectFileImportBtn.disabled &&
         !els.docxInput.disabled &&
         !els.localizationInput.disabled &&
         !els.projectPackageImportInput.disabled &&
         !els.backupImportInput.disabled,
-      "import and restore controls are restored after an import task finishes"
+      "checked import/export controller restores import controls after an import task finishes"
     );
     const splitFixture = "First <b>bold part</b> continues. Second sentence.";
     const splitFixtureIndex = mappedSourceSplitIndex(splitFixture, "Hedef metin burada daha uzun olabilir.", 16);
@@ -17867,9 +17827,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       });
       state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
       const reportTargetText = state.segments[segmentIndex].target;
-      await exportProjectReport();
+      els.exportProjectReportBtn.click();
       const reportDownload = await waitFor(() => reportDownloads.find((item) => item.type === "text/html"), "project report download");
-      assert(reportDownload.text.includes("LoopCAT Project Report") && reportDownload.text.includes(state.project.name), "project report export creates offline HTML report");
+      assert(
+        reportDownload.text.includes("LoopCAT Project Report") && reportDownload.text.includes(state.project.name),
+        "checked import/export controller delegates project report export"
+      );
       assert(reportDownload.text.includes(`Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`), "project report export includes restrictive CSP");
       assert(
         reportDownload.text.includes("AI Triage") &&
@@ -17964,7 +17927,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(state.activityEvents.some((event) => event.type === "export" && event.summary === "Project report exported"), "project report export records project activity");
       assert(state.workspaceDirtyProjectIds.has(project.id), "project report export marks workspace package dirty");
 
-      await exportQualityPassport();
+      els.exportQualityPassportMenuBtn.click();
       const qualityPassportDownload = await waitFor(() => reportDownloads.find((item) => item.text.includes("LoopCAT Quality Passport")), "quality passport download");
       assert(
         qualityPassportDownload.text.includes("Quality Contract") &&
@@ -17978,7 +17941,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(!qualityPassportDownload.text.includes(reportTargetText), "quality passport omits segment target text");
       assert(state.activityEvents.some((event) => event.type === "export" && event.summary === "Quality Passport exported"), "quality passport export records project activity");
 
-      await exportProjectReport({ anonymized: true });
+      els.exportAnonymizedProjectReportBtn.click();
       const anonymizedReportDownload = await waitFor(() => reportDownloads.find((item) => item.text.includes("LoopCAT Anonymized Project Report")), "anonymized project report download");
       assert(anonymizedReportDownload.text.includes("Anonymized project") && !anonymizedReportDownload.text.includes(state.project.name), "anonymized project report redacts project name");
       assert(anonymizedReportDownload.text.includes(`Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`), "anonymized project report includes restrictive CSP");
@@ -18049,6 +18012,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       } finally {
         Reflect.deleteProperty(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG);
       }
+      els.focusModeBtn.focus();
       renderValidationReport({
         ok: true,
         errors: [],
@@ -18065,7 +18029,22 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           !validationReportText.includes("validation-report-preserved-token-that-must-not-appear"),
         "validation report display redacts credential-looking app-added messages"
       );
-      renderValidationReport(null);
+      assert(
+        importExportController?.getState?.().validationVisible &&
+          importExportController.getState().validationCount === 2 &&
+          !els.validationReportList.querySelector("img"),
+        "checked import/export controller owns safe validation rendering"
+      );
+      const validationDismissButton = els.validationReportMeta.querySelector(".validation-dismiss");
+      validationDismissButton.focus();
+      validationDismissButton.click();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      assert(
+          !importExportController?.getState?.().validationVisible &&
+          state.lastValidationReport === null &&
+          document.activeElement === els.focusModeBtn,
+        "checked import/export controller restores validation focus after dismissal"
+      );
       const originalValidationAlert = window.alert;
       const validationAlerts = [];
       try {

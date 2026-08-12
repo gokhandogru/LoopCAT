@@ -18,6 +18,7 @@ This document records what the current working tree implements from the 2026 mod
 - A checked Resources controller now owns Resources navigation, TM/termbase tab state and keyboard behavior, view-local resource selection, language-field normalization, import-input lifecycle, card/detail/row event delegation, initial focus, and focus restoration across asynchronous resource refreshes. Existing parsers, storage, exports, validation, linked-project dirtiness, and recovery boundaries remain injected domain services. Empty Resources actions now open the dedicated resource import inputs instead of the project-level import inputs.
 - A checked quality/review controller now owns Comments and Quality Workbench rendering, review/profile/decision form values and event lifecycles, delegated risk navigation, in-progress form preservation, deterministic empty states, and focus restoration across risk-list rendering. Quality scoring, QA, persistence, commands, status/activity, workspace dirtiness, AI review safeguards, and Quality Passport/report generation remain injected domain boundaries.
 - A checked recovery/workspace controller now owns workspace health and local-storage presentation, connected/unsupported/busy control states, project-folder status, recovery and backup-reminder rendering, workspace action listeners, recovery dismissal, menu access, cleanup, and visible focus restoration when recovery UI disappears. Directory handles, workspace manifest v1, project-package schema 5, database/backup schema 6, dirty-marker persistence, pending-save flushes, autosave, package validation/import conflict policy, repair, redaction, jobs, and status remain injected domain boundaries. The recovery-folder action now stops the application outside-click handler from immediately closing the menu.
+- A checked import/export controller now owns project-file, project-package, browser-backup, TMX, TBX, term-list, delivery, project-report, Quality Passport, and anonymized-report event lifecycles; sequential multi-file input reset; one shared import busy state; safe validation-report DOM; delegated dismissal; auto-dismiss timing; and visible focus restoration. Parsers, encoding detection, format reconstruction, package/backup replacement, pending-save flushes, report generation, downloads, validation/redaction policy, activity history, workspace dirtiness, storage, and status remain injected application boundaries.
 - Checked JavaScript/JSDoc, ESLint, Prettier, Stylelint/token enforcement, import-boundary checks, Node focused tests, axe checks, and visual regression checks. Prettier now follows the repository's `.gitattributes` LF contract, so the formatting gate is reproducible on a clean checkout.
 - Explicit app store, navigation, platform, repository, preference, status/job/error, feature-controller, command, palette, theme, layout, update, diagnostics, safe-DOM, and report-template boundaries under `src/`.
 - A quiet semantic design system with restrained surfaces, no persistent blur, semantic light/dark roles, Balanced/Compact density, remembered inspector/layout preferences, and responsive Projects → dashboard → editor layouts.
@@ -37,12 +38,12 @@ This document records what the current working tree implements from the 2026 mod
 
 ## Measured results
 
-- Packaged production JavaScript graph: 2,398,020 bytes across five modules, including both mutually exclusive startup paths.
-- Hosted/desktop initial production `app.js`: 954,638 bytes minified and 255,654 bytes gzip (approximately 249.7 KiB). Its two locale chunks remain lazy.
-- Direct-file web fallback `app-file.js`: 1,198,988 bytes minified and 338,760 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
-- Initial synchronous JavaScript is more than 40% below the recorded approximately 2.62 MB baseline. Hosted gzip is 249.7 KiB, within the 250 KiB-class budget but 5,654 bytes above a strict 250,000-byte interpretation; the 750 KB minified stretch target is not yet met.
-- Visual verification passes 75 deterministic screenshots covering 1440×900, 1366×768, and 1024×768, including the actionable local recovery panel and open workspace-status menu, populated Comments and Quality Workbench inspectors, Resources TM dashboard/detail, termbase dashboard, populated resource Trash, post-restore empty Trash, the TM threshold and OPUS-CAT help dialogs, light/dark, inspector open/closed, Focus mode, AI, status, and compact-density states.
-- Automated accessibility checks pass the deterministic Projects, actionable local recovery panel, open workspace-status menu, Resources translation-memory/termbase empty states, populated resource Trash, populated Comments and Quality Workbench states, New project dialog, About dialog, TM threshold dialog, OPUS-CAT help dialog, and command-palette states with zero blocking findings. This is not a WCAG conformance claim.
+- Packaged production JavaScript graph: 2,409,084 bytes across five modules, including both mutually exclusive startup paths.
+- Hosted/desktop initial production `app.js`: 959,971 bytes minified and 256,939 bytes gzip (approximately 250.9 KiB). Its two locale chunks remain lazy.
+- Direct-file web fallback `app-file.js`: 1,204,520 bytes minified and 340,033 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
+- Initial synchronous JavaScript is more than 40% below the recorded approximately 2.62 MB baseline. Hosted gzip remains within the 250 KiB-class budget but is 6,939 bytes above a strict 250,000-byte interpretation; the 750 KB minified stretch target is not yet met.
+- Visual verification passes 78 deterministic screenshots covering 1440×900, 1366×768, and 1024×768, including an actionable import-validation failure, visible focus recovery, the local recovery panel and open workspace-status menu, populated Comments and Quality Workbench inspectors, Resources TM dashboard/detail, termbase dashboard, populated resource Trash, post-restore empty Trash, the TM threshold and OPUS-CAT help dialogs, light/dark, inspector open/closed, Focus mode, AI, status, and compact-density states.
+- Automated accessibility checks pass the deterministic Projects, import-validation error and focus-return path, actionable local recovery panel, open workspace-status menu, Resources translation-memory/termbase empty states, populated resource Trash, populated Comments and Quality Workbench states, New project dialog, About dialog, TM threshold dialog, OPUS-CAT help dialog, and command-palette states with zero blocking findings. This is not a WCAG conformance claim.
 - The full Electron browser suite passes security, offline shell, smoke, regression, application workflow, workspace storage, package round trip, and large-project coverage.
 - The packaged Windows desktop passes artifact inspection, fuse verification, renderer OS sandbox verification, GPU-enabled startup, and the explicit GPU-disabled fallback.
 
@@ -52,16 +53,16 @@ This document records what the current working tree implements from the 2026 mod
 
 The new checked boundaries are active, but `app.js` remains the compatibility coordinator and is still approximately 20,000 source lines, including the isolated workflow-test source section. Production strips the test driver, but the roadmap's source goal of a bootstrap under 300 lines is not met.
 
-The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT help, Resources, quality/review, and recovery/workspace slices are complete. Still required before this package is complete:
+The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT help, Resources, quality/review, recovery/workspace, and import/export/report slices are complete. Still required before this package is complete:
 
-1. Extract import/export/reports and the remaining AI UI orchestration one family at a time.
-2. Move provider implementations from the `ai.js` façade into independently tested adapters without changing provider behavior or consent rules.
+1. Extract the remaining AI UI orchestration one behavior-preserving family at a time.
+2. Move remaining provider implementations from the `ai.js` façade into independently tested adapters without changing provider behavior or consent rules.
 3. Replace remaining mutable compatibility state with injected repositories/controllers and remove new code's reliance on `window.CatHan`.
 4. Keep each extraction behavior-preserving and run the focused feature suite plus the full browser/release suite at each family boundary.
 
 ### P2-05 — Performance stretch target
 
-Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 204,638 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
+Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 209,971 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
 
 ## Manual and external release gates still required
 
@@ -88,19 +89,19 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 with a behavior-preserving import/export/report controller extraction.
+Continue P1-08 with a behavior-preserving AI provider-administration and command-centre UI controller extraction.
 
 Entry criteria:
 
-- Preserve every supported import/export format, project-package and backup schemas, source assets, protected tags, encodings, validation/redaction, pending-save flushes, activity history, workspace dirtiness, cancellation/confirmation, browser downloads, offline operation, and desktop/web behavior.
-- Characterize import input lifecycle, progress/busy/error states, package and backup restore, delivery/export selection and confirmation, report/passport generation, download cleanup, activity-log failures, localization, and keyboard/focus behavior before moving ownership.
-- Extract checked import/export/report view state, rendering, input/action event lifecycle, focus restoration, and cleanup behind injected parsers, package/backup services, repositories, jobs/status, validation, report-template, and download boundaries. Do not move parsing, format reconstruction, data replacement, report generation, persistence, or redaction policy into the controller.
+- Preserve every provider, key-storage mode, endpoint/model contract, consent/redaction rule, source/context disclosure, cancellation path, prompt mode, batch safeguard, confirmed/locked protection, suggestion provenance, review state, and local-first/offline behavior.
+- Characterize provider/preset/model selection, connection and key controls, prompt previews/tests, batch controls, output-drawer state, help entry points, disabled/busy/error states, localization, and keyboard/focus behavior before moving ownership.
+- Extract checked provider-administration and command-centre view state, rendering, static/delegated event lifecycle, focus restoration, and cleanup behind injected provider services, consent/redaction policy, jobs/status, project settings, prompt builders, suggestion services, commands, and persistence. Do not move network adapters, prompt policy, credential storage, AI application, or provider consent into the controller.
 - Keep the extraction behavior-preserving: no information-hierarchy or visual redesign in this slice.
 
 Exit criteria:
 
-- Import/export/report view state, delegated inputs/actions, focus restoration, progress/error presentation, and cleanup are owned by explicit checked controllers; domain changes still cross the existing parser, package, repository, report, download, job, validation, and status boundaries.
-- Existing formats, package/backup round trips, source assets, encodings, protected tags, validation/redaction, pending-save flushes, activity history, workspace dirtiness, cancellation, and offline/browser/Electron behavior are unchanged under characterization tests.
+- Provider-administration and command-centre view state, delegated inputs/actions, focus restoration, busy/error presentation, and cleanup are owned by explicit checked controllers; AI effects still cross existing provider, consent, redaction, job, suggestion, command, persistence, and status boundaries.
+- Existing providers, key modes, endpoint/model behavior, prompts, consent, cancellation, redaction, locked/confirmed protection, provenance, review states, local/offline operation, and browser/Electron behavior are unchanged under characterization tests.
 - Focused controller/state tests, accessibility/visual checks, web/desktop smoke, app workflow, package/workspace round trips, and FULL-SUITE gates pass with no intended visual difference.
 
-After the import/export/report family, continue P1-08 with the remaining AI UI orchestration one behavior-preserving boundary at a time.
+After the AI UI family, continue P1-08 with provider-adapter decomposition and final compatibility-bootstrap/global cleanup one behavior-preserving boundary at a time.

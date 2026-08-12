@@ -341,6 +341,37 @@ app
     );
     await captureState("03", "translation-editor");
 
+    await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const returnTarget = document.querySelector("#focusModeBtn");
+        const input = document.querySelector("#projectPackageImportInput");
+        returnTarget.focus();
+        Object.defineProperty(input, "files", {
+          configurable: true,
+          value: [new File(["{"], "invalid-project.loopcat.json", { type: "application/json" })]
+        });
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      })()`,
+      true
+    );
+    await waitFor(
+      "!document.querySelector('#validationReportPanel').classList.contains('hidden') && document.querySelector('#validationReportList').textContent.includes('not valid JSON')",
+      "editor import validation error"
+    );
+    await captureState("05", "editor-import-validation-error");
+    await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const dismiss = document.querySelector("#validationReportMeta .validation-dismiss");
+        dismiss.focus();
+        dismiss.click();
+      })()`,
+      true
+    );
+    await waitFor(
+      "document.querySelector('#validationReportPanel').classList.contains('hidden') && document.activeElement === document.querySelector('#focusModeBtn')",
+      "editor import validation dismissal"
+    );
+
     await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorToggleBtn').click()", true);
     await waitFor(
       "document.querySelector('#inspectorToggleBtn').getAttribute('aria-expanded') === 'false'",
@@ -481,7 +512,7 @@ app
     };
     await fsPromises.writeFile(path.join(outputDir, "baseline.json"), `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 
-    const expectedScreenshotCount = 75;
+    const expectedScreenshotCount = 78;
     if (screenshots.length !== expectedScreenshotCount) {
       throw new Error(`Expected ${expectedScreenshotCount} screenshots, captured ${screenshots.length}.`);
     }

@@ -278,6 +278,36 @@ app
         true
       );
       await waitFor("document.querySelector('#segmentBody textarea')", "accessibility translation editor");
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const returnTarget = document.querySelector("#focusModeBtn");
+          const input = document.querySelector("#projectPackageImportInput");
+          returnTarget.focus();
+          Object.defineProperty(input, "files", {
+            configurable: true,
+            value: [new File(["{"], "invalid-project.loopcat.json", { type: "application/json" })]
+          });
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        })()`,
+        true
+      );
+      await waitFor(
+        "!document.querySelector('#validationReportPanel').classList.contains('hidden') && document.querySelector('#validationReportList').textContent.includes('not valid JSON')",
+        "accessible import validation error"
+      );
+      await audit("Import validation error");
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const dismiss = document.querySelector("#validationReportMeta .validation-dismiss");
+          dismiss.focus();
+          dismiss.click();
+        })()`,
+        true
+      );
+      await waitFor(
+        "document.querySelector('#validationReportPanel').classList.contains('hidden') && document.activeElement === document.querySelector('#focusModeBtn')",
+        "accessible import validation focus return"
+      );
       await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorTabReview').click()", true);
       await waitFor(
         "document.querySelector('#inspectorTabReview').getAttribute('aria-selected') === 'true'",

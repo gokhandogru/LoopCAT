@@ -679,6 +679,7 @@
     "auto.import.csv.tsv.xlsx.d7d176e1": "Import CSV/TSV/XLSX",
     "auto.import.d6fbc9d2": "Import",
     "auto.import.files.dfc18031": "Import files",
+    "auto.import.or.export.action.failed.ef60984f": "Import or export action failed.",
     "auto.import.project.447a25af": "Import project",
     "auto.import.project.package.ab572a27": "Import project package",
     "auto.import.tbx.67e61598": "Import TBX",

@@ -160,10 +160,12 @@ const requiredReleaseFiles = [
   "src/features/quality/quality-review-controller.js",
   "src/features/resources/resources-controller.js",
   "src/features/resources/tm-pretranslation-dialog-controller.js",
+  "src/features/import-export/import-export-controller.js",
   "src/features/workspace/recovery-workspace-controller.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
+  "tests/unit/import-export-controller.test.cjs",
   "tests/unit/recovery-workspace-controller.test.cjs",
   "tests/unit/resource-trash.test.cjs",
   "tests/unit/resources-controller.test.cjs",
@@ -233,6 +235,8 @@ const qualityReviewControllerJs = readText("src/features/quality/quality-review-
 const qualityReviewControllerUnitTests = readText("tests/unit/quality-review-controller.test.cjs");
 const recoveryWorkspaceControllerJs = readText("src/features/workspace/recovery-workspace-controller.js");
 const recoveryWorkspaceControllerUnitTests = readText("tests/unit/recovery-workspace-controller.test.cjs");
+const importExportControllerJs = readText("src/features/import-export/import-export-controller.js");
+const importExportControllerUnitTests = readText("tests/unit/import-export-controller.test.cjs");
 const resourcesControllerJs = readText("src/features/resources/resources-controller.js");
 const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
 const resourceTrashUnitTests = readText("tests/unit/resource-trash.test.cjs");
@@ -1155,8 +1159,7 @@ assertIncludes(
   "the checked recovery/workspace controller must restore visible focus when recovery UI disappears."
 );
 assert(
-  !recoveryWorkspaceControllerJs.includes("innerHTML") &&
-    !recoveryWorkspaceControllerJs.includes("insertAdjacentHTML"),
+  !recoveryWorkspaceControllerJs.includes("innerHTML") && !recoveryWorkspaceControllerJs.includes("insertAdjacentHTML"),
   "the extracted recovery/workspace renderer must build external folder and warning labels with safe DOM construction."
 );
 assert(
@@ -1186,9 +1189,7 @@ assert(
   !functionBody(appJs, "function renderWorkspaceStatus", "function workspaceRecoveryProjectIds").includes(
     "replaceSafeHtml"
   ) &&
-    !functionBody(appJs, "function renderWorkspaceRecoveryPanel", "function daysBetween").includes(
-      "replaceSafeHtml"
-    ),
+    !functionBody(appJs, "function renderWorkspaceRecoveryPanel", "function daysBetween").includes("replaceSafeHtml"),
   "workspace health and recovery DOM construction must live in the checked controller rather than app.js."
 );
 assertIncludes(
@@ -1210,6 +1211,91 @@ assertIncludes(
   appJs,
   "checked recovery/workspace controller opens the workspace menu without document-click cancellation",
   "the app workflow must characterize recovery folder access and focus in the real application."
+);
+assertIncludes(
+  importExportControllerJs,
+  'listen(projectFileImportInput, "change"',
+  "the checked import/export controller must own multi-file project import events."
+);
+assertIncludes(
+  importExportControllerJs,
+  'importSingle(projectPackageImportInput, "Project package import"',
+  "the checked import/export controller must own project-package import events."
+);
+assertIncludes(
+  importExportControllerJs,
+  'importSingle(backupImportInput, "Backup restore"',
+  "the checked import/export controller must own browser-backup restore events."
+);
+assertIncludes(
+  importExportControllerJs,
+  'listen(validationMeta, "click"',
+  "the checked import/export controller must own validation dismissal through one stable listener."
+);
+assertIncludes(
+  importExportControllerJs,
+  "restoreValidationFocus()",
+  "the checked import/export controller must restore visible focus after validation dismissal."
+);
+assert(
+  !importExportControllerJs.includes("innerHTML") &&
+    !importExportControllerJs.includes("insertAdjacentHTML") &&
+    !importExportControllerJs.includes("storage.js") &&
+    !importExportControllerJs.includes("workspace-storage") &&
+    !importExportControllerJs.includes("download(") &&
+    !importExportControllerJs.includes("parse"),
+  "the import/export controller must use safe DOM construction and must not own storage, parsing, or download policy."
+);
+assertIncludes(
+  appJs,
+  "createImportExportController",
+  "app.js must compose the checked import/export controller with injected domain actions."
+);
+assert(
+  !appJs.includes('els.projectFileImportBtn.addEventListener("click"') &&
+    !appJs.includes('els.projectsImportProjectBtn?.addEventListener("click"') &&
+    !appJs.includes('els.docxInput.addEventListener("change"') &&
+    !appJs.includes('els.localizationInput.addEventListener("change"') &&
+    !appJs.includes('els.projectFileImportInput.addEventListener("change"') &&
+    !appJs.includes('els.projectPackageImportInput.addEventListener("change"') &&
+    !appJs.includes('els.backupImportInput.addEventListener("change"') &&
+    !appJs.includes('els.tmxImportInput.addEventListener("change"') &&
+    !appJs.includes('els.tbxImportInput.addEventListener("change"') &&
+    !appJs.includes('els.termListImportInput.addEventListener("change"') &&
+    !appJs.includes('els.exportProjectReportBtn.addEventListener("click"') &&
+    !appJs.includes('els.backupExportBtn.addEventListener("click"'),
+  "the migrated import/export/report family must not retain superseded static listeners in app.js."
+);
+assert(
+  !functionBody(appJs, "function renderValidationReport", "async function renderProjectAnalysis").includes(
+    "replaceSafeHtml"
+  ),
+  "validation-report DOM construction must live in the checked controller rather than app.js."
+);
+assertIncludes(
+  importExportControllerUnitTests,
+  "owns project, package, backup, TM, termbase, and report actions",
+  "focused tests must characterize import/export/report event delegation and cleanup."
+);
+assertIncludes(
+  importExportControllerUnitTests,
+  "renders validation safely and restores focus on dismissal",
+  "focused tests must characterize safe validation rendering and focus restoration."
+);
+assertIncludes(
+  appJs,
+  "checked import/export controller owns shared busy state while an import task runs",
+  "the app workflow must characterize shared import busy state through the checked controller."
+);
+assertIncludes(
+  appJs,
+  "checked import/export controller delegates project report export",
+  "the app workflow must characterize report export through the checked controller."
+);
+assertIncludes(
+  appJs,
+  "checked import/export controller restores validation focus after dismissal",
+  "the app workflow must characterize validation dismissal and visible focus return."
 );
 assertIncludes(
   indexHtml,
@@ -4732,14 +4818,14 @@ assertIncludes(
 );
 assertIncludes(appJs, "function renderImportBusyState", "app.js must keep a visible import busy-state guard.");
 assertIncludes(
-  functionBody(appJs, "els.backupImportInput.addEventListener", "els.projectPackageImportInput.addEventListener"),
-  'runFileImportTask("Backup restore"',
-  "app.js must run browser backup restore through the import busy-state guard."
+  functionBody(appJs, "const importExportController", "const projectDialogController"),
+  "runImportTask: runFileImportTask",
+  "app.js must inject the shared import busy-state guard into the checked import/export controller."
 );
 assertIncludes(
-  functionBody(appJs, "els.projectPackageImportInput.addEventListener", 'window.addEventListener("beforeunload"'),
-  'runFileImportTask("Project package import"',
-  "app.js must run project package import through the import busy-state guard."
+  functionBody(appJs, "const importExportController", "const projectDialogController"),
+  "await flushPendingSegmentSaves();",
+  "app.js must flush pending edits before checked package-import and backup-restore boundaries."
 );
 assertIncludes(
   functionBody(appJs, "function shouldWarnBeforeUnload()", "function handleBeforeUnload"),
@@ -4755,6 +4841,11 @@ assertIncludes(
   appJs,
   "overlapping workspace sync is blocked before it reads package data",
   "app workflow test must verify workspace sync cannot overlap with active imports."
+);
+assertIncludes(
+  functionBody(appJs, "function renderImportBusyState()", "function stableLower"),
+  "importExportController?.renderBusy",
+  "app.js must delegate shared import-control busy state to the checked import/export controller."
 );
 assertIncludes(
   functionBody(appJs, "function renderImportBusyState()", "function stableLower"),
@@ -6204,8 +6295,13 @@ assertIncludes(
 );
 assertIncludes(
   baselineCaptureScript,
-  "const expectedScreenshotCount = 75;",
-  "the deterministic visual checkpoint count must include quality, review, and recovery/workspace states."
+  'captureState("05", "editor-import-validation-error")',
+  "visual checkpoints must include an actionable import-validation error at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  "const expectedScreenshotCount = 78;",
+  "the deterministic visual checkpoint count must include validation, quality, review, and recovery/workspace states."
 );
 assertIncludes(
   accessibilityVerificationScript,
@@ -6226,6 +6322,11 @@ assertIncludes(
   accessibilityVerificationScript,
   'audit("Workspace local status menu")',
   "automated accessibility checks must cover local workspace status and storage warnings."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'audit("Import validation error")',
+  "automated accessibility checks must cover import-validation semantics and focus recovery."
 );
 assertIncludes(
   appJs,
