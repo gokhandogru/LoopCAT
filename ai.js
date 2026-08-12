@@ -1927,148 +1927,6 @@ const OpusCatProvider = {
   }
 };
 
-function geminiProviderAuthError() {
-  return "Add a Gemini API key before using Gemini for pre-translation.";
-}
-
-function geminiStatusError(data, status, model = "") {
-  const raw = redactSensitiveText(data?.error?.message || data?.message || data?.error || "").trim();
-  if (status === 401 || status === 403) return "Gemini rejected the request. Add or check the Gemini API key.";
-  if ((status === 404 || /model/i.test(raw)) && model) return `Model ${model} was not found by Gemini.`;
-  return raw || `Gemini request failed with status ${status}.`;
-}
-
-async function geminiJson(endpoint, options = {}, config = {}) {
-  const url = geminiApiUrl(config.baseUrl || GEMINI_DEFAULT_BASE_URL, endpoint);
-  let result = null;
-  try {
-    result = await fetchJsonWithTimeout(url, options, config);
-  } catch (error) {
-    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
-    throw new Error(`Gemini is not reachable at ${normalizeGeminiBaseUrl(config.baseUrl || GEMINI_DEFAULT_BASE_URL)}.`);
-  }
-  if (!result.response?.ok) {
-    throw new Error(geminiStatusError(result.data, result.response?.status, config.model));
-  }
-  return result.data;
-}
-
-function extractGeminiResponseText(data) {
-  if (typeof data?.output_text === "string") return data.output_text;
-  if (typeof data?.text === "string") return data.text;
-  const stepsText = Array.isArray(data?.steps)
-    ? data.steps.flatMap((step) => {
-      if (typeof step?.output_text === "string") return [step.output_text];
-      const stepType = typeof step?.type === "string" ? step.type : "";
-      if (stepType && !["model_output", "modelOutput", "assistant", "output"].includes(stepType)) return [];
-      const content = Array.isArray(step?.content) ? step.content : [];
-      const contentText = content.map((part) => {
-        if (typeof part === "string") return part;
-        return typeof part?.text === "string" ? part.text : "";
-      }).filter(Boolean);
-      if (contentText.length) return contentText;
-      const parts = Array.isArray(step?.content?.parts) ? step.content.parts : [];
-      return parts.map((part) => part?.text).filter((text) => typeof text === "string");
-    }).join("")
-    : "";
-  if (stepsText) return stepsText;
-  const candidateParts = Array.isArray(data?.candidates?.[0]?.content?.parts)
-    ? data.candidates[0].content.parts.map((part) => part?.text).filter((text) => typeof text === "string").join("")
-    : "";
-  return candidateParts;
-}
-
-function geminiTokenCount(...values) {
-  for (const value of values) {
-    const number = Number(value);
-    if (Number.isFinite(number)) return number;
-  }
-  return 0;
-}
-
-const GeminiProvider = {
-  id: "gemini",
-  name: "Google Gemini",
-  defaultBaseUrl: GEMINI_DEFAULT_BASE_URL,
-  defaultModel: GEMINI_DEFAULT_MODEL,
-  async testConnection(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(geminiProviderAuthError());
-    const baseUrl = normalizeGeminiBaseUrl(config.baseUrl || GEMINI_DEFAULT_BASE_URL);
-    const data = await geminiJson("/models", { method: "GET", headers: geminiAuthHeaders(config) }, { ...config, baseUrl });
-    return {
-      ok: true,
-      provider: "Google Gemini",
-      baseUrl,
-      modelCount: Array.isArray(data?.models) ? data.models.length : 0
-    };
-  },
-  async listModels(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(geminiProviderAuthError());
-    const baseUrl = normalizeGeminiBaseUrl(config.baseUrl || GEMINI_DEFAULT_BASE_URL);
-    const data = await geminiJson("/models", { method: "GET", headers: geminiAuthHeaders(config) }, { ...config, baseUrl });
-    const models = Array.isArray(data?.models)
-      ? data.models.map((model) => ({
-        name: String(model.name || "").replace(/^models\//, "").trim(),
-        size: 0,
-        modifiedAt: model.updateTime || model.version || ""
-      })).filter((model) => model.name)
-      : [];
-    return { models, raw: data };
-  },
-  async translateSegment(config = {}, request = {}) {
-    const settings = defaultLocalAiSettings({ ...config, providerId: "gemini", model: config.model || request.model }, request.project);
-    const baseUrl = normalizeGeminiBaseUrl(config.baseUrl || settings.baseUrl || GEMINI_DEFAULT_BASE_URL);
-    const model = String(config.model || request.model || settings.model || GEMINI_DEFAULT_MODEL).replace(/^models\//, "").trim() || GEMINI_DEFAULT_MODEL;
-    const sourceText = String(request.text ?? request.segment?.source ?? "");
-    if (!sourceText.trim()) throw new Error("The segment has no source text.");
-    if (!String(config.apiKey || "").trim()) throw new Error(geminiProviderAuthError());
-    const prompt = request.prompt || buildTranslateGemmaPrompt({
-      sourceLanguage: request.sourceLanguage || settings.sourceLanguage,
-      sourceCode: request.sourceCode || settings.sourceCode,
-      targetLanguage: request.targetLanguage || settings.targetLanguage,
-      targetCode: request.targetCode || settings.targetCode,
-      text: sourceText,
-      segment: request.segment,
-      glossaryTerms: request.glossaryTerms,
-      tmMatches: request.tmMatches,
-      surroundingSegments: request.surroundingSegments
-    });
-    const startedAt = localAiStartedAt();
-    const data = await geminiJson("/interactions", {
-      method: "POST",
-      headers: geminiAuthHeaders(config, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        model,
-        input: prompt,
-        stream: false,
-        store: false,
-        system_instruction: "You are a professional translation assistant inside LoopCAT. Produce only the requested target-language translation for one CAT-tool segment.",
-        generation_config: {
-          temperature: 0.1
-        }
-      })
-    }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-    const rawOutput = extractGeminiResponseText(data);
-    if (typeof rawOutput !== "string") throw new Error("Gemini returned a malformed response.");
-    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
-    if (!translatedText.trim()) throw new Error("Gemini returned an empty translation for this segment.");
-    return {
-      translatedText,
-      rawOutput,
-      provider: "Google Gemini",
-      providerId: "gemini",
-      model,
-      durationMs: requestDurationMs(startedAt),
-      prompt,
-      metadata: {
-        promptTokens: geminiTokenCount(data?.usage?.total_input_tokens, data?.usage?.promptTokenCount, data?.usageMetadata?.promptTokenCount, data?.usage_metadata?.prompt_token_count),
-        outputTokens: geminiTokenCount(data?.usage?.total_output_tokens, data?.usage?.responseTokenCount, data?.usageMetadata?.candidatesTokenCount, data?.usage_metadata?.candidates_token_count),
-        totalTokens: geminiTokenCount(data?.usage?.total_tokens, data?.usage?.totalTokenCount, data?.usageMetadata?.totalTokenCount, data?.usage_metadata?.total_token_count)
-      }
-    };
-  }
-};
-
 function anthropicProviderAuthError() {
   return "Add an Anthropic API key before using Claude for pre-translation.";
 }
@@ -2462,6 +2320,8 @@ function genericPromptResult(provider, providerId, model, prompt, rawOutput, sta
 const providerAdapterRuntime = Object.freeze({
   OPENAI_DEFAULT_BASE_URL,
   OPENAI_DEFAULT_MODEL,
+  GEMINI_DEFAULT_BASE_URL,
+  GEMINI_DEFAULT_MODEL,
   XAI_DEFAULT_BASE_URL,
   XAI_DEFAULT_MODEL,
   PERPLEXITY_DEFAULT_BASE_URL,
@@ -2490,9 +2350,11 @@ const providerAdapterRuntime = Object.freeze({
   cleanModelTranslationOutput,
   defaultLocalAiSettings,
   fetchJsonWithTimeout,
+  geminiAuthHeaders,
   genericPromptResult,
   genericPromptSystem,
   openAiApiUrl,
+  geminiApiUrl,
   xAiApiUrl,
   perplexityApiUrl,
   azureOpenAiApiUrl,
@@ -2506,6 +2368,7 @@ const providerAdapterRuntime = Object.freeze({
   fireworksApiUrl,
   localAiStartedAt,
   normalizeOpenAiBaseUrl,
+  normalizeGeminiBaseUrl,
   normalizeXAiBaseUrl,
   normalizePerplexityBaseUrl,
   normalizeAzureOpenAiBaseUrl,
@@ -2547,32 +2410,6 @@ OllamaProvider.completePrompt = async function completePrompt(config = {}, reque
     totalDuration: data.total_duration || 0,
     promptEvalCount: data.prompt_eval_count || 0,
     evalCount: data.eval_count || 0
-  });
-};
-
-GeminiProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
-  const settings = defaultLocalAiSettings({ ...config, providerId: "gemini", model: config.model || request.model }, request.project);
-  const baseUrl = normalizeGeminiBaseUrl(config.baseUrl || settings.baseUrl || GEMINI_DEFAULT_BASE_URL);
-  const model = String(config.model || request.model || settings.model || GEMINI_DEFAULT_MODEL).replace(/^models\//, "").trim() || GEMINI_DEFAULT_MODEL;
-  if (!String(config.apiKey || "").trim()) throw new Error(geminiProviderAuthError());
-  const prompt = promptTextOrThrow(request);
-  const startedAt = localAiStartedAt();
-  const data = await geminiJson("/interactions", {
-    method: "POST",
-    headers: geminiAuthHeaders(config, { "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      model,
-      input: prompt,
-      stream: false,
-      store: false,
-      system_instruction: request.system || genericPromptSystem(),
-      generation_config: { temperature: 0.1 }
-    })
-  }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-  return genericPromptResult("Google Gemini", "gemini", model, prompt, extractGeminiResponseText(data), startedAt, {
-    promptTokens: geminiTokenCount(data?.usage?.total_input_tokens, data?.usage?.promptTokenCount, data?.usageMetadata?.promptTokenCount, data?.usage_metadata?.prompt_token_count),
-    outputTokens: geminiTokenCount(data?.usage?.total_output_tokens, data?.usage?.responseTokenCount, data?.usageMetadata?.candidatesTokenCount, data?.usage_metadata?.candidates_token_count),
-    totalTokens: geminiTokenCount(data?.usage?.total_tokens, data?.usage?.totalTokenCount, data?.usageMetadata?.totalTokenCount, data?.usage_metadata?.total_token_count)
   });
 };
 
@@ -2694,7 +2531,7 @@ aiProviderRegistry.reserve("openrouter");
 aiProviderRegistry.reserve("huggingface");
 aiProviderRegistry.reserve("deepinfra");
 aiProviderRegistry.reserve("fireworks");
-aiProviderRegistry.register(GeminiProvider);
+aiProviderRegistry.reserve("gemini");
 aiProviderRegistry.register(AnthropicProvider);
 aiProviderRegistry.register(CohereProvider);
 aiProviderRegistry.reserve("mistral");
@@ -3339,7 +3176,6 @@ window.CatHan.ai = {
   defaultLocalAiSettings,
   localAISettingsStore,
   OllamaProvider,
-  GeminiProvider,
   AnthropicProvider,
   CohereProvider,
   OpenAICompatibleProvider,

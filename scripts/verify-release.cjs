@@ -153,6 +153,7 @@ const requiredReleaseFiles = [
   "src/entry/production.js",
   "src/entry/renderer-bootstrap.js",
   "src/entry/test.js",
+  "src/ai/providers/gemini-provider-adapter.js",
   "src/ai/providers/groq-provider-adapter.js",
   "src/ai/providers/hosted-provider-adapters.js",
   "src/ai/providers/install-extracted-providers.js",
@@ -173,6 +174,7 @@ const requiredReleaseFiles = [
   "src/features/workspace/recovery-workspace-controller.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
+  "tests/unit/gemini-provider-adapter.test.cjs",
   "tests/unit/groq-provider-adapter.test.cjs",
   "tests/unit/hosted-provider-adapters.test.cjs",
   "tests/unit/native-chat-provider-adapters.test.cjs",
@@ -248,6 +250,7 @@ const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-p
 const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
 const aiAdministrationControllerJs = readText("src/features/ai/ai-administration-controller.js");
 const aiAdministrationControllerUnitTests = readText("tests/unit/ai-administration-controller.test.cjs");
+const geminiProviderAdapterJs = readText("src/ai/providers/gemini-provider-adapter.js");
 const groqProviderAdapterJs = readText("src/ai/providers/groq-provider-adapter.js");
 const hostedProviderAdaptersJs = readText("src/ai/providers/hosted-provider-adapters.js");
 const hostedProviderAdapterCoreJs = readText("src/ai/providers/openai-compatible-hosted-provider-adapter.js");
@@ -256,6 +259,7 @@ const nativeOpenAiProviderAdaptersJs = readText("src/ai/providers/native-openai-
 const openAiResponsesProviderAdapterJs = readText("src/ai/providers/openai-responses-provider-adapter.js");
 const perplexityProviderAdapterJs = readText("src/ai/providers/perplexity-provider-adapter.js");
 const extractedProviderInstallerJs = readText("src/ai/providers/install-extracted-providers.js");
+const geminiProviderAdapterUnitTests = readText("tests/unit/gemini-provider-adapter.test.cjs");
 const groqProviderAdapterUnitTests = readText("tests/unit/groq-provider-adapter.test.cjs");
 const hostedProviderAdaptersUnitTests = readText("tests/unit/hosted-provider-adapters.test.cjs");
 const nativeChatProviderAdaptersUnitTests = readText("tests/unit/native-chat-provider-adapters.test.cjs");
@@ -2396,24 +2400,18 @@ assert(
 );
 assertIncludes(indexHtml, `object-src 'none'`, "Content Security Policy must disable plugin/object content.");
 const openAiHelperFunction = functionBody(aiJs, "async function openAiSuggestion(", "window.CatHan =");
-const geminiResponseParserFunction = functionBody(
-  aiJs,
-  "function extractGeminiResponseText",
-  "function geminiTokenCount"
-);
 const defaultLocalAiSettingsFunction = functionBody(
   aiJs,
   "function defaultLocalAiSettings",
   "function readLocalAiSettings"
 );
-const geminiProviderFunction = functionBody(aiJs, "const GeminiProvider = {", "function openAiCompatibleStatusError");
 const anthropicProviderFunction = functionBody(
   aiJs,
   "const AnthropicProvider = {",
   "function openAiCompatibleStatusError"
 );
 const cohereProviderFunction = functionBody(aiJs, "const CohereProvider = {", "function openAiCompatibleStatusError");
-const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function geminiProviderAuthError");
+const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function anthropicProviderAuthError");
 assertIncludes(
   aiJs,
   `const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"`,
@@ -2504,7 +2502,6 @@ assertIncludes(
   `const OPUS_CAT_WEB_BRIDGE_BASE_URL = "http://127.0.0.1:8502"`,
   "ai.js must keep the OPUS-CAT browser bridge URL centralized."
 );
-assertIncludes(aiJs, "const GeminiProvider = {", "ai.js must implement the native Gemini provider.");
 for (const provider of [
   ["deepseek", "DeepSeekProvider", "DeepSeek"],
   ["mistral", "MistralProvider", "Mistral AI"]
@@ -2557,17 +2554,61 @@ assertIncludes(
   "preserve multipart parsing, payloads, aborts, provenance, and token metadata",
   "Native chat adapters must retain focused parsing, request, abort, provenance, and token characterization."
 );
-assertIncludes(aiJs, "geminiAuthHeaders", "ai.js must send Gemini API keys in headers, not query strings.");
+assertIncludes(aiJs, '"x-goog-api-key"', "The Gemini runtime must send API keys in headers, not query strings.");
+assertIncludes(
+  geminiProviderAdapterJs,
+  "geminiAuthHeaders",
+  "The Gemini adapter must use the checked header-auth boundary."
+);
 assertIncludes(aiJs, "geminiApiUrl", "ai.js must normalize Gemini model-list and interaction endpoints.");
 assertIncludes(
-  geminiProviderFunction,
-  "store: false",
-  "ai.js Gemini Interactions requests must opt out of provider-side storage."
+  defaultLocalAiSettingsFunction,
+  'providerId === "gemini"',
+  "ai.js must preserve Gemini's provider-specific default settings."
 );
 assertIncludes(
-  geminiResponseParserFunction,
+  geminiProviderAdapterJs,
+  "store: false",
+  "The checked Gemini adapter must opt out of provider-side storage."
+);
+assertIncludes(
+  geminiProviderAdapterJs,
   "Array.isArray(step?.content)",
-  "ai.js Gemini response parser must read documented Interactions step content."
+  "The checked Gemini response parser must read documented Interactions step content."
+);
+assertIncludes(
+  geminiProviderAdapterJs,
+  '"/interactions"',
+  "The checked Gemini adapter must use the native Interactions endpoint."
+);
+assertIncludes(
+  geminiProviderAdapterJs,
+  "async completePrompt",
+  "The checked Gemini adapter must route AI-native commands through Interactions."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installGeminiProviderAdapter",
+  "The extracted-provider installer must register the native Gemini provider."
+);
+assertIncludes(
+  aiJs,
+  'aiProviderRegistry.reserve("gemini")',
+  "The legacy registry must preserve Gemini's provider order while its adapter installs."
+);
+assertIncludes(
+  geminiProviderAdapterJs,
+  "ai.GeminiProvider = provider",
+  "The Gemini adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  geminiProviderAdapterUnitTests,
+  "preserves Interactions translation payload, abort, step parsing, provenance, and token metadata",
+  "The Gemini adapter must retain focused payload, abort, parsing, provenance, and token characterization."
+);
+assert(
+  !aiJs.includes("const GeminiProvider = {") && !aiJs.includes("function geminiProviderAuthError"),
+  "ai.js must not retain the extracted Gemini provider implementation."
 );
 assertIncludes(aiJs, "const AnthropicProvider = {", "ai.js must implement the native Anthropic provider.");
 assertIncludes(aiJs, "anthropicAuthHeaders", "ai.js must send Anthropic API keys in headers, not query strings.");
@@ -2984,6 +3025,11 @@ assertIncludes(
   regressionHtml,
   'providerIds.indexOf("fireworks") === providerIds.indexOf("deepinfra") + 1',
   "The regression harness must preserve the complete hosted-provider family order."
+);
+assertIncludes(
+  regressionHtml,
+  'providerIds.indexOf("gemini") === providerIds.indexOf("fireworks") + 1',
+  "The regression harness must preserve Gemini's original provider order."
 );
 assertIncludes(
   regressionHtml,

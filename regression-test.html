@@ -4373,8 +4373,33 @@
           targetLanguage: "Turkish",
           targetCode: "tr"
         });
+        let geminiPromptRequest = null;
+        const geminiPromptResult = await geminiProvider.completePrompt({
+          baseUrl: "https://generativelanguage.googleapis.com",
+          apiKey: "gemini-api-key",
+          model: "models/gemini-3.5-flash",
+          fetchImpl: async (url, options = {}) => {
+            geminiPromptRequest = {
+              url: String(url),
+              apiKey: options.headers?.["x-goog-api-key"] || "",
+              body: JSON.parse(String(options.body || "{}"))
+            };
+            return {
+              ok: true,
+              json: async () => ({
+                candidates: [{ content: { parts: [{ text: "Gemini QA note" }] } }],
+                usageMetadata: { promptTokenCount: 6, candidatesTokenCount: 3, totalTokenCount: 9 }
+              })
+            };
+          }
+        }, {
+          prompt: "Check this translation.",
+          system: "You are a translation QA assistant.",
+          project: null
+        });
         assert(
-          window.CatHan.ai.geminiApiUrl("https://generativelanguage.googleapis.com", "/models") === "https://generativelanguage.googleapis.com/v1beta/models" &&
+          window.CatHan.ai.GeminiProvider === geminiProvider &&
+            window.CatHan.ai.geminiApiUrl("https://generativelanguage.googleapis.com", "/models") === "https://generativelanguage.googleapis.com/v1beta/models" &&
             geminiModelsRequest?.url === "https://generativelanguage.googleapis.com/v1beta/models" &&
             geminiModelsRequest.apiKey === "gemini-api-key" &&
             geminiModels.models[0].name === "gemini-3.5-flash" &&
@@ -4387,6 +4412,14 @@
             geminiPretranslateRequest.body.generation_config.temperature === 0.1 &&
             geminiPretranslation.translatedText === "Merhaba Gemini." &&
             geminiPretranslation.metadata.totalTokens === 18 &&
+            geminiPromptRequest?.url === "https://generativelanguage.googleapis.com/v1beta/interactions" &&
+            geminiPromptRequest.apiKey === "gemini-api-key" &&
+            geminiPromptRequest.body.model === "gemini-3.5-flash" &&
+            geminiPromptRequest.body.system_instruction === "You are a translation QA assistant." &&
+            geminiPromptRequest.body.store === false &&
+            geminiPromptResult.text === "Gemini QA note" &&
+            geminiPromptResult.providerId === "gemini" &&
+            geminiPromptResult.metadata.totalTokens === 9 &&
             window.CatHan.ai.localAiProviderNeedsApiKey("gemini", "https://generativelanguage.googleapis.com/v1beta") &&
             window.CatHan.ai.localAiProviderSharesExternally("gemini", "https://generativelanguage.googleapis.com/v1beta"),
           "Gemini provider lists models and pretranslates through Interactions with header auth and storage disabled"
@@ -4908,6 +4941,8 @@
             providerIds.indexOf("huggingface") === providerIds.indexOf("openrouter") + 1 &&
             providerIds.indexOf("deepinfra") === providerIds.indexOf("huggingface") + 1 &&
             providerIds.indexOf("fireworks") === providerIds.indexOf("deepinfra") + 1 &&
+            providerIds.indexOf("gemini") === providerIds.indexOf("fireworks") + 1 &&
+            providerIds.indexOf("anthropic") === providerIds.indexOf("gemini") + 1 &&
             providerIds.indexOf("azure-openai") === providerIds.indexOf("mistral") + 1 &&
             providerIds.indexOf("openai-compatible") === providerIds.indexOf("azure-openai") + 1 &&
             window.CatHan.ai.localAiProviderPresetForSettings({ providerId: "groq", baseUrl: "https://api.groq.com" })?.id === "groq" &&
