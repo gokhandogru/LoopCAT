@@ -1399,6 +1399,51 @@ const resourcesController = appRuntime?.featureFactories?.createResourcesControl
   onError: (error) => setSaveStatus(error?.message || "Resource action failed.", "dirty")
 });
 resourcesController?.mount?.();
+const qualityReviewController = appRuntime?.featureFactories?.createQualityReviewController?.({
+  elements: {
+    reviewForm: els.reviewForm,
+    reviewStateSelect: els.reviewStateSelect,
+    reviewNoteInput: els.reviewNoteInput,
+    reviewCommentInput: els.reviewCommentInput,
+    reviewCommentsList: els.reviewCommentsList,
+    qualityForm: els.qualityForm,
+    qualityStandardSelect: els.qualityStandardSelect,
+    qualityReviewDepthSelect: els.qualityReviewDepthSelect,
+    qualityRiskToleranceSelect: els.qualityRiskToleranceSelect,
+    qualityTerminologyStrictnessSelect: els.qualityTerminologyStrictnessSelect,
+    qualityAiDisclosureSelect: els.qualityAiDisclosureSelect,
+    qualityAudienceInput: els.qualityAudienceInput,
+    qualityToneInput: els.qualityToneInput,
+    qualitySummary: els.qualitySummary,
+    qualityActiveEvidence: els.qualityActiveEvidence,
+    qualityDecisionForm: els.qualityDecisionForm,
+    qualityIssueCategorySelect: els.qualityIssueCategorySelect,
+    qualityIssueSeveritySelect: els.qualityIssueSeveritySelect,
+    qualityDecisionNoteInput: els.qualityDecisionNoteInput,
+    saveQualityDecisionBtn: els.saveQualityDecisionBtn,
+    refreshQualityRiskBtn: els.refreshQualityRiskBtn,
+    nextQualityRiskBtn: els.nextQualityRiskBtn,
+    exportQualityPassportBtn: els.exportQualityPassportBtn,
+    qualityRiskList: els.qualityRiskList
+  },
+  defaultProfile: defaultQualityProfile,
+  source: uiSource,
+  label: uiLabel,
+  profileLabel: qualityLabel,
+  categoryLabel: qualityCategoryName,
+  riskLevelLabel: qualityRiskLevelLabel,
+  formatDate,
+  saveReview: saveActiveReviewMetadata,
+  saveProfile: saveQualityProfileFromForm,
+  saveDecision: saveQualityDecisionFromForm,
+  refreshRisks: refreshQualityRiskQueue,
+  nextRisk: goToNextQualityRisk,
+  exportPassport: exportQualityPassport,
+  openRisk: goToQualityRiskItem,
+  scheduleFrame: requestAnimationFrame,
+  onError: (error) => setSaveStatus(error?.message || "Quality or review action failed.", "dirty")
+});
+qualityReviewController?.mount?.();
 dialogLifecycleController?.mount?.();
 
 function uiT(key, values = {}) {
@@ -7173,54 +7218,8 @@ async function refreshSidebar() {
   await Promise.all([refreshTmMatches(), refreshTerms()]);
 }
 
-function renderReviewPanel() {
-  if (!els.reviewForm) return;
-  const segment = currentSegment();
-  if (!segment) {
-    els.reviewStateSelect.value = "";
-    els.reviewNoteInput.value = "";
-    els.reviewCommentInput.value = "";
-    els.reviewCommentsList.replaceChildren();
-    els.reviewForm.classList.add("empty-review");
-    return;
-  }
-  els.reviewForm.classList.remove("empty-review");
-  els.reviewStateSelect.value = segment.reviewState || "";
-  els.reviewNoteInput.value = segment.reviewNote || "";
-  els.reviewCommentInput.value = "";
-  const comments = segment.comments || [];
-  replaceSafeHtml(els.reviewCommentsList, comments.length
-    ? comments.map((comment) => `
-      <article class="comment-card">
-        <header><strong>${escapeHtml(uiSource(comment.state || "open"))}</strong><span>${escapeHtml(formatDate(comment.updatedAt || comment.createdAt))}</span></header>
-        <div>${escapeHtml(comment.body)}</div>
-      </article>
-    `).join("")
-    : `<div class="muted">${uiLabelHtml("noStructuredComments")}</div>`);
-}
-
-function qualityProfileFromForm() {
-  return defaultQualityProfile({
-    standard: els.qualityStandardSelect?.value,
-    reviewDepth: els.qualityReviewDepthSelect?.value,
-    riskTolerance: els.qualityRiskToleranceSelect?.value,
-    terminologyStrictness: els.qualityTerminologyStrictnessSelect?.value,
-    aiDisclosure: els.qualityAiDisclosureSelect?.value,
-    audience: els.qualityAudienceInput?.value,
-    tone: els.qualityToneInput?.value
-  });
-}
-
-function renderQualityProfileForm() {
-  if (!els.qualityForm || !state.project) return;
-  const profile = defaultQualityProfile(state.project.qualityProfile);
-  els.qualityStandardSelect.value = profile.standard;
-  els.qualityReviewDepthSelect.value = profile.reviewDepth;
-  els.qualityRiskToleranceSelect.value = profile.riskTolerance;
-  els.qualityTerminologyStrictnessSelect.value = profile.terminologyStrictness;
-  els.qualityAiDisclosureSelect.value = profile.aiDisclosure;
-  els.qualityAudienceInput.value = profile.audience || "";
-  els.qualityToneInput.value = profile.tone || "";
+function renderReviewPanel(options = {}) {
+  qualityReviewController?.renderReview?.({ segment: currentSegment(), force: Boolean(options.force) });
 }
 
 function qualityLabel(value) {
@@ -7322,99 +7321,28 @@ function activeQualityEvidence(queue = null) {
   });
 }
 
-function renderQualityActiveEvidence(queue) {
-  if (!els.qualityActiveEvidence || !els.qualityDecisionForm) return;
-  const segment = currentSegment();
-  if (!state.project || !segment) {
-    els.qualityActiveEvidence.textContent = uiSource("No active segment.");
-    els.qualityActiveEvidence.classList.add("muted");
-    if (els.saveQualityDecisionBtn) els.saveQualityDecisionBtn.disabled = true;
-    return;
-  }
-  if (els.saveQualityDecisionBtn) els.saveQualityDecisionBtn.disabled = false;
-  const evidence = activeQualityEvidence(queue);
-  const categories = Object.entries(evidence?.categoryCounts || {})
-    .sort((a, b) => b[1] - a[1] || qualityCategoryName(a[0]).localeCompare(qualityCategoryName(b[0])));
-  const categoryPills = categories.length
-    ? categories.map(([category, count]) => `<span class="quality-category-pill">${escapeHtml(qualityCategoryName(category))} ${count}</span>`).join("")
-    : `<span class="quality-category-pill">${translatedSourceHtml("Clear")}</span>`;
-  const reasonItems = (evidence?.reasons || []).slice(0, 4).map((reason) => (
-    `<li>${escapeHtml(qualityCategoryName(reason.category))}: ${escapeHtml(reason.label)}</li>`
-  )).join("");
-  els.qualityActiveEvidence.classList.remove("muted");
-  replaceSafeHtml(els.qualityActiveEvidence, `
-    <header>
-      <strong>#${escapeHtml(String((evidence?.index ?? state.activeIndex) + 1))}</strong>
-      <span>${escapeHtml(qualityRiskLevelLabel(evidence?.level))} ${evidence?.score || 0}</span>
-    </header>
-    <div class="quality-category-row">${categoryPills}</div>
-    ${reasonItems ? `<ul>${reasonItems}</ul>` : `<p class="muted">${uiLabelHtml("noActiveQualitySignals")}</p>`}
-  `);
-}
-
 function renderQualityWorkbench() {
-  if (!els.qualitySummary || !els.qualityRiskList) return;
-  if (!state.project) {
-    els.qualitySummary.textContent = uiSource("No project.");
-    els.qualitySummary.classList.add("muted");
-    els.qualityRiskList.textContent = uiSource("No risk queue yet.");
-    els.qualityRiskList.classList.add("muted");
-    renderQualityActiveEvidence(null);
-    return;
-  }
-  if (!els.qualityForm?.contains(document.activeElement)) renderQualityProfileForm();
-  const queue = state.qualityRiskQueue?.projectId === state.project.id ? state.qualityRiskQueue : currentQualityRiskQueue();
-  state.qualityRiskQueue = queue;
-  const profile = defaultQualityProfile(state.project.qualityProfile);
-  els.qualitySummary.classList.remove("muted");
-  replaceSafeHtml(els.qualitySummary, `
-    <div class="quality-summary-grid">
-      <div><strong>${queue.totalRiskItems}</strong><span>${uiLabelHtml("riskItems")}</span></div>
-      <div><strong>${queue.highRiskCount}</strong><span>${uiLabelHtml("highRisk")}</span></div>
-      <div><strong>${queue.averageScore}</strong><span>${uiLabelHtml("avgRisk")}</span></div>
-    </div>
-    <p>${escapeHtml(qualityLabel(profile.standard))} - ${escapeHtml(qualityLabel(profile.reviewDepth))} - ${escapeHtml(qualityLabel(profile.riskTolerance))}</p>
-  `);
-  renderQualityActiveEvidence(queue);
-  if (!queue.items.length) {
-    els.qualityRiskList.textContent = uiSource("No unresolved quality risks in this scope.");
-    els.qualityRiskList.classList.add("muted");
-    return;
-  }
-  els.qualityRiskList.classList.remove("muted");
-  const fragment = document.createDocumentFragment();
-  queue.items.slice(0, 8).forEach((item) => {
-    const card = document.createElement("article");
-    card.className = `quality-risk-card ${item.level}`;
-    const reasonText = item.reasons.slice(0, 2).map((reason) => reason.label).join(" ");
-    const categoryText = Object.entries(item.categoryCounts || {})
-      .sort((a, b) => b[1] - a[1] || qualityCategoryName(a[0]).localeCompare(qualityCategoryName(b[0])))
-      .map(([category]) => qualityCategoryName(category))
-      .slice(0, 3)
-      .join(", ") || qualityCategoryName(item.category);
-    replaceSafeHtml(card, `
-      <header>
-        <strong>${escapeHtml(qualityRiskLevelLabel(item.level))} ${item.score}</strong>
-        <span>#${escapeHtml(item.label)}</span>
-      </header>
-      <p>${escapeHtml(item.documentName || uiLabel("document"))}</p>
-      <p class="muted">${escapeHtml(categoryText)}: ${escapeHtml(reasonText || uiLabel("riskSignalRecorded"))}</p>
-    `);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = uiLabel("go");
-    button.addEventListener("click", () => goToQualityRiskItem(item));
-    card.append(button);
-    fragment.append(card);
+  const queue = state.project
+    ? state.qualityRiskQueue?.projectId === state.project.id
+      ? state.qualityRiskQueue
+      : currentQualityRiskQueue()
+    : null;
+  if (state.project) state.qualityRiskQueue = queue;
+  qualityReviewController?.renderQuality?.({
+    project: state.project,
+    segment: currentSegment(),
+    activeIndex: state.activeIndex,
+    profile: state.project?.qualityProfile,
+    queue,
+    evidence: activeQualityEvidence(queue)
   });
-  els.qualityRiskList.replaceChildren(fragment);
 }
 
-async function saveQualityProfileFromForm() {
-  if (!state.project || !els.qualityForm) return false;
+async function saveQualityProfileFromForm(values = qualityReviewController?.readProfile?.()) {
+  if (!state.project) return false;
   const previousProject = structuredClone(state.project);
   const previousProjects = state.projects.map((project) => structuredClone(project));
-  const qualityProfile = qualityProfileFromForm();
+  const qualityProfile = defaultQualityProfile(values);
   try {
     state.project = await updateProject({ ...state.project, qualityProfile });
     state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
@@ -7440,14 +7368,14 @@ async function saveQualityProfileFromForm() {
   }
 }
 
-async function saveQualityDecisionFromForm() {
-  if (!state.project || !els.qualityDecisionForm) return false;
+async function saveQualityDecisionFromForm(values = qualityReviewController?.readDecision?.()) {
+  if (!state.project) return false;
   const segment = currentSegment();
   if (!segment) return false;
   const snapshot = structuredClone(segment);
-  const category = qualityDecisionCategory(els.qualityIssueCategorySelect?.value);
-  const severity = qualityDecisionSeverity(els.qualityIssueSeveritySelect?.value);
-  const note = (els.qualityDecisionNoteInput?.value || "").trim();
+  const category = qualityDecisionCategory(values?.category);
+  const severity = qualityDecisionSeverity(values?.severity);
+  const note = String(values?.note || "").trim();
   const decisionTitle = `Quality decision: ${qualityCategoryName(category)} (${qualityDecisionSeverityLabel(severity)})`;
   const now = new Date().toISOString();
   try {
@@ -7466,9 +7394,9 @@ async function saveQualityDecisionFromForm() {
     touchSegment(segment);
     clearPendingSave(segment);
     await saveSegment(segment);
-    if (els.qualityDecisionNoteInput) els.qualityDecisionNoteInput.value = "";
+    qualityReviewController?.clearDecisionNote?.();
     state.qualityRiskQueue = currentQualityRiskQueue();
-    renderReviewPanel();
+    renderReviewPanel({ force: true });
     renderQualityWorkbench();
     updateRow(state.activeIndex);
     markWorkspaceDirty();
@@ -7483,7 +7411,7 @@ async function saveQualityDecisionFromForm() {
     Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
     Object.assign(segment, snapshot);
     prepareSegmentHistoryState(segment);
-    renderReviewPanel();
+    renderReviewPanel({ force: true });
     renderQualityWorkbench();
     updateRow(state.activeIndex);
     setSaveStatus(error.message || "Quality decision save failed", "dirty");
@@ -7588,14 +7516,14 @@ function renderRevisionHistory() {
   `).join(""));
 }
 
-async function saveActiveReviewMetadata() {
+async function saveActiveReviewMetadata(values = qualityReviewController?.readReview?.()) {
   const segment = currentSegment();
-  if (!segment || !els.reviewForm) return;
+  if (!segment) return;
   const snapshot = structuredClone(segment);
   try {
-    segment.reviewState = els.reviewStateSelect.value;
-    segment.reviewNote = els.reviewNoteInput.value.trim();
-    const commentBody = els.reviewCommentInput.value.trim();
+    segment.reviewState = String(values?.reviewState || "");
+    segment.reviewNote = String(values?.reviewNote || "").trim();
+    const commentBody = String(values?.commentBody || "").trim();
     if (commentBody) {
       const now = new Date().toISOString();
       segment.comments = [
@@ -7618,7 +7546,7 @@ async function saveActiveReviewMetadata() {
     } catch (activityError) {
       console.warn("Review activity log failed.", activityError);
     }
-    renderReviewPanel();
+    renderReviewPanel({ force: true });
     updateRow(state.activeIndex);
     markWorkspaceDirty();
     setSaveStatus("Review saved", "saved");
@@ -7626,7 +7554,7 @@ async function saveActiveReviewMetadata() {
     Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
     Object.assign(segment, snapshot);
     prepareSegmentHistoryState(segment);
-    renderReviewPanel();
+    renderReviewPanel({ force: true });
     updateRow(state.activeIndex);
     renderRevisionHistory();
     setSaveStatus(error.message || "Review save failed", "dirty");
@@ -7635,7 +7563,7 @@ async function saveActiveReviewMetadata() {
 
 async function setActiveReviewState(reviewState) {
   const segment = currentSegment();
-  if (!segment || !els.reviewStateSelect) return;
+  if (!state.project || !segment) return;
   const snapshot = structuredClone(segment);
   try {
     const command = appRuntime.commands.createChangeReviewStateCommand({
@@ -7646,7 +7574,7 @@ async function setActiveReviewState(reviewState) {
       applyFirst: async () => {
         segment.reviewState = segment.reviewState === reviewState ? "" : reviewState;
         touchSegment(segment);
-        els.reviewStateSelect.value = segment.reviewState;
+        qualityReviewController?.syncReviewState?.(segment.reviewState);
         clearPendingSave(segment);
         if (LOOPCAT_TEST_BUILD && segment[REVIEW_STATE_SAVE_FAILURE_TEST_FLAG]) {
           throw new Error("Simulated review state save failure");
@@ -13866,21 +13794,6 @@ function wireEvents() {
     event.preventDefault();
     await saveProjectDomainFromForm();
   });
-  els.reviewForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await saveActiveReviewMetadata();
-  });
-  els.qualityForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await saveQualityProfileFromForm();
-  });
-  els.qualityDecisionForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await saveQualityDecisionFromForm();
-  });
-  els.refreshQualityRiskBtn?.addEventListener("click", refreshQualityRiskQueue);
-  els.nextQualityRiskBtn?.addEventListener("click", goToNextQualityRisk);
-  els.exportQualityPassportBtn?.addEventListener("click", exportQualityPassport);
   els.saveAiSettingsBtn?.addEventListener("click", saveAiSettings);
   els.contextualAiTranslateBtn?.addEventListener("click", () => {
     if (els.localAiModeSelect) els.localAiModeSelect.value = "selected";
@@ -15164,14 +15077,19 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.reviewStateSelect.value = "needs-review";
     els.reviewNoteInput.value = "Saved review note";
     els.reviewCommentInput.value = "Saved review comment";
-    await saveActiveReviewMetadata();
+    const reviewSubmitEvent = new Event("submit", { bubbles: true, cancelable: true });
+    const reviewSubmitResult = els.reviewForm.dispatchEvent(reviewSubmitEvent);
+    await waitFor(() => els.saveStatus.textContent === "Review saved", "checked review form submit");
     const savedReviewStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
     assert(
-      els.saveStatus.textContent === "Review saved" &&
+      !reviewSubmitResult &&
+        reviewSubmitEvent.defaultPrevented &&
+        els.saveStatus.textContent === "Review saved" &&
         savedReviewStored?.reviewState === "needs-review" &&
         savedReviewStored?.reviewNote === "Saved review note" &&
-        savedReviewStored?.comments?.some((comment) => comment.body === "Saved review comment"),
-      "review metadata save persists review note and comment"
+        savedReviewStored?.comments?.some((comment) => comment.body === "Saved review comment") &&
+        els.reviewCommentInput.value === "",
+      "checked quality/review controller owns review submit, persistence delegation, and form refresh"
     );
     setHiddenSegmentField(state.segments[segmentIndex], REVIEW_STATE_SAVE_FAILURE_TEST_FLAG, true);
     await setActiveReviewState("reviewed");
@@ -17902,31 +17820,45 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.qualityAiDisclosureSelect.value = "client-approved";
     els.qualityAudienceInput.value = "Workflow client reviewers";
     els.qualityToneInput.value = "Formal";
-    const qualityProfileSaved = await saveQualityProfileFromForm();
+    const qualityProfileSubmitEvent = new Event("submit", { bubbles: true, cancelable: true });
+    const qualityProfileSubmitResult = els.qualityForm.dispatchEvent(qualityProfileSubmitEvent);
+    await waitFor(
+      () => state.project.qualityProfile?.standard === "agency-delivery" && state.project.qualityProfile?.reviewDepth === "lqa",
+      "checked quality profile form submit"
+    );
     assert(
-      qualityProfileSaved &&
+      !qualityProfileSubmitResult &&
+        qualityProfileSubmitEvent.defaultPrevented &&
         state.project.qualityProfile.standard === "agency-delivery" &&
         state.project.qualityProfile.reviewDepth === "lqa" &&
         state.project.qualityProfile.terminologyStrictness === "strict",
-      "quality profile persists project review contract"
+      "checked quality/review controller owns profile submit while domain persistence keeps the review contract"
     );
     state.qualityRiskQueue = currentQualityRiskQueue();
     renderQualityWorkbench();
     assert(
       els.qualitySummary.textContent.includes("risk items") &&
-        els.qualityRiskList.textContent.length > 0,
-      "quality workbench renders risk summary"
+        els.qualityRiskList.textContent.length > 0 &&
+        qualityReviewController.getState().projectId === state.project.id &&
+        qualityReviewController.getState().segmentId === currentSegment()?.id &&
+        qualityReviewController.getState().riskCount === state.qualityRiskQueue.totalRiskItems,
+      "checked quality/review controller owns workbench rendering and redacted view state"
     );
     const qualityDecisionSegment = currentSegment();
     const qualityDecisionCommentCount = qualityDecisionSegment?.comments?.length || 0;
     els.qualityIssueCategorySelect.value = "accuracy";
     els.qualityIssueSeveritySelect.value = "high";
     els.qualityDecisionNoteInput.value = "Quality evidence note";
-    const qualityDecisionSaved = await saveQualityDecisionFromForm();
+    const qualityDecisionSubmitEvent = new Event("submit", { bubbles: true, cancelable: true });
+    const qualityDecisionSubmitResult = els.qualityDecisionForm.dispatchEvent(qualityDecisionSubmitEvent);
+    await waitFor(
+      () => (currentSegment()?.comments || []).length === qualityDecisionCommentCount + 1,
+      "checked quality decision form submit"
+    );
     const storedQualityDecisionSegment = (await getProjectSegments(project.id)).find((segment) => segment.id === qualityDecisionSegment?.id);
     assert(
-      qualityDecisionSaved,
-      "quality decision save reports success"
+      !qualityDecisionSubmitResult && qualityDecisionSubmitEvent.defaultPrevented,
+      "checked quality/review controller delegates quality decision save"
     );
     assert(
       storedQualityDecisionSegment?.reviewState === "needs-review",

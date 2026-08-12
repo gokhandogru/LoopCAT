@@ -220,6 +220,43 @@ app
       await windowRef.webContents.executeJavaScript("document.querySelector('#projectsViewBtn').click()", true);
       await waitFor("!document.querySelector('#projectsView').classList.contains('hidden')", "Projects return");
 
+      const fixture = JSON.parse(
+        await fs.readFile(path.join(root, "tests", "fixtures", "modernization", "baseline-backup.json"), "utf8")
+      );
+      await windowRef.webContents.executeJavaScript(
+        `window.CatHan.storage.importAllData(${JSON.stringify(fixture)})`,
+        true
+      );
+      await windowRef.reload();
+      await waitFor("document.querySelector('.project-tile button.primary')", "populated accessibility project");
+      await windowRef.webContents.executeJavaScript(
+        "document.querySelector('.project-tile button.primary').click()",
+        true
+      );
+      await waitFor("document.querySelector('.file-card button.primary')", "accessibility project dashboard");
+      await windowRef.webContents.executeJavaScript(
+        "document.querySelector('.file-card button.primary').click()",
+        true
+      );
+      await waitFor("document.querySelector('#segmentBody textarea')", "accessibility translation editor");
+      await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorTabReview').click()", true);
+      await waitFor(
+        "document.querySelector('#inspectorTabReview').getAttribute('aria-selected') === 'true'",
+        "populated review inspector"
+      );
+      await audit("Review comments populated");
+      await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorTabQuality').click()", true);
+      await waitFor(
+        "document.querySelector('#inspectorTabQuality').getAttribute('aria-selected') === 'true'",
+        "populated Quality Workbench"
+      );
+      await audit("Quality Workbench populated");
+      await windowRef.webContents.executeJavaScript("document.querySelector('#projectsViewBtn').click()", true);
+      await waitFor(
+        "!document.querySelector('#projectsView').classList.contains('hidden')",
+        "Projects return after quality audit"
+      );
+
       await windowRef.webContents.executeJavaScript(
         `(() => {
           const opener = document.querySelector("#newProjectBtn");

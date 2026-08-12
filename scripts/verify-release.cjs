@@ -157,10 +157,12 @@ const requiredReleaseFiles = [
   "src/ui/dialog-controller.js",
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
+  "src/features/quality/quality-review-controller.js",
   "src/features/resources/resources-controller.js",
   "src/features/resources/tm-pretranslation-dialog-controller.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
+  "tests/unit/quality-review-controller.test.cjs",
   "tests/unit/resource-trash.test.cjs",
   "tests/unit/resources-controller.test.cjs",
   "scripts/generate-brand-icons.cjs",
@@ -225,6 +227,8 @@ const projectDialogControllerUnitTests = readText("tests/unit/project-dialog-con
 const opusCatHelpControllerJs = readText("src/features/ai/opus-cat-help-controller.js");
 const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-pretranslation-dialog-controller.js");
 const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
+const qualityReviewControllerJs = readText("src/features/quality/quality-review-controller.js");
+const qualityReviewControllerUnitTests = readText("tests/unit/quality-review-controller.test.cjs");
 const resourcesControllerJs = readText("src/features/resources/resources-controller.js");
 const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
 const resourceTrashUnitTests = readText("tests/unit/resource-trash.test.cjs");
@@ -250,6 +254,7 @@ const modernizationBaselineDocs = readText("docs/modernization-baseline.md");
 const modernizationFixture = readJson("tests/fixtures/modernization/baseline-backup.json");
 const bundleContract = readJson("scripts/bundle-contract.json");
 const baselineCaptureScript = readText("scripts/capture-modernization-baseline.cjs");
+const accessibilityVerificationScript = readText("scripts/verify-accessibility.cjs");
 const bundleContractScript = readText("scripts/verify-bundle-contract.cjs");
 const bundleContractSelfTestScript = readText("scripts/verify-bundle-contract-selftest.cjs");
 const productionAssetsScript = readText("config/production-assets.js");
@@ -1050,6 +1055,80 @@ assertIncludes(
   appJs,
   "Resources detail close restores focus to the originating resource card action",
   "the app workflow must characterize visible focus return after closing resource detail."
+);
+assertIncludes(
+  qualityReviewControllerJs,
+  'listen(reviewForm, "submit"',
+  "the checked quality/review controller must own the review form event lifecycle."
+);
+assertIncludes(
+  qualityReviewControllerJs,
+  'listen(qualityForm, "submit"',
+  "the checked quality/review controller must own the quality-profile event lifecycle."
+);
+assertIncludes(
+  qualityReviewControllerJs,
+  'listen(qualityRiskList, "click"',
+  "the checked quality/review controller must delegate dynamic risk navigation from one stable listener."
+);
+assertIncludes(
+  qualityReviewControllerJs,
+  "restoreRiskFocus(activeRiskSegmentId)",
+  "the checked quality/review controller must restore risk-action focus across rendering."
+);
+assert(
+  !qualityReviewControllerJs.includes("innerHTML") && !qualityReviewControllerJs.includes("insertAdjacentHTML"),
+  "the extracted quality/review renderer must build user-visible evidence with safe DOM construction."
+);
+assertIncludes(
+  appJs,
+  "createQualityReviewController",
+  "app.js must compose the checked quality/review controller with injected domain actions."
+);
+assert(
+  !appJs.includes('els.reviewForm?.addEventListener("submit"') &&
+    !appJs.includes('els.qualityForm?.addEventListener("submit"') &&
+    !appJs.includes('els.qualityDecisionForm?.addEventListener("submit"') &&
+    !appJs.includes('els.refreshQualityRiskBtn?.addEventListener("click"') &&
+    !appJs.includes('els.nextQualityRiskBtn?.addEventListener("click"') &&
+    !appJs.includes('els.exportQualityPassportBtn?.addEventListener("click"'),
+  "the migrated quality/review family must not retain superseded static listeners in app.js."
+);
+assert(
+  !functionBody(appJs, "function renderReviewPanel", "function qualityLabel").includes("replaceSafeHtml") &&
+    !functionBody(appJs, "function renderQualityWorkbench", "async function saveQualityProfileFromForm").includes(
+      "createElement"
+    ),
+  "quality/review DOM construction must live in the checked controller rather than app.js."
+);
+assert(
+  !functionBody(appJs, "async function saveQualityProfileFromForm", "async function refreshQualityRiskQueue").includes(
+    ".value"
+  ) &&
+    !functionBody(appJs, "async function saveActiveReviewMetadata", "async function setActiveReviewState").includes(
+      ".value"
+    ),
+  "quality/review domain saves must consume controller values instead of reading form DOM directly."
+);
+assertIncludes(
+  qualityReviewControllerUnitTests,
+  "owns form and action events without owning domain mutations",
+  "focused tests must characterize quality/review event delegation and domain separation."
+);
+assertIncludes(
+  qualityReviewControllerUnitTests,
+  "preserves active form edits and restores risk focus across rendering",
+  "focused tests must characterize quality/review focus and in-progress form preservation."
+);
+assertIncludes(
+  appJs,
+  "checked quality/review controller owns review submit, persistence delegation, and form refresh",
+  "the app workflow must characterize the checked review form in the real application."
+);
+assertIncludes(
+  appJs,
+  "checked quality/review controller owns workbench rendering and redacted view state",
+  "the app workflow must characterize quality rendering through the checked controller."
 );
 assertIncludes(
   indexHtml,
@@ -4845,8 +4924,8 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "review metadata save persists review note and comment",
-  "app workflow test must verify review notes and comments can be saved."
+  "checked quality/review controller owns review submit, persistence delegation, and form refresh",
+  "app workflow test must verify the checked review form saves notes and comments."
 );
 assertIncludes(
   appJs,
@@ -6021,6 +6100,31 @@ assertIncludes(
   baselineCaptureScript,
   'captureState("03", "resource-trash-empty-after-restore")',
   "visual checkpoints must include the actionable empty Trash state after resource restoration."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'captureState("05", "review-comments-inspector")',
+  "visual checkpoints must include the populated Comments inspector at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'captureState("05", "quality-workbench-inspector")',
+  "visual checkpoints must include the populated Quality Workbench at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  "const expectedScreenshotCount = 69;",
+  "the deterministic visual checkpoint count must include quality and review states."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'audit("Review comments populated")',
+  "automated accessibility checks must cover the populated Comments inspector."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'audit("Quality Workbench populated")',
+  "automated accessibility checks must cover the populated Quality Workbench."
 );
 assertIncludes(
   appJs,

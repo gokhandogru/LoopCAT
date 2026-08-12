@@ -49,6 +49,7 @@ import { createAiContextController } from "../features/ai/ai-context-controller.
 import { createOpusCatHelpController } from "../features/ai/opus-cat-help-controller.js";
 import { createTmPretranslationDialogController } from "../features/resources/tm-pretranslation-dialog-controller.js";
 import { createResourcesController } from "../features/resources/resources-controller.js";
+import { createQualityReviewController } from "../features/quality/quality-review-controller.js";
 import {
   asTrustedHtml,
   asTrustedScriptUrl,
@@ -121,6 +122,7 @@ export function createApplicationRuntime({ browserWindow, projectApi, storageApi
       createInspectorController,
       createProjectDialogController,
       createProjectsController,
+      createQualityReviewController,
       createResourcesController,
       createPaletteController,
       createThemeController,

@@ -351,6 +351,19 @@ app
       true
     );
 
+    await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorTabReview').click()", true);
+    await waitFor(
+      "document.querySelector('#inspectorTabReview').getAttribute('aria-selected') === 'true'",
+      "review inspector tab"
+    );
+    await captureState("05", "review-comments-inspector");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorTabQuality').click()", true);
+    await waitFor(
+      "document.querySelector('#inspectorTabQuality').getAttribute('aria-selected') === 'true'",
+      "quality inspector tab"
+    );
+    await captureState("05", "quality-workbench-inspector");
+
     const aiTabState = await windowRef.webContents.executeJavaScript(
       `(() => {
         document.querySelector('#inspectorTabAi').click();
@@ -439,7 +452,7 @@ app
     };
     await fsPromises.writeFile(path.join(outputDir, "baseline.json"), `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 
-    const expectedScreenshotCount = 63;
+    const expectedScreenshotCount = 69;
     if (screenshots.length !== expectedScreenshotCount) {
       throw new Error(`Expected ${expectedScreenshotCount} screenshots, captured ${screenshots.length}.`);
     }

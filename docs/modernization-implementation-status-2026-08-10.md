@@ -16,6 +16,7 @@ This document records what the current working tree implements from the 2026 mod
 - A checked shared dialog-lifecycle controller now owns open, close, native cancel, initial focus, and explicit focus return for About, Diagnostics, Trash, the TM pretranslation threshold prompt, and OPUS-CAT connection help. Feature-local adapters return only user intent: TM matching and provider/network ownership remain in their existing services. TM cancel returns to the visible Segment tools trigger; OPUS-CAT help returns to its visible Project settings entry point. The superseded `showManagedDialog` helper and direct TM/OPUS lifecycle listeners are removed.
 - A checked project-dialog controller owns create/edit mode, asynchronous resource preparation, field and delegated dynamic listeners, workspace-folder interaction, AI-settings deep linking, and lifecycle delegation. The existing domain save service remains the only persistence/validation boundary, and no project/resource/workspace data moved into UI state.
 - A checked Resources controller now owns Resources navigation, TM/termbase tab state and keyboard behavior, view-local resource selection, language-field normalization, import-input lifecycle, card/detail/row event delegation, initial focus, and focus restoration across asynchronous resource refreshes. Existing parsers, storage, exports, validation, linked-project dirtiness, and recovery boundaries remain injected domain services. Empty Resources actions now open the dedicated resource import inputs instead of the project-level import inputs.
+- A checked quality/review controller now owns Comments and Quality Workbench rendering, review/profile/decision form values and event lifecycles, delegated risk navigation, in-progress form preservation, deterministic empty states, and focus restoration across risk-list rendering. Quality scoring, QA, persistence, commands, status/activity, workspace dirtiness, AI review safeguards, and Quality Passport/report generation remain injected domain boundaries.
 - Checked JavaScript/JSDoc, ESLint, Prettier, Stylelint/token enforcement, import-boundary checks, Node focused tests, axe checks, and visual regression checks. Prettier now follows the repository's `.gitattributes` LF contract, so the formatting gate is reproducible on a clean checkout.
 - Explicit app store, navigation, platform, repository, preference, status/job/error, feature-controller, command, palette, theme, layout, update, diagnostics, safe-DOM, and report-template boundaries under `src/`.
 - A quiet semantic design system with restrained surfaces, no persistent blur, semantic light/dark roles, Balanced/Compact density, remembered inspector/layout preferences, and responsive Projects → dashboard → editor layouts.
@@ -35,12 +36,12 @@ This document records what the current working tree implements from the 2026 mod
 
 ## Measured results
 
-- Packaged production JavaScript graph: 2,374,860 bytes across five modules, including both mutually exclusive startup paths.
-- Hosted/desktop initial production `app.js`: 943,832 bytes minified and 251,718 bytes gzip (approximately 245.8 KiB). Its two locale chunks remain lazy.
-- Direct-file web fallback `app-file.js`: 1,187,408 bytes minified and 335,321 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
+- Packaged production JavaScript graph: 2,386,836 bytes across five modules, including both mutually exclusive startup paths.
+- Hosted/desktop initial production `app.js`: 949,629 bytes minified and 253,519 bytes gzip (approximately 247.6 KiB). Its two locale chunks remain lazy.
+- Direct-file web fallback `app-file.js`: 1,193,396 bytes minified and 337,162 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
 - Initial synchronous JavaScript is more than 40% below the recorded approximately 2.62 MB baseline. The roadmap's 250 KB gzip target is met; the 750 KB minified stretch target is not yet met.
-- Visual verification passes 63 deterministic screenshots covering 1440×900, 1366×768, and 1024×768, including Resources TM dashboard/detail, termbase dashboard, populated resource Trash, post-restore empty Trash, the TM threshold and OPUS-CAT help dialogs, light/dark, inspector open/closed, Focus mode, AI, status, and compact-density states.
-- Automated accessibility checks pass the deterministic Projects, Resources translation-memory/termbase empty states, populated resource Trash, New project dialog, About dialog, TM threshold dialog, OPUS-CAT help dialog, and command-palette states with zero blocking findings. This is not a WCAG conformance claim.
+- Visual verification passes 69 deterministic screenshots covering 1440×900, 1366×768, and 1024×768, including populated Comments and Quality Workbench inspectors, Resources TM dashboard/detail, termbase dashboard, populated resource Trash, post-restore empty Trash, the TM threshold and OPUS-CAT help dialogs, light/dark, inspector open/closed, Focus mode, AI, status, and compact-density states.
+- Automated accessibility checks pass the deterministic Projects, Resources translation-memory/termbase empty states, populated resource Trash, populated Comments and Quality Workbench states, New project dialog, About dialog, TM threshold dialog, OPUS-CAT help dialog, and command-palette states with zero blocking findings. This is not a WCAG conformance claim.
 - The full Electron browser suite passes security, offline shell, smoke, regression, application workflow, workspace storage, package round trip, and large-project coverage.
 - The packaged Windows desktop passes artifact inspection, fuse verification, renderer OS sandbox verification, GPU-enabled startup, and the explicit GPU-disabled fallback.
 
@@ -50,16 +51,16 @@ This document records what the current working tree implements from the 2026 mod
 
 The new checked boundaries are active, but `app.js` remains the compatibility coordinator and is still approximately 20,000 source lines, including the isolated workflow-test source section. Production strips the test driver, but the roadmap's source goal of a bootstrap under 300 lines is not met.
 
-The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT help, and Resources slices are complete. Still required before this package is complete:
+The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT help, Resources, and quality/review slices are complete. Still required before this package is complete:
 
-1. Extract quality/review, recovery/workspace, import/export/reports, and the remaining AI UI orchestration one family at a time.
+1. Extract recovery/workspace, import/export/reports, and the remaining AI UI orchestration one family at a time.
 2. Move provider implementations from the `ai.js` façade into independently tested adapters without changing provider behavior or consent rules.
 3. Replace remaining mutable compatibility state with injected repositories/controllers and remove new code's reliance on `window.CatHan`.
 4. Keep each extraction behavior-preserving and run the focused feature suite plus the full browser/release suite at each family boundary.
 
 ### P2-05 — Performance stretch target
 
-Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 193,832 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
+Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 199,629 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
 
 ## Manual and external release gates still required
 
@@ -86,19 +87,19 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 with a behavior-preserving quality/review extraction.
+Continue P1-08 with a behavior-preserving recovery/workspace extraction.
 
 Entry criteria:
 
-- Preserve the quality profile, structured review decisions/comments, QA and category-risk aggregation, segment selection/focus, report/passport outputs, command/status boundaries, AI safeguards, and all storage/package contracts.
-- Characterize quality-workbench rendering, profile persistence, decision save/failure paths, active-segment review-state changes, comments/category/severity metadata, filtering, report aggregation, and keyboard/focus behavior before moving ownership.
-- Extract checked quality/review state and DOM/event ownership behind injected repositories, commands, status/error services, report boundaries, and one owned DOM root. Do not move QA, report generation, AI, or persistence logic into the controller.
+- Preserve workspace manifest version 1, project-package schema 5, database/backup schema 6, dirty-project markers, directory handles, autosave flushes, recovery scanning/import, conflict handling, validation/redaction, and offline/browser/Electron fallbacks.
+- Characterize workspace connection, scan/sync/save, pending-edit flush, dirty-marker recovery, missing/unreadable/invalid packages, project recovery, status/error states, focus, and cancellation before moving ownership.
+- Extract checked recovery/workspace state, rendering, and event lifecycle behind injected workspace storage, repositories, jobs/status, validation, and dialog boundaries. Do not move file-system handles, package parsing, persistence, or recovery policy into the controller.
 - Keep the extraction behavior-preserving: no information-hierarchy or visual redesign in this slice.
 
 Exit criteria:
 
-- Quality/review view state, rendering, delegated events, focus restoration, and cleanup are owned by an explicit checked controller; domain changes still cross the existing command/repository boundaries.
-- Existing quality profiles, review decisions, comments, category/severity evidence, filters, reports, AI provenance, and package/recovery behavior are unchanged under characterization tests.
+- Recovery/workspace view state, rendering, delegated events, focus restoration, and cleanup are owned by an explicit checked controller; domain changes still cross existing workspace-storage, repository, job, validation, and status boundaries.
+- Existing workspace manifests/packages, dirty-marker behavior, autosave flushing, recovery, conflicts, redaction, and offline/browser/Electron behavior are unchanged under characterization tests.
 - Focused controller/state tests, accessibility/visual checks, web/desktop smoke, app workflow, package/workspace round trips, and FULL-SUITE gates pass with no intended visual difference.
 
-After the quality/review family, continue P1-08 with recovery/workspace, import/export/reports, and the remaining AI UI orchestration one behavior-preserving boundary at a time.
+After the recovery/workspace family, continue P1-08 with import/export/reports and the remaining AI UI orchestration one behavior-preserving boundary at a time.
