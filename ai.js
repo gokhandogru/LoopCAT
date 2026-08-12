@@ -1927,129 +1927,6 @@ const OpusCatProvider = {
   }
 };
 
-function deepSeekProviderAuthError() {
-  return "Add a DeepSeek API key before using DeepSeek for pre-translation.";
-}
-
-function deepSeekStatusError(data, status, model = "") {
-  const raw = redactSensitiveText(data?.error?.message || data?.message || data?.error || "").trim();
-  if (status === 401 || status === 403) return "DeepSeek rejected the request. Add or check the DeepSeek API key.";
-  if ((status === 404 || /model/i.test(raw)) && model) return `Model ${model} was not found by DeepSeek.`;
-  return raw || `DeepSeek request failed with status ${status}.`;
-}
-
-async function deepSeekJson(endpoint, options = {}, config = {}) {
-  const url = deepSeekApiUrl(config.baseUrl || DEEPSEEK_DEFAULT_BASE_URL, endpoint);
-  let result = null;
-  try {
-    result = await fetchJsonWithTimeout(url, options, config);
-  } catch (error) {
-    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
-    throw new Error(`DeepSeek is not reachable at ${normalizeDeepSeekBaseUrl(config.baseUrl || DEEPSEEK_DEFAULT_BASE_URL)}.`);
-  }
-  if (!result.response?.ok) {
-    throw new Error(deepSeekStatusError(result.data, result.response?.status, config.model));
-  }
-  return result.data;
-}
-
-function extractDeepSeekResponseText(data) {
-  if (typeof data?.output_text === "string") return data.output_text;
-  if (typeof data?.text === "string") return data.text;
-  const content = data?.choices?.[0]?.message?.content;
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content.map((part) => typeof part === "string" ? part : part?.text || part?.content || "").join("").trim();
-  }
-  return "";
-}
-
-const DeepSeekProvider = {
-  id: "deepseek",
-  name: "DeepSeek",
-  defaultBaseUrl: DEEPSEEK_DEFAULT_BASE_URL,
-  defaultModel: DEEPSEEK_DEFAULT_MODEL,
-  async testConnection(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(deepSeekProviderAuthError());
-    const baseUrl = normalizeDeepSeekBaseUrl(config.baseUrl || DEEPSEEK_DEFAULT_BASE_URL);
-    const data = await deepSeekJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    return {
-      ok: true,
-      provider: "DeepSeek",
-      baseUrl,
-      modelCount: Array.isArray(data?.data) ? data.data.length : 0
-    };
-  },
-  async listModels(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(deepSeekProviderAuthError());
-    const baseUrl = normalizeDeepSeekBaseUrl(config.baseUrl || DEEPSEEK_DEFAULT_BASE_URL);
-    const data = await deepSeekJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    const models = Array.isArray(data?.data)
-      ? data.data.map((model) => {
-        const created = Number(model.created);
-        return {
-          name: String(model.id || model.name || "").trim(),
-          size: 0,
-          modifiedAt: Number.isFinite(created) ? new Date(created * 1000).toISOString() : ""
-        };
-      }).filter((model) => model.name)
-      : [];
-    return { models, raw: data };
-  },
-  async translateSegment(config = {}, request = {}) {
-    const settings = defaultLocalAiSettings({ ...config, providerId: "deepseek", model: config.model || request.model }, request.project);
-    const baseUrl = normalizeDeepSeekBaseUrl(config.baseUrl || settings.baseUrl || DEEPSEEK_DEFAULT_BASE_URL);
-    const model = String(config.model || request.model || settings.model || DEEPSEEK_DEFAULT_MODEL).trim() || DEEPSEEK_DEFAULT_MODEL;
-    const sourceText = String(request.text ?? request.segment?.source ?? "");
-    if (!sourceText.trim()) throw new Error("The segment has no source text.");
-    if (!String(config.apiKey || "").trim()) throw new Error(deepSeekProviderAuthError());
-    const prompt = request.prompt || buildTranslateGemmaPrompt({
-      sourceLanguage: request.sourceLanguage || settings.sourceLanguage,
-      sourceCode: request.sourceCode || settings.sourceCode,
-      targetLanguage: request.targetLanguage || settings.targetLanguage,
-      targetCode: request.targetCode || settings.targetCode,
-      text: sourceText,
-      segment: request.segment,
-      glossaryTerms: request.glossaryTerms,
-      tmMatches: request.tmMatches,
-      surroundingSegments: request.surroundingSegments
-    });
-    const startedAt = localAiStartedAt();
-    const data = await deepSeekJson("/chat/completions", {
-      method: "POST",
-      headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: "You are a professional translation assistant inside LoopCAT. Produce only the requested target-language translation for one CAT-tool segment." },
-          { role: "user", content: prompt }
-        ],
-        stream: false,
-        temperature: 0.1,
-        max_tokens: 1200
-      })
-    }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-    const rawOutput = extractDeepSeekResponseText(data);
-    if (typeof rawOutput !== "string") throw new Error("DeepSeek returned a malformed chat response.");
-    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
-    if (!translatedText.trim()) throw new Error("DeepSeek returned an empty translation for this segment.");
-    return {
-      translatedText,
-      rawOutput,
-      provider: "DeepSeek",
-      providerId: "deepseek",
-      model,
-      durationMs: requestDurationMs(startedAt),
-      prompt,
-      metadata: {
-        promptTokens: data?.usage?.prompt_tokens || 0,
-        completionTokens: data?.usage?.completion_tokens || 0,
-        totalTokens: data?.usage?.total_tokens || 0
-      }
-    };
-  }
-};
-
 function perplexityProviderAuthError() {
   return "Add a Perplexity API key before using Perplexity Sonar for pre-translation.";
 }
@@ -2589,133 +2466,6 @@ const CohereProvider = {
   }
 };
 
-function mistralProviderAuthError() {
-  return "Add a Mistral API key before using Mistral for pre-translation.";
-}
-
-function mistralStatusError(data, status, model = "") {
-  const raw = redactSensitiveText(data?.error?.message || data?.message || data?.error || "").trim();
-  if (status === 401 || status === 403) return "Mistral rejected the request. Add or check the Mistral API key.";
-  if ((status === 404 || /model/i.test(raw)) && model) return `Model ${model} was not found by Mistral.`;
-  return raw || `Mistral request failed with status ${status}.`;
-}
-
-async function mistralJson(endpoint, options = {}, config = {}) {
-  const url = mistralApiUrl(config.baseUrl || MISTRAL_DEFAULT_BASE_URL, endpoint);
-  let result = null;
-  try {
-    result = await fetchJsonWithTimeout(url, options, config);
-  } catch (error) {
-    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
-    throw new Error(`Mistral is not reachable at ${normalizeMistralBaseUrl(config.baseUrl || MISTRAL_DEFAULT_BASE_URL)}.`);
-  }
-  if (!result.response?.ok) {
-    throw new Error(mistralStatusError(result.data, result.response?.status, config.model));
-  }
-  return result.data;
-}
-
-function extractMistralResponseText(data) {
-  if (typeof data?.output_text === "string") return data.output_text;
-  if (typeof data?.text === "string") return data.text;
-  if (typeof data?.choices?.[0]?.message?.content === "string") return data.choices[0].message.content;
-  const content = Array.isArray(data?.choices?.[0]?.message?.content) ? data.choices[0].message.content : [];
-  return content.map((part) => {
-    if (typeof part === "string") return part;
-    if (part?.type && part.type !== "text") return "";
-    return typeof part?.text === "string" ? part.text : "";
-  }).filter(Boolean).join("");
-}
-
-const MistralProvider = {
-  id: "mistral",
-  name: "Mistral AI",
-  defaultBaseUrl: MISTRAL_DEFAULT_BASE_URL,
-  defaultModel: MISTRAL_DEFAULT_MODEL,
-  async testConnection(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(mistralProviderAuthError());
-    const baseUrl = normalizeMistralBaseUrl(config.baseUrl || MISTRAL_DEFAULT_BASE_URL);
-    const data = await mistralJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    return {
-      ok: true,
-      provider: "Mistral AI",
-      baseUrl,
-      modelCount: Array.isArray(data?.data) ? data.data.length : 0
-    };
-  },
-  async listModels(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(mistralProviderAuthError());
-    const baseUrl = normalizeMistralBaseUrl(config.baseUrl || MISTRAL_DEFAULT_BASE_URL);
-    const data = await mistralJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    const models = Array.isArray(data?.data)
-      ? data.data.map((model) => {
-        const created = Number(model.created);
-        return {
-          name: String(model.id || model.name || "").trim(),
-          size: model.size || 0,
-          modifiedAt: model.updated || model.updated_at || model.created_at || (Number.isFinite(created) ? new Date(created * 1000).toISOString() : "")
-        };
-      }).filter((model) => model.name)
-      : [];
-    return { models, raw: data };
-  },
-  async translateSegment(config = {}, request = {}) {
-    const settings = defaultLocalAiSettings({ ...config, providerId: "mistral", model: config.model || request.model }, request.project);
-    const baseUrl = normalizeMistralBaseUrl(config.baseUrl || settings.baseUrl || MISTRAL_DEFAULT_BASE_URL);
-    const model = String(config.model || request.model || settings.model || MISTRAL_DEFAULT_MODEL).trim() || MISTRAL_DEFAULT_MODEL;
-    const sourceText = String(request.text ?? request.segment?.source ?? "");
-    if (!sourceText.trim()) throw new Error("The segment has no source text.");
-    if (!String(config.apiKey || "").trim()) throw new Error(mistralProviderAuthError());
-    const prompt = request.prompt || buildTranslateGemmaPrompt({
-      sourceLanguage: request.sourceLanguage || settings.sourceLanguage,
-      sourceCode: request.sourceCode || settings.sourceCode,
-      targetLanguage: request.targetLanguage || settings.targetLanguage,
-      targetCode: request.targetCode || settings.targetCode,
-      text: sourceText,
-      segment: request.segment,
-      glossaryTerms: request.glossaryTerms,
-      tmMatches: request.tmMatches,
-      surroundingSegments: request.surroundingSegments
-    });
-    const startedAt = localAiStartedAt();
-    const data = await mistralJson("/chat/completions", {
-      method: "POST",
-      headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content: "You are a professional translation assistant inside LoopCAT. Produce only the requested target-language translation for one CAT-tool segment."
-          },
-          { role: "user", content: prompt }
-        ],
-        stream: false,
-        temperature: 0.1,
-        max_tokens: 1200
-      })
-    }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-    const rawOutput = extractMistralResponseText(data);
-    if (typeof rawOutput !== "string") throw new Error("Mistral returned a malformed chat response.");
-    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
-    if (!translatedText.trim()) throw new Error("Mistral returned an empty translation for this segment.");
-    return {
-      translatedText,
-      rawOutput,
-      provider: "Mistral AI",
-      providerId: "mistral",
-      model,
-      durationMs: requestDurationMs(startedAt),
-      prompt,
-      metadata: {
-        promptTokens: data?.usage?.prompt_tokens || 0,
-        completionTokens: data?.usage?.completion_tokens || 0,
-        totalTokens: data?.usage?.total_tokens || 0
-      }
-    };
-  }
-};
-
 function openAiCompatibleStatusError(data, status, model = "") {
   const raw = redactSensitiveText(data?.error?.message || data?.message || data?.error || "").trim();
   if (status === 401 || status === 403) return "The OpenAI-compatible provider rejected the request. Add or check the provider API key.";
@@ -2862,6 +2612,10 @@ const providerAdapterRuntime = Object.freeze({
   XAI_DEFAULT_MODEL,
   AZURE_OPENAI_DEFAULT_BASE_URL,
   AZURE_OPENAI_DEFAULT_MODEL,
+  DEEPSEEK_DEFAULT_BASE_URL,
+  DEEPSEEK_DEFAULT_MODEL,
+  MISTRAL_DEFAULT_BASE_URL,
+  MISTRAL_DEFAULT_MODEL,
   GROQ_DEFAULT_BASE_URL,
   GROQ_DEFAULT_MODEL,
   TOGETHER_DEFAULT_BASE_URL,
@@ -2885,6 +2639,8 @@ const providerAdapterRuntime = Object.freeze({
   openAiApiUrl,
   xAiApiUrl,
   azureOpenAiApiUrl,
+  deepSeekApiUrl,
+  mistralApiUrl,
   groqApiUrl,
   togetherApiUrl,
   openRouterApiUrl,
@@ -2895,6 +2651,8 @@ const providerAdapterRuntime = Object.freeze({
   normalizeOpenAiBaseUrl,
   normalizeXAiBaseUrl,
   normalizeAzureOpenAiBaseUrl,
+  normalizeDeepSeekBaseUrl,
+  normalizeMistralBaseUrl,
   normalizeGroqBaseUrl,
   normalizeTogetherBaseUrl,
   normalizeOpenRouterBaseUrl,
@@ -2931,34 +2689,6 @@ OllamaProvider.completePrompt = async function completePrompt(config = {}, reque
     totalDuration: data.total_duration || 0,
     promptEvalCount: data.prompt_eval_count || 0,
     evalCount: data.eval_count || 0
-  });
-};
-
-DeepSeekProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
-  const settings = defaultLocalAiSettings({ ...config, providerId: "deepseek", model: config.model || request.model }, request.project);
-  const baseUrl = normalizeDeepSeekBaseUrl(config.baseUrl || settings.baseUrl || DEEPSEEK_DEFAULT_BASE_URL);
-  const model = String(config.model || request.model || settings.model || DEEPSEEK_DEFAULT_MODEL).trim() || DEEPSEEK_DEFAULT_MODEL;
-  if (!String(config.apiKey || "").trim()) throw new Error(deepSeekProviderAuthError());
-  const prompt = promptTextOrThrow(request);
-  const startedAt = localAiStartedAt();
-  const data = await deepSeekJson("/chat/completions", {
-    method: "POST",
-    headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: request.system || genericPromptSystem() },
-        { role: "user", content: prompt }
-      ],
-      stream: false,
-      temperature: 0.1,
-      max_tokens: 1200
-    })
-  }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-  return genericPromptResult("DeepSeek", "deepseek", model, prompt, extractDeepSeekResponseText(data), startedAt, {
-    promptTokens: data?.usage?.prompt_tokens || 0,
-    completionTokens: data?.usage?.completion_tokens || 0,
-    totalTokens: data?.usage?.total_tokens || 0
   });
 };
 
@@ -3076,34 +2806,6 @@ CohereProvider.completePrompt = async function completePrompt(config = {}, reque
   });
 };
 
-MistralProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
-  const settings = defaultLocalAiSettings({ ...config, providerId: "mistral", model: config.model || request.model }, request.project);
-  const baseUrl = normalizeMistralBaseUrl(config.baseUrl || settings.baseUrl || MISTRAL_DEFAULT_BASE_URL);
-  const model = String(config.model || request.model || settings.model || MISTRAL_DEFAULT_MODEL).trim() || MISTRAL_DEFAULT_MODEL;
-  if (!String(config.apiKey || "").trim()) throw new Error(mistralProviderAuthError());
-  const prompt = promptTextOrThrow(request);
-  const startedAt = localAiStartedAt();
-  const data = await mistralJson("/chat/completions", {
-    method: "POST",
-    headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: request.system || genericPromptSystem() },
-        { role: "user", content: prompt }
-      ],
-      stream: false,
-      temperature: 0.1,
-      max_tokens: 1200
-    })
-  }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-  return genericPromptResult("Mistral AI", "mistral", model, prompt, extractMistralResponseText(data), startedAt, {
-    promptTokens: data?.usage?.prompt_tokens || 0,
-    completionTokens: data?.usage?.completion_tokens || 0,
-    totalTokens: data?.usage?.total_tokens || 0
-  });
-};
-
 OpenAICompatibleProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
   const settings = defaultLocalAiSettings({ ...config, providerId: "openai-compatible", model: config.model || request.model }, request.project);
   const baseUrl = normalizeOpenAiCompatibleBaseUrl(config.baseUrl || settings.baseUrl || LM_STUDIO_DEFAULT_BASE_URL);
@@ -3158,7 +2860,7 @@ const aiProviderRegistry = (() => {
 
 aiProviderRegistry.register(OllamaProvider);
 aiProviderRegistry.reserve("openai");
-aiProviderRegistry.register(DeepSeekProvider);
+aiProviderRegistry.reserve("deepseek");
 aiProviderRegistry.reserve("xai");
 aiProviderRegistry.register(PerplexityProvider);
 aiProviderRegistry.reserve("groq");
@@ -3170,7 +2872,7 @@ aiProviderRegistry.reserve("fireworks");
 aiProviderRegistry.register(GeminiProvider);
 aiProviderRegistry.register(AnthropicProvider);
 aiProviderRegistry.register(CohereProvider);
-aiProviderRegistry.register(MistralProvider);
+aiProviderRegistry.reserve("mistral");
 aiProviderRegistry.reserve("azure-openai");
 aiProviderRegistry.register(OpenAICompatibleProvider);
 aiProviderRegistry.register(OpusCatProvider);
@@ -3812,12 +3514,10 @@ window.CatHan.ai = {
   defaultLocalAiSettings,
   localAISettingsStore,
   OllamaProvider,
-  DeepSeekProvider,
   PerplexityProvider,
   GeminiProvider,
   AnthropicProvider,
   CohereProvider,
-  MistralProvider,
   OpenAICompatibleProvider,
   OpusCatProvider,
   providerAdapterRuntime,

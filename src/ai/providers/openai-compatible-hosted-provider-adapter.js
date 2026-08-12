@@ -61,6 +61,9 @@ function assertDefinition(definition) {
   ) {
     throw new TypeError("Hosted AI provider definitions require URL and model-mapping functions.");
   }
+  if (definition.extractResponseText !== undefined && typeof definition.extractResponseText !== "function") {
+    throw new TypeError("Hosted AI provider response extraction must be a function when provided.");
+  }
   return definition;
 }
 
@@ -178,6 +181,7 @@ function normalizedSettings(runtime, definition, config, request) {
 }
 
 function responseText(definition, data) {
+  if (definition.extractResponseText) return definition.extractResponseText(data);
   return extractOpenAiCompatibleResponseText(data, definition.responseFallbackFields);
 }
 

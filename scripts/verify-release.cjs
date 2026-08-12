@@ -156,6 +156,7 @@ const requiredReleaseFiles = [
   "src/ai/providers/groq-provider-adapter.js",
   "src/ai/providers/hosted-provider-adapters.js",
   "src/ai/providers/install-extracted-providers.js",
+  "src/ai/providers/native-chat-provider-adapters.js",
   "src/ai/providers/native-openai-provider-adapters.js",
   "src/ai/providers/openai-compatible-hosted-provider-adapter.js",
   "src/ai/providers/openai-responses-provider-adapter.js",
@@ -173,6 +174,7 @@ const requiredReleaseFiles = [
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/groq-provider-adapter.test.cjs",
   "tests/unit/hosted-provider-adapters.test.cjs",
+  "tests/unit/native-chat-provider-adapters.test.cjs",
   "tests/unit/native-openai-provider-adapters.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
@@ -247,11 +249,13 @@ const aiAdministrationControllerUnitTests = readText("tests/unit/ai-administrati
 const groqProviderAdapterJs = readText("src/ai/providers/groq-provider-adapter.js");
 const hostedProviderAdaptersJs = readText("src/ai/providers/hosted-provider-adapters.js");
 const hostedProviderAdapterCoreJs = readText("src/ai/providers/openai-compatible-hosted-provider-adapter.js");
+const nativeChatProviderAdaptersJs = readText("src/ai/providers/native-chat-provider-adapters.js");
 const nativeOpenAiProviderAdaptersJs = readText("src/ai/providers/native-openai-provider-adapters.js");
 const openAiResponsesProviderAdapterJs = readText("src/ai/providers/openai-responses-provider-adapter.js");
 const extractedProviderInstallerJs = readText("src/ai/providers/install-extracted-providers.js");
 const groqProviderAdapterUnitTests = readText("tests/unit/groq-provider-adapter.test.cjs");
 const hostedProviderAdaptersUnitTests = readText("tests/unit/hosted-provider-adapters.test.cjs");
+const nativeChatProviderAdaptersUnitTests = readText("tests/unit/native-chat-provider-adapters.test.cjs");
 const nativeOpenAiProviderAdaptersUnitTests = readText("tests/unit/native-openai-provider-adapters.test.cjs");
 const productionEntryJs = readText("src/entry/production.js");
 const qualityReviewControllerJs = readText("src/features/quality/quality-review-controller.js");
@@ -2398,7 +2402,6 @@ const defaultLocalAiSettingsFunction = functionBody(
   "function defaultLocalAiSettings",
   "function readLocalAiSettings"
 );
-const deepSeekProviderFunction = functionBody(aiJs, "const DeepSeekProvider = {", "function geminiProviderAuthError");
 const perplexityProviderFunction = functionBody(
   aiJs,
   "const PerplexityProvider = {",
@@ -2410,13 +2413,8 @@ const anthropicProviderFunction = functionBody(
   "const AnthropicProvider = {",
   "function openAiCompatibleStatusError"
 );
-const cohereProviderFunction = functionBody(aiJs, "const CohereProvider = {", "function mistralProviderAuthError");
-const mistralProviderFunction = functionBody(
-  aiJs,
-  "const MistralProvider = {",
-  "function openAiCompatibleStatusError"
-);
-const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function deepSeekProviderAuthError");
+const cohereProviderFunction = functionBody(aiJs, "const CohereProvider = {", "function openAiCompatibleStatusError");
+const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function perplexityProviderAuthError");
 assertIncludes(
   aiJs,
   `const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"`,
@@ -2508,22 +2506,57 @@ assertIncludes(
   "ai.js must keep the OPUS-CAT browser bridge URL centralized."
 );
 assertIncludes(aiJs, "const GeminiProvider = {", "ai.js must implement the native Gemini provider.");
-assertIncludes(aiJs, "const DeepSeekProvider = {", "ai.js must implement the native DeepSeek provider.");
+for (const provider of [
+  ["deepseek", "DeepSeekProvider", "DeepSeek"],
+  ["mistral", "MistralProvider", "Mistral AI"]
+]) {
+  const [providerId, compatibilityExport, providerName] = provider;
+  assertIncludes(
+    nativeChatProviderAdaptersJs,
+    `id: "${providerId}"`,
+    `The checked native chat adapter family must implement ${providerName}.`
+  );
+  assertIncludes(
+    nativeChatProviderAdaptersJs,
+    `compatibilityExport: "${compatibilityExport}"`,
+    `The native chat adapter family must preserve the ${providerName} compatibility export.`
+  );
+  assertIncludes(
+    defaultLocalAiSettingsFunction,
+    `providerId === "${providerId}"`,
+    `ai.js must preserve ${providerName} default settings.`
+  );
+  assertIncludes(
+    aiJs,
+    `aiProviderRegistry.reserve("${providerId}")`,
+    `The provider registry must preserve ${providerName}'s original order before adapter installation.`
+  );
+}
+assert(
+  !["DeepSeekProvider", "MistralProvider"].some((providerName) => aiJs.includes(`const ${providerName} = {`)),
+  "ai.js must not retain extracted native chat-provider implementations."
+);
 assertIncludes(aiJs, "deepSeekApiUrl", "ai.js must normalize DeepSeek model-list and chat-completion endpoints.");
+assertIncludes(aiJs, "mistralApiUrl", "ai.js must normalize Mistral model-list and chat-completion endpoints.");
 assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "deepseek"',
-  "ai.js must default native DeepSeek settings to the DeepSeek base URL/model, not Ollama."
-);
-assertIncludes(
-  deepSeekProviderFunction,
+  hostedProviderAdapterCoreJs,
   "bearerAuthHeaders",
-  "ai.js DeepSeek requests must send API keys in authorization headers."
+  "Native chat adapters must send API keys in authorization headers."
 );
 assertIncludes(
-  deepSeekProviderFunction,
+  hostedProviderAdapterCoreJs,
   "max_tokens: 1200",
-  "ai.js DeepSeek chat-completion requests must include bounded max_tokens."
+  "Native chat adapters must keep chat-completion output bounded."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installNativeChatProviderAdapters",
+  "The extracted-provider installer must register the native chat provider family."
+);
+assertIncludes(
+  nativeChatProviderAdaptersUnitTests,
+  "preserve multipart parsing, payloads, aborts, provenance, and token metadata",
+  "Native chat adapters must retain focused parsing, request, abort, provenance, and token characterization."
 );
 assertIncludes(aiJs, "geminiAuthHeaders", "ai.js must send Gemini API keys in headers, not query strings.");
 assertIncludes(aiJs, "geminiApiUrl", "ai.js must normalize Gemini model-list and interaction endpoints.");
@@ -2552,23 +2585,6 @@ assertIncludes(
   cohereProviderFunction,
   "max_tokens: 1200",
   "ai.js Cohere Chat V2 requests must include bounded max_tokens."
-);
-assertIncludes(aiJs, "const MistralProvider = {", "ai.js must implement the native Mistral provider.");
-assertIncludes(aiJs, "mistralApiUrl", "ai.js must normalize Mistral model-list and chat-completion endpoints.");
-assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "mistral"',
-  "ai.js must default native Mistral settings to the Mistral base URL/model, not Ollama."
-);
-assertIncludes(
-  mistralProviderFunction,
-  "bearerAuthHeaders",
-  "ai.js Mistral requests must send API keys in authorization headers."
-);
-assertIncludes(
-  mistralProviderFunction,
-  "max_tokens: 1200",
-  "ai.js Mistral chat-completion requests must include bounded max_tokens."
 );
 for (const provider of [
   ["openai", "OpenAIProvider", "OpenAI"],
@@ -2873,24 +2889,9 @@ assertIncludes(
 );
 assertIncludes(aiJs, "const LOCAL_AI_PROVIDER_PRESETS = [", "ai.js must centralize Local AI provider presets.");
 assertIncludes(
-  aiJs,
-  "DeepSeekProvider.completePrompt = async function completePrompt",
-  "ai.js must route DeepSeek AI-native commands through the native provider."
-);
-assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(DeepSeekProvider)",
-  "ai.js must register the native DeepSeek provider."
-);
-assertIncludes(
-  aiJs,
-  "MistralProvider.completePrompt = async function completePrompt",
-  "ai.js must route Mistral AI-native commands through the native provider."
-);
-assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(MistralProvider)",
-  "ai.js must register the native Mistral provider."
+  hostedProviderAdapterCoreJs,
+  "async completePrompt",
+  "The native chat adapter family must route AI-native commands through chat completions."
 );
 assertIncludes(
   openAiResponsesProviderAdapterJs,
