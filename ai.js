@@ -1927,124 +1927,6 @@ const OpusCatProvider = {
   }
 };
 
-function anthropicProviderAuthError() {
-  return "Add an Anthropic API key before using Claude for pre-translation.";
-}
-
-function anthropicStatusError(data, status, model = "") {
-  const raw = redactSensitiveText(data?.error?.message || data?.message || data?.error || "").trim();
-  if (status === 401 || status === 403) return "Anthropic rejected the request. Add or check the Anthropic API key.";
-  if ((status === 404 || /model/i.test(raw)) && model) return `Model ${model} was not found by Anthropic.`;
-  return raw || `Anthropic request failed with status ${status}.`;
-}
-
-async function anthropicJson(endpoint, options = {}, config = {}) {
-  const url = anthropicApiUrl(config.baseUrl || ANTHROPIC_DEFAULT_BASE_URL, endpoint);
-  let result = null;
-  try {
-    result = await fetchJsonWithTimeout(url, options, config);
-  } catch (error) {
-    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
-    throw new Error(`Anthropic is not reachable at ${normalizeAnthropicBaseUrl(config.baseUrl || ANTHROPIC_DEFAULT_BASE_URL)}.`);
-  }
-  if (!result.response?.ok) {
-    throw new Error(anthropicStatusError(result.data, result.response?.status, config.model));
-  }
-  return result.data;
-}
-
-function extractAnthropicResponseText(data) {
-  if (typeof data?.output_text === "string") return data.output_text;
-  if (typeof data?.text === "string") return data.text;
-  const content = Array.isArray(data?.content) ? data.content : [];
-  return content.map((part) => {
-    if (typeof part === "string") return part;
-    if (part?.type && part.type !== "text") return "";
-    return typeof part?.text === "string" ? part.text : "";
-  }).filter(Boolean).join("");
-}
-
-const AnthropicProvider = {
-  id: "anthropic",
-  name: "Anthropic Claude",
-  defaultBaseUrl: ANTHROPIC_DEFAULT_BASE_URL,
-  defaultModel: ANTHROPIC_DEFAULT_MODEL,
-  async testConnection(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(anthropicProviderAuthError());
-    const baseUrl = normalizeAnthropicBaseUrl(config.baseUrl || ANTHROPIC_DEFAULT_BASE_URL);
-    const data = await anthropicJson("/models", { method: "GET", headers: anthropicAuthHeaders(config) }, { ...config, baseUrl });
-    return {
-      ok: true,
-      provider: "Anthropic Claude",
-      baseUrl,
-      modelCount: Array.isArray(data?.data) ? data.data.length : 0
-    };
-  },
-  async listModels(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(anthropicProviderAuthError());
-    const baseUrl = normalizeAnthropicBaseUrl(config.baseUrl || ANTHROPIC_DEFAULT_BASE_URL);
-    const data = await anthropicJson("/models", { method: "GET", headers: anthropicAuthHeaders(config) }, { ...config, baseUrl });
-    const models = Array.isArray(data?.data)
-      ? data.data.map((model) => ({
-        name: String(model.id || model.name || "").trim(),
-        size: 0,
-        modifiedAt: model.created_at || model.createdAt || ""
-      })).filter((model) => model.name)
-      : [];
-    return { models, raw: data };
-  },
-  async translateSegment(config = {}, request = {}) {
-    const settings = defaultLocalAiSettings({ ...config, providerId: "anthropic", model: config.model || request.model }, request.project);
-    const baseUrl = normalizeAnthropicBaseUrl(config.baseUrl || settings.baseUrl || ANTHROPIC_DEFAULT_BASE_URL);
-    const model = String(config.model || request.model || settings.model || ANTHROPIC_DEFAULT_MODEL).trim() || ANTHROPIC_DEFAULT_MODEL;
-    const sourceText = String(request.text ?? request.segment?.source ?? "");
-    if (!sourceText.trim()) throw new Error("The segment has no source text.");
-    if (!String(config.apiKey || "").trim()) throw new Error(anthropicProviderAuthError());
-    const prompt = request.prompt || buildTranslateGemmaPrompt({
-      sourceLanguage: request.sourceLanguage || settings.sourceLanguage,
-      sourceCode: request.sourceCode || settings.sourceCode,
-      targetLanguage: request.targetLanguage || settings.targetLanguage,
-      targetCode: request.targetCode || settings.targetCode,
-      text: sourceText,
-      segment: request.segment,
-      glossaryTerms: request.glossaryTerms,
-      tmMatches: request.tmMatches,
-      surroundingSegments: request.surroundingSegments
-    });
-    const startedAt = localAiStartedAt();
-    const data = await anthropicJson("/messages", {
-      method: "POST",
-      headers: anthropicAuthHeaders(config, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        model,
-        max_tokens: 1200,
-        system: "You are a professional translation assistant inside LoopCAT. Produce only the requested target-language translation for one CAT-tool segment.",
-        messages: [{ role: "user", content: prompt }]
-      })
-    }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-    const rawOutput = extractAnthropicResponseText(data);
-    if (typeof rawOutput !== "string") throw new Error("Anthropic returned a malformed response.");
-    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
-    if (!translatedText.trim()) throw new Error("Anthropic returned an empty translation for this segment.");
-    const inputTokens = Number(data?.usage?.input_tokens) || 0;
-    const outputTokens = Number(data?.usage?.output_tokens) || 0;
-    return {
-      translatedText,
-      rawOutput,
-      provider: "Anthropic Claude",
-      providerId: "anthropic",
-      model,
-      durationMs: requestDurationMs(startedAt),
-      prompt,
-      metadata: {
-        inputTokens,
-        outputTokens,
-        totalTokens: inputTokens + outputTokens
-      }
-    };
-  }
-};
-
 function cohereProviderAuthError() {
   return "Add a Cohere API key before using Cohere for pre-translation.";
 }
@@ -2322,6 +2204,8 @@ const providerAdapterRuntime = Object.freeze({
   OPENAI_DEFAULT_MODEL,
   GEMINI_DEFAULT_BASE_URL,
   GEMINI_DEFAULT_MODEL,
+  ANTHROPIC_DEFAULT_BASE_URL,
+  ANTHROPIC_DEFAULT_MODEL,
   XAI_DEFAULT_BASE_URL,
   XAI_DEFAULT_MODEL,
   PERPLEXITY_DEFAULT_BASE_URL,
@@ -2345,6 +2229,7 @@ const providerAdapterRuntime = Object.freeze({
   FIREWORKS_DEFAULT_BASE_URL,
   FIREWORKS_DEFAULT_MODEL,
   azureOpenAiAuthHeaders,
+  anthropicAuthHeaders,
   bearerAuthHeaders,
   buildTranslateGemmaPrompt,
   cleanModelTranslationOutput,
@@ -2355,6 +2240,7 @@ const providerAdapterRuntime = Object.freeze({
   genericPromptSystem,
   openAiApiUrl,
   geminiApiUrl,
+  anthropicApiUrl,
   xAiApiUrl,
   perplexityApiUrl,
   azureOpenAiApiUrl,
@@ -2369,6 +2255,7 @@ const providerAdapterRuntime = Object.freeze({
   localAiStartedAt,
   normalizeOpenAiBaseUrl,
   normalizeGeminiBaseUrl,
+  normalizeAnthropicBaseUrl,
   normalizeXAiBaseUrl,
   normalizePerplexityBaseUrl,
   normalizeAzureOpenAiBaseUrl,
@@ -2410,32 +2297,6 @@ OllamaProvider.completePrompt = async function completePrompt(config = {}, reque
     totalDuration: data.total_duration || 0,
     promptEvalCount: data.prompt_eval_count || 0,
     evalCount: data.eval_count || 0
-  });
-};
-
-AnthropicProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
-  const settings = defaultLocalAiSettings({ ...config, providerId: "anthropic", model: config.model || request.model }, request.project);
-  const baseUrl = normalizeAnthropicBaseUrl(config.baseUrl || settings.baseUrl || ANTHROPIC_DEFAULT_BASE_URL);
-  const model = String(config.model || request.model || settings.model || ANTHROPIC_DEFAULT_MODEL).trim() || ANTHROPIC_DEFAULT_MODEL;
-  if (!String(config.apiKey || "").trim()) throw new Error(anthropicProviderAuthError());
-  const prompt = promptTextOrThrow(request);
-  const startedAt = localAiStartedAt();
-  const data = await anthropicJson("/messages", {
-    method: "POST",
-    headers: anthropicAuthHeaders(config, { "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      model,
-      max_tokens: 1200,
-      system: request.system || genericPromptSystem(),
-      messages: [{ role: "user", content: prompt }]
-    })
-  }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-  const inputTokens = Number(data?.usage?.input_tokens) || 0;
-  const outputTokens = Number(data?.usage?.output_tokens) || 0;
-  return genericPromptResult("Anthropic Claude", "anthropic", model, prompt, extractAnthropicResponseText(data), startedAt, {
-    inputTokens,
-    outputTokens,
-    totalTokens: inputTokens + outputTokens
   });
 };
 
@@ -2532,7 +2393,7 @@ aiProviderRegistry.reserve("huggingface");
 aiProviderRegistry.reserve("deepinfra");
 aiProviderRegistry.reserve("fireworks");
 aiProviderRegistry.reserve("gemini");
-aiProviderRegistry.register(AnthropicProvider);
+aiProviderRegistry.reserve("anthropic");
 aiProviderRegistry.register(CohereProvider);
 aiProviderRegistry.reserve("mistral");
 aiProviderRegistry.reserve("azure-openai");
@@ -3176,7 +3037,6 @@ window.CatHan.ai = {
   defaultLocalAiSettings,
   localAISettingsStore,
   OllamaProvider,
-  AnthropicProvider,
   CohereProvider,
   OpenAICompatibleProvider,
   OpusCatProvider,

@@ -153,6 +153,7 @@ const requiredReleaseFiles = [
   "src/entry/production.js",
   "src/entry/renderer-bootstrap.js",
   "src/entry/test.js",
+  "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/gemini-provider-adapter.js",
   "src/ai/providers/groq-provider-adapter.js",
   "src/ai/providers/hosted-provider-adapters.js",
@@ -174,6 +175,7 @@ const requiredReleaseFiles = [
   "src/features/workspace/recovery-workspace-controller.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
+  "tests/unit/anthropic-provider-adapter.test.cjs",
   "tests/unit/gemini-provider-adapter.test.cjs",
   "tests/unit/groq-provider-adapter.test.cjs",
   "tests/unit/hosted-provider-adapters.test.cjs",
@@ -250,6 +252,7 @@ const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-p
 const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
 const aiAdministrationControllerJs = readText("src/features/ai/ai-administration-controller.js");
 const aiAdministrationControllerUnitTests = readText("tests/unit/ai-administration-controller.test.cjs");
+const anthropicProviderAdapterJs = readText("src/ai/providers/anthropic-provider-adapter.js");
 const geminiProviderAdapterJs = readText("src/ai/providers/gemini-provider-adapter.js");
 const groqProviderAdapterJs = readText("src/ai/providers/groq-provider-adapter.js");
 const hostedProviderAdaptersJs = readText("src/ai/providers/hosted-provider-adapters.js");
@@ -259,6 +262,7 @@ const nativeOpenAiProviderAdaptersJs = readText("src/ai/providers/native-openai-
 const openAiResponsesProviderAdapterJs = readText("src/ai/providers/openai-responses-provider-adapter.js");
 const perplexityProviderAdapterJs = readText("src/ai/providers/perplexity-provider-adapter.js");
 const extractedProviderInstallerJs = readText("src/ai/providers/install-extracted-providers.js");
+const anthropicProviderAdapterUnitTests = readText("tests/unit/anthropic-provider-adapter.test.cjs");
 const geminiProviderAdapterUnitTests = readText("tests/unit/gemini-provider-adapter.test.cjs");
 const groqProviderAdapterUnitTests = readText("tests/unit/groq-provider-adapter.test.cjs");
 const hostedProviderAdaptersUnitTests = readText("tests/unit/hosted-provider-adapters.test.cjs");
@@ -2405,13 +2409,8 @@ const defaultLocalAiSettingsFunction = functionBody(
   "function defaultLocalAiSettings",
   "function readLocalAiSettings"
 );
-const anthropicProviderFunction = functionBody(
-  aiJs,
-  "const AnthropicProvider = {",
-  "function openAiCompatibleStatusError"
-);
 const cohereProviderFunction = functionBody(aiJs, "const CohereProvider = {", "function openAiCompatibleStatusError");
-const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function anthropicProviderAuthError");
+const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function cohereProviderAuthError");
 assertIncludes(
   aiJs,
   `const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"`,
@@ -2610,13 +2609,57 @@ assert(
   !aiJs.includes("const GeminiProvider = {") && !aiJs.includes("function geminiProviderAuthError"),
   "ai.js must not retain the extracted Gemini provider implementation."
 );
-assertIncludes(aiJs, "const AnthropicProvider = {", "ai.js must implement the native Anthropic provider.");
-assertIncludes(aiJs, "anthropicAuthHeaders", "ai.js must send Anthropic API keys in headers, not query strings.");
+assertIncludes(aiJs, '"x-api-key"', "The Anthropic runtime must send API keys in headers, not query strings.");
+assertIncludes(aiJs, '"anthropic-version"', "The Anthropic runtime must send the pinned API version header.");
+assertIncludes(
+  anthropicProviderAdapterJs,
+  "anthropicAuthHeaders",
+  "The Anthropic adapter must use the checked versioned header-auth boundary."
+);
 assertIncludes(aiJs, "anthropicApiUrl", "ai.js must normalize Anthropic model-list and message endpoints.");
 assertIncludes(
-  anthropicProviderFunction,
+  defaultLocalAiSettingsFunction,
+  'providerId === "anthropic"',
+  "ai.js must preserve Anthropic's provider-specific default settings."
+);
+assertIncludes(
+  anthropicProviderAdapterJs,
   "max_tokens: 1200",
-  "ai.js Anthropic Messages requests must include bounded max_tokens."
+  "The checked Anthropic adapter must keep Messages output bounded."
+);
+assertIncludes(
+  anthropicProviderAdapterJs,
+  '"/messages"',
+  "The checked Anthropic adapter must use the native Messages endpoint."
+);
+assertIncludes(
+  anthropicProviderAdapterJs,
+  "async completePrompt",
+  "The checked Anthropic adapter must route AI-native commands through Messages."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installAnthropicProviderAdapter",
+  "The extracted-provider installer must register the native Anthropic provider."
+);
+assertIncludes(
+  aiJs,
+  'aiProviderRegistry.reserve("anthropic")',
+  "The legacy registry must preserve Anthropic's provider order while its adapter installs."
+);
+assertIncludes(
+  anthropicProviderAdapterJs,
+  "ai.AnthropicProvider = provider",
+  "The Anthropic adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  anthropicProviderAdapterUnitTests,
+  "preserves Messages translation payload, abort, content parsing, provenance, and token metadata",
+  "The Anthropic adapter must retain focused payload, abort, parsing, provenance, and token characterization."
+);
+assert(
+  !aiJs.includes("const AnthropicProvider = {") && !aiJs.includes("function anthropicProviderAuthError"),
+  "ai.js must not retain the extracted Anthropic provider implementation."
 );
 assertIncludes(aiJs, "const CohereProvider = {", "ai.js must implement the native Cohere provider.");
 assertIncludes(aiJs, "cohereAuthHeaders", "ai.js must send Cohere API keys in headers, not query strings.");
@@ -3030,6 +3073,11 @@ assertIncludes(
   regressionHtml,
   'providerIds.indexOf("gemini") === providerIds.indexOf("fireworks") + 1',
   "The regression harness must preserve Gemini's original provider order."
+);
+assertIncludes(
+  regressionHtml,
+  'providerIds.indexOf("anthropic") === providerIds.indexOf("gemini") + 1',
+  "The regression harness must preserve Anthropic's original provider order."
 );
 assertIncludes(
   regressionHtml,

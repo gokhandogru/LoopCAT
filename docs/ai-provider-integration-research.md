@@ -71,7 +71,7 @@ The provider map was rechecked against official provider documentation on 2026-0
 | OPUS-CAT MT Engine | OPUS-CAT local HTTP API | `GET /MTRestService/ListSupportedLanguagePairs` and `GET /MTRestService/GetLanguagePairModelTags` | `GET /MTRestService/TranslateJson` | Existing `OpusCatProvider`, pre-translation only |
 | OpenAI | Responses API and Chat Completions | `GET /v1/models` | `POST /v1/responses` or `/v1/chat/completions` | Existing `OpenAIProvider` uses Responses for suggestions and pretranslation |
 | Google Gemini | Gemini Developer API Interactions | `GET /v1beta/models` | `POST /v1beta/interactions` | Checked Gemini adapter with storage disabled |
-| Anthropic Claude | Messages API | `GET /v1/models` | `POST /v1/messages` | Existing `AnthropicProvider` |
+| Anthropic Claude | Messages API | `GET /v1/models` | `POST /v1/messages` | Checked Anthropic adapter with versioned header auth |
 | Mistral AI | Mistral chat completion API | `GET /v1/models` | `POST /v1/chat/completions` | Existing `MistralProvider` |
 | DeepSeek | DeepSeek chat completion API | `GET /models` | `POST /chat/completions` | Existing `DeepSeekProvider` without automatic `/v1` base-path insertion |
 | Cohere | Cohere Chat API v2 | `GET /v1/models` | `POST /v2/chat` | Existing `CohereProvider` |

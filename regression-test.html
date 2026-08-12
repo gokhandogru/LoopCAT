@@ -4468,8 +4468,34 @@
           targetLanguage: "Turkish",
           targetCode: "tr"
         });
+        let anthropicPromptRequest = null;
+        const anthropicPromptResult = await anthropicProvider.completePrompt({
+          baseUrl: "https://api.anthropic.com",
+          apiKey: "anthropic-api-key",
+          model: "claude-sonnet-4-6",
+          fetchImpl: async (url, options = {}) => {
+            anthropicPromptRequest = {
+              url: String(url),
+              apiKey: options.headers?.["x-api-key"] || "",
+              version: options.headers?.["anthropic-version"] || "",
+              body: JSON.parse(String(options.body || "{}"))
+            };
+            return {
+              ok: true,
+              json: async () => ({
+                content: [{ type: "text", text: "Anthropic QA note" }],
+                usage: { input_tokens: 6, output_tokens: 3 }
+              })
+            };
+          }
+        }, {
+          prompt: "Check this translation.",
+          system: "You are a translation QA assistant.",
+          project: null
+        });
         assert(
-          window.CatHan.ai.anthropicApiUrl("https://api.anthropic.com", "/messages") === "https://api.anthropic.com/v1/messages" &&
+          window.CatHan.ai.AnthropicProvider === anthropicProvider &&
+            window.CatHan.ai.anthropicApiUrl("https://api.anthropic.com", "/messages") === "https://api.anthropic.com/v1/messages" &&
             anthropicModelsRequest?.url === "https://api.anthropic.com/v1/models" &&
             anthropicModelsRequest.apiKey === "anthropic-api-key" &&
             anthropicModelsRequest.version === window.CatHan.ai.ANTHROPIC_VERSION &&
@@ -4482,6 +4508,15 @@
             anthropicPretranslateRequest.body.messages[0].content.includes("Please translate the following English text into Turkish:\n\nHello Claude.") &&
             anthropicPretranslation.translatedText === "Merhaba Claude." &&
             anthropicPretranslation.metadata.totalTokens === 20 &&
+            anthropicPromptRequest?.url === "https://api.anthropic.com/v1/messages" &&
+            anthropicPromptRequest.apiKey === "anthropic-api-key" &&
+            anthropicPromptRequest.version === window.CatHan.ai.ANTHROPIC_VERSION &&
+            anthropicPromptRequest.body.model === "claude-sonnet-4-6" &&
+            anthropicPromptRequest.body.max_tokens === 1200 &&
+            anthropicPromptRequest.body.system === "You are a translation QA assistant." &&
+            anthropicPromptResult.text === "Anthropic QA note" &&
+            anthropicPromptResult.providerId === "anthropic" &&
+            anthropicPromptResult.metadata.totalTokens === 9 &&
             window.CatHan.ai.localAiProviderNeedsApiKey("anthropic", "https://api.anthropic.com/v1") &&
             window.CatHan.ai.localAiProviderSharesExternally("anthropic", "https://api.anthropic.com/v1"),
           "Anthropic provider lists models and pretranslates through Messages with header auth"
