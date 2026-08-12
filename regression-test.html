@@ -4899,6 +4899,10 @@
             groqDefaultSettings.model === "llama-3.3-70b-versatile" &&
             providerIds.indexOf("groq") === providerIds.indexOf("perplexity") + 1 &&
             providerIds.indexOf("together") === providerIds.indexOf("groq") + 1 &&
+            providerIds.indexOf("openrouter") === providerIds.indexOf("together") + 1 &&
+            providerIds.indexOf("huggingface") === providerIds.indexOf("openrouter") + 1 &&
+            providerIds.indexOf("deepinfra") === providerIds.indexOf("huggingface") + 1 &&
+            providerIds.indexOf("fireworks") === providerIds.indexOf("deepinfra") + 1 &&
             window.CatHan.ai.localAiProviderPresetForSettings({ providerId: "groq", baseUrl: "https://api.groq.com" })?.id === "groq" &&
             window.CatHan.ai.localAiProviderNeedsApiKey("groq", "https://api.groq.com/openai/v1") &&
             window.CatHan.ai.localAiProviderSharesExternally("groq", "https://api.groq.com/openai/v1"),

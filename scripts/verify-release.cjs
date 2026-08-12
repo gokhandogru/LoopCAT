@@ -154,7 +154,9 @@ const requiredReleaseFiles = [
   "src/entry/renderer-bootstrap.js",
   "src/entry/test.js",
   "src/ai/providers/groq-provider-adapter.js",
+  "src/ai/providers/hosted-provider-adapters.js",
   "src/ai/providers/install-extracted-providers.js",
+  "src/ai/providers/openai-compatible-hosted-provider-adapter.js",
   "src/commands/edit-target-session.js",
   "src/ui/dialog-controller.js",
   "src/features/ai/ai-administration-controller.js",
@@ -168,6 +170,7 @@ const requiredReleaseFiles = [
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/groq-provider-adapter.test.cjs",
+  "tests/unit/hosted-provider-adapters.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
   "tests/unit/import-export-controller.test.cjs",
@@ -239,8 +242,11 @@ const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-contr
 const aiAdministrationControllerJs = readText("src/features/ai/ai-administration-controller.js");
 const aiAdministrationControllerUnitTests = readText("tests/unit/ai-administration-controller.test.cjs");
 const groqProviderAdapterJs = readText("src/ai/providers/groq-provider-adapter.js");
+const hostedProviderAdaptersJs = readText("src/ai/providers/hosted-provider-adapters.js");
+const hostedProviderAdapterCoreJs = readText("src/ai/providers/openai-compatible-hosted-provider-adapter.js");
 const extractedProviderInstallerJs = readText("src/ai/providers/install-extracted-providers.js");
 const groqProviderAdapterUnitTests = readText("tests/unit/groq-provider-adapter.test.cjs");
+const hostedProviderAdaptersUnitTests = readText("tests/unit/hosted-provider-adapters.test.cjs");
 const productionEntryJs = readText("src/entry/production.js");
 const qualityReviewControllerJs = readText("src/features/quality/quality-review-controller.js");
 const qualityReviewControllerUnitTests = readText("tests/unit/quality-review-controller.test.cjs");
@@ -2393,24 +2399,6 @@ const perplexityProviderFunction = functionBody(
   "const PerplexityProvider = {",
   "function geminiProviderAuthError"
 );
-const groqProviderFunction = functionBody(
-  groqProviderAdapterJs,
-  "export function createGroqProviderAdapter",
-  "export function installGroqProviderAdapter"
-);
-const togetherProviderFunction = functionBody(aiJs, "const TogetherProvider = {", "function geminiProviderAuthError");
-const openRouterProviderFunction = functionBody(
-  aiJs,
-  "const OpenRouterProvider = {",
-  "function geminiProviderAuthError"
-);
-const huggingFaceProviderFunction = functionBody(
-  aiJs,
-  "const HuggingFaceProvider = {",
-  "function deepInfraProviderAuthError"
-);
-const deepInfraProviderFunction = functionBody(aiJs, "const DeepInfraProvider = {", "function geminiProviderAuthError");
-const fireworksProviderFunction = functionBody(aiJs, "const FireworksProvider = {", "function geminiProviderAuthError");
 const geminiProviderFunction = functionBody(aiJs, "const GeminiProvider = {", "function openAiCompatibleStatusError");
 const anthropicProviderFunction = functionBody(
   aiJs,
@@ -2632,108 +2620,65 @@ assertIncludes(
   "ai.js must default native Groq settings to the Groq base URL/model, not Ollama."
 );
 assertIncludes(
-  groqProviderAdapterJs,
+  hostedProviderAdapterCoreJs,
   "bearerAuthHeaders",
   "The Groq adapter must send API keys in authorization headers."
 );
 assertIncludes(
-  groqProviderAdapterJs,
+  hostedProviderAdapterCoreJs,
   "max_tokens: 1200",
   "The Groq adapter chat-completion requests must include bounded max_tokens."
 );
-assertIncludes(aiJs, "const TogetherProvider = {", "ai.js must implement the native Together AI provider.");
-assertIncludes(aiJs, "togetherApiUrl", "ai.js must normalize Together AI model-list and chat-completion endpoints.");
-assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "together"',
-  "ai.js must default native Together AI settings to the Together base URL/model, not Ollama."
+for (const provider of [
+  ["together", "TogetherProvider", "Together AI"],
+  ["openrouter", "OpenRouterProvider", "OpenRouter"],
+  ["huggingface", "HuggingFaceProvider", "Hugging Face Inference Providers"],
+  ["deepinfra", "DeepInfraProvider", "DeepInfra"],
+  ["fireworks", "FireworksProvider", "Fireworks AI"]
+]) {
+  const [providerId, compatibilityExport, providerName] = provider;
+  assertIncludes(
+    hostedProviderAdaptersJs,
+    `id: "${providerId}"`,
+    `The checked hosted adapter family must implement ${providerName}.`
+  );
+  assertIncludes(
+    hostedProviderAdaptersJs,
+    `compatibilityExport: "${compatibilityExport}"`,
+    `The hosted adapter family must preserve the ${providerName} compatibility export.`
+  );
+  assertIncludes(
+    defaultLocalAiSettingsFunction,
+    `providerId === "${providerId}"`,
+    `ai.js must preserve ${providerName} default settings.`
+  );
+  assertIncludes(
+    aiJs,
+    `aiProviderRegistry.reserve("${providerId}")`,
+    `The provider registry must preserve ${providerName}'s original order before adapter installation.`
+  );
+}
+assert(
+  !["TogetherProvider", "OpenRouterProvider", "HuggingFaceProvider", "DeepInfraProvider", "FireworksProvider"].some(
+    (providerName) => aiJs.includes(`const ${providerName} = {`)
+  ),
+  "ai.js must not retain extracted hosted-provider implementations."
 );
 assertIncludes(
-  togetherProviderFunction,
+  hostedProviderAdapterCoreJs,
   "bearerAuthHeaders",
-  "ai.js Together AI requests must send API keys in authorization headers."
+  "Hosted provider adapters must send credentials through authorization headers."
 );
 assertIncludes(
-  togetherProviderFunction,
+  hostedProviderAdapterCoreJs,
   "max_tokens: 1200",
-  "ai.js Together AI chat-completion requests must include bounded max_tokens."
+  "Hosted provider adapters must keep chat-completion output bounded."
 );
-assertIncludes(aiJs, "const OpenRouterProvider = {", "ai.js must implement the native OpenRouter provider.");
-assertIncludes(aiJs, "openRouterApiUrl", "ai.js must normalize OpenRouter model-list and chat-completion endpoints.");
-assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "openrouter"',
-  "ai.js must default native OpenRouter settings to the OpenRouter base URL/model, not Ollama."
-);
-assertIncludes(
-  openRouterProviderFunction,
-  "bearerAuthHeaders",
-  "ai.js OpenRouter requests must send API keys in authorization headers."
-);
-assertIncludes(
-  openRouterProviderFunction,
-  "max_tokens: 1200",
-  "ai.js OpenRouter chat-completion requests must include bounded max_tokens."
-);
-assertIncludes(
-  aiJs,
-  "const HuggingFaceProvider = {",
-  "ai.js must implement the native Hugging Face Inference Providers provider."
-);
-assertIncludes(
-  aiJs,
-  "huggingFaceApiUrl",
-  "ai.js must normalize Hugging Face model-list and chat-completion endpoints."
-);
-assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "huggingface"',
-  "ai.js must default native Hugging Face settings to the Hugging Face base URL/model, not Ollama."
-);
-assertIncludes(
-  huggingFaceProviderFunction,
-  "bearerAuthHeaders",
-  "ai.js Hugging Face requests must send tokens in authorization headers."
-);
-assertIncludes(
-  huggingFaceProviderFunction,
-  "max_tokens: 1200",
-  "ai.js Hugging Face chat-completion requests must include bounded max_tokens."
-);
-assertIncludes(aiJs, "const DeepInfraProvider = {", "ai.js must implement the native DeepInfra provider.");
-assertIncludes(aiJs, "deepInfraApiUrl", "ai.js must normalize DeepInfra model-list and chat-completion endpoints.");
-assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "deepinfra"',
-  "ai.js must default native DeepInfra settings to the DeepInfra base URL/model, not Ollama."
-);
-assertIncludes(
-  deepInfraProviderFunction,
-  "bearerAuthHeaders",
-  "ai.js DeepInfra requests must send API keys in authorization headers."
-);
-assertIncludes(
-  deepInfraProviderFunction,
-  "max_tokens: 1200",
-  "ai.js DeepInfra chat-completion requests must include bounded max_tokens."
-);
-assertIncludes(aiJs, "const FireworksProvider = {", "ai.js must implement the native Fireworks AI provider.");
-assertIncludes(aiJs, "fireworksApiUrl", "ai.js must normalize Fireworks AI model-list and chat-completion endpoints.");
-assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "fireworks"',
-  "ai.js must default native Fireworks AI settings to the Fireworks base URL/model, not Ollama."
-);
-assertIncludes(
-  fireworksProviderFunction,
-  "bearerAuthHeaders",
-  "ai.js Fireworks AI requests must send API keys in authorization headers."
-);
-assertIncludes(
-  fireworksProviderFunction,
-  "max_tokens: 1200",
-  "ai.js Fireworks AI chat-completion requests must include bounded max_tokens."
-);
+assertIncludes(aiJs, "togetherApiUrl", "ai.js must preserve Together AI endpoint normalization policy.");
+assertIncludes(aiJs, "openRouterApiUrl", "ai.js must preserve OpenRouter endpoint normalization policy.");
+assertIncludes(aiJs, "huggingFaceApiUrl", "ai.js must preserve Hugging Face endpoint normalization policy.");
+assertIncludes(aiJs, "deepInfraApiUrl", "ai.js must preserve DeepInfra endpoint normalization policy.");
+assertIncludes(aiJs, "fireworksApiUrl", "ai.js must preserve Fireworks AI endpoint normalization policy.");
 assertIncludes(aiJs, "const AzureOpenAIProvider = {", "ai.js must implement the native Azure OpenAI provider.");
 assertIncludes(aiJs, "azureOpenAiAuthHeaders", "ai.js must send Azure OpenAI API keys in headers, not query strings.");
 assertIncludes(aiJs, "azureOpenAiApiUrl", "ai.js must normalize Azure OpenAI v1 endpoints.");
@@ -2923,7 +2868,7 @@ assertIncludes(
   "ai.js must register the native Perplexity provider."
 );
 assertIncludes(
-  groqProviderFunction,
+  hostedProviderAdapterCoreJs,
   "async completePrompt",
   "The Groq adapter must route AI-native commands through the native provider."
 );
@@ -2958,6 +2903,11 @@ assertIncludes(
   "The regression harness must characterize provider ordering across extracted adapters."
 );
 assertIncludes(
+  regressionHtml,
+  'providerIds.indexOf("fireworks") === providerIds.indexOf("deepinfra") + 1',
+  "The regression harness must preserve the complete hosted-provider family order."
+);
+assertIncludes(
   groqProviderAdapterJs,
   "ai.GroqProvider = provider",
   "The Groq adapter must retain the temporary compatibility export."
@@ -2968,54 +2918,24 @@ assertIncludes(
   "The Groq adapter must retain focused request, abort, normalization, and provenance characterization."
 );
 assertIncludes(
-  aiJs,
-  "TogetherProvider.completePrompt = async function completePrompt",
-  "ai.js must route Together AI-native commands through the native provider."
+  hostedProviderAdapterCoreJs,
+  "async completePrompt",
+  "The hosted adapter core must route AI-native commands through each named provider."
 );
 assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(TogetherProvider)",
-  "ai.js must register the native Together AI provider."
+  extractedProviderInstallerJs,
+  "installHostedProviderAdapters",
+  "The extracted-provider installer must register the remaining hosted provider family."
 );
 assertIncludes(
-  aiJs,
-  "OpenRouterProvider.completePrompt = async function completePrompt",
-  "ai.js must route OpenRouter AI-native commands through the native provider."
+  hostedProviderAdaptersUnitTests,
+  "preserve translation and generic-command payloads, aborts, normalization, and provenance",
+  "Hosted adapters must retain focused request, abort, normalization, and provenance characterization."
 );
 assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(OpenRouterProvider)",
-  "ai.js must register the native OpenRouter provider."
-);
-assertIncludes(
-  aiJs,
-  "HuggingFaceProvider.completePrompt = async function completePrompt",
-  "ai.js must route Hugging Face AI-native commands through the native provider."
-);
-assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(HuggingFaceProvider)",
-  "ai.js must register the native Hugging Face provider."
-);
-assertIncludes(
-  aiJs,
-  "DeepInfraProvider.completePrompt = async function completePrompt",
-  "ai.js must route DeepInfra AI-native commands through the native provider."
-);
-assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(DeepInfraProvider)",
-  "ai.js must register the native DeepInfra provider."
-);
-assertIncludes(
-  aiJs,
-  "FireworksProvider.completePrompt = async function completePrompt",
-  "ai.js must route Fireworks AI-native commands through the native provider."
-);
-assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(FireworksProvider)",
-  "ai.js must register the native Fireworks AI provider."
+  hostedProviderAdaptersUnitTests,
+  "preserve special, redacted, cancellation, and reachability failures",
+  "Hosted adapters must retain focused special-status, redaction, cancellation, and network-failure characterization."
 );
 assertIncludes(
   aiJs,
