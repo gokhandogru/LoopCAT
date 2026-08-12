@@ -154,6 +154,7 @@ const requiredReleaseFiles = [
   "src/entry/renderer-bootstrap.js",
   "src/entry/test.js",
   "src/ai/providers/anthropic-provider-adapter.js",
+  "src/ai/providers/cohere-provider-adapter.js",
   "src/ai/providers/gemini-provider-adapter.js",
   "src/ai/providers/groq-provider-adapter.js",
   "src/ai/providers/hosted-provider-adapters.js",
@@ -176,6 +177,7 @@ const requiredReleaseFiles = [
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/anthropic-provider-adapter.test.cjs",
+  "tests/unit/cohere-provider-adapter.test.cjs",
   "tests/unit/gemini-provider-adapter.test.cjs",
   "tests/unit/groq-provider-adapter.test.cjs",
   "tests/unit/hosted-provider-adapters.test.cjs",
@@ -253,6 +255,7 @@ const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-contr
 const aiAdministrationControllerJs = readText("src/features/ai/ai-administration-controller.js");
 const aiAdministrationControllerUnitTests = readText("tests/unit/ai-administration-controller.test.cjs");
 const anthropicProviderAdapterJs = readText("src/ai/providers/anthropic-provider-adapter.js");
+const cohereProviderAdapterJs = readText("src/ai/providers/cohere-provider-adapter.js");
 const geminiProviderAdapterJs = readText("src/ai/providers/gemini-provider-adapter.js");
 const groqProviderAdapterJs = readText("src/ai/providers/groq-provider-adapter.js");
 const hostedProviderAdaptersJs = readText("src/ai/providers/hosted-provider-adapters.js");
@@ -263,6 +266,7 @@ const openAiResponsesProviderAdapterJs = readText("src/ai/providers/openai-respo
 const perplexityProviderAdapterJs = readText("src/ai/providers/perplexity-provider-adapter.js");
 const extractedProviderInstallerJs = readText("src/ai/providers/install-extracted-providers.js");
 const anthropicProviderAdapterUnitTests = readText("tests/unit/anthropic-provider-adapter.test.cjs");
+const cohereProviderAdapterUnitTests = readText("tests/unit/cohere-provider-adapter.test.cjs");
 const geminiProviderAdapterUnitTests = readText("tests/unit/gemini-provider-adapter.test.cjs");
 const groqProviderAdapterUnitTests = readText("tests/unit/groq-provider-adapter.test.cjs");
 const hostedProviderAdaptersUnitTests = readText("tests/unit/hosted-provider-adapters.test.cjs");
@@ -2409,8 +2413,7 @@ const defaultLocalAiSettingsFunction = functionBody(
   "function defaultLocalAiSettings",
   "function readLocalAiSettings"
 );
-const cohereProviderFunction = functionBody(aiJs, "const CohereProvider = {", "function openAiCompatibleStatusError");
-const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function cohereProviderAuthError");
+const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function openAiCompatibleStatusError");
 assertIncludes(
   aiJs,
   `const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"`,
@@ -2661,13 +2664,37 @@ assert(
   !aiJs.includes("const AnthropicProvider = {") && !aiJs.includes("function anthropicProviderAuthError"),
   "ai.js must not retain the extracted Anthropic provider implementation."
 );
-assertIncludes(aiJs, "const CohereProvider = {", "ai.js must implement the native Cohere provider.");
-assertIncludes(aiJs, "cohereAuthHeaders", "ai.js must send Cohere API keys in headers, not query strings.");
-assertIncludes(aiJs, "cohereApiUrl", "ai.js must normalize Cohere model-list and chat endpoints.");
+assertIncludes(cohereProviderAdapterJs, 'id: "cohere"', "The checked Cohere adapter must implement Cohere Command.");
+assertIncludes(cohereProviderAdapterJs, "cohereAuthHeaders", "The Cohere adapter must send API keys in headers, not query strings.");
+assertIncludes(cohereProviderAdapterJs, "cohereApiUrl", "The Cohere adapter must normalize model-list and chat endpoints.");
 assertIncludes(
-  cohereProviderFunction,
+  cohereProviderAdapterJs,
   "max_tokens: 1200",
-  "ai.js Cohere Chat V2 requests must include bounded max_tokens."
+  "The Cohere Chat V2 adapter must include bounded max_tokens."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installCohereProviderAdapter",
+  "The extracted-provider installer must register Cohere Command."
+);
+assertIncludes(
+  aiJs,
+  'aiProviderRegistry.reserve("cohere")',
+  "The legacy registry must preserve Cohere's provider order while its adapter installs."
+);
+assertIncludes(
+  cohereProviderAdapterJs,
+  "ai.CohereProvider = provider",
+  "The Cohere adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  cohereProviderAdapterUnitTests,
+  "preserves Chat V2 translation payload, abort, content parsing, provenance, and usage fallbacks",
+  "The Cohere adapter must retain focused payload, abort, parsing, provenance, and usage characterization."
+);
+assert(
+  !aiJs.includes("const CohereProvider = {") && !aiJs.includes("function cohereProviderAuthError"),
+  "ai.js must not retain the extracted Cohere provider implementation."
 );
 for (const provider of [
   ["openai", "OpenAIProvider", "OpenAI"],
@@ -3078,6 +3105,11 @@ assertIncludes(
   regressionHtml,
   'providerIds.indexOf("anthropic") === providerIds.indexOf("gemini") + 1',
   "The regression harness must preserve Anthropic's original provider order."
+);
+assertIncludes(
+  regressionHtml,
+  'providerIds.indexOf("cohere") === providerIds.indexOf("anthropic") + 1',
+  "The regression harness must preserve Cohere's original provider order."
 );
 assertIncludes(
   regressionHtml,

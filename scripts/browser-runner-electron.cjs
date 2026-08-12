@@ -32,6 +32,7 @@ const standaloneTestDependencies = [
   "qa.js",
   "quality.js",
   "src/ai/providers/anthropic-provider-adapter.js",
+  "src/ai/providers/cohere-provider-adapter.js",
   "src/ai/providers/groq-provider-adapter.js",
   "src/ai/providers/gemini-provider-adapter.js",
   "src/ai/providers/hosted-provider-adapters.js",

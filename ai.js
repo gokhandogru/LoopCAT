@@ -1927,139 +1927,6 @@ const OpusCatProvider = {
   }
 };
 
-function cohereProviderAuthError() {
-  return "Add a Cohere API key before using Cohere for pre-translation.";
-}
-
-function cohereStatusError(data, status, model = "") {
-  const raw = redactSensitiveText(data?.message || data?.error?.message || data?.error || "").trim();
-  if (status === 401 || status === 403) return "Cohere rejected the request. Add or check the Cohere API key.";
-  if ((status === 404 || /model/i.test(raw)) && model) return `Model ${model} was not found by Cohere.`;
-  return raw || `Cohere request failed with status ${status}.`;
-}
-
-async function cohereJson(endpoint, options = {}, config = {}) {
-  const url = cohereApiUrl(config.baseUrl || COHERE_DEFAULT_BASE_URL, endpoint);
-  let result = null;
-  try {
-    result = await fetchJsonWithTimeout(url, options, config);
-  } catch (error) {
-    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
-    throw new Error(`Cohere is not reachable at ${normalizeCohereBaseUrl(config.baseUrl || COHERE_DEFAULT_BASE_URL)}.`);
-  }
-  if (!result.response?.ok) {
-    throw new Error(cohereStatusError(result.data, result.response?.status, config.model));
-  }
-  return result.data;
-}
-
-function extractCohereResponseText(data) {
-  if (typeof data?.text === "string") return data.text;
-  if (typeof data?.output_text === "string") return data.output_text;
-  if (typeof data?.message?.content === "string") return data.message.content;
-  const content = Array.isArray(data?.message?.content) ? data.message.content : [];
-  return content.map((part) => {
-    if (typeof part === "string") return part;
-    if (part?.type && part.type !== "text") return "";
-    return typeof part?.text === "string" ? part.text : "";
-  }).filter(Boolean).join("");
-}
-
-function cohereTokenCount(...values) {
-  for (const value of values) {
-    const number = Number(value);
-    if (Number.isFinite(number)) return number;
-  }
-  return 0;
-}
-
-const CohereProvider = {
-  id: "cohere",
-  name: "Cohere Command",
-  defaultBaseUrl: COHERE_DEFAULT_BASE_URL,
-  defaultModel: COHERE_DEFAULT_MODEL,
-  async testConnection(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(cohereProviderAuthError());
-    const baseUrl = normalizeCohereBaseUrl(config.baseUrl || COHERE_DEFAULT_BASE_URL);
-    const data = await cohereJson("/v1/models", { method: "GET", headers: cohereAuthHeaders(config) }, { ...config, baseUrl });
-    return {
-      ok: true,
-      provider: "Cohere Command",
-      baseUrl,
-      modelCount: Array.isArray(data?.models) ? data.models.length : 0
-    };
-  },
-  async listModels(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(cohereProviderAuthError());
-    const baseUrl = normalizeCohereBaseUrl(config.baseUrl || COHERE_DEFAULT_BASE_URL);
-    const data = await cohereJson("/v1/models", { method: "GET", headers: cohereAuthHeaders(config) }, { ...config, baseUrl });
-    const models = Array.isArray(data?.models)
-      ? data.models.map((model) => ({
-        name: String(model.name || model.id || "").trim(),
-        size: 0,
-        modifiedAt: model.created_at || model.createdAt || ""
-      })).filter((model) => model.name)
-      : [];
-    return { models, raw: data };
-  },
-  async translateSegment(config = {}, request = {}) {
-    const settings = defaultLocalAiSettings({ ...config, providerId: "cohere", model: config.model || request.model }, request.project);
-    const baseUrl = normalizeCohereBaseUrl(config.baseUrl || settings.baseUrl || COHERE_DEFAULT_BASE_URL);
-    const model = String(config.model || request.model || settings.model || COHERE_DEFAULT_MODEL).trim() || COHERE_DEFAULT_MODEL;
-    const sourceText = String(request.text ?? request.segment?.source ?? "");
-    if (!sourceText.trim()) throw new Error("The segment has no source text.");
-    if (!String(config.apiKey || "").trim()) throw new Error(cohereProviderAuthError());
-    const prompt = request.prompt || buildTranslateGemmaPrompt({
-      sourceLanguage: request.sourceLanguage || settings.sourceLanguage,
-      sourceCode: request.sourceCode || settings.sourceCode,
-      targetLanguage: request.targetLanguage || settings.targetLanguage,
-      targetCode: request.targetCode || settings.targetCode,
-      text: sourceText,
-      segment: request.segment,
-      glossaryTerms: request.glossaryTerms,
-      tmMatches: request.tmMatches,
-      surroundingSegments: request.surroundingSegments
-    });
-    const startedAt = localAiStartedAt();
-    const data = await cohereJson("/v2/chat", {
-      method: "POST",
-      headers: cohereAuthHeaders(config, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content: "You are a professional translation assistant inside LoopCAT. Produce only the requested target-language translation for one CAT-tool segment."
-          },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.1,
-        max_tokens: 1200
-      })
-    }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-    const rawOutput = extractCohereResponseText(data);
-    if (typeof rawOutput !== "string") throw new Error("Cohere returned a malformed response.");
-    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
-    if (!translatedText.trim()) throw new Error("Cohere returned an empty translation for this segment.");
-    const inputTokens = cohereTokenCount(data?.usage?.tokens?.input_tokens, data?.usage?.billed_units?.input_tokens);
-    const outputTokens = cohereTokenCount(data?.usage?.tokens?.output_tokens, data?.usage?.billed_units?.output_tokens);
-    return {
-      translatedText,
-      rawOutput,
-      provider: "Cohere Command",
-      providerId: "cohere",
-      model,
-      durationMs: requestDurationMs(startedAt),
-      prompt,
-      metadata: {
-        inputTokens,
-        outputTokens,
-        totalTokens: inputTokens + outputTokens
-      }
-    };
-  }
-};
-
 function openAiCompatibleStatusError(data, status, model = "") {
   const raw = redactSensitiveText(data?.error?.message || data?.message || data?.error || "").trim();
   if (status === 401 || status === 403) return "The OpenAI-compatible provider rejected the request. Add or check the provider API key.";
@@ -2206,6 +2073,8 @@ const providerAdapterRuntime = Object.freeze({
   GEMINI_DEFAULT_MODEL,
   ANTHROPIC_DEFAULT_BASE_URL,
   ANTHROPIC_DEFAULT_MODEL,
+  COHERE_DEFAULT_BASE_URL,
+  COHERE_DEFAULT_MODEL,
   XAI_DEFAULT_BASE_URL,
   XAI_DEFAULT_MODEL,
   PERPLEXITY_DEFAULT_BASE_URL,
@@ -2230,6 +2099,7 @@ const providerAdapterRuntime = Object.freeze({
   FIREWORKS_DEFAULT_MODEL,
   azureOpenAiAuthHeaders,
   anthropicAuthHeaders,
+  cohereAuthHeaders,
   bearerAuthHeaders,
   buildTranslateGemmaPrompt,
   cleanModelTranslationOutput,
@@ -2241,6 +2111,7 @@ const providerAdapterRuntime = Object.freeze({
   openAiApiUrl,
   geminiApiUrl,
   anthropicApiUrl,
+  cohereApiUrl,
   xAiApiUrl,
   perplexityApiUrl,
   azureOpenAiApiUrl,
@@ -2256,6 +2127,7 @@ const providerAdapterRuntime = Object.freeze({
   normalizeOpenAiBaseUrl,
   normalizeGeminiBaseUrl,
   normalizeAnthropicBaseUrl,
+  normalizeCohereBaseUrl,
   normalizeXAiBaseUrl,
   normalizePerplexityBaseUrl,
   normalizeAzureOpenAiBaseUrl,
@@ -2297,35 +2169,6 @@ OllamaProvider.completePrompt = async function completePrompt(config = {}, reque
     totalDuration: data.total_duration || 0,
     promptEvalCount: data.prompt_eval_count || 0,
     evalCount: data.eval_count || 0
-  });
-};
-
-CohereProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
-  const settings = defaultLocalAiSettings({ ...config, providerId: "cohere", model: config.model || request.model }, request.project);
-  const baseUrl = normalizeCohereBaseUrl(config.baseUrl || settings.baseUrl || COHERE_DEFAULT_BASE_URL);
-  const model = String(config.model || request.model || settings.model || COHERE_DEFAULT_MODEL).trim() || COHERE_DEFAULT_MODEL;
-  if (!String(config.apiKey || "").trim()) throw new Error(cohereProviderAuthError());
-  const prompt = promptTextOrThrow(request);
-  const startedAt = localAiStartedAt();
-  const data = await cohereJson("/v2/chat", {
-    method: "POST",
-    headers: cohereAuthHeaders(config, { "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: request.system || genericPromptSystem() },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.1,
-      max_tokens: 1200
-    })
-  }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-  const inputTokens = cohereTokenCount(data?.usage?.tokens?.input_tokens, data?.usage?.billed_units?.input_tokens);
-  const outputTokens = cohereTokenCount(data?.usage?.tokens?.output_tokens, data?.usage?.billed_units?.output_tokens);
-  return genericPromptResult("Cohere Command", "cohere", model, prompt, extractCohereResponseText(data), startedAt, {
-    inputTokens,
-    outputTokens,
-    totalTokens: inputTokens + outputTokens
   });
 };
 
@@ -2394,7 +2237,7 @@ aiProviderRegistry.reserve("deepinfra");
 aiProviderRegistry.reserve("fireworks");
 aiProviderRegistry.reserve("gemini");
 aiProviderRegistry.reserve("anthropic");
-aiProviderRegistry.register(CohereProvider);
+aiProviderRegistry.reserve("cohere");
 aiProviderRegistry.reserve("mistral");
 aiProviderRegistry.reserve("azure-openai");
 aiProviderRegistry.register(OpenAICompatibleProvider);
@@ -3037,7 +2880,6 @@ window.CatHan.ai = {
   defaultLocalAiSettings,
   localAISettingsStore,
   OllamaProvider,
-  CohereProvider,
   OpenAICompatibleProvider,
   OpusCatProvider,
   providerAdapterRuntime,

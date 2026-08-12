@@ -4566,7 +4566,8 @@
           targetCode: "tr"
         });
         assert(
-          window.CatHan.ai.cohereApiUrl("https://api.cohere.com/v2", "/v1/models") === "https://api.cohere.com/v1/models" &&
+          window.CatHan.ai.CohereProvider === cohereProvider &&
+            window.CatHan.ai.cohereApiUrl("https://api.cohere.com/v2", "/v1/models") === "https://api.cohere.com/v1/models" &&
             window.CatHan.ai.cohereApiUrl("https://api.cohere.com/v1", "/v2/chat") === "https://api.cohere.com/v2/chat" &&
             cohereModelsRequest?.url === "https://api.cohere.com/v1/models" &&
             cohereModelsRequest.authorization === "Bearer cohere-api-key" &&
@@ -4978,6 +4979,8 @@
             providerIds.indexOf("fireworks") === providerIds.indexOf("deepinfra") + 1 &&
             providerIds.indexOf("gemini") === providerIds.indexOf("fireworks") + 1 &&
             providerIds.indexOf("anthropic") === providerIds.indexOf("gemini") + 1 &&
+            providerIds.indexOf("cohere") === providerIds.indexOf("anthropic") + 1 &&
+            providerIds.indexOf("mistral") === providerIds.indexOf("cohere") + 1 &&
             providerIds.indexOf("azure-openai") === providerIds.indexOf("mistral") + 1 &&
             providerIds.indexOf("openai-compatible") === providerIds.indexOf("azure-openai") + 1 &&
             window.CatHan.ai.localAiProviderPresetForSettings({ providerId: "groq", baseUrl: "https://api.groq.com" })?.id === "groq" &&
