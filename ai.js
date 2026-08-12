@@ -2408,134 +2408,6 @@ const PerplexityProvider = {
   }
 };
 
-function groqProviderAuthError() {
-  return "Add a Groq API key before using Groq for pre-translation.";
-}
-
-function groqStatusError(data, status, model = "") {
-  const raw = redactSensitiveText(data?.error?.message || data?.message || data?.error || "").trim();
-  if (status === 401 || status === 403) return "Groq rejected the request. Add or check the Groq API key.";
-  if ((status === 404 || /model/i.test(raw)) && model) return `Model ${model} was not found by Groq.`;
-  return raw || `Groq request failed with status ${status}.`;
-}
-
-async function groqJson(endpoint, options = {}, config = {}) {
-  const url = groqApiUrl(config.baseUrl || GROQ_DEFAULT_BASE_URL, endpoint);
-  let result = null;
-  try {
-    result = await fetchJsonWithTimeout(url, options, config);
-  } catch (error) {
-    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
-    throw new Error(`Groq is not reachable at ${normalizeGroqBaseUrl(config.baseUrl || GROQ_DEFAULT_BASE_URL)}.`);
-  }
-  if (!result.response?.ok) {
-    throw new Error(groqStatusError(result.data, result.response?.status, config.model));
-  }
-  return result.data;
-}
-
-function extractGroqResponseText(data) {
-  const messageContent = data?.choices?.[0]?.message?.content;
-  if (typeof messageContent === "string") return messageContent;
-  if (Array.isArray(messageContent)) {
-    return messageContent.map((part) => {
-      if (typeof part === "string") return part;
-      if (typeof part?.text === "string") return part.text;
-      if (typeof part?.content === "string") return part.content;
-      return "";
-    }).join("");
-  }
-  if (typeof data?.output_text === "string") return data.output_text;
-  if (typeof data?.text === "string") return data.text;
-  return "";
-}
-
-const GroqProvider = {
-  id: "groq",
-  name: "Groq",
-  defaultBaseUrl: GROQ_DEFAULT_BASE_URL,
-  defaultModel: GROQ_DEFAULT_MODEL,
-  async testConnection(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(groqProviderAuthError());
-    const baseUrl = normalizeGroqBaseUrl(config.baseUrl || GROQ_DEFAULT_BASE_URL);
-    const data = await groqJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    return {
-      ok: true,
-      provider: "Groq",
-      baseUrl,
-      modelCount: Array.isArray(data?.data) ? data.data.length : 0
-    };
-  },
-  async listModels(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(groqProviderAuthError());
-    const baseUrl = normalizeGroqBaseUrl(config.baseUrl || GROQ_DEFAULT_BASE_URL);
-    const data = await groqJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    const models = Array.isArray(data?.data)
-      ? data.data.map((model) => {
-        const created = Number(model.created);
-        return {
-          name: String(model.id || model.name || "").trim(),
-          size: model.size || 0,
-          modifiedAt: Number.isFinite(created) ? new Date(created * 1000).toISOString() : ""
-        };
-      }).filter((model) => model.name)
-      : [];
-    return { models, raw: data };
-  },
-  async translateSegment(config = {}, request = {}) {
-    const settings = defaultLocalAiSettings({ ...config, providerId: "groq", model: config.model || request.model }, request.project);
-    const baseUrl = normalizeGroqBaseUrl(config.baseUrl || settings.baseUrl || GROQ_DEFAULT_BASE_URL);
-    const model = String(config.model || request.model || settings.model || GROQ_DEFAULT_MODEL).trim() || GROQ_DEFAULT_MODEL;
-    const sourceText = String(request.text ?? request.segment?.source ?? "");
-    if (!sourceText.trim()) throw new Error("The segment has no source text.");
-    if (!String(config.apiKey || "").trim()) throw new Error(groqProviderAuthError());
-    const prompt = request.prompt || buildTranslateGemmaPrompt({
-      sourceLanguage: request.sourceLanguage || settings.sourceLanguage,
-      sourceCode: request.sourceCode || settings.sourceCode,
-      targetLanguage: request.targetLanguage || settings.targetLanguage,
-      targetCode: request.targetCode || settings.targetCode,
-      text: sourceText,
-      segment: request.segment,
-      glossaryTerms: request.glossaryTerms,
-      tmMatches: request.tmMatches,
-      surroundingSegments: request.surroundingSegments
-    });
-    const startedAt = localAiStartedAt();
-    const data = await groqJson("/chat/completions", {
-      method: "POST",
-      headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: "You are a professional translation assistant inside LoopCAT. Produce only the requested target-language translation for one CAT-tool segment." },
-          { role: "user", content: prompt }
-        ],
-        stream: false,
-        temperature: 0.1,
-        max_tokens: 1200
-      })
-    }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-    const rawOutput = extractGroqResponseText(data);
-    if (typeof rawOutput !== "string") throw new Error("Groq returned a malformed chat response.");
-    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
-    if (!translatedText.trim()) throw new Error("Groq returned an empty translation for this segment.");
-    return {
-      translatedText,
-      rawOutput,
-      provider: "Groq",
-      providerId: "groq",
-      model,
-      durationMs: requestDurationMs(startedAt),
-      prompt,
-      metadata: {
-        promptTokens: data?.usage?.prompt_tokens || 0,
-        completionTokens: data?.usage?.completion_tokens || 0,
-        totalTokens: data?.usage?.total_tokens || 0
-      }
-    };
-  }
-};
-
 function togetherProviderAuthError() {
   return "Add a Together AI API key before using Together AI for pre-translation.";
 }
@@ -3947,6 +3819,24 @@ function genericPromptResult(provider, providerId, model, prompt, rawOutput, sta
   };
 }
 
+const providerAdapterRuntime = Object.freeze({
+  GROQ_DEFAULT_BASE_URL,
+  GROQ_DEFAULT_MODEL,
+  bearerAuthHeaders,
+  buildTranslateGemmaPrompt,
+  cleanModelTranslationOutput,
+  defaultLocalAiSettings,
+  fetchJsonWithTimeout,
+  genericPromptResult,
+  genericPromptSystem,
+  groqApiUrl,
+  localAiStartedAt,
+  normalizeGroqBaseUrl,
+  promptTextOrThrow,
+  redactSensitiveText,
+  requestDurationMs
+});
+
 OllamaProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
   const settings = defaultLocalAiSettings({ ...config, model: config.model || request.model }, request.project);
   const model = String(config.model || request.model || settings.model || DEFAULT_LOCAL_AI_MODEL).trim() || DEFAULT_LOCAL_AI_MODEL;
@@ -4082,34 +3972,6 @@ PerplexityProvider.completePrompt = async function completePrompt(config = {}, r
     completionTokens: data?.usage?.completion_tokens || 0,
     totalTokens: data?.usage?.total_tokens || 0,
     citationCount: Array.isArray(data?.citations) ? data.citations.length : 0
-  });
-};
-
-GroqProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
-  const settings = defaultLocalAiSettings({ ...config, providerId: "groq", model: config.model || request.model }, request.project);
-  const baseUrl = normalizeGroqBaseUrl(config.baseUrl || settings.baseUrl || GROQ_DEFAULT_BASE_URL);
-  const model = String(config.model || request.model || settings.model || GROQ_DEFAULT_MODEL).trim() || GROQ_DEFAULT_MODEL;
-  if (!String(config.apiKey || "").trim()) throw new Error(groqProviderAuthError());
-  const prompt = promptTextOrThrow(request);
-  const startedAt = localAiStartedAt();
-  const data = await groqJson("/chat/completions", {
-    method: "POST",
-    headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: request.system || genericPromptSystem() },
-        { role: "user", content: prompt }
-      ],
-      stream: false,
-      temperature: 0.1,
-      max_tokens: 1200
-    })
-  }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-  return genericPromptResult("Groq", "groq", model, prompt, extractGroqResponseText(data), startedAt, {
-    promptTokens: data?.usage?.prompt_tokens || 0,
-    completionTokens: data?.usage?.completion_tokens || 0,
-    totalTokens: data?.usage?.total_tokens || 0
   });
 };
 
@@ -4420,6 +4282,11 @@ OpenAICompatibleProvider.completePrompt = async function completePrompt(config =
 const aiProviderRegistry = (() => {
   const providers = new Map();
   return {
+    reserve(id) {
+      const providerId = String(id || "").trim();
+      if (providerId && !providers.has(providerId)) providers.set(providerId, null);
+      return providerId;
+    },
     register(provider) {
       if (!provider?.id) return null;
       providers.set(provider.id, provider);
@@ -4429,7 +4296,7 @@ const aiProviderRegistry = (() => {
       return providers.get(id || "ollama") || providers.get("ollama");
     },
     list() {
-      return Array.from(providers.values());
+      return Array.from(providers.values()).filter(Boolean);
     }
   };
 })();
@@ -4439,7 +4306,7 @@ aiProviderRegistry.register(OpenAIProvider);
 aiProviderRegistry.register(DeepSeekProvider);
 aiProviderRegistry.register(XAIProvider);
 aiProviderRegistry.register(PerplexityProvider);
-aiProviderRegistry.register(GroqProvider);
+aiProviderRegistry.reserve("groq");
 aiProviderRegistry.register(TogetherProvider);
 aiProviderRegistry.register(OpenRouterProvider);
 aiProviderRegistry.register(HuggingFaceProvider);
@@ -5094,7 +4961,6 @@ window.CatHan.ai = {
   DeepSeekProvider,
   XAIProvider,
   PerplexityProvider,
-  GroqProvider,
   TogetherProvider,
   OpenRouterProvider,
   HuggingFaceProvider,
@@ -5107,6 +4973,7 @@ window.CatHan.ai = {
   AzureOpenAIProvider,
   OpenAICompatibleProvider,
   OpusCatProvider,
+  providerAdapterRuntime,
   aiProviderRegistry,
   preTranslationService,
   aiCommandService

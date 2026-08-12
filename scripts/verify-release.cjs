@@ -153,6 +153,8 @@ const requiredReleaseFiles = [
   "src/entry/production.js",
   "src/entry/renderer-bootstrap.js",
   "src/entry/test.js",
+  "src/ai/providers/groq-provider-adapter.js",
+  "src/ai/providers/install-extracted-providers.js",
   "src/commands/edit-target-session.js",
   "src/ui/dialog-controller.js",
   "src/features/ai/ai-administration-controller.js",
@@ -165,6 +167,7 @@ const requiredReleaseFiles = [
   "src/features/workspace/recovery-workspace-controller.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
+  "tests/unit/groq-provider-adapter.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
   "tests/unit/import-export-controller.test.cjs",
@@ -235,6 +238,10 @@ const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-p
 const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
 const aiAdministrationControllerJs = readText("src/features/ai/ai-administration-controller.js");
 const aiAdministrationControllerUnitTests = readText("tests/unit/ai-administration-controller.test.cjs");
+const groqProviderAdapterJs = readText("src/ai/providers/groq-provider-adapter.js");
+const extractedProviderInstallerJs = readText("src/ai/providers/install-extracted-providers.js");
+const groqProviderAdapterUnitTests = readText("tests/unit/groq-provider-adapter.test.cjs");
+const productionEntryJs = readText("src/entry/production.js");
 const qualityReviewControllerJs = readText("src/features/quality/quality-review-controller.js");
 const qualityReviewControllerUnitTests = readText("tests/unit/quality-review-controller.test.cjs");
 const recoveryWorkspaceControllerJs = readText("src/features/workspace/recovery-workspace-controller.js");
@@ -2386,7 +2393,11 @@ const perplexityProviderFunction = functionBody(
   "const PerplexityProvider = {",
   "function geminiProviderAuthError"
 );
-const groqProviderFunction = functionBody(aiJs, "const GroqProvider = {", "function geminiProviderAuthError");
+const groqProviderFunction = functionBody(
+  groqProviderAdapterJs,
+  "export function createGroqProviderAdapter",
+  "export function installGroqProviderAdapter"
+);
 const togetherProviderFunction = functionBody(aiJs, "const TogetherProvider = {", "function geminiProviderAuthError");
 const openRouterProviderFunction = functionBody(
   aiJs,
@@ -2605,7 +2616,15 @@ assertIncludes(
   "max_tokens: 1200",
   "ai.js Perplexity Sonar requests must include bounded max_tokens."
 );
-assertIncludes(aiJs, "const GroqProvider = {", "ai.js must implement the native Groq provider.");
+assertIncludes(
+  groqProviderAdapterJs,
+  "export function createGroqProviderAdapter",
+  "The checked Groq adapter module must implement the native Groq provider."
+);
+assert(
+  !aiJs.includes("const GroqProvider = {") && !aiJs.includes("function groqProviderAuthError"),
+  "ai.js must not retain the extracted Groq provider implementation."
+);
 assertIncludes(aiJs, "groqApiUrl", "ai.js must normalize Groq model-list and chat-completion endpoints.");
 assertIncludes(
   defaultLocalAiSettingsFunction,
@@ -2613,14 +2632,14 @@ assertIncludes(
   "ai.js must default native Groq settings to the Groq base URL/model, not Ollama."
 );
 assertIncludes(
-  groqProviderFunction,
+  groqProviderAdapterJs,
   "bearerAuthHeaders",
-  "ai.js Groq requests must send API keys in authorization headers."
+  "The Groq adapter must send API keys in authorization headers."
 );
 assertIncludes(
-  groqProviderFunction,
+  groqProviderAdapterJs,
   "max_tokens: 1200",
-  "ai.js Groq chat-completion requests must include bounded max_tokens."
+  "The Groq adapter chat-completion requests must include bounded max_tokens."
 );
 assertIncludes(aiJs, "const TogetherProvider = {", "ai.js must implement the native Together AI provider.");
 assertIncludes(aiJs, "togetherApiUrl", "ai.js must normalize Together AI model-list and chat-completion endpoints.");
@@ -2904,11 +2923,50 @@ assertIncludes(
   "ai.js must register the native Perplexity provider."
 );
 assertIncludes(
-  aiJs,
-  "GroqProvider.completePrompt = async function completePrompt",
-  "ai.js must route Groq AI-native commands through the native provider."
+  groqProviderFunction,
+  "async completePrompt",
+  "The Groq adapter must route AI-native commands through the native provider."
 );
-assertIncludes(aiJs, "aiProviderRegistry.register(GroqProvider)", "ai.js must register the native Groq provider.");
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installGroqProviderAdapter",
+  "The extracted-provider installer must register the native Groq provider."
+);
+assertIncludes(
+  aiJs,
+  'aiProviderRegistry.reserve("groq")',
+  "The legacy registry must preserve Groq's provider order while its adapter installs."
+);
+assertIncludes(
+  productionEntryJs,
+  'import "../ai/providers/install-extracted-providers.js"',
+  "The production renderer must install extracted providers before app bootstrap."
+);
+assert(
+  productionEntryJs.indexOf('import "../../ai.js"') <
+    productionEntryJs.indexOf('import "../ai/providers/install-extracted-providers.js"'),
+  "The production renderer must load the AI façade before installing extracted providers."
+);
+assertIncludes(
+  regressionHtml,
+  'import "./src/ai/providers/install-extracted-providers.js"',
+  "The standalone regression harness must install extracted providers through the production adapter boundary."
+);
+assertIncludes(
+  regressionHtml,
+  'providerIds.indexOf("together") === providerIds.indexOf("groq") + 1',
+  "The regression harness must characterize provider ordering across extracted adapters."
+);
+assertIncludes(
+  groqProviderAdapterJs,
+  "ai.GroqProvider = provider",
+  "The Groq adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  groqProviderAdapterUnitTests,
+  "preserves translation payload, cancellation signal, response normalization, and provenance",
+  "The Groq adapter must retain focused request, abort, normalization, and provenance characterization."
+);
 assertIncludes(
   aiJs,
   "TogetherProvider.completePrompt = async function completePrompt",

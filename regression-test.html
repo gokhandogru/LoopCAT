@@ -21,7 +21,9 @@
     <script src="./ai.js"></script>
     <script src="./worker-client.js"></script>
     <script src="./project.js"></script>
-    <script>
+    <script type="module">
+      import "./src/ai/providers/install-extracted-providers.js";
+
       (async () => {
         const out = [];
         const assert = (condition, label) => {
@@ -4871,6 +4873,7 @@
           project: null
         });
         const groqDefaultSettings = window.CatHan.ai.localAISettingsStore.defaults({ providerId: "groq" });
+        const providerIds = window.CatHan.ai.aiProviderRegistry.list().map((provider) => provider.id);
         assert(
           window.CatHan.ai.normalizeGroqBaseUrl("https://api.groq.com") === "https://api.groq.com/openai/v1" &&
             window.CatHan.ai.groqApiUrl("https://api.groq.com/openai/v1", "/chat/completions") === "https://api.groq.com/openai/v1/chat/completions" &&
@@ -4894,6 +4897,8 @@
             groqPromptResult.metadata.totalTokens === 10 &&
             groqDefaultSettings.baseUrl === "https://api.groq.com/openai/v1" &&
             groqDefaultSettings.model === "llama-3.3-70b-versatile" &&
+            providerIds.indexOf("groq") === providerIds.indexOf("perplexity") + 1 &&
+            providerIds.indexOf("together") === providerIds.indexOf("groq") + 1 &&
             window.CatHan.ai.localAiProviderPresetForSettings({ providerId: "groq", baseUrl: "https://api.groq.com" })?.id === "groq" &&
             window.CatHan.ai.localAiProviderNeedsApiKey("groq", "https://api.groq.com/openai/v1") &&
             window.CatHan.ai.localAiProviderSharesExternally("groq", "https://api.groq.com/openai/v1"),

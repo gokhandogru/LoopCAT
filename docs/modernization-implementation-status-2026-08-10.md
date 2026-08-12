@@ -54,9 +54,9 @@ This document records what the current working tree implements from the 2026 mod
 
 The new checked boundaries are active, but `app.js` remains the compatibility coordinator and is still approximately 20,000 source lines, including the isolated workflow-test source section. Production strips the test driver, but the roadmap's source goal of a bootstrap under 300 lines is not met.
 
-The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT help, Resources, quality/review, recovery/workspace, import/export/report, and AI provider-administration/command-centre UI slices are complete. Still required before this package is complete:
+The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT help, Resources, quality/review, recovery/workspace, import/export/report, and AI provider-administration/command-centre UI slices are complete. The first provider-adapter boundary is also complete: Groq now lives in an independently checked adapter, installs through the existing registry before application bootstrap, and retains only a temporary compatibility export from the AI façade. Still required before this package is complete:
 
-1. Move remaining provider implementations from the `ai.js` façade into independently tested adapters without changing provider behavior or consent rules.
+1. Move the remaining provider implementations from the `ai.js` façade into independently tested adapters without changing provider behavior or consent rules. Continue the hosted OpenAI-compatible family with Together AI, OpenRouter, Hugging Face Inference Providers, DeepInfra, and Fireworks AI before moving the distinct native/local provider families.
 2. Replace remaining mutable compatibility state with injected repositories/controllers and remove new code's reliance on `window.CatHan`.
 3. Keep each extraction behavior-preserving and run the focused feature suite plus the full browser/release suite at each family boundary.
 
@@ -89,7 +89,7 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 with behavior-preserving provider-adapter decomposition behind the existing checked provider service.
+Continue P1-08 with the remaining hosted OpenAI-compatible provider adapters behind the existing checked provider service.
 
 Entry criteria:
 
