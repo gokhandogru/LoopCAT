@@ -749,7 +749,6 @@ const state = {
   storageDurability: { checked: false, supported: false, persisted: false, requested: false, usageBytes: 0, quotaBytes: 0 },
   workspaceDirtyProjectIds: new Set(),
   workspaceRecoveryProjectIds: new Set(),
-  workspaceRecoveryDismissed: false,
   localAi: {
     connectionStatus: "disconnected",
     statusText: "Disconnected",
@@ -1291,6 +1290,61 @@ dialogLifecycleController?.register?.({
   initialFocus: els.closeTrashBtn,
   beforeOpen: renderTrashList
 });
+const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecoveryWorkspaceController?.({
+  elements: {
+    menu: els.workspaceMenu,
+    menuSummary: els.workspaceMenuSummary,
+    health: els.workspaceHealth,
+    chooseWorkspaceButton: els.chooseWorkspaceBtn,
+    saveProjectButton: els.saveWorkspaceProjectBtn,
+    syncWorkspaceButton: els.syncWorkspaceBtn,
+    exportWorkspaceBackupButton: els.workspaceBackupBtn,
+    repairWorkspaceButton: els.repairWorkspaceBtn,
+    recoveryPanel: els.workspaceRecoveryPanel,
+    recoveryMessage: els.workspaceRecoveryMessage,
+    recoveryList: els.workspaceRecoveryList,
+    saveRecoveryButton: els.workspaceRecoverySaveBtn,
+    openRecoveryButton: els.workspaceRecoveryOpenBtn,
+    dismissRecoveryButton: els.workspaceRecoveryDismissBtn,
+    backupReminderPanel: els.backupReminderPanel,
+    backupReminderMessage: els.backupReminderMessage,
+    exportRecoveryCopyButton: els.backupReminderExportBtn,
+    dismissBackupReminderButton: els.backupReminderDismissBtn,
+    projectStorageStatus: els.projectStorageStatus,
+    saveProjectToFolderInput: els.saveProjectToFolderInput,
+    projectChooseWorkspaceButton: els.projectChooseWorkspaceBtn
+  },
+  translate: uiT,
+  source: uiSource,
+  label: uiLabel,
+  formatDateTime,
+  safeText: displaySafeText,
+  chooseWorkspace: chooseWorkspaceFolder,
+  saveProject: saveCurrentProjectPackageToWorkspace,
+  syncWorkspace: () => runFileImportTask("Workspace sync", () => syncWorkspaceFromFolder()),
+  exportWorkspaceBackup: exportWorkspaceBackupToFolder,
+  repairWorkspace: repairWorkspaceLinks,
+  saveRecovery: saveWorkspaceRecoveryPackages,
+  exportRecoveryCopy: exportProjectPackage,
+  dismissBackupReminder: () => dismissBackupReminder(),
+  scheduleFrame: requestAnimationFrame,
+  onError: (error, context) => {
+    if (error?.name === "AbortError" && context?.phase === "choose-workspace") return;
+    const fallback = {
+      "choose-workspace": uiSource("Could not choose workspace folder"),
+      "save-project": uiSource("Project package save failed"),
+      "sync-workspace": uiSource("Workspace sync failed"),
+      "export-workspace-backup": uiSource("Workspace backup failed"),
+      "repair-workspace": uiSource("Workspace repair check failed"),
+      "save-recovery": uiSource("Workspace recovery save failed"),
+      "export-recovery-copy": uiSource("Recovery copy export failed"),
+      "dismiss-backup-reminder": uiSource("Backup reminder could not be dismissed")
+    }[context?.phase] || uiSource("Workspace action failed");
+    setSaveStatus(error?.message || fallback, "dirty");
+    if (context?.phase === "save-recovery") renderWorkspaceRecoveryPanel();
+  }
+});
+recoveryWorkspaceController?.mount?.();
 const projectDialogController = appRuntime?.featureFactories?.createProjectDialogController?.({
   dialogLifecycle: dialogLifecycleController,
   elements: {
@@ -1824,11 +1878,7 @@ function renderImportBusyState() {
     control.disabled = busy;
     control.setAttribute("aria-busy", String(busy));
   });
-  if (els.syncWorkspaceBtn) {
-    const status = state.workspaceStatus || {};
-    els.syncWorkspaceBtn.disabled = busy || !status.supported || !status.connected;
-    els.syncWorkspaceBtn.setAttribute("aria-busy", String(busy));
-  }
+  recoveryWorkspaceController?.renderBusy?.({ busy, status: state.workspaceStatus || {} });
 }
 
 function formatFileSize(bytes) {
@@ -3803,7 +3853,7 @@ function restoreWorkspaceDirtyIds() {
   const ids = readStoredWorkspaceDirtyIds();
   state.workspaceDirtyProjectIds = new Set(ids);
   state.workspaceRecoveryProjectIds = new Set(ids);
-  state.workspaceRecoveryDismissed = false;
+  recoveryWorkspaceController?.resetRecoveryDismissal?.();
 }
 
 function pruneWorkspaceDirtyProjectIds() {
@@ -3885,7 +3935,7 @@ function clearWorkspaceDirty(projectId = state.project?.id) {
 function clearWorkspaceDirtyMarkers() {
   state.workspaceDirtyProjectIds.clear();
   state.workspaceRecoveryProjectIds.clear();
-  state.workspaceRecoveryDismissed = false;
+  recoveryWorkspaceController?.resetRecoveryDismissal?.();
   persistWorkspaceDirtyIds();
   renderWorkspaceStatus();
 }
@@ -3896,46 +3946,19 @@ function clearWorkspaceDirtyMemoryOnly() {
   renderWorkspaceStatus();
 }
 
-function workspaceStatusLine(status = state.workspaceStatus) {
-  return uiT("workspace.menu.summary");
-}
-
 function renderWorkspaceStatus() {
-  if (!els.workspaceMenuSummary || !workspaceStorage) return;
+  if (!workspaceStorage) return;
   const status = state.workspaceStatus || {};
   const dirtyCount = visibleWorkspaceDirtyCount(status);
-  els.workspaceMenuSummary.textContent = dirtyCount
-    ? uiT("workspace.menu.summaryDirty", { count: dirtyCount })
-    : workspaceStatusLine(status);
-  const mode = status.connected ? uiT("workspace.status.folderTitle") : uiT("workspace.status.localTitle");
-  const folderSupport = status.supported
-    ? uiT("workspace.status.localDetail")
-    : uiT("workspace.status.unsupportedDetail");
   const storageWarnings = storageDurabilityWarnings(state.storageDurability);
-  const folderName = displaySafeText(status.name, uiT("workspace.status.workspaceFolder"));
-  const countLine = status.connected
-    ? uiT("workspace.status.folderContents", {
-      packages: status.projectCount || 0,
-      resources: status.resourceCount || 0,
-      backups: status.backupCount || 0
-    })
-    : "";
-  replaceSafeHtml(els.workspaceHealth, `
-    <strong>${escapeHtml(mode)}</strong>
-    <span>${status.connected ? escapeHtml(uiT("workspace.status.folderDetail", { name: folderName })) : escapeHtml(folderSupport)}</span>
-    <span>${escapeHtml(uiSource(storageDurabilityLine(state.storageDurability)))}</span>
-    ${status.connected ? `<span>${escapeHtml(uiT("workspace.status.lastSync", { date: formatDateTime(status.lastSyncedAt) }))}</span>` : ""}
-    ${countLine ? `<span>${escapeHtml(countLine)}</span>` : ""}
-    ${dirtyCount ? `<span class="workspace-warning">${escapeHtml(uiT("workspace.status.dirtyWarning", { count: dirtyCount }))}</span>` : ""}
-    ${storageWarnings.map((warning) => `<span class="workspace-warning">${escapeHtml(uiSource(warning))}</span>`).join("")}
-    ${(status.warnings || []).length ? `<span class="workspace-warning">${escapeHtml(status.warnings[0])}${status.warnings.length > 1 ? ` (${status.warnings.length} total)` : ""}</span>` : ""}
-  `);
-  els.chooseWorkspaceBtn.disabled = !status.supported;
-  els.saveWorkspaceProjectBtn.disabled = !status.supported || !status.connected || !state.project;
-  els.syncWorkspaceBtn.disabled = Boolean(state.importTask) || !status.supported || !status.connected;
-  els.workspaceBackupBtn.disabled = !status.supported || !status.connected;
-  els.repairWorkspaceBtn.disabled = !status.supported || !status.connected;
-  renderProjectStorageStatus();
+  recoveryWorkspaceController?.renderStatus?.({
+    status,
+    dirtyCount,
+    storageLine: storageDurabilityLine(state.storageDurability),
+    storageWarnings,
+    importBusy: Boolean(state.importTask),
+    hasProject: Boolean(state.project)
+  });
   renderWorkspaceRecoveryPanel();
 }
 
@@ -3944,23 +3967,15 @@ function workspaceRecoveryProjectIds() {
 }
 
 function renderWorkspaceRecoveryPanel() {
-  if (!els.workspaceRecoveryPanel) return;
   const ids = workspaceRecoveryProjectIds();
-  const supported = Boolean(state.workspaceStatus?.supported);
-  const shouldShow = supported && !state.workspaceRecoveryDismissed && ids.length > 0;
-  els.workspaceRecoveryPanel.classList.toggle("hidden", !shouldShow);
-  if (!shouldShow) return;
-  const connected = Boolean(state.workspaceStatus?.connected);
-  els.workspaceRecoveryMessage.textContent = connected
-    ? "Your edits are saved in LoopCAT but have not yet been copied to your workspace folder."
-    : "Your edits are saved in this browser. Choose your workspace folder to keep a visible recovery copy.";
-  replaceSafeHtml(els.workspaceRecoveryList, ids
-    .map((id) => {
+  recoveryWorkspaceController?.renderRecovery?.({
+    status: state.workspaceStatus || {},
+    projects: ids.map((id) => {
       const project = knownProjectById(id);
-      return `<li>${displaySafeHtml(project?.name || id)}</li>`;
-    })
-    .join(""));
-  els.workspaceRecoverySaveBtn.disabled = !supported || state.workspaceAutosaving;
+      return { id, name: project?.name || id };
+    }),
+    autosaving: state.workspaceAutosaving
+  });
 }
 
 function daysBetween(fromIso, toDate = new Date()) {
@@ -4023,11 +4038,8 @@ function backupReminderInfo(project = state.project, activityEvents = state.acti
 }
 
 function renderBackupReminder() {
-  if (!els.backupReminderPanel) return;
   const info = backupReminderInfo();
-  els.backupReminderPanel.classList.toggle("hidden", !info);
-  if (!info) return;
-  els.backupReminderMessage.textContent = `${info.reason} Export a portable project package so this work can be recovered outside this browser profile.`;
+  recoveryWorkspaceController?.renderBackupReminder?.({ info });
 }
 
 function knownProjectById(projectId) {
@@ -4052,20 +4064,8 @@ async function markLocalProjectsMissingFromWorkspaceDirty() {
 }
 
 function renderProjectStorageStatus() {
-  if (!els.projectStorageStatus || !workspaceStorage) return;
-  const status = state.workspaceStatus || {};
-  if (!status.supported) {
-    els.projectStorageStatus.textContent = uiSource("Folder saving is unavailable in this browser. Project packages can still be imported and exported manually.");
-    els.saveProjectToFolderInput.checked = false;
-    els.saveProjectToFolderInput.disabled = true;
-    els.projectChooseWorkspaceBtn.disabled = true;
-    return;
-  }
-  els.saveProjectToFolderInput.disabled = false;
-  els.projectChooseWorkspaceBtn.disabled = false;
-  els.projectStorageStatus.textContent = status.connected
-    ? uiLabel("projectStorageFolder", { name: displaySafeText(status.name, uiT("workspace.status.workspaceFolder")) })
-    : uiLabel("projectStorageDefault");
+  if (!workspaceStorage) return;
+  recoveryWorkspaceController?.renderProjectStorage?.({ status: state.workspaceStatus || {} });
 }
 
 function projectProgress(segments) {
@@ -13596,59 +13596,6 @@ function wireEvents() {
   });
   els.uiLocaleImportInput?.addEventListener("change", importUiLocaleFile);
   els.exportUiSourceBtn?.addEventListener("click", exportUiSourceCatalog);
-  els.workspaceRecoverySaveBtn.addEventListener("click", async () => {
-    try {
-      await saveWorkspaceRecoveryPackages();
-    } catch (error) {
-      setSaveStatus(error.message || "Workspace recovery save failed", "dirty");
-      renderWorkspaceRecoveryPanel();
-    }
-  });
-  els.workspaceRecoveryOpenBtn.addEventListener("click", () => {
-    if (els.workspaceMenu) els.workspaceMenu.open = true;
-    els.workspaceMenuSummary?.focus();
-  });
-  els.workspaceRecoveryDismissBtn.addEventListener("click", () => {
-    state.workspaceRecoveryDismissed = true;
-    renderWorkspaceRecoveryPanel();
-  });
-  els.backupReminderExportBtn.addEventListener("click", exportProjectPackage);
-  els.backupReminderDismissBtn.addEventListener("click", () => dismissBackupReminder());
-  els.chooseWorkspaceBtn.addEventListener("click", async () => {
-    try {
-      await chooseWorkspaceFolder();
-    } catch (error) {
-      if (error.name !== "AbortError") setSaveStatus(error.message || "Could not choose workspace folder", "dirty");
-    }
-  });
-  els.saveWorkspaceProjectBtn.addEventListener("click", async () => {
-    try {
-      await saveCurrentProjectPackageToWorkspace();
-    } catch (error) {
-      setSaveStatus(error.message || "Project package save failed", "dirty");
-    }
-  });
-  els.syncWorkspaceBtn.addEventListener("click", async () => {
-    try {
-      await runFileImportTask("Workspace sync", () => syncWorkspaceFromFolder());
-    } catch (error) {
-      setSaveStatus(error.message || "Workspace sync failed", "dirty");
-    }
-  });
-  els.workspaceBackupBtn.addEventListener("click", async () => {
-    try {
-      await exportWorkspaceBackupToFolder();
-    } catch (error) {
-      setSaveStatus(error.message || "Workspace backup failed", "dirty");
-    }
-  });
-  els.repairWorkspaceBtn.addEventListener("click", async () => {
-    try {
-      await repairWorkspaceLinks();
-    } catch (error) {
-      setSaveStatus(error.message || "Workspace repair check failed", "dirty");
-    }
-  });
   els.projectFilesBtn.addEventListener("click", showProjectHome);
   els.projectFileImportBtn.addEventListener("click", () => els.projectFileImportInput.click());
   els.projectPackageExportBtn.addEventListener("click", exportProjectPackage);
@@ -19063,14 +19010,39 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     workspaceStorage.getStatus = async () => ({ ...state.workspaceStatus, projectCount: savedWorkspacePackages.length });
     try {
       state.workspaceRecoveryProjectIds = new Set([project.id]);
-      state.workspaceRecoveryDismissed = false;
+      recoveryWorkspaceController.resetRecoveryDismissal();
       renderWorkspaceStatus();
       assert(
         !els.workspaceRecoveryPanel.classList.contains("hidden") &&
           els.workspaceRecoveryMessage.textContent.includes("saved in LoopCAT") &&
-          els.workspaceRecoveryList.textContent.includes(project.name),
-        "startup workspace recovery panel names unsaved project packages"
+          els.workspaceRecoveryList.textContent.includes(project.name) &&
+          recoveryWorkspaceController.getState().dirtyCount === 1 &&
+          recoveryWorkspaceController.getState().recoveryDismissed === false,
+        "checked recovery/workspace controller renders startup recovery state without owning dirty markers"
       );
+      els.workspaceRecoveryDismissBtn.focus();
+      els.workspaceRecoveryDismissBtn.click();
+      await waitFor(
+        () =>
+          els.workspaceRecoveryPanel.classList.contains("hidden") &&
+          document.activeElement === els.workspaceMenuSummary,
+        "checked workspace recovery dismissal focus"
+      );
+      assert(
+        recoveryWorkspaceController.getState().recoveryDismissed,
+        "checked recovery/workspace controller owns recovery dismissal and visible focus restoration"
+      );
+      recoveryWorkspaceController.resetRecoveryDismissal({ render: true });
+      els.workspaceRecoveryOpenBtn.click();
+      await waitFor(
+        () => els.workspaceMenu.open && document.activeElement === els.workspaceMenuSummary,
+        "checked workspace recovery menu open"
+      );
+      assert(
+        els.workspaceMenu.open,
+        "checked recovery/workspace controller opens the workspace menu without document-click cancellation"
+      );
+      els.workspaceMenu.removeAttribute("open");
       els.workspaceRecoverySaveBtn.click();
       await waitFor(() => !state.workspaceDirtyProjectIds.has(project.id), "workspace recovery panel save");
       assert(els.workspaceRecoveryPanel.classList.contains("hidden"), "workspace recovery panel hides after saved packages are written");

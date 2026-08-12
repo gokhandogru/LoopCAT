@@ -160,9 +160,11 @@ const requiredReleaseFiles = [
   "src/features/quality/quality-review-controller.js",
   "src/features/resources/resources-controller.js",
   "src/features/resources/tm-pretranslation-dialog-controller.js",
+  "src/features/workspace/recovery-workspace-controller.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
+  "tests/unit/recovery-workspace-controller.test.cjs",
   "tests/unit/resource-trash.test.cjs",
   "tests/unit/resources-controller.test.cjs",
   "scripts/generate-brand-icons.cjs",
@@ -229,6 +231,8 @@ const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-p
 const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
 const qualityReviewControllerJs = readText("src/features/quality/quality-review-controller.js");
 const qualityReviewControllerUnitTests = readText("tests/unit/quality-review-controller.test.cjs");
+const recoveryWorkspaceControllerJs = readText("src/features/workspace/recovery-workspace-controller.js");
+const recoveryWorkspaceControllerUnitTests = readText("tests/unit/recovery-workspace-controller.test.cjs");
 const resourcesControllerJs = readText("src/features/resources/resources-controller.js");
 const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
 const resourceTrashUnitTests = readText("tests/unit/resource-trash.test.cjs");
@@ -1129,6 +1133,83 @@ assertIncludes(
   appJs,
   "checked quality/review controller owns workbench rendering and redacted view state",
   "the app workflow must characterize quality rendering through the checked controller."
+);
+assertIncludes(
+  recoveryWorkspaceControllerJs,
+  'listen(chooseWorkspaceButton, "click"',
+  "the checked recovery/workspace controller must own the primary workspace action lifecycle."
+);
+assertIncludes(
+  recoveryWorkspaceControllerJs,
+  'listen(saveRecoveryButton, "click"',
+  "the checked recovery/workspace controller must own recovery-save intent."
+);
+assertIncludes(
+  recoveryWorkspaceControllerJs,
+  "event.stopPropagation?.()",
+  "the recovery-folder action must not be cancelled by the application outside-click listener."
+);
+assertIncludes(
+  recoveryWorkspaceControllerJs,
+  "if (hadFocus) restoreMenuFocus()",
+  "the checked recovery/workspace controller must restore visible focus when recovery UI disappears."
+);
+assert(
+  !recoveryWorkspaceControllerJs.includes("innerHTML") &&
+    !recoveryWorkspaceControllerJs.includes("insertAdjacentHTML"),
+  "the extracted recovery/workspace renderer must build external folder and warning labels with safe DOM construction."
+);
+assert(
+  !recoveryWorkspaceControllerJs.includes("workspace-storage") &&
+    !recoveryWorkspaceControllerJs.includes("localStorage") &&
+    !recoveryWorkspaceControllerJs.includes("buildProjectPackage") &&
+    !recoveryWorkspaceControllerJs.includes("importProjectPackageData"),
+  "the recovery/workspace controller must not own directory handles, dirty-marker persistence, packages, or import policy."
+);
+assertIncludes(
+  appJs,
+  "createRecoveryWorkspaceController",
+  "app.js must compose the checked recovery/workspace controller with injected domain actions."
+);
+assert(
+  !appJs.includes('els.workspaceRecoverySaveBtn.addEventListener("click"') &&
+    !appJs.includes('els.workspaceRecoveryOpenBtn.addEventListener("click"') &&
+    !appJs.includes('els.workspaceRecoveryDismissBtn.addEventListener("click"') &&
+    !appJs.includes('els.chooseWorkspaceBtn.addEventListener("click"') &&
+    !appJs.includes('els.saveWorkspaceProjectBtn.addEventListener("click"') &&
+    !appJs.includes('els.syncWorkspaceBtn.addEventListener("click"') &&
+    !appJs.includes('els.workspaceBackupBtn.addEventListener("click"') &&
+    !appJs.includes('els.repairWorkspaceBtn.addEventListener("click"'),
+  "the migrated recovery/workspace family must not retain superseded static listeners in app.js."
+);
+assert(
+  !functionBody(appJs, "function renderWorkspaceStatus", "function workspaceRecoveryProjectIds").includes(
+    "replaceSafeHtml"
+  ) &&
+    !functionBody(appJs, "function renderWorkspaceRecoveryPanel", "function daysBetween").includes(
+      "replaceSafeHtml"
+    ),
+  "workspace health and recovery DOM construction must live in the checked controller rather than app.js."
+);
+assertIncludes(
+  recoveryWorkspaceControllerUnitTests,
+  "owns workspace actions without owning storage or recovery policy",
+  "focused tests must characterize recovery/workspace event delegation and domain separation."
+);
+assertIncludes(
+  recoveryWorkspaceControllerUnitTests,
+  "owns recovery dismissal and restores visible focus",
+  "focused tests must characterize recovery dismissal and focus restoration."
+);
+assertIncludes(
+  appJs,
+  "checked recovery/workspace controller renders startup recovery state without owning dirty markers",
+  "the app workflow must characterize startup recovery rendering through the checked controller."
+);
+assertIncludes(
+  appJs,
+  "checked recovery/workspace controller opens the workspace menu without document-click cancellation",
+  "the app workflow must characterize recovery folder access and focus in the real application."
 );
 assertIncludes(
   indexHtml,
@@ -4677,13 +4758,13 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "function renderImportBusyState()", "function stableLower"),
-  "els.syncWorkspaceBtn",
-  "app.js must disable workspace sync while import or restore tasks are active."
+  "recoveryWorkspaceController?.renderBusy",
+  "app.js must delegate workspace-sync busy state while import or restore tasks are active."
 );
 assertIncludes(
-  functionBody(appJs, "els.syncWorkspaceBtn.addEventListener", "els.workspaceBackupBtn.addEventListener"),
+  functionBody(appJs, "const recoveryWorkspaceController", "const projectDialogController"),
   'runFileImportTask("Workspace sync"',
-  "app.js must run workspace sync through the import busy-state guard."
+  "the checked recovery/workspace controller must receive workspace sync through the import busy-state guard."
 );
 assertIncludes(
   appJs,
@@ -6113,8 +6194,18 @@ assertIncludes(
 );
 assertIncludes(
   baselineCaptureScript,
-  "const expectedScreenshotCount = 69;",
-  "the deterministic visual checkpoint count must include quality and review states."
+  'captureState("01", "workspace-recovery-local")',
+  "visual checkpoints must include the local workspace recovery state at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'captureState("01", "workspace-local-status-menu")',
+  "visual checkpoints must include the local workspace status menu at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  "const expectedScreenshotCount = 75;",
+  "the deterministic visual checkpoint count must include quality, review, and recovery/workspace states."
 );
 assertIncludes(
   accessibilityVerificationScript,
@@ -6125,6 +6216,16 @@ assertIncludes(
   accessibilityVerificationScript,
   'audit("Quality Workbench populated")',
   "automated accessibility checks must cover the populated Quality Workbench."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'audit("Workspace recovery visible")',
+  "automated accessibility checks must cover the actionable local recovery state."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'audit("Workspace local status menu")',
+  "automated accessibility checks must cover local workspace status and storage warnings."
 );
 assertIncludes(
   appJs,

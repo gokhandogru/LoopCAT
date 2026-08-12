@@ -223,12 +223,51 @@ app
       const fixture = JSON.parse(
         await fs.readFile(path.join(root, "tests", "fixtures", "modernization", "baseline-backup.json"), "utf8")
       );
+      const recoveryProjectId = fixture.projects?.[0]?.id;
+      if (!recoveryProjectId) throw new Error("Accessibility fixture has no project for workspace recovery.");
       await windowRef.webContents.executeJavaScript(
-        `window.CatHan.storage.importAllData(${JSON.stringify(fixture)})`,
+        `(async () => {
+          await window.CatHan.storage.importAllData(${JSON.stringify(fixture)});
+          localStorage.setItem("loopcat.workspace.dirtyProjectIds", ${JSON.stringify(JSON.stringify([recoveryProjectId]))});
+        })()`,
         true
       );
       await windowRef.reload();
       await waitFor("document.querySelector('.project-tile button.primary')", "populated accessibility project");
+      await waitFor(
+        "!document.querySelector('#workspaceRecoveryPanel').classList.contains('hidden')",
+        "accessible workspace recovery panel"
+      );
+      await audit("Workspace recovery visible");
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const opener = document.querySelector("#workspaceRecoveryOpenBtn");
+          opener.focus();
+          opener.click();
+        })()`,
+        true
+      );
+      await waitFor(
+        "document.querySelector('.workspace-menu').open && document.activeElement === document.querySelector('#workspaceMenuSummary')",
+        "accessible workspace local status menu"
+      );
+      await audit("Workspace local status menu");
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const dismiss = document.querySelector("#workspaceRecoveryDismissBtn");
+          dismiss.focus();
+          dismiss.click();
+        })()`,
+        true
+      );
+      await waitFor(
+        "document.querySelector('#workspaceRecoveryPanel').classList.contains('hidden') && document.activeElement === document.querySelector('#workspaceMenuSummary')",
+        "accessible workspace recovery dismissal"
+      );
+      await windowRef.webContents.executeJavaScript(
+        "document.querySelector('.workspace-menu').removeAttribute('open')",
+        true
+      );
       await windowRef.webContents.executeJavaScript(
         "document.querySelector('.project-tile button.primary').click()",
         true

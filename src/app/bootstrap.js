@@ -50,6 +50,7 @@ import { createOpusCatHelpController } from "../features/ai/opus-cat-help-contro
 import { createTmPretranslationDialogController } from "../features/resources/tm-pretranslation-dialog-controller.js";
 import { createResourcesController } from "../features/resources/resources-controller.js";
 import { createQualityReviewController } from "../features/quality/quality-review-controller.js";
+import { createRecoveryWorkspaceController } from "../features/workspace/recovery-workspace-controller.js";
 import {
   asTrustedHtml,
   asTrustedScriptUrl,
@@ -123,6 +124,7 @@ export function createApplicationRuntime({ browserWindow, projectApi, storageApi
       createProjectDialogController,
       createProjectsController,
       createQualityReviewController,
+      createRecoveryWorkspaceController,
       createResourcesController,
       createPaletteController,
       createThemeController,

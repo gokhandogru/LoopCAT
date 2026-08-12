@@ -202,7 +202,8 @@
         "app.js:2372",
         "app.js:2412",
         "app.js:2552",
-        "app.js:2597"
+        "app.js:2597",
+        "app.js:2647"
       ]
     },
     "auto.activityevents.043a4fa3": {
@@ -284,7 +285,8 @@
         "app.js:3431",
         "app.js:3471",
         "app.js:3603",
-        "app.js:3648"
+        "app.js:3648",
+        "app.js:3698"
       ]
     },
     "auto.adapt.ai.drafts.batch.857571a6": {
@@ -309,7 +311,8 @@
         "app.js:3432",
         "app.js:3472",
         "app.js:3604",
-        "app.js:3649"
+        "app.js:3649",
+        "app.js:3699"
       ]
     },
     "auto.adapt.draft.ce3bee5b": {
@@ -571,6 +574,7 @@
         "app.js:3461",
         "app.js:3593",
         "app.js:3638",
+        "app.js:3688",
         "app.js:6575",
         "app.js:6612",
         "app.js:6731",
@@ -1347,6 +1351,7 @@
         "app.js:2641",
         "app.js:2781",
         "app.js:2826",
+        "app.js:2876",
         "index.html"
       ]
     },
@@ -1665,6 +1670,7 @@
         "app.js:3466",
         "app.js:3598",
         "app.js:3643",
+        "app.js:3693",
         "index.html"
       ]
     },
@@ -1717,6 +1723,7 @@
         "app.js:3465",
         "app.js:3597",
         "app.js:3642",
+        "app.js:3692",
         "index.html"
       ]
     },
@@ -2856,7 +2863,8 @@
         "app.js:3435",
         "app.js:3475",
         "app.js:3607",
-        "app.js:3652"
+        "app.js:3652",
+        "app.js:3702"
       ]
     },
     "auto.apply.ai.terminology.batch.78c70c2c": {
@@ -2881,7 +2889,8 @@
         "app.js:3436",
         "app.js:3476",
         "app.js:3608",
-        "app.js:3653"
+        "app.js:3653",
+        "app.js:3703"
       ]
     },
     "auto.apply.and.next.4f6a64c6": {
@@ -2993,7 +3002,8 @@
         "app.js:2365",
         "app.js:2405",
         "app.js:2545",
-        "app.js:2590"
+        "app.js:2590",
+        "app.js:2640"
       ]
     },
     "auto.applytotarget.e08b6007": {
@@ -3272,7 +3282,8 @@
         "app.js:3084",
         "app.js:3124",
         "app.js:3264",
-        "app.js:3309"
+        "app.js:3309",
+        "app.js:3359"
       ]
     },
     "auto.auto.c614ba7c": {
@@ -3296,7 +3307,8 @@
         "app.js:3084",
         "app.js:3124",
         "app.js:3264",
-        "app.js:3309"
+        "app.js:3309",
+        "app.js:3359"
       ]
     },
     "auto.automatic.lm.studio.server.start.is.availa.96356226": {
@@ -3426,7 +3438,8 @@
         "app.js:1612",
         "app.js:1652",
         "app.js:1792",
-        "app.js:1837"
+        "app.js:1837",
+        "app.js:1887"
       ]
     },
     "auto.back.to.files.2a555987": {
@@ -3495,6 +3508,7 @@
         "app.js:13861",
         "app.js:13867",
         "app.js:13873",
+        "app.js:13902",
         "app.js:13955",
         "app.js:13996",
         "app.js:14025",
@@ -3528,6 +3542,7 @@
         "app.js:13861",
         "app.js:13867",
         "app.js:13873",
+        "app.js:13902",
         "app.js:13955",
         "app.js:13996",
         "app.js:14025",
@@ -3539,6 +3554,13 @@
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
+      ]
+    },
+    "auto.backup.reminder.could.not.be.dismissed.26ded881": {
+      "message": "Backup reminder could not be dismissed",
+      "description": "Generated interface text from app.js.",
+      "locations": [
+        "app.js:1341"
       ]
     },
     "auto.backup.restore.failed.validation.7763efe7": {
@@ -4391,7 +4413,8 @@
         "app.js:3326",
         "app.js:3366",
         "app.js:3498",
-        "app.js:3543"
+        "app.js:3543",
+        "app.js:3593"
       ]
     },
     "auto.bilingual.docx.export.failed.70c9af18": {
@@ -4461,6 +4484,7 @@
         "app.js:3427",
         "app.js:3559",
         "app.js:3604",
+        "app.js:3654",
         "app.js:5554",
         "index.html"
       ]
@@ -4474,7 +4498,8 @@
         "app.js:3420",
         "app.js:3460",
         "app.js:3592",
-        "app.js:3637"
+        "app.js:3637",
+        "app.js:3687"
       ]
     },
     "auto.bn.19f38987": {
@@ -6490,7 +6515,8 @@
         "app.js:3410",
         "app.js:3450",
         "app.js:3582",
-        "app.js:3627"
+        "app.js:3627",
+        "app.js:3677"
       ]
     },
     "auto.command.failed.ad9f31ca": {
@@ -6526,7 +6552,8 @@
         "app.js:3419",
         "app.js:3459",
         "app.js:3591",
-        "app.js:3636"
+        "app.js:3636",
+        "app.js:3686"
       ]
     },
     "auto.comments.fce06e20": {
@@ -6645,7 +6672,8 @@
         "app.js:1980",
         "app.js:2020",
         "app.js:2160",
-        "app.js:2205"
+        "app.js:2205",
+        "app.js:2255"
       ]
     },
     "auto.concise.ui.f87a57f1": {
@@ -6677,7 +6705,8 @@
         "app.js:3416",
         "app.js:3456",
         "app.js:3588",
-        "app.js:3633"
+        "app.js:3633",
+        "app.js:3683"
       ]
     },
     "auto.concordance.cac0151d": {
@@ -7112,6 +7141,7 @@
         "app.js:3445",
         "app.js:3577",
         "app.js:3622",
+        "app.js:3672",
         "app.js:5727"
       ]
     },
@@ -7165,7 +7195,8 @@
         "app.js:3405",
         "app.js:3445",
         "app.js:3577",
-        "app.js:3622"
+        "app.js:3622",
+        "app.js:3672"
       ]
     },
     "auto.confirm.this.is.intentional.or.translate.t.5df95568": {
@@ -7445,6 +7476,7 @@
         "app.js:3448",
         "app.js:3580",
         "app.js:3625",
+        "app.js:3675",
         "index.html"
       ]
     },
@@ -7502,6 +7534,7 @@
         "app.js:12903",
         "app.js:13031",
         "app.js:13068",
+        "app.js:1334",
         "app.js:13406",
         "app.js:13443",
         "app.js:13450",
@@ -7610,7 +7643,8 @@
         "app.js:3440",
         "app.js:3480",
         "app.js:3612",
-        "app.js:3657"
+        "app.js:3657",
+        "app.js:3707"
       ]
     },
     "auto.create.or.open.a.project.79ed912d": {
@@ -7708,6 +7742,8 @@
         "app.js:2816",
         "app.js:2820",
         "app.js:2865",
+        "app.js:2866",
+        "app.js:2915",
         "app.js:5767",
         "app.js:5775",
         "app.js:5783",
@@ -8038,7 +8074,8 @@
         "app.js:3409",
         "app.js:3449",
         "app.js:3581",
-        "app.js:3626"
+        "app.js:3626",
+        "app.js:3676"
       ]
     },
     "auto.custom.f9ac14b6": {
@@ -8059,7 +8096,8 @@
         "app.js:1296",
         "app.js:1337",
         "app.js:1446",
-        "app.js:1491"
+        "app.js:1491",
+        "app.js:1545"
       ]
     },
     "auto.custom.filters.3be34e01": {
@@ -8410,6 +8448,7 @@
         "app.js:2578",
         "app.js:2718",
         "app.js:2763",
+        "app.js:2813",
         "app.js:3421",
         "app.js:3429",
         "app.js:3437",
@@ -8677,7 +8716,8 @@
         "app.js:1484",
         "app.js:1525",
         "app.js:1665",
-        "app.js:1710"
+        "app.js:1710",
+        "app.js:1764"
       ]
     },
     "auto.deleted.local.items.stay.here.until.you.em.9bced109": {
@@ -8758,7 +8798,8 @@
       "locations": [
         "app.js:1262",
         "app.js:1263",
-        "app.js:1340"
+        "app.js:1340",
+        "app.js:1394"
       ]
     },
     "auto.dimli.3896f913": {
@@ -10161,6 +10202,7 @@
         "app.js:13413",
         "app.js:13420",
         "app.js:13427",
+        "app.js:1343",
         "app.js:13432",
         "app.js:13434",
         "app.js:13440",
@@ -10229,6 +10271,9 @@
         "app.js:13871",
         "app.js:13873",
         "app.js:13877",
+        "app.js:13902",
+        "app.js:13906",
+        "app.js:1394",
         "app.js:13955",
         "app.js:13959",
         "app.js:1399",
@@ -10238,15 +10283,21 @@
         "app.js:14029",
         "app.js:14042",
         "app.js:14046",
+        "app.js:1405",
+        "app.js:1416",
         "app.js:1440",
         "app.js:1444",
+        "app.js:1453",
         "app.js:1454",
         "app.js:1462",
         "app.js:1491",
+        "app.js:1498",
         "app.js:1503",
         "app.js:1536",
+        "app.js:1590",
         "app.js:1643",
         "app.js:1688",
+        "app.js:1742",
         "app.js:2233",
         "app.js:2237",
         "app.js:2241",
@@ -10278,6 +10329,7 @@
         "app.js:2625",
         "app.js:2651",
         "app.js:2655",
+        "app.js:2675",
         "app.js:2717",
         "app.js:2721",
         "app.js:2732",
@@ -10364,6 +10416,8 @@
         "app.js:3004",
         "app.js:3008",
         "app.js:3048",
+        "app.js:3054",
+        "app.js:3058",
         "app.js:3085",
         "app.js:3086",
         "app.js:3094",
@@ -10415,9 +10469,15 @@
         "app.js:3544",
         "app.js:3548",
         "app.js:3552",
+        "app.js:3584",
+        "app.js:3585",
+        "app.js:3593",
+        "app.js:3594",
         "app.js:3597",
+        "app.js:3647",
         "app.js:3680",
         "app.js:3725",
+        "app.js:3775",
         "app.js:4508",
         "app.js:4516",
         "app.js:4524",
@@ -12935,6 +12995,8 @@
         "app.js:13716",
         "app.js:13718",
         "app.js:13724",
+        "app.js:13771",
+        "app.js:13779",
         "app.js:13824",
         "app.js:13832",
         "app.js:13839",
@@ -13015,6 +13077,8 @@
         "app.js:13716",
         "app.js:13718",
         "app.js:13724",
+        "app.js:13771",
+        "app.js:13779",
         "app.js:13824",
         "app.js:13832",
         "app.js:13839",
@@ -13041,6 +13105,7 @@
         "app.js:2314",
         "app.js:2454",
         "app.js:2499",
+        "app.js:2549",
         "app.js:4187",
         "app.js:4195",
         "app.js:4203",
@@ -13116,7 +13181,8 @@
         "app.js:1789",
         "app.js:1829",
         "app.js:1969",
-        "app.js:2014"
+        "app.js:2014",
+        "app.js:2064"
       ]
     },
     "auto.div.class.empty.file.state.import.a.docx.o.cfd4d722": {
@@ -13216,7 +13282,8 @@
         "app.js:3409",
         "app.js:3449",
         "app.js:3581",
-        "app.js:3626"
+        "app.js:3626",
+        "app.js:3676"
       ]
     },
     "auto.docm.23d9bf62": {
@@ -13239,7 +13306,8 @@
         "app.js:1791",
         "app.js:1831",
         "app.js:1971",
-        "app.js:2016"
+        "app.js:2016",
+        "app.js:2066"
       ]
     },
     "auto.document.names.e9662bf6": {
@@ -13492,7 +13560,8 @@
         "app.js:1791",
         "app.js:1831",
         "app.js:1971",
-        "app.js:2016"
+        "app.js:2016",
+        "app.js:2066"
       ]
     },
     "auto.dotx.7c1165fb": {
@@ -13515,7 +13584,8 @@
         "app.js:1791",
         "app.js:1831",
         "app.js:1971",
-        "app.js:2016"
+        "app.js:2016",
+        "app.js:2066"
       ]
     },
     "auto.download.recovery.copy.e7ab66a3": {
@@ -13673,6 +13743,7 @@
         "app.js:3574",
         "app.js:3584",
         "app.js:3629",
+        "app.js:3679",
         "app.js:3771",
         "app.js:3772",
         "app.js:3823",
@@ -13711,7 +13782,8 @@
         "app.js:3407",
         "app.js:3447",
         "app.js:3579",
-        "app.js:3624"
+        "app.js:3624",
+        "app.js:3674"
       ]
     },
     "auto.editor.density.2cd9d328": {
@@ -13845,6 +13917,8 @@
         "app.js:3098",
         "app.js:3101",
         "app.js:3146",
+        "app.js:3148",
+        "app.js:3196",
         "app.js:578",
         "app.js:581",
         "app.js:592",
@@ -14356,7 +14430,8 @@
         "app.js:3407",
         "app.js:3447",
         "app.js:3579",
-        "app.js:3624"
+        "app.js:3624",
+        "app.js:3674"
       ]
     },
     "auto.enter.sample.source.text.or.select.a.segme.32c5f59e": {
@@ -14457,8 +14532,10 @@
         "app.js:2415",
         "app.js:2449",
         "app.js:2494",
+        "app.js:2544",
         "app.js:2555",
         "app.js:2600",
+        "app.js:2650",
         "app.js:6188",
         "app.js:6196",
         "app.js:6204",
@@ -14947,7 +15024,8 @@
         "app.js:3407",
         "app.js:3447",
         "app.js:3579",
-        "app.js:3624"
+        "app.js:3624",
+        "app.js:3674"
       ]
     },
     "auto.expand.ai.settings.8d7aa736": {
@@ -15000,6 +15078,7 @@
         "app.js:2005",
         "app.js:2145",
         "app.js:2190",
+        "app.js:2240",
         "app.js:3504",
         "app.js:3512",
         "app.js:3520",
@@ -15044,7 +15123,8 @@
         "app.js:3423",
         "app.js:3463",
         "app.js:3595",
-        "app.js:3640"
+        "app.js:3640",
+        "app.js:3690"
       ]
     },
     "auto.export.anyway.5e76b2b5": {
@@ -15062,7 +15142,8 @@
         "app.js:3367",
         "app.js:3407",
         "app.js:3539",
-        "app.js:3584"
+        "app.js:3584",
+        "app.js:3634"
       ]
     },
     "auto.export.blocked.fix.missing.protected.place.20fa3c4b": {
@@ -15145,7 +15226,8 @@
         "app.js:3317",
         "app.js:3357",
         "app.js:3489",
-        "app.js:3534"
+        "app.js:3534",
+        "app.js:3584"
       ]
     },
     "auto.export.blocked.translate.empty.target.segm.5ad84232": {
@@ -15183,7 +15265,8 @@
         "app.js:3380",
         "app.js:3420",
         "app.js:3552",
-        "app.js:3597"
+        "app.js:3597",
+        "app.js:3647"
       ]
     },
     "auto.export.current.file.777b75f4": {
@@ -15256,7 +15339,8 @@
         "app.js:3422",
         "app.js:3462",
         "app.js:3594",
-        "app.js:3639"
+        "app.js:3639",
+        "app.js:3689"
       ]
     },
     "auto.export.quality.passport.03faf56b": {
@@ -15281,7 +15365,8 @@
         "app.js:3414",
         "app.js:3454",
         "app.js:3586",
-        "app.js:3631"
+        "app.js:3631",
+        "app.js:3681"
       ]
     },
     "auto.export.readiness.5d7939b0": {
@@ -15531,7 +15616,8 @@
         "app.js:3437",
         "app.js:3477",
         "app.js:3609",
-        "app.js:3654"
+        "app.js:3654",
+        "app.js:3704"
       ]
     },
     "auto.extract.ai.terms.batch.1edb5a07": {
@@ -15556,7 +15642,8 @@
         "app.js:3438",
         "app.js:3478",
         "app.js:3610",
-        "app.js:3655"
+        "app.js:3655",
+        "app.js:3705"
       ]
     },
     "auto.extract.terminology.bebc7802": {
@@ -16039,7 +16126,11 @@
         "app.js:3635",
         "app.js:3636",
         "app.js:3637",
-        "app.js:3638"
+        "app.js:3638",
+        "app.js:3685",
+        "app.js:3686",
+        "app.js:3687",
+        "app.js:3688"
       ]
     },
     "auto.find.and.replace.target.text.4faaaba3": {
@@ -16064,7 +16155,8 @@
         "app.js:3417",
         "app.js:3457",
         "app.js:3589",
-        "app.js:3634"
+        "app.js:3634",
+        "app.js:3684"
       ]
     },
     "auto.find.command.0d5fa468": {
@@ -16102,7 +16194,8 @@
         "app.js:3275",
         "app.js:3315",
         "app.js:3447",
-        "app.js:3492"
+        "app.js:3492",
+        "app.js:3542"
       ]
     },
     "auto.find.target.text.e8547e76": {
@@ -16176,7 +16269,8 @@
         "app.js:3420",
         "app.js:3460",
         "app.js:3592",
-        "app.js:3637"
+        "app.js:3637",
+        "app.js:3687"
       ]
     },
     "auto.fluency.79432612": {
@@ -16400,7 +16494,8 @@
         "app.js:1980",
         "app.js:2020",
         "app.js:2160",
-        "app.js:2205"
+        "app.js:2205",
+        "app.js:2255"
       ]
     },
     "auto.formal.9fea6de7": {
@@ -16438,7 +16533,8 @@
         "app.js:1983",
         "app.js:2023",
         "app.js:2163",
-        "app.js:2208"
+        "app.js:2208",
+        "app.js:2258"
       ]
     },
     "auto.formatting.5b4cda60": {
@@ -16744,7 +16840,8 @@
         "app.js:1612",
         "app.js:1652",
         "app.js:1792",
-        "app.js:1837"
+        "app.js:1837",
+        "app.js:1887"
       ]
     },
     "auto.generate.ai.project.brief.e41cc86c": {
@@ -16769,7 +16866,8 @@
         "app.js:3439",
         "app.js:3479",
         "app.js:3611",
-        "app.js:3656"
+        "app.js:3656",
+        "app.js:3706"
       ]
     },
     "auto.generate.project.brief.ac6460f9": {
@@ -16947,7 +17045,8 @@
         "app.js:2014",
         "app.js:2054",
         "app.js:2194",
-        "app.js:2239"
+        "app.js:2239",
+        "app.js:2289"
       ]
     },
     "auto.gilbertese.0069d707": {
@@ -17355,6 +17454,8 @@
         "app.js:2816",
         "app.js:2820",
         "app.js:2865",
+        "app.js:2866",
+        "app.js:2915",
         "app.js:5767",
         "app.js:5775",
         "app.js:5783",
@@ -17678,7 +17779,8 @@
         "app.js:1784",
         "app.js:1824",
         "app.js:1964",
-        "app.js:2009"
+        "app.js:2009",
+        "app.js:2059"
       ]
     },
     "auto.html.950a39b6": {
@@ -17701,7 +17803,8 @@
         "app.js:1784",
         "app.js:1824",
         "app.js:1964",
-        "app.js:2009"
+        "app.js:2009",
+        "app.js:2059"
       ]
     },
     "auto.hu.06b08b32": {
@@ -17829,7 +17932,8 @@
         "app.js:1789",
         "app.js:1829",
         "app.js:1969",
-        "app.js:2014"
+        "app.js:2014",
+        "app.js:2064"
       ]
     },
     "auto.id.87ea5dfc": {
@@ -18607,7 +18711,8 @@
         "app.js:1341",
         "app.js:1382",
         "app.js:1491",
-        "app.js:1536"
+        "app.js:1536",
+        "app.js:1590"
       ]
     },
     "auto.interface.translation.imported.b6077666": {
@@ -18628,7 +18733,8 @@
         "app.js:1339",
         "app.js:1380",
         "app.js:1489",
-        "app.js:1534"
+        "app.js:1534",
+        "app.js:1588"
       ]
     },
     "auto.interlingua.06fac3d2": {
@@ -18863,7 +18969,8 @@
         "app.js:3410",
         "app.js:3450",
         "app.js:3582",
-        "app.js:3627"
+        "app.js:3627",
+        "app.js:3677"
       ]
     },
     "auto.join.tbody.table.4dd9aea8": {
@@ -19138,7 +19245,8 @@
         "app.js:1612",
         "app.js:1652",
         "app.js:1792",
-        "app.js:1837"
+        "app.js:1837",
+        "app.js:1887"
       ]
     },
     "auto.keep.opus.cat.open.then.open.the.engine.ch.c4610203": {
@@ -19567,7 +19675,9 @@
         "app.js:3053",
         "app.js:3098",
         "app.js:3101",
-        "app.js:3146"
+        "app.js:3146",
+        "app.js:3148",
+        "app.js:3196"
       ]
     },
     "auto.language.pair.3392baa9": {
@@ -19960,7 +20070,8 @@
         "app.js:2274",
         "app.js:2314",
         "app.js:2454",
-        "app.js:2499"
+        "app.js:2499",
+        "app.js:2549"
       ]
     },
     "auto.local.ai.key.cleared.from.this.browser.3ee2a7d0": {
@@ -19990,6 +20101,7 @@
         "app.js:13725",
         "app.js:13731",
         "app.js:13737",
+        "app.js:13792",
         "app.js:13845",
         "app.js:13860",
         "app.js:13889",
@@ -20017,7 +20129,8 @@
         "app.js:2269",
         "app.js:2309",
         "app.js:2449",
-        "app.js:2494"
+        "app.js:2494",
+        "app.js:2544"
       ]
     },
     "auto.local.ai.key.could.not.be.saved.in.this.br.f809e2b1": {
@@ -20041,7 +20154,8 @@
         "app.js:2257",
         "app.js:2297",
         "app.js:2437",
-        "app.js:2482"
+        "app.js:2482",
+        "app.js:2532"
       ]
     },
     "auto.local.ai.key.storage.could.not.be.cleared.1b54dccc": {
@@ -20065,7 +20179,8 @@
         "app.js:2254",
         "app.js:2294",
         "app.js:2434",
-        "app.js:2479"
+        "app.js:2479",
+        "app.js:2529"
       ]
     },
     "auto.local.ai.key.storage.restore.failed.67fdc795": {
@@ -20089,7 +20204,8 @@
         "app.js:2229",
         "app.js:2269",
         "app.js:2409",
-        "app.js:2454"
+        "app.js:2454",
+        "app.js:2504"
       ]
     },
     "auto.local.ai.pre.translate.6ee14b8b": {
@@ -20114,7 +20230,8 @@
         "app.js:3424",
         "app.js:3464",
         "app.js:3596",
-        "app.js:3641"
+        "app.js:3641",
+        "app.js:3691"
       ]
     },
     "auto.local.ai.pre.translating.value1.segment.va.eb1d3351": {
@@ -20330,6 +20447,7 @@
         "app.js:2020",
         "app.js:2160",
         "app.js:2205",
+        "app.js:2255",
         "app.js:5772",
         "app.js:5780",
         "app.js:5788",
@@ -20428,7 +20546,8 @@
         "app.js:1983",
         "app.js:2023",
         "app.js:2163",
-        "app.js:2208"
+        "app.js:2208",
+        "app.js:2258"
       ]
     },
     "auto.lojban.8ffcbc7f": {
@@ -20611,6 +20730,7 @@
         "app.js:2631",
         "app.js:2771",
         "app.js:2816",
+        "app.js:2866",
         "app.js:5767",
         "app.js:5775",
         "app.js:5783",
@@ -21221,7 +21341,8 @@
         "app.js:3418",
         "app.js:3458",
         "app.js:3590",
-        "app.js:3635"
+        "app.js:3635",
+        "app.js:3685"
       ]
     },
     "auto.matches.ee2dbd5d": {
@@ -21322,7 +21443,8 @@
         "app.js:1612",
         "app.js:1652",
         "app.js:1792",
-        "app.js:1837"
+        "app.js:1837",
+        "app.js:1887"
       ]
     },
     "auto.medium.20af4186": {
@@ -21347,6 +21469,7 @@
         "app.js:2631",
         "app.js:2771",
         "app.js:2816",
+        "app.js:2866",
         "app.js:5767",
         "app.js:5775",
         "app.js:5783",
@@ -21512,7 +21635,8 @@
         "app.js:3410",
         "app.js:3450",
         "app.js:3582",
-        "app.js:3627"
+        "app.js:3627",
+        "app.js:3677"
       ]
     },
     "auto.meru.80b12b34": {
@@ -22212,6 +22336,7 @@
         "app.js:3425",
         "app.js:3557",
         "app.js:3602",
+        "app.js:3652",
         "index.html"
       ]
     },
@@ -22224,7 +22349,8 @@
         "app.js:3419",
         "app.js:3459",
         "app.js:3591",
-        "app.js:3636"
+        "app.js:3636",
+        "app.js:3686"
       ]
     },
     "auto.nepali.16e34074": {
@@ -22314,7 +22440,9 @@
         "app.js:3724",
         "app.js:3729",
         "app.js:3769",
-        "app.js:3774"
+        "app.js:3774",
+        "app.js:3819",
+        "app.js:3824"
       ]
     },
     "auto.new.main.tm.9a61d19a": {
@@ -22385,7 +22513,8 @@
         "app.js:3406",
         "app.js:3446",
         "app.js:3578",
-        "app.js:3623"
+        "app.js:3623",
+        "app.js:3673"
       ]
     },
     "auto.next.quality.risk.ac328c3f": {
@@ -22410,7 +22539,8 @@
         "app.js:3415",
         "app.js:3455",
         "app.js:3587",
-        "app.js:3632"
+        "app.js:3632",
+        "app.js:3682"
       ]
     },
     "auto.next.risk.f8a5bd32": {
@@ -24346,7 +24476,8 @@
         "app.js:1794",
         "app.js:1834",
         "app.js:1974",
-        "app.js:2019"
+        "app.js:2019",
+        "app.js:2069"
       ]
     },
     "auto.ods.86de42e9": {
@@ -24369,7 +24500,8 @@
         "app.js:1794",
         "app.js:1834",
         "app.js:1974",
-        "app.js:2019"
+        "app.js:2019",
+        "app.js:2069"
       ]
     },
     "auto.odt.7e2c8634": {
@@ -24392,7 +24524,8 @@
         "app.js:1794",
         "app.js:1834",
         "app.js:1974",
-        "app.js:2019"
+        "app.js:2019",
+        "app.js:2069"
       ]
     },
     "auto.office.6c3a72ea": {
@@ -24443,7 +24576,8 @@
         "app.js:2400",
         "app.js:2440",
         "app.js:2580",
-        "app.js:2625"
+        "app.js:2625",
+        "app.js:2675"
       ]
     },
     "auto.ollama.4d75d43c": {
@@ -24553,12 +24687,14 @@
         "app.js:1605",
         "app.js:1745",
         "app.js:1790",
+        "app.js:1844",
         "app.js:3345",
         "app.js:3360",
         "app.js:3418",
         "app.js:3458",
         "app.js:3590",
         "app.js:3635",
+        "app.js:3685",
         "app.js:5753",
         "app.js:5790",
         "app.js:5909",
@@ -24673,7 +24809,8 @@
         "app.js:3416",
         "app.js:3456",
         "app.js:3588",
-        "app.js:3633"
+        "app.js:3633",
+        "app.js:3683"
       ]
     },
     "auto.open.engine.check.992bb822": {
@@ -24771,7 +24908,8 @@
         "app.js:3404",
         "app.js:3444",
         "app.js:3576",
-        "app.js:3621"
+        "app.js:3621",
+        "app.js:3671"
       ]
     },
     "auto.open.value1.and.send.value2.outside.loopca.b6a945d8": {
@@ -24845,6 +24983,7 @@
         "app.js:13791",
         "app.js:13797",
         "app.js:13803",
+        "app.js:13858",
         "app.js:13911",
         "app.js:13926",
         "app.js:13955",
@@ -24872,7 +25011,8 @@
         "app.js:2115",
         "app.js:2155",
         "app.js:2295",
-        "app.js:2340"
+        "app.js:2340",
+        "app.js:2390"
       ]
     },
     "auto.openai.key.could.not.be.saved.in.this.brow.3c4b4608": {
@@ -24896,7 +25036,8 @@
         "app.js:2103",
         "app.js:2143",
         "app.js:2283",
-        "app.js:2328"
+        "app.js:2328",
+        "app.js:2378"
       ]
     },
     "auto.openai.key.not.saved.api.keys.stay.in.this.4baa5d4a": {
@@ -24920,7 +25061,8 @@
         "app.js:2122",
         "app.js:2162",
         "app.js:2302",
-        "app.js:2347"
+        "app.js:2347",
+        "app.js:2397"
       ]
     },
     "auto.openai.key.storage.restore.failed.2f9c88d4": {
@@ -24944,7 +25086,8 @@
         "app.js:2075",
         "app.js:2115",
         "app.js:2255",
-        "app.js:2300"
+        "app.js:2300",
+        "app.js:2350"
       ]
     },
     "auto.openai.key.value1.api.keys.stay.in.this.br.3bdc3947": {
@@ -25220,7 +25363,8 @@
       "message": "OPUS-CAT connection help could not complete the action.",
       "description": "Generated interface text from app.js.",
       "locations": [
-        "app.js:1362"
+        "app.js:1362",
+        "app.js:1416"
       ]
     },
     "auto.opus.cat.mt.engine.18aa30ad": {
@@ -25326,7 +25470,8 @@
         "app.js:1794",
         "app.js:1834",
         "app.js:1974",
-        "app.js:2019"
+        "app.js:2019",
+        "app.js:2069"
       ]
     },
     "auto.ots.d273cbf7": {
@@ -25349,7 +25494,8 @@
         "app.js:1794",
         "app.js:1834",
         "app.js:1974",
-        "app.js:2019"
+        "app.js:2019",
+        "app.js:2069"
       ]
     },
     "auto.ott.326ed324": {
@@ -25372,7 +25518,8 @@
         "app.js:1794",
         "app.js:1834",
         "app.js:1974",
-        "app.js:2019"
+        "app.js:2019",
+        "app.js:2069"
       ]
     },
     "auto.overwrite.existing.target.text.04a14f6a": {
@@ -25511,7 +25658,8 @@
         "app.js:2364",
         "app.js:2404",
         "app.js:2544",
-        "app.js:2589"
+        "app.js:2589",
+        "app.js:2639"
       ]
     },
     "auto.perplexity.sonar.80c1f1c2": {
@@ -25624,7 +25772,8 @@
         "app.js:1980",
         "app.js:2020",
         "app.js:2160",
-        "app.js:2205"
+        "app.js:2205",
+        "app.js:2255"
       ]
     },
     "auto.plain.language.9ba3341a": {
@@ -25684,7 +25833,8 @@
         "app.js:3429",
         "app.js:3469",
         "app.js:3601",
-        "app.js:3646"
+        "app.js:3646",
+        "app.js:3696"
       ]
     },
     "auto.polish.adapt.and.compare.7a971cd7": {
@@ -25716,7 +25866,8 @@
         "app.js:3430",
         "app.js:3470",
         "app.js:3602",
-        "app.js:3647"
+        "app.js:3647",
+        "app.js:3697"
       ]
     },
     "auto.polish.d0119864": {
@@ -25911,7 +26062,8 @@
         "app.js:1791",
         "app.js:1831",
         "app.js:1971",
-        "app.js:2016"
+        "app.js:2016",
+        "app.js:2066"
       ]
     },
     "auto.potx.0777877a": {
@@ -25934,7 +26086,8 @@
         "app.js:1791",
         "app.js:1831",
         "app.js:1971",
-        "app.js:2016"
+        "app.js:2016",
+        "app.js:2066"
       ]
     },
     "auto.ppsm.50ce071a": {
@@ -25957,7 +26110,8 @@
         "app.js:1791",
         "app.js:1831",
         "app.js:1971",
-        "app.js:2016"
+        "app.js:2016",
+        "app.js:2066"
       ]
     },
     "auto.ppsx.fef40232": {
@@ -25980,7 +26134,8 @@
         "app.js:1791",
         "app.js:1831",
         "app.js:1971",
-        "app.js:2016"
+        "app.js:2016",
+        "app.js:2066"
       ]
     },
     "auto.pptm.902de376": {
@@ -26003,7 +26158,8 @@
         "app.js:1791",
         "app.js:1831",
         "app.js:1971",
-        "app.js:2016"
+        "app.js:2016",
+        "app.js:2066"
       ]
     },
     "auto.pptx.206a699d": {
@@ -26026,7 +26182,8 @@
         "app.js:1791",
         "app.js:1831",
         "app.js:1971",
-        "app.js:2016"
+        "app.js:2016",
+        "app.js:2066"
       ]
     },
     "auto.preserved.4133ef96": {
@@ -26288,6 +26445,7 @@
         "app.js:2017",
         "app.js:2157",
         "app.js:2202",
+        "app.js:2252",
         "app.js:4608",
         "app.js:4635",
         "app.js:4641",
@@ -26564,6 +26722,7 @@
         "app.js:12980",
         "app.js:1671",
         "app.js:1716",
+        "app.js:1770",
         "index.html"
       ]
     },
@@ -26572,7 +26731,8 @@
       "description": "Generated interface text from app.js.",
       "locations": [
         "app.js:1669",
-        "app.js:1714"
+        "app.js:1714",
+        "app.js:1768"
       ]
     },
     "auto.project.glossary.hints.88a66f02": {
@@ -26973,6 +27133,7 @@
         "app.js:12734",
         "app.js:12873",
         "app.js:13038",
+        "app.js:1335",
         "app.js:13413",
         "app.js:13457",
         "app.js:13459",
@@ -27064,6 +27225,7 @@
         "app.js:3584",
         "app.js:3605",
         "app.js:3629",
+        "app.js:3679",
         "app.js:3803",
         "app.js:3855",
         "app.js:3903",
@@ -27937,7 +28099,8 @@
         "app.js:3413",
         "app.js:3453",
         "app.js:3585",
-        "app.js:3630"
+        "app.js:3630",
+        "app.js:3680"
       ]
     },
     "auto.qa.details.dcc888b7": {
@@ -28151,7 +28314,8 @@
         "app.js:3420",
         "app.js:3460",
         "app.js:3592",
-        "app.js:3637"
+        "app.js:3637",
+        "app.js:3687"
       ]
     },
     "auto.quality.a60f2c73": {
@@ -28308,7 +28472,8 @@
       "message": "Quality or review action failed.",
       "description": "Generated interface text from app.js.",
       "locations": [
-        "app.js:1444"
+        "app.js:1444",
+        "app.js:1498"
       ]
     },
     "auto.quality.passport.6790364d": {
@@ -28623,6 +28788,13 @@
         "app.js:12714"
       ]
     },
+    "auto.recovery.copy.export.failed.6f57778f": {
+      "message": "Recovery copy export failed",
+      "description": "Generated interface text from app.js.",
+      "locations": [
+        "app.js:1340"
+      ]
+    },
     "auto.redacted.8780785a": {
       "message": "Redacted",
       "description": "Generated interface text from app.js.",
@@ -28672,7 +28844,8 @@
         "app.js:1437",
         "app.js:1478",
         "app.js:1617",
-        "app.js:1662"
+        "app.js:1662",
+        "app.js:1716"
       ]
     },
     "auto.redo.471b94d4": {
@@ -28694,6 +28867,7 @@
         "app.js:3443",
         "app.js:3575",
         "app.js:3620",
+        "app.js:3670",
         "app.js:6371",
         "app.js:6411",
         "app.js:6519",
@@ -28711,7 +28885,8 @@
         "app.js:3403",
         "app.js:3443",
         "app.js:3575",
-        "app.js:3620"
+        "app.js:3620",
+        "app.js:3670"
       ]
     },
     "auto.redo.last.reverted.action.c01daebb": {
@@ -28809,6 +28984,7 @@
         "app.js:2415",
         "app.js:2555",
         "app.js:2600",
+        "app.js:2650",
         "index.html"
       ]
     },
@@ -28823,6 +28999,7 @@
         "app.js:2403",
         "app.js:2543",
         "app.js:2588",
+        "app.js:2638",
         "index.html"
       ]
     },
@@ -28836,7 +29013,8 @@
         "app.js:2372",
         "app.js:2412",
         "app.js:2552",
-        "app.js:2597"
+        "app.js:2597",
+        "app.js:2647"
       ]
     },
     "auto.reloading.loopcat.c8595e9f": {
@@ -28849,7 +29027,8 @@
         "app.js:2366",
         "app.js:2406",
         "app.js:2546",
-        "app.js:2591"
+        "app.js:2591",
+        "app.js:2641"
       ]
     },
     "auto.remember.hosted.key.in.this.browser.14c75c82": {
@@ -28895,7 +29074,8 @@
         "app.js:3428",
         "app.js:3468",
         "app.js:3600",
-        "app.js:3645"
+        "app.js:3645",
+        "app.js:3695"
       ]
     },
     "auto.repair.folder.links.6ae40d41": {
@@ -29270,7 +29450,8 @@
       "message": "Resource action failed.",
       "description": "Generated interface text from app.js.",
       "locations": [
-        "app.js:1399"
+        "app.js:1399",
+        "app.js:1453"
       ]
     },
     "auto.resource.export.failed.6206984a": {
@@ -29409,7 +29590,8 @@
         "app.js:1492",
         "app.js:1533",
         "app.js:1681",
-        "app.js:1726"
+        "app.js:1726",
+        "app.js:1780"
       ]
     },
     "auto.restore.browser.backup.01d94147": {
@@ -29431,7 +29613,8 @@
         "app.js:1493",
         "app.js:1534",
         "app.js:1682",
-        "app.js:1727"
+        "app.js:1727",
+        "app.js:1781"
       ]
     },
     "auto.restoring.backup.stores.dceeb40f": {
@@ -29493,7 +29676,8 @@
         "app.js:1789",
         "app.js:1829",
         "app.js:1969",
-        "app.js:2014"
+        "app.js:2014",
+        "app.js:2064"
       ]
     },
     "auto.review.61e62b21": {
@@ -29506,6 +29690,7 @@
         "app.js:3459",
         "app.js:3591",
         "app.js:3636",
+        "app.js:3686",
         "app.js:3815",
         "app.js:3823",
         "app.js:3831",
@@ -29945,6 +30130,7 @@
         "app.js:3426",
         "app.js:3558",
         "app.js:3603",
+        "app.js:3653",
         "index.html"
       ]
     },
@@ -29967,6 +30153,7 @@
         "app.js:3632",
         "app.js:3638",
         "app.js:3655",
+        "app.js:3688",
         "app.js:3707",
         "app.js:3734",
         "app.js:3739",
@@ -30417,6 +30604,7 @@
         "app.js:3453",
         "app.js:3585",
         "app.js:3630",
+        "app.js:3680",
         "index.html"
       ]
     },
@@ -31208,7 +31396,8 @@
         "app.js:3411",
         "app.js:3451",
         "app.js:3583",
-        "app.js:3628"
+        "app.js:3628",
+        "app.js:3678"
       ]
     },
     "auto.save.settings.913aba9f": {
@@ -31330,6 +31519,7 @@
         "app.js:3539",
         "app.js:3671",
         "app.js:3716",
+        "app.js:3766",
         "app.js:5372",
         "app.js:5380",
         "app.js:5388",
@@ -32236,17 +32426,20 @@
         "app.js:13745",
         "app.js:13789",
         "app.js:13791",
+        "app.js:13792",
         "app.js:13797",
         "app.js:1380",
         "app.js:13803",
         "app.js:13815",
         "app.js:13845",
+        "app.js:13858",
         "app.js:13859",
         "app.js:13860",
         "app.js:13861",
         "app.js:13867",
         "app.js:13873",
         "app.js:13889",
+        "app.js:13902",
         "app.js:1391",
         "app.js:13911",
         "app.js:13926",
@@ -32278,13 +32471,18 @@
         "app.js:1545",
         "app.js:1556",
         "app.js:1585",
+        "app.js:1588",
+        "app.js:1599",
         "app.js:1617",
         "app.js:1630",
         "app.js:1639",
         "app.js:1662",
         "app.js:1684",
         "app.js:1704",
+        "app.js:1716",
+        "app.js:1738",
         "app.js:1749",
+        "app.js:1803",
         "app.js:1892",
         "app.js:1900",
         "app.js:1924",
@@ -32315,6 +32513,7 @@
         "app.js:3539",
         "app.js:3671",
         "app.js:3716",
+        "app.js:3766",
         "app.js:4258",
         "app.js:4266",
         "app.js:4274",
@@ -33486,6 +33685,7 @@
         "app.js:3530",
         "app.js:3662",
         "app.js:3707",
+        "app.js:3757",
         "app.js:5593",
         "app.js:5599",
         "app.js:5623",
@@ -33514,7 +33714,8 @@
         "app.js:2364",
         "app.js:2404",
         "app.js:2544",
-        "app.js:2589"
+        "app.js:2589",
+        "app.js:2639"
       ]
     },
     "auto.saving.e7912bf7": {
@@ -33527,7 +33728,8 @@
         "app.js:2372",
         "app.js:2412",
         "app.js:2552",
-        "app.js:2597"
+        "app.js:2597",
+        "app.js:2647"
       ]
     },
     "auto.saving.project.package.records.df64b0b7": {
@@ -33699,7 +33901,9 @@
         "app.js:3581",
         "app.js:3582",
         "app.js:3626",
-        "app.js:3627"
+        "app.js:3627",
+        "app.js:3676",
+        "app.js:3677"
       ]
     },
     "auto.segment.merge.failed.1b0485ce": {
@@ -34214,6 +34418,7 @@
         "app.js:2017",
         "app.js:2157",
         "app.js:2202",
+        "app.js:2252",
         "app.js:7176",
         "app.js:7184",
         "app.js:7192",
@@ -34515,7 +34720,8 @@
         "app.js:1983",
         "app.js:2023",
         "app.js:2163",
-        "app.js:2208"
+        "app.js:2208",
+        "app.js:2258"
       ]
     },
     "auto.shorten.ea87755f": {
@@ -34729,7 +34935,8 @@
         "app.js:1983",
         "app.js:2023",
         "app.js:2163",
-        "app.js:2208"
+        "app.js:2208",
+        "app.js:2258"
       ]
     },
     "auto.simulated.ai.apply.save.failure.907b0b1c": {
@@ -34943,7 +35150,8 @@
         "app.js:3495",
         "app.js:3535",
         "app.js:3667",
-        "app.js:3712"
+        "app.js:3712",
+        "app.js:3762"
       ]
     },
     "auto.simulated.confirm.activity.failure.1537e64a": {
@@ -35211,7 +35419,8 @@
         "app.js:2100",
         "app.js:2140",
         "app.js:2280",
-        "app.js:2325"
+        "app.js:2325",
+        "app.js:2375"
       ]
     },
     "auto.simulated.pending.save.flush.failure.b1b6f95c": {
@@ -35236,7 +35445,8 @@
         "app.js:3541",
         "app.js:3581",
         "app.js:3713",
-        "app.js:3758"
+        "app.js:3758",
+        "app.js:3808"
       ]
     },
     "auto.simulated.post.save.confirm.failure.6726c387": {
@@ -36623,6 +36833,7 @@
         "app.js:3449",
         "app.js:3581",
         "app.js:3626",
+        "app.js:3676",
         "index.html"
       ]
     },
@@ -36742,7 +36953,8 @@
         "app.js:1980",
         "app.js:2020",
         "app.js:2160",
-        "app.js:2205"
+        "app.js:2205",
+        "app.js:2255"
       ]
     },
     "auto.standard.latvian.64e50efa": {
@@ -36940,6 +37152,7 @@
         "app.js:2140",
         "app.js:2280",
         "app.js:2325",
+        "app.js:2375",
         "app.js:2930",
         "app.js:2938",
         "app.js:2972",
@@ -36958,7 +37171,8 @@
         "app.js:3568",
         "app.js:3608",
         "app.js:3740",
-        "app.js:3785"
+        "app.js:3785",
+        "app.js:3835"
       ]
     },
     "auto.strong.value1.strong.span.value2.span.span.617daee5": {
@@ -36981,7 +37195,9 @@
         "app.js:3581",
         "app.js:3582",
         "app.js:3626",
-        "app.js:3627"
+        "app.js:3627",
+        "app.js:3676",
+        "app.js:3677"
       ]
     },
     "auto.student.review.2cfc074e": {
@@ -37055,7 +37271,8 @@
         "app.js:3433",
         "app.js:3473",
         "app.js:3605",
-        "app.js:3650"
+        "app.js:3650",
+        "app.js:3700"
       ]
     },
     "auto.suggest.ai.alternatives.batch.19fb79d1": {
@@ -37080,7 +37297,8 @@
         "app.js:3434",
         "app.js:3474",
         "app.js:3606",
-        "app.js:3651"
+        "app.js:3651",
+        "app.js:3701"
       ]
     },
     "auto.suggest.ai.tag.repair.6479f524": {
@@ -37105,7 +37323,8 @@
         "app.js:3427",
         "app.js:3467",
         "app.js:3599",
-        "app.js:3644"
+        "app.js:3644",
+        "app.js:3694"
       ]
     },
     "auto.suggest.alternatives.batch.4c553676": {
@@ -37180,7 +37399,8 @@
         "app.js:3421",
         "app.js:3461",
         "app.js:3593",
-        "app.js:3638"
+        "app.js:3638",
+        "app.js:3688"
       ]
     },
     "auto.suggestions.stay.inspectable.and.do.not.re.02606f20": {
@@ -38107,7 +38327,8 @@
         "app.js:11905",
         "app.js:11977",
         "app.js:1536",
-        "app.js:1581"
+        "app.js:1581",
+        "app.js:1635"
       ]
     },
     "auto.term.could.not.be.moved.to.trash.existing..b4407f72": {
@@ -38306,6 +38527,7 @@
         "app.js:12932",
         "app.js:1674",
         "app.js:1719",
+        "app.js:1773",
         "index.html"
       ]
     },
@@ -39243,7 +39465,8 @@
         "app.js:3354",
         "app.js:3394",
         "app.js:3526",
-        "app.js:3571"
+        "app.js:3571",
+        "app.js:3621"
       ]
     },
     "auto.the.local.first.translation.workspace.3213bfcc": {
@@ -39310,7 +39533,8 @@
         "app.js:2365",
         "app.js:2405",
         "app.js:2545",
-        "app.js:2590"
+        "app.js:2590",
+        "app.js:2640"
       ]
     },
     "auto.the.original.split.segment.is.no.longer.av.cd5f6e17": {
@@ -39685,7 +39909,8 @@
         "app.js:2311",
         "app.js:2351",
         "app.js:2491",
-        "app.js:2536"
+        "app.js:2536",
+        "app.js:2586"
       ]
     },
     "auto.timed.out.waiting.for.offline.app.shell.co.618a14ff": {
@@ -39709,7 +39934,8 @@
         "app.js:2326",
         "app.js:2366",
         "app.js:2506",
-        "app.js:2551"
+        "app.js:2551",
+        "app.js:2601"
       ]
     },
     "auto.timeout.ms.15b720a7": {
@@ -39802,7 +40028,8 @@
         "app.js:2530",
         "app.js:2570",
         "app.js:2710",
-        "app.js:2755"
+        "app.js:2755",
+        "app.js:2805"
       ]
     },
     "auto.tm.entry.could.not.be.moved.to.trash.exist.5964f583": {
@@ -40166,7 +40393,8 @@
         "app.js:2626",
         "app.js:2666",
         "app.js:2806",
-        "app.js:2851"
+        "app.js:2851",
+        "app.js:2901"
       ]
     },
     "auto.tm.pretranslation.match.value1.from.value2.60824e35": {
@@ -40187,7 +40415,8 @@
         "app.js:2625",
         "app.js:2665",
         "app.js:2805",
-        "app.js:2850"
+        "app.js:2850",
+        "app.js:2900"
       ]
     },
     "auto.tm.pretranslation.settings.are.unavailable.4ffa2fc5": {
@@ -40216,7 +40445,8 @@
       "message": "TM pretranslation settings could not be opened.",
       "description": "Generated interface text from app.js.",
       "locations": [
-        "app.js:1351"
+        "app.js:1351",
+        "app.js:1405"
       ]
     },
     "auto.tmx.export.failed.9c5d7385": {
@@ -40513,7 +40743,8 @@
         "app.js:3418",
         "app.js:3458",
         "app.js:3590",
-        "app.js:3635"
+        "app.js:3635",
+        "app.js:3685"
       ]
     },
     "auto.translate.selected.21299025": {
@@ -40677,7 +40908,8 @@
       "description": "Generated interface text from app.js.",
       "locations": [
         "app.js:1673",
-        "app.js:1718"
+        "app.js:1718",
+        "app.js:1772"
       ]
     },
     "auto.trash.6aa46034": {
@@ -40691,7 +40923,8 @@
         "app.js:3404",
         "app.js:3444",
         "app.js:3576",
-        "app.js:3621"
+        "app.js:3621",
+        "app.js:3671"
       ]
     },
     "auto.trash.e3bf62bb": {
@@ -40707,6 +40940,7 @@
         "app.js:1489",
         "app.js:1628",
         "app.js:1673",
+        "app.js:1727",
         "index.html"
       ]
     },
@@ -40722,7 +40956,8 @@
         "app.js:1516",
         "app.js:1556",
         "app.js:1704",
-        "app.js:1749"
+        "app.js:1749",
+        "app.js:1803"
       ]
     },
     "auto.trash.is.empty.deleted.projects.and.files..1556a740": {
@@ -40743,7 +40978,8 @@
       "description": "Generated interface text from app.js.",
       "locations": [
         "app.js:1654",
-        "app.js:1699"
+        "app.js:1699",
+        "app.js:1753"
       ]
     },
     "auto.trash.restore.failed.existing.work.was.pre.b873d631": {
@@ -40758,7 +40994,8 @@
         "app.js:1462",
         "app.js:1503",
         "app.js:1643",
-        "app.js:1688"
+        "app.js:1688",
+        "app.js:1742"
       ]
     },
     "auto.trash.value1.3d1b766c": {
@@ -40773,7 +41010,8 @@
         "app.js:1448",
         "app.js:1489",
         "app.js:1628",
-        "app.js:1673"
+        "app.js:1673",
+        "app.js:1727"
       ]
     },
     "auto.trash.value1.item.s.1d905565": {
@@ -40788,7 +41026,8 @@
         "app.js:1449",
         "app.js:1490",
         "app.js:1629",
-        "app.js:1674"
+        "app.js:1674",
+        "app.js:1728"
       ]
     },
     "auto.try.again.042c862e": {
@@ -40801,7 +41040,8 @@
         "app.js:2375",
         "app.js:2415",
         "app.js:2555",
-        "app.js:2600"
+        "app.js:2600",
+        "app.js:2650"
       ]
     },
     "auto.try.connection.again.6bc178de": {
@@ -40831,7 +41071,8 @@
         "app.js:1789",
         "app.js:1829",
         "app.js:1969",
-        "app.js:2014"
+        "app.js:2014",
+        "app.js:2064"
       ]
     },
     "auto.tsonga.1183487f": {
@@ -40910,7 +41151,8 @@
         "app.js:1789",
         "app.js:1829",
         "app.js:1969",
-        "app.js:2014"
+        "app.js:2014",
+        "app.js:2064"
       ]
     },
     "auto.tumbuka.bcadf0a0": {
@@ -41040,7 +41282,8 @@
         "app.js:1789",
         "app.js:1829",
         "app.js:1969",
-        "app.js:2014"
+        "app.js:2014",
+        "app.js:2064"
       ]
     },
     "auto.tyap.e3261433": {
@@ -41164,7 +41407,8 @@
         "app.js:1350",
         "app.js:1391",
         "app.js:1500",
-        "app.js:1545"
+        "app.js:1545",
+        "app.js:1599"
       ]
     },
     "auto.uk.68c42a32": {
@@ -41250,6 +41494,7 @@
         "app.js:3442",
         "app.js:3574",
         "app.js:3619",
+        "app.js:3669",
         "app.js:6318",
         "app.js:6358",
         "app.js:6466",
@@ -41267,7 +41512,8 @@
         "app.js:3402",
         "app.js:3442",
         "app.js:3574",
-        "app.js:3619"
+        "app.js:3619",
+        "app.js:3669"
       ]
     },
     "auto.undo.last.reversible.action.dd40565e": {
@@ -41456,7 +41702,8 @@
         "app.js:2367",
         "app.js:2407",
         "app.js:2547",
-        "app.js:2592"
+        "app.js:2592",
+        "app.js:2642"
       ]
     },
     "auto.update.ready.1fd080d5": {
@@ -41470,6 +41717,7 @@
         "app.js:2403",
         "app.js:2543",
         "app.js:2588",
+        "app.js:2638",
         "index.html"
       ]
     },
@@ -41566,7 +41814,8 @@
         "app.js:3421",
         "app.js:3461",
         "app.js:3593",
-        "app.js:3638"
+        "app.js:3638",
+        "app.js:3688"
       ]
     },
     "auto.use.hosted.ollama.ecf1ee63": {
@@ -41599,7 +41848,8 @@
         "app.js:3420",
         "app.js:3460",
         "app.js:3592",
-        "app.js:3637"
+        "app.js:3637",
+        "app.js:3687"
       ]
     },
     "auto.use.regular.expressions.42fb00d1": {
@@ -41618,7 +41868,8 @@
         "app.js:3419",
         "app.js:3459",
         "app.js:3591",
-        "app.js:3636"
+        "app.js:3636",
+        "app.js:3686"
       ]
     },
     "auto.use.the.approved.term.or.update.the.termba.e437dbec": {
@@ -41638,7 +41889,8 @@
         "app.js:3418",
         "app.js:3458",
         "app.js:3590",
-        "app.js:3635"
+        "app.js:3635",
+        "app.js:3685"
       ]
     },
     "auto.uyghur.eae494af": {
@@ -42301,7 +42553,8 @@
         "app.js:3359",
         "app.js:3399",
         "app.js:3531",
-        "app.js:3576"
+        "app.js:3576",
+        "app.js:3626"
       ]
     },
     "auto.value1.empty.target.segment.s.will.remain..d24ebc2b": {
@@ -42319,7 +42572,8 @@
         "app.js:3362",
         "app.js:3402",
         "app.js:3534",
-        "app.js:3579"
+        "app.js:3579",
+        "app.js:3629"
       ]
     },
     "auto.value1.export.a.portable.project.package.s.d99f095f": {
@@ -42548,7 +42802,8 @@
         "app.js:1296",
         "app.js:1337",
         "app.js:1446",
-        "app.js:1491"
+        "app.js:1491",
+        "app.js:1545"
       ]
     },
     "auto.value1.main.tm.value2.value3.value4.d12e9363": {
@@ -42630,7 +42885,8 @@
         "app.js:3365",
         "app.js:3405",
         "app.js:3537",
-        "app.js:3582"
+        "app.js:3582",
+        "app.js:3632"
       ]
     },
     "auto.value1.note.value2.08a22b52": {
@@ -42808,7 +43064,8 @@
         "app.js:1458",
         "app.js:1499",
         "app.js:1639",
-        "app.js:1684"
+        "app.js:1684",
+        "app.js:1738"
       ]
     },
     "auto.value1.restored.project.package.value2.mus.eb4616fd": {
@@ -42888,7 +43145,8 @@
         "app.js:3499",
         "app.js:3539",
         "app.js:3671",
-        "app.js:3716"
+        "app.js:3716",
+        "app.js:3766"
       ]
     },
     "auto.value1.segment.source.target.snippets.72cc3d99": {
@@ -43311,6 +43569,7 @@
         "app.js:1791",
         "app.js:1931",
         "app.js:1976",
+        "app.js:2026",
         "app.js:9375",
         "app.js:9383",
         "app.js:9391",
@@ -43370,7 +43629,9 @@
         "app.js:1716",
         "app.js:1761",
         "app.js:1800",
+        "app.js:1815",
         "app.js:1845",
+        "app.js:1895",
         "app.js:5833",
         "app.js:5841",
         "app.js:5849",
@@ -43463,7 +43724,8 @@
         "app.js:2959",
         "app.js:2999",
         "app.js:3139",
-        "app.js:3184"
+        "app.js:3184",
+        "app.js:3234"
       ]
     },
     "auto.value1.value2.connected.d525c3d1": {
@@ -43518,7 +43780,8 @@
         "app.js:1486",
         "app.js:1527",
         "app.js:1675",
-        "app.js:1720"
+        "app.js:1720",
+        "app.js:1774"
       ]
     },
     "auto.value1.value2.df067c3c": {
@@ -43568,7 +43831,8 @@
         "app.js:1704",
         "app.js:1744",
         "app.js:1884",
-        "app.js:1929"
+        "app.js:1929",
+        "app.js:1979"
       ]
     },
     "auto.value1.value2.value3.value4.value5.df47bca0": {
@@ -43665,6 +43929,7 @@
         "app.js:3127",
         "app.js:3267",
         "app.js:3312",
+        "app.js:3362",
         "app.js:3632",
         "app.js:3640",
         "app.js:3648",
@@ -43875,6 +44140,7 @@
         "app.js:2017",
         "app.js:2157",
         "app.js:2202",
+        "app.js:2252",
         "app.js:7177",
         "app.js:7185",
         "app.js:7193",
@@ -44230,7 +44496,8 @@
         "app.js:1789",
         "app.js:1829",
         "app.js:1969",
-        "app.js:2014"
+        "app.js:2014",
+        "app.js:2064"
       ]
     },
     "auto.wolof.552dd937": {
@@ -44290,6 +44557,13 @@
         "index.html"
       ]
     },
+    "auto.workspace.action.failed.0de3f9c1": {
+      "message": "Workspace action failed",
+      "description": "Generated interface text from app.js.",
+      "locations": [
+        "app.js:1342"
+      ]
+    },
     "auto.workspace.backup.failed.bae28004": {
       "message": "Workspace backup failed",
       "description": "Generated interface text from app.js.",
@@ -44312,6 +44586,7 @@
         "app.js:12748",
         "app.js:12887",
         "app.js:13052",
+        "app.js:1337",
         "app.js:13427",
         "app.js:13471",
         "app.js:13473",
@@ -44456,6 +44731,7 @@
         "app.js:12848",
         "app.js:13013",
         "app.js:13388",
+        "app.js:1339",
         "app.js:13432",
         "app.js:13434",
         "app.js:13440",
@@ -44488,6 +44764,7 @@
         "app.js:12755",
         "app.js:12894",
         "app.js:13059",
+        "app.js:1338",
         "app.js:13434",
         "app.js:13478",
         "app.js:13480",
@@ -44553,6 +44830,7 @@
         "app.js:12741",
         "app.js:12880",
         "app.js:13045",
+        "app.js:1336",
         "app.js:13420",
         "app.js:13464",
         "app.js:13466",
@@ -44637,7 +44915,8 @@
         "app.js:1789",
         "app.js:1829",
         "app.js:1969",
-        "app.js:2014"
+        "app.js:2014",
+        "app.js:2064"
       ]
     },
     "auto.xlf.836a3cf3": {
@@ -44779,7 +45058,8 @@
         "app.js:1791",
         "app.js:1831",
         "app.js:1971",
-        "app.js:2016"
+        "app.js:2016",
+        "app.js:2066"
       ]
     },
     "auto.xlsx.5531f97b": {
@@ -44802,7 +45082,8 @@
         "app.js:1791",
         "app.js:1831",
         "app.js:1971",
-        "app.js:2016"
+        "app.js:2016",
+        "app.js:2066"
       ]
     },
     "auto.xltm.53d43ae2": {
@@ -44825,7 +45106,8 @@
         "app.js:1791",
         "app.js:1831",
         "app.js:1971",
-        "app.js:2016"
+        "app.js:2016",
+        "app.js:2066"
       ]
     },
     "auto.xltx.ecb3b429": {
@@ -44848,7 +45130,8 @@
         "app.js:1791",
         "app.js:1831",
         "app.js:1971",
-        "app.js:2016"
+        "app.js:2016",
+        "app.js:2066"
       ]
     },
     "auto.xml.42f7b70e": {
@@ -44871,7 +45154,8 @@
         "app.js:1789",
         "app.js:1829",
         "app.js:1969",
-        "app.js:2014"
+        "app.js:2014",
+        "app.js:2064"
       ]
     },
     "auto.yakut.8b817d07": {
@@ -44952,7 +45236,8 @@
         "app.js:2367",
         "app.js:2407",
         "app.js:2547",
-        "app.js:2592"
+        "app.js:2592",
+        "app.js:2642"
       ]
     },
     "auto.your.saved.project.and.workspace.state.wil.45c4e9ef": {
@@ -44965,7 +45250,8 @@
         "app.js:2366",
         "app.js:2406",
         "app.js:2546",
-        "app.js:2591"
+        "app.js:2591",
+        "app.js:2641"
       ]
     },
     "auto.zh.68a5d7a1": {
@@ -45795,7 +46081,8 @@
         "app.js:3418",
         "app.js:3458",
         "app.js:3590",
-        "app.js:3635"
+        "app.js:3635",
+        "app.js:3685"
       ]
     },
     "ui.label.segmentsTitle": {
@@ -45956,7 +46243,8 @@
         "app.js:143",
         "app.js:151",
         "app.js:1536",
-        "app.js:1581"
+        "app.js:1581",
+        "app.js:1635"
       ]
     },
     "ui.label.termCount": {
@@ -46070,6 +46358,7 @@
         "app.js:2017",
         "app.js:2157",
         "app.js:2202",
+        "app.js:2252",
         "app.js:7275",
         "app.js:7312",
         "app.js:7431",

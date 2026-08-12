@@ -230,6 +230,35 @@ app
     await waitFor("document.querySelector('.project-tile button.primary')", "populated projects");
     await captureState("01", "projects-populated");
 
+    const recoveryProjectId = fixture.projects?.[0]?.id;
+    if (!recoveryProjectId) throw new Error("Modernization fixture has no project for workspace recovery capture.");
+    await windowRef.webContents.executeJavaScript(
+      `localStorage.setItem("loopcat.workspace.dirtyProjectIds", ${JSON.stringify(JSON.stringify([recoveryProjectId]))})`,
+      true
+    );
+    await windowRef.reload();
+    await waitFor("document.querySelector('.project-tile button.primary')", "workspace recovery project");
+    await waitFor(
+      "!document.querySelector('#workspaceRecoveryPanel').classList.contains('hidden')",
+      "local workspace recovery panel"
+    );
+    await captureState("01", "workspace-recovery-local");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#workspaceMenuSummary').click()", true);
+    await waitFor("document.querySelector('.workspace-menu').open", "local workspace status menu");
+    await captureState("01", "workspace-local-status-menu");
+    await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const dismiss = document.querySelector("#workspaceRecoveryDismissBtn");
+        dismiss.focus();
+        dismiss.click();
+      })()`,
+      true
+    );
+    await waitFor(
+      "document.querySelector('#workspaceRecoveryPanel').classList.contains('hidden')",
+      "dismissed workspace recovery panel"
+    );
+
     await windowRef.webContents.executeJavaScript("document.querySelector('#resourcesViewBtn').click()", true);
     await waitFor("document.querySelector('#tmResourceDashboard .resource-card')", "TM resources dashboard");
     await captureState("02", "resources-translation-memories");
@@ -452,7 +481,7 @@ app
     };
     await fsPromises.writeFile(path.join(outputDir, "baseline.json"), `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 
-    const expectedScreenshotCount = 69;
+    const expectedScreenshotCount = 75;
     if (screenshots.length !== expectedScreenshotCount) {
       throw new Error(`Expected ${expectedScreenshotCount} screenshots, captured ${screenshots.length}.`);
     }
