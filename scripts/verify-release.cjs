@@ -156,7 +156,9 @@ const requiredReleaseFiles = [
   "src/ai/providers/groq-provider-adapter.js",
   "src/ai/providers/hosted-provider-adapters.js",
   "src/ai/providers/install-extracted-providers.js",
+  "src/ai/providers/native-openai-provider-adapters.js",
   "src/ai/providers/openai-compatible-hosted-provider-adapter.js",
+  "src/ai/providers/openai-responses-provider-adapter.js",
   "src/commands/edit-target-session.js",
   "src/ui/dialog-controller.js",
   "src/features/ai/ai-administration-controller.js",
@@ -171,6 +173,7 @@ const requiredReleaseFiles = [
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/groq-provider-adapter.test.cjs",
   "tests/unit/hosted-provider-adapters.test.cjs",
+  "tests/unit/native-openai-provider-adapters.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
   "tests/unit/import-export-controller.test.cjs",
@@ -244,9 +247,12 @@ const aiAdministrationControllerUnitTests = readText("tests/unit/ai-administrati
 const groqProviderAdapterJs = readText("src/ai/providers/groq-provider-adapter.js");
 const hostedProviderAdaptersJs = readText("src/ai/providers/hosted-provider-adapters.js");
 const hostedProviderAdapterCoreJs = readText("src/ai/providers/openai-compatible-hosted-provider-adapter.js");
+const nativeOpenAiProviderAdaptersJs = readText("src/ai/providers/native-openai-provider-adapters.js");
+const openAiResponsesProviderAdapterJs = readText("src/ai/providers/openai-responses-provider-adapter.js");
 const extractedProviderInstallerJs = readText("src/ai/providers/install-extracted-providers.js");
 const groqProviderAdapterUnitTests = readText("tests/unit/groq-provider-adapter.test.cjs");
 const hostedProviderAdaptersUnitTests = readText("tests/unit/hosted-provider-adapters.test.cjs");
+const nativeOpenAiProviderAdaptersUnitTests = readText("tests/unit/native-openai-provider-adapters.test.cjs");
 const productionEntryJs = readText("src/entry/production.js");
 const qualityReviewControllerJs = readText("src/features/quality/quality-review-controller.js");
 const qualityReviewControllerUnitTests = readText("tests/unit/quality-review-controller.test.cjs");
@@ -2393,7 +2399,6 @@ const defaultLocalAiSettingsFunction = functionBody(
   "function readLocalAiSettings"
 );
 const deepSeekProviderFunction = functionBody(aiJs, "const DeepSeekProvider = {", "function geminiProviderAuthError");
-const xAiProviderFunction = functionBody(aiJs, "const XAIProvider = {", "function geminiProviderAuthError");
 const perplexityProviderFunction = functionBody(
   aiJs,
   "const PerplexityProvider = {",
@@ -2409,14 +2414,9 @@ const cohereProviderFunction = functionBody(aiJs, "const CohereProvider = {", "f
 const mistralProviderFunction = functionBody(
   aiJs,
   "const MistralProvider = {",
-  "function azureOpenAiProviderAuthError"
-);
-const azureOpenAiProviderFunction = functionBody(
-  aiJs,
-  "const AzureOpenAIProvider = {",
   "function openAiCompatibleStatusError"
 );
-const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "const OpenAIProvider = {");
+const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function deepSeekProviderAuthError");
 assertIncludes(
   aiJs,
   `const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"`,
@@ -2570,7 +2570,49 @@ assertIncludes(
   "max_tokens: 1200",
   "ai.js Mistral chat-completion requests must include bounded max_tokens."
 );
-assertIncludes(aiJs, "const XAIProvider = {", "ai.js must implement the native xAI provider.");
+for (const provider of [
+  ["openai", "OpenAIProvider", "OpenAI"],
+  ["xai", "XAIProvider", "xAI Grok"],
+  ["azure-openai", "AzureOpenAIProvider", "Azure OpenAI"]
+]) {
+  const [providerId, compatibilityExport, providerName] = provider;
+  assertIncludes(
+    nativeOpenAiProviderAdaptersJs,
+    `id: "${providerId}"`,
+    `The checked native OpenAI adapter family must implement ${providerName}.`
+  );
+  assertIncludes(
+    nativeOpenAiProviderAdaptersJs,
+    `compatibilityExport: "${compatibilityExport}"`,
+    `The native OpenAI adapter family must preserve the ${providerName} compatibility export.`
+  );
+  assertIncludes(
+    defaultLocalAiSettingsFunction,
+    `providerId === "${providerId}"`,
+    `ai.js must preserve ${providerName} default settings.`
+  );
+  assertIncludes(
+    aiJs,
+    `aiProviderRegistry.reserve("${providerId}")`,
+    `The provider registry must preserve ${providerName}'s original order before adapter installation.`
+  );
+}
+assert(
+  !["OpenAIProvider", "XAIProvider", "AzureOpenAIProvider"].some((providerName) =>
+    aiJs.includes(`const ${providerName} = {`)
+  ),
+  "ai.js must not retain extracted native OpenAI-family provider implementations."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installNativeOpenAiProviderAdapters",
+  "The extracted-provider installer must register the native OpenAI provider family."
+);
+assertIncludes(
+  nativeOpenAiProviderAdaptersUnitTests,
+  "preserve Responses payloads, aborts, output parsing, provenance, and token metadata",
+  "Native OpenAI adapters must retain focused request, abort, parsing, provenance, and token characterization."
+);
 assertIncludes(aiJs, "xAiApiUrl", "ai.js must normalize xAI model-list and Responses endpoints.");
 assertIncludes(
   defaultLocalAiSettingsFunction,
@@ -2578,14 +2620,14 @@ assertIncludes(
   "ai.js must default native xAI settings to the xAI base URL/model, not Ollama."
 );
 assertIncludes(
-  xAiProviderFunction,
+  openAiResponsesProviderAdapterJs,
   "store: false",
-  "ai.js xAI Responses requests must opt out of provider-side storage."
+  "Native OpenAI-family Responses requests must opt out of provider-side storage."
 );
 assertIncludes(
-  xAiProviderFunction,
+  openAiResponsesProviderAdapterJs,
   "max_output_tokens: 1200",
-  "ai.js xAI Responses requests must include bounded max_output_tokens."
+  "Native OpenAI-family Responses requests must include bounded max_output_tokens."
 );
 assertIncludes(aiJs, "const PerplexityProvider = {", "ai.js must implement the native Perplexity Sonar provider.");
 assertIncludes(aiJs, "perplexityApiUrl", "ai.js must normalize Perplexity Sonar model-list and Sonar endpoints.");
@@ -2679,18 +2721,17 @@ assertIncludes(aiJs, "openRouterApiUrl", "ai.js must preserve OpenRouter endpoin
 assertIncludes(aiJs, "huggingFaceApiUrl", "ai.js must preserve Hugging Face endpoint normalization policy.");
 assertIncludes(aiJs, "deepInfraApiUrl", "ai.js must preserve DeepInfra endpoint normalization policy.");
 assertIncludes(aiJs, "fireworksApiUrl", "ai.js must preserve Fireworks AI endpoint normalization policy.");
-assertIncludes(aiJs, "const AzureOpenAIProvider = {", "ai.js must implement the native Azure OpenAI provider.");
 assertIncludes(aiJs, "azureOpenAiAuthHeaders", "ai.js must send Azure OpenAI API keys in headers, not query strings.");
 assertIncludes(aiJs, "azureOpenAiApiUrl", "ai.js must normalize Azure OpenAI v1 endpoints.");
 assertIncludes(
-  azureOpenAiProviderFunction,
-  "store: false",
-  "ai.js Azure OpenAI Responses requests must opt out of provider-side storage."
+  nativeOpenAiProviderAdaptersJs,
+  'authHeadersKey: "azureOpenAiAuthHeaders"',
+  "The checked Azure OpenAI adapter must preserve api-key authentication."
 );
 assertIncludes(
-  azureOpenAiProviderFunction,
-  "max_output_tokens: 1200",
-  "ai.js Azure OpenAI Responses requests must include bounded max_output_tokens."
+  nativeOpenAiProviderAdaptersJs,
+  "Azure OpenAI deployment ${model} was not found.",
+  "The checked Azure OpenAI adapter must preserve deployment-specific failures."
 );
 assertIncludes(aiJs, "const OpusCatProvider = {", "ai.js must implement the OPUS-CAT MT Engine provider.");
 assertIncludes(aiJs, "opusCatApiUrl", "ai.js must normalize OPUS-CAT MTRestService endpoints.");
@@ -2852,11 +2893,10 @@ assertIncludes(
   "ai.js must register the native Mistral provider."
 );
 assertIncludes(
-  aiJs,
-  "XAIProvider.completePrompt = async function completePrompt",
-  "ai.js must route xAI AI-native commands through the native provider."
+  openAiResponsesProviderAdapterJs,
+  "async completePrompt",
+  "The native OpenAI adapter family must route AI-native commands through Responses."
 );
-assertIncludes(aiJs, "aiProviderRegistry.register(XAIProvider)", "ai.js must register the native xAI provider.");
 assertIncludes(
   aiJs,
   "PerplexityProvider.completePrompt = async function completePrompt",
@@ -2899,6 +2939,16 @@ assertIncludes(
 );
 assertIncludes(
   regressionHtml,
+  'providerIds.indexOf("openai") === providerIds.indexOf("ollama") + 1',
+  "The regression harness must preserve OpenAI's original provider order."
+);
+assertIncludes(
+  regressionHtml,
+  'providerIds.indexOf("xai") === providerIds.indexOf("deepseek") + 1',
+  "The regression harness must preserve xAI's original provider order."
+);
+assertIncludes(
+  regressionHtml,
   'providerIds.indexOf("together") === providerIds.indexOf("groq") + 1',
   "The regression harness must characterize provider ordering across extracted adapters."
 );
@@ -2906,6 +2956,11 @@ assertIncludes(
   regressionHtml,
   'providerIds.indexOf("fireworks") === providerIds.indexOf("deepinfra") + 1',
   "The regression harness must preserve the complete hosted-provider family order."
+);
+assertIncludes(
+  regressionHtml,
+  'providerIds.indexOf("azure-openai") === providerIds.indexOf("mistral") + 1',
+  "The regression harness must preserve Azure OpenAI's original provider order."
 );
 assertIncludes(
   groqProviderAdapterJs,

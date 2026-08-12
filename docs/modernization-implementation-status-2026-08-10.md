@@ -54,7 +54,7 @@ This document records what the current working tree implements from the 2026 mod
 
 The new checked boundaries are active, but `app.js` remains the compatibility coordinator and is still approximately 20,000 source lines, including the isolated workflow-test source section. Production strips the test driver, but the roadmap's source goal of a bootstrap under 300 lines is not met.
 
-The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT help, Resources, quality/review, recovery/workspace, import/export/report, and AI provider-administration/command-centre UI slices are complete. The hosted OpenAI-compatible provider-adapter family is also complete: Groq, Together AI, OpenRouter, Hugging Face Inference Providers, DeepInfra, and Fireworks AI now use independently checked adapters over one shared transport/prompt core, install through the existing registry before application bootstrap, preserve their original order, and retain temporary compatibility exports from the AI façade. Still required before this package is complete:
+The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT help, Resources, quality/review, recovery/workspace, import/export/report, and AI provider-administration/command-centre UI slices are complete. The hosted OpenAI-compatible provider-adapter family is also complete: Groq, Together AI, OpenRouter, Hugging Face Inference Providers, DeepInfra, and Fireworks AI now use independently checked adapters over one shared transport/prompt core. The native Responses family is complete as well: OpenAI, xAI, and Azure OpenAI use a separate checked Responses core while retaining OpenAI's connection/status wording, xAI's bearer/model behavior, Azure's `api-key`/deployment behavior, original registry positions, and temporary compatibility exports. The explicit-consent direct OpenAI suggestion flow remains separate and unchanged in the AI façade. Still required before this package is complete:
 
 1. Move the remaining distinct native/local provider implementations from the `ai.js` façade into independently tested adapters without changing provider behavior or consent rules.
 2. Replace remaining mutable compatibility state with injected repositories/controllers and remove new code's reliance on `window.CatHan`.
@@ -89,7 +89,7 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 with the native OpenAI Responses-compatible provider family—OpenAI, xAI, and Azure OpenAI—behind the existing checked provider service.
+Continue P1-08 with the remaining native chat-completion provider pair—DeepSeek and Mistral—behind the existing checked provider service.
 
 Entry criteria:
 

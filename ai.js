@@ -1927,108 +1927,6 @@ const OpusCatProvider = {
   }
 };
 
-function openAiProviderAuthError() {
-  return "Add an OpenAI API key before using OpenAI for pre-translation.";
-}
-
-async function openAiJson(endpoint, options = {}, config = {}) {
-  const url = openAiApiUrl(config.baseUrl || OPENAI_DEFAULT_BASE_URL, endpoint);
-  let result = null;
-  try {
-    result = await fetchJsonWithTimeout(url, options, config);
-  } catch (error) {
-    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
-    throw new Error("OpenAI request could not connect. Check your internet connection or provider access and try again.");
-  }
-  if (!result.response?.ok) {
-    throw new Error(openAiProviderErrorMessage(result.data, result.response?.status));
-  }
-  return result.data;
-}
-
-const OpenAIProvider = {
-  id: "openai",
-  name: "OpenAI",
-  defaultBaseUrl: OPENAI_DEFAULT_BASE_URL,
-  defaultModel: OPENAI_DEFAULT_MODEL,
-  async testConnection(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(openAiProviderAuthError());
-    const baseUrl = normalizeOpenAiBaseUrl(config.baseUrl || OPENAI_DEFAULT_BASE_URL);
-    const data = await openAiJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    return {
-      ok: true,
-      provider: "OpenAI",
-      baseUrl,
-      modelCount: Array.isArray(data?.data) ? data.data.length : 0
-    };
-  },
-  async listModels(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(openAiProviderAuthError());
-    const baseUrl = normalizeOpenAiBaseUrl(config.baseUrl || OPENAI_DEFAULT_BASE_URL);
-    const data = await openAiJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    const models = Array.isArray(data?.data)
-      ? data.data.map((model) => {
-        const created = Number(model.created);
-        return {
-          name: String(model.id || "").trim(),
-          size: 0,
-          modifiedAt: Number.isFinite(created) ? new Date(created * 1000).toISOString() : ""
-        };
-      }).filter((model) => model.name)
-      : [];
-    return { models, raw: data };
-  },
-  async translateSegment(config = {}, request = {}) {
-    const settings = defaultLocalAiSettings({ ...config, providerId: "openai", model: config.model || request.model }, request.project);
-    const baseUrl = normalizeOpenAiBaseUrl(config.baseUrl || settings.baseUrl || OPENAI_DEFAULT_BASE_URL);
-    const model = String(config.model || request.model || settings.model || OPENAI_DEFAULT_MODEL).trim() || OPENAI_DEFAULT_MODEL;
-    const sourceText = String(request.text ?? request.segment?.source ?? "");
-    if (!sourceText.trim()) throw new Error("The segment has no source text.");
-    if (!String(config.apiKey || "").trim()) throw new Error(openAiProviderAuthError());
-    const prompt = request.prompt || buildTranslateGemmaPrompt({
-      sourceLanguage: request.sourceLanguage || settings.sourceLanguage,
-      sourceCode: request.sourceCode || settings.sourceCode,
-      targetLanguage: request.targetLanguage || settings.targetLanguage,
-      targetCode: request.targetCode || settings.targetCode,
-      text: sourceText,
-      segment: request.segment,
-      glossaryTerms: request.glossaryTerms,
-      tmMatches: request.tmMatches,
-      surroundingSegments: request.surroundingSegments
-    });
-    const startedAt = localAiStartedAt();
-    const data = await openAiJson("/responses", {
-      method: "POST",
-      headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        model,
-        store: false,
-        instructions: "You are a professional translation assistant inside LoopCAT. Produce only the requested target-language translation for one CAT-tool segment.",
-        input: prompt,
-        max_output_tokens: 1200
-      })
-    }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-    const rawOutput = extractResponseText(data);
-    if (typeof rawOutput !== "string") throw new Error("OpenAI returned a malformed response.");
-    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
-    if (!translatedText.trim()) throw new Error("OpenAI returned an empty translation for this segment.");
-    return {
-      translatedText,
-      rawOutput,
-      provider: "OpenAI",
-      providerId: "openai",
-      model,
-      durationMs: requestDurationMs(startedAt),
-      prompt,
-      metadata: {
-        inputTokens: data?.usage?.input_tokens || 0,
-        outputTokens: data?.usage?.output_tokens || 0,
-        totalTokens: data?.usage?.total_tokens || 0
-      }
-    };
-  }
-};
-
 function deepSeekProviderAuthError() {
   return "Add a DeepSeek API key before using DeepSeek for pre-translation.";
 }
@@ -2146,117 +2044,6 @@ const DeepSeekProvider = {
       metadata: {
         promptTokens: data?.usage?.prompt_tokens || 0,
         completionTokens: data?.usage?.completion_tokens || 0,
-        totalTokens: data?.usage?.total_tokens || 0
-      }
-    };
-  }
-};
-
-function xAiProviderAuthError() {
-  return "Add an xAI API key before using xAI Grok for pre-translation.";
-}
-
-function xAiStatusError(data, status, model = "") {
-  const raw = redactSensitiveText(data?.error?.message || data?.message || data?.error || "").trim();
-  if (status === 401 || status === 403) return "xAI rejected the request. Add or check the xAI API key.";
-  if ((status === 404 || /model/i.test(raw)) && model) return `Model ${model} was not found by xAI.`;
-  return raw || `xAI request failed with status ${status}.`;
-}
-
-async function xAiJson(endpoint, options = {}, config = {}) {
-  const url = xAiApiUrl(config.baseUrl || XAI_DEFAULT_BASE_URL, endpoint);
-  let result = null;
-  try {
-    result = await fetchJsonWithTimeout(url, options, config);
-  } catch (error) {
-    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
-    throw new Error(`xAI is not reachable at ${normalizeXAiBaseUrl(config.baseUrl || XAI_DEFAULT_BASE_URL)}.`);
-  }
-  if (!result.response?.ok) {
-    throw new Error(xAiStatusError(result.data, result.response?.status, config.model));
-  }
-  return result.data;
-}
-
-const XAI_TRANSLATION_INSTRUCTIONS = "You are a professional translation assistant inside LoopCAT. Produce only the requested target-language translation for one CAT-tool segment.";
-
-const XAIProvider = {
-  id: "xai",
-  name: "xAI Grok",
-  defaultBaseUrl: XAI_DEFAULT_BASE_URL,
-  defaultModel: XAI_DEFAULT_MODEL,
-  async testConnection(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(xAiProviderAuthError());
-    const baseUrl = normalizeXAiBaseUrl(config.baseUrl || XAI_DEFAULT_BASE_URL);
-    const data = await xAiJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    return {
-      ok: true,
-      provider: "xAI Grok",
-      baseUrl,
-      modelCount: Array.isArray(data?.data) ? data.data.length : 0
-    };
-  },
-  async listModels(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(xAiProviderAuthError());
-    const baseUrl = normalizeXAiBaseUrl(config.baseUrl || XAI_DEFAULT_BASE_URL);
-    const data = await xAiJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    const models = Array.isArray(data?.data)
-      ? data.data.map((model) => {
-        const created = Number(model.created);
-        return {
-          name: String(model.id || model.name || "").trim(),
-          size: 0,
-          modifiedAt: Number.isFinite(created) ? new Date(created * 1000).toISOString() : ""
-        };
-      }).filter((model) => model.name)
-      : [];
-    return { models, raw: data };
-  },
-  async translateSegment(config = {}, request = {}) {
-    const settings = defaultLocalAiSettings({ ...config, providerId: "xai", model: config.model || request.model }, request.project);
-    const baseUrl = normalizeXAiBaseUrl(config.baseUrl || settings.baseUrl || XAI_DEFAULT_BASE_URL);
-    const model = String(config.model || request.model || settings.model || XAI_DEFAULT_MODEL).trim() || XAI_DEFAULT_MODEL;
-    const sourceText = String(request.text ?? request.segment?.source ?? "");
-    if (!sourceText.trim()) throw new Error("The segment has no source text.");
-    if (!String(config.apiKey || "").trim()) throw new Error(xAiProviderAuthError());
-    const prompt = request.prompt || buildTranslateGemmaPrompt({
-      sourceLanguage: request.sourceLanguage || settings.sourceLanguage,
-      sourceCode: request.sourceCode || settings.sourceCode,
-      targetLanguage: request.targetLanguage || settings.targetLanguage,
-      targetCode: request.targetCode || settings.targetCode,
-      text: sourceText,
-      segment: request.segment,
-      glossaryTerms: request.glossaryTerms,
-      tmMatches: request.tmMatches,
-      surroundingSegments: request.surroundingSegments
-    });
-    const startedAt = localAiStartedAt();
-    const data = await xAiJson("/responses", {
-      method: "POST",
-      headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        model,
-        store: false,
-        instructions: XAI_TRANSLATION_INSTRUCTIONS,
-        input: prompt,
-        max_output_tokens: 1200
-      })
-    }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-    const rawOutput = extractResponseText(data);
-    if (typeof rawOutput !== "string") throw new Error("xAI returned a malformed response.");
-    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
-    if (!translatedText.trim()) throw new Error("xAI returned an empty translation for this segment.");
-    return {
-      translatedText,
-      rawOutput,
-      provider: "xAI Grok",
-      providerId: "xai",
-      model,
-      durationMs: requestDurationMs(startedAt),
-      prompt,
-      metadata: {
-        inputTokens: data?.usage?.input_tokens || 0,
-        outputTokens: data?.usage?.output_tokens || 0,
         totalTokens: data?.usage?.total_tokens || 0
       }
     };
@@ -2929,115 +2716,6 @@ const MistralProvider = {
   }
 };
 
-function azureOpenAiProviderAuthError() {
-  return "Add an Azure OpenAI API key before using Azure OpenAI for pre-translation.";
-}
-
-function azureOpenAiStatusError(data, status, model = "") {
-  const raw = redactSensitiveText(data?.error?.message || data?.message || data?.error || "").trim();
-  if (status === 401 || status === 403) return "Azure OpenAI rejected the request. Add or check the Azure OpenAI API key.";
-  if ((status === 404 || /deployment|model/i.test(raw)) && model) return `Azure OpenAI deployment ${model} was not found.`;
-  return raw || `Azure OpenAI request failed with status ${status}.`;
-}
-
-async function azureOpenAiJson(endpoint, options = {}, config = {}) {
-  const url = azureOpenAiApiUrl(config.baseUrl || AZURE_OPENAI_DEFAULT_BASE_URL, endpoint);
-  let result = null;
-  try {
-    result = await fetchJsonWithTimeout(url, options, config);
-  } catch (error) {
-    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
-    throw new Error(`Azure OpenAI is not reachable at ${normalizeAzureOpenAiBaseUrl(config.baseUrl || AZURE_OPENAI_DEFAULT_BASE_URL)}.`);
-  }
-  if (!result.response?.ok) {
-    throw new Error(azureOpenAiStatusError(result.data, result.response?.status, config.model));
-  }
-  return result.data;
-}
-
-const AzureOpenAIProvider = {
-  id: "azure-openai",
-  name: "Azure OpenAI",
-  defaultBaseUrl: AZURE_OPENAI_DEFAULT_BASE_URL,
-  defaultModel: AZURE_OPENAI_DEFAULT_MODEL,
-  async testConnection(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(azureOpenAiProviderAuthError());
-    const baseUrl = normalizeAzureOpenAiBaseUrl(config.baseUrl || AZURE_OPENAI_DEFAULT_BASE_URL);
-    const data = await azureOpenAiJson("/models", { method: "GET", headers: azureOpenAiAuthHeaders(config) }, { ...config, baseUrl });
-    return {
-      ok: true,
-      provider: "Azure OpenAI",
-      baseUrl,
-      modelCount: Array.isArray(data?.data) ? data.data.length : 0
-    };
-  },
-  async listModels(config = {}) {
-    if (!String(config.apiKey || "").trim()) throw new Error(azureOpenAiProviderAuthError());
-    const baseUrl = normalizeAzureOpenAiBaseUrl(config.baseUrl || AZURE_OPENAI_DEFAULT_BASE_URL);
-    const data = await azureOpenAiJson("/models", { method: "GET", headers: azureOpenAiAuthHeaders(config) }, { ...config, baseUrl });
-    const models = Array.isArray(data?.data)
-      ? data.data.map((model) => {
-        const created = Number(model.created);
-        return {
-          name: String(model.id || model.name || "").trim(),
-          size: 0,
-          modifiedAt: Number.isFinite(created) ? new Date(created * 1000).toISOString() : ""
-        };
-      }).filter((model) => model.name)
-      : [];
-    return { models, raw: data };
-  },
-  async translateSegment(config = {}, request = {}) {
-    const settings = defaultLocalAiSettings({ ...config, providerId: "azure-openai", model: config.model || request.model }, request.project);
-    const baseUrl = normalizeAzureOpenAiBaseUrl(config.baseUrl || settings.baseUrl || AZURE_OPENAI_DEFAULT_BASE_URL);
-    const model = String(config.model || request.model || settings.model || AZURE_OPENAI_DEFAULT_MODEL).trim() || AZURE_OPENAI_DEFAULT_MODEL;
-    const sourceText = String(request.text ?? request.segment?.source ?? "");
-    if (!sourceText.trim()) throw new Error("The segment has no source text.");
-    if (!String(config.apiKey || "").trim()) throw new Error(azureOpenAiProviderAuthError());
-    const prompt = request.prompt || buildTranslateGemmaPrompt({
-      sourceLanguage: request.sourceLanguage || settings.sourceLanguage,
-      sourceCode: request.sourceCode || settings.sourceCode,
-      targetLanguage: request.targetLanguage || settings.targetLanguage,
-      targetCode: request.targetCode || settings.targetCode,
-      text: sourceText,
-      segment: request.segment,
-      glossaryTerms: request.glossaryTerms,
-      tmMatches: request.tmMatches,
-      surroundingSegments: request.surroundingSegments
-    });
-    const startedAt = localAiStartedAt();
-    const data = await azureOpenAiJson("/responses", {
-      method: "POST",
-      headers: azureOpenAiAuthHeaders(config, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        model,
-        store: false,
-        instructions: "You are a professional translation assistant inside LoopCAT. Produce only the requested target-language translation for one CAT-tool segment.",
-        input: prompt,
-        max_output_tokens: 1200
-      })
-    }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-    const rawOutput = extractResponseText(data);
-    if (typeof rawOutput !== "string") throw new Error("Azure OpenAI returned a malformed response.");
-    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
-    if (!translatedText.trim()) throw new Error("Azure OpenAI returned an empty translation for this segment.");
-    return {
-      translatedText,
-      rawOutput,
-      provider: "Azure OpenAI",
-      providerId: "azure-openai",
-      model,
-      durationMs: requestDurationMs(startedAt),
-      prompt,
-      metadata: {
-        inputTokens: data?.usage?.input_tokens || 0,
-        outputTokens: data?.usage?.output_tokens || 0,
-        totalTokens: data?.usage?.total_tokens || 0
-      }
-    };
-  }
-};
-
 function openAiCompatibleStatusError(data, status, model = "") {
   const raw = redactSensitiveText(data?.error?.message || data?.message || data?.error || "").trim();
   if (status === 401 || status === 403) return "The OpenAI-compatible provider rejected the request. Add or check the provider API key.";
@@ -3178,6 +2856,12 @@ function genericPromptResult(provider, providerId, model, prompt, rawOutput, sta
 }
 
 const providerAdapterRuntime = Object.freeze({
+  OPENAI_DEFAULT_BASE_URL,
+  OPENAI_DEFAULT_MODEL,
+  XAI_DEFAULT_BASE_URL,
+  XAI_DEFAULT_MODEL,
+  AZURE_OPENAI_DEFAULT_BASE_URL,
+  AZURE_OPENAI_DEFAULT_MODEL,
   GROQ_DEFAULT_BASE_URL,
   GROQ_DEFAULT_MODEL,
   TOGETHER_DEFAULT_BASE_URL,
@@ -3190,6 +2874,7 @@ const providerAdapterRuntime = Object.freeze({
   DEEPINFRA_DEFAULT_MODEL,
   FIREWORKS_DEFAULT_BASE_URL,
   FIREWORKS_DEFAULT_MODEL,
+  azureOpenAiAuthHeaders,
   bearerAuthHeaders,
   buildTranslateGemmaPrompt,
   cleanModelTranslationOutput,
@@ -3197,6 +2882,9 @@ const providerAdapterRuntime = Object.freeze({
   fetchJsonWithTimeout,
   genericPromptResult,
   genericPromptSystem,
+  openAiApiUrl,
+  xAiApiUrl,
+  azureOpenAiApiUrl,
   groqApiUrl,
   togetherApiUrl,
   openRouterApiUrl,
@@ -3204,6 +2892,9 @@ const providerAdapterRuntime = Object.freeze({
   deepInfraApiUrl,
   fireworksApiUrl,
   localAiStartedAt,
+  normalizeOpenAiBaseUrl,
+  normalizeXAiBaseUrl,
+  normalizeAzureOpenAiBaseUrl,
   normalizeGroqBaseUrl,
   normalizeTogetherBaseUrl,
   normalizeOpenRouterBaseUrl,
@@ -3243,31 +2934,6 @@ OllamaProvider.completePrompt = async function completePrompt(config = {}, reque
   });
 };
 
-OpenAIProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
-  const settings = defaultLocalAiSettings({ ...config, providerId: "openai", model: config.model || request.model }, request.project);
-  const baseUrl = normalizeOpenAiBaseUrl(config.baseUrl || settings.baseUrl || OPENAI_DEFAULT_BASE_URL);
-  const model = String(config.model || request.model || settings.model || OPENAI_DEFAULT_MODEL).trim() || OPENAI_DEFAULT_MODEL;
-  if (!String(config.apiKey || "").trim()) throw new Error(openAiProviderAuthError());
-  const prompt = promptTextOrThrow(request);
-  const startedAt = localAiStartedAt();
-  const data = await openAiJson("/responses", {
-    method: "POST",
-    headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      model,
-      store: false,
-      instructions: request.system || genericPromptSystem(),
-      input: prompt,
-      max_output_tokens: 1200
-    })
-  }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-  return genericPromptResult("OpenAI", "openai", model, prompt, extractResponseText(data), startedAt, {
-    inputTokens: data?.usage?.input_tokens || 0,
-    outputTokens: data?.usage?.output_tokens || 0,
-    totalTokens: data?.usage?.total_tokens || 0
-  });
-};
-
 DeepSeekProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
   const settings = defaultLocalAiSettings({ ...config, providerId: "deepseek", model: config.model || request.model }, request.project);
   const baseUrl = normalizeDeepSeekBaseUrl(config.baseUrl || settings.baseUrl || DEEPSEEK_DEFAULT_BASE_URL);
@@ -3292,31 +2958,6 @@ DeepSeekProvider.completePrompt = async function completePrompt(config = {}, req
   return genericPromptResult("DeepSeek", "deepseek", model, prompt, extractDeepSeekResponseText(data), startedAt, {
     promptTokens: data?.usage?.prompt_tokens || 0,
     completionTokens: data?.usage?.completion_tokens || 0,
-    totalTokens: data?.usage?.total_tokens || 0
-  });
-};
-
-XAIProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
-  const settings = defaultLocalAiSettings({ ...config, providerId: "xai", model: config.model || request.model }, request.project);
-  const baseUrl = normalizeXAiBaseUrl(config.baseUrl || settings.baseUrl || XAI_DEFAULT_BASE_URL);
-  const model = String(config.model || request.model || settings.model || XAI_DEFAULT_MODEL).trim() || XAI_DEFAULT_MODEL;
-  if (!String(config.apiKey || "").trim()) throw new Error(xAiProviderAuthError());
-  const prompt = promptTextOrThrow(request);
-  const startedAt = localAiStartedAt();
-  const data = await xAiJson("/responses", {
-    method: "POST",
-    headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      model,
-      store: false,
-      instructions: request.system || genericPromptSystem(),
-      input: prompt,
-      max_output_tokens: 1200
-    })
-  }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-  return genericPromptResult("xAI Grok", "xai", model, prompt, extractResponseText(data), startedAt, {
-    inputTokens: data?.usage?.input_tokens || 0,
-    outputTokens: data?.usage?.output_tokens || 0,
     totalTokens: data?.usage?.total_tokens || 0
   });
 };
@@ -3463,31 +3104,6 @@ MistralProvider.completePrompt = async function completePrompt(config = {}, requ
   });
 };
 
-AzureOpenAIProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
-  const settings = defaultLocalAiSettings({ ...config, providerId: "azure-openai", model: config.model || request.model }, request.project);
-  const baseUrl = normalizeAzureOpenAiBaseUrl(config.baseUrl || settings.baseUrl || AZURE_OPENAI_DEFAULT_BASE_URL);
-  const model = String(config.model || request.model || settings.model || AZURE_OPENAI_DEFAULT_MODEL).trim() || AZURE_OPENAI_DEFAULT_MODEL;
-  if (!String(config.apiKey || "").trim()) throw new Error(azureOpenAiProviderAuthError());
-  const prompt = promptTextOrThrow(request);
-  const startedAt = localAiStartedAt();
-  const data = await azureOpenAiJson("/responses", {
-    method: "POST",
-    headers: azureOpenAiAuthHeaders(config, { "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      model,
-      store: false,
-      instructions: request.system || genericPromptSystem(),
-      input: prompt,
-      max_output_tokens: 1200
-    })
-  }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-  return genericPromptResult("Azure OpenAI", "azure-openai", model, prompt, extractResponseText(data), startedAt, {
-    inputTokens: data?.usage?.input_tokens || 0,
-    outputTokens: data?.usage?.output_tokens || 0,
-    totalTokens: data?.usage?.total_tokens || 0
-  });
-};
-
 OpenAICompatibleProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
   const settings = defaultLocalAiSettings({ ...config, providerId: "openai-compatible", model: config.model || request.model }, request.project);
   const baseUrl = normalizeOpenAiCompatibleBaseUrl(config.baseUrl || settings.baseUrl || LM_STUDIO_DEFAULT_BASE_URL);
@@ -3541,9 +3157,9 @@ const aiProviderRegistry = (() => {
 })();
 
 aiProviderRegistry.register(OllamaProvider);
-aiProviderRegistry.register(OpenAIProvider);
+aiProviderRegistry.reserve("openai");
 aiProviderRegistry.register(DeepSeekProvider);
-aiProviderRegistry.register(XAIProvider);
+aiProviderRegistry.reserve("xai");
 aiProviderRegistry.register(PerplexityProvider);
 aiProviderRegistry.reserve("groq");
 aiProviderRegistry.reserve("together");
@@ -3555,7 +3171,7 @@ aiProviderRegistry.register(GeminiProvider);
 aiProviderRegistry.register(AnthropicProvider);
 aiProviderRegistry.register(CohereProvider);
 aiProviderRegistry.register(MistralProvider);
-aiProviderRegistry.register(AzureOpenAIProvider);
+aiProviderRegistry.reserve("azure-openai");
 aiProviderRegistry.register(OpenAICompatibleProvider);
 aiProviderRegistry.register(OpusCatProvider);
 
@@ -4196,15 +3812,12 @@ window.CatHan.ai = {
   defaultLocalAiSettings,
   localAISettingsStore,
   OllamaProvider,
-  OpenAIProvider,
   DeepSeekProvider,
-  XAIProvider,
   PerplexityProvider,
   GeminiProvider,
   AnthropicProvider,
   CohereProvider,
   MistralProvider,
-  AzureOpenAIProvider,
   OpenAICompatibleProvider,
   OpusCatProvider,
   providerAdapterRuntime,
