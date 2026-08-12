@@ -15,15 +15,15 @@
 
 ## Required verification baseline
 
-| Command | Result | Duration |
-| --- | --- | ---: |
-| `pnpm verify:release` | Pass | 0.77s |
-| `pnpm verify:desktop-wrapper` | Pass | 0.67s |
-| `pnpm verify:ai-sidebar-ux` | Pass | 10.74s |
-| `pnpm i18n:validate` | Pass; 1,816 source messages and 126 explicit keys | 0.72s |
-| `pnpm verify:web-artifact` | Pass | 0.85s |
-| `pnpm verify:web-smoke` | Pass | 4.79s |
-| `pnpm verify:browser-runner` | Pass; all eight browser suites | 160.33s |
+| Command                       | Result                                            | Duration |
+| ----------------------------- | ------------------------------------------------- | -------: |
+| `pnpm verify:release`         | Pass                                              |    0.77s |
+| `pnpm verify:desktop-wrapper` | Pass                                              |    0.67s |
+| `pnpm verify:ai-sidebar-ux`   | Pass                                              |   10.74s |
+| `pnpm i18n:validate`          | Pass; 1,816 source messages and 126 explicit keys |    0.72s |
+| `pnpm verify:web-artifact`    | Pass                                              |    0.85s |
+| `pnpm verify:web-smoke`       | Pass                                              |    4.79s |
+| `pnpm verify:browser-runner`  | Pass; all eight browser suites                    |  160.33s |
 
 Raw logs and the machine-readable timing summary were written outside the repository to the current user's temporary directory under `loopcat-modernization-baseline-2026-08-10`.
 
@@ -41,7 +41,7 @@ For retained local artifacts rather than a disposable verification run:
 node scripts/capture-modernization-baseline.cjs --output test-artifacts/modernization-baseline-current
 ```
 
-The capture uses a deterministic project and produces 78 screenshots covering projects empty/populated, project dashboard, translation editor, import-validation error and focus recovery, resource dashboards and Trash, recovery/workspace state, new-project and focused utility dialogs, contextual AI, review/quality inspector states, responsive and compact editor checkpoints, Focus mode, command palette, and light/dark themes at 1440×900, 1366×768, and 1024×768. `baseline.json` records runtime versions, asset composition, startup sample, input-dispatch sample, scroll-frame sample, keyboard paths, and known accessibility exceptions.
+The capture uses a deterministic project and produces 81 screenshots covering projects empty/populated, project dashboard, translation editor, import-validation error and focus recovery, resource dashboards and Trash, recovery/workspace state, new-project and focused utility dialogs, contextual AI, provider administration/AI Command Centre, review/quality inspector states, responsive and compact editor checkpoints, Focus mode, command palette, and light/dark themes at 1440×900, 1366×768, and 1024×768. `baseline.json` records runtime versions, asset composition, startup sample, input-dispatch sample, scroll-frame sample, keyboard paths, and known accessibility exceptions.
 
 ## Contract baseline
 

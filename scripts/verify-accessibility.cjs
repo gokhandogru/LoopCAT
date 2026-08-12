@@ -320,6 +320,26 @@ app
         "populated Quality Workbench"
       );
       await audit("Quality Workbench populated");
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          document.querySelector("#inspectorTabAi").click();
+          const opener = document.querySelector("#openProjectAiSettingsBtn");
+          opener.focus();
+          opener.click();
+        })()`,
+        true
+      );
+      await waitFor(
+        "document.querySelector('#projectDialog').open && document.querySelector('#projectAiOptions').open",
+        "AI provider administration dialog"
+      );
+      await audit("AI provider administration and command centre");
+      await windowRef.webContents.executeJavaScript("document.querySelector('#cancelProjectBtn').click()", true);
+      await waitFor("!document.querySelector('#projectDialog').open", "AI provider administration dialog close");
+      await waitFor(
+        "document.activeElement === document.querySelector('#openProjectAiSettingsBtn')",
+        "AI provider administration focus return"
+      );
       await windowRef.webContents.executeJavaScript("document.querySelector('#projectsViewBtn').click()", true);
       await waitFor(
         "!document.querySelector('#projectsView').classList.contains('hidden')",

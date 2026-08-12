@@ -440,6 +440,21 @@ app
     }
     await captureState("05", "contextual-ai-inspector");
     await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const opener = document.querySelector("#openProjectAiSettingsBtn");
+        opener.focus();
+        opener.click();
+      })()`,
+      true
+    );
+    await waitFor(
+      "document.querySelector('#projectDialog').open && document.querySelector('#projectAiOptions').open",
+      "AI provider administration dialog"
+    );
+    await captureState("05", "ai-provider-administration");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#cancelProjectBtn').click()", true);
+    await waitFor("!document.querySelector('#projectDialog').open", "AI provider administration dialog close");
+    await windowRef.webContents.executeJavaScript(
       "document.querySelector('[data-inspector-tab=\"matches\"]').click()",
       true
     );
@@ -512,7 +527,7 @@ app
     };
     await fsPromises.writeFile(path.join(outputDir, "baseline.json"), `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 
-    const expectedScreenshotCount = 78;
+    const expectedScreenshotCount = 81;
     if (screenshots.length !== expectedScreenshotCount) {
       throw new Error(`Expected ${expectedScreenshotCount} screenshots, captured ${screenshots.length}.`);
     }

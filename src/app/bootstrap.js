@@ -46,6 +46,7 @@ import { createUpdateController } from "../features/update/update-controller.js"
 import { createDiagnosticsController } from "../features/diagnostics/diagnostics-controller.js";
 import { createDiagnosticsService } from "../features/diagnostics/diagnostics-service.js";
 import { createAiContextController } from "../features/ai/ai-context-controller.js";
+import { createAiAdministrationController } from "../features/ai/ai-administration-controller.js";
 import { createOpusCatHelpController } from "../features/ai/opus-cat-help-controller.js";
 import { createTmPretranslationDialogController } from "../features/resources/tm-pretranslation-dialog-controller.js";
 import { createResourcesController } from "../features/resources/resources-controller.js";
@@ -111,6 +112,7 @@ export function createApplicationRuntime({ browserWindow, projectApi, storageApi
       undoStore
     }),
     featureFactories: Object.freeze({
+      createAiAdministrationController,
       createAiContextController,
       createOpusCatHelpController,
       createAiProviderService,

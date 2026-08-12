@@ -155,6 +155,7 @@ const requiredReleaseFiles = [
   "src/entry/test.js",
   "src/commands/edit-target-session.js",
   "src/ui/dialog-controller.js",
+  "src/features/ai/ai-administration-controller.js",
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
   "src/features/quality/quality-review-controller.js",
@@ -163,6 +164,7 @@ const requiredReleaseFiles = [
   "src/features/import-export/import-export-controller.js",
   "src/features/workspace/recovery-workspace-controller.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
+  "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
   "tests/unit/import-export-controller.test.cjs",
@@ -231,6 +233,8 @@ const projectDialogControllerUnitTests = readText("tests/unit/project-dialog-con
 const opusCatHelpControllerJs = readText("src/features/ai/opus-cat-help-controller.js");
 const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-pretranslation-dialog-controller.js");
 const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
+const aiAdministrationControllerJs = readText("src/features/ai/ai-administration-controller.js");
+const aiAdministrationControllerUnitTests = readText("tests/unit/ai-administration-controller.test.cjs");
 const qualityReviewControllerJs = readText("src/features/quality/quality-review-controller.js");
 const qualityReviewControllerUnitTests = readText("tests/unit/quality-review-controller.test.cjs");
 const recoveryWorkspaceControllerJs = readText("src/features/workspace/recovery-workspace-controller.js");
@@ -995,6 +999,87 @@ assertIncludes(
   appJs,
   "OPUS-CAT help close restores focus to the visible connection-help entry point",
   "the app workflow must characterize OPUS-CAT help focus return above Project settings."
+);
+assertIncludes(
+  aiAdministrationControllerJs,
+  'listen(elements.saveSettingsButton, "click"',
+  "the checked AI administration controller must own the global AI settings event lifecycle."
+);
+assertIncludes(
+  aiAdministrationControllerJs,
+  'listen(providerPresetSelect, "change"',
+  "the checked AI administration controller must own provider-preset selection events."
+);
+assertIncludes(
+  aiAdministrationControllerJs,
+  "renderProviderSummary(view.summary || {})",
+  "the checked AI administration controller must own provider-summary presentation."
+);
+assertIncludes(
+  aiAdministrationControllerJs,
+  "outputObserver?.disconnect?.()",
+  "the checked AI administration controller must clean up output-disclosure observation."
+);
+assertIncludes(
+  aiAdministrationControllerJs,
+  "function renderOutput",
+  "the checked AI administration controller must own command-centre output presentation."
+);
+assert(
+  !aiAdministrationControllerJs.includes("innerHTML") &&
+    !aiAdministrationControllerJs.includes("insertAdjacentHTML") &&
+    !aiAdministrationControllerJs.includes("localStorage") &&
+    !aiAdministrationControllerJs.includes("sessionStorage") &&
+    !aiAdministrationControllerJs.includes("fetch(") &&
+    !aiAdministrationControllerJs.includes("ai.js") &&
+    !aiAdministrationControllerJs.includes("command-bus") &&
+    !aiAdministrationControllerJs.includes("buildTranslate"),
+  "the AI administration controller must use safe DOM construction and must not own credentials, providers, prompts, network calls, or commands."
+);
+assertIncludes(
+  appJs,
+  "createAiAdministrationController",
+  "app.js must compose the checked AI administration controller with injected application actions."
+);
+assert(
+  !appJs.includes('els.saveAiSettingsBtn?.addEventListener("click"') &&
+    !appJs.includes('els.contextualAiTranslateBtn?.addEventListener("click"') &&
+    !appJs.includes('els.openAiSuggestionBtn.addEventListener("click"') &&
+    !appJs.includes('els.localAiPresetSelect?.addEventListener("change"') &&
+    !appJs.includes('els.localAiProviderSelect?.addEventListener("change"') &&
+    !appJs.includes('els.localAiPullModelBtn?.addEventListener("click"') &&
+    !appJs.includes('els.clearOpenAiKeyBtn.addEventListener("click"'),
+  "the migrated AI administration and command-centre surfaces must not retain superseded static listeners in app.js."
+);
+assert(
+  !functionBody(appJs, "function localAiSettingsFromForm", "function assertLocalAiEndpointAllowed").includes(
+    "els.localAi"
+  ) &&
+    !functionBody(appJs, "function renderLocalAiCommandCentre", "async function persistLocalAiSettings").includes(
+      "els.localAi"
+    ) &&
+    (appJs.slice(0, appJs.indexOf("const runAppWorkflowTest")).match(/els\.localAiPromptOutput/g) || []).length === 1,
+  "AI provider form values, command-centre rendering, and output presentation must be owned by the checked controller."
+);
+assertIncludes(
+  aiAdministrationControllerUnitTests,
+  "owns provider and command action lifecycle without owning AI effects",
+  "focused tests must characterize AI administration event delegation and cleanup."
+);
+assertIncludes(
+  aiAdministrationControllerUnitTests,
+  "renders provider details with safe DOM construction",
+  "focused tests must characterize safe AI provider-summary rendering."
+);
+assertIncludes(
+  appJs,
+  "checked AI administration controller owns provider form values and safe summary rendering",
+  "the app workflow must characterize provider form ownership and safe rendering through the checked controller."
+);
+assertIncludes(
+  appJs,
+  "checked AI administration controller owns prompt preview events and output disclosure",
+  "the app workflow must characterize AI prompt events and output disclosure through the checked controller."
 );
 assertIncludes(
   indexHtml,
@@ -3021,7 +3106,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "function renderLocalAiProviderSummary",
+  "function localAiProviderSummaryView",
   "app.js must render AI provider locality, key, and endpoint details."
 );
 assertIncludes(
@@ -3035,9 +3120,9 @@ assertIncludes(
   "ai.js must derive provider guidance from the active provider locality."
 );
 assertIncludes(
-  appJs,
+  aiAdministrationControllerJs,
   "local-ai-provider-guidance",
-  "app.js must render provider best-fit guidance in the AI Command Centre summary."
+  "the checked AI administration controller must render provider best-fit guidance in the AI Command Centre summary."
 );
 assertIncludes(
   appJs,
@@ -3061,7 +3146,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "AI Command Centre prompt test previews and sends selected AI-native command prompts",
+  "checked AI administration controller owns prompt preview events and output disclosure",
   "app workflow test must verify mode-aware Prompt Test previews and sends non-translation prompts."
 );
 assertIncludes(
@@ -3150,20 +3235,20 @@ assertIncludes(
   "app.js must scope Local AI API-key storage by active provider settings."
 );
 assertIncludes(
-  appJs,
-  'localAiHostedKeyControls?.classList.toggle("hidden", !needsKey)',
-  "app.js must hide hosted Local AI key controls when the active provider does not need a key."
+  aiAdministrationControllerJs,
+  'hostedKeyControls?.classList.toggle("hidden", !view.needsKey)',
+  "the checked AI administration controller must hide hosted Local AI key controls when the active provider does not need a key."
 );
 assertIncludes(
-  appJs,
-  'localAiPullModelWrap?.classList.toggle("hidden", !canPull)',
-  "app.js must hide local model-pull controls when the active provider cannot pull models."
+  aiAdministrationControllerJs,
+  'pullModelWrap?.classList.toggle("hidden", !view.canPull)',
+  "the checked AI administration controller must hide local model-pull controls when the active provider cannot pull models."
 );
 assertIncludes(appJs, "window.LoopCATDesktop", "app.js must detect the optional LoopCAT desktop bridge.");
 assertIncludes(
-  appJs,
-  'localAiStartLmStudioBtn.classList.toggle("hidden", !canStartServer)',
-  "app.js must hide the LM Studio start button when the desktop helper is unavailable."
+  aiAdministrationControllerJs,
+  'startLmStudioButton.classList.toggle("hidden", !view.canStartServer)',
+  "the checked AI administration controller must hide the LM Studio start button when the desktop helper is unavailable."
 );
 assertIncludes(
   appJs,
@@ -6300,8 +6385,13 @@ assertIncludes(
 );
 assertIncludes(
   baselineCaptureScript,
-  "const expectedScreenshotCount = 78;",
-  "the deterministic visual checkpoint count must include validation, quality, review, and recovery/workspace states."
+  'captureState("05", "ai-provider-administration")',
+  "visual checkpoints must include AI provider administration at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  "const expectedScreenshotCount = 81;",
+  "the deterministic visual checkpoint count must include validation, quality, review, recovery/workspace, and AI administration states."
 );
 assertIncludes(
   accessibilityVerificationScript,
@@ -6327,6 +6417,11 @@ assertIncludes(
   accessibilityVerificationScript,
   'audit("Import validation error")',
   "automated accessibility checks must cover import-validation semantics and focus recovery."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'audit("AI provider administration and command centre")',
+  "automated accessibility checks must cover AI provider administration and its dialog focus lifecycle."
 );
 assertIncludes(
   appJs,

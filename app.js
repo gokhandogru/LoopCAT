@@ -1119,6 +1119,125 @@ const aiContextController = appRuntime?.featureFactories?.createAiContextControl
 });
 aiContextController?.mount?.();
 
+const aiAdministrationController = appRuntime?.featureFactories?.createAiAdministrationController?.({
+  elements: {
+    saveSettingsButton: els.saveAiSettingsBtn,
+    aiEnabledInput: els.aiEnabledInput,
+    aiProviderInput: els.aiProviderInput,
+    aiModelInput: els.aiModelInput,
+    openAiApiKeyInput: els.openAiApiKeyInput,
+    rememberOpenAiKeyInput: els.rememberOpenAiKeyInput,
+    clearOpenAiKeyButton: els.clearOpenAiKeyBtn,
+    aiConnectionStatus: els.aiConnectionStatus,
+    aiSendSourceInput: els.aiSendSourceInput,
+    aiUseTmInput: els.aiUseTmInput,
+    aiUseTbInput: els.aiUseTbInput,
+    aiStyleGuideInput: els.aiStyleGuideInput,
+    contextualTranslateButton: els.contextualAiTranslateBtn,
+    contextualReviewButton: els.contextualAiReviewBtn,
+    contextualRepairButton: els.contextualAiRepairBtn,
+    contextualPolishButton: els.contextualAiPolishBtn,
+    contextualVariantsButton: els.contextualAiVariantsBtn,
+    contextualApplyTermsButton: els.contextualAiApplyTermsBtn,
+    contextualOpenAiButton: els.contextualOpenAiSuggestionBtn,
+    contextualCancelButton: els.contextualAiCancelBtn,
+    openAiSuggestionButton: els.openAiSuggestionBtn,
+    privacyNote: els.localAiPrivacyNote,
+    providerPresetSelect: els.localAiPresetSelect,
+    providerSelect: els.localAiProviderSelect,
+    baseUrlInput: els.localAiBaseUrlInput,
+    localCloudPresetButton: els.localAiLocalCloudPresetBtn,
+    cloudPresetButton: els.localAiCloudPresetBtn,
+    status: els.localAiStatus,
+    statusText: els.localAiStatusText,
+    providerSummary: els.localAiProviderSummary,
+    hostedKeyControls: els.localAiHostedKeyControls,
+    localAiApiKeyInput: els.localAiApiKeyInput,
+    rememberLocalAiKeyInput: els.rememberLocalAiKeyInput,
+    clearLocalAiKeyButton: els.clearLocalAiKeyBtn,
+    testConnectionButton: els.localAiTestBtn,
+    startLmStudioButton: els.localAiStartLmStudioBtn,
+    refreshModelsButton: els.localAiRefreshModelsBtn,
+    modelSelect: els.localAiModelSelect,
+    modelInput: els.localAiModelInput,
+    pullModelWrap: els.localAiPullModelWrap,
+    pullModelButton: els.localAiPullModelBtn,
+    sourceLanguageInput: els.localAiSourceLangInput,
+    sourceCodeInput: els.localAiSourceCodeInput,
+    targetLanguageInput: els.localAiTargetLangInput,
+    targetCodeInput: els.localAiTargetCodeInput,
+    modeSelect: els.localAiModeSelect,
+    concurrencyInput: els.localAiConcurrencyInput,
+    timeoutInput: els.localAiTimeoutInput,
+    overwriteInput: els.localAiOverwriteInput,
+    includeContextInput: els.localAiIncludeContextInput,
+    preserveConfirmedInput: els.localAiPreserveConfirmedInput,
+    pretranslateButton: els.localAiPretranslateBtn,
+    cancelButton: els.localAiCancelBtn,
+    progress: els.localAiProgress,
+    promptModeSelect: els.localAiPromptModeSelect,
+    sampleInput: els.localAiSampleInput,
+    promptPreview: els.localAiPromptPreview,
+    promptTestButton: els.localAiPromptTestBtn,
+    reviewSegmentButton: els.localAiReviewSegmentBtn,
+    reviewBatchButton: els.localAiReviewBatchBtn,
+    repairSegmentButton: els.localAiRepairTagsBtn,
+    repairBatchButton: els.localAiRepairTagsBatchBtn,
+    polishSegmentButton: els.localAiPolishDraftBtn,
+    polishBatchButton: els.localAiPolishBatchBtn,
+    adaptModeSelect: els.localAiAdaptModeSelect,
+    adaptSegmentButton: els.localAiAdaptDraftBtn,
+    adaptBatchButton: els.localAiAdaptBatchBtn,
+    variantModeSelect: els.localAiVariantModeSelect,
+    variantsSegmentButton: els.localAiSuggestVariantsBtn,
+    variantsBatchButton: els.localAiSuggestVariantsBatchBtn,
+    applyTermsSegmentButton: els.localAiApplyTermsBtn,
+    applyTermsBatchButton: els.localAiApplyTermsBatchBtn,
+    extractTermsSegmentButton: els.localAiExtractTermsBtn,
+    extractTermsBatchButton: els.localAiExtractTermsBatchBtn,
+    projectBriefButton: els.localAiProjectBriefBtn,
+    outputDrawer: els.localAiOutputDrawer,
+    promptOutput: els.localAiPromptOutput
+  },
+  actions: {
+    saveSettings: saveAiSettings,
+    contextualTranslate: pretranslateWithLocalAi,
+    reviewSegment: reviewActiveSegmentWithLocalAi,
+    repairSegment: repairActiveSegmentTagsWithLocalAi,
+    polishSegment: polishActiveSegmentDraftWithLocalAi,
+    variantsSegment: suggestActiveSegmentVariantsWithLocalAi,
+    applyTermsSegment: applyActiveSegmentTerminologyWithLocalAi,
+    openAiSuggestion: createOpenAiSuggestion,
+    cancel: cancelLocalAiBatch,
+    testConnection: testLocalAiConnection,
+    startLmStudio: startLmStudioServerAndTestConnection,
+    refreshModels: refreshLocalAiModels,
+    pullModel: pullLocalAiModel,
+    promptTest: testLocalAiPrompt,
+    reviewBatch: reviewBatchWithLocalAi,
+    repairBatch: repairBatchTagsWithLocalAi,
+    polishBatch: polishBatchDraftsWithLocalAi,
+    adaptSegment: adaptActiveSegmentDraftWithLocalAi,
+    adaptBatch: adaptBatchDraftsWithLocalAi,
+    variantsBatch: suggestBatchSegmentVariantsWithLocalAi,
+    applyTermsBatch: applyBatchTerminologyWithLocalAi,
+    extractTermsSegment: extractActiveSegmentTermsWithLocalAi,
+    extractTermsBatch: extractBatchTermsWithLocalAi,
+    pretranslate: pretranslateWithLocalAi,
+    projectBrief: generateProjectBriefWithLocalAi,
+    presetChange: handleLocalAiPresetChange,
+    providerChange: handleLocalAiProviderChange,
+    baseUrlInput: handleLocalAiBaseUrlInput,
+    clearLocalKey: handleClearLocalAiKey,
+    clearOpenAiKey: handleClearOpenAiKey,
+    formChanged: handleLocalAiFormChanged,
+    languageChanged: handleLocalAiLanguageChanged
+  },
+  source: uiSource,
+  onError: (error) => setSaveStatus(error?.message || "AI action failed.", "dirty")
+});
+aiAdministrationController?.mount?.();
+
 const verticalFeatureState = (() => {
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "creating vertical feature controllers";
   const factories = appRuntime?.featureFactories;
@@ -2438,16 +2557,15 @@ function clearOpenAiKey() {
   try {
     saveOpenAiKey("", false);
   } catch (error) {
-    if (els.aiConnectionStatus) {
-      els.aiConnectionStatus.textContent = redactSensitiveText(error.message || "OpenAI key could not be cleared.");
-    }
+    aiAdministrationController?.renderGlobalConnectionStatus?.(
+      redactSensitiveText(error.message || "OpenAI key could not be cleared.")
+    );
     return false;
   }
-  if (els.openAiApiKeyInput) els.openAiApiKeyInput.value = "";
-  if (els.rememberOpenAiKeyInput) els.rememberOpenAiKeyInput.checked = false;
-  if (els.aiConnectionStatus) {
-    els.aiConnectionStatus.textContent = "OpenAI key: Not saved. API keys stay in this browser and are never exported with project packages.";
-  }
+  aiAdministrationController?.clearOpenAiSecret?.();
+  aiAdministrationController?.renderGlobalConnectionStatus?.(
+    "OpenAI key: Not saved. API keys stay in this browser and are never exported with project packages."
+  );
   return true;
 }
 
@@ -2596,8 +2714,7 @@ function clearLocalAiKey() {
     setLocalAiStatus("error", redactSensitiveText(error.message || "Local AI key could not be cleared."));
     return false;
   }
-  if (els.localAiApiKeyInput) els.localAiApiKeyInput.value = "";
-  if (els.rememberLocalAiKeyInput) els.rememberLocalAiKeyInput.checked = false;
+  aiAdministrationController?.clearLocalAiSecret?.();
   setLocalAiStatus("disconnected", "Local AI key cleared for this provider");
   return true;
 }
@@ -3445,21 +3562,24 @@ function renderFrequentLanguagePairs() {
   }).join(""));
 }
 
-function syncLocalAiLanguageFields(changedInput = null) {
-  const sourceCode = changedInput === els.localAiSourceLangInput
-    ? normalizeLanguageInputValue(els.localAiSourceLangInput?.value || state.project?.sourceLang || "")
-    : normalizeLanguageInputValue(els.localAiSourceCodeInput?.value || els.localAiSourceLangInput?.value || state.project?.sourceLang || "");
-  const targetCode = changedInput === els.localAiTargetLangInput
-    ? normalizeLanguageInputValue(els.localAiTargetLangInput?.value || state.project?.targetLang || "")
-    : normalizeLanguageInputValue(els.localAiTargetCodeInput?.value || els.localAiTargetLangInput?.value || state.project?.targetLang || "");
+function syncLocalAiLanguageFields(changedField = "") {
+  const form = aiAdministrationController?.readLocalForm?.() || {};
+  const sourceCode = changedField === "sourceLanguage"
+    ? normalizeLanguageInputValue(form.sourceLanguage || state.project?.sourceLang || "")
+    : normalizeLanguageInputValue(form.sourceCode || form.sourceLanguage || state.project?.sourceLang || "");
+  const targetCode = changedField === "targetLanguage"
+    ? normalizeLanguageInputValue(form.targetLanguage || state.project?.targetLang || "")
+    : normalizeLanguageInputValue(form.targetCode || form.targetLanguage || state.project?.targetLang || "");
+  const fields = {};
   if (sourceCode) {
-    if (changedInput !== els.localAiSourceLangInput && els.localAiSourceLangInput) els.localAiSourceLangInput.value = languageNameForUi(sourceCode);
-    if (changedInput !== els.localAiSourceCodeInput && els.localAiSourceCodeInput) els.localAiSourceCodeInput.value = sourceCode;
+    if (changedField !== "sourceLanguage") fields.sourceLanguage = languageNameForUi(sourceCode);
+    if (changedField !== "sourceCode") fields.sourceCode = sourceCode;
   }
   if (targetCode) {
-    if (changedInput !== els.localAiTargetLangInput && els.localAiTargetLangInput) els.localAiTargetLangInput.value = languageNameForUi(targetCode);
-    if (changedInput !== els.localAiTargetCodeInput && els.localAiTargetCodeInput) els.localAiTargetCodeInput.value = targetCode;
+    if (changedField !== "targetLanguage") fields.targetLanguage = languageNameForUi(targetCode);
+    if (changedField !== "targetCode") fields.targetCode = targetCode;
   }
+  aiAdministrationController?.setLanguageFields?.(fields);
 }
 
 function selectedEditorText() {
@@ -4608,31 +4728,32 @@ function localAiSettingsFromForm() {
   const projectSettings = localAISettingsStore?.projectSettings
     ? localAISettingsStore.projectSettings(state.project)
     : {};
-  const formSourceCode = normalizeLanguageInputValue(els.localAiSourceCodeInput?.value || els.localAiSourceLangInput?.value || projectSettings.sourceCode || state.project?.sourceLang);
-  const formTargetCode = normalizeLanguageInputValue(els.localAiTargetCodeInput?.value || els.localAiTargetLangInput?.value || projectSettings.targetCode || state.project?.targetLang);
-  const formSourceLanguage = els.localAiSourceLangInput?.value
-    ? languageNameForUi(normalizeLanguageInputValue(els.localAiSourceLangInput.value))
+  const form = aiAdministrationController?.readLocalForm?.() || {};
+  const formSourceCode = normalizeLanguageInputValue(form.sourceCode || form.sourceLanguage || projectSettings.sourceCode || state.project?.sourceLang);
+  const formTargetCode = normalizeLanguageInputValue(form.targetCode || form.targetLanguage || projectSettings.targetCode || state.project?.targetLang);
+  const formSourceLanguage = form.sourceLanguage
+    ? languageNameForUi(normalizeLanguageInputValue(form.sourceLanguage))
     : projectSettings.sourceLanguage;
-  const formTargetLanguage = els.localAiTargetLangInput?.value
-    ? languageNameForUi(normalizeLanguageInputValue(els.localAiTargetLangInput.value))
+  const formTargetLanguage = form.targetLanguage
+    ? languageNameForUi(normalizeLanguageInputValue(form.targetLanguage))
     : projectSettings.targetLanguage;
   return localAISettingsStore.defaults({
     ...projectSettings,
-    providerId: els.localAiProviderSelect?.value || projectSettings.providerId,
-    baseUrl: els.localAiBaseUrlInput?.value || projectSettings.baseUrl || OLLAMA_DEFAULT_BASE_URL,
-    model: els.localAiModelInput?.value || els.localAiModelSelect?.value || projectSettings.model || DEFAULT_LOCAL_AI_MODEL,
+    providerId: form.providerId || projectSettings.providerId,
+    baseUrl: form.baseUrl || projectSettings.baseUrl || OLLAMA_DEFAULT_BASE_URL,
+    model: form.model || projectSettings.model || DEFAULT_LOCAL_AI_MODEL,
     sourceLanguage: formSourceLanguage,
     sourceCode: formSourceCode || projectSettings.sourceCode || state.project?.sourceLang,
     targetLanguage: formTargetLanguage,
     targetCode: formTargetCode || projectSettings.targetCode || state.project?.targetLang,
-    mode: els.localAiModeSelect?.value || projectSettings.mode,
-    variantMode: els.localAiVariantModeSelect?.value || projectSettings.variantMode,
-    adaptMode: els.localAiAdaptModeSelect?.value || projectSettings.adaptMode,
-    concurrency: els.localAiConcurrencyInput?.value || projectSettings.concurrency,
-    timeoutMs: els.localAiTimeoutInput?.value || projectSettings.timeoutMs,
-    overwriteExisting: Boolean(els.localAiOverwriteInput?.checked),
-    includeNearbyContext: els.localAiIncludeContextInput?.checked !== false,
-    preserveConfirmedLocked: els.localAiPreserveConfirmedInput?.checked !== false
+    mode: form.mode || projectSettings.mode,
+    variantMode: form.variantMode || projectSettings.variantMode,
+    adaptMode: form.adaptMode || projectSettings.adaptMode,
+    concurrency: form.concurrency || projectSettings.concurrency,
+    timeoutMs: form.timeoutMs || projectSettings.timeoutMs,
+    overwriteExisting: Boolean(form.overwriteExisting),
+    includeNearbyContext: form.includeNearbyContext !== false,
+    preserveConfirmedLocked: form.preserveConfirmedLocked !== false
   }, state.project);
 }
 
@@ -4648,9 +4769,10 @@ function assertLocalAiEndpointAllowed(settings) {
 
 function localAiRuntimeConfig(settings = localAiSettingsFromForm()) {
   assertLocalAiEndpointAllowed(settings);
-  const typedKey = String(els.localAiApiKeyInput?.value || "").trim();
+  const secrets = aiAdministrationController?.readSecrets?.() || {};
+  const typedKey = String(secrets.localAiKey || "").trim();
   if (typedKey) {
-    saveLocalAiKey(typedKey, Boolean(els.rememberLocalAiKeyInput?.checked), settings);
+    saveLocalAiKey(typedKey, Boolean(secrets.rememberLocalAiKey), settings);
   }
   const apiKey = typedKey || storedLocalAiKey(settings) || (settings.providerId === "openai" ? storedOpenAiKey() : "");
   return {
@@ -4670,48 +4792,29 @@ function assertLocalAiRuntimeReady(settings, config, actionLabel = "using this p
 function setLocalAiStatus(status, text) {
   state.localAi.connectionStatus = status || "disconnected";
   state.localAi.statusText = redactSensitiveText(text || "");
-  if (els.localAiStatus) {
-    els.localAiStatus.className = `local-ai-status ${state.localAi.connectionStatus}`;
-  }
-  if (els.localAiStatusText) {
-    els.localAiStatusText.textContent = uiSource(state.localAi.statusText || "Disconnected");
-  }
+  aiAdministrationController?.renderStatus?.({
+    connectionStatus: state.localAi.connectionStatus,
+    text: state.localAi.statusText || "Disconnected"
+  });
 }
 
 function renderLocalAiModelOptions(settings) {
-  if (!els.localAiModelSelect) return;
   const currentModel = settings.model || DEFAULT_LOCAL_AI_MODEL;
   const models = state.localAi.models || [];
-  els.localAiModelSelect.replaceChildren();
-  if (!models.length) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = uiSource("Refresh models");
-    els.localAiModelSelect.append(option);
-  }
-  models.forEach((model) => {
-    const option = document.createElement("option");
-    option.value = model.name;
-    option.textContent = model.name;
-    els.localAiModelSelect.append(option);
+  aiAdministrationController?.renderModels?.({
+    models,
+    currentModel,
+    emptyLabel: "Refresh models",
+    manualLabel: uiSource("{value1} (manual)", { value1: currentModel })
   });
-  if (currentModel && !models.some((model) => model.name === currentModel)) {
-    const option = document.createElement("option");
-    option.value = currentModel;
-    option.textContent = uiSource("{value1} (manual)", { value1: currentModel });
-    els.localAiModelSelect.prepend(option);
-  }
-  els.localAiModelSelect.value = currentModel && Array.from(els.localAiModelSelect.options).some((option) => option.value === currentModel)
-    ? currentModel
-    : "";
 }
 
 function localAiSampleText() {
-  return els.localAiSampleInput?.value || currentSegment()?.source || "";
+  return aiAdministrationController?.readPromptState?.().sample || currentSegment()?.source || "";
 }
 
 function localAiPromptMode() {
-  return els.localAiPromptModeSelect?.value || "pretranslate";
+  return aiAdministrationController?.readPromptState?.().mode || "pretranslate";
 }
 
 function localAiPromptModeLabel(mode = localAiPromptMode()) {
@@ -4826,61 +4929,35 @@ function localAiPromptPreviewRequest(settings = localAiSettingsFromForm(), mode 
 }
 
 function renderLocalAiPromptPreview() {
-  if (!els.localAiPromptPreview) return;
   const settings = localAiSettingsFromForm();
-  els.localAiPromptPreview.value = localAiPromptPreviewRequest(settings).prompt;
+  aiAdministrationController?.renderPromptPreview?.(localAiPromptPreviewRequest(settings).prompt);
 }
 
 function renderLocalAiProgress() {
-  if (!els.localAiProgress) return;
-  const progress = state.localAi.progress;
-  els.localAiProgress.classList.toggle("running", Boolean(state.localAi.running));
-  if (!progress) {
-    els.localAiProgress.textContent = state.localAi.running ? "Starting local AI batch..." : "No local AI batch running.";
-    return;
-  }
-  const pieces = [
-    `${progress.completed || 0}/${progress.total || 0} completed`,
-    `${progress.failed || 0} failed`,
-    `${progress.skipped || 0} skipped`
-  ];
-  if (progress.canceled) pieces.push("canceled");
-  els.localAiProgress.textContent = pieces.join(" - ");
-}
-
-function bindLocalAiOutputDrawer() {
-  if (!els.localAiOutputDrawer || !els.localAiPromptOutput || typeof MutationObserver === "undefined") return;
-  const revealWhenUseful = () => {
-    const hasUsefulOutput = Boolean(String(els.localAiPromptOutput.textContent || "").trim()) && !els.localAiPromptOutput.classList.contains("muted");
-    if (hasUsefulOutput) els.localAiOutputDrawer.open = true;
-  };
-  new MutationObserver(revealWhenUseful).observe(els.localAiPromptOutput, {
-    attributes: true,
-    attributeFilter: ["class"],
-    childList: true,
-    characterData: true,
-    subtree: true
+  aiAdministrationController?.renderProgress?.({
+    running: state.localAi.running,
+    value: state.localAi.progress
   });
-  revealWhenUseful();
 }
 
-function renderLocalAiPrivacyNote(settings) {
-  if (!els.localAiPrivacyNote) return;
+function renderLocalAiOutput(value, options) {
+  aiAdministrationController?.renderOutput?.(value, options);
+}
+
+function localAiPrivacyText(settings) {
   const sharesExternally = localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model);
   const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
   if (sharesExternally) {
     if (settings.providerId === "ollama" && !needsKey) {
-      els.localAiPrivacyNote.textContent = "Ollama cloud model mode: requests are sent to local Ollama first, and cloud-suffixed models may be processed through Ollama Cloud after confirmation.";
-    } else {
-      els.localAiPrivacyNote.textContent = needsKey
-        ? "Hosted AI mode: source text is sent to the configured provider URL after confirmation. API keys stay in this browser and are never exported with project packages."
-        : "Network AI mode: source text is sent to the configured provider URL after confirmation.";
+      return "Ollama cloud model mode: requests are sent to local Ollama first, and cloud-suffixed models may be processed through Ollama Cloud after confirmation.";
     }
-  } else {
-    els.localAiPrivacyNote.textContent = settings.providerId === "ollama"
-      ? "Local AI mode: requests are sent to the loopback provider URL below. Ollama is the default local provider."
-      : "Local AI mode: requests are sent only to the loopback provider URL below.";
+    return needsKey
+      ? "Hosted AI mode: source text is sent to the configured provider URL after confirmation. API keys stay in this browser and are never exported with project packages."
+      : "Network AI mode: source text is sent to the configured provider URL after confirmation.";
   }
+  return settings.providerId === "ollama"
+    ? "Local AI mode: requests are sent to the loopback provider URL below. Ollama is the default local provider."
+    : "Local AI mode: requests are sent only to the loopback provider URL below.";
 }
 
 function endpointPathLabel(url) {
@@ -5026,8 +5103,7 @@ function localAiProviderCapabilityLabels(settings, provider) {
   return labels.length ? labels : ["No AI commands available"];
 }
 
-function renderLocalAiProviderSummary(settings) {
-  if (!els.localAiProviderSummary) return;
+function localAiProviderSummaryView(settings) {
   const provider = aiProviderService.get(settings.providerId);
   const preset = localAiProviderPresetForSettings(settings);
   const sharesExternally = localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model);
@@ -5042,43 +5118,40 @@ function renderLocalAiProviderSummary(settings) {
     canPull ? uiLabel("pullSupported") : uiLabel("manualModel"),
     settings.includeNearbyContext !== false ? uiLabel("nearbyContextOn") : uiLabel("nearbyContextOff")
   ];
-  replaceSafeHtml(els.localAiProviderSummary, `
-    <div class="local-ai-provider-summary-head">
-      <strong>${displaySafeHtml(preset?.label || provider?.name || settings.providerId || "AI provider")}</strong>
-      <span>${displaySafeHtml(settings.model || DEFAULT_LOCAL_AI_MODEL)}</span>
-    </div>
-    <div class="local-ai-provider-badges">
-      ${badges.map((badge) => `<span>${escapeHtml(badge)}</span>`).join("")}
-    </div>
-    <p class="local-ai-provider-guidance">${displaySafeHtml(uiSource(guidance))}</p>
-    <dl>
-      <div><dt>${uiLabelHtml("base")}</dt><dd>${displaySafeHtml(settings.baseUrl || OLLAMA_DEFAULT_BASE_URL)}</dd></div>
-      <div><dt>${uiLabelHtml("tools")}</dt><dd>${escapeHtml(capabilities.map((item) => uiSource(item)).join(" - "))}</dd></div>
-      <div><dt>${uiLabelHtml("models")}</dt><dd>${escapeHtml(endpoints.models)}</dd></div>
-      <div><dt>${uiLabelHtml("translate")}</dt><dd>${escapeHtml(endpoints.translate)}</dd></div>
-    </dl>
-  `);
+  return {
+    name: preset?.label || provider?.name || settings.providerId || "AI provider",
+    model: settings.model || DEFAULT_LOCAL_AI_MODEL,
+    badges,
+    guidance: uiSource(guidance),
+    baseLabel: uiLabel("base"),
+    baseUrl: settings.baseUrl || OLLAMA_DEFAULT_BASE_URL,
+    toolsLabel: uiLabel("tools"),
+    capabilities: capabilities.map((item) => uiSource(item)).join(" - "),
+    modelsLabel: uiLabel("models"),
+    modelsEndpoint: endpoints.models,
+    translateLabel: uiLabel("translate"),
+    translateEndpoint: endpoints.translate
+  };
 }
 
 function renderLocalAiProviderControls(settings) {
-  renderLocalAiPrivacyNote(settings);
-  renderLocalAiProviderSummary(settings);
   const provider = aiProviderService.get(settings.providerId);
   const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
-  if (els.localAiPullModelBtn) {
-    const canPull = localAiCanPullModel(settings, provider);
-    els.localAiPullModelBtn.disabled = state.localAi.running || !canPull;
-    els.localAiPullModelBtn.textContent = canPull ? uiSource("Pull {value1}", { value1: settings.model || DEFAULT_LOCAL_AI_MODEL }) : uiSource("Pull unavailable");
-    els.localAiPullModelWrap?.classList.toggle("hidden", !canPull);
-  }
-  if (els.localAiStartLmStudioBtn) {
-    const canStartServer = canStartLmStudioServer(settings);
-    els.localAiStartLmStudioBtn.classList.toggle("hidden", !canStartServer);
-    els.localAiStartLmStudioBtn.disabled = state.localAi.running || state.localAi.promptBusy || !canStartServer;
-  }
-  els.localAiHostedKeyControls?.classList.toggle("hidden", !needsKey);
-  if (els.rememberLocalAiKeyInput) els.rememberLocalAiKeyInput.checked = Boolean(localAiKeySnapshot(settings).local);
-  if (els.localAiApiKeyInput && document.activeElement !== els.localAiApiKeyInput) els.localAiApiKeyInput.value = storedLocalAiKey(settings);
+  const canPull = localAiCanPullModel(settings, provider);
+  aiAdministrationController?.renderProvider?.({
+    privacyText: localAiPrivacyText(settings),
+    summary: localAiProviderSummaryView(settings),
+    running: state.localAi.running,
+    promptBusy: state.localAi.promptBusy,
+    canPull,
+    pullLabel: canPull
+      ? uiSource("Pull {value1}", { value1: settings.model || DEFAULT_LOCAL_AI_MODEL })
+      : uiSource("Pull unavailable"),
+    canStartServer: canStartLmStudioServer(settings),
+    needsKey,
+    rememberLocalKey: Boolean(localAiKeySnapshot(settings).local),
+    storedLocalKey: storedLocalAiKey(settings)
+  });
 }
 
 function localAiPresetGroupLabel(preset) {
@@ -5091,38 +5164,30 @@ function localAiPresetGroupLabel(preset) {
 }
 
 function renderLocalAiPresetOptions(settings) {
-  if (!els.localAiPresetSelect) return;
   const currentPreset = localAiProviderPresetForSettings(settings);
   const currentValue = currentPreset?.id || "custom";
-  els.localAiPresetSelect.replaceChildren();
-  const customOption = document.createElement("option");
-  customOption.value = "custom";
-  customOption.textContent = uiSource("Custom provider");
-  els.localAiPresetSelect.append(customOption);
   const groups = new Map();
   LOCAL_AI_PROVIDER_PRESETS.forEach((preset) => {
     const groupLabel = localAiPresetGroupLabel(preset);
-    let group = groups.get(groupLabel);
-    if (!group) {
-      group = document.createElement("optgroup");
-      group.label = groupLabel;
-      groups.set(groupLabel, group);
-      els.localAiPresetSelect.append(group);
-    }
-    const option = document.createElement("option");
-    option.value = preset.id;
-    option.textContent = preset.label;
-    group.append(option);
+    const group = groups.get(groupLabel) || [];
+    group.push({ id: preset.id, label: preset.label });
+    groups.set(groupLabel, group);
   });
-  els.localAiPresetSelect.value = currentValue;
+  aiAdministrationController?.renderPresets?.({
+    groups: Array.from(groups, ([label, options]) => ({ label, options })),
+    currentPresetId: currentValue,
+    customLabel: "Custom provider"
+  });
 }
 
 function applyLocalAiProviderPreset(presetId) {
   const preset = localAiProviderPresetById(presetId);
   if (!preset) return;
-  if (els.localAiProviderSelect) els.localAiProviderSelect.value = preset.providerId;
-  if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = preset.baseUrl;
-  if (els.localAiModelInput) els.localAiModelInput.value = preset.model;
+  aiAdministrationController?.setProviderFields?.({
+    providerId: preset.providerId,
+    baseUrl: preset.baseUrl,
+    model: preset.model
+  });
   state.localAi.models = [];
   setOpusCatConnectionHelpVisible(false);
   setLocalAiStatus("disconnected", `${preset.label} selected`);
@@ -5133,60 +5198,126 @@ function applyLocalAiProviderPreset(presetId) {
   renderLocalAiPromptPreview();
 }
 
-function renderLocalAiCommandCentre() {
-  if (!els.localAiProviderSelect) return;
-  const settings = localAISettingsStore.projectSettings(state.project);
-  renderLocalAiPresetOptions(settings);
-  els.localAiProviderSelect.value = settings.providerId;
-  els.localAiBaseUrlInput.value = settings.baseUrl;
-  els.localAiModelInput.value = settings.model;
-  els.localAiSourceLangInput.value = settings.sourceLanguage || languageNameForUi(settings.sourceCode || state.project?.sourceLang);
-  els.localAiSourceCodeInput.value = normalizeLanguageInputValue(settings.sourceCode || state.project?.sourceLang);
-  els.localAiTargetLangInput.value = settings.targetLanguage || languageNameForUi(settings.targetCode || state.project?.targetLang);
-  els.localAiTargetCodeInput.value = normalizeLanguageInputValue(settings.targetCode || state.project?.targetLang);
-  els.localAiModeSelect.value = settings.mode;
-  els.localAiConcurrencyInput.value = String(settings.concurrency);
-  els.localAiTimeoutInput.value = String(settings.timeoutMs);
-  els.localAiOverwriteInput.checked = Boolean(settings.overwriteExisting);
-  if (els.localAiVariantModeSelect) els.localAiVariantModeSelect.value = settings.variantMode || "standard";
-  if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = settings.adaptMode || "simplify";
-  if (els.localAiIncludeContextInput) els.localAiIncludeContextInput.checked = settings.includeNearbyContext !== false;
-  els.localAiPreserveConfirmedInput.checked = settings.preserveConfirmedLocked !== false;
-  if (els.rememberLocalAiKeyInput) els.rememberLocalAiKeyInput.checked = Boolean(localAiKeySnapshot(settings).local);
-  if (els.localAiApiKeyInput && document.activeElement !== els.localAiApiKeyInput) els.localAiApiKeyInput.value = storedLocalAiKey(settings);
-  renderLocalAiModelOptions(settings);
-  renderLocalAiProviderControls(settings);
-  setLocalAiStatus(state.localAi.connectionStatus, state.localAi.statusText);
-  renderLocalAiProgress();
+function handleLocalAiPresetChange(presetId) {
+  if (presetId !== "custom") {
+    applyLocalAiProviderPreset(presetId);
+    return;
+  }
+  renderLocalAiProviderControls(localAiSettingsFromForm());
   renderLocalAiPromptPreview();
-  if (els.localAiPretranslateBtn) els.localAiPretranslateBtn.disabled = state.localAi.running || !state.project;
-  if (els.localAiCancelBtn) els.localAiCancelBtn.disabled = !state.localAi.running;
-  if (els.localAiPromptTestBtn) els.localAiPromptTestBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiReviewSegmentBtn) els.localAiReviewSegmentBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiReviewBatchBtn) els.localAiReviewBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiRepairTagsBtn) els.localAiRepairTagsBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiRepairTagsBatchBtn) els.localAiRepairTagsBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiPolishDraftBtn) els.localAiPolishDraftBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiPolishBatchBtn) els.localAiPolishBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiAdaptDraftBtn) els.localAiAdaptDraftBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiAdaptBatchBtn) els.localAiAdaptBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiSuggestVariantsBtn) els.localAiSuggestVariantsBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiSuggestVariantsBatchBtn) els.localAiSuggestVariantsBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiApplyTermsBtn) els.localAiApplyTermsBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiApplyTermsBatchBtn) els.localAiApplyTermsBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiExtractTermsBtn) els.localAiExtractTermsBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiExtractTermsBatchBtn) els.localAiExtractTermsBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiProjectBriefBtn) els.localAiProjectBriefBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  const contextualBusy = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.contextualAiTranslateBtn) els.contextualAiTranslateBtn.disabled = state.localAi.running || !state.project || !currentSegment();
-  if (els.contextualAiReviewBtn) els.contextualAiReviewBtn.disabled = contextualBusy;
-  if (els.contextualAiRepairBtn) els.contextualAiRepairBtn.disabled = contextualBusy;
-  if (els.contextualAiPolishBtn) els.contextualAiPolishBtn.disabled = contextualBusy;
-  if (els.contextualAiVariantsBtn) els.contextualAiVariantsBtn.disabled = contextualBusy;
-  if (els.contextualAiApplyTermsBtn) els.contextualAiApplyTermsBtn.disabled = contextualBusy;
-  if (els.contextualOpenAiSuggestionBtn) els.contextualOpenAiSuggestionBtn.disabled = contextualBusy;
-  if (els.contextualAiCancelBtn) els.contextualAiCancelBtn.disabled = !state.localAi.running;
+}
+
+function handleLocalAiProviderChange(providerId) {
+  const provider = aiProviderService.get(providerId);
+  aiAdministrationController?.setProviderFields?.({
+    providerId,
+    baseUrl: provider?.defaultBaseUrl || OLLAMA_DEFAULT_BASE_URL,
+    model:
+      provider?.defaultModel ||
+      (providerId === "openai"
+        ? OPENAI_DEFAULT_MODEL
+        : providerId === "gemini"
+          ? GEMINI_DEFAULT_MODEL
+          : DEFAULT_LOCAL_AI_MODEL)
+  });
+  state.localAi.models = [];
+  setOpusCatConnectionHelpVisible(false);
+  setLocalAiStatus("disconnected", "Disconnected");
+  const settings = localAiSettingsFromForm();
+  renderLocalAiPresetOptions(settings);
+  renderLocalAiProviderControls(settings);
+  renderLocalAiModelOptions(settings);
+  renderLocalAiPromptPreview();
+}
+
+function handleLocalAiBaseUrlInput() {
+  setOpusCatConnectionHelpVisible(false);
+  setLocalAiStatus("disconnected", "Disconnected");
+  const settings = localAiSettingsFromForm();
+  renderLocalAiPresetOptions(settings);
+  renderLocalAiProviderControls(settings);
+}
+
+function handleClearLocalAiKey() {
+  if (clearLocalAiKey()) setSaveStatus("Local AI key cleared from this browser", "saved");
+}
+
+function handleClearOpenAiKey() {
+  if (clearOpenAiKey()) setSaveStatus("OpenAI key cleared from this browser", "saved");
+}
+
+function handleLocalAiFormChanged({ providerChanged = false } = {}) {
+  if (providerChanged) renderLocalAiProviderControls(localAiSettingsFromForm());
+  renderLocalAiPromptPreview();
+}
+
+function handleLocalAiLanguageChanged(field, value, eventType) {
+  if (eventType !== "input" || shouldLiveSyncLanguageInput({ value })) syncLocalAiLanguageFields(field);
+  renderLocalAiPromptPreview();
+}
+
+function renderLocalAiCommandCentre() {
+  const settings = localAISettingsStore.projectSettings(state.project);
+  const currentPreset = localAiProviderPresetForSettings(settings);
+  const groups = new Map();
+  LOCAL_AI_PROVIDER_PRESETS.forEach((preset) => {
+    const groupLabel = localAiPresetGroupLabel(preset);
+    const group = groups.get(groupLabel) || [];
+    group.push({ id: preset.id, label: preset.label });
+    groups.set(groupLabel, group);
+  });
+  const provider = aiProviderService.get(settings.providerId);
+  const canPull = localAiCanPullModel(settings, provider);
+  const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
+  aiAdministrationController?.render?.({
+    settings: {
+      ...settings,
+      sourceLanguage: settings.sourceLanguage || languageNameForUi(settings.sourceCode || state.project?.sourceLang),
+      sourceCode: normalizeLanguageInputValue(settings.sourceCode || state.project?.sourceLang),
+      targetLanguage: settings.targetLanguage || languageNameForUi(settings.targetCode || state.project?.targetLang),
+      targetCode: normalizeLanguageInputValue(settings.targetCode || state.project?.targetLang)
+    },
+    presets: {
+      groups: Array.from(groups, ([label, options]) => ({ label, options })),
+      currentPresetId: currentPreset?.id || "custom",
+      customLabel: "Custom provider"
+    },
+    models: {
+      models: state.localAi.models || [],
+      currentModel: settings.model || DEFAULT_LOCAL_AI_MODEL,
+      emptyLabel: "Refresh models",
+      manualLabel: uiSource("{value1} (manual)", { value1: settings.model || DEFAULT_LOCAL_AI_MODEL })
+    },
+    provider: {
+      privacyText: localAiPrivacyText(settings),
+      summary: localAiProviderSummaryView(settings),
+      running: state.localAi.running,
+      promptBusy: state.localAi.promptBusy,
+      canPull,
+      pullLabel: canPull
+        ? uiSource("Pull {value1}", { value1: settings.model || DEFAULT_LOCAL_AI_MODEL })
+        : uiSource("Pull unavailable"),
+      canStartServer: canStartLmStudioServer(settings),
+      needsKey,
+      rememberLocalKey: Boolean(localAiKeySnapshot(settings).local),
+      storedLocalKey: storedLocalAiKey(settings)
+    },
+    status: {
+      connectionStatus: state.localAi.connectionStatus,
+      text: state.localAi.statusText || "Disconnected"
+    },
+    progress: {
+      running: state.localAi.running,
+      value: state.localAi.progress
+    },
+    promptPreview: localAiPromptPreviewRequest(settings).prompt,
+    availability: {
+      hasProject: Boolean(state.project),
+      hasSegment: Boolean(currentSegment()),
+      running: state.localAi.running,
+      promptBusy: state.localAi.promptBusy
+    }
+  });
 }
 
 async function persistLocalAiSettings(options = {}) {
@@ -5266,22 +5397,12 @@ function renderEditor() {
     <dt>${uiLabelHtml("activity")}</dt><dd>${uiLabelHtml("eventCount", { count: state.activityEvents.length })}</dd>
   `);
   const ai = defaultAiSettings(state.project.aiSettings);
-  els.aiEnabledInput.checked = Boolean(ai.enabled);
-  els.aiProviderInput.value = ai.provider || "";
-  els.aiModelInput.value = ai.model || "";
-  if (els.openAiApiKeyInput && document.activeElement !== els.openAiApiKeyInput) {
-    els.openAiApiKeyInput.value = storedOpenAiKey();
-  }
-  if (els.rememberOpenAiKeyInput) {
-    els.rememberOpenAiKeyInput.checked = Boolean(openAiKeySnapshot().local);
-  }
-  if (els.aiConnectionStatus) {
-    els.aiConnectionStatus.textContent = `OpenAI key: ${openAiKeyStorageLabel()}. API keys stay in this browser and are never exported with project packages.`;
-  }
-  els.aiSendSourceInput.checked = Boolean(ai.sendSourceToAi);
-  els.aiUseTmInput.checked = ai.useTmContext !== false;
-  els.aiUseTbInput.checked = ai.useTermbaseContext !== false;
-  els.aiStyleGuideInput.value = ai.styleGuide || "";
+  aiAdministrationController?.renderGlobalSettings?.({
+    settings: ai,
+    storedKey: storedOpenAiKey(),
+    rememberKey: Boolean(openAiKeySnapshot().local),
+    storageText: `OpenAI key: ${openAiKeyStorageLabel()}. API keys stay in this browser and are never exported with project packages.`
+  });
   renderLocalAiCommandCentre();
   renderQualityWorkbench();
   renderTermbaseSelect();
@@ -8031,22 +8152,24 @@ async function saveAiSettings() {
   const previousProject = structuredClone(state.project);
   const previousProjects = state.projects.map((project) => structuredClone(project));
   const previousOpenAiKey = openAiKeySnapshot();
-  const apiKeyInput = els.openAiApiKeyInput.value;
-  const rememberApiKey = els.rememberOpenAiKeyInput.checked;
-  const localAiKeyInput = els.localAiApiKeyInput?.value || "";
-  const rememberLocalAiKey = Boolean(els.rememberLocalAiKeyInput?.checked);
+  const globalForm = aiAdministrationController?.readGlobalForm?.() || {};
+  const secrets = aiAdministrationController?.readSecrets?.() || {};
+  const apiKeyInput = secrets.openAiKey || "";
+  const rememberApiKey = Boolean(secrets.rememberOpenAiKey);
+  const localAiKeyInput = secrets.localAiKey || "";
+  const rememberLocalAiKey = Boolean(secrets.rememberLocalAiKey);
   const localAiSettings = localAiSettingsFromForm();
   const previousLocalAiKey = localAiKeySnapshot(localAiSettings);
   let projectPersisted = false;
   let activityLogged = true;
   const aiSettings = defaultAiSettings({
-    enabled: els.aiEnabledInput.checked,
-    provider: els.aiProviderInput.value.trim() || "OpenAI",
-    model: els.aiModelInput.value.trim() || OPENAI_DEFAULT_MODEL,
-    sendSourceToAi: els.aiSendSourceInput.checked,
-    useTmContext: els.aiUseTmInput.checked,
-    useTermbaseContext: els.aiUseTbInput.checked,
-    styleGuide: els.aiStyleGuideInput.value.trim(),
+    enabled: Boolean(globalForm.enabled),
+    provider: globalForm.provider || "OpenAI",
+    model: globalForm.model || OPENAI_DEFAULT_MODEL,
+    sendSourceToAi: Boolean(globalForm.sendSourceToAi),
+    useTmContext: globalForm.useTmContext !== false,
+    useTermbaseContext: globalForm.useTermbaseContext !== false,
+    styleGuide: globalForm.styleGuide || "",
     ...localAISettingsStore.projectUpdateFields(localAiSettings, state.project)
   });
   const shouldUpdateOpenAiKey = Boolean(String(apiKeyInput || "").trim()) && isOpenAiProvider({ aiSettings });
@@ -8351,15 +8474,17 @@ async function applyAiSuggestion(suggestionId, options = {}) {
 async function createOpenAiSuggestion() {
   const segment = currentSegment();
   if (!state.project || !segment) return;
+  const globalForm = aiAdministrationController?.readGlobalForm?.() || {};
+  const secrets = aiAdministrationController?.readSecrets?.() || {};
   const aiSettings = defaultAiSettings({
     ...state.project.aiSettings,
-    enabled: els.aiEnabledInput.checked,
-    provider: els.aiProviderInput.value.trim() || "OpenAI",
-    model: els.aiModelInput.value.trim() || OPENAI_DEFAULT_MODEL,
-    sendSourceToAi: els.aiSendSourceInput.checked,
-    useTmContext: els.aiUseTmInput.checked,
-    useTermbaseContext: els.aiUseTbInput.checked,
-    styleGuide: els.aiStyleGuideInput.value.trim()
+    enabled: Boolean(globalForm.enabled),
+    provider: globalForm.provider || "OpenAI",
+    model: globalForm.model || OPENAI_DEFAULT_MODEL,
+    sendSourceToAi: Boolean(globalForm.sendSourceToAi),
+    useTmContext: globalForm.useTmContext !== false,
+    useTermbaseContext: globalForm.useTermbaseContext !== false,
+    styleGuide: globalForm.styleGuide || ""
   });
   if (!aiSettings.enabled) {
     setSaveStatus("Enable AI helpers before requesting an OpenAI suggestion.", "dirty");
@@ -8381,7 +8506,7 @@ async function createOpenAiSuggestion() {
     setSaveStatus("OpenAI suggestions need an internet connection. LoopCAT appears to be offline; no source text, API key, or AI settings were sent or saved.", "dirty");
     return;
   }
-  const apiKey = String(els.openAiApiKeyInput.value || "").trim() || storedOpenAiKey();
+  const apiKey = String(secrets.openAiKey || "").trim() || storedOpenAiKey();
   if (!apiKey) {
     setSaveStatus("Add your OpenAI API key first.", "dirty");
     return;
@@ -8404,7 +8529,7 @@ async function createOpenAiSuggestion() {
     state.project = await updateProject({ ...state.project, aiSettings });
     projectPersisted = true;
     state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
-    saveOpenAiKey(apiKey, els.rememberOpenAiKeyInput.checked);
+    saveOpenAiKey(apiKey, Boolean(secrets.rememberOpenAiKey));
     markWorkspaceDirty();
     renderEditor();
     setSaveStatus("Requesting OpenAI suggestion...");
@@ -8465,7 +8590,7 @@ async function finishLocalAiConnection(settings, provider, result, saveMessage =
     discoveredBaseUrl &&
     normalizedProviderBaseUrl("opus-cat", discoveredBaseUrl) !== normalizedProviderBaseUrl("opus-cat", settings.baseUrl)
   ) {
-    els.localAiBaseUrlInput.value = discoveredBaseUrl;
+    aiAdministrationController?.setBaseUrl?.(discoveredBaseUrl);
     const rememberedSettings = await persistLocalAiSettings({ silent: true });
     renderLocalAiPresetOptions(rememberedSettings);
     renderLocalAiProviderControls(rememberedSettings);
@@ -8613,7 +8738,7 @@ async function pullLocalAiModel() {
     return;
   }
   const provider = currentLocalAiProvider(settings);
-  const model = (els.localAiModelInput?.value || settings.model || DEFAULT_LOCAL_AI_MODEL).trim() || DEFAULT_LOCAL_AI_MODEL;
+  const model = (aiAdministrationController?.readLocalForm?.().model || settings.model || DEFAULT_LOCAL_AI_MODEL).trim() || DEFAULT_LOCAL_AI_MODEL;
   if (!provider?.pullModel) {
     const message = "Model pull is available for Ollama in this build.";
     setSaveStatus(message, "dirty");
@@ -8698,18 +8823,12 @@ async function testLocalAiPrompt() {
         model: settings.model
       });
     state.localAi.promptOutput = result.rawOutput || result.translatedText || result.text || "";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = state.localAi.promptOutput;
-      els.localAiPromptOutput.classList.toggle("muted", !state.localAi.promptOutput);
-    }
+    renderLocalAiOutput(state.localAi.promptOutput);
     setSaveStatus(`${promptRequest.label} prompt returned output`, "saved");
     return true;
   } catch (error) {
     const message = error.message || "Local AI prompt test failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -8887,10 +9006,7 @@ async function reviewActiveSegmentWithLocalAi() {
       console.warn("AI review activity log failed.", activityError);
       markWorkspaceDirty();
     }
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = aiReviewOutputText(result);
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    renderLocalAiOutput(aiReviewOutputText(result));
     renderReviewPanel();
     updateRow(state.activeIndex);
     markWorkspaceDirty();
@@ -8903,10 +9019,7 @@ async function reviewActiveSegmentWithLocalAi() {
     renderReviewPanel();
     updateRow(state.activeIndex);
     const message = error.message || "AI review failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -9112,19 +9225,16 @@ async function reviewBatchWithLocalAi() {
     const noIssueText = summary.noIssue ? `; ${summary.noIssue} no issues found` : "";
     const highestRiskText = summary.highestRisk && summary.highestRisk !== "none" ? `; highest risk ${summary.highestRisk}` : "";
     const canceledText = summary.canceled ? " canceled" : "";
-    if (els.localAiPromptOutput) {
-      const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-      const riskLines = ["critical", "high", "medium", "low"]
-        .filter((level) => summary.riskCounts[level])
-        .map((level) => `${aiReviewRiskLabel(level)}: ${summary.riskCounts[level]}`);
-      els.localAiPromptOutput.textContent = [
-        `${summary.commented} review comment${summary.commented === 1 ? "" : "s"} saved.`,
-        riskLines.join("\n"),
-        `${summary.noIssue} segment${summary.noIssue === 1 ? "" : "s"} returned no issues.`,
-        failureLines.join("\n")
-      ].filter(Boolean).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
+    const riskLines = ["critical", "high", "medium", "low"]
+      .filter((level) => summary.riskCounts[level])
+      .map((level) => `${aiReviewRiskLabel(level)}: ${summary.riskCounts[level]}`);
+    renderLocalAiOutput([
+      `${summary.commented} review comment${summary.commented === 1 ? "" : "s"} saved.`,
+      riskLines.join("\n"),
+      `${summary.noIssue} segment${summary.noIssue === 1 ? "" : "s"} returned no issues.`,
+      failureLines.join("\n")
+    ].filter(Boolean).join("\n"));
     setSaveStatus(`Batch AI QA${canceledText}: ${summary.commented} review comment${summary.commented === 1 ? "" : "s"} saved${highestRiskText}${noIssueText}${failureText}${skippedText}`, summary.failed ? "dirty" : "saved");
     return summary;
   } catch (error) {
@@ -9140,10 +9250,7 @@ async function reviewBatchWithLocalAi() {
     renderRevisionHistory();
     renderReviewPanel();
     const message = error.message || "Batch AI QA failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -9214,10 +9321,7 @@ async function repairActiveSegmentTagsWithLocalAi() {
       protectedTokens
     });
     if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
-      if (els.localAiPromptOutput) {
-        els.localAiPromptOutput.textContent = "AI did not propose a different tag repair.";
-        els.localAiPromptOutput.classList.remove("muted");
-      }
+      renderLocalAiOutput("AI did not propose a different tag repair.", { muted: false });
       setSaveStatus("AI did not propose a different tag repair.", "saved");
       return true;
     }
@@ -9236,10 +9340,7 @@ async function repairActiveSegmentTagsWithLocalAi() {
       status: "review"
     };
     const saved = await appendAiSuggestion(segment, suggestion, "ai-tag-repair", "AI tag repair suggestion created");
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = result.suggestedTarget;
-      els.localAiPromptOutput.classList.toggle("muted", !result.suggestedTarget);
-    }
+    renderLocalAiOutput(result.suggestedTarget);
     if (saved?.ok) {
       setSaveStatus(saved.activityLogged ? "AI tag repair suggestion ready for review" : "AI tag repair suggestion ready; activity log failed", saved.activityLogged ? "saved" : "dirty");
       return true;
@@ -9248,10 +9349,7 @@ async function repairActiveSegmentTagsWithLocalAi() {
     return false;
   } catch (error) {
     const message = error.message || "AI tag repair failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -9453,15 +9551,12 @@ async function repairBatchTagsWithLocalAi() {
     const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
     const unchangedText = summary.unchanged ? `; ${summary.unchanged} unchanged` : "";
     const canceledText = summary.canceled ? " canceled" : "";
-    if (els.localAiPromptOutput) {
-      const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-      els.localAiPromptOutput.textContent = [
-        `${summary.suggested} tag repair suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
-        `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
-        failureLines.join("\n")
-      ].filter(Boolean).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
+    renderLocalAiOutput([
+      `${summary.suggested} tag repair suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
+      `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
+      failureLines.join("\n")
+    ].filter(Boolean).join("\n"));
     setSaveStatus(`Batch AI tag repair${canceledText}: ${summary.suggested} suggestion${summary.suggested === 1 ? "" : "s"} saved${unchangedText}${failureText}${skippedText}${activityLogged ? "" : "; activity log failed"}`, summary.failed || !activityLogged || summary.canceled ? "dirty" : "saved");
     return summary;
   } catch (error) {
@@ -9474,10 +9569,7 @@ async function repairBatchTagsWithLocalAi() {
     });
     renderAll();
     const message = error.message || "Batch AI tag repair failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -9558,10 +9650,7 @@ async function suggestActiveSegmentVariantsWithLocalAi() {
       return suggestedTarget && (!currentTarget || suggestedTarget !== currentTarget);
     });
     if (!variants.length) {
-      if (els.localAiPromptOutput) {
-        els.localAiPromptOutput.textContent = "AI did not propose alternatives different from the current target.";
-        els.localAiPromptOutput.classList.remove("muted");
-      }
+      renderLocalAiOutput("AI did not propose alternatives different from the current target.", { muted: false });
       setSaveStatus("AI did not propose different alternatives.", "saved");
       return true;
     }
@@ -9598,10 +9687,7 @@ async function suggestActiveSegmentVariantsWithLocalAi() {
       console.warn("AI alternatives activity log failed.", activityError);
       markWorkspaceDirty();
     }
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = variants.map((variant) => `${variant.label || "Alternative"}: ${variant.suggestedTarget}`).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    renderLocalAiOutput(variants.map((variant) => `${variant.label || "Alternative"}: ${variant.suggestedTarget}`).join("\n"));
     renderAiSuggestions();
     updateRow(state.activeIndex);
     markWorkspaceDirty();
@@ -9614,10 +9700,7 @@ async function suggestActiveSegmentVariantsWithLocalAi() {
     renderAiSuggestions();
     updateRow(state.activeIndex);
     const message = error.message || "AI alternatives failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -9806,15 +9889,12 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
     const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
     const unchangedText = summary.unchanged ? `; ${summary.unchanged} unchanged` : "";
     const canceledText = summary.canceled ? " canceled" : "";
-    if (els.localAiPromptOutput) {
-      const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-      els.localAiPromptOutput.textContent = [
-        `${summary.suggested} alternative suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
-        `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
-        failureLines.join("\n")
-      ].filter(Boolean).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
+    renderLocalAiOutput([
+      `${summary.suggested} alternative suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
+      `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
+      failureLines.join("\n")
+    ].filter(Boolean).join("\n"));
     setSaveStatus(`Batch AI alternatives${canceledText}: ${summary.suggested} suggestion${summary.suggested === 1 ? "" : "s"} saved${unchangedText}${failureText}${skippedText}${activityLogged ? "" : "; activity log failed"}`, summary.failed || !activityLogged || summary.canceled ? "dirty" : "saved");
     return summary;
   } catch (error) {
@@ -9827,10 +9907,7 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
     });
     renderAll();
     const message = error.message || "Batch AI alternatives failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -9880,10 +9957,7 @@ async function applyActiveSegmentTerminologyWithLocalAi() {
   }
   if (!glossaryTerms.length) {
     setSaveStatus("No matching project terminology found for the active segment.", "saved");
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = "No matching project terminology found for the active segment.";
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput("No matching project terminology found for the active segment.", { muted: false });
     return true;
   }
   if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) {
@@ -9917,10 +9991,7 @@ async function applyActiveSegmentTerminologyWithLocalAi() {
       glossaryTerms
     });
     if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
-      if (els.localAiPromptOutput) {
-        els.localAiPromptOutput.textContent = "AI did not propose a different terminology revision.";
-        els.localAiPromptOutput.classList.remove("muted");
-      }
+      renderLocalAiOutput("AI did not propose a different terminology revision.", { muted: false });
       setSaveStatus("AI did not propose a different terminology revision.", "saved");
       return true;
     }
@@ -9940,10 +10011,7 @@ async function applyActiveSegmentTerminologyWithLocalAi() {
       status: "review"
     };
     const saved = await appendAiSuggestion(segment, suggestion, "ai-apply-terminology", "AI terminology suggestion created");
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = result.suggestedTarget;
-      els.localAiPromptOutput.classList.toggle("muted", !result.suggestedTarget);
-    }
+    renderLocalAiOutput(result.suggestedTarget);
     if (saved?.ok) {
       setSaveStatus(saved.activityLogged ? "AI terminology suggestion ready for review" : "AI terminology suggestion ready; activity log failed", saved.activityLogged ? "saved" : "dirty");
       return true;
@@ -9957,10 +10025,7 @@ async function applyActiveSegmentTerminologyWithLocalAi() {
     renderAiSuggestions();
     updateRow(state.activeIndex);
     const message = error.message || "AI terminology application failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -10154,16 +10219,13 @@ async function applyBatchTerminologyWithLocalAi() {
     const unchangedText = summary.unchanged ? `; ${summary.unchanged} unchanged` : "";
     const noTermText = summary.noTerms ? `; ${summary.noTerms} no termbase hits` : "";
     const canceledText = summary.canceled ? " canceled" : "";
-    if (els.localAiPromptOutput) {
-      const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-      els.localAiPromptOutput.textContent = [
-        `${summary.suggested} terminology suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
-        `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
-        `${summary.noTerms} segment${summary.noTerms === 1 ? "" : "s"} had no matching termbase hits.`,
-        failureLines.join("\n")
-      ].filter(Boolean).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
+    renderLocalAiOutput([
+      `${summary.suggested} terminology suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
+      `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
+      `${summary.noTerms} segment${summary.noTerms === 1 ? "" : "s"} had no matching termbase hits.`,
+      failureLines.join("\n")
+    ].filter(Boolean).join("\n"));
     setSaveStatus(`Batch AI terminology${canceledText}: ${summary.suggested} suggestion${summary.suggested === 1 ? "" : "s"} saved${unchangedText}${noTermText}${failureText}${skippedText}${activityLogged ? "" : "; activity log failed"}`, summary.failed || !activityLogged || summary.canceled ? "dirty" : "saved");
     return summary;
   } catch (error) {
@@ -10176,10 +10238,7 @@ async function applyBatchTerminologyWithLocalAi() {
     });
     renderAll();
     const message = error.message || "Batch AI terminology application failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -10257,10 +10316,7 @@ async function polishActiveSegmentDraftWithLocalAi() {
       styleGuide: state.project.aiSettings?.styleGuide || ""
     });
     if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
-      if (els.localAiPromptOutput) {
-        els.localAiPromptOutput.textContent = "AI did not propose a different polished draft.";
-        els.localAiPromptOutput.classList.remove("muted");
-      }
+      renderLocalAiOutput("AI did not propose a different polished draft.", { muted: false });
       setSaveStatus("AI did not propose a different polish.", "saved");
       return true;
     }
@@ -10281,10 +10337,7 @@ async function polishActiveSegmentDraftWithLocalAi() {
       status: "review"
     };
     const saved = await appendAiSuggestion(segment, suggestion, "ai-polish-draft", "AI draft polish suggestion created");
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = result.suggestedTarget;
-      els.localAiPromptOutput.classList.toggle("muted", !result.suggestedTarget);
-    }
+    renderLocalAiOutput(result.suggestedTarget);
     if (saved?.ok) {
       setSaveStatus(saved.activityLogged ? "AI polish suggestion ready for review" : "AI polish suggestion ready; activity log failed", saved.activityLogged ? "saved" : "dirty");
       return true;
@@ -10293,10 +10346,7 @@ async function polishActiveSegmentDraftWithLocalAi() {
     return false;
   } catch (error) {
     const message = error.message || "AI draft polish failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -10373,10 +10423,7 @@ async function adaptActiveSegmentDraftWithLocalAi() {
       adaptMode: settings.adaptMode
     });
     if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
-      if (els.localAiPromptOutput) {
-        els.localAiPromptOutput.textContent = "AI did not propose a different adapted draft.";
-        els.localAiPromptOutput.classList.remove("muted");
-      }
+      renderLocalAiOutput("AI did not propose a different adapted draft.", { muted: false });
       setSaveStatus("AI did not propose a different adaptation.", "saved");
       return true;
     }
@@ -10397,10 +10444,7 @@ async function adaptActiveSegmentDraftWithLocalAi() {
       status: "review"
     };
     const saved = await appendAiSuggestion(segment, suggestion, "ai-adapt-draft", "AI draft adaptation suggestion created");
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = result.suggestedTarget;
-      els.localAiPromptOutput.classList.toggle("muted", !result.suggestedTarget);
-    }
+    renderLocalAiOutput(result.suggestedTarget);
     if (saved?.ok) {
       setSaveStatus(saved.activityLogged ? "AI adaptation suggestion ready for review" : "AI adaptation suggestion ready; activity log failed", saved.activityLogged ? "saved" : "dirty");
       return true;
@@ -10409,10 +10453,7 @@ async function adaptActiveSegmentDraftWithLocalAi() {
     return false;
   } catch (error) {
     const message = error.message || "AI draft adaptation failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -10605,15 +10646,12 @@ async function adaptBatchDraftsWithLocalAi() {
     const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
     const unchangedText = summary.unchanged ? `; ${summary.unchanged} unchanged` : "";
     const canceledText = summary.canceled ? " canceled" : "";
-    if (els.localAiPromptOutput) {
-      const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-      els.localAiPromptOutput.textContent = [
-        `${summary.suggested} adaptation suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
-        `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
-        failureLines.join("\n")
-      ].filter(Boolean).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
+    renderLocalAiOutput([
+      `${summary.suggested} adaptation suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
+      `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
+      failureLines.join("\n")
+    ].filter(Boolean).join("\n"));
     setSaveStatus(`Batch AI adaptation${canceledText}: ${summary.suggested} suggestion${summary.suggested === 1 ? "" : "s"} saved${unchangedText}${failureText}${skippedText}${activityLogged ? "" : "; activity log failed"}`, summary.failed || !activityLogged || summary.canceled ? "dirty" : "saved");
     return summary;
   } catch (error) {
@@ -10626,10 +10664,7 @@ async function adaptBatchDraftsWithLocalAi() {
     });
     renderAll();
     const message = error.message || "Batch AI adaptation failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -10818,15 +10853,12 @@ async function polishBatchDraftsWithLocalAi() {
     const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
     const unchangedText = summary.unchanged ? `; ${summary.unchanged} unchanged` : "";
     const canceledText = summary.canceled ? " canceled" : "";
-    if (els.localAiPromptOutput) {
-      const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-      els.localAiPromptOutput.textContent = [
-        `${summary.suggested} polish suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
-        `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
-        failureLines.join("\n")
-      ].filter(Boolean).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
+    renderLocalAiOutput([
+      `${summary.suggested} polish suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
+      `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
+      failureLines.join("\n")
+    ].filter(Boolean).join("\n"));
     setSaveStatus(`Batch AI polish${canceledText}: ${summary.suggested} suggestion${summary.suggested === 1 ? "" : "s"} saved${unchangedText}${failureText}${skippedText}${activityLogged ? "" : "; activity log failed"}`, summary.failed || !activityLogged || summary.canceled ? "dirty" : "saved");
     return summary;
   } catch (error) {
@@ -10839,10 +10871,7 @@ async function polishBatchDraftsWithLocalAi() {
     });
     renderAll();
     const message = error.message || "Batch AI polish failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -10951,12 +10980,12 @@ async function extractActiveSegmentTermsWithLocalAi() {
     });
     const { savedTerms } = await saveAiTermCandidates(result.terms || [], termBaseName);
     if (!savedTerms.length) {
-      if (els.localAiPromptOutput) {
-        els.localAiPromptOutput.textContent = result.terms?.length
+      renderLocalAiOutput(
+        result.terms?.length
           ? "AI term candidates already exist in the current termbase."
-          : "AI did not find reusable term candidates in the active segment.";
-        els.localAiPromptOutput.classList.remove("muted");
-      }
+          : "AI did not find reusable term candidates in the active segment.",
+        { muted: false }
+      );
       setSaveStatus(result.terms?.length ? "AI term candidates already exist" : "AI did not find term candidates", "saved");
       return true;
     }
@@ -10980,20 +11009,14 @@ async function extractActiveSegmentTermsWithLocalAi() {
     } catch (refreshError) {
       console.warn("Term refresh failed after AI extraction.", refreshError);
     }
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = savedTerms
-        .map((term) => `${term.sourceTerm} -> ${term.targetTerm}${term.notes ? ` (${term.notes})` : ""}`)
-        .join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    renderLocalAiOutput(
+      savedTerms.map((term) => `${term.sourceTerm} -> ${term.targetTerm}${term.notes ? ` (${term.notes})` : ""}`).join("\n")
+    );
     setSaveStatus(activityLogged ? `Saved ${savedTerms.length} AI term candidate${savedTerms.length === 1 ? "" : "s"}` : `Saved ${savedTerms.length} AI term candidate${savedTerms.length === 1 ? "" : "s"}; activity log failed`, activityLogged ? "saved" : "dirty");
     return true;
   } catch (error) {
     const message = error.message || "AI term extraction failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -11110,16 +11133,13 @@ async function extractBatchTermsWithLocalAi() {
       `failed ${failures.length}`
     ];
     if (state.localAi.progress.canceled) statusPieces.push("canceled");
-    if (els.localAiPromptOutput) {
-      const savedText = savedTerms.length
-        ? savedTerms.map((term) => `${term.sourceTerm} -> ${term.targetTerm}${term.notes ? ` (${term.notes})` : ""}`).join("\n")
-        : "No new AI term candidates were saved.";
-      const failureText = failures.length
-        ? `\n\nFailures:\n${failures.slice(0, 5).map((failure) => `- ${failure.segmentId}: ${failure.error}`).join("\n")}`
-        : "";
-      els.localAiPromptOutput.textContent = `${savedText}${failureText}`;
-      els.localAiPromptOutput.classList.toggle("muted", !savedTerms.length && !failures.length);
-    }
+    const savedText = savedTerms.length
+      ? savedTerms.map((term) => `${term.sourceTerm} -> ${term.targetTerm}${term.notes ? ` (${term.notes})` : ""}`).join("\n")
+      : "No new AI term candidates were saved.";
+    const failureText = failures.length
+      ? `\n\nFailures:\n${failures.slice(0, 5).map((failure) => `- ${failure.segmentId}: ${failure.error}`).join("\n")}`
+      : "";
+    renderLocalAiOutput(`${savedText}${failureText}`, { muted: !savedTerms.length && !failures.length });
     setSaveStatus(
       `${state.localAi.progress.canceled ? "Canceled" : "Finished"} batch AI term extraction: ${statusPieces.join(", ")}${activityLogged ? "" : "; activity log failed"}`,
       failures.length || !activityLogged || state.localAi.progress.canceled ? "dirty" : "saved"
@@ -11127,10 +11147,7 @@ async function extractBatchTermsWithLocalAi() {
     return { savedTerms, failures, duplicateCount, canceled: state.localAi.progress.canceled };
   } catch (error) {
     const message = error.message || "Batch AI term extraction failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -11235,22 +11252,16 @@ async function generateProjectBriefWithLocalAi() {
       console.warn("AI project brief activity log failed.", activityError);
       markWorkspaceDirty();
     }
-    if (els.aiStyleGuideInput) els.aiStyleGuideInput.value = state.project.aiSettings.styleGuide || "";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = result.brief;
-      els.localAiPromptOutput.classList.toggle("muted", !result.brief);
-    }
+    aiAdministrationController?.setGlobalStyleGuide?.(state.project.aiSettings.styleGuide || "");
+    renderLocalAiOutput(result.brief);
     setSaveStatus(activityLogged ? "AI project brief saved to style instructions" : "AI project brief saved; activity log failed", activityLogged ? "saved" : "dirty");
     return true;
   } catch (error) {
     state.project = projectSnapshot;
     state.projects = state.projects.map((project) => (project.id === projectSnapshot.id ? projectSnapshot : project));
-    if (els.aiStyleGuideInput) els.aiStyleGuideInput.value = defaultAiSettings(projectSnapshot.aiSettings).styleGuide || "";
+    aiAdministrationController?.setGlobalStyleGuide?.(defaultAiSettings(projectSnapshot.aiSettings).styleGuide || "");
     const message = error.message || "AI project brief failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -13765,122 +13776,6 @@ function wireEvents() {
     event.preventDefault();
     await saveProjectDomainFromForm();
   });
-  els.saveAiSettingsBtn?.addEventListener("click", saveAiSettings);
-  els.contextualAiTranslateBtn?.addEventListener("click", () => {
-    if (els.localAiModeSelect) els.localAiModeSelect.value = "selected";
-    void pretranslateWithLocalAi();
-  });
-  els.contextualAiReviewBtn?.addEventListener("click", reviewActiveSegmentWithLocalAi);
-  els.contextualAiRepairBtn?.addEventListener("click", repairActiveSegmentTagsWithLocalAi);
-  els.contextualAiPolishBtn?.addEventListener("click", polishActiveSegmentDraftWithLocalAi);
-  els.contextualAiVariantsBtn?.addEventListener("click", suggestActiveSegmentVariantsWithLocalAi);
-  els.contextualAiApplyTermsBtn?.addEventListener("click", applyActiveSegmentTerminologyWithLocalAi);
-  els.contextualOpenAiSuggestionBtn?.addEventListener("click", createOpenAiSuggestion);
-  els.contextualAiCancelBtn?.addEventListener("click", cancelLocalAiBatch);
-  els.openAiSuggestionBtn.addEventListener("click", createOpenAiSuggestion);
-  els.localAiPresetSelect?.addEventListener("change", () => {
-    if (els.localAiPresetSelect.value !== "custom") {
-      applyLocalAiProviderPreset(els.localAiPresetSelect.value);
-      return;
-    }
-    renderLocalAiProviderControls(localAiSettingsFromForm());
-    renderLocalAiPromptPreview();
-  });
-  els.localAiProviderSelect?.addEventListener("change", () => {
-    const provider = aiProviderService.get(els.localAiProviderSelect.value);
-    els.localAiBaseUrlInput.value = provider?.defaultBaseUrl || OLLAMA_DEFAULT_BASE_URL;
-    if (els.localAiModelInput) els.localAiModelInput.value = provider?.defaultModel || (els.localAiProviderSelect.value === "openai" ? OPENAI_DEFAULT_MODEL : els.localAiProviderSelect.value === "gemini" ? GEMINI_DEFAULT_MODEL : DEFAULT_LOCAL_AI_MODEL);
-    state.localAi.models = [];
-    setOpusCatConnectionHelpVisible(false);
-    setLocalAiStatus("disconnected", "Disconnected");
-    renderLocalAiPresetOptions(localAiSettingsFromForm());
-    renderLocalAiProviderControls(localAiSettingsFromForm());
-    renderLocalAiModelOptions(localAiSettingsFromForm());
-    renderLocalAiPromptPreview();
-  });
-  els.localAiBaseUrlInput?.addEventListener("input", () => {
-    setOpusCatConnectionHelpVisible(false);
-    setLocalAiStatus("disconnected", "Disconnected");
-    const settings = localAiSettingsFromForm();
-    renderLocalAiPresetOptions(settings);
-    renderLocalAiProviderControls(settings);
-  });
-  els.localAiLocalCloudPresetBtn?.addEventListener("click", () => {
-    applyLocalAiProviderPreset("ollama-local-cloud");
-  });
-  els.localAiCloudPresetBtn?.addEventListener("click", () => {
-    applyLocalAiProviderPreset("ollama-cloud");
-  });
-  els.clearLocalAiKeyBtn?.addEventListener("click", () => {
-    clearLocalAiKey();
-    setSaveStatus("Local AI key cleared from this browser", "saved");
-  });
-  els.localAiTestBtn?.addEventListener("click", testLocalAiConnection);
-  els.localAiStartLmStudioBtn?.addEventListener("click", startLmStudioServerAndTestConnection);
-  els.localAiRefreshModelsBtn?.addEventListener("click", refreshLocalAiModels);
-  els.localAiModelSelect?.addEventListener("change", () => {
-    if (els.localAiModelSelect.value) els.localAiModelInput.value = els.localAiModelSelect.value;
-    renderLocalAiProviderControls(localAiSettingsFromForm());
-    renderLocalAiPromptPreview();
-  });
-  [
-    els.localAiModelInput,
-    els.localAiSampleInput
-  ].filter(Boolean).forEach((input) => input.addEventListener("input", renderLocalAiPromptPreview));
-  [
-    els.localAiSourceLangInput,
-    els.localAiSourceCodeInput,
-    els.localAiTargetLangInput,
-    els.localAiTargetCodeInput
-  ].filter(Boolean).forEach((input) => {
-    input.addEventListener("input", () => {
-      if (shouldLiveSyncLanguageInput(input)) syncLocalAiLanguageFields(input);
-      renderLocalAiPromptPreview();
-    });
-    input.addEventListener("change", () => {
-      syncLocalAiLanguageFields(input);
-      renderLocalAiPromptPreview();
-    });
-    input.addEventListener("blur", () => {
-      syncLocalAiLanguageFields(input);
-      renderLocalAiPromptPreview();
-    });
-  });
-  els.localAiModelInput?.addEventListener("input", () => renderLocalAiProviderControls(localAiSettingsFromForm()));
-  [
-    els.localAiPromptModeSelect,
-    els.localAiModeSelect,
-    els.localAiConcurrencyInput,
-    els.localAiTimeoutInput,
-    els.localAiOverwriteInput,
-    els.localAiIncludeContextInput,
-    els.localAiPreserveConfirmedInput,
-    els.localAiAdaptModeSelect,
-    els.localAiVariantModeSelect
-  ].filter(Boolean).forEach((input) => input.addEventListener("change", renderLocalAiPromptPreview));
-  els.localAiPullModelBtn?.addEventListener("click", pullLocalAiModel);
-  els.localAiPromptTestBtn?.addEventListener("click", testLocalAiPrompt);
-  els.localAiReviewSegmentBtn?.addEventListener("click", reviewActiveSegmentWithLocalAi);
-  els.localAiReviewBatchBtn?.addEventListener("click", reviewBatchWithLocalAi);
-  els.localAiRepairTagsBtn?.addEventListener("click", repairActiveSegmentTagsWithLocalAi);
-  els.localAiRepairTagsBatchBtn?.addEventListener("click", repairBatchTagsWithLocalAi);
-  els.localAiPolishDraftBtn?.addEventListener("click", polishActiveSegmentDraftWithLocalAi);
-  els.localAiPolishBatchBtn?.addEventListener("click", polishBatchDraftsWithLocalAi);
-  els.localAiAdaptDraftBtn?.addEventListener("click", adaptActiveSegmentDraftWithLocalAi);
-  els.localAiAdaptBatchBtn?.addEventListener("click", adaptBatchDraftsWithLocalAi);
-  els.localAiSuggestVariantsBtn?.addEventListener("click", suggestActiveSegmentVariantsWithLocalAi);
-  els.localAiSuggestVariantsBatchBtn?.addEventListener("click", suggestBatchSegmentVariantsWithLocalAi);
-  els.localAiApplyTermsBtn?.addEventListener("click", applyActiveSegmentTerminologyWithLocalAi);
-  els.localAiApplyTermsBatchBtn?.addEventListener("click", applyBatchTerminologyWithLocalAi);
-  els.localAiExtractTermsBtn?.addEventListener("click", extractActiveSegmentTermsWithLocalAi);
-  els.localAiExtractTermsBatchBtn?.addEventListener("click", extractBatchTermsWithLocalAi);
-  els.localAiPretranslateBtn?.addEventListener("click", pretranslateWithLocalAi);
-  els.localAiCancelBtn?.addEventListener("click", cancelLocalAiBatch);
-  els.localAiProjectBriefBtn?.addEventListener("click", generateProjectBriefWithLocalAi);
-  els.clearOpenAiKeyBtn.addEventListener("click", () => {
-    clearOpenAiKey();
-    setSaveStatus("OpenAI key cleared from this browser", "saved");
-  });
   els.projectDomainEditInput.addEventListener("input", () => {
     const current = state.project?.domain || "";
     els.domainForm.classList.toggle("clean", els.projectDomainEditInput.value.trim() === current);
@@ -14152,10 +14047,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(state.project?.id === project.id, "real app project creation");
     els.localAiSourceCodeInput.value = "en";
     els.localAiSourceLangInput.value = languageOptionValue("es");
-    syncLocalAiLanguageFields(els.localAiSourceLangInput);
+    els.localAiSourceLangInput.dispatchEvent(new Event("change", { bubbles: true }));
     els.localAiTargetLangInput.value = "Turkish";
     els.localAiTargetCodeInput.value = languageOptionValue("ca");
-    syncLocalAiLanguageFields(els.localAiTargetCodeInput);
+    els.localAiTargetCodeInput.dispatchEvent(new Event("change", { bubbles: true }));
+    await Promise.resolve();
     const syncedLocalAiSettings = localAiSettingsFromForm();
     assert(
       syncedLocalAiSettings.sourceCode === "es" &&
@@ -17162,9 +17058,17 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           els.localAiProviderSummary.textContent.includes("POST /api/chat"),
         "AI Command Centre explains selected provider locality, best-fit use, available tools, and endpoints"
       );
+      const extractedAiAdministrationForm = aiAdministrationController?.readLocalForm?.();
+      assert(
+        extractedAiAdministrationForm?.providerId === "ollama" &&
+          extractedAiAdministrationForm.model === "workflow-glossary-pretranslate-model" &&
+          !els.localAiProviderSummary?.querySelector("script"),
+        "checked AI administration controller owns provider form values and safe summary rendering"
+      );
       if (els.localAiSampleInput) els.localAiSampleInput.value = "Workflow prompt preview source {name}.";
       if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "review";
-      renderLocalAiPromptPreview();
+      els.localAiSampleInput?.dispatchEvent(new Event("input", { bubbles: true }));
+      els.localAiPromptModeSelect?.dispatchEvent(new Event("change", { bubbles: true }));
       const reviewPromptPreview = els.localAiPromptPreview?.value || "";
       if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "tag-repair";
       renderLocalAiPromptPreview();
@@ -17189,6 +17093,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "review";
       renderLocalAiPromptPreview();
       const promptModeTested = await testLocalAiPrompt();
+      await Promise.resolve();
       assert(
         els.localAiPromptModeSelect?.querySelector('option[value="project-brief"]') &&
           reviewPromptPreview.includes("Review checklist:") &&
@@ -17197,8 +17102,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           repairPromptPreview.includes("{name}") &&
           briefPromptPreview.includes("Create a concise translation project brief") &&
           promptModeTested === true &&
-          els.localAiPromptOutput.textContent.includes("Workflow prompt mode review output"),
-        "AI Command Centre prompt test previews and sends selected AI-native command prompts"
+          els.localAiPromptOutput.textContent.includes("Workflow prompt mode review output") &&
+          els.localAiOutputDrawer?.open,
+        "checked AI administration controller owns prompt preview events and output disclosure"
       );
       if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "pretranslate";
       renderLocalAiPromptPreview();
@@ -20240,7 +20146,6 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "rendering UI locale options";
   renderUiLocaleOptions();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "binding local AI drawer";
-  bindLocalAiOutputDrawer();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "wiring UI events";
   wireEvents();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "starting workspace autosave";
