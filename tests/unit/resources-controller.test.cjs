@@ -164,6 +164,7 @@ test("ResourcesController restores a focused resource action after an asynchrono
     ownerDocument.activeElement = newOpenButton;
   };
   ownerDocument.activeElement = oldOpenButton;
+  const scheduledFrames = [];
 
   const controller = createResourcesController({
     elements,
@@ -171,14 +172,16 @@ test("ResourcesController restores a focused resource action after an asynchrono
       dashboardButtons = [newOpenButton];
     },
     keyForItem: (item, type) => `${type}:${item.id}`,
-    scheduleFrame: (callback) => callback()
+    scheduleFrame: (callback) => scheduledFrames.push(callback)
   });
 
   controller.mount();
   controller.setResources({ tmEntries: [{ id: "tm-1" }], terms: [] });
 
-  assert.equal(newOpenButton.focused, 1);
+  assert.equal(newOpenButton.focused, 1, "focus is restored before another frame can observe the replacement DOM");
   assert.equal(ownerDocument.activeElement, newOpenButton);
+  scheduledFrames.splice(0).forEach((callback) => callback());
+  assert.equal(newOpenButton.focused, 2, "the next frame reinforces focus after layout settles");
 });
 
 test("ResourcesController delegates imports, resource cards, rows, and cleanup without owning domain data", async () => {

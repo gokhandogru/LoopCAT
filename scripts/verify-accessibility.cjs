@@ -182,6 +182,41 @@ app
         "Resources keyboard tab navigation"
       );
       await audit("Resources termbases empty");
+      await windowRef.webContents.executeJavaScript(
+        `window.CatHan.storage.put("trashEntries", {
+          id: "a11y-resource-trash",
+          entityType: "term",
+          entityId: "a11y-term",
+          projectId: "",
+          resourceType: "tb",
+          resourceName: "Accessibility terms",
+          sourceLang: "en",
+          targetLang: "tr",
+          languagePair: "en::tr",
+          label: "Termbase entry · Accessibility terms",
+          deletedAt: new Date().toISOString(),
+          payload: { records: [{
+            id: "a11y-term",
+            termBaseName: "Accessibility terms",
+            sourceLang: "en",
+            targetLang: "tr",
+            languagePair: "en::tr",
+            sourceTerm: "source",
+            targetTerm: "target"
+          }] }
+        })`,
+        true
+      );
+      await windowRef.webContents.executeJavaScript("document.querySelector('#trashBtn').click()", true);
+      await waitFor("document.querySelector('#trashDialog').open", "Resource Trash dialog");
+      await waitFor("document.querySelector('#trashList .trash-item')", "Resource Trash item");
+      await audit("Resource Trash populated");
+      await windowRef.webContents.executeJavaScript("document.querySelector('#closeTrashBtn').click()", true);
+      await waitFor("!document.querySelector('#trashDialog').open", "Resource Trash dialog close");
+      await windowRef.webContents.executeJavaScript(
+        "window.CatHan.storage.deleteByKey('trashEntries', 'a11y-resource-trash')",
+        true
+      );
       await windowRef.webContents.executeJavaScript("document.querySelector('#projectsViewBtn').click()", true);
       await waitFor("!document.querySelector('#projectsView').classList.contains('hidden')", "Projects return");
 

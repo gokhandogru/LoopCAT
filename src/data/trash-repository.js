@@ -3,8 +3,61 @@ function trashId() {
   return `trash-${suffix}`;
 }
 
+function resourceConfig(resourceType) {
+  if (resourceType === "tm") {
+    return {
+      store: "tmEntries",
+      nameField: "tmName",
+      entryType: "tm-entry",
+      resourceType: "translation-memory",
+      entryLabel: "Translation memory entry"
+    };
+  }
+  if (resourceType === "tb") {
+    return {
+      store: "terms",
+      nameField: "termBaseName",
+      entryType: "term",
+      resourceType: "termbase",
+      entryLabel: "Termbase entry"
+    };
+  }
+  throw new Error(`Unsupported Trash resource type: ${resourceType}`);
+}
+
+function languagePair(record = {}) {
+  return String(record.languagePair || `${record.sourceLang || ""}::${record.targetLang || ""}`);
+}
+
+function resourceTrashEntry(resourceType, records, { wholeResource = false } = {}) {
+  const config = resourceConfig(resourceType);
+  const first = records[0];
+  if (!first) throw new Error("Resource no longer exists.");
+  const resourceName = String(first[config.nameField] || "Unnamed resource");
+  const pair = languagePair(first);
+  return {
+    id: trashId(),
+    entityType: wholeResource ? config.resourceType : config.entryType,
+    entityId: wholeResource ? `${resourceType}:${resourceName}:${pair}` : first.id,
+    projectId: "",
+    resourceType,
+    resourceName,
+    sourceLang: String(first.sourceLang || ""),
+    targetLang: String(first.targetLang || ""),
+    languagePair: pair,
+    label: wholeResource ? resourceName : `${config.entryLabel} · ${resourceName}`,
+    deletedAt: new Date().toISOString(),
+    payload: { records }
+  };
+}
+
 export function createTrashRepository(storageRepository) {
-  if (!storageRepository?.moveProjectToTrash || !storageRepository?.restoreTrashRecords) {
+  if (
+    !storageRepository?.moveProjectToTrash ||
+    !storageRepository?.restoreTrashRecords ||
+    !storageRepository?.moveResourceRecordsToTrash ||
+    !storageRepository?.restoreResourceTrashRecords
+  ) {
     throw new TypeError("TrashRepository requires schema-6 storage operations.");
   }
 
@@ -64,6 +117,26 @@ export function createTrashRepository(storageRepository) {
       await storageRepository.moveProjectDocumentToTrash(nextProject, documentId, entry);
       return { entry, project: nextProject };
     },
+    async moveResourceEntry(resourceType, entityId) {
+      const config = resourceConfig(resourceType);
+      const record = await storageRepository.get(config.store, entityId);
+      if (!record) throw new Error("Resource entry no longer exists.");
+      const entry = resourceTrashEntry(resourceType, [record]);
+      await storageRepository.moveResourceRecordsToTrash(resourceType, entry);
+      return entry;
+    },
+    async moveResource(resourceType, descriptor = {}) {
+      const config = resourceConfig(resourceType);
+      const name = String(descriptor.name || "");
+      const pair = String(descriptor.languagePair || `${descriptor.sourceLang || ""}::${descriptor.targetLang || ""}`);
+      const records = (await storageRepository.getAll(config.store)).filter(
+        (record) => String(record?.[config.nameField] || "") === name && languagePair(record) === pair
+      );
+      if (!records.length) throw new Error("Resource no longer exists.");
+      const entry = resourceTrashEntry(resourceType, records, { wholeResource: true });
+      await storageRepository.moveResourceRecordsToTrash(resourceType, entry);
+      return entry;
+    },
     async restore(entryId) {
       const entry = await storageRepository.get("trashEntries", entryId);
       if (!entry) throw new Error("Trash item no longer exists.");
@@ -104,6 +177,9 @@ export function createTrashRepository(storageRepository) {
           activityEvents: []
         });
         return entry;
+      }
+      if (["tm-entry", "term", "translation-memory", "termbase"].includes(entry.entityType)) {
+        return storageRepository.restoreResourceTrashRecords(entryId);
       }
       throw new Error(`Unsupported Trash item type: ${entry.entityType}`);
     },

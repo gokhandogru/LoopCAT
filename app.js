@@ -1395,8 +1395,6 @@ const resourcesController = appRuntime?.featureFactories?.createResourcesControl
   deleteTmEntry: deleteTmResourceEntry,
   saveTerm: saveEditedTermResourceEntry,
   deleteTerm: deleteTermResourceEntry,
-  confirmEntryDelete: (type) =>
-    uiConfirm(type === "tm" ? "Delete this TM entry? This cannot be undone." : "Delete this term? This cannot be undone."),
   scheduleFrame: requestAnimationFrame,
   onError: (error) => setSaveStatus(error?.message || "Resource action failed.", "dirty")
 });
@@ -1533,6 +1531,34 @@ function renderUndoControls() {
   if (els.redoBtn) els.redoBtn.disabled = !appRuntime?.commands?.bus?.canRedo?.(projectId);
 }
 
+function isResourceTrashEntry(entry) {
+  return Boolean(
+    entry && ["tm-entry", "term", "translation-memory", "termbase"].includes(entry.entityType)
+  );
+}
+
+function resourceTrashEntryFromCommandResult(commandResult) {
+  const value = commandResult?.result;
+  if (isResourceTrashEntry(value)) return value;
+  return isResourceTrashEntry(value?.entry) ? value.entry : null;
+}
+
+async function synchronizeResourceTrashChange(entry, { refreshSuggestions = false } = {}) {
+  if (!isResourceTrashEntry(entry)) return false;
+  const linkType = entry.resourceType === "tm" ? "tm" : "termbase";
+  markProjectsUsingResourceDirty(linkType, entry.resourceName, entry.sourceLang, entry.targetLang);
+  await refreshResources();
+  if (entry.resourceType === "tb") {
+    await refreshProjectTerms({ rerender: state.view === "editor" });
+    if (refreshSuggestions || state.view === "editor") await refreshTerms();
+  } else if (state.view === "editor") {
+    await refreshSidebar();
+  }
+  if (els.trashDialog?.open) await renderTrashList();
+  else await refreshTrashSummary();
+  return true;
+}
+
 async function undoLastCommand() {
   const projectId = state.commandProjectId || state.project?.id || null;
   finalizePendingEditCommands(projectId || "");
@@ -1555,6 +1581,7 @@ async function undoLastCommand() {
   } else if (!state.project && projectId && state.projects.some((project) => project.id === projectId)) {
     await openProject(projectId);
   }
+  await synchronizeResourceTrashChange(resourceTrashEntryFromCommandResult(result));
   setSaveStatus(result.receipt.undoLabel, "saved");
   renderUndoControls();
   if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
@@ -1586,6 +1613,7 @@ async function redoLastCommand() {
     if (requestedIndex >= 0) state.activeIndex = requestedIndex;
     renderAll();
   }
+  await synchronizeResourceTrashChange(resourceTrashEntryFromCommandResult(result));
   setSaveStatus(result.receipt.undoLabel.replace(/^Undo\s+/i, "Redid "), "saved");
   renderUndoControls();
   if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
@@ -1606,6 +1634,7 @@ async function restoreTrashEntry(entryId) {
   try {
     const entry = await appRuntime.trashRepository.restore(entryId);
     await loadProjects(false);
+    await synchronizeResourceTrashChange(entry, { refreshSuggestions: true });
     await renderTrashList();
     setSaveStatus(`${entry.label || "Item"} restored from Trash`, "saved");
     renderUndoControls();
@@ -1622,7 +1651,7 @@ async function renderTrashList() {
   if (!entries.length) {
     const empty = document.createElement("div");
     empty.className = "muted";
-    empty.textContent = uiSource("Trash is empty. Deleted projects and files will appear here.");
+    empty.textContent = uiSource("Trash is empty. Deleted projects, files, memories, and termbases will appear here.");
     els.trashList.replaceChildren(empty);
     els.emptyTrashBtn.disabled = true;
     return entries;
@@ -1635,7 +1664,15 @@ async function renderTrashList() {
     const title = document.createElement("strong");
     title.textContent = displaySafeText(entry.label, uiSource("Deleted item"));
     const meta = document.createElement("p");
-    meta.textContent = `${entry.entityType === "document" ? uiSource("Project file") : uiSource("Project")} · ${formatDate(entry.deletedAt)}`;
+    const entityLabel =
+      entry.entityType === "document"
+        ? uiSource("Project file")
+        : entry.entityType === "project"
+          ? uiSource("Project")
+          : entry.resourceType === "tm"
+            ? uiSource("Translation memory")
+            : uiSource("Termbase");
+    meta.textContent = `${entityLabel} · ${formatDate(entry.deletedAt)}`;
     copy.append(title, meta);
     const actions = document.createElement("div");
     actions.className = "trash-item-actions";
@@ -5601,33 +5638,63 @@ async function saveEditedTermResourceEntry(term, values) {
   }
 }
 
+async function executeResourceTrashCommand(command, { refreshSuggestions = false } = {}) {
+  if (!command) throw new Error("The reversible resource deletion service is unavailable.");
+  const commandResult = await appRuntime.commands.bus.execute(command);
+  state.commandProjectId = command.projectId || "";
+  const entry = resourceTrashEntryFromCommandResult(commandResult);
+  let refreshFailed = false;
+  try {
+    await synchronizeResourceTrashChange(entry, { refreshSuggestions });
+  } catch (error) {
+    refreshFailed = true;
+    console.warn("Resource views could not refresh after moving an item to Trash.", error);
+  }
+  renderUndoControls();
+  return { entry, refreshFailed };
+}
+
 async function deleteTmResourceEntry(entry) {
   try {
     if (LOOPCAT_TEST_BUILD && entry[RESOURCE_TM_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated TM resource delete failure");
-    await deleteTmEntry(entry.id);
-    markProjectsUsingResourceDirty("tm", entry.tmName, entry.sourceLang, entry.targetLang);
-    await refreshResources();
-    setSaveStatus("TM entry deleted", "saved");
+    const command = appRuntime?.commands?.createDeleteResourceEntryCommand?.({
+      resourceType: "tm",
+      entityId: entry.id,
+      projectId: state.project?.id || null
+    });
+    const result = await executeResourceTrashCommand(command);
+    setSaveStatus(
+      result.refreshFailed
+        ? "TM entry moved to Trash; the resource view could not refresh. Undo is available."
+        : "TM entry moved to Trash. Undo is available.",
+      "saved"
+    );
     return true;
   } catch (error) {
-    setSaveStatus(error.message || "TM entry delete failed", "dirty");
+    setSaveStatus(error.message || "TM entry could not be moved to Trash. Existing work was preserved.", "dirty");
     return false;
   }
 }
 
 async function deleteTermResourceEntry(term, options = {}) {
-  const { refreshResourceView = true, refreshSuggestions = false } = options;
+  const { refreshSuggestions = false } = options;
   try {
     if (LOOPCAT_TEST_BUILD && term[RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated term resource delete failure");
-    await deleteTerm(term.id);
-    markProjectsUsingResourceDirty("termbase", term.termBaseName, term.sourceLang, term.targetLang);
-    if (refreshResourceView) await refreshResources();
-    await refreshProjectTerms({ rerender: true });
-    if (refreshSuggestions) await refreshTerms();
-    setSaveStatus("Term deleted", "saved");
+    const command = appRuntime?.commands?.createDeleteResourceEntryCommand?.({
+      resourceType: "tb",
+      entityId: term.id,
+      projectId: state.project?.id || null
+    });
+    const result = await executeResourceTrashCommand(command, { refreshSuggestions });
+    setSaveStatus(
+      result.refreshFailed
+        ? "Term moved to Trash; terminology views could not refresh. Undo is available."
+        : "Term moved to Trash. Undo is available.",
+      "saved"
+    );
     return true;
   } catch (error) {
-    setSaveStatus(error.message || "Term delete failed", "dirty");
+    setSaveStatus(error.message || "Term could not be moved to Trash. Existing work was preserved.", "dirty");
     return false;
   }
 }
@@ -5736,22 +5803,34 @@ function renderTermRow(term) {
 
 async function confirmDeleteResource(type, key) {
   const info = resourceLabelFromKey(key);
-  const label = type === "tm" ? uiLabel("translationMemory") : uiLabel("termbase");
-  if (!window.confirm(uiLabel("deleteResourceConfirm", { type: label, name: displaySafeText(info.name), pair: languagePairDisplay(info.sourceLang, info.targetLang) }))) return false;
   try {
     if (LOOPCAT_TEST_BUILD && RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.has(`${type}:${key}`)) throw new Error(`Simulated ${type === "tm" ? "TM" : "termbase"} resource delete failure`);
     const items = resourceItems(type, key);
-    const itemIds = items.map((item) => item.id);
-    if (type === "tm") await deleteTmEntries(itemIds);
-    else await deleteTerms(itemIds);
-    markProjectsUsingResourceDirty(type === "tm" ? "tm" : "termbase", info.name, info.sourceLang, info.targetLang);
-    resourcesController?.closeResource?.({ render: false, focus: false });
-    await refreshResources();
-    if (type === "tb") await refreshProjectTerms({ rerender: true });
-    setSaveStatus(`${type === "tm" ? "TM" : "TB"} deleted`, "saved");
+    const command = appRuntime?.commands?.createDeleteResourceCommand?.({
+      resourceType: type,
+      descriptor: {
+        key,
+        name: info.name,
+        sourceLang: info.sourceLang,
+        targetLang: info.targetLang,
+        languagePair: info.languagePair
+      },
+      affectedIds: items.map((item) => item.id),
+      projectId: state.project?.id || null
+    });
+    const result = await executeResourceTrashCommand(command, { refreshSuggestions: type === "tb" });
+    setSaveStatus(
+      result.refreshFailed
+        ? `${type === "tm" ? "Translation memory" : "Termbase"} moved to Trash; resource views could not refresh. Undo is available.`
+        : `${type === "tm" ? "Translation memory" : "Termbase"} moved to Trash. Undo is available.`,
+      "saved"
+    );
     return true;
   } catch (error) {
-    setSaveStatus(error.message || `${type === "tm" ? "TM" : "TB"} delete failed`, "dirty");
+    setSaveStatus(
+      error.message || `${type === "tm" ? "Translation memory" : "Termbase"} could not be moved to Trash. Existing work was preserved.`,
+      "dirty"
+    );
     return false;
   }
 }
@@ -18451,11 +18530,39 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     Reflect.deleteProperty(editableTmEntry, RESOURCE_TM_DELETE_FAILURE_TEST_FLAG);
     clearWorkspaceDirtyMarkers();
     const successfulResourceTmDelete = await deleteTmResourceEntry(editableTmEntry);
+    const tmEntryTrash = (await appRuntime.trashRepository.list()).find(
+      (entry) => entry.entityType === "tm-entry" && entry.entityId === resourceTmEntry.id
+    );
     assert(
       successfulResourceTmDelete &&
         !(await listTmEntries()).some((entry) => entry.id === resourceTmEntry.id) &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "TM resource row delete removes entry and marks linked project dirty"
+        state.workspaceDirtyProjectIds.has(project.id) &&
+        tmEntryTrash?.payload?.records?.[0]?.target === "Saved TM resource target" &&
+        els.saveStatus.textContent.includes("Undo is available"),
+      "TM resource row delete moves the exact entry to persistent Trash and marks linked project dirty"
+    );
+    await undoLastCommand();
+    const restoredTmCandidates = await getTmMatchCandidates({
+      source: resourceTmEntry.source,
+      sourceLang: state.project.sourceLang,
+      targetLang: state.project.targetLang,
+      tmName: mainTmName()
+    });
+    assert(
+      (await listTmEntries()).some(
+        (entry) => entry.id === resourceTmEntry.id && entry.target === "Saved TM resource target"
+      ) &&
+        restoredTmCandidates.some((entry) => entry.id === resourceTmEntry.id) &&
+        !(await appRuntime.trashRepository.list()).some((entry) => entry.id === tmEntryTrash.id),
+      "TM resource row Undo restores exact content, rebuildable search indexes, and removes its Trash token"
+    );
+    await redoLastCommand();
+    assert(
+      !(await listTmEntries()).some((entry) => entry.id === resourceTmEntry.id) &&
+        (await appRuntime.trashRepository.list()).some(
+          (entry) => entry.entityType === "tm-entry" && entry.entityId === resourceTmEntry.id
+        ),
+      "TM resource row Redo returns the entry to Trash with a fresh recovery token"
     );
     setHiddenSegmentField(editableTerm, RESOURCE_TERM_SAVE_FAILURE_TEST_FLAG, true);
     const failedResourceTermSave = await saveEditedTermResourceEntry(editableTerm, {
@@ -18500,11 +18607,47 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     Reflect.deleteProperty(editableTerm, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG);
     clearWorkspaceDirtyMarkers();
     const successfulResourceTermDelete = await deleteTermResourceEntry(editableTerm);
+    const termEntryTrash = (await appRuntime.trashRepository.list()).find(
+      (entry) => entry.entityType === "term" && entry.entityId === resourceTerm.id
+    );
     assert(
       successfulResourceTermDelete &&
         !(await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang, termBaseNames: [primaryTermBaseName()] })).some((term) => term.id === resourceTerm.id) &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "term resource row delete removes term and marks linked project dirty"
+        state.workspaceDirtyProjectIds.has(project.id) &&
+        termEntryTrash?.payload?.records?.[0]?.notes === "Saved resource term note" &&
+        els.saveStatus.textContent.includes("Undo is available"),
+      "term resource row delete moves the exact term to persistent Trash and marks linked project dirty"
+    );
+    await undoLastCommand();
+    const restoredResourceTerm = (
+      await listTerms({
+        sourceLang: state.project.sourceLang,
+        targetLang: state.project.targetLang,
+        termBaseNames: [primaryTermBaseName()]
+      })
+    ).find((term) => term.id === resourceTerm.id);
+    const restoredTermSuggestions = await findTerms({
+      source: resourceTerm.sourceTerm,
+      sourceLang: state.project.sourceLang,
+      targetLang: state.project.targetLang,
+      termBaseNames: [primaryTermBaseName()]
+    });
+    assert(
+      restoredResourceTerm?.targetTerm === "saved-resource-term-target" &&
+        restoredResourceTerm?.isForbidden === true &&
+        restoredTermSuggestions.some((term) => term.id === resourceTerm.id) &&
+        !(await appRuntime.trashRepository.list()).some((entry) => entry.id === termEntryTrash.id),
+      "term resource row Undo restores exact metadata, rebuildable search indexes, and removes its Trash token"
+    );
+    await redoLastCommand();
+    assert(
+      !(await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })).some(
+        (term) => term.id === resourceTerm.id
+      ) &&
+        (await appRuntime.trashRepository.list()).some(
+          (entry) => entry.entityType === "term" && entry.entityId === resourceTerm.id
+        ),
+      "term resource row Redo returns the term to Trash with a fresh recovery token"
     );
 
     const bulkTmName = `Workflow Bulk Delete TM ${Date.now()}`;
@@ -18542,47 +18685,150 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await refreshResources();
     const bulkTmKey = `${bulkTmName}::${state.project.sourceLang}::${state.project.targetLang}`;
     const bulkTbKey = `${bulkTbName}::${state.project.sourceLang}::${state.project.targetLang}`;
-    const originalResourceConfirm = window.confirm;
-    window.confirm = () => true;
+    const atomicConflictTrashId = `workflow-resource-trash-conflict-${Date.now()}`;
+    await window.CatHan.storage.put("trashEntries", {
+      id: atomicConflictTrashId,
+      entityType: "project",
+      entityId: "atomic-conflict-placeholder",
+      projectId: "atomic-conflict-placeholder",
+      label: "Atomic conflict placeholder",
+      deletedAt: new Date().toISOString(),
+      payload: {}
+    });
+    let atomicResourceTrashFailure = null;
     try {
-      RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.add(`tm:${bulkTmKey}`);
-      const failedBulkTmDelete = await confirmDeleteResource("tm", bulkTmKey);
-      const failedBulkTmEntries = (await listTmEntries()).filter((entry) => entry.tmName === bulkTmName);
-      assert(
-        !failedBulkTmDelete &&
-          els.saveStatus.textContent.includes("Simulated TM resource delete failure") &&
-          failedBulkTmEntries.length === 2,
-        "TM whole resource delete failure reports visible status without partial deletion"
-      );
-      RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.delete(`tm:${bulkTmKey}`);
-      const successfulBulkTmDelete = await confirmDeleteResource("tm", bulkTmKey);
-      assert(
-        successfulBulkTmDelete &&
-          !(await listTmEntries()).some((entry) => entry.tmName === bulkTmName),
-        "TM whole resource delete removes all entries after recovered failure"
-      );
-
-      RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.add(`tb:${bulkTbKey}`);
-      const failedBulkTbDelete = await confirmDeleteResource("tb", bulkTbKey);
-      const failedBulkTbTerms = (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })).filter((term) => term.termBaseName === bulkTbName);
-      assert(
-        !failedBulkTbDelete &&
-          els.saveStatus.textContent.includes("Simulated termbase resource delete failure") &&
-          failedBulkTbTerms.length === 2,
-        "termbase whole resource delete failure reports visible status without partial deletion"
-      );
-      RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.delete(`tb:${bulkTbKey}`);
-      const successfulBulkTbDelete = await confirmDeleteResource("tb", bulkTbKey);
-      assert(
-        successfulBulkTbDelete &&
-          !(await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })).some((term) => term.termBaseName === bulkTbName),
-        "termbase whole resource delete removes all terms after recovered failure"
-      );
-    } finally {
-      RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.delete(`tm:${bulkTmKey}`);
-      RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.delete(`tb:${bulkTbKey}`);
-      window.confirm = originalResourceConfirm;
+      await window.CatHan.storage.moveResourceRecordsToTrash("tm", {
+        id: atomicConflictTrashId,
+        entityType: "translation-memory",
+        entityId: `tm:${bulkTmKey}`,
+        projectId: "",
+        resourceType: "tm",
+        resourceName: bulkTmName,
+        sourceLang: state.project.sourceLang,
+        targetLang: state.project.targetLang,
+        languagePair: `${state.project.sourceLang}::${state.project.targetLang}`,
+        label: bulkTmName,
+        deletedAt: new Date().toISOString(),
+        payload: { records: resourceItems("tm", bulkTmKey) }
+      });
+    } catch (error) {
+      atomicResourceTrashFailure = error;
     }
+    assert(
+      Boolean(atomicResourceTrashFailure) &&
+        (await listTmEntries()).filter((entry) => entry.tmName === bulkTmName).length === 2 &&
+        (await window.CatHan.storage.get("trashEntries", atomicConflictTrashId))?.entityType === "project",
+      "resource Trash transaction conflict rolls back every live record and preserves the existing Trash item"
+    );
+    await window.CatHan.storage.deleteByKey("trashEntries", atomicConflictTrashId);
+    RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.add(`tm:${bulkTmKey}`);
+    const failedBulkTmDelete = await confirmDeleteResource("tm", bulkTmKey);
+    const failedBulkTmEntries = (await listTmEntries()).filter((entry) => entry.tmName === bulkTmName);
+    assert(
+      !failedBulkTmDelete &&
+        els.saveStatus.textContent.includes("Simulated TM resource delete failure") &&
+        failedBulkTmEntries.length === 2 &&
+        !(await appRuntime.trashRepository.list()).some((entry) => entry.resourceName === bulkTmName),
+      "TM whole resource delete failure preserves every live entry and creates no Trash item"
+    );
+    RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.delete(`tm:${bulkTmKey}`);
+    const successfulBulkTmDelete = await confirmDeleteResource("tm", bulkTmKey);
+    const bulkTmTrash = (await appRuntime.trashRepository.list()).find(
+      (entry) => entry.entityType === "translation-memory" && entry.resourceName === bulkTmName
+    );
+    assert(
+      successfulBulkTmDelete &&
+        !(await listTmEntries()).some((entry) => entry.tmName === bulkTmName) &&
+        bulkTmTrash?.payload?.records?.length === 2,
+      "TM whole resource deletion moves every entry to one persistent Trash item"
+    );
+    await undoLastCommand();
+    assert(
+      (await listTmEntries()).filter((entry) => entry.tmName === bulkTmName).length === 2 &&
+        !(await appRuntime.trashRepository.list()).some((entry) => entry.id === bulkTmTrash.id),
+      "TM whole resource Undo atomically restores every entry"
+    );
+    await redoLastCommand();
+    const redoneBulkTmTrash = (await appRuntime.trashRepository.list()).find(
+      (entry) => entry.entityType === "translation-memory" && entry.resourceName === bulkTmName
+    );
+    const conflictingBulkTmEntry = await saveTmEntry({
+      source: "conflicting live TM source",
+      target: "conflicting live TM target",
+      sourceLang: state.project.sourceLang,
+      targetLang: state.project.targetLang,
+      projectName: state.project.name,
+      tmName: bulkTmName
+    });
+    let bulkTmRestoreConflict = null;
+    try {
+      await appRuntime.trashRepository.restore(redoneBulkTmTrash.id);
+    } catch (error) {
+      bulkTmRestoreConflict = error;
+    }
+    assert(
+      bulkTmRestoreConflict?.message?.includes("same name and language pair") &&
+      (await appRuntime.trashRepository.list()).some((entry) => entry.id === redoneBulkTmTrash.id) &&
+        (await listTmEntries()).some((entry) => entry.id === conflictingBulkTmEntry.id),
+      "TM whole resource restore conflict preserves both the Trash item and live resource"
+    );
+    await deleteTmEntry(conflictingBulkTmEntry.id);
+
+    RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.add(`tb:${bulkTbKey}`);
+    const failedBulkTbDelete = await confirmDeleteResource("tb", bulkTbKey);
+    const failedBulkTbTerms = (
+      await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })
+    ).filter((term) => term.termBaseName === bulkTbName);
+    assert(
+      !failedBulkTbDelete &&
+        els.saveStatus.textContent.includes("Simulated termbase resource delete failure") &&
+        failedBulkTbTerms.length === 2 &&
+        !(await appRuntime.trashRepository.list()).some((entry) => entry.resourceName === bulkTbName),
+      "termbase whole resource delete failure preserves every live term and creates no Trash item"
+    );
+    RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.delete(`tb:${bulkTbKey}`);
+    const successfulBulkTbDelete = await confirmDeleteResource("tb", bulkTbKey);
+    const bulkTbTrash = (await appRuntime.trashRepository.list()).find(
+      (entry) => entry.entityType === "termbase" && entry.resourceName === bulkTbName
+    );
+    assert(
+      successfulBulkTbDelete &&
+        !(await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })).some(
+          (term) => term.termBaseName === bulkTbName
+        ) &&
+        bulkTbTrash?.payload?.records?.length === 2,
+      "termbase whole resource deletion moves every term to one persistent Trash item"
+    );
+    await undoLastCommand();
+    assert(
+      (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })).filter(
+        (term) => term.termBaseName === bulkTbName
+      ).length === 2 && !(await appRuntime.trashRepository.list()).some((entry) => entry.id === bulkTbTrash.id),
+      "termbase whole resource Undo atomically restores every term"
+    );
+    await redoLastCommand();
+    assert(
+      !(await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })).some(
+        (term) => term.termBaseName === bulkTbName
+      ) &&
+        (await appRuntime.trashRepository.list()).some(
+          (entry) => entry.entityType === "termbase" && entry.resourceName === bulkTbName
+        ),
+      "termbase whole resource Redo returns every term to one fresh Trash item"
+    );
+    const resourceTrashBackup = await exportAllData();
+    assert(
+      resourceTrashBackup.schemaVersion === 6 &&
+        resourceTrashBackup.trashEntries.some(
+          (entry) => entry.entityType === "translation-memory" && entry.payload?.records?.length === 2
+        ) &&
+        resourceTrashBackup.trashEntries.some(
+          (entry) => entry.entityType === "termbase" && entry.payload?.records?.length === 2
+        ) &&
+        !resourceTrashBackup.tmEntries.some((entry) => entry.tmName === bulkTmName) &&
+        !resourceTrashBackup.terms.some((term) => term.termBaseName === bulkTbName),
+      "schema-6 backup preserves resource Trash while project-package schema remains independent"
+    );
 
     await importLocalization(new File([JSON.stringify({ title: "Package source JSON" })], "workflow-structure.json", { type: "application/json" }));
     await importLocalization(new File(["key,source,target\nbutton,Package source CSV,CSV hedef"], "workflow-structure.csv", { type: "text/csv" }));

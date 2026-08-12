@@ -1166,6 +1166,127 @@
     return { project, segments, activityEvents };
   }
 
+  function resourceTrashStorageConfig(resourceType) {
+    if (resourceType === "tm") {
+      return {
+        entityStore: "tmEntries",
+        indexStore: "tmTokenIndex",
+        indexRecordId: "tmEntryId",
+        nameField: "tmName",
+        metaPrefix: TM_INDEX_META_PREFIX
+      };
+    }
+    if (resourceType === "tb") {
+      return {
+        entityStore: "terms",
+        indexStore: "termTokenIndex",
+        indexRecordId: "termId",
+        nameField: "termBaseName",
+        metaPrefix: TERM_INDEX_META_PREFIX
+      };
+    }
+    throw new Error(`Unsupported Trash resource type: ${resourceType}`);
+  }
+
+  function resourceTrashPayload(trashEntry, config) {
+    const records = Array.isArray(trashEntry?.payload?.records) ? trashEntry.payload.records : [];
+    if (!records.length) throw new Error("The resource Trash item has no records to preserve.");
+    assertUniqueRecordIds(records, "Resource Trash records");
+    records.forEach((record) => {
+      if (!record?.id || !record?.[config.nameField]) {
+        throw new Error("The resource Trash item is missing required record metadata.");
+      }
+    });
+    return records;
+  }
+
+  async function moveResourceRecordsToTrash(resourceType, trashEntry) {
+    const config = resourceTrashStorageConfig(resourceType);
+    const records = resourceTrashPayload(trashEntry, config);
+    const ids = new Set(records.map((record) => record.id));
+    const db = await openDatabase();
+    const tx = db.transaction([config.entityStore, config.indexStore, "trashEntries"], "readwrite");
+    const completion = txDone(tx);
+    const entityStore = tx.objectStore(config.entityStore);
+    try {
+      const existingRecords = await Promise.all(records.map((record) => requestToPromise(entityStore.get(record.id))));
+      records.forEach((record, index) => {
+        const existing = existingRecords[index];
+        if (!existing) throw new Error("A resource record no longer exists. Nothing was moved to Trash.");
+        if (stableJson(existing) !== stableJson(record)) {
+          throw new Error("A resource record changed before deletion. Nothing was moved to Trash.");
+        }
+      });
+      tx.objectStore("trashEntries").add(trashEntry);
+      records.forEach((record) => entityStore.delete(record.id));
+      await deleteWhereInStore(tx.objectStore(config.indexStore), (record) => ids.has(record[config.indexRecordId]));
+      await completion;
+      return trashEntry;
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch (_abortError) {
+        // The transaction may already have completed or aborted.
+      }
+      try {
+        await completion;
+      } catch (_transactionError) {
+        // Preserve the resource snapshot or constraint error.
+      }
+      throw error;
+    }
+  }
+
+  function sameResourceDescriptor(record, entry, config) {
+    return (
+      String(record?.[config.nameField] || "") === String(entry?.resourceName || "") &&
+      languagePairOf(record) === String(entry?.languagePair || "")
+    );
+  }
+
+  async function restoreResourceTrashRecords(entryId) {
+    const entry = await get("trashEntries", entryId);
+    if (!entry) throw new Error("Trash item no longer exists.");
+    const config = resourceTrashStorageConfig(entry.resourceType);
+    const records = resourceTrashPayload(entry, config);
+    const existingRecords = await Promise.all(records.map((record) => get(config.entityStore, record.id)));
+    if (existingRecords.some(Boolean)) {
+      throw new Error("A resource record with the same ID already exists. The Trash item was preserved.");
+    }
+    if (entry.entityType === "translation-memory" || entry.entityType === "termbase") {
+      const liveRecords = await getAll(config.entityStore);
+      if (liveRecords.some((record) => sameResourceDescriptor(record, entry, config))) {
+        throw new Error(
+          "A resource with the same name and language pair already exists. The Trash item was preserved."
+        );
+      }
+    }
+    const now = new Date().toISOString();
+    const languagePairs = new Set(records.map(languagePairOf).filter(Boolean));
+    const db = await openDatabase();
+    const tx = db.transaction([config.entityStore, "appMeta", "trashEntries"], "readwrite");
+    const completion = txDone(tx);
+    records.forEach((record) => tx.objectStore(config.entityStore).add(record));
+    languagePairs.forEach((languagePair) => {
+      tx.objectStore("appMeta").put({
+        key: `${config.metaPrefix}${languagePair}`,
+        languagePair,
+        dirty: true,
+        updatedAt: now
+      });
+    });
+    tx.objectStore("trashEntries").delete(entryId);
+    try {
+      await completion;
+    } catch (error) {
+      if (error?.name === "ConstraintError") {
+        throw new Error("A resource record conflict prevented restoration. The Trash item was preserved.");
+      }
+      throw error;
+    }
+    return entry;
+  }
+
   async function importProjectPackageRecords({
     project,
     segments = [],
@@ -1474,7 +1595,9 @@
     deleteStoresWhereAtomically,
     moveProjectToTrash,
     moveProjectDocumentToTrash,
+    moveResourceRecordsToTrash,
     restoreTrashRecords,
+    restoreResourceTrashRecords,
     importProjectPackageRecords,
     get,
     getMany,

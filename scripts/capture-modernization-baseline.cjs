@@ -240,9 +240,22 @@ app
     await waitFor("!document.querySelector('#tmResourceDetail').classList.contains('hidden')", "TM resource detail");
     await captureState("02", "resource-translation-memory-detail");
     await windowRef.webContents.executeJavaScript(
-      "document.querySelector('#tmResourceDetail [data-resource-action=\"close-detail\"]').click()",
+      "document.querySelector('#tmResourceDetail [data-resource-action=\"delete-entry\"]').click()",
       true
     );
+    await waitFor("document.querySelector('#trashBtn').textContent.includes('Trash (1)')", "Resource in Trash");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#trashBtn').click()", true);
+    await waitFor("document.querySelector('#trashDialog').open", "resource Trash dialog");
+    await waitFor("document.querySelector('#trashList .trash-item')", "resource Trash item");
+    await captureState("03", "resource-trash-populated");
+    await windowRef.webContents.executeJavaScript(
+      "document.querySelector('#trashList .trash-item-actions button').click()",
+      true
+    );
+    await waitFor("document.querySelector('#trashList .muted')", "empty Trash after resource restore");
+    await captureState("03", "resource-trash-empty-after-restore");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#closeTrashBtn').click()", true);
+    await waitFor("!document.querySelector('#trashDialog').open", "closed resource Trash dialog");
     await windowRef.webContents.executeJavaScript("document.querySelector('#tbResourceTab').click()", true);
     await waitFor("document.querySelector('#tbResourceTab').getAttribute('aria-selected') === 'true'", "Termbase tab");
     await waitFor("document.querySelector('#tbResourceDashboard .resource-card')", "Termbase resources dashboard");
@@ -426,7 +439,7 @@ app
     };
     await fsPromises.writeFile(path.join(outputDir, "baseline.json"), `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 
-    const expectedScreenshotCount = 57;
+    const expectedScreenshotCount = 63;
     if (screenshots.length !== expectedScreenshotCount) {
       throw new Error(`Expected ${expectedScreenshotCount} screenshots, captured ${screenshots.length}.`);
     }

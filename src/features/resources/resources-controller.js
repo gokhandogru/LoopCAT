@@ -28,7 +28,6 @@ function resourceType(value) {
  *   deleteTmEntry?: (entry: any) => Promise<boolean>,
  *   saveTerm?: (term: any, values: { sourceTerm: string, targetTerm: string, notes: string, isForbidden: boolean }) => Promise<boolean>,
  *   deleteTerm?: (term: any) => Promise<boolean>,
- *   confirmEntryDelete?: (type: "tm" | "tb") => boolean,
  *   scheduleFrame?: (callback: () => void) => unknown,
  *   onError?: (error: unknown, context: { phase: string, type?: "tm" | "tb" }) => void
  * }} options
@@ -117,12 +116,16 @@ export function createResourcesController(options) {
     const focusDescriptor = focusedAction();
     syncTabs();
     renderView(snapshot());
-    if (focusDescriptor) scheduleFrame(() => restoreFocusedAction(focusDescriptor));
+    if (focusDescriptor) {
+      restoreFocusedAction(focusDescriptor);
+      scheduleFrame(() => restoreFocusedAction(focusDescriptor));
+    }
   }
 
   function setResources(resources = {}, renderAfter = true) {
     tmEntries = Array.isArray(resources.tmEntries) ? resources.tmEntries : [];
     terms = Array.isArray(resources.terms) ? resources.terms : [];
+    if (openKey && !items(type, openKey).length) openKey = null;
     if (renderAfter) render();
     return snapshot();
   }
@@ -276,14 +279,14 @@ export function createResourcesController(options) {
         return;
       }
       if (action === "delete-entry") {
-        if (options.confirmEntryDelete && !options.confirmEntryDelete(actionType)) return;
         const deleted = actionType === "tm" ? await options.deleteTmEntry?.(item) : await options.deleteTerm?.(item);
         if (deleted) {
           scheduleFrame(() => {
             const detail = actionType === "tm" ? tmDetail : tbDetail;
             (
               detail.querySelector?.('[data-resource-action="delete-entry"]') ||
-              detail.querySelector?.('[data-resource-action="close-detail"]')
+              detail.querySelector?.('[data-resource-action="close-detail"]') ||
+              (actionType === "tm" ? tmTab : tbTab)
             )?.focus?.();
           });
         }

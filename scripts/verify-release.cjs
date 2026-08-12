@@ -161,6 +161,7 @@ const requiredReleaseFiles = [
   "src/features/resources/tm-pretranslation-dialog-controller.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
+  "tests/unit/resource-trash.test.cjs",
   "tests/unit/resources-controller.test.cjs",
   "scripts/generate-brand-icons.cjs",
   "scripts/publish-repository-downloads.cjs",
@@ -222,12 +223,13 @@ const dialogControllerUnitTests = readText("tests/unit/dialog-controller.test.cj
 const projectDialogControllerJs = readText("src/features/projects/project-dialog-controller.js");
 const projectDialogControllerUnitTests = readText("tests/unit/project-dialog-controller.test.cjs");
 const opusCatHelpControllerJs = readText("src/features/ai/opus-cat-help-controller.js");
-const tmPretranslationDialogControllerJs = readText(
-  "src/features/resources/tm-pretranslation-dialog-controller.js"
-);
+const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-pretranslation-dialog-controller.js");
 const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
 const resourcesControllerJs = readText("src/features/resources/resources-controller.js");
 const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
+const resourceTrashUnitTests = readText("tests/unit/resource-trash.test.cjs");
+const trashCommandsJs = readText("src/commands/trash-commands.js");
+const trashRepositoryJs = readText("src/data/trash-repository.js");
 const paletteControllerJs = readText("src/features/palette/palette-controller.js");
 const updateControllerJs = readText("src/features/update/update-controller.js");
 const safeHtmlJs = readText("src/security/safe-html.js");
@@ -950,11 +952,7 @@ assertIncludes(
   "returnTarget: els.segmentToolsMenuSummary",
   "the TM prompt must restore focus to the visible Segment tools trigger rather than its collapsed menu item."
 );
-assertIncludes(
-  appJs,
-  "createOpusCatHelpController",
-  "app.js must compose the checked OPUS-CAT help controller."
-);
+assertIncludes(appJs, "createOpusCatHelpController", "app.js must compose the checked OPUS-CAT help controller.");
 assert(
   !appJs.includes("function showManagedDialog") &&
     !appJs.includes('els.localAiOpusCatHelpBtn?.addEventListener("click"') &&
@@ -1016,10 +1014,10 @@ assertIncludes(
   "app.js must compose the checked Resources controller with injected domain actions."
 );
 assert(
-  !appJs.includes('  resourceType: "tm",') &&
-    !appJs.includes("  openResource: null,") &&
-    !appJs.includes("  resourceTmEntries: [],") &&
-    !appJs.includes("  resourceTerms: [],") &&
+  !functionBody(appJs, "const state = {", "const els = {").includes('  resourceType: "tm",') &&
+    !functionBody(appJs, "const state = {", "const els = {").includes("  openResource: null,") &&
+    !functionBody(appJs, "const state = {", "const els = {").includes("  resourceTmEntries: [],") &&
+    !functionBody(appJs, "const state = {", "const els = {").includes("  resourceTerms: [],") &&
     !appJs.includes('els.resourcesViewBtn.addEventListener("click"') &&
     !appJs.includes('els.tmResourceTab.addEventListener("click"') &&
     !appJs.includes('els.resourceTmxImportInput.addEventListener("change"'),
@@ -1030,9 +1028,7 @@ assert(
     "addEventListener"
   ) &&
     !functionBody(appJs, "function renderTmEntryRow", "function renderTermRow").includes("addEventListener") &&
-    !functionBody(appJs, "function renderTermRow", "async function confirmDeleteResource").includes(
-      "addEventListener"
-    ),
+    !functionBody(appJs, "function renderTermRow", "async function confirmDeleteResource").includes("addEventListener"),
   "Resources dashboards and rows must use controller-owned event delegation rather than per-render listeners."
 );
 assertIncludes(
@@ -4486,12 +4482,12 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "TM whole resource delete failure reports visible status without partial deletion",
+  "TM whole resource delete failure preserves every live entry and creates no Trash item",
   "app workflow test must verify failed whole-TM deletes report visibly and do not partially delete entries."
 );
 assertIncludes(
   appJs,
-  "termbase whole resource delete failure reports visible status without partial deletion",
+  "termbase whole resource delete failure preserves every live term and creates no Trash item",
   "app workflow test must verify failed whole-termbase deletes report visibly and do not partially delete terms."
 );
 assertIncludes(
@@ -5927,6 +5923,104 @@ assertIncludes(
   appJs,
   "Undo restores a trashed file and its segments",
   "app workflow test must verify project-file Trash recovery."
+);
+assertIncludes(
+  storageJs,
+  "async function moveResourceRecordsToTrash(resourceType, trashEntry)",
+  "schema-6 storage must expose one atomic resource-to-Trash boundary."
+);
+assertIncludes(
+  storageJs,
+  'db.transaction([config.entityStore, config.indexStore, "trashEntries"], "readwrite")',
+  "resource deletion must remove live records and token indexes in the same Trash transaction."
+);
+assertIncludes(
+  storageJs,
+  'db.transaction([config.entityStore, "appMeta", "trashEntries"], "readwrite")',
+  "resource restoration must recreate records, dirty search indexes, and consume Trash atomically."
+);
+assertIncludes(
+  storageJs,
+  "The Trash item was preserved.",
+  "resource restore conflicts must explicitly preserve the Trash recovery item."
+);
+assertIncludes(
+  trashRepositoryJs,
+  "async moveResourceEntry(resourceType, entityId)",
+  "TrashRepository must support individual TM and termbase entry recovery."
+);
+assertIncludes(
+  trashRepositoryJs,
+  "async moveResource(resourceType, descriptor = {})",
+  "TrashRepository must support whole translation-memory and termbase recovery."
+);
+assertIncludes(
+  trashCommandsJs,
+  "createDeleteResourceEntryCommand",
+  "resource entry deletion must use a reversible domain command."
+);
+assertIncludes(
+  trashCommandsJs,
+  "createDeleteResourceCommand",
+  "whole-resource deletion must use a reversible domain command."
+);
+assert(
+  !functionBody(appJs, "async function deleteTmResourceEntry", "async function deleteTermResourceEntry").includes(
+    "deleteTmEntry("
+  ) &&
+    !functionBody(appJs, "async function deleteTermResourceEntry", "function renderTmResourceDetail").includes(
+      "deleteTerm("
+    ) &&
+    !functionBody(appJs, "async function confirmDeleteResource", "function exportResource").includes(
+      "deleteTmEntries("
+    ) &&
+    !functionBody(appJs, "async function confirmDeleteResource", "function exportResource").includes("deleteTerms("),
+  "user-facing Resources deletion paths must not bypass persistent Trash with hard-delete services."
+);
+assertIncludes(
+  resourceTrashUnitTests,
+  "moves only the selected translation memory name and language pair",
+  "focused tests must characterize whole-resource selection without cross-language deletion."
+);
+assertIncludes(
+  resourceTrashUnitTests,
+  "refresh their recovery token on Redo",
+  "focused tests must characterize resource Trash Undo/Redo recovery-token replacement."
+);
+assertIncludes(
+  appJs,
+  "TM resource row Undo restores exact content, rebuildable search indexes, and removes its Trash token",
+  "the app workflow must characterize exact individual TM recovery and index rebuilding."
+);
+assertIncludes(
+  appJs,
+  "term resource row Undo restores exact metadata, rebuildable search indexes, and removes its Trash token",
+  "the app workflow must characterize exact individual term recovery and index rebuilding."
+);
+assertIncludes(
+  appJs,
+  "TM whole resource restore conflict preserves both the Trash item and live resource",
+  "the app workflow must characterize conflict-safe whole-resource restoration."
+);
+assertIncludes(
+  appJs,
+  "resource Trash transaction conflict rolls back every live record and preserves the existing Trash item",
+  "the app workflow must force a real IndexedDB resource-Trash transaction abort and verify rollback."
+);
+assertIncludes(
+  appJs,
+  "schema-6 backup preserves resource Trash while project-package schema remains independent",
+  "the app workflow must characterize resource Trash backup compatibility without changing project packages."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'captureState("03", "resource-trash-populated")',
+  "visual checkpoints must include populated resource Trash at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'captureState("03", "resource-trash-empty-after-restore")',
+  "visual checkpoints must include the actionable empty Trash state after resource restoration."
 );
 assertIncludes(
   appJs,

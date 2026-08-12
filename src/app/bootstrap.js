@@ -9,7 +9,12 @@ import { createCommandBus } from "../commands/command-bus.js";
 import { createCommandRegistry } from "../commands/command-registry.js";
 import { createUndoStore } from "../commands/undo-store.js";
 import { createEditTargetSessionStore } from "../commands/edit-target-session.js";
-import { createDeleteDocumentCommand, createDeleteProjectCommand } from "../commands/trash-commands.js";
+import {
+  createDeleteDocumentCommand,
+  createDeleteProjectCommand,
+  createDeleteResourceCommand,
+  createDeleteResourceEntryCommand
+} from "../commands/trash-commands.js";
 import { createApplyAiSuggestionCommand } from "../commands/ai-commands.js";
 import {
   createAiPretranslationCommand,
@@ -96,6 +101,8 @@ export function createApplicationRuntime({ browserWindow, projectApi, storageApi
       createTmPretranslationCommand,
       createDeleteDocumentCommand: (options) => createDeleteDocumentCommand({ ...options, trashRepository }),
       createDeleteProjectCommand: (options) => createDeleteProjectCommand({ ...options, trashRepository }),
+      createDeleteResourceCommand: (options) => createDeleteResourceCommand({ ...options, trashRepository }),
+      createDeleteResourceEntryCommand: (options) => createDeleteResourceEntryCommand({ ...options, trashRepository }),
       registry: createCommandRegistry(),
       editTargetSessions,
       undoStore
