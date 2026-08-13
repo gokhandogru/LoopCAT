@@ -711,7 +711,6 @@ const state = {
   segmentFilterCache: { key: "", indexes: [], positions: new Map() },
   projectAnalysisRun: 0,
   importTask: "",
-  confirmingSegmentIds: new Set(),
   tmPretranslating: false,
   revisionHistoryFrame: 0,
   saveStatusTimer: 0,
@@ -1342,6 +1341,74 @@ const autosaveService = appRuntime.featureFactories.createAutosaveService({
     }
   }
 });
+const segmentConfirmationController = appRuntime.featureFactories.createSegmentConfirmationController({
+  element: els.confirmBtn,
+  editorSessionStore,
+  commands: {
+    bus: appRuntime.commands.bus,
+    create: appRuntime.commands.createConfirmSegmentCommand,
+    changed: renderUndoControls
+  },
+  selection: {
+    getActiveIndex: currentActiveIndex,
+    focusTarget: focusActiveTextarea,
+    goToNextOpen: goToNextOpenSegment
+  },
+  validation: {
+    missingTags,
+    tagLabel: tagDisplayText
+  },
+  filters: { matches: segmentPassesFilters },
+  mutation: {
+    confirm: applySegmentConfirmation,
+    restore: restoreSegmentConfirmation,
+    preparePersistedRollback: preparePersistedConfirmationRollback
+  },
+  persistence: {
+    clearPending: clearPendingSave,
+    save: saveSegment,
+    saveToTm: saveSegmentToTm,
+    logActivity: (segment, project) =>
+      logProjectActivity(
+        "confirm-segment",
+        "Segment confirmed",
+        { segmentId: segment.id, documentId: segment.documentId },
+        project
+      )
+  },
+  restoration: {
+    restoreCommand: (segmentId, snapshot, options) =>
+      restoreSegmentCommandSnapshot(segmentId, snapshot, options)
+  },
+  view: {
+    updateRow,
+    renderSegments,
+    renderProgress,
+    scheduleHistory: scheduleRevisionHistoryRender,
+    renderHistory: renderRevisionHistory
+  },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus },
+  testHooks: {
+    beforeSave: (segment) => {
+      if (LOOPCAT_TEST_BUILD && segment[CONFIRM_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated confirm save failure");
+      }
+    },
+    afterSave: (segment) => {
+      if (LOOPCAT_TEST_BUILD && segment[CONFIRM_POST_SAVE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated post-save confirm failure");
+      }
+    },
+    beforeActivity: (segment) => {
+      if (LOOPCAT_TEST_BUILD && segment[CONFIRM_ACTIVITY_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated confirm activity failure");
+      }
+    }
+  },
+  logger: console
+});
+segmentConfirmationController.mount();
 targetEditController = appRuntime.featureFactories.createTargetEditController({
   editorSessionStore,
   commandBus: appRuntime.commands.bus,
@@ -1357,7 +1424,7 @@ targetEditController = appRuntime.featureFactories.createTargetEditController({
   restorePatch: restoreSegmentEditCommandPatch,
   applyDraft: applyTargetDraft,
   activateSegment: setActiveSegment,
-  confirmSegment: confirmCurrentSegment,
+  confirmSegment: () => segmentConfirmationController.confirm(),
   getCommandProjectId: () => state.commandProjectId,
   getVisibleIndexes: filteredSegmentIndexes,
   getVisiblePosition: filteredSegmentPosition,
@@ -6828,9 +6895,24 @@ function debounceSave(segment) {
 }
 
 function renderConfirmBusyState() {
-  const busy = Boolean(currentSegment()?.id && state.confirmingSegmentIds.has(currentSegment().id));
-  els.confirmBtn.disabled = busy;
-  els.confirmBtn.setAttribute("aria-busy", String(busy));
+  return segmentConfirmationController.renderBusy();
+}
+
+function applySegmentConfirmation(segment) {
+  recordSegmentTargetHistory(segment, segment.target, "confirmed", "confirm");
+  segment.status = "confirmed";
+  if (segment.reviewState === "needs-review") segment.reviewState = "";
+  touchSegment(segment);
+}
+
+function restoreSegmentConfirmation(segment, snapshot) {
+  Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
+  Object.assign(segment, snapshot);
+}
+
+function preparePersistedConfirmationRollback(segment, savedConfirmedRevision) {
+  segment.revision = Math.max(Number(segment.revision || 0), Number(savedConfirmedRevision || 0)) + 1;
+  segment.updatedAt = new Date().toISOString();
 }
 
 async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = {}) {
@@ -6861,121 +6943,7 @@ async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = 
 }
 
 async function confirmCurrentSegment() {
-  const segment = currentSegment();
-  if (!segment || !segment.target.trim()) return;
-  if (state.confirmingSegmentIds.has(segment.id)) return;
-  const missing = missingTags(segment);
-  if (missing.length) {
-    setSaveStatus(`Cannot confirm: missing ${missing.map(tagDisplayText).join(", ")}`, "dirty");
-    updateRow(currentActiveIndex());
-    focusActiveTextarea();
-    return;
-  }
-  const segmentIndex = currentActiveIndex();
-  const project = currentProject();
-  const previousStatus = segment.status;
-  const passedFiltersBefore = segmentPassesFilters(segment);
-  const previous = structuredClone(segment);
-  let savedConfirmedRevision = 0;
-  const warnings = [];
-  state.confirmingSegmentIds.add(segment.id);
-  renderConfirmBusyState();
-  try {
-    const command = appRuntime.commands.createConfirmSegmentCommand({
-      projectId: project.id,
-      segmentId: segment.id,
-      beforeSnapshot: previous,
-      restoreSnapshot: (snapshot, context) =>
-        restoreSegmentCommandSnapshot(segment.id, snapshot, { navigateNext: context.direction === "redo" }),
-      applyFirst: async () => {
-        recordSegmentTargetHistory(segment, segment.target, "confirmed", "confirm");
-        segment.status = "confirmed";
-        if (segment.reviewState === "needs-review") segment.reviewState = "";
-        touchSegment(segment);
-        clearPendingSave(segment);
-        setSaveStatus("Saving...");
-        if (passedFiltersBefore !== segmentPassesFilters(segment)) renderSegments({ preserveScroll: true });
-        else updateRow(segmentIndex);
-        renderProgress({ previousStatus, nextStatus: segment.status });
-        scheduleRevisionHistoryRender();
-        if (LOOPCAT_TEST_BUILD && segment[CONFIRM_FAILURE_TEST_FLAG]) throw new Error("Simulated confirm save failure");
-        await saveSegment(segment);
-        savedConfirmedRevision = Number(segment.revision || 0);
-        if (LOOPCAT_TEST_BUILD && segment[CONFIRM_POST_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated post-save confirm failure");
-        markWorkspaceDirty();
-        const navigation = goToNextOpenSegment().catch((navigationError) => {
-          console.warn("Confirm navigation refresh failed.", navigationError);
-          focusActiveTextarea();
-        });
-        renderConfirmBusyState();
-        const [tmResult, activityResult] = await Promise.all([
-          saveSegmentToTm(segment, project)
-            .then(() => true)
-            .catch((tmError) => {
-              console.warn("Confirm TM save failed.", tmError);
-              return false;
-            }),
-          Promise.resolve()
-            .then(() => {
-              if (LOOPCAT_TEST_BUILD && segment[CONFIRM_ACTIVITY_FAILURE_TEST_FLAG]) {
-                throw new Error("Simulated confirm activity failure");
-              }
-              return logProjectActivity(
-                "confirm-segment",
-                "Segment confirmed",
-                { segmentId: segment.id, documentId: segment.documentId },
-                project
-              );
-            })
-            .then(() => true)
-            .catch((activityError) => {
-              console.warn("Confirm activity log failed.", activityError);
-              return false;
-            }),
-          navigation
-        ]);
-        if (!tmResult) warnings.push("TM save failed");
-        if (!activityResult) warnings.push("activity log failed");
-        return {
-          snapshot: structuredClone(segment),
-          activeSegmentId: currentSegment()?.id || segment.id
-        };
-      }
-    });
-    await appRuntime.commands.bus.execute(command);
-    renderUndoControls();
-    setSaveStatus(
-      warnings.length ? `Saved; ${warnings.join("; ")}; Undo is available` : "Saved; Undo is available",
-      warnings.length ? "dirty" : "saved"
-    );
-    return true;
-  } catch (error) {
-    Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-    Object.assign(segment, previous);
-    if (savedConfirmedRevision) {
-      segment.revision = Math.max(Number(segment.revision || 0), savedConfirmedRevision) + 1;
-      segment.updatedAt = new Date().toISOString();
-      try {
-        await saveSegment(segment);
-      } catch (rollbackError) {
-        setSaveStatus(`${error.message || "Confirm segment failed"}; rollback save failed: ${rollbackError.message || rollbackError}`, "dirty");
-        renderSegments({ preserveScroll: true });
-        renderProgress();
-        renderRevisionHistory();
-        focusActiveTextarea();
-        return false;
-      }
-    }
-    setSaveStatus(error.message || "Confirm segment failed", "dirty");
-    renderSegments({ preserveScroll: true });
-    renderProgress();
-    renderRevisionHistory();
-    focusActiveTextarea();
-    return false;
-  } finally {
-    state.confirmingSegmentIds.delete(segment.id);
-    renderConfirmBusyState();
-  }
+  return segmentConfirmationController.confirm();
 }
 
 async function saveSegmentToTm(segment, project = currentProject()) {
@@ -13617,7 +13585,6 @@ function wireEvents() {
   els.projectSearchInput.addEventListener("input", renderProjectsView);
   els.languagePairFilter.addEventListener("change", renderProjectsView);
 
-  els.confirmBtn.addEventListener("click", confirmCurrentSegment);
   els.saveTmBtn.addEventListener("click", saveActiveSegmentToTm);
   els.pretranslateBtn.addEventListener("click", pretranslateFromTm);
   els.copySourceBtn.addEventListener("click", copySourceToTarget);

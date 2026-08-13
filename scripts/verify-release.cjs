@@ -162,6 +162,7 @@ const requiredReleaseFiles = [
   "src/features/editor/editor-context-controller.js",
   "src/features/editor/segment-grid-controller.js",
   "src/features/editor/autosave-service.js",
+  "src/features/editor/segment-confirmation-controller.js",
   "src/features/editor/target-edit-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -195,6 +196,7 @@ const requiredReleaseFiles = [
   "tests/unit/editor-session-store.test.cjs",
   "tests/unit/editor-context-controller.test.cjs",
   "tests/unit/autosave-service.test.cjs",
+  "tests/unit/segment-confirmation-controller.test.cjs",
   "tests/unit/target-edit-controller.test.cjs",
   "tests/app-workflow/workflow-driver.inc.js",
   "tests/unit/gemini-provider-adapter.test.cjs",
@@ -272,8 +274,10 @@ const editorSessionStoreJs = readText("src/features/editor/editor-session-store.
 const editorContextControllerJs = readText("src/features/editor/editor-context-controller.js");
 const segmentGridControllerJs = readText("src/features/editor/segment-grid-controller.js");
 const autosaveServiceJs = readText("src/features/editor/autosave-service.js");
+const segmentConfirmationControllerJs = readText("src/features/editor/segment-confirmation-controller.js");
 const targetEditControllerJs = readText("src/features/editor/target-edit-controller.js");
 const autosaveServiceUnitTests = readText("tests/unit/autosave-service.test.cjs");
+const segmentConfirmationControllerUnitTests = readText("tests/unit/segment-confirmation-controller.test.cjs");
 const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
 const commandBusJs = readText("src/commands/command-bus.js");
 const editTargetSessionJs = readText("src/commands/edit-target-session.js");
@@ -1694,6 +1698,57 @@ assertIncludes(
   appBootstrapJs,
   "createAutosaveService",
   "The application runtime must expose the checked autosave service boundary."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentConfirmationController",
+  "The application runtime must expose the checked segment-confirmation controller boundary."
+);
+assertIncludes(
+  segmentConfirmationControllerJs,
+  "const confirmingSegmentIds = new Set()",
+  "SegmentConfirmationController must own per-segment confirmation busy state."
+);
+assertIncludes(
+  segmentConfirmationControllerJs,
+  "await commands.bus.execute(command)",
+  "SegmentConfirmationController must route confirmation through the injected CommandBus."
+);
+for (const boundary of [
+  "persistence.save(segment)",
+  "persistence.saveToTm(segment, project)",
+  "persistence.logActivity(segment, project)",
+  "selection.goToNextOpen()"
+]) {
+  assertIncludes(
+    segmentConfirmationControllerJs,
+    boundary,
+    `SegmentConfirmationController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "segmentConfirmationController.mount()",
+  "app.js must delegate the Confirm button lifecycle to SegmentConfirmationController."
+);
+assertIncludes(
+  appJs,
+  "return segmentConfirmationController.confirm()",
+  "app.js must delegate the compatibility confirm entry point to SegmentConfirmationController."
+);
+assert(
+  !appJs.includes("confirmingSegmentIds") && !appJs.includes('els.confirmBtn.addEventListener("click"'),
+  "app.js must not regain segment-confirmation event or busy-state ownership."
+);
+assertIncludes(
+  segmentConfirmationControllerUnitTests,
+  "confirmation controller prevents duplicate submission and preserves confirm-and-next command sequencing",
+  "focused confirmation tests must characterize duplicate prevention and confirm-and-next sequencing."
+);
+assertIncludes(
+  segmentConfirmationControllerUnitTests,
+  "post-save confirmation failure persists a monotonic rollback and reports rollback-write failure",
+  "focused confirmation tests must characterize durable post-save rollback recovery."
 );
 assertIncludes(
   targetEditControllerJs,

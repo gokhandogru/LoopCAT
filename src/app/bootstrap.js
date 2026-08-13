@@ -43,6 +43,7 @@ import { createInspectorController } from "../features/editor/inspector-controll
 import { createSegmentGridController } from "../features/editor/segment-grid-controller.js";
 import { createAutosaveService } from "../features/editor/autosave-service.js";
 import { createTargetEditController } from "../features/editor/target-edit-controller.js";
+import { createSegmentConfirmationController } from "../features/editor/segment-confirmation-controller.js";
 import { createPaletteController } from "../features/palette/palette-controller.js";
 import { createWorkspaceLayoutController } from "../features/workspace/workspace-layout-controller.js";
 import { createUpdateController } from "../features/update/update-controller.js";
@@ -138,6 +139,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createQualityReviewController,
       createRecoveryWorkspaceController,
       createResourcesController,
+      createSegmentConfirmationController,
       createPaletteController,
       createThemeController,
       createTargetEditController,
