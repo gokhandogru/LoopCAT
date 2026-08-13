@@ -29,7 +29,9 @@ function assert(condition, message) {
 }
 
 function assertIncludes(text, snippet, message) {
-  assert(text.includes(snippet), message);
+  const workflowAssertion = /workflow|app\.js language catalog|production UI does not expose mock/i.test(message);
+  const source = workflowAssertion && text === appJs ? `${text}\n${appWorkflowDriverJs}` : text;
+  assert(source.includes(snippet), message);
 }
 
 function functionBody(text, startMarker, endMarker) {
@@ -157,6 +159,7 @@ const requiredReleaseFiles = [
   "src/app/compatibility-module-registry.js",
   "src/app/install-runtime.js",
   "src/features/editor/editor-session-store.js",
+  "src/features/editor/editor-context-controller.js",
   "src/features/editor/segment-grid-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -188,6 +191,8 @@ const requiredReleaseFiles = [
   "tests/unit/cohere-provider-adapter.test.cjs",
   "tests/unit/compatibility-module-registry.test.cjs",
   "tests/unit/editor-session-store.test.cjs",
+  "tests/unit/editor-context-controller.test.cjs",
+  "tests/app-workflow/workflow-driver.inc.js",
   "tests/unit/gemini-provider-adapter.test.cjs",
   "tests/unit/groq-provider-adapter.test.cjs",
   "tests/unit/hosted-provider-adapters.test.cjs",
@@ -254,6 +259,7 @@ const manifest = readJson("manifest.webmanifest");
 const indexHtml = readText("index.html");
 const regressionHtml = readText("regression-test.html");
 const appJs = readText("app.js");
+const appWorkflowDriverJs = readText("tests/app-workflow/workflow-driver.inc.js");
 const appBootstrapJs = readText("src/app/bootstrap.js");
 const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-registry.js");
 const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-module-registry.test.cjs");
@@ -367,8 +373,7 @@ assertIncludes(
   "The compatibility registry must retain focused module-capture characterization."
 );
 assert(
-  (appJs.match(/window\.CatHan/g) || []).length === 1 &&
-    appJs.includes("const appRuntime = window.CatHan.appRuntime;"),
+  (appJs.match(/window\.CatHan/g) || []).length === 1 && appJs.includes("const appRuntime = window.CatHan.appRuntime;"),
   "app.js may read only the installed application runtime from window.CatHan; feature APIs must be injected."
 );
 assertIncludes(
@@ -453,11 +458,7 @@ assertIncludes(
   "The segment grid must dispatch active-segment identity through application navigation."
 );
 for (const method of ["calculateWindow", "scheduleScroll", "scheduleRowUpdate", "ensureVisible", "findTargetEditor"]) {
-  assertIncludes(
-    segmentGridControllerJs,
-    method,
-    `The segment grid must retain checked ${method} ownership.`
-  );
+  assertIncludes(segmentGridControllerJs, method, `The segment grid must retain checked ${method} ownership.`);
 }
 assertIncludes(
   appBootstrapJs,
@@ -632,8 +633,19 @@ assert(
   "Bundle contract must characterize the isolated source test driver while production renderer checks enforce its exclusion."
 );
 assert(
-  bundleContract.knownMarkers?.["app.js"]?.runAppWorkflowTest === 4,
+  bundleContract.knownMarkers?.["app.js"]?.runAppWorkflowTest === 1,
   "Bundle contract must lock the characterized workflow-test entry count."
+);
+assert(
+  !appJs.includes("async function runAppWorkflowTest()") &&
+    appJs.includes("/* LOOPCAT_TEST_WORKFLOW_DRIVER */") &&
+    appWorkflowDriverJs.includes("async function runAppWorkflowTest()"),
+  "The lexical-scope workflow driver must live only in the external test composition source."
+);
+assertIncludes(
+  readText("scripts/build-renderer.cjs"),
+  "workflowDriverPath",
+  "The renderer builder must compose the external workflow driver only into the test graph."
 );
 assertIncludes(
   bundleContractScript,
@@ -1261,7 +1273,7 @@ assert(
     !functionBody(appJs, "function renderLocalAiCommandCentre", "async function persistLocalAiSettings").includes(
       "els.localAi"
     ) &&
-    (appJs.slice(0, appJs.indexOf("const runAppWorkflowTest")).match(/els\.localAiPromptOutput/g) || []).length === 1,
+    (appJs.match(/els\.localAiPromptOutput/g) || []).length === 1,
   "AI provider form values, command-centre rendering, and output presentation must be owned by the checked controller."
 );
 assertIncludes(
@@ -2828,8 +2840,16 @@ assert(
   "ai.js must not retain the extracted Anthropic provider implementation."
 );
 assertIncludes(cohereProviderAdapterJs, 'id: "cohere"', "The checked Cohere adapter must implement Cohere Command.");
-assertIncludes(cohereProviderAdapterJs, "cohereAuthHeaders", "The Cohere adapter must send API keys in headers, not query strings.");
-assertIncludes(cohereProviderAdapterJs, "cohereApiUrl", "The Cohere adapter must normalize model-list and chat endpoints.");
+assertIncludes(
+  cohereProviderAdapterJs,
+  "cohereAuthHeaders",
+  "The Cohere adapter must send API keys in headers, not query strings."
+);
+assertIncludes(
+  cohereProviderAdapterJs,
+  "cohereApiUrl",
+  "The Cohere adapter must normalize model-list and chat endpoints."
+);
 assertIncludes(
   cohereProviderAdapterJs,
   "max_tokens: 1200",
@@ -2885,7 +2905,9 @@ assertIncludes(
   "The Ollama adapter must retain focused chat, abort, provenance, and timing characterization."
 );
 assert(
-  !aiJs.includes("const OllamaProvider = {") && !aiJs.includes("function ollamaStatusError") && !aiJs.includes("async function ollamaJson"),
+  !aiJs.includes("const OllamaProvider = {") &&
+    !aiJs.includes("function ollamaStatusError") &&
+    !aiJs.includes("async function ollamaJson"),
   "ai.js must not retain the extracted Ollama provider implementation."
 );
 assertIncludes(

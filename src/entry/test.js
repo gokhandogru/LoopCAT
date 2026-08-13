@@ -1,4 +1,4 @@
 // The test renderer intentionally uses the same dependency order as production.
-// app.js activates its isolated characterization driver only for the test URL.
+// The renderer build composes the external lexical-scope characterization driver only into this graph.
 import "../testing/startup-diagnostics.js";
 import "./production.js";

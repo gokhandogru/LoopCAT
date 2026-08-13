@@ -9,10 +9,10 @@
   ],
   "knownMarkers": {
     "app.js": {
-      "runAppWorkflowTest": 4,
-      "#app-workflow-test": 2,
-      "_TEST_FLAG": 154,
-      "Simulated ": 85
+      "runAppWorkflowTest": 1,
+      "#app-workflow-test": 1,
+      "_TEST_FLAG": 76,
+      "Simulated ": 40
     }
   },
   "forbiddenMarkers": [
