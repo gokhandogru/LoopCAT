@@ -97,7 +97,11 @@ export function createOllamaProviderAdapter(injectedRuntime) {
     defaultModel: runtime.DEFAULT_LOCAL_AI_MODEL,
     async testConnection(config = {}) {
       const hosted = runtime.isOllamaCloudBaseUrl(config.baseUrl || runtime.OLLAMA_DEFAULT_BASE_URL);
-      if (hosted && runtime.localAiProviderNeedsApiKey("ollama", config.baseUrl) && !String(config.apiKey || "").trim()) {
+      if (
+        hosted &&
+        runtime.localAiProviderNeedsApiKey("ollama", config.baseUrl) &&
+        !String(config.apiKey || "").trim()
+      ) {
         throw new Error("Add an Ollama API key before using hosted Ollama.");
       }
       const data = hosted
@@ -111,7 +115,10 @@ export function createOllamaProviderAdapter(injectedRuntime) {
       };
     },
     async listModels(config = {}) {
-      if (runtime.isOllamaCloudBaseUrl(config.baseUrl || runtime.OLLAMA_DEFAULT_BASE_URL) && !String(config.apiKey || "").trim()) {
+      if (
+        runtime.isOllamaCloudBaseUrl(config.baseUrl || runtime.OLLAMA_DEFAULT_BASE_URL) &&
+        !String(config.apiKey || "").trim()
+      ) {
         throw new Error("Add an Ollama API key before refreshing hosted Ollama models.");
       }
       const data = await requestJson(
@@ -205,12 +212,12 @@ export function createOllamaProviderAdapter(injectedRuntime) {
           ]
         : [{ role: "user", content: prompt }];
       const startedAt = runtime.localAiStartedAt();
-      const data = await requestJson(
-        runtime,
-        "/chat",
-        chatRequest(runtime, config, model, messages),
-        { ...settings, ...config, model, signal: request.signal || config.signal }
-      );
+      const data = await requestJson(runtime, "/chat", chatRequest(runtime, config, model, messages), {
+        ...settings,
+        ...config,
+        model,
+        signal: request.signal || config.signal
+      });
       return runtime.genericPromptResult(
         "Ollama",
         "ollama",

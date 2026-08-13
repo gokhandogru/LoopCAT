@@ -21,7 +21,9 @@ function createRuntime(results = []) {
       return `Translate ${request.text} from ${request.sourceCode} to ${request.targetCode}`;
     },
     cleanModelTranslationOutput(value) {
-      return String(value).replace(/^Translation:\s*/i, "").trim();
+      return String(value)
+        .replace(/^Translation:\s*/i, "")
+        .trim();
     },
     defaultLocalAiSettings(config) {
       return {
@@ -55,7 +57,9 @@ function createRuntime(results = []) {
       return 100;
     },
     normalizeOllamaBaseUrl(baseUrl) {
-      const value = String(baseUrl || "http://localhost:11434").replace(/\/+$/, "").replace(/\/api$/, "");
+      const value = String(baseUrl || "http://localhost:11434")
+        .replace(/\/+$/, "")
+        .replace(/\/api$/, "");
       return { rootBaseUrl: value, apiBaseUrl: `${value}/api` };
     },
     ollamaApiUrl(baseUrl, endpoint) {
@@ -81,7 +85,12 @@ test("Ollama adapter preserves local and cloud connection, model mapping, auth, 
   );
   const runtime = createRuntime([
     ok({ version: "0.12.0" }),
-    ok({ models: [{ name: "translategemma", size: 42, modified_at: "today" }, { model: "qwen", modifiedAt: "now" }] })
+    ok({
+      models: [
+        { name: "translategemma", size: 42, modified_at: "today" },
+        { model: "qwen", modifiedAt: "now" }
+      ]
+    })
   ]);
   const provider = createOllamaProviderAdapter(runtime);
   const local = await provider.testConnection({ baseUrl: "http://localhost:11434" });
@@ -98,7 +107,10 @@ test("Ollama adapter preserves local and cloud connection, model mapping, auth, 
   await assert.rejects(provider.listModels({ baseUrl: "https://ollama.com" }), /API key before refreshing/);
 
   const registered = [];
-  const ai = { providerAdapterRuntime: createRuntime(), aiProviderRegistry: { register: (item) => registered.push(item) } };
+  const ai = {
+    providerAdapterRuntime: createRuntime(),
+    aiProviderRegistry: { register: (item) => registered.push(item) }
+  };
   const installed = installOllamaProviderAdapter(ai);
   assert.equal(registered[0], installed);
   assert.equal(ai.OllamaProvider, installed);
@@ -109,9 +121,14 @@ test("Ollama adapter preserves local pull lifecycle and blocks cloud pulls", asy
   const runtime = createRuntime([ok({ status: "success" })]);
   const provider = createOllamaProviderAdapter(runtime);
   const progress = [];
-  const result = await provider.pullModel({ baseUrl: "http://localhost:11434" }, "qwen", (event) => progress.push(event));
+  const result = await provider.pullModel({ baseUrl: "http://localhost:11434" }, "qwen", (event) =>
+    progress.push(event)
+  );
   assert.equal(result.model, "qwen");
-  assert.deepEqual(progress, [{ status: "starting", model: "qwen" }, { status: "complete", model: "qwen" }]);
+  assert.deepEqual(progress, [
+    { status: "starting", model: "qwen" },
+    { status: "complete", model: "qwen" }
+  ]);
   assert.deepEqual(JSON.parse(runtime.calls[0].options.body), { name: "qwen", stream: false });
   await assert.rejects(
     provider.pullModel({ baseUrl: "https://ollama.com", apiKey: "cloud-key" }, "qwen"),
@@ -122,7 +139,13 @@ test("Ollama adapter preserves local pull lifecycle and blocks cloud pulls", asy
 test("Ollama adapter preserves translation and generic chat payloads, cancellation signal, provenance, and timing metadata", async () => {
   const { createOllamaProviderAdapter } = await moduleAt("src/ai/providers/ollama-provider-adapter.js");
   const runtime = createRuntime([
-    ok({ message: { content: "Translation: Merhaba" }, total_duration: 12, load_duration: 3, prompt_eval_count: 7, eval_count: 4 }),
+    ok({
+      message: { content: "Translation: Merhaba" },
+      total_duration: 12,
+      load_duration: 3,
+      prompt_eval_count: 7,
+      eval_count: 4
+    }),
     ok({ message: { content: "QA note" }, total_duration: 9, prompt_eval_count: 5, eval_count: 2 })
   ]);
   const provider = createOllamaProviderAdapter(runtime);
@@ -163,10 +186,19 @@ test("Ollama adapter preserves cloud consent errors and redacted status, model, 
     new Error("socket failed")
   ]);
   const provider = createOllamaProviderAdapter(runtime);
-  await assert.rejects(provider.translateSegment({ baseUrl: "https://ollama.com" }, { text: "Hello" }), /API key before sending/);
-  await assert.rejects(provider.translateSegment({ model: "missing" }, { text: "Hello" }), /Model missing is not installed/);
+  await assert.rejects(
+    provider.translateSegment({ baseUrl: "https://ollama.com" }, { text: "Hello" }),
+    /API key before sending/
+  );
+  await assert.rejects(
+    provider.translateSegment({ model: "missing" }, { text: "Hello" }),
+    /Model missing is not installed/
+  );
   await assert.rejects(provider.translateSegment({}, { text: "Hello" }), /Ollama rejected the request/);
-  await assert.rejects(provider.translateSegment({}, { text: "Hello" }), (error) => error.message === "quota [redacted]");
+  await assert.rejects(
+    provider.translateSegment({}, { text: "Hello" }),
+    (error) => error.message === "quota [redacted]"
+  );
   await assert.rejects(provider.translateSegment({}, { text: "Hello" }), /Local AI request canceled/);
   await assert.rejects(provider.testConnection({ baseUrl: "http://localhost:11434" }), /Ollama is not reachable at/);
   await assert.rejects(

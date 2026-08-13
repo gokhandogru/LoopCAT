@@ -15,7 +15,9 @@ function createRuntime(results = []) {
     OPUS_CAT_DEFAULT_BASE_URL: "http://localhost:8500",
     OPUS_CAT_DEFAULT_MODEL: "default",
     cleanModelTranslationOutput(value) {
-      return String(value).replace(/^Translation:\s*/i, "").trim();
+      return String(value)
+        .replace(/^Translation:\s*/i, "")
+        .trim();
     },
     defaultLocalAiSettings(config) {
       return {
@@ -81,7 +83,10 @@ test("OPUS-CAT adapter preserves direct and bridge discovery, bounded probes, ca
   assert.equal(runtime.calls[2].url, "http://127.0.0.1:8502/MTRestService/ListSupportedLanguagePairs?tokenCode=0");
 
   const registered = [];
-  const ai = { providerAdapterRuntime: createRuntime(), aiProviderRegistry: { register: (item) => registered.push(item) } };
+  const ai = {
+    providerAdapterRuntime: createRuntime(),
+    aiProviderRegistry: { register: (item) => registered.push(item) }
+  };
   const installed = installOpusCatProviderAdapter(ai);
   assert.equal(registered[0], installed);
   assert.equal(ai.OpusCatProvider, installed);
@@ -162,5 +167,8 @@ test("OPUS-CAT adapter preserves actionable setup, redacted status, endpoint, an
   await assert.rejects(provider.listModels(), /rejected the request/);
   await assert.rejects(provider.listModels(), /expected MTRestService endpoint/);
   await assert.rejects(provider.listModels(), (error) => error.message === "quota [redacted]");
-  await assert.rejects(provider.listModels({ baseUrl: "https://engine.example" }), /not reachable at https:\/\/engine\.example/);
+  await assert.rejects(
+    provider.listModels({ baseUrl: "https://engine.example" }),
+    /not reachable at https:\/\/engine\.example/
+  );
 });

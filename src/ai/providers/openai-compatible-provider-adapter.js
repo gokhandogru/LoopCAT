@@ -49,9 +49,7 @@ async function requestJson(runtime, endpoint, options = {}, config = {}) {
   } catch (error) {
     const message = String(error?.message || "");
     if (message.includes("canceled") || message.includes("timed out")) throw error;
-    const baseUrl = runtime.normalizeOpenAiCompatibleBaseUrl(
-      config.baseUrl || runtime.LM_STUDIO_DEFAULT_BASE_URL
-    );
+    const baseUrl = runtime.normalizeOpenAiCompatibleBaseUrl(config.baseUrl || runtime.LM_STUDIO_DEFAULT_BASE_URL);
     throw new Error(`OpenAI-compatible provider is not reachable at ${baseUrl}.`);
   }
   if (!result.response?.ok) {
@@ -105,9 +103,7 @@ export function createOpenAiCompatibleProviderAdapter(injectedRuntime) {
     defaultBaseUrl: runtime.LM_STUDIO_DEFAULT_BASE_URL,
     defaultModel: runtime.DEFAULT_LOCAL_AI_MODEL,
     async testConnection(config = {}) {
-      const baseUrl = runtime.normalizeOpenAiCompatibleBaseUrl(
-        config.baseUrl || runtime.LM_STUDIO_DEFAULT_BASE_URL
-      );
+      const baseUrl = runtime.normalizeOpenAiCompatibleBaseUrl(config.baseUrl || runtime.LM_STUDIO_DEFAULT_BASE_URL);
       requireAllowedEndpoint(runtime, baseUrl, config, "using this hosted OpenAI-compatible endpoint");
       const data = await requestJson(
         runtime,
@@ -123,9 +119,7 @@ export function createOpenAiCompatibleProviderAdapter(injectedRuntime) {
       };
     },
     async listModels(config = {}) {
-      const baseUrl = runtime.normalizeOpenAiCompatibleBaseUrl(
-        config.baseUrl || runtime.LM_STUDIO_DEFAULT_BASE_URL
-      );
+      const baseUrl = runtime.normalizeOpenAiCompatibleBaseUrl(config.baseUrl || runtime.LM_STUDIO_DEFAULT_BASE_URL);
       requireAllowedEndpoint(runtime, baseUrl, config, "refreshing models");
       const data = await requestJson(
         runtime,

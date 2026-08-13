@@ -27,13 +27,25 @@ function assertRuntime(runtime) {
 }
 
 export function opusCatLanguageCode(value, fallback = "und") {
-  const clean = String(value || fallback || "").trim().toLowerCase().replaceAll("_", "-");
+  const clean = String(value || fallback || "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", "-");
   const match = clean.match(/[a-z]{2,3}/);
-  return match?.[0] || String(fallback || "und").trim().toLowerCase() || "und";
+  return (
+    match?.[0] ||
+    String(fallback || "und")
+      .trim()
+      .toLowerCase() ||
+    "und"
+  );
 }
 
 export function opusCatLanguagePairMatches(pair, sourceCode, targetCode) {
-  const tokens = String(pair || "").toLowerCase().match(/[a-z]{2,3}/g) || [];
+  const tokens =
+    String(pair || "")
+      .toLowerCase()
+      .match(/[a-z]{2,3}/g) || [];
   return tokens.length >= 2 && tokens[0] === sourceCode && tokens[1] === targetCode;
 }
 
@@ -78,9 +90,7 @@ async function requestJson(runtime, action, params = {}, options = {}, config = 
   } catch (error) {
     const message = String(error?.message || "");
     if (message.includes("canceled") || message.includes("timed out")) throw error;
-    throw new Error(
-      `OPUS-CAT MT Engine is not reachable at ${baseUrl}. Start OPUS-CAT MT Engine and try again.`
-    );
+    throw new Error(`OPUS-CAT MT Engine is not reachable at ${baseUrl}. Start OPUS-CAT MT Engine and try again.`);
   }
   if (!result.response?.ok) throw new Error(statusError(runtime, result.data, result.response?.status));
   return result.data;
@@ -98,9 +108,7 @@ export function createOpusCatProviderAdapter(injectedRuntime) {
     defaultBaseUrl: runtime.OPUS_CAT_DEFAULT_BASE_URL,
     defaultModel: runtime.OPUS_CAT_DEFAULT_MODEL,
     async testConnection(config = {}) {
-      const configuredBaseUrl = runtime.normalizeOpusCatBaseUrl(
-        config.baseUrl || runtime.OPUS_CAT_DEFAULT_BASE_URL
-      );
+      const configuredBaseUrl = runtime.normalizeOpusCatBaseUrl(config.baseUrl || runtime.OPUS_CAT_DEFAULT_BASE_URL);
       const candidates = runtime.opusCatConnectionCandidates(configuredBaseUrl);
       let lastError = null;
       for (const baseUrl of candidates) {
@@ -123,7 +131,12 @@ export function createOpusCatProviderAdapter(injectedRuntime) {
             modelCount: pairs.length
           };
         } catch (error) {
-          if (String(error?.message || "").toLowerCase().includes("canceled")) throw error;
+          if (
+            String(error?.message || "")
+              .toLowerCase()
+              .includes("canceled")
+          )
+            throw error;
           lastError = error;
         }
       }
@@ -232,9 +245,7 @@ export function createOpusCatProviderAdapter(injectedRuntime) {
           sourceCode,
           targetCode,
           modelTag,
-          segmentedTranslationCount: Array.isArray(data?.SegmentedTranslation)
-            ? data.SegmentedTranslation.length
-            : 0
+          segmentedTranslationCount: Array.isArray(data?.SegmentedTranslation) ? data.SegmentedTranslation.length : 0
         }
       };
     }

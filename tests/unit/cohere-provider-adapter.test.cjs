@@ -24,7 +24,9 @@ function createRuntime(results = []) {
       return `Translate ${request.text} from ${request.sourceCode} to ${request.targetCode}`;
     },
     cleanModelTranslationOutput(value) {
-      return String(value).replace(/^Translation:\s*/i, "").trim();
+      return String(value)
+        .replace(/^Translation:\s*/i, "")
+        .trim();
     },
     cohereApiUrl(baseUrl, endpoint) {
       const rootUrl = this.normalizeCohereBaseUrl(baseUrl).replace(/\/v[12]$/, "");
@@ -163,7 +165,10 @@ test("Cohere adapter preserves generic commands, response fallbacks, bounded tok
   assert.equal(extractCohereResponseText({ message: { content: "content" } }), "content");
 
   const runtime = createRuntime([
-    ok({ message: { content: [{ type: "text", text: " QA note " }] }, usage: { tokens: { input_tokens: 5, output_tokens: 3 } } })
+    ok({
+      message: { content: [{ type: "text", text: " QA note " }] },
+      usage: { tokens: { input_tokens: 5, output_tokens: 3 } }
+    })
   ]);
   const provider = createCohereProviderAdapter(runtime);
   const result = await provider.completePrompt(

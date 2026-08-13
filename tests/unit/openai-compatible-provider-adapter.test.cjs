@@ -16,7 +16,8 @@ function createRuntime(results = []) {
     DEFAULT_LOCAL_AI_MODEL: "translategemma",
     LM_STUDIO_DEFAULT_BASE_URL: "http://localhost:1234/v1",
     assertOpenAiCompatibleHostedAllowed(baseUrl) {
-      if (!allowedHosts.has(new URL(baseUrl).hostname)) throw new Error("This hosted OpenAI-compatible endpoint is not in LoopCAT's explicit provider allowlist.");
+      if (!allowedHosts.has(new URL(baseUrl).hostname))
+        throw new Error("This hosted OpenAI-compatible endpoint is not in LoopCAT's explicit provider allowlist.");
     },
     bearerAuthHeaders(config, extra = {}) {
       return config.apiKey ? { ...extra, Authorization: `Bearer ${config.apiKey}` } : { ...extra };
@@ -25,7 +26,9 @@ function createRuntime(results = []) {
       return `Translate ${request.text} from ${request.sourceCode} to ${request.targetCode}`;
     },
     cleanModelTranslationOutput(value) {
-      return String(value).replace(/^Translation:\s*/i, "").trim();
+      return String(value)
+        .replace(/^Translation:\s*/i, "")
+        .trim();
     },
     defaultLocalAiSettings(config) {
       return {
@@ -100,7 +103,10 @@ test("OpenAI-compatible adapter preserves local model discovery, timestamps, no-
   ]);
 
   const registered = [];
-  const ai = { providerAdapterRuntime: createRuntime(), aiProviderRegistry: { register: (item) => registered.push(item) } };
+  const ai = {
+    providerAdapterRuntime: createRuntime(),
+    aiProviderRegistry: { register: (item) => registered.push(item) }
+  };
   const installed = installOpenAiCompatibleProviderAdapter(ai);
   assert.equal(registered[0], installed);
   assert.equal(ai.OpenAICompatibleProvider, installed);
@@ -111,8 +117,14 @@ test("OpenAI-compatible adapter preserves local and allowlisted hosted chat payl
     "src/ai/providers/openai-compatible-provider-adapter.js"
   );
   const runtime = createRuntime([
-    ok({ choices: [{ message: { content: "Translation: Merhaba" } }], usage: { prompt_tokens: 8, completion_tokens: 2, total_tokens: 10 } }),
-    ok({ choices: [{ message: { content: "QA note" } }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } })
+    ok({
+      choices: [{ message: { content: "Translation: Merhaba" } }],
+      usage: { prompt_tokens: 8, completion_tokens: 2, total_tokens: 10 }
+    }),
+    ok({
+      choices: [{ message: { content: "QA note" } }],
+      usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 }
+    })
   ]);
   const provider = createOpenAiCompatibleProviderAdapter(runtime);
   const signal = { aborted: false };
@@ -172,9 +184,18 @@ test("OpenAI-compatible adapter preserves redacted status, model, cancellation, 
     new Error("socket failed")
   ]);
   const provider = createOpenAiCompatibleProviderAdapter(runtime);
-  await assert.rejects(provider.translateSegment({ model: "missing" }, { text: "Hello" }), /Model missing was not found/);
+  await assert.rejects(
+    provider.translateSegment({ model: "missing" }, { text: "Hello" }),
+    /Model missing was not found/
+  );
   await assert.rejects(provider.translateSegment({}, { text: "Hello" }), /rejected the request/);
-  await assert.rejects(provider.translateSegment({}, { text: "Hello" }), (error) => error.message === "quota [redacted]");
+  await assert.rejects(
+    provider.translateSegment({}, { text: "Hello" }),
+    (error) => error.message === "quota [redacted]"
+  );
   await assert.rejects(provider.translateSegment({}, { text: "Hello" }), /Local AI request canceled/);
-  await assert.rejects(provider.translateSegment({}, { text: "Hello" }), /not reachable at http:\/\/localhost:1234\/v1/);
+  await assert.rejects(
+    provider.translateSegment({}, { text: "Hello" }),
+    /not reachable at http:\/\/localhost:1234\/v1/
+  );
 });

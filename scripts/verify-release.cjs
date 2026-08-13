@@ -3016,6 +3016,14 @@ assert(
     !aiJs.includes("function opusCatStatusError"),
   "ai.js must not retain the extracted OPUS-CAT provider implementation."
 );
+assert(
+  !/\bconst\s+[A-Za-z0-9_$]+Provider\s*=/.test(aiJs),
+  "ai.js must remain free of provider object implementations after provider extraction."
+);
+assert(
+  !aiJs.includes("aiProviderRegistry.register("),
+  "ai.js must reserve provider positions but leave provider registration to checked adapters."
+);
 assertIncludes(
   aiJs,
   'if (providerId === "opus-cat") return false;',
@@ -3216,6 +3224,11 @@ assertIncludes(
   regressionHtml,
   'providerIds.indexOf("cohere") === providerIds.indexOf("anthropic") + 1',
   "The regression harness must preserve Cohere's original provider order."
+);
+assertIncludes(
+  regressionHtml,
+  'providerIds.indexOf("opus-cat") === providerIds.indexOf("openai-compatible") + 1',
+  "The regression harness must preserve the final OpenAI-compatible and OPUS-CAT provider positions."
 );
 assertIncludes(
   regressionHtml,

@@ -1,6 +1,6 @@
 # LoopCAT modernization implementation status
 
-Status date: 2026-08-12
+Status date: 2026-08-13
 Baseline commit: `0a2d5343d6c2a2ef859a16bc0674e128e7803d1a`
 Implementation state: substantial P0-P3 delivery, with P1-08 extraction and the performance stretch target still partial
 
@@ -39,10 +39,10 @@ This document records what the current working tree implements from the 2026 mod
 
 ## Measured results
 
-- Packaged production JavaScript graph: 2,375,686 bytes across five modules, including both mutually exclusive startup paths.
-- Hosted/desktop initial production `app.js`: 943,272 bytes minified and 261,399 bytes gzip. Its two locale chunks remain lazy.
-- Direct-file web fallback `app-file.js`: 1,187,821 bytes minified and 344,402 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
-- Initial synchronous JavaScript is more than 40% below the recorded approximately 2.62 MB baseline. Hosted gzip remains within the 250 KiB-class budget but is 11,399 bytes above a strict 250,000-byte interpretation; the 750 KB minified stretch target is not yet met.
+- Packaged production JavaScript graph: 2,386,272 bytes across five modules, including both mutually exclusive startup paths.
+- Hosted/desktop initial production `app.js`: 948,565 bytes minified and 261,166 bytes gzip. Its two locale chunks remain lazy.
+- Direct-file web fallback `app-file.js`: 1,193,114 bytes minified and 344,169 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
+- Initial synchronous JavaScript is more than 40% below the recorded approximately 2.62 MB baseline. Hosted gzip remains within the 250 KiB-class budget but is 11,166 bytes above a strict 250,000-byte interpretation; the hosted entry remains 198,565 bytes above the 750 KB minified stretch target.
 - Visual verification passes 81 deterministic screenshots covering 1440×900, 1366×768, and 1024×768, including an actionable import-validation failure, visible focus recovery, the local recovery panel and open workspace-status menu, populated Comments and Quality Workbench inspectors, Resources TM dashboard/detail, termbase dashboard, populated resource Trash, post-restore empty Trash, the TM threshold and OPUS-CAT help dialogs, provider administration/AI Command Centre, light/dark, inspector open/closed, Focus mode, AI, status, and compact-density states.
 - Automated accessibility checks pass the deterministic Projects, import-validation error and focus-return path, actionable local recovery panel, open workspace-status menu, Resources translation-memory/termbase empty states, populated resource Trash, populated Comments and Quality Workbench states, AI provider administration/Command Centre and focus-return path, New project dialog, About dialog, TM threshold dialog, OPUS-CAT help dialog, and command-palette states with zero blocking findings. This is not a WCAG conformance claim.
 - The full Electron browser suite passes security, offline shell, smoke, regression, application workflow, workspace storage, package round trip, and large-project coverage.
@@ -54,15 +54,15 @@ This document records what the current working tree implements from the 2026 mod
 
 The new checked boundaries are active, but `app.js` remains the compatibility coordinator and is still approximately 20,000 source lines, including the isolated workflow-test source section. Production strips the test driver, but the roadmap's source goal of a bootstrap under 300 lines is not met.
 
-The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT help, Resources, quality/review, recovery/workspace, import/export/report, and AI provider-administration/command-centre UI slices are complete. The hosted OpenAI-compatible provider-adapter family is also complete: Groq, Together AI, OpenRouter, Hugging Face Inference Providers, DeepInfra, and Fireworks AI now use independently checked adapters over one shared transport/prompt core. The native Responses family is complete as well: OpenAI, xAI, and Azure OpenAI use a separate checked Responses core while retaining OpenAI's connection/status wording, xAI's bearer/model behavior, Azure's `api-key`/deployment behavior, original registry positions, and temporary compatibility exports. DeepSeek and Mistral now use the checked chat-completion core too, with their distinct multipart response parsing and model-metadata precedence retained in explicit descriptors. Perplexity Sonar now uses the same checked chat transport through a distinct adapter that preserves its `/sonar` route, synthesized Sonar model list, mandatory no-search/image/related-question request flags, citation metadata, registry position, and temporary compatibility export. Google Gemini now uses a dedicated checked Interactions adapter that preserves `/v1beta/models`, `/v1beta/interactions`, `x-goog-api-key` authentication, `store: false`, model-prefix normalization, step/candidate response fallbacks, token metadata variants, registry position, and temporary compatibility export. Anthropic Claude now uses a dedicated checked Messages adapter that preserves `/v1/models`, `/v1/messages`, `x-api-key` plus the pinned `anthropic-version`, bounded output, text-block filtering, usage accounting, registry position, and temporary compatibility export. The explicit-consent direct OpenAI suggestion flow remains separate and unchanged in the AI façade. Still required before this package is complete:
+The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT help, Resources, quality/review, recovery/workspace, import/export/report, and AI provider-administration/command-centre UI slices are complete. All 18 AI registry positions now install through checked adapters rather than provider implementations in `ai.js`. This includes the hosted OpenAI-compatible family (Groq, Together AI, OpenRouter, Hugging Face Inference Providers, DeepInfra, and Fireworks AI), the native Responses family (OpenAI, xAI, and Azure OpenAI), native chat-completion providers (DeepSeek and Mistral), Perplexity Sonar, Google Gemini Interactions, Anthropic Messages, Cohere Chat V2, local/hosted Ollama, loopback/allowlisted OpenAI-compatible servers, and OPUS-CAT direct/bridge MTRestService. Their original registry positions, endpoints, credentials, payloads, parsing, metadata, timeout/cancellation behavior, redacted errors, consent rules, and temporary compatibility exports are characterized independently. Release verification now rejects any provider object implementation or provider registration returning to `ai.js`. The explicit-consent direct OpenAI suggestion flow remains separate and unchanged in the AI façade. Still required before this package is complete:
 
-1. Move the remaining distinct native/local provider implementations from the `ai.js` façade into independently tested adapters without changing provider behavior or consent rules.
-2. Replace remaining mutable compatibility state with injected repositories/controllers and remove new code's reliance on `window.CatHan`.
+1. Replace remaining mutable compatibility state with injected repositories/controllers and remove new code's reliance on `window.CatHan`.
+2. Reduce the remaining `app.js` compatibility coordinator toward the roadmap's bootstrap-only goal, one characterized feature boundary at a time.
 3. Keep each extraction behavior-preserving and run the focused feature suite plus the full browser/release suite at each family boundary.
 
 ### P2-05 — Performance stretch target
 
-Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 193,272 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
+Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 198,565 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
 
 ## Manual and external release gates still required
 
@@ -89,19 +89,19 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 with the distinct Cohere Chat V2 provider behind an independently checked provider adapter.
+Continue P1-08 with final compatibility-bootstrap and global-state cleanup, now that every AI provider implementation is outside the façade.
 
 Entry criteria:
 
-- Preserve Cohere's provider identifier, default URL/model, `/v1/models` and `/v2/chat` routes, bearer authentication plus `X-Client-Name`, bounded `max_tokens`, message-content parsing, token/billed-unit usage fallbacks, timeout/abort behavior, endpoint allowlist, consent/redaction rule, cancellation path, and local-first/offline behavior.
-- Characterize each adapter with focused request/response, failure, redaction, abort, and capability tests before moving its implementation from `ai.js`.
-- Move Cohere alone behind the existing registry/service interface before combining any other distinct provider protocols. Keep provider selection, administration UI, prompt policy, consent, key storage, jobs, commands, persistence, and status outside the adapter.
-- Keep the extraction behavior-preserving: no provider additions, route changes, UI redesign, or consent-policy changes in this slice.
+- Inventory remaining `window.CatHan` compatibility reads/writes and mutable cross-feature state in `app.js`, then select one cohesive bootstrap/controller boundary with existing characterization coverage.
+- Preserve the extracted provider installer, all registry positions and compatibility exports, provider selection/administration, endpoint allowlists, key storage, consent/redaction, jobs, commands/Undo, persistence, status, and offline behavior.
+- Move ownership to an injected repository/controller interface before deleting the legacy path; do not combine this with visual redesign, provider changes, or new features.
+- Keep `app.js` usable throughout and retain a temporary read-only façade only for callers not yet migrated.
 
 Exit criteria:
 
-- Each migrated provider is an independently checked adapter registered through the existing provider service, while `ai.js` retains a compatibility export until all callers migrate.
-- Existing URLs, models, methods, headers, payloads, response parsing, errors, aborts, key rules, consent/redaction behavior, and browser/Electron operation are unchanged under characterization tests.
-- Focused adapter/contract tests, security policy, AI UX, web/desktop smoke, app workflow, package/workspace round trips, and FULL-SUITE gates pass with no intended user-visible difference.
+- The selected state/bootstrap owner has a checked interface, focused tests, and no new global mutable state.
+- The migrated path no longer reads or writes its legacy `window.CatHan`/`app.js` compatibility state, while unmigrated callers continue to work through the narrow façade.
+- Focused controller/repository tests, provider adapter tests, security policy, AI UX, web/desktop smoke, app workflow, package/workspace round trips, and FULL-SUITE gates pass with no intended user-visible difference.
 
-After provider adapters, continue P1-08 with final compatibility-bootstrap/global cleanup one behavior-preserving boundary at a time.
+Continue until `app.js` is a bootstrap-only compatibility entry and the façade can be removed without changing mature LoopCAT behavior.
