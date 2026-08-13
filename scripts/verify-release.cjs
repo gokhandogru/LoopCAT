@@ -432,7 +432,8 @@ for (const field of [
   "projectTerms",
   "activityEvents",
   "qaChecks",
-  "qualityRiskQueue"
+  "qualityRiskQueue",
+  "progressSummary"
 ]) {
   assert(
     !appJs.includes(`state.${field}`) && !appWorkflowDriverJs.includes(`state.${field}`),
@@ -453,7 +454,9 @@ for (const method of [
   "getQaChecks",
   "replaceQaChecks",
   "getQualityRiskQueue",
-  "replaceQualityRiskQueue"
+  "replaceQualityRiskQueue",
+  "getProgressSummary",
+  "replaceProgressSummary"
 ]) {
   assertIncludes(editorSessionStoreJs, method, `EditorSessionStore must retain explicit ${method} ownership.`);
 }

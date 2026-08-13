@@ -44,6 +44,7 @@ test("EditorSessionStore compatibility bridge delegates only unmigrated replacem
   assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "activityEvents"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "qaChecks"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "qualityRiskQueue"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "progressSummary"), false);
   assert.equal(compatibility.transient, true);
   assert.deepEqual(
     EDITOR_SESSION_COMPATIBILITY_FIELDS.filter((name) => Object.prototype.hasOwnProperty.call(compatibility, name)),
@@ -127,4 +128,17 @@ test("EditorSessionStore explicitly owns QA checks and the derived quality-risk 
 
   assert.equal(store.replaceQualityRiskQueue(null), null);
   assert.throws(() => store.replaceQaChecks(null), /qaChecks must be an array/);
+});
+
+test("EditorSessionStore explicitly owns the derived progress summary", async () => {
+  const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
+  const originalSummary = { projectId: "project-1", total: 3, confirmed: 1, words: 12 };
+  const store = createEditorSessionStore({ progressSummary: originalSummary });
+
+  assert.equal(store.getProgressSummary(), originalSummary);
+
+  const progressSummary = { projectId: "project-1", total: 3, confirmed: 2, words: 12 };
+  assert.equal(store.replaceProgressSummary(progressSummary), progressSummary);
+  assert.equal(store.getProgressSummary(), progressSummary);
+  assert.equal(store.replaceProgressSummary(null), null);
 });

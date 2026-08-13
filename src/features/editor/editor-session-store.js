@@ -29,7 +29,8 @@ const EXPLICIT_SESSION_FIELDS = new Set([
   "projectTerms",
   "activityEvents",
   "qaChecks",
-  "qualityRiskQueue"
+  "qualityRiskQueue",
+  "progressSummary"
 ]);
 export const EDITOR_SESSION_COMPATIBILITY_FIELDS = Object.freeze(
   EDITOR_SESSION_FIELDS.filter((name) => !EXPLICIT_SESSION_FIELDS.has(name))
@@ -78,6 +79,7 @@ export function createEditorSessionStore(initialState = {}) {
     getActivityEvents: () => state.activityEvents,
     getProjectTerms: () => state.projectTerms,
     getProjectSummaries: () => state.projectSummaries,
+    getProgressSummary: () => state.progressSummary,
     getQaChecks: () => state.qaChecks,
     getQualityRiskQueue: () => state.qualityRiskQueue,
     getProjectSummaryRevision(projectId) {
@@ -108,6 +110,9 @@ export function createEditorSessionStore(initialState = {}) {
     },
     replaceProjectTerms(projectTerms) {
       return replace({ projectTerms }).projectTerms;
+    },
+    replaceProgressSummary(progressSummary) {
+      return replace({ progressSummary }).progressSummary;
     },
     replaceQaChecks(qaChecks) {
       return replace({ qaChecks }).qaChecks;

@@ -762,6 +762,10 @@ function storedQualityRiskQueue() {
   return editorSessionStore.getQualityRiskQueue();
 }
 
+function currentProgressSummary() {
+  return editorSessionStore.getProgressSummary();
+}
+
 function currentApplicationView() {
   return applicationStore.getState().navigation.view;
 }
@@ -6382,7 +6386,7 @@ function calculateProgressSummary() {
 function renderProgress(options = {}) {
   const previousStatus = options.previousStatus;
   const nextStatus = options.nextStatus;
-  const cached = state.progressSummary;
+  const cached = currentProgressSummary();
   const canApplyStatusDelta =
     cached &&
     cached.projectId === (state.project?.id || "") &&
@@ -6398,7 +6402,7 @@ function renderProgress(options = {}) {
   } else {
     summary = calculateProgressSummary();
   }
-  state.progressSummary = summary;
+  editorSessionStore.replaceProgressSummary(summary);
   const { total, confirmed, words } = summary;
   const open = total - confirmed;
   els.progressText.textContent = uiLabel("progressSummary", { confirmed, open, total });
