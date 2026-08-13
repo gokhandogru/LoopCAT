@@ -184,6 +184,7 @@ const requiredReleaseFiles = [
   "src/ui/dialog-controller.js",
   "src/features/ai/ai-administration-controller.js",
   "src/features/ai/ai-alternatives-controller.js",
+  "src/features/ai/ai-draft-editing-controller.js",
   "src/features/ai/ai-terminology-application-controller.js",
   "src/features/ai/ai-pretranslation-controller.js",
   "src/features/ai/ai-review-controller.js",
@@ -204,6 +205,7 @@ const requiredReleaseFiles = [
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/ai-alternatives-controller.test.cjs",
+  "tests/unit/ai-draft-editing-controller.test.cjs",
   "tests/unit/ai-terminology-application-controller.test.cjs",
   "tests/unit/ai-pretranslation-controller.test.cjs",
   "tests/unit/ai-review-controller.test.cjs",
@@ -342,6 +344,8 @@ const aiTagRepairControllerJs = readText("src/features/ai/ai-tag-repair-controll
 const aiTagRepairControllerUnitTests = readText("tests/unit/ai-tag-repair-controller.test.cjs");
 const aiAlternativesControllerJs = readText("src/features/ai/ai-alternatives-controller.js");
 const aiAlternativesControllerUnitTests = readText("tests/unit/ai-alternatives-controller.test.cjs");
+const aiDraftEditingControllerJs = readText("src/features/ai/ai-draft-editing-controller.js");
+const aiDraftEditingControllerUnitTests = readText("tests/unit/ai-draft-editing-controller.test.cjs");
 const aiTerminologyApplicationControllerJs = readText("src/features/ai/ai-terminology-application-controller.js");
 const aiTerminologyApplicationControllerUnitTests = readText(
   "tests/unit/ai-terminology-application-controller.test.cjs"
@@ -2736,6 +2740,103 @@ for (const testName of [
     aiTerminologyApplicationControllerUnitTests,
     testName,
     `focused AI-terminology-application tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiDraftEditingController",
+  "The application runtime must expose the checked AI-draft-editing controller boundary."
+);
+for (const boundary of [
+  "if (!project || running || promptBusy || lifecycle.isRunning() || lifecycle.isPromptBusy()) return false",
+  "settingsBoundary.assertReady(settings, config, definition.activeReadyAction)",
+  "providers.sharesExternally(settings)",
+  "const resolvedContext = await promptContext(segment)",
+  "const result = await domain[operation](",
+  'styleGuide: project.aiSettings?.styleGuide || ""',
+  '...(operation === "adapt" ? { adaptMode: settings.adaptMode } : {})',
+  "const saved = await suggestions.append(",
+  "const candidateSelection = selectSegments(settings)",
+  "await persistence.flush(project.id)",
+  "abortController = createAbortController()",
+  "for (const segment of candidateSelection.candidates)",
+  "segment.aiSuggestions = [...(segment.aiSuggestions || []), suggestion]",
+  "if (updated.length) await persistence.saveMany(updated)",
+  "await activity.logBatch(operation, activityDetails)",
+  "editorSessionStore.replaceSegments(",
+  "mutation.restore(segment, snapshot)",
+  "abortController = null",
+  'status.set("Canceling local AI batch...", "dirty")'
+]) {
+  assertIncludes(
+    aiDraftEditingControllerJs,
+    boundary,
+    `AiDraftEditingController must retain checked ${boundary} orchestration.`
+  );
+}
+for (const facade of [
+  [
+    "async function polishActiveSegmentDraftWithLocalAi",
+    "async function adaptActiveSegmentDraftWithLocalAi",
+    "return aiDraftEditingController.polishActive()"
+  ],
+  [
+    "async function adaptActiveSegmentDraftWithLocalAi",
+    "async function adaptBatchDraftsWithLocalAi",
+    "return aiDraftEditingController.adaptActive()"
+  ],
+  [
+    "async function adaptBatchDraftsWithLocalAi",
+    "async function polishBatchDraftsWithLocalAi",
+    "return aiDraftEditingController.adaptBatch()"
+  ],
+  [
+    "async function polishBatchDraftsWithLocalAi",
+    "async function saveAiTermCandidates",
+    "return aiDraftEditingController.polishBatch()"
+  ]
+]) {
+  const body = functionBody(appJs, facade[0], facade[1]);
+  assertIncludes(body, facade[2], `${facade[0]} must delegate to the checked draft-editing controller.`);
+  assert(
+    !body.includes("persistLocalAiSettings(") &&
+      !body.includes("localAiRuntimeConfig(") &&
+      !body.includes("confirmExternalAiPromptShare(") &&
+      !body.includes("localAiGlossaryTermsForSegment(") &&
+      !body.includes("localAiTmMatchesForSegment(") &&
+      !body.includes("segmentTags(") &&
+      !body.includes("aiCommandService.polishSegmentStyle(") &&
+      !body.includes("aiCommandService.adaptSegmentDraft(") &&
+      !body.includes("appendAiSuggestion(") &&
+      !body.includes("saveSegments(") &&
+      !body.includes("logProjectActivity(") &&
+      !body.includes("renderLocalAiOutput(") &&
+      !body.includes("Reflect.ownKeys") &&
+      !body.includes("state.localAi"),
+    "app.js must not regain AI-draft-editing validation, consent, lifecycle, selection, context, provider, suggestion, persistence, activity, presentation, or recovery orchestration."
+  );
+}
+assertIncludes(
+  appJs,
+  "if (aiDraftEditingController.cancel()) return;",
+  "the shared AI cancel facade must delegate owned draft-editing cancellation."
+);
+for (const testName of [
+  "active AI draft editing preserves shared busy, source, target, provider, and consent safeguards",
+  "active AI polish routes TM, termbase, style, and protected tokens into a non-overwriting suggestion",
+  "active AI adaptation propagates adaptation mode and preserves warning confidence",
+  "active AI draft editing reports unchanged and suggestion-storage warning outcomes",
+  "batch AI draft editing selects only translated unlocked drafts and returns deterministic empty summaries",
+  "batch AI polish saves normalized suggestions, contains failures, and never overwrites targets",
+  "batch AI adaptation preserves adaptation mode in provider and activity boundaries",
+  "mid-batch AI draft editing cancellation preserves completed suggestions and saves partial output",
+  "primary batch AI draft editing persistence failure restores every candidate and cleans lifecycle",
+  "secondary batch AI draft editing activity failure keeps durable suggestions and reports dirty"
+]) {
+  assertIncludes(
+    aiDraftEditingControllerUnitTests,
+    testName,
+    `focused AI-draft-editing tests must characterize ${testName}.`
   );
 }
 assertIncludes(
