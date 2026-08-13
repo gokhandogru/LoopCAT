@@ -371,6 +371,10 @@ assertIncludes(
   "app.js must resolve legacy feature APIs through the injected compatibility registry."
 );
 assert(
+  !appJs.includes("state.view"),
+  "AppStore must remain the only route/view owner; app.js cannot restore a legacy state.view field."
+);
+assert(
   productionAssets.appVersion === packageJson.version,
   "Canonical production asset manifest appVersion must match package.json."
 );
@@ -4705,8 +4709,8 @@ assertIncludes(
 assertIncludes(appJs, "projectAnalysisRun", "app.js must guard async project analysis renders against stale updates.");
 assertIncludes(
   appJs,
-  'state.view !== "project"',
-  "app.js must skip project analysis work when the project home panel is not visible."
+  'currentApplicationView() !== "project"',
+  "app.js must skip project analysis work when AppStore reports that the project home panel is not visible."
 );
 assertIncludes(
   appJs,

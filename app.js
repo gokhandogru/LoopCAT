@@ -714,7 +714,6 @@ const state = {
   progressSummary: null,
   activeIndex: -1,
   saveTimers: new Map(),
-  view: "projects",
   focusMode: false,
   inspectorOpen: true,
   documentFilter: "",
@@ -764,10 +763,14 @@ const state = {
   }
 };
 
+function currentApplicationView() {
+  return applicationStore.getState().navigation.view;
+}
+
 function applicationNavigationPayload(overrides = {}) {
   const activeSegment = state.segments[state.activeIndex] || null;
   return {
-    view: state.view,
+    view: currentApplicationView(),
     projectId: state.project?.id || null,
     documentId: state.documentFilter || "",
     segmentId: activeSegment?.id || "",
@@ -791,7 +794,6 @@ function syncLegacyApplicationState(overrides = {}) {
 
 function applyApplicationNavigation(navigation) {
   if (!navigation) return;
-  state.view = navigation.view;
   state.documentFilter = navigation.documentId || "";
   state.activeIndex = Number.isInteger(navigation.activeIndex) ? navigation.activeIndex : state.activeIndex;
 }
@@ -1751,10 +1753,10 @@ function refreshLocalizedUi() {
   renderFocusMode();
   renderWorkspaceStatus();
   renderProjectStorageStatus();
-  if (state.view === "projects") renderProjectsView();
-  if (state.view === "resources") renderResourcesView();
+  if (currentApplicationView() === "projects") renderProjectsView();
+  if (currentApplicationView() === "resources") renderResourcesView();
   if (state.project) {
-    if (state.view === "project") {
+    if (currentApplicationView() === "project") {
       renderProjectHome();
       void renderProjectAnalysis();
     }
@@ -1840,9 +1842,9 @@ async function synchronizeResourceTrashChange(entry, { refreshSuggestions = fals
   markProjectsUsingResourceDirty(linkType, entry.resourceName, entry.sourceLang, entry.targetLang);
   await refreshResources();
   if (entry.resourceType === "tb") {
-    await refreshProjectTerms({ rerender: state.view === "editor" });
-    if (refreshSuggestions || state.view === "editor") await refreshTerms();
-  } else if (state.view === "editor") {
+    await refreshProjectTerms({ rerender: currentApplicationView() === "editor" });
+    if (refreshSuggestions || currentApplicationView() === "editor") await refreshTerms();
+  } else if (currentApplicationView() === "editor") {
     await refreshSidebar();
   }
   if (els.trashDialog?.open) await renderTrashList();
@@ -2012,7 +2014,7 @@ function syncAllPanelToggleStates() {
 }
 
 function renderFocusMode() {
-  const active = Boolean(state.focusMode && state.view === "editor" && state.project);
+  const active = Boolean(state.focusMode && currentApplicationView() === "editor" && state.project);
   document.body.classList.toggle("focus-mode", active);
   els.workspace.classList.toggle("focus-mode", active);
   if (els.focusModeBtn) {
@@ -2027,7 +2029,7 @@ function renderFocusMode() {
 }
 
 function setFocusMode(enabled) {
-  state.focusMode = Boolean(enabled && state.view === "editor" && state.project);
+  state.focusMode = Boolean(enabled && currentApplicationView() === "editor" && state.project);
   applicationStore?.dispatch?.({
     type: "interface/focus-mode-changed",
     payload: { enabled: state.focusMode }
@@ -3847,7 +3849,7 @@ function commandList() {
     { id: "trash", label: "Open Trash", run: openTrash, enabled: Boolean(appRuntime?.trashRepository) },
     { id: "confirm", label: "Confirm segment", run: confirmCurrentSegment, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(state.segments.length) },
-    { id: "focus-mode", label: state.focusMode ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(state.view === "editor" && state.project) },
+    { id: "focus-mode", label: state.focusMode ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(currentApplicationView() === "editor" && state.project) },
     { id: "copy-source", label: "Copy source", run: copySourceToTarget, enabled: Boolean(currentSegment()) },
     { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: splitCurrentSegment, enabled: Boolean(currentSegment() && canSplitSegmentStructure(currentSegment())) },
     { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: mergeWithNextSegment, enabled: Boolean(currentSegment() && canMergeSegmentStructures(currentSegment(), nextSegmentForMerge(currentSegment()))) },
@@ -4329,9 +4331,10 @@ function setView(view) {
     ? applicationNavigation?.openProjects?.()
     : view === "resources"
       ? applicationNavigation?.openResources?.()
-      : applicationNavigation?.syncLegacy?.(applicationNavigationPayload({ view }));
+      : view === "project"
+        ? applicationNavigation?.openProject?.(state.project?.id || null, state.activeIndex)
+        : applicationNavigation?.openEditor?.(applicationNavigationPayload({ view: "editor" }));
   if (navigation) applyApplicationNavigation(navigation);
-  else state.view = view;
   if (view !== "editor") state.focusMode = false;
   renderEditor();
   if (view === "projects") refreshProjectSummaries();
@@ -4345,7 +4348,6 @@ function showProjectHome() {
   state.activeIndex = state.segments.length ? 0 : -1;
   const navigation = applicationNavigation?.openProject?.(state.project.id, state.activeIndex);
   if (navigation) applyApplicationNavigation(navigation);
-  else state.view = "project";
   renderAll();
 }
 
@@ -4643,10 +4645,10 @@ function renderValidationReport(report) {
 async function renderProjectAnalysis() {
   const run = (state.projectAnalysisRun += 1);
   const project = state.project;
-  if (!project || state.view !== "project" || !els.projectAnalysis) return;
+  if (!project || currentApplicationView() !== "project" || !els.projectAnalysis) return;
   const segments = state.segments;
   const tmEntries = await getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`);
-  if (run !== state.projectAnalysisRun || state.view !== "project" || state.project?.id !== project.id) return;
+  if (run !== state.projectAnalysisRun || currentApplicationView() !== "project" || state.project?.id !== project.id) return;
   const tmNames = new Set(projectTmNames(project));
   const analysis = analyzeProject(project, segments, tmEntries.filter((entry) => tmNames.has(entry.tmName)));
   const ai = analysis.ai || {};
@@ -4695,9 +4697,8 @@ async function openProject(projectId) {
   await filterPresetController?.restoreForProject?.(state.project?.id || projectId);
   const navigation = applicationNavigation?.openProject?.(state.project?.id || projectId, state.activeIndex);
   if (navigation) applyApplicationNavigation(navigation);
-  else state.view = "project";
   renderAll();
-  if (state.view === "editor") await refreshSidebar();
+  if (currentApplicationView() === "editor") await refreshSidebar();
 }
 
 async function openProjectFile(documentId) {
@@ -4712,7 +4713,6 @@ async function openProjectFile(documentId) {
     activeIndex: first
   });
   if (navigation) applyApplicationNavigation(navigation);
-  else state.view = "editor";
   renderAll();
   await refreshSidebar();
 }
@@ -5351,9 +5351,9 @@ function renderEditor() {
   renderWorkspaceStatus();
   renderBackupReminder();
   if (verticalFeatureState?.editor) {
-    verticalFeatureState.editor.renderShell({ view: state.view, hasProject, inspectorOpen: state.inspectorOpen });
-    verticalFeatureState.inspector.setVisible(state.view === "editor" && state.inspectorOpen);
-    verticalFeatureState.dashboard.setVisible(state.view === "project" && hasProject);
+    verticalFeatureState.editor.renderShell({ view: currentApplicationView(), hasProject, inspectorOpen: state.inspectorOpen });
+    verticalFeatureState.inspector.setVisible(currentApplicationView() === "editor" && state.inspectorOpen);
+    verticalFeatureState.dashboard.setVisible(currentApplicationView() === "project" && hasProject);
     verticalFeatureState.filters.update({
       documentId: state.documentFilter,
       query: state.segmentQuery,
@@ -5365,13 +5365,13 @@ function renderEditor() {
       aiState: state.aiSegmentFilter
     });
   } else {
-    els.workspace.classList.toggle("projects-mode", state.view !== "editor");
-    els.sidebar.classList.toggle("hidden", state.view !== "editor");
-    els.projectsView.classList.toggle("hidden", state.view !== "projects");
-    els.resourcesView.classList.toggle("hidden", state.view !== "resources");
-    els.projectHomeView.classList.toggle("hidden", state.view !== "project" || !hasProject);
-    els.emptyState.classList.toggle("hidden", state.view !== "editor" || hasProject);
-    els.editorView.classList.toggle("hidden", state.view !== "editor" || !hasProject);
+    els.workspace.classList.toggle("projects-mode", currentApplicationView() !== "editor");
+    els.sidebar.classList.toggle("hidden", currentApplicationView() !== "editor");
+    els.projectsView.classList.toggle("hidden", currentApplicationView() !== "projects");
+    els.resourcesView.classList.toggle("hidden", currentApplicationView() !== "resources");
+    els.projectHomeView.classList.toggle("hidden", currentApplicationView() !== "project" || !hasProject);
+    els.emptyState.classList.toggle("hidden", currentApplicationView() !== "editor" || hasProject);
+    els.editorView.classList.toggle("hidden", currentApplicationView() !== "editor" || !hasProject);
   }
   renderFocusMode();
   if (els.inspectorToggleBtn) {
@@ -5634,7 +5634,7 @@ async function confirmDeleteProject(projectId = state.project?.id) {
       state.segments = [];
       state.activeIndex = -1;
       state.documentFilter = "";
-      state.view = "projects";
+      applicationNavigation.openProjects();
     }
     await loadProjects(false);
     setSaveStatus("Project moved to Trash. Undo is available.", "saved");
@@ -7249,14 +7249,14 @@ function handleGlobalKeydown(event) {
     openCommandPalette();
     return;
   }
-  if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "f" && state.view === "editor" && state.project) {
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "f" && currentApplicationView() === "editor" && state.project) {
     event.preventDefault();
     event.stopPropagation();
     toggleFocusMode();
     return;
   }
   const concordanceShortcut = isK && (event.ctrlKey || event.metaKey) && event.altKey;
-  if (concordanceShortcut && state.view === "editor") {
+  if (concordanceShortcut && currentApplicationView() === "editor") {
     event.preventDefault();
     event.stopPropagation();
     openConcordanceSearch();
@@ -7279,7 +7279,7 @@ function handleGlobalKeydown(event) {
 }
 
 async function openConcordanceSearch() {
-  if (state.view !== "editor" || !state.project) return;
+  if (currentApplicationView() !== "editor" || !state.project) return;
   const keyword = selectedConcordanceKeyword();
   if (!keyword) {
     setSaveStatus("Select a source word, then press Ctrl+K or Alt+K.", "dirty");
@@ -12276,7 +12276,7 @@ async function importProjectPackageData(pkg, options = {}) {
   const activityLogged = activityResult.ok;
   state.project = null;
   state.segments = [];
-  state.view = "projects";
+  applicationNavigation.openProjects();
   await loadProjects(false);
   if (options.open !== false) await openProject(prepared.project.id);
   renderValidationReport(importReport);
@@ -12311,7 +12311,7 @@ async function restoreBackupData(backup) {
   await reportImportProgress("Refreshing projects");
   state.project = null;
   state.segments = [];
-  state.view = "projects";
+  applicationNavigation.openProjects();
   await loadProjects(false);
   const restoredProjectIds = state.projects.map((project) => project.id).filter(Boolean);
   if (state.workspaceStatus?.connected) {
@@ -12610,7 +12610,7 @@ async function syncWorkspaceFromFolder() {
   }
   state.project = null;
   state.segments = [];
-  state.view = "projects";
+  applicationNavigation.openProjects();
   await loadProjects(false);
   state.workspaceStatus = await workspaceStorage.getStatus();
   const finalWarnings = Array.from(new Set([...(state.workspaceStatus.warnings || []), ...warnings].map((warning) => redactSensitiveText(warning || "").trim()).filter(Boolean)));
@@ -14566,7 +14566,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(document.activeElement === els.confirmBtn, "command palette restores focus to its opener");
     els.brandHomeLink.click();
     assert(
-      state.view === "projects" && !els.projectsView.classList.contains("hidden"),
+      currentApplicationView() === "projects" && !els.projectsView.classList.contains("hidden"),
       "LoopCAT brand navigates to the Projects view"
     );
     showProjectHome();
@@ -18215,7 +18215,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     workflowTmOpenButton?.click();
     await yieldToUi();
     const resourceOpenFocusState = {
-      view: state.view,
+      view: currentApplicationView(),
       detailHidden: els.tmResourceDetail.classList.contains("hidden"),
       activeAction: document.activeElement?.dataset?.resourceAction || "",
       activeKey: document.activeElement?.dataset?.resourceKey || "",
@@ -18831,7 +18831,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     clearWorkspaceDirty(deleteFileFixture.id);
     state.project = null;
     state.segments = [];
-    state.view = "projects";
+    applicationNavigation.openProjects();
     await loadProjects(false);
 
     state.workspaceStatus = { supported: true, connected: false, mode: "browser-cache", name: "", lastSyncedAt: "", projectCount: 0, resourceCount: 0, backupCount: 0 };
