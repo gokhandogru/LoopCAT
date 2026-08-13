@@ -1996,6 +1996,45 @@ const reviewMetadataController = appRuntime.featureFactories.createReviewMetadat
   },
   logger: console
 });
+const qualityDecisionController = appRuntime.featureFactories.createQualityDecisionController({
+  editorSessionStore,
+  selection: { getActiveIndex: currentActiveIndex },
+  mutation: {
+    touch: touchSegment,
+    restore: (segment, snapshot) => {
+      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
+      Object.assign(segment, snapshot);
+    },
+    prepareHistory: prepareSegmentHistoryState
+  },
+  persistence: {
+    clearPending: clearPendingSave,
+    save: saveSegment
+  },
+  risk: { buildQueue: currentQualityRiskQueue },
+  activity: {
+    log: (segment, _project, { category, severity }) =>
+      logOptionalProjectActivity(
+        "quality-decision",
+        "Quality decision saved",
+        { segmentId: segment.id, category, severity },
+        "Quality decision save"
+      )
+  },
+  presentation: {
+    clearNote: () => qualityReviewController?.clearDecisionNote?.(),
+    renderReview: renderReviewPanel,
+    renderWorkbench: renderQualityWorkbench,
+    updateRow
+  },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus },
+  labels: {
+    category: qualityCategoryName,
+    severity: qualityDecisionSeverityLabel
+  },
+  ids: { comment: () => makeId("comment") }
+});
 const reviewStateController = appRuntime.featureFactories.createReviewStateController({
   editorSessionStore,
   commands: {
@@ -7359,18 +7398,6 @@ function qualityDecisionSeverityLabel(value) {
   return uiSource(label);
 }
 
-function qualityDecisionSeverity(value) {
-  const severity = stableLower(value || "");
-  return ["low", "medium", "high", "critical"].includes(severity) ? severity : "medium";
-}
-
-function qualityDecisionCategory(value) {
-  const category = stableLower(value || "");
-  return ["accuracy", "terminology", "fluency", "style", "locale", "formatting", "compliance", "review"].includes(category)
-    ? category
-    : "review";
-}
-
 function qualityQaBySegment(qaChecks = currentQaChecks()) {
   const map = new Map();
   (qaChecks || []).forEach((check) => {
@@ -7463,54 +7490,7 @@ async function saveQualityProfileFromForm(values = qualityReviewController?.read
 }
 
 async function saveQualityDecisionFromForm(values = qualityReviewController?.readDecision?.()) {
-  if (!currentProject()) return false;
-  const segment = currentSegment();
-  if (!segment) return false;
-  const snapshot = structuredClone(segment);
-  const category = qualityDecisionCategory(values?.category);
-  const severity = qualityDecisionSeverity(values?.severity);
-  const note = String(values?.note || "").trim();
-  const decisionTitle = `Quality decision: ${qualityCategoryName(category)} (${qualityDecisionSeverityLabel(severity)})`;
-  const now = new Date().toISOString();
-  try {
-    segment.reviewState = "needs-review";
-    segment.comments = [
-      ...(segment.comments || []),
-      {
-        id: makeId("comment"),
-        body: [decisionTitle, note].filter(Boolean).join("\n"),
-        state: "open",
-        qualityDecision: { category, severity },
-        createdAt: now,
-        updatedAt: now
-      }
-    ];
-    touchSegment(segment);
-    clearPendingSave(segment);
-    await saveSegment(segment);
-    qualityReviewController?.clearDecisionNote?.();
-    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
-    renderReviewPanel({ force: true });
-    renderQualityWorkbench();
-    updateRow(currentActiveIndex());
-    markWorkspaceDirty();
-    const activityLogged = await logOptionalProjectActivity("quality-decision", "Quality decision saved", {
-      segmentId: segment.id,
-      category,
-      severity
-    }, "Quality decision save");
-    setSaveStatus(appendActivityWarning("Quality decision saved", activityLogged), exportStatusMode("saved", activityLogged));
-    return true;
-  } catch (error) {
-    Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-    Object.assign(segment, snapshot);
-    prepareSegmentHistoryState(segment);
-    renderReviewPanel({ force: true });
-    renderQualityWorkbench();
-    updateRow(currentActiveIndex());
-    setSaveStatus(error.message || "Quality decision save failed", "dirty");
-    return false;
-  }
+  return qualityDecisionController.save(values);
 }
 
 async function refreshQualityRiskQueue() {

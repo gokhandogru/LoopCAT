@@ -185,6 +185,7 @@ const requiredReleaseFiles = [
   "src/features/ai/ai-administration-controller.js",
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
+  "src/features/quality/quality-decision-controller.js",
   "src/features/quality/quality-review-controller.js",
   "src/features/quality/review-metadata-controller.js",
   "src/features/quality/review-state-controller.js",
@@ -215,6 +216,7 @@ const requiredReleaseFiles = [
   "tests/unit/opus-cat-provider-adapter.test.cjs",
   "tests/unit/perplexity-provider-adapter.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
+  "tests/unit/quality-decision-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
   "tests/unit/review-metadata-controller.test.cjs",
   "tests/unit/review-state-controller.test.cjs",
@@ -291,6 +293,8 @@ const segmentConfirmationControllerUnitTests = readText("tests/unit/segment-conf
 const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
+const qualityDecisionControllerJs = readText("src/features/quality/quality-decision-controller.js");
+const qualityDecisionControllerUnitTests = readText("tests/unit/quality-decision-controller.test.cjs");
 const reviewMetadataControllerJs = readText("src/features/quality/review-metadata-controller.js");
 const reviewMetadataControllerUnitTests = readText("tests/unit/review-metadata-controller.test.cjs");
 const reviewStateControllerJs = readText("src/features/quality/review-state-controller.js");
@@ -1905,6 +1909,60 @@ assertIncludes(
   "filter membership changes preserve scroll while producer failure restores the exact target patch and caret",
   "focused target-producer tests must characterize rendering and failure recovery."
 );
+assertIncludes(
+  appBootstrapJs,
+  "createQualityDecisionController",
+  "The application runtime must expose the checked quality-decision controller boundary."
+);
+for (const boundary of [
+  "const DECISION_CATEGORIES = new Set([",
+  'segment.reviewState = "needs-review"',
+  "qualityDecision: { category, severity }",
+  "mutation.touch(segment)",
+  "persistence.clearPending(segment)",
+  "await persistence.save(segment)",
+  "presentation.clearNote()",
+  "editorSessionStore.replaceQualityRiskQueue(risk.buildQueue())",
+  "const activityLogged = await activity.log(segment, project, { category, severity })",
+  "mutation.restore(segment, snapshot)"
+]) {
+  assertIncludes(
+    qualityDecisionControllerJs,
+    boundary,
+    `QualityDecisionController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return qualityDecisionController.save(values)",
+  "app.js must retain only the checked quality-decision compatibility facade."
+);
+const qualityDecisionFacade = functionBody(
+  appJs,
+  "async function saveQualityDecisionFromForm",
+  "async function refreshQualityRiskQueue"
+);
+assert(
+  !qualityDecisionFacade.includes("segment.reviewState =") &&
+    !qualityDecisionFacade.includes("saveSegment(") &&
+    !qualityDecisionFacade.includes("logOptionalProjectActivity(") &&
+    !qualityDecisionFacade.includes("renderQualityWorkbench(") &&
+    !qualityDecisionFacade.includes("Reflect.ownKeys") &&
+    !appJs.includes("function qualityDecisionCategory(value)") &&
+    !appJs.includes("function qualityDecisionSeverity(value)"),
+  "app.js must not regain quality-decision normalization, mutation, persistence, risk, activity, presentation, or rollback orchestration."
+);
+for (const testName of [
+  "quality decision normalizes metadata, persists one stable comment, refreshes risk, and clears the note",
+  "primary quality decision persistence failure restores the exact snapshot and failure presentation",
+  "secondary quality decision activity failure keeps the saved decision and reports a dirty warning"
+]) {
+  assertIncludes(
+    qualityDecisionControllerUnitTests,
+    testName,
+    `focused quality-decision tests must characterize ${testName}.`
+  );
+}
 assertIncludes(
   appBootstrapJs,
   "createReviewMetadataController",
