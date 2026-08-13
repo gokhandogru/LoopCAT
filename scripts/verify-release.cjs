@@ -156,6 +156,7 @@ const requiredReleaseFiles = [
   "src/app/bootstrap.js",
   "src/app/compatibility-module-registry.js",
   "src/app/install-runtime.js",
+  "src/features/editor/editor-session-store.js",
   "src/features/editor/segment-grid-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -186,6 +187,7 @@ const requiredReleaseFiles = [
   "tests/unit/anthropic-provider-adapter.test.cjs",
   "tests/unit/cohere-provider-adapter.test.cjs",
   "tests/unit/compatibility-module-registry.test.cjs",
+  "tests/unit/editor-session-store.test.cjs",
   "tests/unit/gemini-provider-adapter.test.cjs",
   "tests/unit/groq-provider-adapter.test.cjs",
   "tests/unit/hosted-provider-adapters.test.cjs",
@@ -256,6 +258,7 @@ const appBootstrapJs = readText("src/app/bootstrap.js");
 const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-registry.js");
 const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-module-registry.test.cjs");
 const installRuntimeJs = readText("src/app/install-runtime.js");
+const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
 const segmentGridControllerJs = readText("src/features/editor/segment-grid-controller.js");
 const commandBusJs = readText("src/commands/command-bus.js");
 const editTargetSessionJs = readText("src/commands/edit-target-session.js");
@@ -407,6 +410,36 @@ assertIncludes(
   "const editorFilterStore = appRuntime.featureFactories.createFilterStore();",
   "app.js must install one authoritative checked editor FilterStore."
 );
+assertIncludes(
+  appBootstrapJs,
+  "const editorSession = createEditorSessionStore();",
+  "The application runtime must own one checked EditorSessionStore."
+);
+assertIncludes(
+  editorSessionStoreJs,
+  "attachCompatibility(target)",
+  "EditorSessionStore must retain the temporary checked compatibility bridge while app.js is decomposed."
+);
+const appStateStart = appJs.indexOf("const state = {");
+const appStateEnd = appJs.indexOf("\n};", appStateStart);
+const appStateBlock = appJs.slice(appStateStart, appStateEnd);
+for (const field of [
+  "projects",
+  "projectSummaries",
+  "projectSummaryRevisions",
+  "project",
+  "segments",
+  "progressSummary",
+  "projectTerms",
+  "activityEvents",
+  "qaChecks",
+  "qualityRiskQueue"
+]) {
+  assert(
+    !appStateBlock.includes(`${field}:`),
+    `EditorSessionStore must own ${field}; app.js cannot restore it to the legacy state literal.`
+  );
+}
 assertIncludes(
   segmentGridControllerJs,
   "navigation.selectSegment",

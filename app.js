@@ -707,15 +707,8 @@ const segmentSourceWordCounts = new WeakMap();
 const editorFilterStore = appRuntime.featureFactories.createFilterStore();
 
 const state = {
-  projects: [],
-  projectSummaries: [],
-  projectSummaryRevisions: new Map(),
-  project: null,
-  segments: [],
-  progressSummary: null,
   saveTimers: new Map(),
   inspectorOpen: true,
-  projectTerms: [],
   segmentFilterRevision: 0,
   segmentFilterCache: { key: "", indexes: [], positions: new Map() },
   projectAnalysisRun: 0,
@@ -730,10 +723,7 @@ const state = {
   saveStatusTimer: 0,
   workspaceAutosaveTimer: 0,
   workspaceAutosaving: false,
-  activityEvents: [],
-  qaChecks: [],
   qaFilter: "",
-  qualityRiskQueue: null,
   lastValidationReport: null,
   commandQuery: "",
   commandProjectId: "",
@@ -753,6 +743,7 @@ const state = {
     promptBusy: false
   }
 };
+appRuntime.editorSession.attachCompatibility(state);
 
 function currentApplicationView() {
   return applicationStore.getState().navigation.view;

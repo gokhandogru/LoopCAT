@@ -35,6 +35,7 @@ import { createDashboardController } from "../features/projects/dashboard-contro
 import { createProjectsController } from "../features/projects/projects-controller.js";
 import { createProjectDialogController } from "../features/projects/project-dialog-controller.js";
 import { createEditorController } from "../features/editor/editor-controller.js";
+import { createEditorSessionStore } from "../features/editor/editor-session-store.js";
 import { createFilterStore } from "../features/editor/filter-store.js";
 import { createFilterPresetController } from "../features/editor/filter-preset-controller.js";
 import { createInspectorController } from "../features/editor/inspector-controller.js";
@@ -81,6 +82,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
   const saveStore = createSaveStore();
   const jobStore = createJobStore();
   const noticeStore = createNoticeStore();
+  const editorSession = createEditorSessionStore();
   const platform = desktopBridge?.getRuntimeStatus
     ? createElectronPlatform(desktopBridge)
     : createBrowserPlatform(browserWindow);
@@ -89,6 +91,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
   return Object.freeze({
     compatibilityModules,
     events,
+    editorSession,
     commands: Object.freeze({
       bus: commandBus,
       createAiPretranslationCommand,
