@@ -711,7 +711,6 @@ const state = {
   segmentFilterCache: { key: "", indexes: [], positions: new Map() },
   projectAnalysisRun: 0,
   importTask: "",
-  tmPretranslating: false,
   revisionHistoryFrame: 0,
   saveStatusTimer: 0,
   workspaceAutosaveTimer: 0,
@@ -1532,6 +1531,65 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
   logger: console
 });
 targetReplacementController.mount();
+const tmPretranslationController = appRuntime.featureFactories.createTmPretranslationController({
+  pretranslateButton: els.pretranslateBtn,
+  editorSessionStore,
+  segments: {
+    getDocumentSegments: currentDocumentSegments,
+    isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment))
+  },
+  threshold: { request: requestTmPretranslationThreshold },
+  tm: {
+    getNames: projectTmNames,
+    findMatchesBatch: findProjectTmMatchesBatch
+  },
+  commands: {
+    bus: appRuntime.commands.bus,
+    create: appRuntime.commands.createTmPretranslationCommand,
+    changed: renderUndoControls
+  },
+  persistence: {
+    flush: flushPendingSegmentSaves,
+    save: saveSegments
+  },
+  mutation: {
+    capturePatch: targetCommandPatch,
+    applyTarget: setSegmentTargetAndStatus,
+    touch: touchSegment,
+    restore: (segment, snapshot) => {
+      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
+      Object.assign(segment, snapshot);
+    },
+    prepareHistory: prepareSegmentHistoryState
+  },
+  restoration: { restorePatches: restoreBatchTargetCommandPatches },
+  selection: {
+    getActiveSegmentId: () => currentSegment()?.id || "",
+    focusTarget: focusActiveTextarea
+  },
+  presentation: {
+    yieldToUi,
+    renderSegments,
+    renderProgress,
+    renderHistory: renderRevisionHistory,
+    refreshSidebar
+  },
+  activity: {
+    log: (details) => logProjectActivity("pretranslate", "TM pretranslation applied", details)
+  },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus },
+  batchSize: TM_PRETRANSLATE_BATCH_SIZE,
+  testHooks: {
+    beforeSave: (segments) => {
+      if (LOOPCAT_TEST_BUILD && segments.some((segment) => segment[PRETRANSLATE_SAVE_FAILURE_TEST_FLAG])) {
+        throw new Error("Simulated pretranslation save failure");
+      }
+    }
+  },
+  logger: console
+});
+tmPretranslationController.mount();
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
     splitButton: els.splitSegmentBtn,
@@ -7053,143 +7111,7 @@ function requestTmPretranslationThreshold() {
 }
 
 async function pretranslateFromTm() {
-  if (!currentProject() || state.tmPretranslating) return null;
-  const beforePatches = new Map();
-  const beforeSnapshots = new Map();
-  const updated = [];
-  state.tmPretranslating = true;
-  try {
-    const raw = await requestTmPretranslationThreshold();
-    if (raw === null) return null;
-    const threshold = Number(raw);
-    if (!Number.isFinite(threshold) || threshold < 0 || threshold > 100) {
-      setSaveStatus("Enter a match percentage between 0 and 100.", "dirty");
-      return null;
-    }
-    const candidates = currentDocumentSegments().filter(
-      (segment) =>
-        !segment.target.trim() &&
-        segment.source.trim() &&
-        segment.status !== "confirmed" &&
-        !preTranslationService.isLockedSegment?.(segment)
-    );
-    if (!candidates.length) {
-      setSaveStatus("No empty segments to pretranslate.", "saved");
-      return null;
-    }
-    els.pretranslateBtn.disabled = true;
-    els.pretranslateBtn.setAttribute("aria-busy", "true");
-    setSaveStatus("Pretranslating...");
-    await yieldToUi();
-    const tmNames = projectTmNames();
-    const uniqueSources = Array.from(new Set(candidates.map((segment) => segment.source)));
-    const matchesBySource = new Map();
-    for (let offset = 0; offset < uniqueSources.length; offset += TM_PRETRANSLATE_BATCH_SIZE) {
-      const sources = uniqueSources.slice(offset, offset + TM_PRETRANSLATE_BATCH_SIZE);
-      const options = sources.map((source) => ({
-        source,
-        sourceLang: currentProject().sourceLang,
-        targetLang: currentProject().targetLang,
-        tmNames,
-        limit: 1
-      }));
-      const batches = await findProjectTmMatchesBatch(options);
-      sources.forEach((source, index) => matchesBySource.set(source, batches[index]?.[0] || null));
-      const completed = Math.min(offset + sources.length, uniqueSources.length);
-      setSaveStatus(`Pretranslating... ${completed}/${uniqueSources.length}`);
-      await yieldToUi();
-    }
-    const proposals = [];
-    for (const segment of candidates) {
-      const match = matchesBySource.get(segment.source);
-      if (!match || match.score < threshold || !match.target?.trim()) continue;
-      proposals.push({ segment, match });
-    }
-    if (!proposals.length) {
-      setSaveStatus(`No TM matches at ${threshold}% or higher.`, "saved");
-      return null;
-    }
-    await flushPendingSegmentSaves(currentProject().id);
-    const activeSegmentId = currentSegment()?.id || proposals[0].segment.id;
-    proposals.forEach(({ segment }) => {
-      beforePatches.set(segment.id, targetCommandPatch(segment));
-      beforeSnapshots.set(segment.id, structuredClone(segment));
-    });
-    const command = appRuntime.commands.createTmPretranslationCommand({
-      projectId: currentProject().id,
-      segmentIds: proposals.map(({ segment }) => segment.id),
-      beforePatches: proposals.map(({ segment }) => beforePatches.get(segment.id)),
-      provenance: {
-        origin: "translation-memory",
-        producer: "pretranslation",
-        threshold,
-        matchCount: proposals.length
-      },
-      restorePatches: (patches, context) =>
-        restoreBatchTargetCommandPatches(patches, { ...context, activeSegmentId }),
-      applyFirst: async () => {
-        for (const { segment, match } of proposals) {
-          setSegmentTargetAndStatus(segment, match.target, "draft", "pretranslate");
-          segment.tmPretranslation = {
-            score: Math.max(0, Math.min(100, Math.round(Number(match.score || 0)))),
-            tmName: String(match.tmName || "").trim(),
-            matchId: String(match.id || "").trim(),
-            appliedAt: new Date().toISOString()
-          };
-          Reflect.deleteProperty(segment, "aiPretranslation");
-          touchSegment(segment);
-          updated.push(segment);
-        }
-        if (LOOPCAT_TEST_BUILD && updated.some((segment) => segment[PRETRANSLATE_SAVE_FAILURE_TEST_FLAG])) {
-          throw new Error("Simulated pretranslation save failure");
-        }
-        await saveSegments(updated);
-        return {
-          patches: updated.map((segment) => targetCommandPatch(segment)),
-          activeSegmentId,
-          affectedCount: updated.length
-        };
-      }
-    });
-    const commandExecution = await appRuntime.commands.bus.execute(command);
-    renderUndoControls();
-    try {
-      await logProjectActivity("pretranslate", "TM pretranslation applied", { threshold, updatedCount: updated.length });
-    } catch (activityError) {
-      console.warn("Pretranslation activity log failed.", activityError);
-    }
-    renderSegments({ preserveScroll: true });
-    renderProgress();
-    try {
-      await refreshSidebar();
-    } catch (refreshError) {
-      console.warn("TM pretranslation sidebar refresh failed.", refreshError);
-    }
-    markWorkspaceDirty();
-    setSaveStatus(
-      `Pretranslated ${updated.length} segment${updated.length === 1 ? "" : "s"} at ${threshold}%+; Undo is available`,
-      "saved"
-    );
-    return commandExecution;
-  } catch (error) {
-    beforeSnapshots.forEach((snapshot, segmentId) => {
-      const segment = currentSegments().find((item) => item.id === segmentId);
-      if (!segment) return;
-      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-      Object.assign(segment, snapshot);
-      prepareSegmentHistoryState(segment);
-    });
-    renderSegments();
-    renderProgress();
-    renderRevisionHistory();
-    focusActiveTextarea();
-    setSaveStatus(error.message || "TM pretranslation failed", "dirty");
-    return null;
-  } finally {
-    state.tmPretranslating = false;
-    els.pretranslateBtn.disabled = false;
-    els.pretranslateBtn.setAttribute("aria-busy", "false");
-  }
+  return tmPretranslationController.pretranslate();
 }
 
 function selectedConcordanceKeyword() {
@@ -13201,7 +13123,6 @@ function wireEvents() {
   els.languagePairFilter.addEventListener("change", renderProjectsView);
 
   els.saveTmBtn.addEventListener("click", saveActiveSegmentToTm);
-  els.pretranslateBtn.addEventListener("click", pretranslateFromTm);
   els.nextOpenBtn.addEventListener("click", goToNextOpenSegment);
   els.runQaBtn.addEventListener("click", runProjectQa);
   document.querySelectorAll("[data-panel-toggle]").forEach((button) => {

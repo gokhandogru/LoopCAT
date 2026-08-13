@@ -191,6 +191,7 @@ const requiredReleaseFiles = [
   "src/features/quality/review-metadata-controller.js",
   "src/features/quality/review-state-controller.js",
   "src/features/editor/target-replacement-controller.js",
+  "src/features/editor/tm-pretranslation-controller.js",
   "src/features/resources/resources-controller.js",
   "src/features/resources/tm-pretranslation-dialog-controller.js",
   "src/features/import-export/import-export-controller.js",
@@ -207,6 +208,7 @@ const requiredReleaseFiles = [
   "tests/unit/target-edit-controller.test.cjs",
   "tests/unit/target-producer-controller.test.cjs",
   "tests/unit/target-replacement-controller.test.cjs",
+  "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
   "tests/app-workflow/workflow-driver.inc.js",
   "tests/unit/gemini-provider-adapter.test.cjs",
@@ -292,12 +294,14 @@ const segmentConfirmationControllerJs = readText("src/features/editor/segment-co
 const targetEditControllerJs = readText("src/features/editor/target-edit-controller.js");
 const targetProducerControllerJs = readText("src/features/editor/target-producer-controller.js");
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
+const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
 const autosaveServiceUnitTests = readText("tests/unit/autosave-service.test.cjs");
 const segmentConfirmationControllerUnitTests = readText("tests/unit/segment-confirmation-controller.test.cjs");
 const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
+const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
 const qualityProfileControllerJs = readText("src/features/quality/quality-profile-controller.js");
 const qualityProfileControllerUnitTests = readText("tests/unit/quality-profile-controller.test.cjs");
@@ -2199,6 +2203,72 @@ assertIncludes(
   "discrete target producers preserve patches, provenance boundaries, selection, and retryable Undo",
   "focused command tests must cover target-producer transaction failure recovery."
 );
+assertIncludes(
+  appBootstrapJs,
+  "createTmPretranslationController",
+  "The application runtime must expose the checked TM-pretranslation controller boundary."
+);
+for (const boundary of [
+  "if (!editorSessionStore.getProject() || busy) return null",
+  "const raw = await threshold.request()",
+  "const uniqueSources = Array.from(new Set(candidates.map((segment) => segment.source)))",
+  "for (let offset = 0; offset < uniqueSources.length; offset += batchSize)",
+  "const batches = await tm.findMatchesBatch(matchOptions)",
+  "await persistence.flush(editorSessionStore.getProject().id)",
+  "const command = commands.create({",
+  "segment.tmPretranslation = {",
+  'Reflect.deleteProperty(segment, "aiPretranslation")',
+  "await persistence.save(updated)",
+  "const commandExecution = await commands.bus.execute(command)",
+  "await activity.log({ threshold: matchThreshold, updatedCount: updated.length })",
+  "mutation.restore(segment, snapshot)",
+  'pretranslateButton.setAttribute("aria-busy", "false")'
+]) {
+  assertIncludes(
+    tmPretranslationControllerJs,
+    boundary,
+    `TmPretranslationController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "tmPretranslationController.mount()",
+  "app.js must delegate the TM pretranslation button lifecycle to TmPretranslationController."
+);
+assertIncludes(
+  appJs,
+  "return tmPretranslationController.pretranslate()",
+  "app.js must retain only the checked TM-pretranslation compatibility facade."
+);
+const tmPretranslationFacade = functionBody(
+  appJs,
+  "async function pretranslateFromTm",
+  "function selectedConcordanceKeyword"
+);
+assert(
+  !tmPretranslationFacade.includes("currentDocumentSegments(") &&
+    !tmPretranslationFacade.includes("findProjectTmMatchesBatch(") &&
+    !tmPretranslationFacade.includes("createTmPretranslationCommand(") &&
+    !tmPretranslationFacade.includes("saveSegments(") &&
+    !tmPretranslationFacade.includes("logProjectActivity(") &&
+    !tmPretranslationFacade.includes("renderSegments(") &&
+    !tmPretranslationFacade.includes("Reflect.ownKeys") &&
+    !appJs.includes("tmPretranslating:") &&
+    !appJs.includes('els.pretranslateBtn.addEventListener("click"'),
+  "app.js must not regain TM-pretranslation busy, candidate, lookup-loop, mutation, command, persistence, activity, presentation, or rollback orchestration."
+);
+for (const testName of [
+  "TM pretranslation owns button lifecycle, prevents threshold re-entry, and cleans busy state after cancellation",
+  "TM pretranslation deduplicates batched lookups and saves one atomic command with normalized provenance",
+  "primary TM pretranslation persistence failure restores exact snapshots and always releases busy presentation",
+  "secondary activity and sidebar failures preserve the TM command, workspace update, and success status"
+]) {
+  assertIncludes(
+    tmPretranslationControllerUnitTests,
+    testName,
+    `focused TM-pretranslation tests must characterize ${testName}.`
+  );
+}
 assertIncludes(
   segmentCommandsJs,
   "createTmPretranslationCommand",

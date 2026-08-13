@@ -46,6 +46,7 @@ import { createTargetEditController } from "../features/editor/target-edit-contr
 import { createSegmentConfirmationController } from "../features/editor/segment-confirmation-controller.js";
 import { createTargetProducerController } from "../features/editor/target-producer-controller.js";
 import { createTargetReplacementController } from "../features/editor/target-replacement-controller.js";
+import { createTmPretranslationController } from "../features/editor/tm-pretranslation-controller.js";
 import { createStructuralSegmentController } from "../features/editor/structural-segment-controller.js";
 import { createPaletteController } from "../features/palette/palette-controller.js";
 import { createWorkspaceLayoutController } from "../features/workspace/workspace-layout-controller.js";
@@ -154,6 +155,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createStructuralSegmentController,
       createTargetProducerController,
       createTargetReplacementController,
+      createTmPretranslationController,
       createPaletteController,
       createThemeController,
       createTargetEditController,
