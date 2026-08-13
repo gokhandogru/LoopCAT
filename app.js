@@ -1796,6 +1796,106 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
   clock: { now: () => new Date().toISOString() },
   logger: console
 });
+let aiTagRepairAbortController = null;
+let aiTagRepairOwnsPromptBusy = false;
+const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairController({
+  editorSessionStore,
+  selection: { getActiveSegment: currentSegment },
+  scope: {
+    getVisibleSegments: () =>
+      filteredSegmentIndexes()
+        .map((index) => currentSegments()[index])
+        .filter(Boolean),
+    getDocumentSegments: currentDocumentSegments,
+    isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
+    getTags: segmentTags,
+    getMissingTags: missingTags,
+    tagText: tagDisplayText
+  },
+  settings: {
+    persist: () => persistLocalAiSettings({ silent: true }),
+    runtimeConfig: localAiRuntimeConfig,
+    assertReady: assertLocalAiRuntimeReady
+  },
+  providers: {
+    get: currentLocalAiProvider,
+    sharesExternally: (settings) =>
+      localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
+  },
+  consent: { externalShare: confirmExternalAiPromptShare },
+  domain: { repairSegmentTags: (options) => aiCommandService.repairSegmentTags(options) },
+  lifecycle: {
+    isRunning: () => state.localAi.running,
+    isPromptBusy: () => state.localAi.promptBusy,
+    sync: ({ running, promptBusy, abortController, progress }) => {
+      if (progress !== undefined) state.localAi.progress = progress;
+      if (promptBusy) {
+        aiTagRepairOwnsPromptBusy = true;
+        state.localAi.promptBusy = true;
+      } else if (aiTagRepairOwnsPromptBusy) {
+        state.localAi.promptBusy = false;
+        aiTagRepairOwnsPromptBusy = false;
+      }
+      if (running) {
+        aiTagRepairAbortController = abortController;
+        state.localAi.running = true;
+        state.localAi.abortController = abortController;
+      } else if (
+        aiTagRepairAbortController &&
+        state.localAi.abortController === aiTagRepairAbortController
+      ) {
+        state.localAi.running = false;
+        state.localAi.abortController = null;
+        aiTagRepairAbortController = null;
+      }
+    }
+  },
+  suggestions: {
+    append: (segment, suggestion) =>
+      appendAiSuggestion(
+        segment,
+        suggestion,
+        "ai-tag-repair",
+        "AI tag repair suggestion created"
+      ),
+    normalize: savedAiSuggestionRecord,
+    nextId: () => makeId("ai-suggestion")
+  },
+  persistence: {
+    flush: flushPendingSegmentSaves,
+    saveMany: saveSegments,
+    load: getProjectSegments
+  },
+  mutation: {
+    touch: touchSegment,
+    clearPending: clearPendingSave,
+    restore: (segment, snapshot) => {
+      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
+      Object.assign(segment, snapshot);
+    },
+    prepareHistory: prepareSegmentHistoryState,
+    prepareHistories: prepareSegmentHistoryStates
+  },
+  presentation: {
+    renderCommandCentre: renderLocalAiCommandCentre,
+    renderAiProgress: renderLocalAiProgress,
+    renderOutput: renderLocalAiOutput,
+    renderAll,
+    refreshSidebar
+  },
+  activity: {
+    logBatch: (details) =>
+      logProjectActivity(
+        "ai-tag-repair-batch",
+        "Batch AI tag repair suggestions created",
+        details
+      )
+  },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus },
+  redact: redactSensitiveText,
+  logger: console
+});
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
     splitButton: els.splitSegmentBtn,
@@ -8691,322 +8791,11 @@ async function reviewBatchWithLocalAi() {
 }
 
 async function repairActiveSegmentTagsWithLocalAi() {
-  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
-  const segment = currentSegment();
-  if (!segment) {
-    setSaveStatus("Select a segment before requesting AI tag repair.", "dirty");
-    return false;
-  }
-  if (!String(segment.source || "").trim()) {
-    setSaveStatus("The active segment has no source text.", "dirty");
-    return false;
-  }
-  if (!String(segment.target || "").trim()) {
-    setSaveStatus("The active segment has no target text to repair.", "dirty");
-    return false;
-  }
-  const settings = await persistLocalAiSettings({ silent: true });
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-    assertLocalAiRuntimeReady(settings, config, "suggesting a tag repair");
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const provider = currentLocalAiProvider(settings);
-  if (!provider?.completePrompt) {
-    const message = "AI tag repair is not available for this provider.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) {
-    const ok = confirmExternalAiPromptShare({
-      provider: provider.name || settings.providerId,
-      includesSourceText: true,
-      contextLabels: ["target text", "protected tags and placeholders", "configured provider URL"]
-    });
-    if (!ok) {
-      setSaveStatus("AI tag repair canceled", "dirty");
-      return false;
-    }
-  }
-  state.localAi.promptBusy = true;
-  renderLocalAiCommandCentre();
-  setSaveStatus("Requesting AI tag repair suggestion...");
-  try {
-    const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
-    const result = await aiCommandService.repairSegmentTags({
-      provider,
-      project: currentProject(),
-      segment: { ...segment, tags: segmentTags(segment) },
-      settings,
-      config,
-      sourceLanguage: settings.sourceLanguage,
-      sourceCode: settings.sourceCode,
-      targetLanguage: settings.targetLanguage,
-      targetCode: settings.targetCode,
-      protectedTokens
-    });
-    if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
-      renderLocalAiOutput("AI did not propose a different tag repair.", { muted: false });
-      setSaveStatus("AI did not propose a different tag repair.", "saved");
-      return true;
-    }
-    const suggestion = {
-      id: makeId("ai-suggestion"),
-      provider: result.provider || provider.name || "AI",
-      model: result.model || settings.model,
-      segmentId: segment.id,
-      suggestedTarget: result.suggestedTarget,
-      confidence: result.warnings?.length ? 60 : 80,
-      explanation: [
-        "AI tag repair suggestion. Review before applying.",
-        ...(result.protectedTokens?.length ? [`Protected tokens considered: ${result.protectedTokens.join(", ")}`] : []),
-        ...(result.warnings || [])
-      ],
-      status: "review"
-    };
-    const saved = await appendAiSuggestion(segment, suggestion, "ai-tag-repair", "AI tag repair suggestion created");
-    renderLocalAiOutput(result.suggestedTarget);
-    if (saved?.ok) {
-      setSaveStatus(saved.activityLogged ? "AI tag repair suggestion ready for review" : "AI tag repair suggestion ready; activity log failed", saved.activityLogged ? "saved" : "dirty");
-      return true;
-    }
-    setSaveStatus("AI tag repair suggestion could not be saved.", "dirty");
-    return false;
-  } catch (error) {
-    const message = error.message || "AI tag repair failed.";
-    renderLocalAiOutput(message, { muted: false });
-    setSaveStatus(message, "dirty");
-    return false;
-  } finally {
-    state.localAi.promptBusy = false;
-    renderLocalAiCommandCentre();
-  }
-}
-
-function localAiTagRepairSkipReason(segment = {}) {
-  const reason = localAiReviewSkipReason(segment);
-  if (reason) return reason;
-  if (!segmentTags(segment).length) return "no-protected-tags";
-  if (!missingTags(segment).length) return "no-tag-mismatch";
-  return "";
-}
-
-function selectLocalAiTagRepairSegments(settings = {}) {
-  const skipped = [];
-  const candidates = [];
-  localAiReviewScopeSegments(settings).forEach((segment) => {
-    const reason = localAiTagRepairSkipReason(segment);
-    if (reason) {
-      skipped.push({ segmentId: segment.id || "", reason });
-      return;
-    }
-    candidates.push(segment);
-  });
-  return { candidates, skipped, mode: settings.mode || "untranslated" };
+  return aiTagRepairController.repairActive();
 }
 
 async function repairBatchTagsWithLocalAi() {
-  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
-  const settings = await persistLocalAiSettings({ silent: true });
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-    assertLocalAiRuntimeReady(settings, config, "repairing tag batches");
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const provider = currentLocalAiProvider(settings);
-  if (!provider?.completePrompt) {
-    const message = "Batch AI tag repair is not available for this provider.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const selection = selectLocalAiTagRepairSegments(settings);
-  if (!selection.candidates.length) {
-    setSaveStatus(selection.skipped.length ? "No protected tag mismatches are eligible for batch AI repair." : "No translated segments to repair with local AI.", "saved");
-    return {
-      total: 0,
-      completed: 0,
-      suggested: 0,
-      unchanged: 0,
-      failed: 0,
-      skipped: selection.skipped.length,
-      failures: [],
-      skippedSegments: selection.skipped,
-      updatedSegmentIds: [],
-      canceled: false
-    };
-  }
-  if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) {
-    const ok = confirmExternalAiPromptShare({
-      provider: provider.name || settings.providerId,
-      includesSourceText: true,
-      contextLabels: [`${selection.candidates.length} source/target segments with protected tag mismatches`, "protected tags and placeholders", "configured provider URL"]
-    });
-    if (!ok) {
-      setSaveStatus("Batch AI tag repair canceled", "dirty");
-      return false;
-    }
-  }
-  try {
-    await flushPendingSegmentSaves(currentProject().id);
-  } catch (error) {
-    setSaveStatus(error.message || "Save pending changes before batch AI tag repair failed", "dirty");
-    return false;
-  }
-  const snapshots = new Map(selection.candidates.map((segment) => [segment.id, structuredClone(segment)]));
-  const summary = {
-    total: selection.candidates.length,
-    completed: 0,
-    suggested: 0,
-    unchanged: 0,
-    failed: 0,
-    skipped: selection.skipped.length,
-    failures: [],
-    skippedSegments: selection.skipped,
-    updatedSegmentIds: [],
-    canceled: false
-  };
-  const updated = [];
-  state.localAi.running = true;
-  state.localAi.promptBusy = true;
-  state.localAi.abortController = new AbortController();
-  state.localAi.progress = {
-    total: summary.total,
-    completed: 0,
-    failed: 0,
-    skipped: summary.skipped,
-    canceled: false
-  };
-  renderLocalAiCommandCentre();
-  setSaveStatus(`Repairing protected tags in ${summary.total} segment${summary.total === 1 ? "" : "s"} with AI...`);
-  try {
-    for (const segment of selection.candidates) {
-      if (state.localAi.abortController.signal.aborted) {
-        summary.canceled = true;
-        break;
-      }
-      try {
-        const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
-        const missingTokens = missingTags(segment).map(tagDisplayText).filter(Boolean);
-        const result = await aiCommandService.repairSegmentTags({
-          provider,
-          project: currentProject(),
-          segment: { ...segment, tags: segmentTags(segment) },
-          settings,
-          config,
-          sourceLanguage: settings.sourceLanguage,
-          sourceCode: settings.sourceCode,
-          targetLanguage: settings.targetLanguage,
-          targetCode: settings.targetCode,
-          protectedTokens,
-          signal: state.localAi.abortController.signal
-        });
-        if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
-          summary.unchanged += 1;
-        } else {
-          const suggestion = savedAiSuggestionRecord({
-            id: makeId("ai-suggestion"),
-            provider: result.provider || provider.name || "AI",
-            model: result.model || settings.model,
-            segmentId: segment.id,
-            suggestedTarget: result.suggestedTarget,
-            confidence: result.warnings?.length ? 60 : 80,
-            explanation: [
-              "Batch AI tag repair suggestion. Review before applying.",
-              ...(missingTokens.length ? [`Missing tokens detected: ${missingTokens.join(", ")}`] : []),
-              ...(result.protectedTokens?.length ? [`Protected tokens considered: ${result.protectedTokens.join(", ")}`] : []),
-              ...(result.warnings || [])
-            ],
-            status: "review"
-          });
-          segment.aiSuggestions = [...(segment.aiSuggestions || []), suggestion];
-          touchSegment(segment);
-          clearPendingSave(segment);
-          updated.push(segment);
-          summary.suggested += 1;
-          summary.updatedSegmentIds.push(segment.id || "");
-        }
-        summary.completed += 1;
-      } catch (error) {
-        if (state.localAi.abortController.signal.aborted || String(error?.message || "").includes("canceled")) {
-          summary.canceled = true;
-          break;
-        }
-        summary.failed += 1;
-        summary.failures.push({
-          segmentId: segment.id || "",
-          message: redactSensitiveText(error?.message || "AI tag repair failed for this segment.")
-        });
-      } finally {
-        state.localAi.progress = { ...summary };
-        renderLocalAiProgress();
-      }
-    }
-    if (updated.length) await saveSegments(updated);
-    let activityLogged = true;
-    try {
-      await logProjectActivity("ai-tag-repair-batch", "Batch AI tag repair suggestions created", {
-        provider: provider.name || settings.providerId,
-        model: settings.model,
-        mode: settings.mode,
-        repairedCount: summary.completed,
-        suggestionCount: summary.suggested,
-        unchangedCount: summary.unchanged,
-        failedCount: summary.failed,
-        skippedCount: summary.skipped,
-        canceled: summary.canceled
-      });
-    } catch (activityError) {
-      activityLogged = false;
-      console.warn("Batch AI tag repair activity log failed.", activityError);
-      if (updated.length) markWorkspaceDirty();
-    }
-    if (updated.length) {
-      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
-      renderAll();
-      await refreshSidebar();
-      markWorkspaceDirty();
-    } else {
-      renderLocalAiProgress();
-    }
-    const failureText = summary.failed ? `; ${summary.failed} failed` : "";
-    const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
-    const unchangedText = summary.unchanged ? `; ${summary.unchanged} unchanged` : "";
-    const canceledText = summary.canceled ? " canceled" : "";
-    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-    renderLocalAiOutput([
-      `${summary.suggested} tag repair suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
-      `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
-      failureLines.join("\n")
-    ].filter(Boolean).join("\n"));
-    setSaveStatus(`Batch AI tag repair${canceledText}: ${summary.suggested} suggestion${summary.suggested === 1 ? "" : "s"} saved${unchangedText}${failureText}${skippedText}${activityLogged ? "" : "; activity log failed"}`, summary.failed || !activityLogged || summary.canceled ? "dirty" : "saved");
-    return summary;
-  } catch (error) {
-    snapshots.forEach((snapshot, id) => {
-      const segment = currentSegments().find((item) => item.id === id);
-      if (!segment) return;
-      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-      Object.assign(segment, snapshot);
-      prepareSegmentHistoryState(segment);
-    });
-    renderAll();
-    const message = error.message || "Batch AI tag repair failed.";
-    renderLocalAiOutput(message, { muted: false });
-    setSaveStatus(message, "dirty");
-    return false;
-  } finally {
-    state.localAi.running = false;
-    state.localAi.promptBusy = false;
-    state.localAi.abortController = null;
-    renderLocalAiCommandCentre();
-  }
+  return aiTagRepairController.repairBatch();
 }
 
 async function suggestActiveSegmentVariantsWithLocalAi() {
@@ -10786,6 +10575,7 @@ async function pretranslateWithLocalAi() {
 function cancelLocalAiBatch() {
   if (aiPretranslationController.cancel()) return;
   if (aiReviewController.cancel()) return;
+  if (aiTagRepairController.cancel()) return;
   state.localAi.abortController?.abort();
   state.localAi.progress = {
     ...(state.localAi.progress || {}),

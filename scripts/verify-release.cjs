@@ -185,6 +185,7 @@ const requiredReleaseFiles = [
   "src/features/ai/ai-administration-controller.js",
   "src/features/ai/ai-pretranslation-controller.js",
   "src/features/ai/ai-review-controller.js",
+  "src/features/ai/ai-tag-repair-controller.js",
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
   "src/features/quality/quality-profile-controller.js",
@@ -202,6 +203,7 @@ const requiredReleaseFiles = [
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/ai-pretranslation-controller.test.cjs",
   "tests/unit/ai-review-controller.test.cjs",
+  "tests/unit/ai-tag-repair-controller.test.cjs",
   "tests/unit/anthropic-provider-adapter.test.cjs",
   "tests/unit/cohere-provider-adapter.test.cjs",
   "tests/unit/compatibility-module-registry.test.cjs",
@@ -332,6 +334,8 @@ const aiPretranslationControllerJs = readText("src/features/ai/ai-pretranslation
 const aiPretranslationControllerUnitTests = readText("tests/unit/ai-pretranslation-controller.test.cjs");
 const aiReviewControllerJs = readText("src/features/ai/ai-review-controller.js");
 const aiReviewControllerUnitTests = readText("tests/unit/ai-review-controller.test.cjs");
+const aiTagRepairControllerJs = readText("src/features/ai/ai-tag-repair-controller.js");
+const aiTagRepairControllerUnitTests = readText("tests/unit/ai-tag-repair-controller.test.cjs");
 const anthropicProviderAdapterJs = readText("src/ai/providers/anthropic-provider-adapter.js");
 const cohereProviderAdapterJs = readText("src/ai/providers/cohere-provider-adapter.js");
 const geminiProviderAdapterJs = readText("src/ai/providers/gemini-provider-adapter.js");
@@ -2456,6 +2460,97 @@ for (const testName of [
     aiReviewControllerUnitTests,
     testName,
     `focused AI-review tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiTagRepairController",
+  "The application runtime must expose the checked AI-tag-repair controller boundary."
+);
+for (const boundary of [
+  "if (!project || running || promptBusy || lifecycle.isRunning() || lifecycle.isPromptBusy()) return false",
+  'status.set("Select a segment before requesting AI tag repair.", "dirty")',
+  'settingsBoundary.assertReady(settings, config, "suggesting a tag repair")',
+  "providers.sharesExternally(settings)",
+  "const result = await domain.repairSegmentTags(",
+  "const saved = await suggestions.append(segment, activeSuggestion(segment, result, provider, settings))",
+  'if (scope.isLocked(segment)) return "locked"',
+  'if (!scope.getTags(segment).length) return "no-protected-tags"',
+  'if (!scope.getMissingTags(segment).length) return "no-tag-mismatch"',
+  "const candidateSelection = selectSegments(settings)",
+  "await persistence.flush(project.id)",
+  "abortController = createAbortController()",
+  "for (const segment of candidateSelection.candidates)",
+  "const suggestion = batchSuggestion(segment, result, provider, settings, missingTokens)",
+  "segment.aiSuggestions = [...(segment.aiSuggestions || []), suggestion]",
+  "if (updated.length) await persistence.saveMany(updated)",
+  "await activity.logBatch({",
+  "editorSessionStore.replaceSegments(mutation.prepareHistories(await persistence.load(project.id)))",
+  "mutation.restore(segment, snapshot)",
+  "abortController = null",
+  'status.set("Canceling local AI batch...", "dirty")'
+]) {
+  assertIncludes(
+    aiTagRepairControllerJs,
+    boundary,
+    `AiTagRepairController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return aiTagRepairController.repairActive()",
+  "app.js must retain only the checked active AI-tag-repair compatibility facade."
+);
+assertIncludes(
+  appJs,
+  "return aiTagRepairController.repairBatch()",
+  "app.js must retain only the checked batch AI-tag-repair compatibility facade."
+);
+assertIncludes(
+  appJs,
+  "if (aiTagRepairController.cancel()) return;",
+  "the shared AI cancel facade must delegate owned tag-repair cancellation."
+);
+const activeAiTagRepairFacade = functionBody(
+  appJs,
+  "async function repairActiveSegmentTagsWithLocalAi",
+  "async function repairBatchTagsWithLocalAi"
+);
+const batchAiTagRepairFacade = functionBody(
+  appJs,
+  "async function repairBatchTagsWithLocalAi",
+  "async function suggestActiveSegmentVariantsWithLocalAi"
+);
+for (const facade of [activeAiTagRepairFacade, batchAiTagRepairFacade]) {
+  assert(
+    !facade.includes("persistLocalAiSettings(") &&
+      !facade.includes("localAiRuntimeConfig(") &&
+      !facade.includes("confirmExternalAiPromptShare(") &&
+      !facade.includes("segmentTags(") &&
+      !facade.includes("missingTags(") &&
+      !facade.includes("aiCommandService.repairSegmentTags(") &&
+      !facade.includes("appendAiSuggestion(") &&
+      !facade.includes("saveSegments(") &&
+      !facade.includes("logProjectActivity(") &&
+      !facade.includes("renderLocalAiOutput(") &&
+      !facade.includes("Reflect.ownKeys") &&
+      !facade.includes("state.localAi"),
+    "app.js must not regain AI-tag-repair validation, consent, lifecycle, selection, provider, suggestion, persistence, activity, presentation, or recovery orchestration."
+  );
+}
+for (const testName of [
+  "active AI tag repair preserves busy, source, target, provider, and external-consent safeguards",
+  "active AI tag repair routes protected tokens and saves a non-overwriting review suggestion",
+  "batch AI tag repair selects only translated unlocked mismatches and returns deterministic empty summaries",
+  "batch AI tag repair saves normalized suggestions, contains failures, skips protected segments, and never overwrites targets",
+  "mid-batch AI tag repair cancellation preserves completed suggestions and saves the partial result",
+  "primary batch AI tag repair persistence failure restores every candidate and always cleans lifecycle state",
+  "secondary batch AI tag repair activity failure keeps saved suggestions durable and reports a dirty warning"
+]) {
+  assertIncludes(
+    aiTagRepairControllerUnitTests,
+    testName,
+    `focused AI-tag-repair tests must characterize ${testName}.`
   );
 }
 assertIncludes(
