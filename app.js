@@ -746,6 +746,14 @@ function currentProjectSummaries() {
   return editorSessionStore.getProjectSummaries();
 }
 
+function currentProjectTerms() {
+  return editorSessionStore.getProjectTerms();
+}
+
+function currentActivityEvents() {
+  return editorSessionStore.getActivityEvents();
+}
+
 function currentApplicationView() {
   return applicationStore.getState().navigation.view;
 }
@@ -4221,7 +4229,7 @@ function latestProjectPackageExport(project = state.project) {
   return history.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0] || null;
 }
 
-function backupReminderInfo(project = state.project, activityEvents = state.activityEvents, now = new Date()) {
+function backupReminderInfo(project = state.project, activityEvents = currentActivityEvents(), now = new Date()) {
   if (!project || isBackupReminderDismissed(project.id, now)) return null;
   const latestExport = latestProjectPackageExport(project);
   const projectAgeDays = daysBetween(project.createdAt, now);
@@ -4527,14 +4535,14 @@ async function refreshResources() {
 
 async function refreshProjectTerms({ rerender = false } = {}) {
   if (!state.project) {
-    state.projectTerms = [];
+    editorSessionStore.replaceProjectTerms([]);
     return;
   }
-  state.projectTerms = await listTerms({
+  editorSessionStore.replaceProjectTerms(await listTerms({
     sourceLang: state.project.sourceLang,
     targetLang: state.project.targetLang,
     termBaseNames: projectTermBaseNames()
-  });
+  }));
   invalidateSegmentFilterCache();
   renderTermbaseSelect();
   if (rerender) renderSegments({ preserveScroll: true });
@@ -4553,7 +4561,7 @@ async function logProjectActivity(type, summary, detail = {}, project = state.pr
   if (!project) return null;
   const event = await recordActivityEvent({ projectId: project.id, type, summary, detail });
   if (event && state.project?.id === project.id) {
-    state.activityEvents = [event, ...state.activityEvents.filter((item) => item.id !== event.id)];
+    editorSessionStore.prependActivityEvent(event);
     renderBackupReminder();
   }
   markWorkspaceDirty(project.id);
@@ -4600,7 +4608,7 @@ async function logOptionalActivityForProject(projectId, type, summary, detail = 
     }
     const event = await recordActivityEvent({ projectId, type, summary, detail });
     if (state.project?.id === projectId) {
-      state.activityEvents = await listActivityEvents(projectId);
+      editorSessionStore.replaceActivityEvents(await listActivityEvents(projectId));
       renderBackupReminder();
     }
     markWorkspaceDirty(projectId);
@@ -4706,7 +4714,7 @@ async function openProject(projectId) {
   state.project = state.projects.find((project) => project.id === projectId) || null;
   state.commandProjectId = state.project?.id || projectId || "";
   state.segments = prepareSegmentHistoryStates(state.project ? await getProjectSegments(projectId) : []);
-  state.activityEvents = state.project ? await listActivityEvents(projectId) : [];
+  editorSessionStore.replaceActivityEvents(state.project ? await listActivityEvents(projectId) : []);
   await refreshProjectTerms();
   const activeIndex = state.segments.length ? 0 : -1;
   await filterPresetReady;
@@ -4871,10 +4879,11 @@ function localAiPromptTestContextLabels(mode = localAiPromptMode()) {
 }
 
 function localAiPreviewTermsForSegment(segment = currentSegment()) {
-  if (!Array.isArray(state.projectTerms) || !state.projectTerms.length) return [];
+  const projectTerms = currentProjectTerms();
+  if (!projectTerms.length) return [];
   const source = stableLower(String(segment?.source || ""));
   const target = stableLower(String(segment?.target || ""));
-  const matching = state.projectTerms.filter((term) => {
+  const matching = projectTerms.filter((term) => {
     const sourceTerm = stableLower(term.sourceTerm || "");
     const targetTerm = stableLower(term.targetTerm || "");
     return Boolean(
@@ -4882,7 +4891,7 @@ function localAiPreviewTermsForSegment(segment = currentSegment()) {
         (targetTerm && target.includes(targetTerm))
     );
   });
-  return (matching.length ? matching : state.projectTerms).slice(0, 12);
+  return (matching.length ? matching : projectTerms).slice(0, 12);
 }
 
 function localAiPromptPreviewRequest(settings = localAiSettingsFromForm(), mode = localAiPromptMode()) {
@@ -4927,7 +4936,7 @@ function localAiPromptPreviewRequest(settings = localAiSettingsFromForm(), mode 
       ...common,
       documents: projectDocuments(),
       sampleSegments: projectBriefSampleSegments(),
-      terms: (state.projectTerms || []).slice(0, 12)
+      terms: currentProjectTerms().slice(0, 12)
     })
   }[mode]?.() || buildTranslateGemmaPrompt({
     ...common,
@@ -5400,7 +5409,7 @@ function renderEditor() {
     <dt>${uiLabelHtml("linkedTbs")}</dt><dd>${displaySafeHtml(resources.tbNames.join(", "))}</dd>
     <dt>${translatedSourceHtml("Documents")}</dt><dd>${projectDocuments().length || 0}</dd>
     <dt>${uiLabelHtml("segmentsTitle")}</dt><dd>${state.segments.length}</dd>
-    <dt>${uiLabelHtml("activity")}</dt><dd>${uiLabelHtml("eventCount", { count: state.activityEvents.length })}</dd>
+    <dt>${uiLabelHtml("activity")}</dt><dd>${uiLabelHtml("eventCount", { count: currentActivityEvents().length })}</dd>
   `);
   const ai = defaultAiSettings(state.project.aiSettings);
   aiAdministrationController?.renderGlobalSettings?.({
@@ -6106,7 +6115,7 @@ function rangesOverlap(a, b) {
 function appendTextWithSourceMarkup(container, segment) {
   const text = segment.source || "";
   const tagMarkers = sourceTagMarkers(text, segmentTags(segment));
-  const termMarkers = termRanges(text, state.projectTerms)
+  const termMarkers = termRanges(text, currentProjectTerms())
     .filter((range) => !tagMarkers.some((tagMarker) => rangesOverlap(range, tagMarker)))
     .map((range) => ({ type: "term", index: range.index, length: range.length, range }));
   const markers = [...tagMarkers, ...termMarkers].sort((a, b) => a.index - b.index || (a.type === "tag" ? -1 : 1));
@@ -12189,7 +12198,7 @@ async function exportProjectPackage() {
     if (shouldSimulateActivityFailure) throw new Error("Simulated export activity log failure");
     if (pendingActivityEvent) {
       await bulkPut("activityEvents", [pendingActivityEvent]);
-      state.activityEvents = await listActivityEvents(state.project.id);
+      editorSessionStore.replaceActivityEvents(await listActivityEvents(state.project.id));
     }
     markWorkspaceDirty(state.project.id);
     renderBackupReminder();
@@ -12361,7 +12370,7 @@ async function saveCurrentProjectPackageToWorkspace() {
     if (shouldSimulateActivityFailure) throw new Error("Simulated workspace save activity failure");
     if (pendingActivityEvent) {
       await bulkPut("activityEvents", [pendingActivityEvent]);
-      state.activityEvents = await listActivityEvents(state.project.id);
+      editorSessionStore.replaceActivityEvents(await listActivityEvents(state.project.id));
     }
     renderBackupReminder();
   } catch (activityError) {

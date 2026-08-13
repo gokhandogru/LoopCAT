@@ -23,7 +23,12 @@ function createDefaultSession() {
 }
 
 export const EDITOR_SESSION_FIELDS = Object.freeze(Object.keys(createDefaultSession()));
-const EXPLICIT_SESSION_FIELDS = new Set(["projectSummaries", "projectSummaryRevisions"]);
+const EXPLICIT_SESSION_FIELDS = new Set([
+  "projectSummaries",
+  "projectSummaryRevisions",
+  "projectTerms",
+  "activityEvents"
+]);
 export const EDITOR_SESSION_COMPATIBILITY_FIELDS = Object.freeze(
   EDITOR_SESSION_FIELDS.filter((name) => !EXPLICIT_SESSION_FIELDS.has(name))
 );
@@ -68,6 +73,8 @@ export function createEditorSessionStore(initialState = {}) {
 
   return Object.freeze({
     getState: () => state,
+    getActivityEvents: () => state.activityEvents,
+    getProjectTerms: () => state.projectTerms,
     getProjectSummaries: () => state.projectSummaries,
     getProjectSummaryRevision(projectId) {
       return Number(state.projectSummaryRevisions.get(String(projectId || "")) || 0);
@@ -88,6 +95,16 @@ export function createEditorSessionStore(initialState = {}) {
       return replace({ projectSummaryRevisions: revisions }).projectSummaryRevisions;
     },
     replace,
+    prependActivityEvent(activityEvent) {
+      const activityEvents = [activityEvent, ...state.activityEvents.filter((item) => item.id !== activityEvent.id)];
+      return replace({ activityEvents }).activityEvents;
+    },
+    replaceActivityEvents(activityEvents) {
+      return replace({ activityEvents }).activityEvents;
+    },
+    replaceProjectTerms(projectTerms) {
+      return replace({ projectTerms }).projectTerms;
+    },
     replaceProjectSummaries(projectSummaries) {
       return replace({ projectSummaries }).projectSummaries;
     },

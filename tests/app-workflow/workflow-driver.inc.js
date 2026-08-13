@@ -1035,7 +1035,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "Redo reapplies target replacement atomically"
     );
     assert(state.workspaceDirtyProjectIds.has(project.id), "target replace marks workspace package dirty");
-    assert(state.activityEvents.some((event) => event.type === "replace-target"), "target replace records project activity");
+    assert(currentActivityEvents().some((event) => event.type === "replace-target"), "target replace records project activity");
     const beforeFailedReplaceTarget = state.segments[segmentIndex].target;
     els.replaceFindInput.value = "hedef";
     els.replaceWithInput.value = "Kaydedilemeyen";
@@ -2490,7 +2490,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const successfulAiSuggestionSave = await appendAiSuggestion(state.segments[segmentIndex], savedAiSuggestion, "ai-test-suggestion", "AI suggestion created");
     const savedAiSuggestionStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
     const savedAiSuggestionRecordJson = JSON.stringify(savedAiSuggestionStored?.aiSuggestions?.find((suggestion) => suggestion.id === savedAiSuggestion.id) || {});
-    const savedAiSuggestionActivityJson = JSON.stringify(state.activityEvents.find((event) => event.type === "ai-test-suggestion" && event.detail?.segmentId === state.segments[segmentIndex].id) || {});
+    const savedAiSuggestionActivityJson = JSON.stringify(currentActivityEvents().find((event) => event.type === "ai-test-suggestion" && event.detail?.segmentId === state.segments[segmentIndex].id) || {});
     assert(
       successfulAiSuggestionSave &&
         savedAiSuggestionStored?.aiSuggestions?.some((suggestion) => suggestion.id === savedAiSuggestion.id),
@@ -2694,7 +2694,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.aiModelInput.value = "Bearer workflow-ai-model-token-that-must-redact";
       els.openAiApiKeyInput.value = "sk-ai-provider-model-redaction-key-that-must-not-store";
       const redactedAiSettingsMetadataSave = await saveAiSettings();
-      const redactedAiSettingsMetadataActivity = state.activityEvents.find(
+      const redactedAiSettingsMetadataActivity = currentActivityEvents().find(
         (event) =>
           event.type === "ai-settings" &&
           String(event.detail?.provider || "").includes("[redacted secret]") &&
@@ -2718,7 +2718,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.aiModelInput.value = "test-model-non-openai-provider";
       els.openAiApiKeyInput.value = "sk-non-openai-provider-should-not-store";
       const nonOpenAiProviderSettingsSave = await saveAiSettings();
-      const nonOpenAiProviderSettingsActivity = state.activityEvents.find(
+      const nonOpenAiProviderSettingsActivity = currentActivityEvents().find(
         (event) =>
           event.type === "ai-settings" &&
           event.detail?.provider === "Anthropic" &&
@@ -4057,7 +4057,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           reportDownload.text.includes("[redacted secret]"),
         "project report redacts credential-looking activity summaries and types"
       );
-      assert(state.activityEvents.some((event) => event.type === "export" && event.summary === "Project report exported"), "project report export records project activity");
+      assert(currentActivityEvents().some((event) => event.type === "export" && event.summary === "Project report exported"), "project report export records project activity");
       assert(state.workspaceDirtyProjectIds.has(project.id), "project report export marks workspace package dirty");
 
       els.exportQualityPassportMenuBtn.click();
@@ -4072,7 +4072,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       assert(qualityPassportDownload.text.includes(`Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`), "quality passport export includes restrictive CSP");
       assert(!qualityPassportDownload.text.includes(reportTargetText), "quality passport omits segment target text");
-      assert(state.activityEvents.some((event) => event.type === "export" && event.summary === "Quality Passport exported"), "quality passport export records project activity");
+      assert(currentActivityEvents().some((event) => event.type === "export" && event.summary === "Quality Passport exported"), "quality passport export records project activity");
 
       els.exportAnonymizedProjectReportBtn.click();
       const anonymizedReportDownload = await waitFor(() => reportDownloads.find((item) => item.text.includes("LoopCAT Anonymized Project Report")), "anonymized project report download");
@@ -4087,7 +4087,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "anonymized project report omits academic metadata"
       );
       assert(!anonymizedReportDownload.text.includes("forbidden-report-term") && !anonymizedReportDownload.text.includes("Workflow TM"), "anonymized project report redacts terminology and resource names");
-      assert(state.activityEvents.some((event) => event.type === "export" && event.summary === "Anonymized project report exported"), "anonymized project report export records project activity");
+      assert(currentActivityEvents().some((event) => event.type === "export" && event.summary === "Anonymized project report exported"), "anonymized project report export records project activity");
     } finally {
       URL.createObjectURL = originalReportCreateObjectUrl;
       HTMLAnchorElement.prototype.click = originalReportAnchorClick;
@@ -4853,7 +4853,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       localStorage.removeItem(BACKUP_REMINDER_STORAGE);
       renderBackupReminder();
       assert(!els.backupReminderPanel.classList.contains("hidden"), "backup reminder returns after dismissal window is cleared");
-      const packageExportActivityCountBeforeFailure = state.activityEvents.filter((event) => event.type === "export" && event.summary === "Project package exported").length;
+      const packageExportActivityCountBeforeFailure = currentActivityEvents().filter((event) => event.type === "export" && event.summary === "Project package exported").length;
       const packageFlushFailureText = `Paket dis aktarimi oncesi bekleyen hata ${Date.now()}`;
       updateSegmentDraft(segmentIndex, packageFlushFailureText);
       setHiddenSegmentField(state.segments[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
@@ -4863,7 +4863,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         els.saveStatus.textContent.includes("Simulated pending save flush failure") &&
           state.saveTimers.has(state.segments[segmentIndex].id) &&
           packageDownloads.length === packageDownloadCountBeforeFlushFailure &&
-          state.activityEvents.filter((event) => event.type === "export" && event.summary === "Project package exported").length === packageExportActivityCountBeforeFailure,
+          currentActivityEvents().filter((event) => event.type === "export" && event.summary === "Project package exported").length === packageExportActivityCountBeforeFailure,
         "project package export reports pending save flush failure without download or activity"
       );
       Reflect.deleteProperty(state.segments[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG);
@@ -4875,7 +4875,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(
         els.saveStatus.textContent.includes("Simulated package download failure") &&
           !(state.project.exportHistory || []).some((entry) => entry.type === "project-package") &&
-          state.activityEvents.filter((event) => event.type === "export" && event.summary === "Project package exported").length === packageExportActivityCountBeforeFailure,
+          currentActivityEvents().filter((event) => event.type === "export" && event.summary === "Project package exported").length === packageExportActivityCountBeforeFailure,
         "project package download failure does not record export success"
       );
       URL.createObjectURL = (blob) => {

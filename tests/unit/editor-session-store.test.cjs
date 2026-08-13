@@ -40,6 +40,8 @@ test("EditorSessionStore compatibility bridge delegates only unmigrated replacem
   assert.equal(compatibility.projects, store.getState().projects);
   assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "projectSummaries"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "projectSummaryRevisions"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "projectTerms"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "activityEvents"), false);
   assert.equal(compatibility.transient, true);
   assert.deepEqual(
     EDITOR_SESSION_COMPATIBILITY_FIELDS.filter((name) => Object.prototype.hasOwnProperty.call(compatibility, name)),
@@ -73,4 +75,31 @@ test("EditorSessionStore explicitly owns project summaries and copy-on-write rev
   const summaries = [{ id: "project-1", wordCount: 8 }];
   assert.equal(store.replaceProjectSummaries(summaries), summaries);
   assert.equal(store.getProjectSummaries(), summaries);
+});
+
+test("EditorSessionStore explicitly owns project terms and deduplicated activity events", async () => {
+  const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
+  const originalTerm = { id: "term-1", sourceTerm: "source" };
+  const originalEvent = { id: "activity-1", type: "project-opened" };
+  const store = createEditorSessionStore({
+    projectTerms: [originalTerm],
+    activityEvents: [originalEvent]
+  });
+
+  assert.deepEqual(store.getProjectTerms(), [originalTerm]);
+  assert.deepEqual(store.getActivityEvents(), [originalEvent]);
+
+  const projectTerms = [{ id: "term-2", sourceTerm: "updated" }];
+  assert.equal(store.replaceProjectTerms(projectTerms), projectTerms);
+  assert.equal(store.getProjectTerms(), projectTerms);
+
+  const olderEvent = { id: "activity-2", type: "import" };
+  const updatedOriginalEvent = { ...originalEvent, summary: "Opened again" };
+  store.replaceActivityEvents([originalEvent, olderEvent]);
+  const activityEvents = store.prependActivityEvent(updatedOriginalEvent);
+
+  assert.deepEqual(activityEvents, [updatedOriginalEvent, olderEvent]);
+  assert.equal(store.getActivityEvents(), activityEvents);
+  assert.throws(() => store.replaceProjectTerms(null), /projectTerms must be an array/);
+  assert.throws(() => store.replaceActivityEvents(null), /activityEvents must be an array/);
 });
