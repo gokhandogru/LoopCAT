@@ -163,6 +163,40 @@ test("legacy navigation synchronization is characterized before writer migration
   assert.deepEqual(store.getState().navigation, synchronized);
 });
 
+test("NavigationController owns document and project selection identity", async () => {
+  const [{ createAppStore }, { createApplicationEvents }, { createNavigationController }] = await Promise.all([
+    moduleAt("src/app/app-store.js"),
+    moduleAt("src/app/events.js"),
+    moduleAt("src/app/navigation-controller.js")
+  ]);
+  const store = createAppStore();
+  const navigation = createNavigationController({ store, events: createApplicationEvents() });
+
+  navigation.openEditor({
+    projectId: "project-1",
+    documentId: "document-1",
+    segmentId: "segment-1",
+    activeIndex: 2
+  });
+  navigation.selectDocument({ documentId: "document-2", segmentId: "segment-5", activeIndex: 6 });
+  assert.deepEqual(store.getState().navigation, {
+    view: "editor",
+    projectId: "project-1",
+    documentId: "document-2",
+    segmentId: "segment-5",
+    activeIndex: 6
+  });
+
+  navigation.clearSelection();
+  assert.deepEqual(store.getState().navigation, {
+    view: "editor",
+    projectId: null,
+    documentId: "",
+    segmentId: "",
+    activeIndex: -1
+  });
+});
+
 test("PreferencesRepository ignores unknown versions and stores only its scoped record", async () => {
   const { createPreferencesRepository } = await moduleAt("src/data/preferences-repository.js");
   const records = new Map([["modernization.preferences", { key: "modernization.preferences", version: 99 }]]);

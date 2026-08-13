@@ -716,7 +716,6 @@ const state = {
   saveTimers: new Map(),
   focusMode: false,
   inspectorOpen: true,
-  documentFilter: "",
   segmentQuery: "",
   segmentSearchScope: "both",
   segmentRegex: false,
@@ -767,12 +766,25 @@ function currentApplicationView() {
   return applicationStore.getState().navigation.view;
 }
 
+function currentProjectId() {
+  return applicationStore.getState().navigation.projectId;
+}
+
+function currentDocumentId() {
+  return applicationStore.getState().navigation.documentId;
+}
+
+function selectApplicationDocument(documentId, selection = {}) {
+  return applicationNavigation.selectDocument({ documentId, ...selection });
+}
+
 function applicationNavigationPayload(overrides = {}) {
+  const navigation = applicationStore.getState().navigation;
   const activeSegment = state.segments[state.activeIndex] || null;
   return {
-    view: currentApplicationView(),
-    projectId: state.project?.id || null,
-    documentId: state.documentFilter || "",
+    view: navigation.view,
+    projectId: currentProjectId(),
+    documentId: navigation.documentId,
     segmentId: activeSegment?.id || "",
     activeIndex: state.activeIndex,
     ...overrides
@@ -794,7 +806,6 @@ function syncLegacyApplicationState(overrides = {}) {
 
 function applyApplicationNavigation(navigation) {
   if (!navigation) return;
-  state.documentFilter = navigation.documentId || "";
   state.activeIndex = Number.isInteger(navigation.activeIndex) ? navigation.activeIndex : state.activeIndex;
 }
 
@@ -1893,6 +1904,7 @@ async function redoLastCommand() {
     state.project = null;
     state.segments = [];
     setView("projects");
+    applicationNavigation.clearSelection();
   }
   await loadProjects(false);
   if (result.receipt.commandId === "delete-document" && state.project?.id === projectId) {
@@ -3127,7 +3139,7 @@ function segmentQueryMatcher() {
 
 function segmentPassesFilters(segment, queryMatches = segmentQueryMatcher()) {
   const status = state.segmentStatusFilter;
-  if (state.documentFilter && segment.documentId !== state.documentFilter) return false;
+  if (currentDocumentId() && segment.documentId !== currentDocumentId()) return false;
   if (state.reviewStateFilter) {
     const comments = (segment.comments || []).length + ((segment.reviewNote || "").trim() ? 1 : 0);
     if (state.reviewStateFilter === "comments") {
@@ -3152,7 +3164,7 @@ function projectSegmentIndexes() {
 function segmentFilterCacheKey() {
   return [
     state.segmentFilterRevision,
-    state.documentFilter,
+    currentDocumentId(),
     state.segmentQuery,
     state.segmentSearchScope,
     state.segmentRegex ? "regex" : "plain",
@@ -3223,7 +3235,7 @@ function projectDocumentType(documentInfo) {
 
 function exportDocumentForTypes(supportedTypes, selectedTypeMessage, missingMessage) {
   const docs = projectDocuments();
-  const selected = state.documentFilter ? docs.find((item) => item.id === state.documentFilter) : null;
+  const selected = currentDocumentId() ? docs.find((item) => item.id === currentDocumentId()) : null;
   if (selected) {
     if (supportedTypes.has(projectDocumentType(selected))) return selected;
     setSaveStatus(selectedTypeMessage, "dirty");
@@ -3288,14 +3300,14 @@ function documentStats(documentId) {
 }
 
 function currentDocumentSegments() {
-  return state.documentFilter
-    ? state.segments.filter((segment) => segment.documentId === state.documentFilter)
+  return currentDocumentId()
+    ? state.segments.filter((segment) => segment.documentId === currentDocumentId())
     : state.segments;
 }
 
 function currentSelectedDocument() {
-  if (!state.documentFilter) return null;
-  return projectDocuments().find((documentInfo) => documentInfo.id === state.documentFilter) || null;
+  if (!currentDocumentId()) return null;
+  return projectDocuments().find((documentInfo) => documentInfo.id === currentDocumentId()) || null;
 }
 
 function deliveryExportScope() {
@@ -4344,7 +4356,6 @@ function setView(view) {
 function showProjectHome() {
   if (!state.project) return;
   state.focusMode = false;
-  state.documentFilter = "";
   state.activeIndex = state.segments.length ? 0 : -1;
   const navigation = applicationNavigation?.openProject?.(state.project.id, state.activeIndex);
   if (navigation) applyApplicationNavigation(navigation);
@@ -4692,7 +4703,6 @@ async function openProject(projectId) {
   state.activityEvents = state.project ? await listActivityEvents(projectId) : [];
   await refreshProjectTerms();
   state.activeIndex = state.segments.length ? 0 : -1;
-  state.documentFilter = "";
   await filterPresetReady;
   await filterPresetController?.restoreForProject?.(state.project?.id || projectId);
   const navigation = applicationNavigation?.openProject?.(state.project?.id || projectId, state.activeIndex);
@@ -4703,7 +4713,6 @@ async function openProject(projectId) {
 
 async function openProjectFile(documentId) {
   if (!state.project) return;
-  state.documentFilter = documentId;
   const first = state.segments.findIndex((segment) => segment.documentId === documentId);
   state.activeIndex = first;
   const navigation = applicationNavigation?.openEditor?.({
@@ -5355,7 +5364,7 @@ function renderEditor() {
     verticalFeatureState.inspector.setVisible(currentApplicationView() === "editor" && state.inspectorOpen);
     verticalFeatureState.dashboard.setVisible(currentApplicationView() === "project" && hasProject);
     verticalFeatureState.filters.update({
-      documentId: state.documentFilter,
+      documentId: currentDocumentId(),
       query: state.segmentQuery,
       scope: state.segmentSearchScope,
       regex: state.segmentRegex,
@@ -5491,7 +5500,7 @@ function renderProjectHome() {
 }
 
 function renderDocumentFilter() {
-  const current = state.documentFilter;
+  const current = currentDocumentId();
   const documents = projectDocuments();
   const fragment = document.createDocumentFragment();
   const allOption = document.createElement("option");
@@ -5506,7 +5515,7 @@ function renderDocumentFilter() {
   });
   els.documentFilter.replaceChildren(fragment);
   els.documentFilter.value = documents.some((documentInfo) => documentInfo.id === current) ? current : "";
-  state.documentFilter = els.documentFilter.value;
+  if (els.documentFilter.value !== current) selectApplicationDocument(els.documentFilter.value);
 }
 
 function renderLanguagePairFilter() {
@@ -5633,8 +5642,8 @@ async function confirmDeleteProject(projectId = state.project?.id) {
       state.project = null;
       state.segments = [];
       state.activeIndex = -1;
-      state.documentFilter = "";
       applicationNavigation.openProjects();
+      applicationNavigation.clearSelection();
     }
     await loadProjects(false);
     setSaveStatus("Project moved to Trash. Undo is available.", "saved");
@@ -5663,7 +5672,7 @@ async function confirmDeleteFile(documentInfo) {
     state.project = commandResult.result.project;
     state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
     state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
-    state.documentFilter = "";
+    selectApplicationDocument("");
     state.activeIndex = state.segments.length ? 0 : -1;
     markWorkspaceDirty();
     let fileDeleteActivityFailed = false;
@@ -7598,9 +7607,9 @@ async function goToQualityRiskItem(item) {
   if (index === -1) return;
   const segment = state.segments[index];
   if (!segmentPassesFilters(segment)) {
-    if (state.documentFilter && segment.documentId !== state.documentFilter) {
-      state.documentFilter = "";
-      els.documentFilter.value = state.documentFilter;
+    if (currentDocumentId() && segment.documentId !== currentDocumentId()) {
+      selectApplicationDocument("");
+      els.documentFilter.value = currentDocumentId();
     }
     state.segmentQuery = "";
     els.segmentSearchInput.value = "";
@@ -7983,7 +7992,7 @@ async function runProjectQa() {
     renderQualityWorkbench();
     try {
     if (LOOPCAT_TEST_BUILD && state.project[QA_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated QA activity log failure");
-      await logProjectActivity("qa-run", "QA checks run", { issueCount: checks.length, documentId: state.documentFilter || "" });
+      await logProjectActivity("qa-run", "QA checks run", { issueCount: checks.length, documentId: currentDocumentId() });
     } catch (activityError) {
       console.warn("QA activity log failed.", activityError);
     }
@@ -11780,9 +11789,12 @@ async function importDocx(file) {
   state.project = importResult.project;
   state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
   state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
-  state.documentFilter = documentId;
   await refreshProjectSummaries();
   state.activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
+  selectApplicationDocument(documentId, {
+    segmentId: state.segments[state.activeIndex]?.id || "",
+    activeIndex: state.activeIndex
+  });
   const extractedParts = result.structure?.textPartSummary?.filter((part) => part.segments > 0).length || 1;
   const activityLogged = await logOptionalProjectActivity("import", "DOCX imported", { fileName: file.name, segmentCount: result.segments.length, documentId }, "DOCX import");
   markWorkspaceDirty();
@@ -11810,9 +11822,12 @@ async function importLocalization(file) {
   state.project = importResult.project;
   state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
   state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
-  state.documentFilter = documentId;
   await refreshProjectSummaries();
   state.activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
+  selectApplicationDocument(documentId, {
+    segmentId: state.segments[state.activeIndex]?.id || "",
+    activeIndex: state.activeIndex
+  });
   const activityLogged = await logOptionalProjectActivity("import", "Localization file imported", { fileName: file.name, documentType: result.documentType, segmentCount: result.segments.length, documentId }, "Localization import");
   markWorkspaceDirty();
   setSaveStatus(appendActivityWarning("Saved", activityLogged), exportStatusMode("saved", activityLogged));
@@ -11840,9 +11855,12 @@ async function importXliff(file) {
   state.project = importResult.project;
   state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
   state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
-  state.documentFilter = documentId;
   await refreshProjectSummaries();
   state.activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
+  selectApplicationDocument(documentId, {
+    segmentId: state.segments[state.activeIndex]?.id || "",
+    activeIndex: state.activeIndex
+  });
   const activityLogged = await logOptionalProjectActivity("import", "XLIFF imported", { fileName: file.name, segmentCount: result.segments.length, documentId }, "XLIFF import");
   markWorkspaceDirty();
   setSaveStatus(appendActivityWarning(`Imported ${result.segments.length} XLIFF segment${result.segments.length === 1 ? "" : "s"}`, activityLogged), exportStatusMode("saved", activityLogged));
@@ -12277,6 +12295,7 @@ async function importProjectPackageData(pkg, options = {}) {
   state.project = null;
   state.segments = [];
   applicationNavigation.openProjects();
+  applicationNavigation.clearSelection();
   await loadProjects(false);
   if (options.open !== false) await openProject(prepared.project.id);
   renderValidationReport(importReport);
@@ -12312,6 +12331,7 @@ async function restoreBackupData(backup) {
   state.project = null;
   state.segments = [];
   applicationNavigation.openProjects();
+  applicationNavigation.clearSelection();
   await loadProjects(false);
   const restoredProjectIds = state.projects.map((project) => project.id).filter(Boolean);
   if (state.workspaceStatus?.connected) {
@@ -12611,6 +12631,7 @@ async function syncWorkspaceFromFolder() {
   state.project = null;
   state.segments = [];
   applicationNavigation.openProjects();
+  applicationNavigation.clearSelection();
   await loadProjects(false);
   state.workspaceStatus = await workspaceStorage.getStatus();
   const finalWarnings = Array.from(new Set([...(state.workspaceStatus.warnings || []), ...warnings].map((warning) => redactSensitiveText(warning || "").trim()).filter(Boolean)));
@@ -13717,7 +13738,7 @@ function wireEvents() {
     });
   });
   els.documentFilter.addEventListener("change", async () => {
-    state.documentFilter = els.documentFilter.value;
+    selectApplicationDocument(els.documentFilter.value);
     renderSegments();
     renderProgress();
     const first = firstVisibleSegmentIndex();
@@ -14200,7 +14221,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       documents: state.project.documents.map((item) => (item.id === documentInfo.id ? { ...item, type: "HTML" } : item))
     });
     state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-    state.documentFilter = documentInfo.id;
+    selectApplicationDocument(documentInfo.id);
     const caseInsensitiveTypeDownloads = [];
     const originalCaseCreateObjectUrl = URL.createObjectURL.bind(URL);
     const originalCaseAnchorClick = HTMLAnchorElement.prototype.click;
@@ -14481,7 +14502,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const docxLandingDocument = state.project.documents.find((item) => item.name === "workflow-docx-landing.docx");
     assert(
       docxLandingDocument &&
-        state.documentFilter === docxLandingDocument.id &&
+        currentDocumentId() === docxLandingDocument.id &&
         els.documentFilter.value === docxLandingDocument.id &&
         state.activeIndex >= 0 &&
         state.segments[state.activeIndex]?.documentId === docxLandingDocument.id,
@@ -14993,7 +15014,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiBatchReviewIndexes = state.segments.map((_, index) => index).slice(0, 3);
     const aiBatchReviewSnapshots = new Map(aiBatchReviewIndexes.map((index) => [state.segments[index].id, structuredClone(state.segments[index])]));
     const originalBatchReviewFilters = {
-      documentFilter: state.documentFilter,
+      documentFilter: currentDocumentId(),
       segmentQuery: state.segmentQuery,
       segmentSearchScope: state.segmentSearchScope,
       segmentRegex: state.segmentRegex,
@@ -15009,7 +15030,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-review-model";
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
-      state.documentFilter = "";
+      selectApplicationDocument("");
       state.segmentQuery = "workflow batch qa";
       state.segmentSearchScope = "both";
       state.segmentRegex = false;
@@ -15086,7 +15107,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
     } finally {
       aiReviewProvider.completePrompt = originalAiBatchReviewCompletePrompt;
-      state.documentFilter = originalBatchReviewFilters.documentFilter;
+      selectApplicationDocument(originalBatchReviewFilters.documentFilter);
       state.segmentQuery = originalBatchReviewFilters.segmentQuery;
       state.segmentSearchScope = originalBatchReviewFilters.segmentSearchScope;
       state.segmentRegex = originalBatchReviewFilters.segmentRegex;
@@ -15166,7 +15187,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiBatchRepairIndexes = state.segments.map((_, index) => index).slice(0, 3);
     const aiBatchRepairSnapshots = new Map(aiBatchRepairIndexes.map((index) => [state.segments[index].id, structuredClone(state.segments[index])]));
     const originalBatchRepairFilters = {
-      documentFilter: state.documentFilter,
+      documentFilter: currentDocumentId(),
       segmentQuery: state.segmentQuery,
       segmentSearchScope: state.segmentSearchScope,
       segmentRegex: state.segmentRegex,
@@ -15181,7 +15202,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-repair-model";
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
-      state.documentFilter = "";
+      selectApplicationDocument("");
       state.segmentQuery = "workflow batch tag repair";
       state.segmentSearchScope = "both";
       state.segmentRegex = false;
@@ -15264,7 +15285,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
     } finally {
       aiRepairProvider.completePrompt = originalAiBatchRepairCompletePrompt;
-      state.documentFilter = originalBatchRepairFilters.documentFilter;
+      selectApplicationDocument(originalBatchRepairFilters.documentFilter);
       state.segmentQuery = originalBatchRepairFilters.segmentQuery;
       state.segmentSearchScope = originalBatchRepairFilters.segmentSearchScope;
       state.segmentRegex = originalBatchRepairFilters.segmentRegex;
@@ -15292,7 +15313,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiVariantsProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
     const originalAiVariantsMode = els.localAiVariantModeSelect?.value || "";
     const originalAiVariantsFilters = {
-      documentFilter: state.documentFilter,
+      documentFilter: currentDocumentId(),
       segmentQuery: state.segmentQuery,
       segmentSearchScope: state.segmentSearchScope,
       segmentRegex: state.segmentRegex,
@@ -15438,7 +15459,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       aiVariantsProvider.completePrompt = originalAiVariantsCompletePrompt;
       if (els.localAiVariantModeSelect) els.localAiVariantModeSelect.value = originalAiVariantsMode;
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiVariantsFilters.localAiMode;
-      state.documentFilter = originalAiVariantsFilters.documentFilter;
+      selectApplicationDocument(originalAiVariantsFilters.documentFilter);
       state.segmentQuery = originalAiVariantsFilters.segmentQuery;
       state.segmentSearchScope = originalAiVariantsFilters.segmentSearchScope;
       state.segmentRegex = originalAiVariantsFilters.segmentRegex;
@@ -15539,7 +15560,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiBatchApplyTermsIndexes = state.segments.map((_, index) => index).slice(0, 3);
     const aiBatchApplyTermsSnapshots = new Map(aiBatchApplyTermsIndexes.map((index) => [state.segments[index].id, structuredClone(state.segments[index])]));
     const originalBatchApplyTermsFilters = {
-      documentFilter: state.documentFilter,
+      documentFilter: currentDocumentId(),
       segmentQuery: state.segmentQuery,
       segmentSearchScope: state.segmentSearchScope,
       segmentRegex: state.segmentRegex,
@@ -15555,7 +15576,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-apply-terms-model";
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
-      state.documentFilter = "";
+      selectApplicationDocument("");
       state.segmentQuery = "workflow batch apply terminology";
       state.segmentSearchScope = "both";
       state.segmentRegex = false;
@@ -15652,7 +15673,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } finally {
       aiApplyTermsProvider.completePrompt = originalAiBatchApplyTermsCompletePrompt;
       await Promise.all(aiBatchApplyTermsSavedTerms.filter((term) => term?.id).map((term) => deleteTerm(term.id)));
-      state.documentFilter = originalBatchApplyTermsFilters.documentFilter;
+      selectApplicationDocument(originalBatchApplyTermsFilters.documentFilter);
       state.segmentQuery = originalBatchApplyTermsFilters.segmentQuery;
       state.segmentSearchScope = originalBatchApplyTermsFilters.segmentSearchScope;
       state.segmentRegex = originalBatchApplyTermsFilters.segmentRegex;
@@ -15679,7 +15700,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiPolishSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
     const aiPolishProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
     const originalAiPolishFilters = {
-      documentFilter: state.documentFilter,
+      documentFilter: currentDocumentId(),
       segmentQuery: state.segmentQuery,
       segmentSearchScope: state.segmentSearchScope,
       segmentRegex: state.segmentRegex,
@@ -15821,7 +15842,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } finally {
       aiPolishProvider.completePrompt = originalAiPolishCompletePrompt;
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiPolishFilters.localAiMode;
-      state.documentFilter = originalAiPolishFilters.documentFilter;
+      selectApplicationDocument(originalAiPolishFilters.documentFilter);
       state.segmentQuery = originalAiPolishFilters.segmentQuery;
       state.segmentSearchScope = originalAiPolishFilters.segmentSearchScope;
       state.segmentRegex = originalAiPolishFilters.segmentRegex;
@@ -15954,7 +15975,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const originalAiBatchAdaptCompletePrompt = aiBatchAdaptProvider.completePrompt;
     const aiBatchAdaptProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
     const originalAiBatchAdaptFilters = {
-      documentFilter: state.documentFilter,
+      documentFilter: currentDocumentId(),
       segmentQuery: state.segmentQuery,
       segmentSearchScope: state.segmentSearchScope,
       segmentRegex: state.segmentRegex,
@@ -16080,7 +16101,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       aiBatchAdaptProvider.completePrompt = originalAiBatchAdaptCompletePrompt;
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiBatchAdaptFilters.localAiMode;
       if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = originalAiBatchAdaptFilters.localAiAdaptMode;
-      state.documentFilter = originalAiBatchAdaptFilters.documentFilter;
+      selectApplicationDocument(originalAiBatchAdaptFilters.documentFilter);
       state.segmentQuery = originalAiBatchAdaptFilters.segmentQuery;
       state.segmentSearchScope = originalAiBatchAdaptFilters.segmentSearchScope;
       state.segmentRegex = originalAiBatchAdaptFilters.segmentRegex;
@@ -16102,7 +16123,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiTermsProvider = aiProviderService.get("ollama");
     const originalAiTermsCompletePrompt = aiTermsProvider.completePrompt;
     const originalAiTermsMode = els.localAiModeSelect?.value || "";
-    const originalAiTermsDocumentFilter = state.documentFilter;
+    const originalAiTermsDocumentFilter = currentDocumentId();
     const originalAiTermsActiveIndex = state.activeIndex;
     let aiExtractedTermIds = [];
     let aiTermsPromptCount = 0;
@@ -16171,7 +16192,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } finally {
       aiTermsProvider.completePrompt = originalAiTermsCompletePrompt;
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiTermsMode;
-      state.documentFilter = originalAiTermsDocumentFilter;
+      selectApplicationDocument(originalAiTermsDocumentFilter);
       renderDocumentFilter();
       renderSegments();
       if (Number.isInteger(originalAiTermsActiveIndex) && originalAiTermsActiveIndex >= 0) await setActiveSegment(originalAiTermsActiveIndex);
@@ -18832,6 +18853,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     state.project = null;
     state.segments = [];
     applicationNavigation.openProjects();
+    applicationNavigation.clearSelection();
     await loadProjects(false);
 
     state.workspaceStatus = { supported: true, connected: false, mode: "browser-cache", name: "", lastSyncedAt: "", projectCount: 0, resourceCount: 0, backupCount: 0 };
@@ -19810,7 +19832,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await importLocalization(taggedFile);
     const taggedDocument = state.project.documents.find((item) => item.name === "tagged.html");
     assert(Boolean(taggedDocument), "tagged HTML fixture imported");
-    state.documentFilter = taggedDocument.id;
+    selectApplicationDocument(taggedDocument.id);
     const taggedIndex = state.segments.findIndex((segment) => segment.documentId === taggedDocument.id);
     renderSegments();
     const taggedRow = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"]`);
@@ -19941,7 +19963,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await importLocalization(structuredMergeFile);
     const structuredMergeDocument = state.project.documents.find((item) => item.name === "structured-merge.html");
     assert(Boolean(structuredMergeDocument), "structured merge fixture imported");
-    state.documentFilter = structuredMergeDocument.id;
+    selectApplicationDocument(structuredMergeDocument.id);
     renderSegments();
     const structuredMergeIndexes = state.segments
       .map((segment, index) => ({ segment, index }))
@@ -19963,7 +19985,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await importLocalization(duplicateTaggedFile);
     const duplicateTaggedDocument = state.project.documents.find((item) => item.name === "duplicate-tagged.html");
     assert(Boolean(duplicateTaggedDocument), "duplicate tagged HTML fixture imported");
-    state.documentFilter = duplicateTaggedDocument.id;
+    selectApplicationDocument(duplicateTaggedDocument.id);
     const duplicateTaggedIndex = state.segments.findIndex((segment) => segment.documentId === duplicateTaggedDocument.id);
     state.segments[duplicateTaggedIndex].target = "<strong>Bir</strong> ve iki";
     state.segments[duplicateTaggedIndex].status = "draft";
@@ -20006,7 +20028,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await importLocalization(scopedEmptyFile);
     const scopedEmptyDocument = state.project.documents.find((item) => item.name === "scoped-empty.html");
     assert(Boolean(scopedEmptyDocument) && state.segments.some((segment) => segment.documentId === scopedEmptyDocument.id && !String(segment.target || "").trim()), "scoped export unfinished fixture imported");
-    state.documentFilter = scopedCompleteDocument.id;
+    selectApplicationDocument(scopedCompleteDocument.id);
     renderDocumentFilter();
     renderSegments();
     const scopedExportDownloads = [];
@@ -20042,7 +20064,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "selected XLIFF export ignores unfinished unselected files"
       );
 
-      state.documentFilter = scopedEmptyDocument.id;
+      selectApplicationDocument(scopedEmptyDocument.id);
       renderDocumentFilter();
       renderSegments();
       const scopedEmptySegment = state.segments.find((segment) => segment.documentId === scopedEmptyDocument.id);
@@ -20119,7 +20141,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         touchSegment(segment);
       });
       if (untranslatedForDelivery.length) await saveSegments(state.segments);
-      state.documentFilter = "";
+      selectApplicationDocument("");
       renderDocumentFilter();
       clearWorkspaceDirtyMarkers();
       await exportXliff();

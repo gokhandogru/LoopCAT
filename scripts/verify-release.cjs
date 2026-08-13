@@ -375,6 +375,10 @@ assert(
   "AppStore must remain the only route/view owner; app.js cannot restore a legacy state.view field."
 );
 assert(
+  !appJs.includes("state.documentFilter"),
+  "AppStore must remain the only selected-document owner; app.js cannot restore a legacy state.documentFilter field."
+);
+assert(
   productionAssets.appVersion === packageJson.version,
   "Canonical production asset manifest appVersion must match package.json."
 );
@@ -5236,8 +5240,8 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "async function importDocx(file)", "async function importLocalization(file)"),
-  "state.documentFilter = documentId",
-  "app.js DOCX import must select the newly imported document like other file imports."
+  "selectApplicationDocument(documentId",
+  "app.js DOCX import must select the newly imported document through AppStore like other file imports."
 );
 assertIncludes(
   functionBody(appJs, "async function importLocalization(file)", "async function importXliff(file)"),
