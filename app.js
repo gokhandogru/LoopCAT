@@ -1,17 +1,22 @@
 (() => {
-const { buildBilingualDocx, buildTargetDocx, detectProtectedTags, extractDocxSegments } = window.CatHan.docx;
-const { appendProjectSegments, appendProjectSegmentsAndUpdateProject, createProject, deleteProject, deleteProjectDocument, deleteSegment, getProjectSegments, listProjects, replaceProjectSegments, saveSegment, saveSegments, saveSegmentStructure, updateProject } = window.CatHan.project;
-const { bulkPut, constants: storageConstants, createPortableSanitizerContext, exportAllData, getAll, getAllByIndex, importAllData, importProjectPackageRecords, listActivityEvents, makeId, recordActivityEvent, sanitizePortableValue } = window.CatHan.storage;
-const { deleteTmEntry, deleteTmEntries, getTmMatchCandidates, getTmMatchCandidateBatches, importTmEntries, listTmEntries, rebuildAllTmIndexes, saveTmEntry, scoreTmEntries, updateTmEntry } = window.CatHan.tm;
-const { buildTmx, parseTmx, parseTmxAsync } = window.CatHan.tmx;
-const { deleteTerm, deleteTerms, findTerms, importTerms, listTerms, parseTermList, parseTermWorkbook, rebuildAllTermIndexes, saveTerm, termRanges, updateTerm } = window.CatHan.termbase;
-const { buildTbx, parseTbx, parseTbxAsync } = window.CatHan.tbx;
-const { buildTargetXliff, buildXliff, buildXliff22, parseXliffFile, xliffMimeType } = window.CatHan.xliff;
-const { buildLocalizationFile, parseLocalizationFile } = window.CatHan.localization;
-const { runQaChecks } = window.CatHan.qa;
-const { validateProjectPackage: validatePackage, validateBackupFile, planDeliveryExport, validateExportReadiness, reportCount, reportSummary } = window.CatHan.validation;
-const { analyzeProject } = window.CatHan.analysis;
-const { buildQualityPassportData, buildRiskQueue, defaultQualityProfile, qualityCategoryLabel: baseQualityCategoryLabel, scoreSegment } = window.CatHan.quality;
+const appRuntime = window.CatHan.appRuntime;
+const compatibilityModules = appRuntime.compatibilityModules;
+const storageApi = compatibilityModules.storage;
+const encodingApi = compatibilityModules.encoding;
+const xliffApi = compatibilityModules.xliff;
+const { buildBilingualDocx, buildTargetDocx, detectProtectedTags, extractDocxSegments } = compatibilityModules.docx;
+const { appendProjectSegments, appendProjectSegmentsAndUpdateProject, createProject, deleteProject, deleteProjectDocument, deleteSegment, getProjectSegments, listProjects, replaceProjectSegments, saveSegment, saveSegments, saveSegmentStructure, updateProject } = compatibilityModules.project;
+const { bulkPut, constants: storageConstants, createPortableSanitizerContext, exportAllData, getAll, getAllByIndex, importAllData, importProjectPackageRecords, listActivityEvents, makeId, recordActivityEvent, sanitizePortableValue } = storageApi;
+const { deleteTmEntry, deleteTmEntries, getTmMatchCandidates, getTmMatchCandidateBatches, importTmEntries, listTmEntries, rebuildAllTmIndexes, saveTmEntry, scoreTmEntries, updateTmEntry } = compatibilityModules.tm;
+const { buildTmx, parseTmx, parseTmxAsync } = compatibilityModules.tmx;
+const { deleteTerm, deleteTerms, findTerms, importTerms, listTerms, parseTermList, parseTermWorkbook, rebuildAllTermIndexes, saveTerm, termRanges, updateTerm } = compatibilityModules.termbase;
+const { buildTbx, parseTbx, parseTbxAsync } = compatibilityModules.tbx;
+const { buildTargetXliff, buildXliff, buildXliff22, parseXliffFile, xliffMimeType } = xliffApi;
+const { buildLocalizationFile, parseLocalizationFile } = compatibilityModules.localization;
+const { runQaChecks } = compatibilityModules.qa;
+const { validateProjectPackage: validatePackage, validateBackupFile, planDeliveryExport, validateExportReadiness, reportCount, reportSummary } = compatibilityModules.validation;
+const { analyzeProject } = compatibilityModules.analysis;
+const { buildQualityPassportData, buildRiskQueue, defaultQualityProfile, qualityCategoryLabel: baseQualityCategoryLabel, scoreSegment } = compatibilityModules.quality;
 const {
   DEFAULT_LOCAL_AI_MODEL,
   GEMINI_DEFAULT_MODEL,
@@ -64,12 +69,11 @@ const {
   openAiSuggestion,
   parseAiReviewRisk,
   preTranslationService
-} = window.CatHan.ai;
-const workerClient = window.CatHan.workerClient;
-const workspaceStorage = window.CatHan.workspaceStorage;
-const uiI18n = window.CatHan.i18n;
-const focusController = window.CatHan.focusController?.createFocusController?.();
-const appRuntime = window.CatHan.appRuntime;
+} = compatibilityModules.ai;
+const workerClient = compatibilityModules.workerClient;
+const workspaceStorage = compatibilityModules.workspaceStorage;
+const uiI18n = compatibilityModules.i18n;
+const focusController = compatibilityModules.focusController.createFocusController();
 const replaceSafeHtml = appRuntime.safeHtml.replace;
 const finalizeReportDocument = appRuntime.reports.finalize;
 const aiProviderService = appRuntime.featureFactories.createAiProviderService(aiProviderRegistry);
@@ -3525,7 +3529,7 @@ function renderLanguageDatalists() {
 
 function renderTextEncodingOptions() {
   if (!els.fileEncodingSelect) return;
-  const options = window.CatHan.encoding?.TEXT_ENCODING_OPTIONS || [["auto", "Auto"], ["utf-8", "UTF-8"]];
+  const options = encodingApi.TEXT_ENCODING_OPTIONS || [["auto", "Auto"], ["utf-8", "UTF-8"]];
   replaceSafeHtml(
     els.fileEncodingSelect,
     options.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("")
@@ -11982,8 +11986,8 @@ async function parseJsonFile(file, label) {
     throw new Error(`${label} is too large. Choose a LoopCAT JSON file under 50 MB.`);
   }
   try {
-    const decoded = window.CatHan.encoding
-      ? await window.CatHan.encoding.decodeTextFile(file, textDecodingOptions())
+    const decoded = encodingApi
+      ? await encodingApi.decodeTextFile(file, textDecodingOptions())
       : { text: await file.text() };
     return JSON.parse(decoded.text);
   } catch {
@@ -11992,7 +11996,7 @@ async function parseJsonFile(file, label) {
 }
 
 async function readImportTextFile(file, options = textDecodingOptions()) {
-  if (window.CatHan.encoding) return (await window.CatHan.encoding.decodeTextFile(file, options)).text;
+  if (encodingApi) return (await encodingApi.decodeTextFile(file, options)).text;
   return file.text();
 }
 
@@ -13852,7 +13856,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
   try {
     assert(Boolean(document.querySelector('link[rel="manifest"]')), "installable app manifest linked");
-    const workflowDatabase = await window.CatHan.storage.openDatabase();
+    const workflowDatabase = await storageApi.openDatabase();
     assert(
       workflowDatabase.version === 6 &&
         workflowDatabase.objectStoreNames.contains("trashEntries") &&
@@ -14257,7 +14261,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "text import encoding override offers Arabic and Japanese legacy encodings"
     );
     const windows1254Text = "Istanbul ışık\n\nÇeviri";
-    const windows1254Bytes = window.CatHan.encoding.encodeText(windows1254Text, "windows-1254").content;
+    const windows1254Bytes = encodingApi.encodeText(windows1254Text, "windows-1254").content;
     const windows1254Parsed = await parseLocalizationFile(new File([windows1254Bytes], "workflow-windows-1254.txt", { type: "text/plain" }), { encoding: "windows-1254" });
     assert(
       windows1254Parsed.segments[0]?.text === "Istanbul ışık" &&
@@ -14267,19 +14271,19 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const windows1254Output = await buildLocalizationFile("txt", [{ ...windows1254Parsed.segments[0], target: "Işık çıktı" }], windows1254Parsed.structure);
     assert(
       windows1254Output instanceof Uint8Array &&
-        window.CatHan.encoding.decodeTextBytes(windows1254Output, { encoding: "windows-1254" }).text.includes("Işık çıktı"),
+        encodingApi.decodeTextBytes(windows1254Output, { encoding: "windows-1254" }).text.includes("Işık çıktı"),
       "text export preserves single-byte legacy encoding when every target character is encodable"
     );
-    const arabicBytes = window.CatHan.encoding.encodeText("سلام", "windows-1256").content;
+    const arabicBytes = encodingApi.encodeText("سلام", "windows-1256").content;
     const arabicParsed = await parseLocalizationFile(new File([arabicBytes], "workflow-arabic.txt", { type: "text/plain" }), { encoding: "windows-1256" });
     assert(arabicParsed.segments[0]?.text === "سلام", "Windows-1256 Arabic text import decodes Arabic script");
-    const cyrillicBytes = window.CatHan.encoding.encodeText("Привет", "windows-1251").content;
+    const cyrillicBytes = encodingApi.encodeText("Привет", "windows-1251").content;
     const cyrillicParsed = await parseLocalizationFile(new File([cyrillicBytes], "workflow-cyrillic.txt", { type: "text/plain" }), { encoding: "windows-1251" });
     assert(cyrillicParsed.segments[0]?.text === "Привет", "Windows-1251 Cyrillic text import decodes Cyrillic script");
     const shiftJisBytes = new Uint8Array([0x93, 0xfa, 0x96, 0x7b, 0x8c, 0xea]);
     const shiftJisParsed = await parseLocalizationFile(new File([shiftJisBytes], "workflow-shift-jis.txt", { type: "text/plain" }), { encoding: "shift_jis" });
     assert(shiftJisParsed.segments[0]?.text === "日本語", "Shift_JIS Japanese text import decodes Japanese script");
-    const utf16Bytes = window.CatHan.encoding.encodeText("שלום", { encoding: "utf-16le", bom: true }).content;
+    const utf16Bytes = encodingApi.encodeText("שלום", { encoding: "utf-16le", bom: true }).content;
     const utf16Parsed = await parseLocalizationFile(new File([utf16Bytes], "workflow-utf16.txt", { type: "text/plain" }));
     assert(
       utf16Parsed.segments[0]?.text === "שלום" &&
@@ -14297,7 +14301,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
   </body>
 </tmx>`;
     const windows1254TmxEntries = parseTmx(
-      await readImportTextFile(new File([window.CatHan.encoding.encodeText(windows1254TmxText, "windows-1254").content], "workflow-windows-1254.tmx", { type: "application/xml" })),
+      await readImportTextFile(new File([encodingApi.encodeText(windows1254TmxText, "windows-1254").content], "workflow-windows-1254.tmx", { type: "application/xml" })),
       { sourceLang: "en", targetLang: "tr", tmName: "Encoding TM", projectName: "Encoding test" }
     );
     assert(windows1254TmxEntries[0]?.target === "I\u015f\u0131k \u00e7\u0131kt\u0131", "TMX import decodes Windows-1254 translation memory text");
@@ -14314,7 +14318,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
   </text>
 </tbx>`;
     const windows1254TbxTerms = parseTbx(
-      await readImportTextFile(new File([window.CatHan.encoding.encodeText(windows1254TbxText, "windows-1254").content], "workflow-windows-1254.tbx", { type: "application/xml" })),
+      await readImportTextFile(new File([encodingApi.encodeText(windows1254TbxText, "windows-1254").content], "workflow-windows-1254.tbx", { type: "application/xml" })),
       { sourceLang: "en", targetLang: "tr", termBaseName: "Encoding TB" }
     );
     assert(
@@ -14380,7 +14384,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     try {
       const windows1254TermCsvText = "source,target,notes\nlight,\u0131\u015f\u0131k,\u00c7al\u0131\u015fma notu";
       const windows1254CsvTerms = await parseTermListFile(
-        new File([window.CatHan.encoding.encodeText(windows1254TermCsvText, "windows-1254").content], "workflow-windows-1254.csv", { type: "text/csv" }),
+        new File([encodingApi.encodeText(windows1254TermCsvText, "windows-1254").content], "workflow-windows-1254.csv", { type: "text/csv" }),
         { sourceLang: "en", targetLang: "tr", termBaseName: "Encoding TB", fileName: "workflow-windows-1254.csv" }
       );
       assert(
@@ -18450,7 +18454,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const bulkTmKey = `${bulkTmName}::${state.project.sourceLang}::${state.project.targetLang}`;
     const bulkTbKey = `${bulkTbName}::${state.project.sourceLang}::${state.project.targetLang}`;
     const atomicConflictTrashId = `workflow-resource-trash-conflict-${Date.now()}`;
-    await window.CatHan.storage.put("trashEntries", {
+    await storageApi.put("trashEntries", {
       id: atomicConflictTrashId,
       entityType: "project",
       entityId: "atomic-conflict-placeholder",
@@ -18461,7 +18465,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     });
     let atomicResourceTrashFailure = null;
     try {
-      await window.CatHan.storage.moveResourceRecordsToTrash("tm", {
+      await storageApi.moveResourceRecordsToTrash("tm", {
         id: atomicConflictTrashId,
         entityType: "translation-memory",
         entityId: `tm:${bulkTmKey}`,
@@ -18481,10 +18485,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(
       Boolean(atomicResourceTrashFailure) &&
         (await listTmEntries()).filter((entry) => entry.tmName === bulkTmName).length === 2 &&
-        (await window.CatHan.storage.get("trashEntries", atomicConflictTrashId))?.entityType === "project",
+        (await storageApi.get("trashEntries", atomicConflictTrashId))?.entityType === "project",
       "resource Trash transaction conflict rolls back every live record and preserves the existing Trash item"
     );
-    await window.CatHan.storage.deleteByKey("trashEntries", atomicConflictTrashId);
+    await storageApi.deleteByKey("trashEntries", atomicConflictTrashId);
     RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.add(`tm:${bulkTmKey}`);
     const failedBulkTmDelete = await confirmDeleteResource("tm", bulkTmKey);
     const failedBulkTmEntries = (await listTmEntries()).filter((entry) => entry.tmName === bulkTmName);
@@ -20083,7 +20087,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await exportXliff();
       const partialXliffDownload = scopedExportDownloads.filter((item) => item.type === "application/x-xliff+xml").at(-1);
       const partialXliff = await partialXliffDownload?.blob.text();
-      const parsedPartialXliff = window.CatHan.xliff.parseXliffText(partialXliff, "partial.xlf");
+      const parsedPartialXliff = xliffApi.parseXliffText(partialXliff, "partial.xlf");
       assert(
         parsedPartialXliff.segments[0].target === "" &&
           parsedPartialXliff.segments[0].status === "empty" &&

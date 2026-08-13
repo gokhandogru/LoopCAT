@@ -69,11 +69,11 @@ import { createAiProviderService } from "../ai/providers/legacy-registry-adapter
 import { finalizeReportDocument } from "../reports/report-document.js";
 import { createLocaleLoader } from "../i18n/locale-loader.js";
 
-export function createApplicationRuntime({ browserWindow, projectApi, storageApi, desktopBridge }) {
+export function createApplicationRuntime({ browserWindow, compatibilityModules, desktopBridge }) {
   const store = createAppStore();
   const events = createApplicationEvents();
-  const storageRepository = createStorageRepository(storageApi);
-  const projectRepository = createProjectRepository(projectApi);
+  const storageRepository = createStorageRepository(compatibilityModules.storage);
+  const projectRepository = createProjectRepository(compatibilityModules.project);
   const preferencesRepository = createPreferencesRepository(storageRepository);
   const trashRepository = createTrashRepository(storageRepository);
   const undoStore = createUndoStore(100);
@@ -85,9 +85,10 @@ export function createApplicationRuntime({ browserWindow, projectApi, storageApi
   const platform = desktopBridge?.getRuntimeStatus
     ? createElectronPlatform(desktopBridge)
     : createBrowserPlatform(browserWindow);
-  const localeLoader = createLocaleLoader({ i18n: browserWindow.CatHan.i18n, browserWindow });
+  const localeLoader = createLocaleLoader({ i18n: compatibilityModules.i18n, browserWindow });
 
   return Object.freeze({
+    compatibilityModules,
     events,
     commands: Object.freeze({
       bus: commandBus,

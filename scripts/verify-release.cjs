@@ -153,6 +153,9 @@ const requiredReleaseFiles = [
   "src/entry/production.js",
   "src/entry/renderer-bootstrap.js",
   "src/entry/test.js",
+  "src/app/bootstrap.js",
+  "src/app/compatibility-module-registry.js",
+  "src/app/install-runtime.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
   "src/ai/providers/gemini-provider-adapter.js",
@@ -181,6 +184,7 @@ const requiredReleaseFiles = [
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/anthropic-provider-adapter.test.cjs",
   "tests/unit/cohere-provider-adapter.test.cjs",
+  "tests/unit/compatibility-module-registry.test.cjs",
   "tests/unit/gemini-provider-adapter.test.cjs",
   "tests/unit/groq-provider-adapter.test.cjs",
   "tests/unit/hosted-provider-adapters.test.cjs",
@@ -247,6 +251,10 @@ const manifest = readJson("manifest.webmanifest");
 const indexHtml = readText("index.html");
 const regressionHtml = readText("regression-test.html");
 const appJs = readText("app.js");
+const appBootstrapJs = readText("src/app/bootstrap.js");
+const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-registry.js");
+const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-module-registry.test.cjs");
+const installRuntimeJs = readText("src/app/install-runtime.js");
 const commandBusJs = readText("src/commands/command-bus.js");
 const editTargetSessionJs = readText("src/commands/edit-target-session.js");
 const segmentCommandsJs = readText("src/commands/segment-commands.js");
@@ -322,6 +330,46 @@ const bundleContractScript = readText("scripts/verify-bundle-contract.cjs");
 const bundleContractSelfTestScript = readText("scripts/verify-bundle-contract-selftest.cjs");
 const productionAssetsScript = readText("config/production-assets.js");
 const productionAssets = require(path.join(root, "config", "production-assets.js"));
+assertIncludes(
+  installRuntimeJs,
+  "createCompatibilityModuleRegistry(window.CatHan)",
+  "The runtime installer must be the single compatibility edge that captures legacy modules."
+);
+assertIncludes(
+  appBootstrapJs,
+  "compatibilityModules.storage",
+  "The application runtime must inject storage through the compatibility module registry."
+);
+assertIncludes(
+  appBootstrapJs,
+  "compatibilityModules.project",
+  "The application runtime must inject projects through the compatibility module registry."
+);
+assertIncludes(
+  appBootstrapJs,
+  "compatibilityModules.i18n",
+  "The application runtime must inject localization through the compatibility module registry."
+);
+assertIncludes(
+  compatibilityModuleRegistryJs,
+  '"workspaceStorage"',
+  "The compatibility registry must include the workspace persistence boundary."
+);
+assertIncludes(
+  compatibilityModuleRegistryUnitTests,
+  "captures every legacy application API behind one immutable boundary",
+  "The compatibility registry must retain focused module-capture characterization."
+);
+assert(
+  (appJs.match(/window\.CatHan/g) || []).length === 1 &&
+    appJs.includes("const appRuntime = window.CatHan.appRuntime;"),
+  "app.js may read only the installed application runtime from window.CatHan; feature APIs must be injected."
+);
+assertIncludes(
+  appJs,
+  "const compatibilityModules = appRuntime.compatibilityModules;",
+  "app.js must resolve legacy feature APIs through the injected compatibility registry."
+);
 assert(
   productionAssets.appVersion === packageJson.version,
   "Canonical production asset manifest appVersion must match package.json."
