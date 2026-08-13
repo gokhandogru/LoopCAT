@@ -162,6 +162,7 @@ const requiredReleaseFiles = [
   "src/ai/providers/native-chat-provider-adapters.js",
   "src/ai/providers/native-openai-provider-adapters.js",
   "src/ai/providers/openai-compatible-hosted-provider-adapter.js",
+  "src/ai/providers/ollama-provider-adapter.js",
   "src/ai/providers/openai-responses-provider-adapter.js",
   "src/ai/providers/perplexity-provider-adapter.js",
   "src/commands/edit-target-session.js",
@@ -183,6 +184,7 @@ const requiredReleaseFiles = [
   "tests/unit/hosted-provider-adapters.test.cjs",
   "tests/unit/native-chat-provider-adapters.test.cjs",
   "tests/unit/native-openai-provider-adapters.test.cjs",
+  "tests/unit/ollama-provider-adapter.test.cjs",
   "tests/unit/perplexity-provider-adapter.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
@@ -263,6 +265,7 @@ const hostedProviderAdapterCoreJs = readText("src/ai/providers/openai-compatible
 const nativeChatProviderAdaptersJs = readText("src/ai/providers/native-chat-provider-adapters.js");
 const nativeOpenAiProviderAdaptersJs = readText("src/ai/providers/native-openai-provider-adapters.js");
 const openAiResponsesProviderAdapterJs = readText("src/ai/providers/openai-responses-provider-adapter.js");
+const ollamaProviderAdapterJs = readText("src/ai/providers/ollama-provider-adapter.js");
 const perplexityProviderAdapterJs = readText("src/ai/providers/perplexity-provider-adapter.js");
 const extractedProviderInstallerJs = readText("src/ai/providers/install-extracted-providers.js");
 const anthropicProviderAdapterUnitTests = readText("tests/unit/anthropic-provider-adapter.test.cjs");
@@ -272,6 +275,7 @@ const groqProviderAdapterUnitTests = readText("tests/unit/groq-provider-adapter.
 const hostedProviderAdaptersUnitTests = readText("tests/unit/hosted-provider-adapters.test.cjs");
 const nativeChatProviderAdaptersUnitTests = readText("tests/unit/native-chat-provider-adapters.test.cjs");
 const nativeOpenAiProviderAdaptersUnitTests = readText("tests/unit/native-openai-provider-adapters.test.cjs");
+const ollamaProviderAdapterUnitTests = readText("tests/unit/ollama-provider-adapter.test.cjs");
 const perplexityProviderAdapterUnitTests = readText("tests/unit/perplexity-provider-adapter.test.cjs");
 const productionEntryJs = readText("src/entry/production.js");
 const qualityReviewControllerJs = readText("src/features/quality/quality-review-controller.js");
@@ -2695,6 +2699,35 @@ assertIncludes(
 assert(
   !aiJs.includes("const CohereProvider = {") && !aiJs.includes("function cohereProviderAuthError"),
   "ai.js must not retain the extracted Cohere provider implementation."
+);
+assertIncludes(ollamaProviderAdapterJs, 'id: "ollama"', "The checked Ollama adapter must implement Ollama.");
+assertIncludes(ollamaProviderAdapterJs, '"/version"', "The Ollama adapter must retain the local version health check.");
+assertIncludes(ollamaProviderAdapterJs, '"/tags"', "The Ollama adapter must retain local and hosted model discovery.");
+assertIncludes(ollamaProviderAdapterJs, '"/pull"', "The Ollama adapter must retain local model pull.");
+assertIncludes(ollamaProviderAdapterJs, '"/chat"', "The Ollama adapter must retain translation and command chat.");
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installOllamaProviderAdapter",
+  "The extracted-provider installer must register Ollama."
+);
+assertIncludes(
+  aiJs,
+  'aiProviderRegistry.reserve("ollama")',
+  "The legacy registry must preserve Ollama's provider order while its adapter installs."
+);
+assertIncludes(
+  ollamaProviderAdapterJs,
+  "ai.OllamaProvider = provider",
+  "The Ollama adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  ollamaProviderAdapterUnitTests,
+  "preserves translation and generic chat payloads, cancellation signal, provenance, and timing metadata",
+  "The Ollama adapter must retain focused chat, abort, provenance, and timing characterization."
+);
+assert(
+  !aiJs.includes("const OllamaProvider = {") && !aiJs.includes("function ollamaStatusError") && !aiJs.includes("async function ollamaJson"),
+  "ai.js must not retain the extracted Ollama provider implementation."
 );
 for (const provider of [
   ["openai", "OpenAIProvider", "OpenAI"],

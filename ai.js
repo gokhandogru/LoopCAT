@@ -1618,141 +1618,6 @@ async function fetchJsonWithTimeout(url, options = {}, config = {}) {
   return { response, data };
 }
 
-function ollamaReachableError(baseUrl) {
-  const rootBaseUrl = normalizeOllamaBaseUrl(baseUrl).rootBaseUrl;
-  if (isOllamaCloudBaseUrl(rootBaseUrl)) return "Ollama Cloud is not reachable. Check your connection and hosted Ollama access.";
-  return `Ollama is not reachable at ${rootBaseUrl}. Start Ollama and try again.`;
-}
-
-function ollamaStatusError(data, status, model = "") {
-  const raw = redactSensitiveText(data?.error || data?.message || "").trim();
-  if (status === 401 || status === 403) {
-    return "Ollama rejected the request. Add or check the Ollama API key for hosted Ollama.";
-  }
-  if (/not\s+found|model/i.test(raw) && model) {
-    return `Model ${model} is not installed. Pull it from the AI Command Centre.`;
-  }
-  if (status === 404 && model) return `Model ${model} is not installed. Pull it from the AI Command Centre.`;
-  return raw || `Ollama request failed with status ${status}.`;
-}
-
-async function ollamaJson(endpoint, options = {}, config = {}) {
-  const url = ollamaApiUrl(config.baseUrl || OLLAMA_DEFAULT_BASE_URL, endpoint);
-  let result = null;
-  try {
-    result = await fetchJsonWithTimeout(url, options, config);
-  } catch (error) {
-    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
-    throw new Error(ollamaReachableError(config.baseUrl || OLLAMA_DEFAULT_BASE_URL));
-  }
-  if (!result.response?.ok) {
-    throw new Error(ollamaStatusError(result.data, result.response?.status, config.model));
-  }
-  return result.data;
-}
-
-const OllamaProvider = {
-  id: "ollama",
-  name: "Ollama",
-  defaultBaseUrl: OLLAMA_DEFAULT_BASE_URL,
-  defaultModel: DEFAULT_LOCAL_AI_MODEL,
-  async testConnection(config = {}) {
-    const hosted = isOllamaCloudBaseUrl(config.baseUrl || OLLAMA_DEFAULT_BASE_URL);
-    if (hosted && localAiProviderNeedsApiKey("ollama", config.baseUrl) && !String(config.apiKey || "").trim()) {
-      throw new Error("Add an Ollama API key before using hosted Ollama.");
-    }
-    const data = hosted
-      ? await ollamaJson("/tags", { method: "GET", headers: bearerAuthHeaders(config) }, config)
-      : await ollamaJson("/version", { method: "GET", headers: bearerAuthHeaders(config) }, config);
-    return {
-      ok: true,
-      provider: hosted ? "Ollama Cloud" : "Ollama",
-      version: data?.version || "",
-      baseUrl: normalizeOllamaBaseUrl(config.baseUrl || OLLAMA_DEFAULT_BASE_URL).rootBaseUrl
-    };
-  },
-  async listModels(config = {}) {
-    if (isOllamaCloudBaseUrl(config.baseUrl || OLLAMA_DEFAULT_BASE_URL) && !String(config.apiKey || "").trim()) {
-      throw new Error("Add an Ollama API key before refreshing hosted Ollama models.");
-    }
-    const data = await ollamaJson("/tags", { method: "GET", headers: bearerAuthHeaders(config) }, config);
-    const models = Array.isArray(data?.models)
-      ? data.models.map((model) => ({
-        name: String(model.name || model.model || "").trim(),
-        size: model.size || 0,
-        modifiedAt: model.modified_at || model.modifiedAt || ""
-      })).filter((model) => model.name)
-      : [];
-    return { models, raw: data };
-  },
-  async pullModel(config = {}, modelName = DEFAULT_LOCAL_AI_MODEL, onProgress = null) {
-    const model = String(modelName || DEFAULT_LOCAL_AI_MODEL).trim() || DEFAULT_LOCAL_AI_MODEL;
-    if (isOllamaCloudBaseUrl(config.baseUrl || OLLAMA_DEFAULT_BASE_URL)) {
-      throw new Error("Model pull is only available for local Ollama. Refresh hosted Ollama models instead.");
-    }
-    onProgress?.({ status: "starting", model });
-    const data = await ollamaJson("/pull", {
-      method: "POST",
-      headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-      body: JSON.stringify({ name: model, stream: false })
-    }, { ...config, model });
-    onProgress?.({ status: "complete", model });
-    return { ok: true, model, raw: data };
-  },
-  async translateSegment(config = {}, request = {}) {
-    const settings = defaultLocalAiSettings({ ...config, model: config.model || request.model }, request.project);
-    const model = String(config.model || request.model || settings.model || DEFAULT_LOCAL_AI_MODEL).trim() || DEFAULT_LOCAL_AI_MODEL;
-    const sourceText = String(request.text ?? request.segment?.source ?? "");
-    if (!sourceText.trim()) throw new Error("The segment has no source text.");
-    if (isOllamaCloudBaseUrl(config.baseUrl || settings.baseUrl) && !String(config.apiKey || "").trim()) {
-      throw new Error("Add an Ollama API key before sending source text to hosted Ollama.");
-    }
-    const prompt = request.prompt || buildTranslateGemmaPrompt({
-      sourceLanguage: request.sourceLanguage || settings.sourceLanguage,
-      sourceCode: request.sourceCode || settings.sourceCode,
-      targetLanguage: request.targetLanguage || settings.targetLanguage,
-      targetCode: request.targetCode || settings.targetCode,
-      text: sourceText,
-      segment: request.segment,
-      glossaryTerms: request.glossaryTerms,
-      tmMatches: request.tmMatches,
-      surroundingSegments: request.surroundingSegments
-    });
-    const startedAt = localAiStartedAt();
-    const data = await ollamaJson("/chat", {
-      method: "POST",
-      headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        stream: false,
-        options: {
-          temperature: 0.1
-        }
-      })
-    }, { ...settings, ...config, model, signal: request.signal || config.signal });
-    const rawOutput = data?.message?.content;
-    if (typeof rawOutput !== "string") throw new Error("Ollama returned a malformed chat response.");
-    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
-    if (!translatedText.trim()) throw new Error("The model returned an empty translation for this segment.");
-    return {
-      translatedText,
-      rawOutput,
-      provider: "Ollama",
-      providerId: "ollama",
-      model,
-      durationMs: requestDurationMs(startedAt),
-      prompt,
-      metadata: {
-        totalDuration: data.total_duration || 0,
-        loadDuration: data.load_duration || 0,
-        promptEvalCount: data.prompt_eval_count || 0,
-        evalCount: data.eval_count || 0
-      }
-    };
-  }
-};
-
 function opusCatLanguageCode(value, fallback = "und") {
   const clean = String(value || fallback || "").trim().toLowerCase().replaceAll("_", "-");
   const match = clean.match(/[a-z]{2,3}/);
@@ -2067,6 +1932,8 @@ function genericPromptResult(provider, providerId, model, prompt, rawOutput, sta
 }
 
 const providerAdapterRuntime = Object.freeze({
+  OLLAMA_DEFAULT_BASE_URL,
+  DEFAULT_LOCAL_AI_MODEL,
   OPENAI_DEFAULT_BASE_URL,
   OPENAI_DEFAULT_MODEL,
   GEMINI_DEFAULT_BASE_URL,
@@ -2124,6 +1991,10 @@ const providerAdapterRuntime = Object.freeze({
   deepInfraApiUrl,
   fireworksApiUrl,
   localAiStartedAt,
+  isOllamaCloudBaseUrl,
+  localAiProviderNeedsApiKey,
+  normalizeOllamaBaseUrl,
+  ollamaApiUrl,
   normalizeOpenAiBaseUrl,
   normalizeGeminiBaseUrl,
   normalizeAnthropicBaseUrl,
@@ -2143,34 +2014,6 @@ const providerAdapterRuntime = Object.freeze({
   redactSensitiveText,
   requestDurationMs
 });
-
-OllamaProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
-  const settings = defaultLocalAiSettings({ ...config, model: config.model || request.model }, request.project);
-  const model = String(config.model || request.model || settings.model || DEFAULT_LOCAL_AI_MODEL).trim() || DEFAULT_LOCAL_AI_MODEL;
-  if (isOllamaCloudBaseUrl(config.baseUrl || settings.baseUrl) && !String(config.apiKey || "").trim()) {
-    throw new Error("Add an Ollama API key before sending source text to hosted Ollama.");
-  }
-  const prompt = promptTextOrThrow(request);
-  const messages = request.system
-    ? [{ role: "system", content: String(request.system) }, { role: "user", content: prompt }]
-    : [{ role: "user", content: prompt }];
-  const startedAt = localAiStartedAt();
-  const data = await ollamaJson("/chat", {
-    method: "POST",
-    headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      model,
-      messages,
-      stream: false,
-      options: { temperature: 0.1 }
-    })
-  }, { ...settings, ...config, model, signal: request.signal || config.signal });
-  return genericPromptResult("Ollama", "ollama", model, prompt, data?.message?.content, startedAt, {
-    totalDuration: data.total_duration || 0,
-    promptEvalCount: data.prompt_eval_count || 0,
-    evalCount: data.eval_count || 0
-  });
-};
 
 OpenAICompatibleProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
   const settings = defaultLocalAiSettings({ ...config, providerId: "openai-compatible", model: config.model || request.model }, request.project);
@@ -2224,7 +2067,7 @@ const aiProviderRegistry = (() => {
   };
 })();
 
-aiProviderRegistry.register(OllamaProvider);
+aiProviderRegistry.reserve("ollama");
 aiProviderRegistry.reserve("openai");
 aiProviderRegistry.reserve("deepseek");
 aiProviderRegistry.reserve("xai");
@@ -2879,7 +2722,6 @@ window.CatHan.ai = {
   localAiProviderGuidance,
   defaultLocalAiSettings,
   localAISettingsStore,
-  OllamaProvider,
   OpenAICompatibleProvider,
   OpusCatProvider,
   providerAdapterRuntime,

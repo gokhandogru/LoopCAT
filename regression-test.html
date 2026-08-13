@@ -4105,7 +4105,8 @@
           targetCode: "tr"
         });
         assert(
-          lastOllamaChat?.url === "http://localhost:11434/api/chat" &&
+          window.CatHan.ai.OllamaProvider === ollamaProvider &&
+            lastOllamaChat?.url === "http://localhost:11434/api/chat" &&
             lastOllamaChat.body.model === "translategemma" &&
             lastOllamaChat.body.stream === false &&
             lastOllamaChat.body.messages[0].content.includes("Please translate the following English text into Turkish:\n\nHello {name}") &&

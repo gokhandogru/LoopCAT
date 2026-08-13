@@ -5,8 +5,10 @@ import { installGeminiProviderAdapter } from "./gemini-provider-adapter.js";
 import { installHostedProviderAdapters } from "./hosted-provider-adapters.js";
 import { installNativeChatProviderAdapters } from "./native-chat-provider-adapters.js";
 import { installNativeOpenAiProviderAdapters } from "./native-openai-provider-adapters.js";
+import { installOllamaProviderAdapter } from "./ollama-provider-adapter.js";
 import { installPerplexityProviderAdapter } from "./perplexity-provider-adapter.js";
 
+installOllamaProviderAdapter(globalThis.window?.CatHan?.ai);
 installNativeOpenAiProviderAdapters(globalThis.window?.CatHan?.ai);
 installNativeChatProviderAdapters(globalThis.window?.CatHan?.ai);
 installPerplexityProviderAdapter(globalThis.window?.CatHan?.ai);
