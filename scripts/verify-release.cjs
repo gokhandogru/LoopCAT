@@ -384,6 +384,10 @@ assert(
   !appJs.includes("state.activeIndex"),
   "AppStore must remain the only active-segment owner; app.js cannot restore a legacy state.activeIndex field."
 );
+assert(
+  !appJs.includes("state.focusMode"),
+  "AppStore must remain the only Focus-mode owner; app.js cannot restore a legacy state.focusMode field."
+);
 assertIncludes(
   segmentGridControllerJs,
   "navigation.selectSegment",

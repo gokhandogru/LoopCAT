@@ -713,7 +713,6 @@ const state = {
   segments: [],
   progressSummary: null,
   saveTimers: new Map(),
-  focusMode: false,
   inspectorOpen: true,
   segmentQuery: "",
   segmentSearchScope: "both",
@@ -781,6 +780,10 @@ function currentSegmentId() {
   return applicationStore.getState().navigation.segmentId;
 }
 
+function currentFocusMode() {
+  return applicationStore.getState().interface.focusMode;
+}
+
 function selectApplicationSegment(activeIndex, segmentId = state.segments[activeIndex]?.id || "") {
   return applicationNavigation.selectSegment({ activeIndex, segmentId });
 }
@@ -803,10 +806,6 @@ function applicationNavigationPayload(overrides = {}) {
 
 function syncLegacyApplicationState(overrides = {}) {
   const navigation = applicationNavigation?.syncLegacy?.(applicationNavigationPayload(overrides));
-  applicationStore?.dispatch?.({
-    type: "interface/focus-mode-changed",
-    payload: { enabled: state.focusMode }
-  });
   applicationStore?.dispatch?.({
     type: "interface/locale-changed",
     payload: { locale: uiI18n?.getLocale?.() || "" }
@@ -2030,7 +2029,7 @@ function syncAllPanelToggleStates() {
 }
 
 function renderFocusMode() {
-  const active = Boolean(state.focusMode && currentApplicationView() === "editor" && state.project);
+  const active = Boolean(currentFocusMode() && currentApplicationView() === "editor" && state.project);
   document.body.classList.toggle("focus-mode", active);
   els.workspace.classList.toggle("focus-mode", active);
   if (els.focusModeBtn) {
@@ -2045,22 +2044,21 @@ function renderFocusMode() {
 }
 
 function setFocusMode(enabled) {
-  state.focusMode = Boolean(enabled && currentApplicationView() === "editor" && state.project);
   applicationStore?.dispatch?.({
     type: "interface/focus-mode-changed",
-    payload: { enabled: state.focusMode }
+    payload: { enabled: Boolean(enabled && state.project) }
   });
   renderFocusMode();
   document.querySelectorAll(".menu[open]").forEach((menu) => menu.removeAttribute("open"));
   if (!state.project) return;
   requestAnimationFrame(() => {
     renderSegments({ preserveScroll: true });
-    if (state.focusMode) focusActiveTextarea();
+    if (currentFocusMode()) focusActiveTextarea();
   });
 }
 
 function toggleFocusMode() {
-  setFocusMode(!state.focusMode);
+  setFocusMode(!currentFocusMode());
 }
 
 function invalidateSegmentFilterCache() {
@@ -3865,7 +3863,7 @@ function commandList() {
     { id: "trash", label: "Open Trash", run: openTrash, enabled: Boolean(appRuntime?.trashRepository) },
     { id: "confirm", label: "Confirm segment", run: confirmCurrentSegment, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(state.segments.length) },
-    { id: "focus-mode", label: state.focusMode ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(currentApplicationView() === "editor" && state.project) },
+    { id: "focus-mode", label: currentFocusMode() ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(currentApplicationView() === "editor" && state.project) },
     { id: "copy-source", label: "Copy source", run: copySourceToTarget, enabled: Boolean(currentSegment()) },
     { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: splitCurrentSegment, enabled: Boolean(currentSegment() && canSplitSegmentStructure(currentSegment())) },
     { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: mergeWithNextSegment, enabled: Boolean(currentSegment() && canMergeSegmentStructures(currentSegment(), nextSegmentForMerge(currentSegment()))) },
@@ -4347,7 +4345,6 @@ function setView(view) {
   else if (view === "resources") applicationNavigation?.openResources?.();
   else if (view === "project") applicationNavigation?.openProject?.(state.project?.id || null, currentActiveIndex());
   else applicationNavigation?.openEditor?.(applicationNavigationPayload({ view: "editor" }));
-  if (view !== "editor") state.focusMode = false;
   renderEditor();
   if (view === "projects") refreshProjectSummaries();
   if (view === "resources") refreshResources();
@@ -4355,7 +4352,6 @@ function setView(view) {
 
 function showProjectHome() {
   if (!state.project) return;
-  state.focusMode = false;
   const activeIndex = state.segments.length ? 0 : -1;
   applicationNavigation?.openProject?.(state.project.id, activeIndex);
   renderAll();
@@ -7266,7 +7262,7 @@ function handleGlobalKeydown(event) {
     closeCommandPalette();
     return;
   }
-  if (event.key === "Escape" && state.focusMode) {
+  if (event.key === "Escape" && currentFocusMode()) {
     event.preventDefault();
     setFocusMode(false);
   }
@@ -14606,7 +14602,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(Boolean(els.focusModeBtn && els.exitFocusModeBtn), "focus view controls are available in the editor");
     setFocusMode(true);
     assert(
-      state.focusMode &&
+      currentFocusMode() &&
         document.body.classList.contains("focus-mode") &&
         els.workspace.classList.contains("focus-mode") &&
         els.focusModeBtn.getAttribute("aria-pressed") === "true" &&
@@ -14616,7 +14612,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     setFocusMode(false);
     assert(
-      !state.focusMode &&
+      !currentFocusMode() &&
         !document.body.classList.contains("focus-mode") &&
         !els.workspace.classList.contains("focus-mode") &&
         els.focusModeBtn.getAttribute("aria-pressed") === "false" &&
