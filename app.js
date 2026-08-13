@@ -2217,6 +2217,84 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
   redact: redactSensitiveText,
   logger: console
 });
+let aiTerminologyExtractionAbortController = null;
+let aiTerminologyExtractionOwnsPromptBusy = false;
+const aiTerminologyExtractionController =
+  appRuntime.featureFactories.createAiTerminologyExtractionController({
+    editorSessionStore,
+    selection: { getActiveSegment: currentSegment },
+    scope: {
+      getVisibleSegments: () =>
+        filteredSegmentIndexes()
+          .map((index) => currentSegments()[index])
+          .filter(Boolean),
+      getDocumentSegments: currentDocumentSegments
+    },
+    termbase: {
+      getSelectedName: () => els.termBaseSelect?.value || primaryTermBaseName(),
+      saveCandidates: saveAiTermCandidates
+    },
+    settings: {
+      persist: () => persistLocalAiSettings({ silent: true }),
+      runtimeConfig: localAiRuntimeConfig,
+      assertReady: assertLocalAiRuntimeReady
+    },
+    providers: {
+      get: currentLocalAiProvider,
+      sharesExternally: (settings) =>
+        localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
+    },
+    consent: { externalShare: confirmExternalAiPromptShare },
+    domain: {
+      extractSegmentTerms: (options) => aiCommandService.extractSegmentTerms(options)
+    },
+    lifecycle: {
+      isRunning: () => state.localAi.running,
+      isPromptBusy: () => state.localAi.promptBusy,
+      sync: ({ running, promptBusy, abortController, progress }) => {
+        if (progress !== undefined) state.localAi.progress = progress;
+        if (promptBusy) {
+          aiTerminologyExtractionOwnsPromptBusy = true;
+          state.localAi.promptBusy = true;
+        } else if (aiTerminologyExtractionOwnsPromptBusy) {
+          state.localAi.promptBusy = false;
+          aiTerminologyExtractionOwnsPromptBusy = false;
+        }
+        if (running) {
+          aiTerminologyExtractionAbortController = abortController;
+          state.localAi.running = true;
+          state.localAi.abortController = abortController;
+        } else if (
+          aiTerminologyExtractionAbortController &&
+          state.localAi.abortController === aiTerminologyExtractionAbortController
+        ) {
+          state.localAi.running = false;
+          state.localAi.abortController = null;
+          aiTerminologyExtractionAbortController = null;
+        }
+      }
+    },
+    presentation: {
+      renderCommandCentre: renderLocalAiCommandCentre,
+      renderAiProgress: renderLocalAiProgress,
+      renderOutput: renderLocalAiOutput,
+      refreshProjectTerms: () => refreshProjectTerms({ rerender: true }),
+      refreshTerms
+    },
+    activity: {
+      logActive: (details) =>
+        logProjectActivity("ai-term-extraction", "AI term candidates extracted", details),
+      logBatch: (details) =>
+        logProjectActivity(
+          "ai-term-extraction-batch",
+          "Batch AI term candidates extracted",
+          details
+        )
+    },
+    workspace: { markDirty: markWorkspaceDirty },
+    status: { set: setSaveStatus },
+    logger: console
+  });
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
     splitButton: els.splitSegmentBtn,
@@ -9194,237 +9272,11 @@ function localAiTerminologySegments(settings = localAiSettingsFromForm()) {
 }
 
 async function extractActiveSegmentTermsWithLocalAi() {
-  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
-  const segment = currentSegment();
-  if (!segment) {
-    setSaveStatus("Select a segment before extracting AI terms.", "dirty");
-    return false;
-  }
-  if (!String(segment.source || "").trim()) {
-    setSaveStatus("The active segment has no source text.", "dirty");
-    return false;
-  }
-  const settings = await persistLocalAiSettings({ silent: true });
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-    assertLocalAiRuntimeReady(settings, config, "extracting terminology");
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const provider = currentLocalAiProvider(settings);
-  if (!provider?.completePrompt) {
-    const message = "AI term extraction is not available for this provider.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const termBaseName = els.termBaseSelect?.value || primaryTermBaseName();
-  if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) {
-    const ok = confirmExternalAiPromptShare({
-      provider: provider.name || settings.providerId,
-      includesSourceText: true,
-      contextLabels: ["current target draft", "configured provider URL", `termbase ${termBaseName}`]
-    });
-    if (!ok) {
-      setSaveStatus("AI term extraction canceled", "dirty");
-      return false;
-    }
-  }
-  state.localAi.promptBusy = true;
-  renderLocalAiCommandCentre();
-  setSaveStatus("Extracting AI terminology candidates...");
-  try {
-    const result = await aiCommandService.extractSegmentTerms({
-      provider,
-      project: currentProject(),
-      segment,
-      settings,
-      config,
-      sourceLanguage: settings.sourceLanguage,
-      sourceCode: settings.sourceCode,
-      targetLanguage: settings.targetLanguage,
-      targetCode: settings.targetCode
-    });
-    const { savedTerms } = await saveAiTermCandidates(result.terms || [], termBaseName);
-    if (!savedTerms.length) {
-      renderLocalAiOutput(
-        result.terms?.length
-          ? "AI term candidates already exist in the current termbase."
-          : "AI did not find reusable term candidates in the active segment.",
-        { muted: false }
-      );
-      setSaveStatus(result.terms?.length ? "AI term candidates already exist" : "AI did not find term candidates", "saved");
-      return true;
-    }
-    let activityLogged = true;
-    try {
-      await logProjectActivity("ai-term-extraction", "AI term candidates extracted", {
-        segmentId: segment.id,
-        provider: result.provider || provider.name || settings.providerId,
-        model: result.model || settings.model,
-        termBaseName,
-        termCount: savedTerms.length
-      });
-    } catch (activityError) {
-      activityLogged = false;
-      console.warn("AI term extraction activity log failed.", activityError);
-      markWorkspaceDirty();
-    }
-    try {
-      await refreshProjectTerms({ rerender: true });
-      await refreshTerms();
-    } catch (refreshError) {
-      console.warn("Term refresh failed after AI extraction.", refreshError);
-    }
-    renderLocalAiOutput(
-      savedTerms.map((term) => `${term.sourceTerm} -> ${term.targetTerm}${term.notes ? ` (${term.notes})` : ""}`).join("\n")
-    );
-    setSaveStatus(activityLogged ? `Saved ${savedTerms.length} AI term candidate${savedTerms.length === 1 ? "" : "s"}` : `Saved ${savedTerms.length} AI term candidate${savedTerms.length === 1 ? "" : "s"}; activity log failed`, activityLogged ? "saved" : "dirty");
-    return true;
-  } catch (error) {
-    const message = error.message || "AI term extraction failed.";
-    renderLocalAiOutput(message, { muted: false });
-    setSaveStatus(message, "dirty");
-    return false;
-  } finally {
-    state.localAi.promptBusy = false;
-    renderLocalAiCommandCentre();
-  }
+  return aiTerminologyExtractionController.extractActive();
 }
 
 async function extractBatchTermsWithLocalAi() {
-  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
-  const settings = await persistLocalAiSettings({ silent: true });
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-    assertLocalAiRuntimeReady(settings, config, "extracting batch terminology");
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const provider = currentLocalAiProvider(settings);
-  if (!provider?.completePrompt) {
-    const message = "Batch AI term extraction is not available for this provider.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const segments = localAiTerminologySegments(settings).filter((segment) => String(segment?.source || "").trim());
-  if (!segments.length) {
-    setSaveStatus("No source segments are available for batch AI term extraction.", "dirty");
-    return false;
-  }
-  const termBaseName = els.termBaseSelect?.value || primaryTermBaseName();
-  if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) {
-    const ok = confirmExternalAiPromptShare({
-      provider: provider.name || settings.providerId,
-      includesSourceText: true,
-      contextLabels: [`${segments.length} segment source/target snippets`, "configured provider URL", `termbase ${termBaseName}`]
-    });
-    if (!ok) {
-      setSaveStatus("Batch AI term extraction canceled", "dirty");
-      return false;
-    }
-  }
-  const abortController = new AbortController();
-  state.localAi.running = true;
-  state.localAi.promptBusy = true;
-  state.localAi.abortController = abortController;
-  state.localAi.progress = {
-    total: segments.length,
-    completed: 0,
-    failed: 0,
-    skipped: 0,
-    skippedSegments: 0,
-    canceled: false
-  };
-  renderLocalAiCommandCentre();
-  setSaveStatus(`Extracting AI terms from ${segments.length} segment${segments.length === 1 ? "" : "s"}...`);
-  const allCandidates = [];
-  const failures = [];
-  try {
-    for (const segment of segments) {
-      if (abortController.signal.aborted) break;
-      try {
-        const result = await aiCommandService.extractSegmentTerms({
-          provider,
-          project: currentProject(),
-          segment,
-          settings,
-          config,
-          sourceLanguage: settings.sourceLanguage,
-          sourceCode: settings.sourceCode,
-          targetLanguage: settings.targetLanguage,
-          targetCode: settings.targetCode,
-          signal: abortController.signal
-        });
-        allCandidates.push(...(result.terms || []));
-        state.localAi.progress.completed += 1;
-      } catch (error) {
-        if (abortController.signal.aborted || String(error?.message || "").includes("canceled")) break;
-        failures.push({ segmentId: segment.id, error: error.message || String(error) });
-        state.localAi.progress.failed += 1;
-      }
-      renderLocalAiProgress();
-    }
-    state.localAi.progress.canceled = abortController.signal.aborted;
-    const { savedTerms, duplicateCount } = await saveAiTermCandidates(allCandidates, termBaseName);
-    let activityLogged = true;
-    try {
-      await logProjectActivity("ai-term-extraction-batch", "Batch AI term candidates extracted", {
-        provider: provider.name || settings.providerId,
-        model: settings.model,
-        mode: settings.mode,
-        termBaseName,
-        segmentCount: segments.length,
-        completed: state.localAi.progress.completed,
-        failed: state.localAi.progress.failed,
-        savedTermCount: savedTerms.length,
-        duplicateCount
-      });
-    } catch (activityError) {
-      activityLogged = false;
-      console.warn("Batch AI term extraction activity log failed.", activityError);
-      markWorkspaceDirty();
-    }
-    try {
-      await refreshProjectTerms({ rerender: true });
-      await refreshTerms();
-    } catch (refreshError) {
-      console.warn("Term refresh failed after batch AI extraction.", refreshError);
-    }
-    const statusPieces = [
-      `saved ${savedTerms.length}`,
-      `duplicates ${duplicateCount}`,
-      `failed ${failures.length}`
-    ];
-    if (state.localAi.progress.canceled) statusPieces.push("canceled");
-    const savedText = savedTerms.length
-      ? savedTerms.map((term) => `${term.sourceTerm} -> ${term.targetTerm}${term.notes ? ` (${term.notes})` : ""}`).join("\n")
-      : "No new AI term candidates were saved.";
-    const failureText = failures.length
-      ? `\n\nFailures:\n${failures.slice(0, 5).map((failure) => `- ${failure.segmentId}: ${failure.error}`).join("\n")}`
-      : "";
-    renderLocalAiOutput(`${savedText}${failureText}`, { muted: !savedTerms.length && !failures.length });
-    setSaveStatus(
-      `${state.localAi.progress.canceled ? "Canceled" : "Finished"} batch AI term extraction: ${statusPieces.join(", ")}${activityLogged ? "" : "; activity log failed"}`,
-      failures.length || !activityLogged || state.localAi.progress.canceled ? "dirty" : "saved"
-    );
-    return { savedTerms, failures, duplicateCount, canceled: state.localAi.progress.canceled };
-  } catch (error) {
-    const message = error.message || "Batch AI term extraction failed.";
-    renderLocalAiOutput(message, { muted: false });
-    setSaveStatus(message, "dirty");
-    return false;
-  } finally {
-    state.localAi.running = false;
-    state.localAi.promptBusy = false;
-    state.localAi.abortController = null;
-    renderLocalAiCommandCentre();
-  }
+  return aiTerminologyExtractionController.extractBatch();
 }
 
 function projectBriefSampleSegments(limit = 6) {
@@ -9630,6 +9482,7 @@ function cancelLocalAiBatch() {
   if (aiAlternativesController.cancel()) return;
   if (aiTerminologyApplicationController.cancel()) return;
   if (aiDraftEditingController.cancel()) return;
+  if (aiTerminologyExtractionController.cancel()) return;
   state.localAi.abortController?.abort();
   state.localAi.progress = {
     ...(state.localAi.progress || {}),

@@ -61,6 +61,7 @@ import { createAiTagRepairController } from "../features/ai/ai-tag-repair-contro
 import { createAiAlternativesController } from "../features/ai/ai-alternatives-controller.js";
 import { createAiTerminologyApplicationController } from "../features/ai/ai-terminology-application-controller.js";
 import { createAiDraftEditingController } from "../features/ai/ai-draft-editing-controller.js";
+import { createAiTerminologyExtractionController } from "../features/ai/ai-terminology-extraction-controller.js";
 import { createOpusCatHelpController } from "../features/ai/opus-cat-help-controller.js";
 import { createTmPretranslationDialogController } from "../features/resources/tm-pretranslation-dialog-controller.js";
 import { createResourcesController } from "../features/resources/resources-controller.js";
@@ -141,6 +142,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createAiAlternativesController,
       createAiTerminologyApplicationController,
       createAiDraftEditingController,
+      createAiTerminologyExtractionController,
       createAutosaveService,
       createOpusCatHelpController,
       createAiProviderService,

@@ -186,6 +186,7 @@ const requiredReleaseFiles = [
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
   "src/features/ai/ai-terminology-application-controller.js",
+  "src/features/ai/ai-terminology-extraction-controller.js",
   "src/features/ai/ai-pretranslation-controller.js",
   "src/features/ai/ai-review-controller.js",
   "src/features/ai/ai-tag-repair-controller.js",
@@ -207,6 +208,7 @@ const requiredReleaseFiles = [
   "tests/unit/ai-alternatives-controller.test.cjs",
   "tests/unit/ai-draft-editing-controller.test.cjs",
   "tests/unit/ai-terminology-application-controller.test.cjs",
+  "tests/unit/ai-terminology-extraction-controller.test.cjs",
   "tests/unit/ai-pretranslation-controller.test.cjs",
   "tests/unit/ai-review-controller.test.cjs",
   "tests/unit/ai-tag-repair-controller.test.cjs",
@@ -350,6 +352,8 @@ const aiTerminologyApplicationControllerJs = readText("src/features/ai/ai-termin
 const aiTerminologyApplicationControllerUnitTests = readText(
   "tests/unit/ai-terminology-application-controller.test.cjs"
 );
+const aiTerminologyExtractionControllerJs = readText("src/features/ai/ai-terminology-extraction-controller.js");
+const aiTerminologyExtractionControllerUnitTests = readText("tests/unit/ai-terminology-extraction-controller.test.cjs");
 const anthropicProviderAdapterJs = readText("src/ai/providers/anthropic-provider-adapter.js");
 const cohereProviderAdapterJs = readText("src/ai/providers/cohere-provider-adapter.js");
 const geminiProviderAdapterJs = readText("src/ai/providers/gemini-provider-adapter.js");
@@ -2837,6 +2841,95 @@ for (const testName of [
     aiDraftEditingControllerUnitTests,
     testName,
     `focused AI-draft-editing tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiTerminologyExtractionController",
+  "The application runtime must expose the checked AI-terminology-extraction controller boundary."
+);
+for (const boundary of [
+  "if (!project || running || promptBusy || lifecycle.isRunning() || lifecycle.isPromptBusy()) return false",
+  'status.set("Select a segment before extracting AI terms.", "dirty")',
+  'settingsBoundary.assertReady(settings, config, "extracting terminology")',
+  "const termBaseName = termbase.getSelectedName()",
+  "providers.sharesExternally(settings)",
+  "const result = await domain.extractSegmentTerms(",
+  "const { savedTerms } = await termbase.saveCandidates(result.terms || [], termBaseName)",
+  "await activity.logActive({",
+  "await refreshTermsAfterExtraction(false)",
+  "const segments = scopedSegments(settings).filter(",
+  "abortController = createAbortController()",
+  "for (const segment of segments)",
+  "allCandidates.push(...(result.terms || []))",
+  "const { savedTerms, duplicateCount } = await termbase.saveCandidates(",
+  "await activity.logBatch({",
+  "await refreshTermsAfterExtraction(true)",
+  "abortController = null",
+  'status.set("Canceling local AI batch...", "dirty")'
+]) {
+  assertIncludes(
+    aiTerminologyExtractionControllerJs,
+    boundary,
+    `AiTerminologyExtractionController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return aiTerminologyExtractionController.extractActive()",
+  "app.js must retain only the checked active AI-terminology-extraction compatibility facade."
+);
+assertIncludes(
+  appJs,
+  "return aiTerminologyExtractionController.extractBatch()",
+  "app.js must retain only the checked batch AI-terminology-extraction compatibility facade."
+);
+assertIncludes(
+  appJs,
+  "if (aiTerminologyExtractionController.cancel()) return;",
+  "the shared AI cancel facade must delegate owned terminology-extraction cancellation."
+);
+const activeAiTerminologyExtractionFacade = functionBody(
+  appJs,
+  "async function extractActiveSegmentTermsWithLocalAi",
+  "async function extractBatchTermsWithLocalAi"
+);
+const batchAiTerminologyExtractionFacade = functionBody(
+  appJs,
+  "async function extractBatchTermsWithLocalAi",
+  "function projectBriefSampleSegments"
+);
+for (const facade of [activeAiTerminologyExtractionFacade, batchAiTerminologyExtractionFacade]) {
+  assert(
+    !facade.includes("persistLocalAiSettings(") &&
+      !facade.includes("localAiRuntimeConfig(") &&
+      !facade.includes("confirmExternalAiPromptShare(") &&
+      !facade.includes("localAiTerminologySegments(") &&
+      !facade.includes("saveAiTermCandidates(") &&
+      !facade.includes("aiCommandService.extractSegmentTerms(") &&
+      !facade.includes("logProjectActivity(") &&
+      !facade.includes("refreshProjectTerms(") &&
+      !facade.includes("refreshTerms(") &&
+      !facade.includes("renderLocalAiOutput(") &&
+      !facade.includes("state.localAi"),
+    "app.js must not regain AI-terminology-extraction validation, consent, lifecycle, selection, provider, term persistence, activity, presentation, status, or recovery orchestration."
+  );
+}
+for (const testName of [
+  "active AI terminology extraction preserves busy, source, provider, and external-consent safeguards",
+  "active AI terminology extraction routes provider output through injected deduplication and storage",
+  "active AI terminology extraction distinguishes empty and duplicate-only results",
+  "active AI terminology extraction keeps saved terms durable through activity and refresh warnings",
+  "batch AI terminology extraction preserves mode-specific source selection and aggregated persistence",
+  "batch AI terminology extraction contains segment failures and reports aggregate counts",
+  "mid-batch AI terminology extraction cancellation saves completed candidates and cleans lifecycle",
+  "primary batch AI terminology storage failure returns failure and always releases lifecycle state",
+  "secondary batch AI terminology activity failure keeps saved terms durable and reports dirty"
+]) {
+  assertIncludes(
+    aiTerminologyExtractionControllerUnitTests,
+    testName,
+    `focused AI-terminology-extraction tests must characterize ${testName}.`
   );
 }
 assertIncludes(
