@@ -2352,6 +2352,67 @@ const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBrie
   status: { set: setSaveStatus },
   logger: console
 });
+const aiSuggestionApplicationController =
+  appRuntime.featureFactories.createAiSuggestionApplicationController({
+    editorSessionStore,
+    commands: {
+      bus: appRuntime.commands.bus,
+      create: appRuntime.commands.createApplyAiSuggestionCommand,
+      changed: renderUndoControls
+    },
+    selection: {
+      getActiveIndex: currentActiveIndex,
+      goToNextOpen: goToNextOpenSegment
+    },
+    mutation: {
+      applyTarget: setSegmentTargetAndStatus,
+      touch: touchSegment,
+      restoreInPlace: (segment, snapshot) => {
+        Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
+        Object.assign(segment, snapshot);
+      },
+      prepareHistory: prepareSegmentHistoryState,
+      prepareRestoreSnapshot: prepareCommandRestoreSegmentSnapshot
+    },
+    persistence: {
+      flush: flushPendingSegmentSaves,
+      clearPending: clearPendingSave,
+      save: saveSegment
+    },
+    activity: {
+      log: (details) =>
+        logProjectActivity("ai-apply-suggestion", "AI suggestion applied to target", details)
+    },
+    presentation: {
+      renderSegments,
+      renderProgress,
+      renderHistory: renderRevisionHistory,
+      renderSuggestions: renderAiSuggestions,
+      refreshSidebar,
+      renderAll,
+      focusTarget: focusActiveTextarea
+    },
+    workspace: {
+      markDirty: markWorkspaceDirty,
+      markActivityWarningDirty: () => {
+        if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
+      }
+    },
+    status: { set: setSaveStatus },
+    testHooks: {
+      beforeSave: (segment) => {
+        if (LOOPCAT_TEST_BUILD && segment[AI_APPLY_SAVE_FAILURE_TEST_FLAG]) {
+          throw new Error("Simulated AI apply save failure");
+        }
+      },
+      beforeActivity: (segment) => {
+        if (LOOPCAT_TEST_BUILD && segment[AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG]) {
+          throw new Error("Simulated AI suggestion activity failure");
+        }
+      }
+    },
+    logger: console
+  });
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
     splitButton: els.splitSegmentBtn,
@@ -8725,111 +8786,7 @@ async function appendAiSuggestion(segment, suggestion, activityType, activityMes
 }
 
 async function applyAiSuggestion(suggestionId, options = {}) {
-  const segment = currentSegment();
-  const suggestion = (segment?.aiSuggestions || []).find((item) => item.id === suggestionId);
-  if (!segment || !suggestion?.suggestedTarget) return false;
-  if (segment.locked || segment.status === "confirmed") {
-    setSaveStatus("Confirmed or locked segments must be reopened before applying an AI suggestion", "dirty");
-    return false;
-  }
-  try {
-    await flushPendingSegmentSaves(currentProject().id);
-  } catch (error) {
-    setSaveStatus(error.message || "Save pending changes before applying AI suggestion failed", "dirty");
-    return false;
-  }
-
-  const snapshot = structuredClone(segment);
-  const segmentId = segment.id;
-  const restoreSnapshot = async (nextSnapshot) => {
-    const index = currentSegments().findIndex((item) => item.id === segmentId);
-    if (index < 0) throw new Error("The affected segment is no longer available.");
-    const currentSnapshot = structuredClone(currentSegments()[index]);
-    try {
-      const restored = prepareCommandRestoreSegmentSnapshot(nextSnapshot, currentSnapshot);
-      editorSessionStore.replaceSegmentAt(index, restored);
-      clearPendingSave(restored);
-      await saveSegment(restored);
-      renderSegments();
-      renderProgress();
-      renderRevisionHistory();
-      renderAiSuggestions();
-      await refreshSidebar();
-      markWorkspaceDirty();
-      return restored;
-    } catch (error) {
-      editorSessionStore.replaceSegmentAt(index, prepareSegmentHistoryState(currentSnapshot));
-      renderAll();
-      throw error;
-    }
-  };
-
-  let activityLogged = true;
-  try {
-    const command = appRuntime.commands.createApplyAiSuggestionCommand({
-      projectId: currentProject().id,
-      segmentId,
-      suggestion,
-      beforeSnapshot: snapshot,
-      restoreSnapshot,
-      applyFirst: async () => {
-        setSegmentTargetAndStatus(segment, suggestion.suggestedTarget, "draft", "ai-suggestion");
-        segment.aiApplication = {
-          suggestionId: suggestion.id,
-          origin: suggestion.origin || suggestion.provider || "AI",
-          provider: suggestion.provider || "",
-          model: suggestion.model || "",
-          appliedAt: new Date().toISOString(),
-          reviewState: "needs-review"
-        };
-        segment.reviewState = "needs-review";
-        touchSegment(segment);
-        clearPendingSave(segment);
-        if (LOOPCAT_TEST_BUILD && segment[AI_APPLY_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI apply save failure");
-        await saveSegment(segment);
-        try {
-          if (LOOPCAT_TEST_BUILD && segment[AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated AI suggestion activity failure");
-          await logProjectActivity("ai-apply-suggestion", "AI suggestion applied to target", {
-            segmentId: segment.id,
-            provider: suggestion.provider || "",
-            model: suggestion.model || "",
-            suggestionId: suggestion.id
-          });
-        } catch (activityError) {
-          activityLogged = false;
-          console.warn("AI suggestion activity log failed.", activityError);
-          if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
-        }
-        renderSegments();
-        renderProgress();
-        renderRevisionHistory();
-        await refreshSidebar();
-        markWorkspaceDirty();
-        return { snapshot: structuredClone(segment) };
-      }
-    });
-    await appRuntime.commands.bus.execute(command);
-    renderUndoControls();
-    setSaveStatus(
-      activityLogged
-        ? "AI suggestion applied; Undo is available"
-        : "AI suggestion applied; activity log failed; Undo is available",
-      activityLogged ? "saved" : "dirty"
-    );
-    if (options.andNext) goToNextOpenSegment();
-    return true;
-  } catch (error) {
-    Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-    Object.assign(segment, snapshot);
-    prepareSegmentHistoryState(segment);
-    renderSegments();
-    renderProgress();
-    renderRevisionHistory();
-    renderAiSuggestions();
-    focusActiveTextarea();
-    setSaveStatus(error.message || "AI suggestion apply failed", "dirty");
-    return false;
-  }
+  return aiSuggestionApplicationController.apply(suggestionId, options);
 }
 
 async function createOpenAiSuggestion() {

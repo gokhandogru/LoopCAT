@@ -352,6 +352,8 @@ const aiDraftEditingControllerJs = readText("src/features/ai/ai-draft-editing-co
 const aiDraftEditingControllerUnitTests = readText("tests/unit/ai-draft-editing-controller.test.cjs");
 const aiProjectBriefControllerJs = readText("src/features/ai/ai-project-brief-controller.js");
 const aiProjectBriefControllerUnitTests = readText("tests/unit/ai-project-brief-controller.test.cjs");
+const aiSuggestionApplicationControllerJs = readText("src/features/ai/ai-suggestion-application-controller.js");
+const aiSuggestionApplicationControllerUnitTests = readText("tests/unit/ai-suggestion-application-controller.test.cjs");
 const aiTerminologyApplicationControllerJs = readText("src/features/ai/ai-terminology-application-controller.js");
 const aiTerminologyApplicationControllerUnitTests = readText(
   "tests/unit/ai-terminology-application-controller.test.cjs"
@@ -3001,6 +3003,73 @@ for (const testName of [
     aiProjectBriefControllerUnitTests,
     testName,
     `focused AI-project-brief tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiSuggestionApplicationController",
+  "The application runtime must expose the checked AI-suggestion-application controller boundary."
+);
+for (const boundary of [
+  "await persistence.flush(project.id)",
+  'status.set("Confirmed or locked segments must be reopened before applying an AI suggestion", "dirty")',
+  "const command = commands.create({",
+  "restoreSnapshot: (nextSnapshot) => restoreSnapshot(segment.id, nextSnapshot)",
+  'mutation.applyTarget(segment, suggestion.suggestedTarget, "draft", "ai-suggestion")',
+  "segment.aiApplication = {",
+  'segment.reviewState = "needs-review"',
+  "await persistence.save(segment)",
+  "await activity.log({",
+  "await commands.bus.execute(command)",
+  "commands.changed()",
+  "if (applyOptions.andNext) selection.goToNextOpen()",
+  "mutation.restoreInPlace(segment, snapshot)",
+  "const restored = mutation.prepareRestoreSnapshot(nextSnapshot, currentSnapshot)",
+  "editorSessionStore.replaceSegmentAt(index, restored)",
+  "editorSessionStore.replaceSegmentAt(index, mutation.prepareHistory(currentSnapshot))"
+]) {
+  assertIncludes(
+    aiSuggestionApplicationControllerJs,
+    boundary,
+    `AiSuggestionApplicationController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return aiSuggestionApplicationController.apply(suggestionId, options)",
+  "app.js must retain only the checked AI-suggestion-application compatibility facade."
+);
+const aiSuggestionApplicationFacade = functionBody(
+  appJs,
+  "async function applyAiSuggestion",
+  "async function createOpenAiSuggestion"
+);
+assert(
+  !aiSuggestionApplicationFacade.includes("flushPendingSegmentSaves(") &&
+    !aiSuggestionApplicationFacade.includes("createApplyAiSuggestionCommand(") &&
+    !aiSuggestionApplicationFacade.includes("setSegmentTargetAndStatus(") &&
+    !aiSuggestionApplicationFacade.includes("prepareCommandRestoreSegmentSnapshot(") &&
+    !aiSuggestionApplicationFacade.includes("editorSessionStore.replaceSegmentAt(") &&
+    !aiSuggestionApplicationFacade.includes("saveSegment(") &&
+    !aiSuggestionApplicationFacade.includes("logProjectActivity(") &&
+    !aiSuggestionApplicationFacade.includes("renderSegments(") &&
+    !aiSuggestionApplicationFacade.includes("goToNextOpenSegment(") &&
+    !aiSuggestionApplicationFacade.includes("setSaveStatus("),
+  "app.js must not regain AI-suggestion-application validation, command, restoration, mutation, persistence, activity, presentation, navigation, status, or recovery orchestration."
+);
+for (const testName of [
+  "AI suggestion application preserves project, segment, suggestion, confirmed, and locked safeguards",
+  "AI suggestion application flush failure leaves the active target unchanged",
+  "AI suggestion application executes a reversible command with provenance and apply-and-next",
+  "primary AI suggestion save failure restores the exact target snapshot and focus",
+  "secondary AI suggestion activity failure keeps the saved application durable and reports dirty",
+  "AI suggestion Undo and Redo restoration persists monotonic snapshots and refreshes context",
+  "AI suggestion restoration failure reinstates the current snapshot and full presentation"
+]) {
+  assertIncludes(
+    aiSuggestionApplicationControllerUnitTests,
+    testName,
+    `focused AI-suggestion-application tests must characterize ${testName}.`
   );
 }
 assertIncludes(
