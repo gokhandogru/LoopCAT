@@ -754,6 +754,14 @@ function currentActivityEvents() {
   return editorSessionStore.getActivityEvents();
 }
 
+function currentQaChecks() {
+  return editorSessionStore.getQaChecks();
+}
+
+function storedQualityRiskQueue() {
+  return editorSessionStore.getQualityRiskQueue();
+}
+
 function currentApplicationView() {
   return applicationStore.getState().navigation.view;
 }
@@ -7422,7 +7430,7 @@ function qualityDecisionCategory(value) {
     : "review";
 }
 
-function qualityQaBySegment(qaChecks = state.qaChecks) {
+function qualityQaBySegment(qaChecks = currentQaChecks()) {
   const map = new Map();
   (qaChecks || []).forEach((check) => {
     const segmentId = check?.segmentId || "";
@@ -7433,7 +7441,7 @@ function qualityQaBySegment(qaChecks = state.qaChecks) {
   return map;
 }
 
-function currentQualityRiskQueue(qaChecks = state.qaChecks) {
+function currentQualityRiskQueue(qaChecks = currentQaChecks()) {
   if (!state.project) return null;
   return buildRiskQueue({
     project: state.project,
@@ -7466,12 +7474,13 @@ function activeQualityEvidence(queue = null) {
 }
 
 function renderQualityWorkbench() {
+  const storedQueue = storedQualityRiskQueue();
   const queue = state.project
-    ? state.qualityRiskQueue?.projectId === state.project.id
-      ? state.qualityRiskQueue
+    ? storedQueue?.projectId === state.project.id
+      ? storedQueue
       : currentQualityRiskQueue()
     : null;
-  if (state.project) state.qualityRiskQueue = queue;
+  if (state.project) editorSessionStore.replaceQualityRiskQueue(queue);
   qualityReviewController?.renderQuality?.({
     project: state.project,
     segment: currentSegment(),
@@ -7490,7 +7499,7 @@ async function saveQualityProfileFromForm(values = qualityReviewController?.read
   try {
     state.project = await updateProject({ ...state.project, qualityProfile });
     state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
-    state.qualityRiskQueue = currentQualityRiskQueue();
+    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
     await refreshProjectSummaries();
     markWorkspaceDirty();
     renderQualityWorkbench();
@@ -7539,7 +7548,7 @@ async function saveQualityDecisionFromForm(values = qualityReviewController?.rea
     clearPendingSave(segment);
     await saveSegment(segment);
     qualityReviewController?.clearDecisionNote?.();
-    state.qualityRiskQueue = currentQualityRiskQueue();
+    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
     renderReviewPanel({ force: true });
     renderQualityWorkbench();
     updateRow(currentActiveIndex());
@@ -7567,9 +7576,9 @@ async function refreshQualityRiskQueue() {
   if (!state.project) return null;
   const checks = await runProjectQa();
   if (!checks) return null;
-  state.qualityRiskQueue = currentQualityRiskQueue(checks);
+  editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue(checks));
   renderQualityWorkbench();
-  return state.qualityRiskQueue;
+  return storedQualityRiskQueue();
 }
 
 async function goToQualityRiskItem(item) {
@@ -7595,10 +7604,11 @@ async function goToQualityRiskItem(item) {
 
 async function goToNextQualityRisk() {
   if (!state.project) return;
-  if (!state.qualityRiskQueue || state.qualityRiskQueue.projectId !== state.project.id) {
-    state.qualityRiskQueue = currentQualityRiskQueue();
+  const storedQueue = storedQualityRiskQueue();
+  if (!storedQueue || storedQueue.projectId !== state.project.id) {
+    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
   }
-  const queue = state.qualityRiskQueue;
+  const queue = storedQualityRiskQueue();
   if (!queue?.items?.length) {
     setSaveStatus("No quality risks in this scope", "saved");
     return;
@@ -7769,21 +7779,22 @@ function qaCheckFixHint(check) {
 }
 
 function renderQaResults() {
-  const checks = state.qaFilter ? state.qaChecks.filter((check) => check.type === state.qaFilter) : state.qaChecks;
-  if (!state.qaChecks.length) {
+  const qaChecks = currentQaChecks();
+  const checks = state.qaFilter ? qaChecks.filter((check) => check.type === state.qaFilter) : qaChecks;
+  if (!qaChecks.length) {
     els.qaResults.textContent = uiSource("No QA issues found.");
     els.qaResults.classList.add("muted");
     return;
   }
   els.qaResults.classList.remove("muted");
-  const summary = qaSummary(state.qaChecks);
+  const summary = qaSummary(qaChecks);
   const fragment = document.createDocumentFragment();
   const summaryWrap = document.createElement("div");
   summaryWrap.className = "qa-summary";
   const allButton = document.createElement("button");
   allButton.type = "button";
   allButton.className = state.qaFilter ? "" : "active";
-  allButton.textContent = uiSource("All {value1}", { value1: state.qaChecks.length });
+  allButton.textContent = uiSource("All {value1}", { value1: qaChecks.length });
   allButton.addEventListener("click", () => {
     state.qaFilter = "";
     renderQaResults();
@@ -7952,10 +7963,10 @@ async function runProjectQa() {
     const checks = workerClient?.runQaChecks
       ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
       : await fallback();
-    state.qaChecks = checks;
+    editorSessionStore.replaceQaChecks(checks);
     state.qaFilter = "";
     renderQaResults();
-    state.qualityRiskQueue = currentQualityRiskQueue(checks);
+    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue(checks));
     renderQualityWorkbench();
     try {
     if (LOOPCAT_TEST_BUILD && state.project[QA_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated QA activity log failure");
@@ -13099,9 +13110,9 @@ async function exportQualityPassport() {
   if (!state.project) return;
   try {
     const data = await buildProjectReportData();
-    state.qaChecks = data.qaChecks;
+    editorSessionStore.replaceQaChecks(data.qaChecks);
     state.qaFilter = "";
-    state.qualityRiskQueue = data.qualityPassport.riskQueue;
+    editorSessionStore.replaceQualityRiskQueue(data.qualityPassport.riskQueue);
     renderQaResults();
     renderQualityWorkbench();
     renderValidationReport(data.validation);
@@ -13127,7 +13138,7 @@ async function exportProjectReport(options = {}) {
   try {
     const anonymized = Boolean(options.anonymized);
     const data = await buildProjectReportData();
-    state.qaChecks = data.qaChecks;
+    editorSessionStore.replaceQaChecks(data.qaChecks);
     state.qaFilter = "";
     renderQaResults();
     renderValidationReport(data.validation);
@@ -13232,7 +13243,7 @@ async function exportBilingualDocx() {
     const qaChecks = workerClient?.runQaChecks
       ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
       : await fallback();
-    state.qaChecks = qaChecks;
+    editorSessionStore.replaceQaChecks(qaChecks);
     state.qaFilter = "";
     renderQaResults();
     const base = fileSafeName(state.project.name || "project");

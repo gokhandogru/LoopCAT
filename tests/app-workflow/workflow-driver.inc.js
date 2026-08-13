@@ -2584,14 +2584,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "AI suggestion apply persists target text"
     );
 
-    state.qaChecks = [{ id: "existing-qa-fixture", type: "existing", severity: "info", segmentId: state.segments[segmentIndex].id, label: "fixture", message: "Existing QA fixture." }];
+    editorSessionStore.replaceQaChecks([{ id: "existing-qa-fixture", type: "existing", severity: "info", segmentId: state.segments[segmentIndex].id, label: "fixture", message: "Existing QA fixture." }]);
     renderQaResults();
     setHiddenSegmentField(state.project, QA_RUN_FAILURE_TEST_FLAG, true);
     const failedQaRun = await runProjectQa();
     assert(
       failedQaRun === null &&
         els.saveStatus.textContent.includes("Simulated QA run failure") &&
-        state.qaChecks.some((check) => check.id === "existing-qa-fixture"),
+        currentQaChecks().some((check) => check.id === "existing-qa-fixture"),
       "QA run failure reports visible status and preserves previous QA results"
     );
     Reflect.deleteProperty(state.project, QA_RUN_FAILURE_TEST_FLAG);
@@ -2600,7 +2600,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(
       Array.isArray(qaWithActivityFailure) &&
         els.saveStatus.textContent.startsWith("QA found") &&
-        !state.qaChecks.some((check) => check.id === "existing-qa-fixture"),
+        !currentQaChecks().some((check) => check.id === "existing-qa-fixture"),
       "QA activity log failure still renders fresh QA results"
     );
     Reflect.deleteProperty(state.project, QA_ACTIVITY_FAILURE_TEST_FLAG);
@@ -3874,14 +3874,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         state.project.qualityProfile.terminologyStrictness === "strict",
       "checked quality/review controller owns profile submit while domain persistence keeps the review contract"
     );
-    state.qualityRiskQueue = currentQualityRiskQueue();
+    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
     renderQualityWorkbench();
     assert(
       els.qualitySummary.textContent.includes("risk items") &&
         els.qualityRiskList.textContent.length > 0 &&
         qualityReviewController.getState().projectId === state.project.id &&
         qualityReviewController.getState().segmentId === currentSegment()?.id &&
-        qualityReviewController.getState().riskCount === state.qualityRiskQueue.totalRiskItems,
+        qualityReviewController.getState().riskCount === storedQualityRiskQueue().totalRiskItems,
       "checked quality/review controller owns workbench rendering and redacted view state"
     );
     const qualityDecisionSegment = currentSegment();
@@ -3921,7 +3921,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       buildRiskQueue({
         project: state.project,
         segments: state.segments,
-        qaChecks: state.qaChecks,
+        qaChecks: currentQaChecks(),
         profile: state.project.qualityProfile
       })?.byCategory?.accuracy >= 1,
       "quality decision contributes to category risk aggregation"

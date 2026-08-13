@@ -42,6 +42,8 @@ test("EditorSessionStore compatibility bridge delegates only unmigrated replacem
   assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "projectSummaryRevisions"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "projectTerms"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "activityEvents"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "qaChecks"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "qualityRiskQueue"), false);
   assert.equal(compatibility.transient, true);
   assert.deepEqual(
     EDITOR_SESSION_COMPATIBILITY_FIELDS.filter((name) => Object.prototype.hasOwnProperty.call(compatibility, name)),
@@ -102,4 +104,27 @@ test("EditorSessionStore explicitly owns project terms and deduplicated activity
   assert.equal(store.getActivityEvents(), activityEvents);
   assert.throws(() => store.replaceProjectTerms(null), /projectTerms must be an array/);
   assert.throws(() => store.replaceActivityEvents(null), /activityEvents must be an array/);
+});
+
+test("EditorSessionStore explicitly owns QA checks and the derived quality-risk queue", async () => {
+  const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
+  const originalCheck = { id: "qa-1", type: "terminology", segmentId: "segment-1" };
+  const originalQueue = { projectId: "project-1", totalRiskItems: 1, items: [] };
+  const store = createEditorSessionStore({
+    qaChecks: [originalCheck],
+    qualityRiskQueue: originalQueue
+  });
+
+  assert.deepEqual(store.getQaChecks(), [originalCheck]);
+  assert.equal(store.getQualityRiskQueue(), originalQueue);
+
+  const qaChecks = [{ id: "qa-2", type: "formatting", segmentId: "segment-2" }];
+  const qualityRiskQueue = { projectId: "project-1", totalRiskItems: 2, items: [] };
+  assert.equal(store.replaceQaChecks(qaChecks), qaChecks);
+  assert.equal(store.replaceQualityRiskQueue(qualityRiskQueue), qualityRiskQueue);
+  assert.equal(store.getQaChecks(), qaChecks);
+  assert.equal(store.getQualityRiskQueue(), qualityRiskQueue);
+
+  assert.equal(store.replaceQualityRiskQueue(null), null);
+  assert.throws(() => store.replaceQaChecks(null), /qaChecks must be an array/);
 });
