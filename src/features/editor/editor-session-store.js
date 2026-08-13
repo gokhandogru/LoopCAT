@@ -23,20 +23,6 @@ function createDefaultSession() {
 }
 
 export const EDITOR_SESSION_FIELDS = Object.freeze(Object.keys(createDefaultSession()));
-const EXPLICIT_SESSION_FIELDS = new Set([
-  "projects",
-  "project",
-  "projectSummaries",
-  "projectSummaryRevisions",
-  "projectTerms",
-  "activityEvents",
-  "qaChecks",
-  "qualityRiskQueue",
-  "progressSummary"
-]);
-export const EDITOR_SESSION_COMPATIBILITY_FIELDS = Object.freeze(
-  EDITOR_SESSION_FIELDS.filter((name) => !EXPLICIT_SESSION_FIELDS.has(name))
-);
 
 function normalizeField(name, value) {
   if (ARRAY_FIELDS.has(name) && !Array.isArray(value)) {
@@ -86,6 +72,7 @@ export function createEditorSessionStore(initialState = {}) {
     getProgressSummary: () => state.progressSummary,
     getQaChecks: () => state.qaChecks,
     getQualityRiskQueue: () => state.qualityRiskQueue,
+    getSegments: () => state.segments,
     getProjectSummaryRevision(projectId) {
       return Number(state.projectSummaryRevisions.get(String(projectId || "")) || 0);
     },
@@ -130,6 +117,18 @@ export function createEditorSessionStore(initialState = {}) {
     replaceQualityRiskQueue(qualityRiskQueue) {
       return replace({ qualityRiskQueue }).qualityRiskQueue;
     },
+    replaceSegmentAt(index, segment) {
+      if (!Number.isInteger(index) || index < 0 || index >= state.segments.length) {
+        throw new RangeError("EditorSessionStore segment index is out of range.");
+      }
+      const segments = state.segments.slice();
+      segments[index] = segment;
+      replace({ segments });
+      return segment;
+    },
+    replaceSegments(segments) {
+      return replace({ segments }).segments;
+    },
     replaceProjectSummaries(projectSummaries) {
       return replace({ projectSummaries }).projectSummaries;
     },
@@ -137,23 +136,6 @@ export function createEditorSessionStore(initialState = {}) {
       if (typeof listener !== "function") throw new TypeError("EditorSessionStore listener must be a function.");
       listeners.add(listener);
       return () => listeners.delete(listener);
-    },
-    attachCompatibility(target) {
-      if (!target || typeof target !== "object") {
-        throw new TypeError("EditorSessionStore compatibility target must be an object.");
-      }
-      for (const name of EDITOR_SESSION_COMPATIBILITY_FIELDS) {
-        if (Object.prototype.hasOwnProperty.call(target, name)) {
-          throw new Error(`EditorSessionStore cannot attach over existing state.${name}.`);
-        }
-        Object.defineProperty(target, name, {
-          configurable: false,
-          enumerable: true,
-          get: () => state[name],
-          set: (value) => replace({ [name]: value })
-        });
-      }
-      return target;
     }
   });
 }

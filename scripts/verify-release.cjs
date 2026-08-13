@@ -421,11 +421,6 @@ assertIncludes(
   "const editorSession = createEditorSessionStore();",
   "The application runtime must own one checked EditorSessionStore."
 );
-assertIncludes(
-  editorSessionStoreJs,
-  "attachCompatibility(target)",
-  "EditorSessionStore must retain the temporary checked compatibility bridge while app.js is decomposed."
-);
 for (const field of [
   "projects",
   "project",
@@ -435,7 +430,8 @@ for (const field of [
   "activityEvents",
   "qaChecks",
   "qualityRiskQueue",
-  "progressSummary"
+  "progressSummary",
+  "segments"
 ]) {
   assert(
     !new RegExp(`\\bstate\\.${field}\\b`).test(appJs) &&
@@ -463,10 +459,17 @@ for (const method of [
   "getQualityRiskQueue",
   "replaceQualityRiskQueue",
   "getProgressSummary",
-  "replaceProgressSummary"
+  "replaceProgressSummary",
+  "getSegments",
+  "replaceSegments",
+  "replaceSegmentAt"
 ]) {
   assertIncludes(editorSessionStoreJs, method, `EditorSessionStore must retain explicit ${method} ownership.`);
 }
+assert(
+  !editorSessionStoreJs.includes("attachCompatibility") && !appJs.includes("attachCompatibility"),
+  "The completed EditorSessionStore migration must not restore the temporary compatibility bridge."
+);
 const appStateStart = appJs.indexOf("const state = {");
 const appStateEnd = appJs.indexOf("\n};", appStateStart);
 const appStateBlock = appJs.slice(appStateStart, appStateEnd);
@@ -4746,7 +4749,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "for (const segment of state.segments)",
+  "for (const segment of currentSegments())",
   "app.js must render project progress with one segment pass."
 );
 assertIncludes(

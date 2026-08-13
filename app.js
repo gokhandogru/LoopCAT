@@ -740,7 +740,6 @@ const state = {
   }
 };
 const editorSessionStore = appRuntime.editorSession;
-editorSessionStore.attachCompatibility(state);
 
 function currentProjects() {
   return editorSessionStore.getProjects();
@@ -748,6 +747,10 @@ function currentProjects() {
 
 function currentProject() {
   return editorSessionStore.getProject();
+}
+
+function currentSegments() {
+  return editorSessionStore.getSegments();
 }
 
 function currentProjectSummaries() {
@@ -806,7 +809,7 @@ function updateEditorFilters(patch) {
   return editorFilterStore.update(patch);
 }
 
-function selectApplicationSegment(activeIndex, segmentId = state.segments[activeIndex]?.id || "") {
+function selectApplicationSegment(activeIndex, segmentId = currentSegments()[activeIndex]?.id || "") {
   return applicationNavigation.selectSegment({ activeIndex, segmentId });
 }
 
@@ -1909,14 +1912,14 @@ async function undoLastCommand() {
   await loadProjects(false);
   if (currentProject()?.id === projectId) {
     editorSessionStore.replaceProject(currentProjects().find((project) => project.id === projectId) || currentProject());
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
+    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(projectId)));
     const requestedIndex = requestedActiveSegmentId
-      ? state.segments.findIndex((segment) => segment.id === requestedActiveSegmentId)
+      ? currentSegments().findIndex((segment) => segment.id === requestedActiveSegmentId)
       : -1;
-    const nextIndex = state.segments.length
+    const nextIndex = currentSegments().length
       ? requestedIndex >= 0
         ? requestedIndex
-        : Math.max(0, Math.min(currentActiveIndex(), state.segments.length - 1))
+        : Math.max(0, Math.min(currentActiveIndex(), currentSegments().length - 1))
       : -1;
     selectApplicationSegment(nextIndex);
     renderAll();
@@ -1940,22 +1943,22 @@ async function redoLastCommand() {
   const requestedActiveSegmentId = result.result?.activeSegmentId || "";
   if (result.receipt.commandId === "delete-project" && currentProject()?.id === projectId) {
     editorSessionStore.replaceProject(null);
-    state.segments = [];
+    editorSessionStore.replaceSegments([]);
     setView("projects");
     applicationNavigation.clearSelection();
   }
   await loadProjects(false);
   if (result.receipt.commandId === "delete-document" && currentProject()?.id === projectId) {
     editorSessionStore.replaceProject(currentProjects().find((project) => project.id === projectId) || currentProject());
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
-    const nextIndex = state.segments.length
-      ? Math.max(0, Math.min(currentActiveIndex(), state.segments.length - 1))
+    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(projectId)));
+    const nextIndex = currentSegments().length
+      ? Math.max(0, Math.min(currentActiveIndex(), currentSegments().length - 1))
       : -1;
     selectApplicationSegment(nextIndex);
     renderAll();
   } else if (currentProject()?.id === projectId && requestedActiveSegmentId) {
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
-    const requestedIndex = state.segments.findIndex((segment) => segment.id === requestedActiveSegmentId);
+    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(projectId)));
+    const requestedIndex = currentSegments().findIndex((segment) => segment.id === requestedActiveSegmentId);
     if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
     renderAll();
   }
@@ -2334,7 +2337,7 @@ function sourceWordCount(segment) {
 }
 
 function currentSegment() {
-  return state.segments[currentActiveIndex()] || null;
+  return currentSegments()[currentActiveIndex()] || null;
 }
 
 function setHiddenSegmentField(segment, field, value) {
@@ -2359,7 +2362,7 @@ function prepareSegmentHistoryState(segment) {
   return segment;
 }
 
-function prepareSegmentHistoryStates(segments = state.segments) {
+function prepareSegmentHistoryStates(segments = currentSegments()) {
   (segments || []).forEach(prepareSegmentHistoryState);
   return segments;
 }
@@ -3200,7 +3203,7 @@ function segmentPassesFilters(segment, queryMatches = segmentQueryMatcher()) {
 }
 
 function projectSegmentIndexes() {
-  return state.segments.map((_, index) => index);
+  return currentSegments().map((_, index) => index);
 }
 
 function segmentFilterCacheKey() {
@@ -3223,7 +3226,7 @@ function filteredSegmentIndexes() {
   if (state.segmentFilterCache.key === key) return state.segmentFilterCache.indexes;
   const indexes = [];
   const queryMatches = segmentQueryMatcher();
-  state.segments.forEach((segment, index) => {
+  currentSegments().forEach((segment, index) => {
     if (segmentPassesFilters(segment, queryMatches)) indexes.push(index);
   });
   const positions = new Map(indexes.map((segmentIndex, position) => [segmentIndex, position]));
@@ -3252,7 +3255,7 @@ function projectDocuments() {
       type: stableLower(documentInfo.type || "docx") || "docx"
     });
   });
-  state.segments.forEach((segment) => {
+  currentSegments().forEach((segment) => {
     const id = segment.documentId || "default-document";
     if (!map.has(id)) {
       map.set(id, {
@@ -3290,7 +3293,7 @@ function exportDocumentForTypes(supportedTypes, selectedTypeMessage, missingMess
 }
 
 function documentSegments(documentId) {
-  return state.segments.filter((segment) => segment.documentId === documentId);
+  return currentSegments().filter((segment) => segment.documentId === documentId);
 }
 
 function emptyDocumentStats() {
@@ -3313,7 +3316,7 @@ function finalizeDocumentStats(stats) {
 
 function projectDocumentStats(documents = projectDocuments()) {
   const map = new Map(documents.map((documentInfo) => [documentInfo.id, emptyDocumentStats()]));
-  state.segments.forEach((segment) => {
+  currentSegments().forEach((segment) => {
     const id = segment.documentId || "default-document";
     if (!map.has(id)) map.set(id, emptyDocumentStats());
     addSegmentToDocumentStats(map.get(id), segment);
@@ -3336,7 +3339,7 @@ function aggregateDocumentStats(statsById) {
 
 function documentStats(documentId) {
   const stats = emptyDocumentStats();
-  state.segments.forEach((segment) => {
+  currentSegments().forEach((segment) => {
     if (segment.documentId === documentId) addSegmentToDocumentStats(stats, segment);
   });
   return finalizeDocumentStats(stats);
@@ -3344,8 +3347,8 @@ function documentStats(documentId) {
 
 function currentDocumentSegments() {
   return currentDocumentId()
-    ? state.segments.filter((segment) => segment.documentId === currentDocumentId())
-    : state.segments;
+    ? currentSegments().filter((segment) => segment.documentId === currentDocumentId())
+    : currentSegments();
 }
 
 function currentSelectedDocument() {
@@ -3357,7 +3360,7 @@ function deliveryExportScope() {
   const documentInfo = currentSelectedDocument();
   return {
     documentInfo,
-    segments: documentInfo ? state.segments.filter((segment) => segment.documentId === documentInfo.id) : state.segments
+    segments: documentInfo ? currentSegments().filter((segment) => segment.documentId === documentInfo.id) : currentSegments()
   };
 }
 
@@ -3741,7 +3744,7 @@ function canMergeSegmentStructures(segment, next) {
 function nextSegmentForMerge(segment = currentSegment()) {
   if (!segment) return null;
   return (
-    state.segments.find(
+    currentSegments().find(
       (item) => item.index > segment.index && item.documentId === segment.documentId
     ) || null
   );
@@ -3903,7 +3906,7 @@ function commandList() {
     { id: "redo", label: "Redo last action", run: redoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canRedo?.(commandProjectId)) },
     { id: "trash", label: "Open Trash", run: openTrash, enabled: Boolean(appRuntime?.trashRepository) },
     { id: "confirm", label: "Confirm segment", run: confirmCurrentSegment, enabled: Boolean(currentSegment()?.target?.trim()) },
-    { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(state.segments.length) },
+    { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(currentSegments().length) },
     { id: "focus-mode", label: currentFocusMode() ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(currentApplicationView() === "editor" && currentProject()) },
     { id: "copy-source", label: "Copy source", run: copySourceToTarget, enabled: Boolean(currentSegment()) },
     { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: splitCurrentSegment, enabled: Boolean(currentSegment() && canSplitSegmentStructure(currentSegment())) },
@@ -3989,7 +3992,7 @@ function queueSegmentSave(segment, delay = 450) {
       finalizePendingEditCommand(segment.id);
       setSaveStatus("Saving...");
       const record = state.saveTimers.get(segment.id);
-      const latest = state.segments.find((item) => item.id === segment.id) || record?.segment || segment;
+      const latest = currentSegments().find((item) => item.id === segment.id) || record?.segment || segment;
       if (LOOPCAT_TEST_BUILD && latest[AUTOSAVE_SAVE_FAILURE_TEST_FLAG]) {
         Reflect.deleteProperty(latest, AUTOSAVE_SAVE_FAILURE_TEST_FLAG);
         throw new Error("Simulated autosave save failure");
@@ -4000,7 +4003,7 @@ function queueSegmentSave(segment, delay = 450) {
       renderRevisionHistory();
     } catch (error) {
       const record = state.saveTimers.get(segment.id);
-      const latest = state.segments.find((item) => item.id === segment.id) || record?.segment || segment;
+      const latest = currentSegments().find((item) => item.id === segment.id) || record?.segment || segment;
       if (state.saveTimers.get(segment.id)?.timer === timer) {
         state.saveTimers.delete(segment.id);
         queueSegmentSave(latest, AUTOSAVE_RETRY_DELAY_MS);
@@ -4357,7 +4360,7 @@ async function refreshProjectSummaries() {
         summaryRevision: revision
       };
     }
-    const inMemorySegments = currentProject()?.id === project.id ? state.segments : null;
+    const inMemorySegments = currentProject()?.id === project.id ? currentSegments() : null;
     return summarizeProject(project, inMemorySegments, revision);
   }));
   editorSessionStore.replaceProjectSummaries(projectSummaries);
@@ -4391,7 +4394,7 @@ function setView(view) {
 
 function showProjectHome() {
   if (!currentProject()) return;
-  const activeIndex = state.segments.length ? 0 : -1;
+  const activeIndex = currentSegments().length ? 0 : -1;
   applicationNavigation?.openProject?.(currentProject().id, activeIndex);
   renderAll();
 }
@@ -4691,7 +4694,7 @@ async function renderProjectAnalysis() {
   const run = (state.projectAnalysisRun += 1);
   const project = currentProject();
   if (!project || currentApplicationView() !== "project" || !els.projectAnalysis) return;
-  const segments = state.segments;
+  const segments = currentSegments();
   const tmEntries = await getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`);
   if (run !== state.projectAnalysisRun || currentApplicationView() !== "project" || currentProject()?.id !== project.id) return;
   const tmNames = new Set(projectTmNames(project));
@@ -4733,10 +4736,10 @@ async function openProject(projectId) {
   await flushPendingSegmentSaves();
   editorSessionStore.replaceProject(currentProjects().find((project) => project.id === projectId) || null);
   state.commandProjectId = currentProject()?.id || projectId || "";
-  state.segments = prepareSegmentHistoryStates(currentProject() ? await getProjectSegments(projectId) : []);
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(currentProject() ? await getProjectSegments(projectId) : []));
   editorSessionStore.replaceActivityEvents(currentProject() ? await listActivityEvents(projectId) : []);
   await refreshProjectTerms();
-  const activeIndex = state.segments.length ? 0 : -1;
+  const activeIndex = currentSegments().length ? 0 : -1;
   await filterPresetReady;
   await filterPresetController?.restoreForProject?.(currentProject()?.id || projectId);
   applicationNavigation?.openProject?.(currentProject()?.id || projectId, activeIndex);
@@ -4746,11 +4749,11 @@ async function openProject(projectId) {
 
 async function openProjectFile(documentId) {
   if (!currentProject()) return;
-  const first = state.segments.findIndex((segment) => segment.documentId === documentId);
+  const first = currentSegments().findIndex((segment) => segment.documentId === documentId);
   applicationNavigation?.openEditor?.({
     projectId: currentProject().id,
     documentId,
-    segmentId: state.segments[first]?.id || "",
+    segmentId: currentSegments()[first]?.id || "",
     activeIndex: first
   });
   renderAll();
@@ -5428,7 +5431,7 @@ function renderEditor() {
     <dt>${uiLabelHtml("linkedTms")}</dt><dd>${displaySafeHtml(resources.tmNames.join(", "))}</dd>
     <dt>${uiLabelHtml("linkedTbs")}</dt><dd>${displaySafeHtml(resources.tbNames.join(", "))}</dd>
     <dt>${translatedSourceHtml("Documents")}</dt><dd>${projectDocuments().length || 0}</dd>
-    <dt>${uiLabelHtml("segmentsTitle")}</dt><dd>${state.segments.length}</dd>
+    <dt>${uiLabelHtml("segmentsTitle")}</dt><dd>${currentSegments().length}</dd>
     <dt>${uiLabelHtml("activity")}</dt><dd>${uiLabelHtml("eventCount", { count: currentActivityEvents().length })}</dd>
   `);
   const ai = defaultAiSettings(currentProject().aiSettings);
@@ -5470,7 +5473,7 @@ function renderProjectHome() {
   replaceSafeHtml(els.projectHomeStats, `
     <div><strong>${total.percent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
     <div><strong>${documents.length}</strong><span>${uiLabelHtml("files")}</span></div>
-    <div><strong>${state.segments.length}</strong><span>${uiLabelHtml("segments")}</span></div>
+    <div><strong>${currentSegments().length}</strong><span>${uiLabelHtml("segments")}</span></div>
     <div><strong>${sourceWords}</strong><span>${uiLabelHtml("sourceWords")}</span></div>
   `);
   els.fileCountText.textContent = documents.length ? uiLabel("fileCount", { count: documents.length }) : uiSource("No files imported");
@@ -5662,7 +5665,7 @@ async function confirmDeleteProject(projectId = currentProject()?.id) {
     clearWorkspaceDirty(project.id);
     if (currentProject()?.id === project.id) {
       editorSessionStore.replaceProject(null);
-      state.segments = [];
+      editorSessionStore.replaceSegments([]);
       applicationNavigation.openProjects();
       applicationNavigation.clearSelection();
     }
@@ -5692,9 +5695,9 @@ async function confirmDeleteFile(documentInfo) {
     state.commandProjectId = currentProject().id;
     editorSessionStore.replaceProject(commandResult.result.project);
     editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
     selectApplicationDocument("");
-    selectApplicationSegment(state.segments.length ? 0 : -1);
+    selectApplicationSegment(currentSegments().length ? 0 : -1);
     markWorkspaceDirty();
     let fileDeleteActivityFailed = false;
     try {
@@ -6220,7 +6223,7 @@ function spacerRow(height) {
 }
 
 function renderSegmentRow(index) {
-  const segment = state.segments[index];
+  const segment = currentSegments()[index];
   const row = els.rowTemplate.content.firstElementChild.cloneNode(true);
   row.dataset.index = String(index);
   row.classList.toggle("active", index === currentActiveIndex());
@@ -6360,7 +6363,7 @@ function renderSegments(options = {}) {
 
 function updateRow(index) {
   const row = els.segmentBody.querySelector(`tr[data-index="${index}"]`);
-  const segment = state.segments[index];
+  const segment = currentSegments()[index];
   if (!row || !segment) return;
   row.classList.toggle("active", index === currentActiveIndex());
   row.classList.toggle("tag-warning-row", hasTagIssue(segment));
@@ -6381,10 +6384,10 @@ function scheduleRevisionHistoryRender() {
 }
 
 function calculateProgressSummary() {
-  const total = state.segments.length;
+  const total = currentSegments().length;
   let confirmed = 0;
   let words = 0;
-  for (const segment of state.segments) {
+  for (const segment of currentSegments()) {
     if (segment.status === "confirmed") confirmed += 1;
     words += sourceWordCount(segment);
   }
@@ -6398,7 +6401,7 @@ function renderProgress(options = {}) {
   const canApplyStatusDelta =
     cached &&
     cached.projectId === (currentProject()?.id || "") &&
-    cached.total === state.segments.length &&
+    cached.total === currentSegments().length &&
     previousStatus !== undefined &&
     nextStatus !== undefined;
   let summary;
@@ -6425,11 +6428,11 @@ function ensureSegmentVisible(index) {
 }
 
 async function setActiveSegment(index) {
-  if (index < 0 || index >= state.segments.length) return;
+  if (index < 0 || index >= currentSegments().length) return;
   if (index === currentActiveIndex()) return;
   const oldIndex = currentActiveIndex();
-  verticalFeatureState?.segmentGrid?.selectSegment(index, state.segments[index]?.id || "");
-  verticalFeatureState?.inspector?.setContext({ segmentId: state.segments[index]?.id || "" });
+  verticalFeatureState?.segmentGrid?.selectSegment(index, currentSegments()[index]?.id || "");
+  verticalFeatureState?.inspector?.setContext({ segmentId: currentSegments()[index]?.id || "" });
   renderConfirmBusyState();
   ensureSegmentVisible(index);
   updateRow(oldIndex);
@@ -6439,14 +6442,14 @@ async function setActiveSegment(index) {
 }
 
 async function goToNextOpenSegment() {
-  if (!state.segments.length) return;
+  if (!currentSegments().length) return;
   const start = Math.max(currentActiveIndex() + 1, 0);
-  const afterCurrent = state.segments.findIndex((segment, index) => index >= start && isOpenSegment(segment));
-  const beforeCurrent = state.segments.findIndex((segment, index) => index < start && isOpenSegment(segment));
+  const afterCurrent = currentSegments().findIndex((segment, index) => index >= start && isOpenSegment(segment));
+  const beforeCurrent = currentSegments().findIndex((segment, index) => index < start && isOpenSegment(segment));
   const next = afterCurrent !== -1 ? afterCurrent : beforeCurrent;
   if (next === -1) return;
   await setActiveSegment(next);
-  if (!segmentPassesFilters(state.segments[next])) {
+  if (!segmentPassesFilters(currentSegments()[next])) {
     updateEditorFilters({ status: "all" });
     els.segmentStatusFilter.value = "all";
     renderSegments();
@@ -6455,7 +6458,7 @@ async function goToNextOpenSegment() {
 }
 
 function updateSegmentDraft(index, target) {
-  const segment = state.segments[index];
+  const segment = currentSegments()[index];
   if (!segment) return;
   const editTargetSessions = appRuntime?.commands?.editTargetSessions;
   if (editTargetSessions && !editTargetSessions.has(segment.id)) {
@@ -6504,9 +6507,9 @@ function prepareCommandRestoreSegmentSnapshot(snapshot, current) {
 }
 
 async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}) {
-  const index = state.segments.findIndex((item) => item.id === segmentId);
+  const index = currentSegments().findIndex((item) => item.id === segmentId);
   if (index < 0) throw new Error("The affected segment is no longer available.");
-  const segment = state.segments[index];
+  const segment = currentSegments()[index];
   const currentPatch = targetCommandPatch(segment);
   const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
   try {
@@ -6550,15 +6553,15 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
   }
   const currentById = new Map();
   const indexes = segmentIds.map((segmentId) => {
-    const index = state.segments.findIndex((segment) => segment.id === segmentId);
+    const index = currentSegments().findIndex((segment) => segment.id === segmentId);
     if (index < 0) throw new Error("An affected pretranslation segment is no longer available.");
-    currentById.set(segmentId, targetCommandPatch(state.segments[index]));
+    currentById.set(segmentId, targetCommandPatch(currentSegments()[index]));
     return index;
   });
   const previousActiveId = currentSegment()?.id || "";
   try {
     const restored = patches.map((patch, offset) => {
-      const segment = state.segments[indexes[offset]];
+      const segment = currentSegments()[indexes[offset]];
       const currentPatch = currentById.get(segment.id);
       const restoredPatch = structuredClone(patch);
       restoredPatch.revision = Math.max(
@@ -6572,7 +6575,7 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
     });
     await saveSegments(restored);
     const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
-    const requestedIndex = state.segments.findIndex((segment) => segment.id === requestedActiveId);
+    const requestedIndex = currentSegments().findIndex((segment) => segment.id === requestedActiveId);
     if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
     invalidateSegmentFilterCache();
     markWorkspaceDirty();
@@ -6587,8 +6590,8 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
     };
   } catch (error) {
     currentById.forEach((patch, segmentId) => {
-      const index = state.segments.findIndex((segment) => segment.id === segmentId);
-      if (index >= 0) applyTargetCommandPatch(state.segments[index], patch);
+      const index = currentSegments().findIndex((segment) => segment.id === segmentId);
+      if (index >= 0) applyTargetCommandPatch(currentSegments()[index], patch);
     });
     invalidateSegmentFilterCache();
     renderAll();
@@ -6601,22 +6604,22 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
   const currentById = new Map();
   const indexes = [];
   for (const snapshot of snapshots) {
-    const index = state.segments.findIndex((segment) => segment.id === snapshot?.id);
+    const index = currentSegments().findIndex((segment) => segment.id === snapshot?.id);
     if (index < 0) throw new Error("An affected segment is no longer available.");
     indexes.push(index);
-    currentById.set(snapshot.id, structuredClone(state.segments[index]));
+    currentById.set(snapshot.id, structuredClone(currentSegments()[index]));
   }
   const previousActiveId = currentSegment()?.id || "";
   try {
     const restored = snapshots.map((snapshot, offset) => {
       const next = prepareCommandRestoreSegmentSnapshot(snapshot, currentById.get(snapshot.id));
-      state.segments[indexes[offset]] = next;
+      editorSessionStore.replaceSegmentAt(indexes[offset], next);
       clearPendingSave(next);
       return next;
     });
     await saveSegments(restored);
     const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
-    const requestedIndex = state.segments.findIndex((segment) => segment.id === requestedActiveId);
+    const requestedIndex = currentSegments().findIndex((segment) => segment.id === requestedActiveId);
     if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
     markWorkspaceDirty();
     renderAll();
@@ -6628,8 +6631,8 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
     };
   } catch (error) {
     for (const [segmentId, snapshot] of currentById) {
-      const index = state.segments.findIndex((segment) => segment.id === segmentId);
-      if (index >= 0) state.segments[index] = prepareSegmentHistoryState(snapshot);
+      const index = currentSegments().findIndex((segment) => segment.id === segmentId);
+      if (index >= 0) editorSessionStore.replaceSegmentAt(index, prepareSegmentHistoryState(snapshot));
     }
     renderAll();
     throw error;
@@ -6665,12 +6668,12 @@ async function restoreSplitSegmentCommandSegments(nextSnapshots, options = {}) {
     throw new Error("The split segment snapshot does not contain the original segment.");
   }
 
-  const currentSegments = state.segments.map((segment) => structuredClone(segment));
-  const currentById = new Map(currentSegments.map((segment) => [segment.id, segment]));
+  const currentSegmentSnapshots = currentSegments().map((segment) => structuredClone(segment));
+  const currentById = new Map(currentSegmentSnapshots.map((segment) => [segment.id, segment]));
   if (!currentById.has(options.originalSegmentId)) {
     throw new Error("The original split segment is no longer available.");
   }
-  const preservedCurrentSegments = currentSegments.filter(
+  const preservedCurrentSegments = currentSegmentSnapshots.filter(
     (segment) => !snapshotIds.has(segment.id) && segment.id !== options.createdSegmentId
   );
   const restored = normalizeStructuralSegmentOrder(
@@ -6687,13 +6690,13 @@ async function restoreSplitSegmentCommandSegments(nextSnapshots, options = {}) {
     if (record) clearTimeout(record.timer || record);
     state.saveTimers.delete(segmentId);
   });
-  state.segments = prepareSegmentHistoryStates(savedSegments);
-  const requestedIndex = state.segments.findIndex((segment) => segment.id === options.activeSegmentId);
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
+  const requestedIndex = currentSegments().findIndex((segment) => segment.id === options.activeSegmentId);
   selectApplicationSegment(requestedIndex >= 0 ? requestedIndex : Math.max(0, currentActiveIndex()));
   invalidateSegmentFilterCache();
   markWorkspaceDirty();
   return {
-    segments: state.segments.map((segment) => structuredClone(segment)),
+    segments: currentSegments().map((segment) => structuredClone(segment)),
     activeSegmentId: currentSegment()?.id || options.activeSegmentId || options.originalSegmentId,
     affectedCount: 2,
     focusTarget: true
@@ -6718,12 +6721,12 @@ async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
     throw new Error("The merged segment snapshot does not match the requested restore direction.");
   }
 
-  const currentSegments = state.segments.map((segment) => structuredClone(segment));
-  const currentById = new Map(currentSegments.map((segment) => [segment.id, segment]));
+  const currentSegmentSnapshots = currentSegments().map((segment) => structuredClone(segment));
+  const currentById = new Map(currentSegmentSnapshots.map((segment) => [segment.id, segment]));
   if (!currentById.has(options.segmentId)) {
     throw new Error("The surviving merged segment is no longer available.");
   }
-  const preservedCurrentSegments = currentSegments.filter(
+  const preservedCurrentSegments = currentSegmentSnapshots.filter(
     (segment) => !snapshotIds.has(segment.id) && segment.id !== options.mergedSegmentId
   );
   const restored = normalizeStructuralSegmentOrder(
@@ -6740,13 +6743,13 @@ async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
     if (record) clearTimeout(record.timer || record);
     state.saveTimers.delete(segmentId);
   });
-  state.segments = prepareSegmentHistoryStates(savedSegments);
-  const requestedIndex = state.segments.findIndex((segment) => segment.id === options.activeSegmentId);
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
+  const requestedIndex = currentSegments().findIndex((segment) => segment.id === options.activeSegmentId);
   selectApplicationSegment(requestedIndex >= 0 ? requestedIndex : Math.max(0, currentActiveIndex()));
   invalidateSegmentFilterCache();
   markWorkspaceDirty();
   return {
-    segments: state.segments.map((segment) => structuredClone(segment)),
+    segments: currentSegments().map((segment) => structuredClone(segment)),
     activeSegmentId: currentSegment()?.id || options.activeSegmentId || options.segmentId,
     affectedCount: 2,
     focusTarget: true
@@ -6771,7 +6774,7 @@ async function replaceTargetText(scope = "visible") {
   const proposals = [];
   try {
     indexes.forEach((index) => {
-      const segment = state.segments[index];
+      const segment = currentSegments()[index];
       if (!segment) return;
       const result = replaceOutsideProtectedTokens(segment.target || "", findText, replacement, options);
       if (!result.count || result.text === segment.target) return;
@@ -6867,12 +6870,12 @@ function renderConfirmBusyState() {
 }
 
 async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = {}) {
-  const index = state.segments.findIndex((item) => item.id === segmentId);
+  const index = currentSegments().findIndex((item) => item.id === segmentId);
   if (index < 0) throw new Error("The affected segment is no longer available.");
-  const currentSnapshot = structuredClone(state.segments[index]);
+  const currentSnapshot = structuredClone(currentSegments()[index]);
   try {
     const restored = prepareCommandRestoreSegmentSnapshot(nextSnapshot, currentSnapshot);
-    state.segments[index] = restored;
+    editorSessionStore.replaceSegmentAt(index, restored);
     clearPendingSave(restored);
     await saveSegment(restored);
     verticalFeatureState?.segmentGrid?.selectSegment(index, restored.id);
@@ -6887,7 +6890,7 @@ async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = 
       activeSegmentId: currentSegment()?.id || restored.id
     };
   } catch (error) {
-    state.segments[index] = prepareSegmentHistoryState(currentSnapshot);
+    editorSessionStore.replaceSegmentAt(index, prepareSegmentHistoryState(currentSnapshot));
     renderAll();
     throw error;
   }
@@ -7170,7 +7173,7 @@ async function pretranslateFromTm() {
     return commandExecution;
   } catch (error) {
     beforeSnapshots.forEach((snapshot, segmentId) => {
-      const segment = state.segments.find((item) => item.id === segmentId);
+      const segment = currentSegments().find((item) => item.id === segmentId);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -7345,7 +7348,7 @@ function focusActiveTextarea(selection = null) {
 function handleEditorKeydown(event, index) {
   const key = stableLower(event.key);
   if ((event.ctrlKey || event.metaKey) && key === "z" && !event.altKey) {
-    finalizePendingEditCommand(state.segments[index]?.id || "");
+    finalizePendingEditCommand(currentSegments()[index]?.id || "");
     const projectId = state.commandProjectId || currentProject()?.id || null;
     const canRun = event.shiftKey
       ? appRuntime?.commands?.bus?.canRedo?.(projectId)
@@ -7594,9 +7597,9 @@ async function refreshQualityRiskQueue() {
 }
 
 async function goToQualityRiskItem(item) {
-  const index = state.segments.findIndex((segment) => segment.id === item?.segmentId);
+  const index = currentSegments().findIndex((segment) => segment.id === item?.segmentId);
   if (index === -1) return;
-  const segment = state.segments[index];
+  const segment = currentSegments()[index];
   if (!segmentPassesFilters(segment)) {
     if (currentDocumentId() && segment.documentId !== currentDocumentId()) {
       selectApplicationDocument("");
@@ -7628,7 +7631,7 @@ async function goToNextQualityRisk() {
   const indexedItems = queue.items
     .map((item) => ({
       ...item,
-      globalIndex: state.segments.findIndex((segment) => segment.id === item.segmentId)
+      globalIndex: currentSegments().findIndex((segment) => segment.id === item.segmentId)
     }))
     .filter((item) => item.globalIndex !== -1)
     .sort((a, b) => a.globalIndex - b.globalIndex);
@@ -7833,7 +7836,7 @@ function renderQaResults() {
     button.type = "button";
     button.textContent = uiLabel("go");
     button.addEventListener("click", async () => {
-      const index = state.segments.findIndex((segment) => segment.id === check.segmentId);
+      const index = currentSegments().findIndex((segment) => segment.id === check.segmentId);
       if (index !== -1) {
         await setActiveSegment(index);
         renderSegments();
@@ -8384,12 +8387,12 @@ async function applyAiSuggestion(suggestionId, options = {}) {
   const snapshot = structuredClone(segment);
   const segmentId = segment.id;
   const restoreSnapshot = async (nextSnapshot) => {
-    const index = state.segments.findIndex((item) => item.id === segmentId);
+    const index = currentSegments().findIndex((item) => item.id === segmentId);
     if (index < 0) throw new Error("The affected segment is no longer available.");
-    const currentSnapshot = structuredClone(state.segments[index]);
+    const currentSnapshot = structuredClone(currentSegments()[index]);
     try {
       const restored = prepareCommandRestoreSegmentSnapshot(nextSnapshot, currentSnapshot);
-      state.segments[index] = restored;
+      editorSessionStore.replaceSegmentAt(index, restored);
       clearPendingSave(restored);
       await saveSegment(restored);
       renderSegments();
@@ -8400,7 +8403,7 @@ async function applyAiSuggestion(suggestionId, options = {}) {
       markWorkspaceDirty();
       return restored;
     } catch (error) {
-      state.segments[index] = prepareSegmentHistoryState(currentSnapshot);
+      editorSessionStore.replaceSegmentAt(index, prepareSegmentHistoryState(currentSnapshot));
       renderAll();
       throw error;
     }
@@ -9034,8 +9037,8 @@ async function reviewActiveSegmentWithLocalAi() {
 function localAiReviewScopeSegments(settings = {}) {
   const mode = settings.mode || "untranslated";
   if (mode === "selected") return currentSegment() ? [currentSegment()] : [];
-  if (mode === "visible") return filteredSegmentIndexes().map((index) => state.segments[index]).filter(Boolean);
-  if (mode === "project") return state.segments;
+  if (mode === "visible") return filteredSegmentIndexes().map((index) => currentSegments()[index]).filter(Boolean);
+  if (mode === "project") return currentSegments();
   return currentDocumentSegments();
 }
 
@@ -9216,7 +9219,7 @@ async function reviewBatchWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -9242,7 +9245,7 @@ async function reviewBatchWithLocalAi() {
     return summary;
   } catch (error) {
     snapshots.forEach((snapshot, id) => {
-      const segment = state.segments.find((item) => item.id === id);
+      const segment = currentSegments().find((item) => item.id === id);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -9543,7 +9546,7 @@ async function repairBatchTagsWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -9564,7 +9567,7 @@ async function repairBatchTagsWithLocalAi() {
     return summary;
   } catch (error) {
     snapshots.forEach((snapshot, id) => {
-      const segment = state.segments.find((item) => item.id === id);
+      const segment = currentSegments().find((item) => item.id === id);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -9881,7 +9884,7 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -9902,7 +9905,7 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
     return summary;
   } catch (error) {
     snapshots.forEach((snapshot, id) => {
-      const segment = state.segments.find((item) => item.id === id);
+      const segment = currentSegments().find((item) => item.id === id);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -10210,7 +10213,7 @@ async function applyBatchTerminologyWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -10233,7 +10236,7 @@ async function applyBatchTerminologyWithLocalAi() {
     return summary;
   } catch (error) {
     snapshots.forEach((snapshot, id) => {
-      const segment = state.segments.find((item) => item.id === id);
+      const segment = currentSegments().find((item) => item.id === id);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -10638,7 +10641,7 @@ async function adaptBatchDraftsWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -10659,7 +10662,7 @@ async function adaptBatchDraftsWithLocalAi() {
     return summary;
   } catch (error) {
     snapshots.forEach((snapshot, id) => {
-      const segment = state.segments.find((item) => item.id === id);
+      const segment = currentSegments().find((item) => item.id === id);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -10845,7 +10848,7 @@ async function polishBatchDraftsWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -10866,7 +10869,7 @@ async function polishBatchDraftsWithLocalAi() {
     return summary;
   } catch (error) {
     snapshots.forEach((snapshot, id) => {
-      const segment = state.segments.find((item) => item.id === id);
+      const segment = currentSegments().find((item) => item.id === id);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -10921,8 +10924,8 @@ async function saveAiTermCandidates(terms = [], termBaseName = primaryTermBaseNa
 function localAiTerminologySegments(settings = localAiSettingsFromForm()) {
   if (!currentProject()) return [];
   if (settings.mode === "selected") return currentSegment() ? [currentSegment()] : [];
-  if (settings.mode === "visible") return filteredSegmentIndexes().map((index) => state.segments[index]).filter(Boolean);
-  if (settings.mode === "project") return state.segments;
+  if (settings.mode === "visible") return filteredSegmentIndexes().map((index) => currentSegments()[index]).filter(Boolean);
+  if (settings.mode === "project") return currentSegments();
   if (settings.mode === "untranslated") return currentDocumentSegments().filter((segment) => !String(segment.target || "").trim());
   return currentDocumentSegments();
 }
@@ -11163,7 +11166,7 @@ async function extractBatchTermsWithLocalAi() {
 
 function projectBriefSampleSegments(limit = 6) {
   const scoped = currentDocumentSegments();
-  const source = scoped.length ? scoped : state.segments;
+  const source = scoped.length ? scoped : currentSegments();
   const picked = [];
   for (const segment of source) {
     if (!String(segment.source || "").trim()) continue;
@@ -11274,7 +11277,7 @@ async function generateProjectBriefWithLocalAi() {
 }
 
 function localAiPretranslationSegments(settings) {
-  if (settings.mode === "project" || settings.mode === "visible" || settings.mode === "selected") return state.segments;
+  if (settings.mode === "project" || settings.mode === "visible" || settings.mode === "selected") return currentSegments();
   return currentDocumentSegments();
 }
 
@@ -11282,7 +11285,7 @@ function localAiPretranslationOptions(settings) {
   return {
     mode: settings.mode,
     selectedSegmentIds: currentSegment()?.id ? [currentSegment().id] : [],
-    visibleSegmentIds: filteredSegmentIndexes().map((index) => state.segments[index]?.id).filter(Boolean)
+    visibleSegmentIds: filteredSegmentIndexes().map((index) => currentSegments()[index]?.id).filter(Boolean)
   };
 }
 
@@ -11323,7 +11326,7 @@ function localAiSurroundingSegmentsForSegment(segment, options = {}) {
   if (!currentProject() || !segment) return [];
   const settings = options.settings || localAiSettingsFromForm();
   if (settings.includeNearbyContext === false) return [];
-  const segments = Array.isArray(options.segments) && options.segments.length ? options.segments : state.segments;
+  const segments = Array.isArray(options.segments) && options.segments.length ? options.segments : currentSegments();
   const segmentIndex = segments.findIndex((item) => item?.id === segment.id);
   if (segmentIndex < 0) return [];
   const sameDocument = (item) => {
@@ -11449,11 +11452,11 @@ async function pretranslateWithLocalAi() {
       }
     });
     const updated = summary.updatedSegmentIds
-      .map((id) => state.segments.find((segment) => segment.id === id))
+      .map((id) => currentSegments().find((segment) => segment.id === id))
       .filter(Boolean);
     if (summary.canceled) {
       beforePatches.forEach((patch, segmentId) => {
-        const segment = state.segments.find((item) => item.id === segmentId);
+        const segment = currentSegments().find((item) => item.id === segmentId);
         if (segment) applyTargetCommandPatch(segment, patch);
       });
       invalidateSegmentFilterCache();
@@ -11514,7 +11517,7 @@ async function pretranslateWithLocalAi() {
       console.warn("Local AI pretranslation activity log failed.", activityError);
     }
     try {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
     } catch (refreshError) {
@@ -11531,7 +11534,7 @@ async function pretranslateWithLocalAi() {
     return { ...commandExecution, summary };
   } catch (error) {
     beforeSnapshots.forEach((snapshot, segmentId) => {
-      const segment = state.segments.find((item) => item.id === segmentId);
+      const segment = currentSegments().find((item) => item.id === segmentId);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -11605,7 +11608,7 @@ async function splitCurrentSegment() {
     setSaveStatus(error.message || "Save pending changes before splitting failed", "dirty");
     return null;
   }
-  const beforeSegments = state.segments.map((item) => structuredClone(item));
+  const beforeSegments = currentSegments().map((item) => structuredClone(item));
   const createdSegmentId = `segment-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
   const createdAt = new Date().toISOString();
   const command = appRuntime?.commands?.createSplitSegmentCommand?.({
@@ -11640,12 +11643,12 @@ async function splitCurrentSegment() {
         throw new Error("Simulated split save failure");
       }
       const savedSegments = await saveSegmentStructure(ordered);
-      state.segments = prepareSegmentHistoryStates(savedSegments);
-      selectApplicationSegment(state.segments.findIndex((item) => item.id === createdSegmentId));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
+      selectApplicationSegment(currentSegments().findIndex((item) => item.id === createdSegmentId));
       invalidateSegmentFilterCache();
       markWorkspaceDirty();
       return {
-        segments: state.segments.map((item) => structuredClone(item)),
+        segments: currentSegments().map((item) => structuredClone(item)),
         activeSegmentId: createdSegmentId,
         affectedCount: 2,
         focusTarget: true
@@ -11661,8 +11664,8 @@ async function splitCurrentSegment() {
   try {
     commandExecution = await appRuntime.commands.bus.execute(command);
   } catch (error) {
-    state.segments = prepareSegmentHistoryStates(beforeSegments);
-    selectApplicationSegment(Math.max(0, state.segments.findIndex((item) => item.id === segment.id)));
+    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(beforeSegments));
+    selectApplicationSegment(Math.max(0, currentSegments().findIndex((item) => item.id === segment.id)));
     invalidateSegmentFilterCache();
     renderAll();
     focusActiveTextarea();
@@ -11692,7 +11695,7 @@ async function mergeWithNextSegment() {
     setSaveStatus(error.message || "Save pending changes before merging failed", "dirty");
     return null;
   }
-  const beforeSegments = state.segments.map((item) => structuredClone(item));
+  const beforeSegments = currentSegments().map((item) => structuredClone(item));
   const segmentId = segment.id;
   const mergedSegmentId = next.id;
   const command = appRuntime?.commands?.createMergeSegmentCommand?.({
@@ -11725,12 +11728,12 @@ async function mergeWithNextSegment() {
         throw new Error("Simulated merge transaction failure");
       }
       const savedSegments = await saveSegmentStructure(ordered, [mergedSegmentId]);
-      state.segments = prepareSegmentHistoryStates(savedSegments);
-      selectApplicationSegment(state.segments.findIndex((item) => item.id === segmentId));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
+      selectApplicationSegment(currentSegments().findIndex((item) => item.id === segmentId));
       invalidateSegmentFilterCache();
       markWorkspaceDirty();
       return {
-        segments: state.segments.map((item) => structuredClone(item)),
+        segments: currentSegments().map((item) => structuredClone(item)),
         activeSegmentId: segmentId,
         affectedCount: 2,
         focusTarget: true
@@ -11746,8 +11749,8 @@ async function mergeWithNextSegment() {
   try {
     commandExecution = await appRuntime.commands.bus.execute(command);
   } catch (error) {
-    state.segments = prepareSegmentHistoryStates(beforeSegments);
-    selectApplicationSegment(Math.max(0, state.segments.findIndex((item) => item.id === segmentId)));
+    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(beforeSegments));
+    selectApplicationSegment(Math.max(0, currentSegments().findIndex((item) => item.id === segmentId)));
     invalidateSegmentFilterCache();
     renderAll();
     focusActiveTextarea();
@@ -11777,12 +11780,12 @@ async function importDocx(file) {
   );
   await reportImportProgress("Refreshing project view", file);
   editorSessionStore.replaceProject(importResult.project);
-  state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
   editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   await refreshProjectSummaries();
-  const activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
+  const activeIndex = currentSegments().findIndex((segment) => segment.documentId === documentId);
   selectApplicationDocument(documentId, {
-    segmentId: state.segments[activeIndex]?.id || "",
+    segmentId: currentSegments()[activeIndex]?.id || "",
     activeIndex
   });
   const extractedParts = result.structure?.textPartSummary?.filter((part) => part.segments > 0).length || 1;
@@ -11810,12 +11813,12 @@ async function importLocalization(file) {
   );
   await reportImportProgress("Refreshing project view", file);
   editorSessionStore.replaceProject(importResult.project);
-  state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
   editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   await refreshProjectSummaries();
-  const activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
+  const activeIndex = currentSegments().findIndex((segment) => segment.documentId === documentId);
   selectApplicationDocument(documentId, {
-    segmentId: state.segments[activeIndex]?.id || "",
+    segmentId: currentSegments()[activeIndex]?.id || "",
     activeIndex
   });
   const activityLogged = await logOptionalProjectActivity("import", "Localization file imported", { fileName: file.name, documentType: result.documentType, segmentCount: result.segments.length, documentId }, "Localization import");
@@ -11843,12 +11846,12 @@ async function importXliff(file) {
   );
   await reportImportProgress("Refreshing project view", file);
   editorSessionStore.replaceProject(importResult.project);
-  state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
   editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   await refreshProjectSummaries();
-  const activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
+  const activeIndex = currentSegments().findIndex((segment) => segment.documentId === documentId);
   selectApplicationDocument(documentId, {
-    segmentId: state.segments[activeIndex]?.id || "",
+    segmentId: currentSegments()[activeIndex]?.id || "",
     activeIndex
   });
   const activityLogged = await logOptionalProjectActivity("import", "XLIFF imported", { fileName: file.name, segmentCount: result.segments.length, documentId }, "XLIFF import");
@@ -12046,7 +12049,7 @@ async function runFileImportTask(label, action) {
 async function buildProjectPackage(project = currentProject(), segmentRecords = null, options = {}) {
   if (!project) return null;
   await flushPendingSegmentSaves(project.id);
-  const projectSegments = segmentRecords || (project.id === currentProject()?.id ? state.segments : await getProjectSegments(project.id));
+  const projectSegments = segmentRecords || (project.id === currentProject()?.id ? currentSegments() : await getProjectSegments(project.id));
   const [tmEntries, terms, activityEvents] = await Promise.all([
     getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`),
     listTerms({
@@ -12283,7 +12286,7 @@ async function importProjectPackageData(pkg, options = {}) {
   const activityResult = await logOptionalActivityForProject(prepared.project.id, "import", "Project package imported", { fileName: sourceName, warningCount: reportCount(importReport), importAsCopy }, "Project package import");
   const activityLogged = activityResult.ok;
   editorSessionStore.replaceProject(null);
-  state.segments = [];
+  editorSessionStore.replaceSegments([]);
   applicationNavigation.openProjects();
   applicationNavigation.clearSelection();
   await loadProjects(false);
@@ -12319,7 +12322,7 @@ async function restoreBackupData(backup) {
   await rebuildAllTermIndexes();
   await reportImportProgress("Refreshing projects");
   editorSessionStore.replaceProject(null);
-  state.segments = [];
+  editorSessionStore.replaceSegments([]);
   applicationNavigation.openProjects();
   applicationNavigation.clearSelection();
   await loadProjects(false);
@@ -12619,7 +12622,7 @@ async function syncWorkspaceFromFolder() {
     }
   }
   editorSessionStore.replaceProject(null);
-  state.segments = [];
+  editorSessionStore.replaceSegments([]);
   applicationNavigation.openProjects();
   applicationNavigation.clearSelection();
   await loadProjects(false);
@@ -12749,19 +12752,19 @@ async function buildProjectReportData() {
   ]);
   const scopedTm = tmEntries.filter((entry) => tmNames.has(entry.tmName));
   const reportActivityEvents = sanitizePortableValue(activityEvents, "activityEvents");
-  const validation = validateExportReadiness({ project: currentProject(), segments: state.segments, format: "project-report", terms });
-  const analysis = analyzeProject(currentProject(), state.segments, scopedTm);
-  const qaSegments = state.segments.map((segment) => ({
+  const validation = validateExportReadiness({ project: currentProject(), segments: currentSegments(), format: "project-report", terms });
+  const analysis = analyzeProject(currentProject(), currentSegments(), scopedTm);
+  const qaSegments = currentSegments().map((segment) => ({
     ...segment,
     tags: segmentTags(segment)
   }));
-  const fallback = () => Promise.resolve(runQaChecks(state.segments, terms, { missingTags }));
+  const fallback = () => Promise.resolve(runQaChecks(currentSegments(), terms, { missingTags }));
   const qaChecks = workerClient?.runQaChecks
     ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
     : await fallback();
   const qualityPassport = buildQualityPassportData({
     project: currentProject(),
-    segments: state.segments,
+    segments: currentSegments(),
     qaChecks,
     validation,
     analysis,
@@ -12782,13 +12785,13 @@ async function buildProjectReportData() {
     qaChecks,
     qaBySeverity: countBy(qaChecks, (check) => check.severity),
     qaByType: countBy(qaChecks, (check) => check.type),
-    reviewByState: countBy(state.segments.filter((segment) => segment.reviewState), (segment) => segment.reviewState),
+    reviewByState: countBy(currentSegments().filter((segment) => segment.reviewState), (segment) => segment.reviewState),
     activityEvents: reportActivityEvents,
     activityByType: countBy(reportActivityEvents, (event) => event.type),
     tmEntryCount: scopedTm.length,
     termCount: terms.length,
     forbiddenTermCount: terms.filter((term) => term.isForbidden).length,
-    revisionCount: state.segments.reduce((sum, segment) => sum + (Array.isArray(segment.targetHistory) ? segment.targetHistory.length : 0), 0),
+    revisionCount: currentSegments().reduce((sum, segment) => sum + (Array.isArray(segment.targetHistory) ? segment.targetHistory.length : 0), 0),
     terms: terms
       .map((term) => ({
         sourceTerm: term.sourceTerm || "",
@@ -13213,7 +13216,7 @@ async function exportTargetDocx() {
     await flushPendingSegmentSaves();
     const documentInfo = exportDocumentForTypes(new Set(["docx"]), "The selected file is not a DOCX document.", "Select a DOCX document to export.");
     if (!documentInfo) return;
-    const segments = state.segments.filter((segment) => segment.documentId === documentInfo.id);
+    const segments = currentSegments().filter((segment) => segment.documentId === documentInfo.id);
     const exportPlan = planDeliveryExport({ format: "docx", documentInfo, segments });
     const report = validateExportReadiness({ project: currentProject(), segments, documentInfo, format: "docx", terms: await projectTermsForValidation(), exportPlan });
     renderValidationReport(report);
@@ -13244,14 +13247,14 @@ async function exportBilingualDocx() {
   try {
     await flushPendingSegmentSaves();
     const terms = await projectTermsForValidation();
-    const report = validateExportReadiness({ project: currentProject(), segments: state.segments, format: "bilingual-docx", terms });
+    const report = validateExportReadiness({ project: currentProject(), segments: currentSegments(), format: "bilingual-docx", terms });
     renderValidationReport(report);
     if (!canRunBilingualDocxExport(report)) return;
-    const qaSegments = state.segments.map((segment) => ({
+    const qaSegments = currentSegments().map((segment) => ({
       ...segment,
       tags: segmentTags(segment)
     }));
-    const fallback = () => Promise.resolve(runQaChecks(state.segments, terms, { missingTags }));
+    const fallback = () => Promise.resolve(runQaChecks(currentSegments(), terms, { missingTags }));
     const qaChecks = workerClient?.runQaChecks
       ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
       : await fallback();
@@ -13259,9 +13262,9 @@ async function exportBilingualDocx() {
     state.qaFilter = "";
     renderQaResults();
     const base = fileSafeName(currentProject().name || "project");
-    const bytes = buildBilingualDocx(currentProject(), state.segments, { qaChecks });
+    const bytes = buildBilingualDocx(currentProject(), currentSegments(), { qaChecks });
     download(`${base}_bilingual.docx`, bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    const activityLogged = await logOptionalProjectActivity("export", "Bilingual DOCX exported", { segmentCount: state.segments.length, qaIssueCount: qaChecks.length, validationNoteCount: reportCount(report) }, "Bilingual DOCX export");
+    const activityLogged = await logOptionalProjectActivity("export", "Bilingual DOCX exported", { segmentCount: currentSegments().length, qaIssueCount: qaChecks.length, validationNoteCount: reportCount(report) }, "Bilingual DOCX export");
     const message = reportCount(report) || qaChecks.length ? "Bilingual DOCX exported with notes" : "Bilingual DOCX exported";
     setSaveStatus(appendActivityWarning(message, activityLogged), exportStatusMode(reportCount(report) || qaChecks.length ? "dirty" : "saved", activityLogged));
   } catch (error) {
@@ -13281,7 +13284,7 @@ async function exportLocalization() {
     if (!documentInfo) return;
     const documentType = projectDocumentType(documentInfo);
     const exportDocumentInfo = { ...documentInfo, type: documentType };
-    const segments = state.segments.filter((segment) => segment.documentId === documentInfo.id);
+    const segments = currentSegments().filter((segment) => segment.documentId === documentInfo.id);
     const structure = currentProject().localizationStructures?.[documentInfo.id];
     const exportPlan = planDeliveryExport({ format: documentType, documentInfo: exportDocumentInfo, structure, segments });
     const report = validateExportReadiness({

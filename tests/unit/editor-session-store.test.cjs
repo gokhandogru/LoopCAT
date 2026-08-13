@@ -27,37 +27,6 @@ test("EditorSessionStore owns current project data behind a checked immutable sn
   assert.deepEqual(changes[0].patch, { project, segments });
 });
 
-test("EditorSessionStore compatibility bridge delegates only unmigrated replacements", async () => {
-  const { createEditorSessionStore, EDITOR_SESSION_COMPATIBILITY_FIELDS } = await moduleAt(
-    "src/features/editor/editor-session-store.js"
-  );
-  const store = createEditorSessionStore();
-  const compatibility = store.attachCompatibility({ transient: true });
-
-  compatibility.segments = [{ id: "segment-1" }];
-
-  assert.deepEqual(store.getState().segments, [{ id: "segment-1" }]);
-  assert.equal(compatibility.segments, store.getState().segments);
-  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "projects"), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "project"), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "projectSummaries"), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "projectSummaryRevisions"), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "projectTerms"), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "activityEvents"), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "qaChecks"), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "qualityRiskQueue"), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "progressSummary"), false);
-  assert.equal(compatibility.transient, true);
-  assert.deepEqual(
-    EDITOR_SESSION_COMPATIBILITY_FIELDS.filter((name) => Object.prototype.hasOwnProperty.call(compatibility, name)),
-    [...EDITOR_SESSION_COMPATIBILITY_FIELDS]
-  );
-  assert.throws(() => store.attachCompatibility({ segments: [] }), /cannot attach over existing state\.segments/);
-  assert.throws(() => {
-    compatibility.segments = null;
-  }, /segments must be an array/);
-});
-
 test("EditorSessionStore explicitly owns project summaries and copy-on-write revisions", async () => {
   const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
   const store = createEditorSessionStore({
@@ -162,4 +131,27 @@ test("EditorSessionStore explicitly owns the project collection and current proj
 
   assert.equal(store.replaceProject(null), null);
   assert.throws(() => store.replaceProjects(null), /projects must be an array/);
+});
+
+test("EditorSessionStore explicitly owns segment collection and indexed replacement", async () => {
+  const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
+  const originalSegments = [
+    { id: "segment-1", target: "First" },
+    { id: "segment-2", target: "Second" }
+  ];
+  const store = createEditorSessionStore({ segments: originalSegments });
+
+  assert.equal(store.getSegments(), originalSegments);
+  assert.equal("attachCompatibility" in store, false);
+
+  const replacement = { id: "segment-2", target: "Updated" };
+  assert.equal(store.replaceSegmentAt(1, replacement), replacement);
+  assert.deepEqual(store.getSegments(), [originalSegments[0], replacement]);
+  assert.notEqual(store.getSegments(), originalSegments);
+
+  const reloadedSegments = [{ id: "segment-3", target: "Reloaded" }];
+  assert.equal(store.replaceSegments(reloadedSegments), reloadedSegments);
+  assert.equal(store.getSegments(), reloadedSegments);
+  assert.throws(() => store.replaceSegmentAt(1, replacement), /segment index is out of range/);
+  assert.throws(() => store.replaceSegments(null), /segments must be an array/);
 });
