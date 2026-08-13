@@ -354,6 +354,8 @@ const aiProjectBriefControllerJs = readText("src/features/ai/ai-project-brief-co
 const aiProjectBriefControllerUnitTests = readText("tests/unit/ai-project-brief-controller.test.cjs");
 const aiSuggestionApplicationControllerJs = readText("src/features/ai/ai-suggestion-application-controller.js");
 const aiSuggestionApplicationControllerUnitTests = readText("tests/unit/ai-suggestion-application-controller.test.cjs");
+const aiOpenAiSuggestionControllerJs = readText("src/features/ai/ai-openai-suggestion-controller.js");
+const aiOpenAiSuggestionControllerUnitTests = readText("tests/unit/ai-openai-suggestion-controller.test.cjs");
 const aiTerminologyApplicationControllerJs = readText("src/features/ai/ai-terminology-application-controller.js");
 const aiTerminologyApplicationControllerUnitTests = readText(
   "tests/unit/ai-terminology-application-controller.test.cjs"
@@ -3070,6 +3072,82 @@ for (const testName of [
     aiSuggestionApplicationControllerUnitTests,
     testName,
     `focused AI-suggestion-application tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiOpenAiSuggestionController",
+  "The application runtime must expose the checked direct-OpenAI-suggestion controller boundary."
+);
+for (const boundary of [
+  "const globalForm = administration.readGlobalForm() || {}",
+  "const secrets = administration.readSecrets() || {}",
+  "const aiSettings = settingsBoundary.normalize({",
+  "if (!aiSettings.enabled)",
+  "if (!aiSettings.sendSourceToAi)",
+  "if (!provider.isOpenAi(aiSettings))",
+  'if (!String(segment.source || "").trim())',
+  "if (provider.appearsOffline())",
+  'const apiKey = String(secrets.openAiKey || "").trim() || keys.readStored()',
+  "!consent.externalShare({",
+  "const previousProject = structuredClone(project)",
+  "const previousKey = keys.snapshot()",
+  "const savedProject = await persistence.updateProject({ ...project, aiSettings })",
+  "keys.save(apiKey, Boolean(secrets.rememberOpenAiKey))",
+  "await restoreProject(previousProject, previousProjects, projectPersisted)",
+  "keys.restore(previousKey)",
+  "const [tmMatches, terms] = await context.forSegment(segment, aiSettings)",
+  "const suggestion = await provider.request({",
+  "const saved = await suggestions.append(segment, suggestion)",
+  "workspace.markRollbackDirty(previousProject.id)"
+]) {
+  assertIncludes(
+    aiOpenAiSuggestionControllerJs,
+    boundary,
+    `AiOpenAiSuggestionController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return aiOpenAiSuggestionController.create()",
+  "app.js must retain only the checked direct-OpenAI-suggestion compatibility facade."
+);
+const aiOpenAiSuggestionFacade = functionBody(
+  appJs,
+  "async function createOpenAiSuggestion",
+  "function currentLocalAiProvider"
+);
+assert(
+  !aiOpenAiSuggestionFacade.includes("readGlobalForm(") &&
+    !aiOpenAiSuggestionFacade.includes("readSecrets(") &&
+    !aiOpenAiSuggestionFacade.includes("defaultAiSettings(") &&
+    !aiOpenAiSuggestionFacade.includes("isOpenAiProvider(") &&
+    !aiOpenAiSuggestionFacade.includes("browserAppearsOffline(") &&
+    !aiOpenAiSuggestionFacade.includes("storedOpenAiKey(") &&
+    !aiOpenAiSuggestionFacade.includes("confirmExternalAiPromptShare(") &&
+    !aiOpenAiSuggestionFacade.includes("updateProject(") &&
+    !aiOpenAiSuggestionFacade.includes("saveOpenAiKey(") &&
+    !aiOpenAiSuggestionFacade.includes("aiContextForSegment(") &&
+    !aiOpenAiSuggestionFacade.includes("openAiSuggestion(") &&
+    !aiOpenAiSuggestionFacade.includes("appendAiSuggestion(") &&
+    !aiOpenAiSuggestionFacade.includes("renderEditor(") &&
+    !aiOpenAiSuggestionFacade.includes("setSaveStatus("),
+  "app.js must not regain direct-OpenAI-suggestion validation, consent, setup, key, context, provider, suggestion-storage-result, presentation, workspace, status, or recovery orchestration."
+);
+for (const testName of [
+  "direct OpenAI suggestion preserves project, segment, enabled, sharing, provider, source, offline, and key safeguards",
+  "direct OpenAI suggestion discloses optional local context and cancels before setup",
+  "direct OpenAI suggestion persists settings and key before routing context, provider, and suggestion storage",
+  "direct OpenAI suggestion setup failure restores exact project, list, and key snapshots",
+  "direct OpenAI suggestion key failure rolls persisted settings back before restoring the key",
+  "direct OpenAI suggestion rollback failure restores memory and marks the original project dirty",
+  "direct OpenAI provider failure keeps saved settings and key without appending a suggestion",
+  "direct OpenAI suggestion preserves the shared storage activity-warning result"
+]) {
+  assertIncludes(
+    aiOpenAiSuggestionControllerUnitTests,
+    testName,
+    `focused direct-OpenAI-suggestion tests must characterize ${testName}.`
   );
 }
 assertIncludes(
@@ -9445,11 +9523,7 @@ assertIncludes(
   "anonymized project report includes restrictive CSP",
   "app workflow test must verify anonymized project reports include a restrictive CSP."
 );
-const openAiSuggestionFunction = functionBody(
-  appJs,
-  "async function createOpenAiSuggestion()",
-  "function confirmExternalAiPromptShare"
-);
+const openAiSuggestionFunction = aiOpenAiSuggestionControllerJs;
 const saveAiSettingsFunction = functionBody(appJs, "async function saveAiSettings()", "function renderAiSuggestions()");
 assert(!indexHtml.includes("chatGptBtn"), "index.html must not expose the removed GPT toolbar button.");
 assert(!appJs.includes("openChatGptForSelection"), "app.js must not retain the removed ChatGPT shortcut behavior.");
@@ -9459,8 +9533,8 @@ assert(
 );
 assertIncludes(
   openAiSuggestionFunction,
-  "saveOpenAiKey(apiKey",
-  "app.js must keep OpenAI key persistence in the OpenAI suggestion request path."
+  "keys.save(apiKey",
+  "The checked direct-OpenAI controller must keep key persistence in the suggestion request path."
 );
 assertIncludes(
   saveAiSettingsFunction,
@@ -9468,28 +9542,27 @@ assertIncludes(
   "app.js AI settings saves must only persist typed OpenAI keys when OpenAI is the selected provider."
 );
 assert(
-  openAiSuggestionFunction.indexOf("if (!aiSettings.enabled)") <
-    openAiSuggestionFunction.indexOf("saveOpenAiKey(apiKey"),
-  "app.js must not save OpenAI keys before AI helper enablement is checked."
+  openAiSuggestionFunction.indexOf("if (!aiSettings.enabled)") < openAiSuggestionFunction.indexOf("keys.save(apiKey"),
+  "The direct-OpenAI controller must not save keys before AI helper enablement is checked."
 );
 assert(
   openAiSuggestionFunction.indexOf("if (!aiSettings.sendSourceToAi)") <
-    openAiSuggestionFunction.indexOf("saveOpenAiKey(apiKey"),
-  "app.js must not save OpenAI keys before source-sharing consent is checked."
+    openAiSuggestionFunction.indexOf("keys.save(apiKey"),
+  "The direct-OpenAI controller must not save keys before source-sharing consent is checked."
 );
 assert(
-  openAiSuggestionFunction.indexOf("if (!isOpenAiProvider({ aiSettings }))") <
-    openAiSuggestionFunction.indexOf("saveOpenAiKey(apiKey"),
-  "app.js must not save OpenAI keys before the selected provider is verified as OpenAI."
+  openAiSuggestionFunction.indexOf("if (!provider.isOpenAi(aiSettings))") <
+    openAiSuggestionFunction.indexOf("keys.save(apiKey"),
+  "The direct-OpenAI controller must not save keys before the selected provider is verified as OpenAI."
 );
 assert(
   openAiSuggestionFunction.indexOf("The active segment has no source text.") <
-    openAiSuggestionFunction.indexOf("saveOpenAiKey(apiKey"),
-  "app.js must not save OpenAI keys or settings for empty-source OpenAI suggestion requests."
+    openAiSuggestionFunction.indexOf("keys.save(apiKey"),
+  "The direct-OpenAI controller must not save keys or settings for empty-source requests."
 );
 assert(
-  openAiSuggestionFunction.indexOf("browserAppearsOffline()") < openAiSuggestionFunction.indexOf("const apiKey ="),
-  "app.js must report offline OpenAI requests before reading or requiring an API key."
+  openAiSuggestionFunction.indexOf("provider.appearsOffline()") < openAiSuggestionFunction.indexOf("const apiKey ="),
+  "The direct-OpenAI controller must report offline requests before reading or requiring an API key."
 );
 assertIncludes(
   appJs,
@@ -9568,8 +9641,8 @@ assertIncludes(
 );
 assertIncludes(
   openAiSuggestionFunction,
-  "browserAppearsOffline()",
-  "app.js must check offline state before saving OpenAI suggestion keys or settings."
+  "provider.appearsOffline()",
+  "The direct-OpenAI controller must check offline state before saving keys or settings."
 );
 assertIncludes(
   appJs,
@@ -9583,13 +9656,12 @@ assertIncludes(
 );
 assertIncludes(
   openAiSuggestionFunction,
-  "contextLabels: openAiContextLabels",
-  "app.js must ask for action-time confirmation that names optional local OpenAI context before sending source text."
+  "contextLabels",
+  "The direct-OpenAI controller must ask for action-time confirmation that names optional local context before sending source text."
 );
 assert(
-  openAiSuggestionFunction.indexOf('confirmExternalAiPromptShare({ provider: "OpenAI"') <
-    openAiSuggestionFunction.indexOf("saveOpenAiKey(apiKey"),
-  "app.js must not save OpenAI keys before action-time OpenAI source-sharing confirmation."
+  openAiSuggestionFunction.indexOf("!consent.externalShare({") < openAiSuggestionFunction.indexOf("keys.save(apiKey"),
+  "The direct-OpenAI controller must not save keys before action-time source-sharing confirmation."
 );
 assertIncludes(
   appJs,

@@ -2413,6 +2413,53 @@ const aiSuggestionApplicationController =
     },
     logger: console
   });
+const aiOpenAiSuggestionController = appRuntime.featureFactories.createAiOpenAiSuggestionController({
+  editorSessionStore,
+  selection: { getActiveIndex: currentActiveIndex },
+  administration: {
+    readGlobalForm: () => aiAdministrationController?.readGlobalForm?.() || {},
+    readSecrets: () => aiAdministrationController?.readSecrets?.() || {}
+  },
+  settings: { normalize: defaultAiSettings },
+  provider: {
+    isOpenAi: (aiSettings) => isOpenAiProvider({ aiSettings }),
+    appearsOffline: browserAppearsOffline,
+    request: openAiSuggestion
+  },
+  keys: {
+    readStored: storedOpenAiKey,
+    snapshot: openAiKeySnapshot,
+    save: saveOpenAiKey,
+    restore: safeRestoreOpenAiKeySnapshot
+  },
+  consent: { externalShare: confirmExternalAiPromptShare },
+  persistence: { updateProject },
+  context: { forSegment: aiContextForSegment },
+  suggestions: {
+    append: (segment, suggestion) =>
+      appendAiSuggestion(
+        segment,
+        suggestion,
+        "ai-openai-suggestion",
+        "OpenAI suggestion created"
+      )
+  },
+  presentation: { renderEditor },
+  workspace: {
+    markDirty: markWorkspaceDirty,
+    markRollbackDirty: markOpenAiProjectRollbackDirty
+  },
+  status: { set: setSaveStatus },
+  defaults: { model: OPENAI_DEFAULT_MODEL },
+  testHooks: {
+    beforeProjectSave: () => {
+      if (LOOPCAT_TEST_BUILD && currentProject()[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated AI settings save failure");
+      }
+    }
+  },
+  logger: console
+});
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
     splitButton: els.splitSegmentBtn,
@@ -8790,84 +8837,7 @@ async function applyAiSuggestion(suggestionId, options = {}) {
 }
 
 async function createOpenAiSuggestion() {
-  const segment = currentSegment();
-  if (!currentProject() || !segment) return;
-  const globalForm = aiAdministrationController?.readGlobalForm?.() || {};
-  const secrets = aiAdministrationController?.readSecrets?.() || {};
-  const aiSettings = defaultAiSettings({
-    ...currentProject().aiSettings,
-    enabled: Boolean(globalForm.enabled),
-    provider: globalForm.provider || "OpenAI",
-    model: globalForm.model || OPENAI_DEFAULT_MODEL,
-    sendSourceToAi: Boolean(globalForm.sendSourceToAi),
-    useTmContext: globalForm.useTmContext !== false,
-    useTermbaseContext: globalForm.useTermbaseContext !== false,
-    styleGuide: globalForm.styleGuide || ""
-  });
-  if (!aiSettings.enabled) {
-    setSaveStatus("Enable AI helpers before requesting an OpenAI suggestion.", "dirty");
-    return;
-  }
-  if (!aiSettings.sendSourceToAi) {
-    setSaveStatus("Turn on source sharing before sending a segment to OpenAI.", "dirty");
-    return;
-  }
-  if (!isOpenAiProvider({ aiSettings })) {
-    setSaveStatus("Choose OpenAI as the provider before requesting an OpenAI suggestion.", "dirty");
-    return;
-  }
-  if (!String(segment.source || "").trim()) {
-    setSaveStatus("The active segment has no source text.", "dirty");
-    return;
-  }
-  if (browserAppearsOffline()) {
-    setSaveStatus("OpenAI suggestions need an internet connection. LoopCAT appears to be offline; no source text, API key, or AI settings were sent or saved.", "dirty");
-    return;
-  }
-  const apiKey = String(secrets.openAiKey || "").trim() || storedOpenAiKey();
-  if (!apiKey) {
-    setSaveStatus("Add your OpenAI API key first.", "dirty");
-    return;
-  }
-  const openAiContextLabels = [
-    aiSettings.useTmContext ? "local TM matches" : "",
-    aiSettings.useTermbaseContext ? "local termbase hits" : "",
-    aiSettings.styleGuide ? "style instructions" : ""
-  ].filter(Boolean);
-  if (!confirmExternalAiPromptShare({ provider: "OpenAI", includesSourceText: true, contextLabels: openAiContextLabels })) {
-    setSaveStatus("OpenAI suggestion canceled", "dirty");
-    return;
-  }
-  const previousProject = structuredClone(currentProject());
-  const previousProjects = currentProjects().map((project) => structuredClone(project));
-  const previousOpenAiKey = openAiKeySnapshot();
-  let projectPersisted = false;
-  try {
-    if (LOOPCAT_TEST_BUILD && currentProject()[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
-    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), aiSettings }));
-    projectPersisted = true;
-    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
-    saveOpenAiKey(apiKey, Boolean(secrets.rememberOpenAiKey));
-    markWorkspaceDirty();
-    renderEditor();
-    setSaveStatus("Requesting OpenAI suggestion...");
-  } catch (error) {
-    await restoreProjectAfterOpenAiSetupFailure(previousProject, previousProjects, projectPersisted);
-    safeRestoreOpenAiKeySnapshot(previousOpenAiKey);
-    renderEditor();
-    setSaveStatus(error.message || "OpenAI suggestion setup failed", "dirty");
-    return;
-  }
-  try {
-    const [tmMatches, terms] = await aiContextForSegment(segment, aiSettings);
-    const suggestion = await openAiSuggestion({ apiKey, segment, tmMatches, terms, project: currentProject() });
-    const saved = await appendAiSuggestion(segment, suggestion, "ai-openai-suggestion", "OpenAI suggestion created");
-    if (saved?.ok) {
-      setSaveStatus(saved.activityLogged ? "OpenAI suggestion ready for review" : "OpenAI suggestion ready for review; activity log failed", saved.activityLogged ? "saved" : "dirty");
-    }
-  } catch (error) {
-    setSaveStatus(error.message || "OpenAI suggestion failed", "dirty");
-  }
+  return aiOpenAiSuggestionController.create();
 }
 
 function currentLocalAiProvider(settings = localAiSettingsFromForm()) {
