@@ -161,6 +161,8 @@ const requiredReleaseFiles = [
   "src/features/editor/editor-session-store.js",
   "src/features/editor/editor-context-controller.js",
   "src/features/editor/segment-grid-controller.js",
+  "src/features/editor/autosave-service.js",
+  "src/features/editor/target-edit-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
   "src/ai/providers/gemini-provider-adapter.js",
@@ -192,6 +194,8 @@ const requiredReleaseFiles = [
   "tests/unit/compatibility-module-registry.test.cjs",
   "tests/unit/editor-session-store.test.cjs",
   "tests/unit/editor-context-controller.test.cjs",
+  "tests/unit/autosave-service.test.cjs",
+  "tests/unit/target-edit-controller.test.cjs",
   "tests/app-workflow/workflow-driver.inc.js",
   "tests/unit/gemini-provider-adapter.test.cjs",
   "tests/unit/groq-provider-adapter.test.cjs",
@@ -267,6 +271,10 @@ const installRuntimeJs = readText("src/app/install-runtime.js");
 const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
 const editorContextControllerJs = readText("src/features/editor/editor-context-controller.js");
 const segmentGridControllerJs = readText("src/features/editor/segment-grid-controller.js");
+const autosaveServiceJs = readText("src/features/editor/autosave-service.js");
+const targetEditControllerJs = readText("src/features/editor/target-edit-controller.js");
+const autosaveServiceUnitTests = readText("tests/unit/autosave-service.test.cjs");
+const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
 const commandBusJs = readText("src/commands/command-bus.js");
 const editTargetSessionJs = readText("src/commands/edit-target-session.js");
 const segmentCommandsJs = readText("src/commands/segment-commands.js");
@@ -1678,9 +1686,78 @@ assertIncludes(
   "app.js must restore coalesced target patches through the persistent command boundary."
 );
 assertIncludes(
+  appBootstrapJs,
+  "createTargetEditController",
+  "The application runtime must expose the checked target-edit controller boundary."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createAutosaveService",
+  "The application runtime must expose the checked autosave service boundary."
+);
+assertIncludes(
+  targetEditControllerJs,
+  "editTargetSessions.begin",
+  "ordinary target input must begin one checked EditTarget session."
+);
+assertIncludes(
+  targetEditControllerJs,
+  "editTargetSessions.capture",
+  "ordinary target input must capture applied patches through the checked EditTarget session."
+);
+assertIncludes(
+  targetEditControllerJs,
+  "persistence.debounce(appliedSegment)",
+  "ordinary target input must delegate persistence scheduling to AutosaveService."
+);
+for (const eventName of ["input", "compositionstart", "compositionend", "focus", "blur", "keydown"]) {
+  assertIncludes(
+    targetEditControllerJs,
+    eventName,
+    `TargetEditController must retain checked ${eventName} lifecycle ownership.`
+  );
+}
+assertIncludes(
   appJs,
-  "clearPendingSave(segment, { finalizeEdit: false })",
-  "ordinary target input must retain one EditTarget session while resetting the autosave timer."
+  "targetEditController.bindTargetEditor",
+  "app.js must delegate target textarea event wiring to TargetEditController."
+);
+assert(
+  !appJs.includes("state.saveTimers") &&
+    !appJs.includes("function queueSegmentSave") &&
+    !appJs.includes("function handleEditorKeydown") &&
+    !appJs.includes('textarea.addEventListener("input"'),
+  "app.js must not regain target-editor event or pending autosave timer ownership."
+);
+assertIncludes(
+  autosaveServiceJs,
+  "const pending = new Map()",
+  "AutosaveService must own the pending target-save queue."
+);
+assertIncludes(
+  autosaveServiceJs,
+  "editorSessionStore.getSegments().find",
+  "AutosaveService must select the latest segment record through EditorSessionStore before a timed save."
+);
+assertIncludes(
+  autosaveServiceJs,
+  "await repository.saveMany(segments)",
+  "AutosaveService must flush target edits through the injected repository boundary."
+);
+assertIncludes(
+  targetEditControllerUnitTests,
+  "target editor owns focus, composition input, coalescing, blur finalization, and listener cleanup",
+  "focused target-edit tests must characterize composition, coalescing, focus, and cleanup."
+);
+assertIncludes(
+  autosaveServiceUnitTests,
+  "failed project flush requeues only its records and a recovered flush persists them",
+  "focused autosave tests must characterize retryable forced flushes."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  "target composition input updates the draft, caret, coalesced command, and autosave queue without waiting for compositionend",
+  "the app workflow must characterize target composition and caret behavior."
 );
 assertIncludes(
   appJs,
@@ -4733,9 +4810,9 @@ assertIncludes(
   "app.js must expose cached visible segment position lookups."
 );
 assertIncludes(
-  appJs,
-  "const visibleIndex = filteredSegmentPosition(index)",
-  "app.js must avoid rescanning visible segment indexes during keyboard navigation."
+  targetEditControllerJs,
+  "const position = getVisiblePosition(index)",
+  "TargetEditController must use the cached visible segment position during keyboard navigation."
 );
 assertIncludes(
   appJs,
@@ -5356,9 +5433,9 @@ assertIncludes(
   "app workflow test must verify failed forced autosave flushes keep pending segment saves queued."
 );
 assertIncludes(
-  functionBody(appJs, "function queueSegmentSave", "function pendingSaveRecords"),
-  "AUTOSAVE_RETRY_DELAY_MS",
-  "app.js background autosave failures must schedule a retry instead of leaving a dead pending timer."
+  autosaveServiceJs,
+  "queue(latest, retryDelayMs)",
+  "AutosaveService background failures must schedule a retry instead of leaving a dead pending timer."
 );
 assertIncludes(
   appJs,

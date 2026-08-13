@@ -810,12 +810,35 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         els.exitFocusModeBtn.classList.contains("hidden"),
       "focus view returns to the full editor layout"
     );
+    const compositionTarget = `Bilesim girdisi hedefi ${Date.now()}`;
+    const compositionTextarea = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
+    compositionTextarea.focus();
+    compositionTextarea.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true, data: "B" }));
+    compositionTextarea.value = compositionTarget;
+    compositionTextarea.setSelectionRange(compositionTarget.length, compositionTarget.length);
+    compositionTextarea.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertCompositionText" }));
+    assert(
+      targetEditController.isComposing(compositionTextarea) &&
+        currentSegments()[segmentIndex].target === compositionTarget &&
+        autosaveService.has(currentSegments()[segmentIndex].id) &&
+        compositionTextarea.selectionStart === compositionTarget.length,
+      "target composition input updates the draft, caret, coalesced command, and autosave queue without waiting for compositionend"
+    );
+    compositionTextarea.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: compositionTarget }));
+    await flushPendingSegmentSaves(project.id);
+    const compositionStored = (await getProjectSegments(project.id)).find(
+      (segment) => segment.id === currentSegments()[segmentIndex].id
+    );
+    assert(
+      !targetEditController.isComposing(compositionTextarea) && compositionStored?.target === compositionTarget,
+      "target composition completion leaves one durable target edit with the caret lifecycle released"
+    );
     const autosaveRetryText = `Otomatik kayit yeniden deneme hedefi ${Date.now()}`;
     setHiddenSegmentField(currentSegments()[segmentIndex], AUTOSAVE_SAVE_FAILURE_TEST_FLAG, true);
     updateSegmentDraft(segmentIndex, autosaveRetryText);
-    await waitFor(() => els.saveStatus.textContent.includes("retrying autosave") && state.saveTimers.has(currentSegments()[segmentIndex].id), "autosave retry after transient failure");
-    assert(state.saveTimers.has(currentSegments()[segmentIndex].id), "timed autosave failure stays queued for retry");
-    await waitFor(() => !state.saveTimers.has(currentSegments()[segmentIndex].id), "autosave retry saved target");
+    await waitFor(() => els.saveStatus.textContent.includes("retrying autosave") && autosaveService.has(currentSegments()[segmentIndex].id), "autosave retry after transient failure");
+    assert(autosaveService.has(currentSegments()[segmentIndex].id), "timed autosave failure stays queued for retry");
+    await waitFor(() => !autosaveService.has(currentSegments()[segmentIndex].id), "autosave retry saved target");
     const autosaveRetryStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
     assert(autosaveRetryStored?.target === autosaveRetryText, "timed autosave retry persists target after transient failure");
     const editTargetBefore = targetCommandPatch(currentSegments()[segmentIndex]);
@@ -923,7 +946,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     const targetText = `Aninda yedeklenen hedef ${Date.now()}`;
     updateSegmentDraft(segmentIndex, targetText);
-    assert(state.saveTimers.size > 0, "pending save created");
+    assert(autosaveService.size() > 0, "pending save created");
     assert(currentSegments()[segmentIndex].targetHistory?.some((entry) => entry.reason === "edit" && entry.toTarget === targetText), "segment edit records target revision history");
     setHiddenSegmentField(currentSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
     let pendingFlushError = "";
@@ -932,10 +955,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } catch (error) {
       pendingFlushError = error.message || String(error);
     }
-    assert(pendingFlushError.includes("Simulated pending save flush failure") && state.saveTimers.has(currentSegments()[segmentIndex].id), "failed pending save flush keeps autosave queued");
+    assert(pendingFlushError.includes("Simulated pending save flush failure") && autosaveService.has(currentSegments()[segmentIndex].id), "failed pending save flush keeps autosave queued");
     Reflect.deleteProperty(currentSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG);
     await flushPendingSegmentSaves(project.id);
-    assert(!state.saveTimers.has(currentSegments()[segmentIndex].id), "recovered pending save flush clears autosave queue");
+    assert(!autosaveService.has(currentSegments()[segmentIndex].id), "recovered pending save flush clears autosave queue");
     const restoreGuardBackup = await exportAllData();
     const restoreGuardText = `Geri yukleme oncesi bekleyen hedef ${Date.now()}`;
     updateSegmentDraft(segmentIndex, restoreGuardText);
@@ -949,7 +972,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(
       restoreGuardError.includes("Simulated pending save flush failure") &&
         currentProject()?.id === project.id &&
-        state.saveTimers.has(currentSegments()[segmentIndex].id),
+        autosaveService.has(currentSegments()[segmentIndex].id),
       "backup restore stops before destructive restore when pending save flush fails"
     );
     Reflect.deleteProperty(currentSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG);
@@ -972,14 +995,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(
       replaceGuardError.includes("Simulated pending save flush failure") &&
         currentProject()?.id === project.id &&
-        state.saveTimers.has(currentSegments()[segmentIndex].id),
+        autosaveService.has(currentSegments()[segmentIndex].id),
       "project package replacement stops before destructive import when pending save flush fails"
     );
     Reflect.deleteProperty(currentSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG);
     await flushPendingSegmentSaves(project.id);
     const backupTargetText = `Aninda yedeklenen hedef ${Date.now()}`;
     updateSegmentDraft(segmentIndex, backupTargetText);
-    assert(state.saveTimers.size > 0, "pending save recreated before backup export");
+    assert(autosaveService.size() > 0, "pending save recreated before backup export");
 
     const capturedDownloads = [];
     const originalCreateObjectUrl = URL.createObjectURL.bind(URL);
@@ -4861,7 +4884,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await exportProjectPackage();
       assert(
         els.saveStatus.textContent.includes("Simulated pending save flush failure") &&
-          state.saveTimers.has(currentSegments()[segmentIndex].id) &&
+          autosaveService.has(currentSegments()[segmentIndex].id) &&
           packageDownloads.length === packageDownloadCountBeforeFlushFailure &&
           currentActivityEvents().filter((event) => event.type === "export" && event.summary === "Project package exported").length === packageExportActivityCountBeforeFailure,
         "project package export reports pending save flush failure without download or activity"
@@ -4884,7 +4907,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       };
       const packageExportTargetText = `Paket dis aktariminda saklanan hedef ${Date.now()}`;
       updateSegmentDraft(segmentIndex, packageExportTargetText);
-      assert(state.saveTimers.has(currentSegments()[segmentIndex].id), "pending save exists before project package export");
+      assert(autosaveService.has(currentSegments()[segmentIndex].id), "pending save exists before project package export");
       await exportProjectPackage();
       const packageDownload = await waitFor(() => packageDownloads.find((item) => item.type === "application/json" && item.text.includes('"type": "project-package"')), "project package download");
       const exportedPackage = JSON.parse(packageDownload.text);
@@ -4905,7 +4928,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     const switchText = `Proje gecisinde saklanan hedef ${Date.now()}`;
     updateSegmentDraft(segmentIndex, switchText);
-    assert(state.saveTimers.size > 0, "pending save exists before project switch");
+    assert(autosaveService.size() > 0, "pending save exists before project switch");
     const secondProject = await createProject({
       name: `Workflow Switch ${Date.now()}`,
       sourceLang: "en",
@@ -4958,7 +4981,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await openProject(deleteProjectFixture.id);
     const deleteText = `Silme oncesi hedef ${Date.now()}`;
     updateSegmentDraft(0, deleteText);
-    assert(state.saveTimers.size > 0, "pending save exists before project delete");
+    assert(autosaveService.size() > 0, "pending save exists before project delete");
     const originalConfirm = window.confirm;
     window.confirm = () => true;
     try {
@@ -5009,7 +5032,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const deleteFileDocument = currentProject().documents.find((item) => item.name === "delete-file.html");
     const deleteFileText = `Silinen dosya hedefi ${Date.now()}`;
     updateSegmentDraft(0, deleteFileText);
-    assert(state.saveTimers.size > 0, "pending save exists before file delete");
+    assert(autosaveService.size() > 0, "pending save exists before file delete");
     window.confirm = () => true;
     try {
       setHiddenSegmentField(deleteFileDocument, FILE_DELETE_FAILURE_TEST_FLAG, true);
@@ -5190,7 +5213,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const pendingWorkspaceAutosavePreviousStatus = pendingWorkspaceAutosaveSegment.status || "empty";
       const pendingWorkspaceAutosaveText = `workspace autosave pending target ${Date.now()}`;
       updateSegmentDraft(pendingWorkspaceAutosaveIndex, pendingWorkspaceAutosaveText);
-      assert(state.saveTimers.has(pendingWorkspaceAutosaveSegment.id), "pending active workspace autosave save created");
+      assert(autosaveService.has(pendingWorkspaceAutosaveSegment.id), "pending active workspace autosave save created");
       await autosaveDirtyWorkspacePackages();
       const storedPendingWorkspaceAutosaveSegment = (await getProjectSegments(project.id)).find((segment) => segment.id === pendingWorkspaceAutosaveSegment.id);
       assert(
@@ -5199,7 +5222,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
             pkg.segments.some((segment) => segment.id === pendingWorkspaceAutosaveSegment.id && segment.target === pendingWorkspaceAutosaveText)
         ) &&
           storedPendingWorkspaceAutosaveSegment?.target === pendingWorkspaceAutosaveText &&
-          !state.saveTimers.has(pendingWorkspaceAutosaveSegment.id) &&
+          !autosaveService.has(pendingWorkspaceAutosaveSegment.id) &&
           !state.workspaceDirtyProjectIds.has(project.id),
         "background workspace autosave flushes pending active segment edits before saving package"
       );

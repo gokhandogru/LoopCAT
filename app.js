@@ -107,7 +107,6 @@ const STORAGE_LOW_SPACE_BYTES = 250 * 1024 * 1024;
 const STORAGE_HIGH_USAGE_RATIO = 0.9;
 const SEGMENT_HISTORY_LIMIT = 25;
 const SEGMENT_TYPING_HISTORY_WINDOW_MS = 30000;
-const AUTOSAVE_RETRY_DELAY_MS = 2000;
 const XLIFF_DOCUMENT_TYPES = new Set(["xlf", "xliff", "sdlxliff"]);
 const LOCALIZATION_EXPORT_TYPES = new Set([
   "docm", "dotx", "dotm", "xlsx", "xlsm", "xltx", "xltm", "pptx", "pptm", "ppsx", "ppsm", "potx", "potm",
@@ -707,7 +706,6 @@ const segmentSourceWordCounts = new WeakMap();
 const editorFilterStore = appRuntime.featureFactories.createFilterStore();
 
 const state = {
-  saveTimers: new Map(),
   inspectorOpen: true,
   segmentFilterRevision: 0,
   segmentFilterCache: { key: "", indexes: [], positions: new Map() },
@@ -1315,6 +1313,58 @@ const verticalFeatureState = (() => {
   });
 })();
 verticalFeatureState?.inspector?.mount?.();
+
+let targetEditController = null;
+const autosaveService = appRuntime.featureFactories.createAutosaveService({
+  editorSessionStore,
+  repository: {
+    save: saveSegment,
+    saveMany: saveSegments
+  },
+  editLifecycle: {
+    finalize: (segmentId) => targetEditController?.finalize?.(segmentId),
+    finalizeProject: (projectId) => targetEditController?.finalizeProject?.(projectId) || [],
+    finalizeAll: () => targetEditController?.finalizeAll?.() || []
+  },
+  status: { set: setSaveStatus },
+  onSaved: renderRevisionHistory,
+  testHooks: {
+    beforeSave: (segment) => {
+      if (LOOPCAT_TEST_BUILD && segment[AUTOSAVE_SAVE_FAILURE_TEST_FLAG]) {
+        Reflect.deleteProperty(segment, AUTOSAVE_SAVE_FAILURE_TEST_FLAG);
+        throw new Error("Simulated autosave save failure");
+      }
+    },
+    beforeFlush: (segments) => {
+      if (LOOPCAT_TEST_BUILD && segments.some((segment) => segment[FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG])) {
+        throw new Error("Simulated pending save flush failure");
+      }
+    }
+  }
+});
+targetEditController = appRuntime.featureFactories.createTargetEditController({
+  editorSessionStore,
+  commandBus: appRuntime.commands.bus,
+  editTargetSessions: appRuntime.commands.editTargetSessions,
+  persistence: { debounce: (segment) => autosaveService.debounce(segment) },
+  status: { commandsChanged: renderUndoControls },
+  selection: {
+    getActiveIndex: currentActiveIndex,
+    ensureVisible: ensureSegmentVisible,
+    findEditor: (index) => verticalFeatureState.segmentGrid.findTargetEditor(els.segmentBody, index)
+  },
+  createPatch: targetCommandPatch,
+  restorePatch: restoreSegmentEditCommandPatch,
+  applyDraft: applyTargetDraft,
+  activateSegment: setActiveSegment,
+  confirmSegment: confirmCurrentSegment,
+  getCommandProjectId: () => state.commandProjectId,
+  getVisibleIndexes: filteredSegmentIndexes,
+  getVisiblePosition: filteredSegmentPosition,
+  normalizeKey: stableLower,
+  undo: undoLastCommand,
+  redo: redoLastCommand
+});
 
 const editorContextController = appRuntime?.featureFactories?.createEditorContextController?.({
   getContext: () => ({
@@ -3956,99 +4006,31 @@ function commandList() {
 }
 
 function finalizePendingEditCommand(segmentId) {
-  if (!segmentId) return null;
-  const recorded = appRuntime?.commands?.editTargetSessions?.finalize?.(segmentId) || null;
-  if (recorded) renderUndoControls();
-  return recorded;
+  return targetEditController.finalize(segmentId);
 }
 
 function finalizePendingEditCommands(projectId = "") {
-  const recorded = projectId
-    ? appRuntime?.commands?.editTargetSessions?.finalizeProject?.(projectId) || []
-    : appRuntime?.commands?.editTargetSessions?.finalizeAll?.() || [];
-  if (recorded.length) renderUndoControls();
-  return recorded;
+  return projectId ? targetEditController.finalizeProject(projectId) : targetEditController.finalizeAll();
 }
 
 function clearPendingSave(segment, options = {}) {
-  if (!segment?.id) return;
-  if (options.finalizeEdit !== false) finalizePendingEditCommand(segment.id);
-  const record = state.saveTimers.get(segment.id);
-  if (!record) return;
-  clearTimeout(record.timer || record);
-  state.saveTimers.delete(segment.id);
+  return autosaveService.clear(segment, options);
 }
 
 function clearAllPendingSaves() {
-  finalizePendingEditCommands();
-  state.saveTimers.forEach((record) => clearTimeout(record.timer || record));
-  state.saveTimers.clear();
-}
-
-function queueSegmentSave(segment, delay = 450) {
-  if (!segment?.id) return;
-  const timer = setTimeout(async () => {
-    try {
-      finalizePendingEditCommand(segment.id);
-      setSaveStatus("Saving...");
-      const record = state.saveTimers.get(segment.id);
-      const latest = currentSegments().find((item) => item.id === segment.id) || record?.segment || segment;
-      if (LOOPCAT_TEST_BUILD && latest[AUTOSAVE_SAVE_FAILURE_TEST_FLAG]) {
-        Reflect.deleteProperty(latest, AUTOSAVE_SAVE_FAILURE_TEST_FLAG);
-        throw new Error("Simulated autosave save failure");
-      }
-      await saveSegment(latest);
-      if (state.saveTimers.get(segment.id)?.timer === timer) state.saveTimers.delete(segment.id);
-      setSaveStatus(state.saveTimers.size ? `${state.saveTimers.size} save pending` : "Saved", "saved");
-      renderRevisionHistory();
-    } catch (error) {
-      const record = state.saveTimers.get(segment.id);
-      const latest = currentSegments().find((item) => item.id === segment.id) || record?.segment || segment;
-      if (state.saveTimers.get(segment.id)?.timer === timer) {
-        state.saveTimers.delete(segment.id);
-        queueSegmentSave(latest, AUTOSAVE_RETRY_DELAY_MS);
-      }
-      setSaveStatus(`${error.message || "Save failed"}; retrying autosave`, "dirty");
-    }
-  }, delay);
-  state.saveTimers.set(segment.id, { timer, segment });
+  return autosaveService.clearAll();
 }
 
 function pendingSaveRecords(projectId = "") {
-  return Array.from(state.saveTimers.entries())
-    .map(([id, record]) => ({ id, timer: record.timer || record, segment: record.segment }))
-    .filter((record) => record.segment && (!projectId || record.segment.projectId === projectId));
+  return autosaveService.pendingRecords(projectId);
 }
 
 function clearPendingDocumentSaves(projectId, documentId) {
-  pendingSaveRecords(projectId)
-    .filter((record) => record.segment.documentId === documentId)
-    .forEach((record) => {
-      finalizePendingEditCommand(record.id);
-      clearTimeout(record.timer);
-      state.saveTimers.delete(record.id);
-    });
+  return autosaveService.clearDocument(projectId, documentId);
 }
 
 async function flushPendingSegmentSaves(projectId = "") {
-  finalizePendingEditCommands(projectId);
-  const records = pendingSaveRecords(projectId);
-  if (!records.length) return [];
-  records.forEach((record) => {
-    clearTimeout(record.timer);
-    state.saveTimers.delete(record.id);
-  });
-  const pendingSegments = records.map((record) => record.segment);
-  try {
-    if (LOOPCAT_TEST_BUILD && pendingSegments.some((segment) => segment[FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG])) {
-      throw new Error("Simulated pending save flush failure");
-    }
-    if (pendingSegments.length) await saveSegments(pendingSegments);
-  } catch (error) {
-    records.forEach((record) => queueSegmentSave(record.segment, 2000));
-    throw error;
-  }
-  return pendingSegments;
+  return autosaveService.flush(projectId);
 }
 
 function formatDate(value) {
@@ -4114,7 +4096,7 @@ function visibleWorkspaceDirtyCount(status = state.workspaceStatus) {
 }
 
 function shouldWarnBeforeUnload() {
-  return Boolean(state.importTask || state.saveTimers.size || hasUnsavedWorkspacePackages());
+  return Boolean(state.importTask || autosaveService.size() || hasUnsavedWorkspacePackages());
 }
 
 function handleBeforeUnload(event) {
@@ -6238,16 +6220,12 @@ function renderSegmentRow(index) {
   textarea.setAttribute("aria-label", uiSource("Target translation for segment {value1}", { value1: index + 1 }));
   applyTargetSpellcheckLanguage(textarea);
   textarea.value = segment.target || "";
-  textarea.addEventListener("focus", () => {
-    row.querySelector(".target-cell")?.classList.add("editing");
-    setActiveSegment(index);
+  targetEditController.bindTargetEditor({
+    textarea,
+    editingCell: row.querySelector(".target-cell"),
+    index,
+    segmentId: segment.id
   });
-  textarea.addEventListener("blur", () => {
-    row.querySelector(".target-cell")?.classList.remove("editing");
-    finalizePendingEditCommand(segment.id);
-  });
-  textarea.addEventListener("input", () => updateSegmentDraft(index, textarea.value));
-  textarea.addEventListener("keydown", (event) => handleEditorKeydown(event, index));
   renderTargetTagPreview(row, segment);
   renderStatusCell(row, segment);
   renderTagTray(row, segment);
@@ -6457,18 +6435,7 @@ async function goToNextOpenSegment() {
   focusActiveTextarea();
 }
 
-function updateSegmentDraft(index, target) {
-  const segment = currentSegments()[index];
-  if (!segment) return;
-  const editTargetSessions = appRuntime?.commands?.editTargetSessions;
-  if (editTargetSessions && !editTargetSessions.has(segment.id)) {
-    editTargetSessions.begin({
-      projectId: segment.projectId || currentProject()?.id,
-      segmentId: segment.id,
-      beforePatch: targetCommandPatch(segment),
-      restorePatch: (patch, context) => restoreSegmentEditCommandPatch(segment.id, patch, context)
-    });
-  }
+function applyTargetDraft({ index, segment, target }) {
   const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
   const passedFiltersBefore = segmentPassesFilters(segment);
   setSegmentTargetAndStatus(segment, target, target.trim() ? "draft" : "empty", "edit");
@@ -6485,8 +6452,11 @@ function updateSegmentDraft(index, target) {
   renderProgress({ previousStatus, nextStatus: segment.status });
   scheduleRevisionHistoryRender();
   markWorkspaceDirty();
-  editTargetSessions?.capture?.(segment.id, targetCommandPatch(segment), { activeSegmentId: segment.id });
-  debounceSave(segment);
+  return { segment, patch: targetCommandPatch(segment) };
+}
+
+function updateSegmentDraft(index, target) {
+  return targetEditController.updateDraft(index, target);
 }
 
 function openReplacePanel() {
@@ -6686,9 +6656,7 @@ async function restoreSplitSegmentCommandSegments(nextSnapshots, options = {}) {
   const savedSegments = await saveSegmentStructure(restored, deleteSegmentIds);
 
   deleteSegmentIds.forEach((segmentId) => {
-    const record = state.saveTimers.get(segmentId);
-    if (record) clearTimeout(record.timer || record);
-    state.saveTimers.delete(segmentId);
+    autosaveService.discard(segmentId);
   });
   editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
   const requestedIndex = currentSegments().findIndex((segment) => segment.id === options.activeSegmentId);
@@ -6739,9 +6707,7 @@ async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
   const savedSegments = await saveSegmentStructure(restored, deleteSegmentIds);
 
   deleteSegmentIds.forEach((segmentId) => {
-    const record = state.saveTimers.get(segmentId);
-    if (record) clearTimeout(record.timer || record);
-    state.saveTimers.delete(segmentId);
+    autosaveService.discard(segmentId);
   });
   editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
   const requestedIndex = currentSegments().findIndex((segment) => segment.id === options.activeSegmentId);
@@ -6858,9 +6824,7 @@ async function replaceTargetText(scope = "visible") {
 }
 
 function debounceSave(segment) {
-  setSaveStatus("Unsaved changes", "dirty");
-  clearPendingSave(segment, { finalizeEdit: false });
-  queueSegmentSave(segment);
+  return autosaveService.debounce(segment);
 }
 
 function renderConfirmBusyState() {
@@ -7336,49 +7300,7 @@ async function openConcordanceSearch() {
 }
 
 function focusActiveTextarea(selection = null) {
-  ensureSegmentVisible(currentActiveIndex());
-  const textarea = verticalFeatureState.segmentGrid.findTargetEditor(els.segmentBody, currentActiveIndex());
-  textarea?.focus();
-  if (textarea && selection) {
-    const normalized = normalizedTargetSelection(selection, textarea.value.length);
-    textarea.setSelectionRange(normalized.start, normalized.end);
-  }
-}
-
-function handleEditorKeydown(event, index) {
-  const key = stableLower(event.key);
-  if ((event.ctrlKey || event.metaKey) && key === "z" && !event.altKey) {
-    finalizePendingEditCommand(currentSegments()[index]?.id || "");
-    const projectId = state.commandProjectId || currentProject()?.id || null;
-    const canRun = event.shiftKey
-      ? appRuntime?.commands?.bus?.canRedo?.(projectId)
-      : appRuntime?.commands?.bus?.canUndo?.(projectId);
-    if (canRun) {
-      event.preventDefault();
-      event.stopPropagation();
-      void (event.shiftKey ? redoLastCommand() : undoLastCommand());
-      return;
-    }
-  }
-  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-    event.preventDefault();
-    confirmCurrentSegment();
-    return;
-  }
-  if (event.altKey && event.key === "ArrowDown") {
-    event.preventDefault();
-    const visible = filteredSegmentIndexes();
-    const visibleIndex = filteredSegmentPosition(index);
-    const next = visible[Math.min(visibleIndex + 1, visible.length - 1)];
-    setActiveSegment(next).then(focusActiveTextarea);
-  }
-  if (event.altKey && event.key === "ArrowUp") {
-    event.preventDefault();
-    const visible = filteredSegmentIndexes();
-    const visibleIndex = filteredSegmentPosition(index);
-    const previous = visible[Math.max(visibleIndex - 1, 0)];
-    setActiveSegment(previous).then(focusActiveTextarea);
-  }
+  return targetEditController.focusActive(selection);
 }
 
 async function refreshSidebar() {
@@ -7999,22 +7921,11 @@ async function runProjectQa() {
 }
 
 function normalizedTargetSelection(selection, targetLength) {
-  if (!selection) return null;
-  const length = Math.max(0, Number(targetLength) || 0);
-  const start = Math.max(0, Math.min(length, Number(selection.start) || 0));
-  const end = Math.max(start, Math.min(length, Number(selection.end) || start));
-  return { start, end };
+  return targetEditController.normalizeSelection(selection, targetLength);
 }
 
 function activeTargetSelection(segment) {
-  const textarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
-  const length = String(segment?.target || "").length;
-  return normalizedTargetSelection(
-    textarea
-      ? { start: textarea.selectionStart ?? length, end: textarea.selectionEnd ?? length }
-      : { start: length, end: length },
-    length
-  );
+  return targetEditController.activeSelection(segment);
 }
 
 async function runTargetProducerCommand({

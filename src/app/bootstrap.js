@@ -41,6 +41,8 @@ import { createFilterStore } from "../features/editor/filter-store.js";
 import { createFilterPresetController } from "../features/editor/filter-preset-controller.js";
 import { createInspectorController } from "../features/editor/inspector-controller.js";
 import { createSegmentGridController } from "../features/editor/segment-grid-controller.js";
+import { createAutosaveService } from "../features/editor/autosave-service.js";
+import { createTargetEditController } from "../features/editor/target-edit-controller.js";
 import { createPaletteController } from "../features/palette/palette-controller.js";
 import { createWorkspaceLayoutController } from "../features/workspace/workspace-layout-controller.js";
 import { createUpdateController } from "../features/update/update-controller.js";
@@ -118,6 +120,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
     featureFactories: Object.freeze({
       createAiAdministrationController,
       createAiContextController,
+      createAutosaveService,
       createOpusCatHelpController,
       createAiProviderService,
       createDashboardController,
@@ -137,6 +140,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createResourcesController,
       createPaletteController,
       createThemeController,
+      createTargetEditController,
       createTmPretranslationDialogController,
       createUpdateController,
       createWorkspaceLayoutController,
