@@ -440,11 +440,24 @@ for (const field of [
     `EditorSessionStore must own ${field}; app.js cannot restore it to the legacy state literal.`
   );
 }
+for (const field of ["segmentWindow", "segmentScrollFrame", "segmentRowFrame", "pendingRowUpdates"]) {
+  assert(
+    !appStateBlock.includes(`${field}:`),
+    `SegmentGridController must own ${field}; app.js cannot restore it to the legacy state literal.`
+  );
+}
 assertIncludes(
   segmentGridControllerJs,
   "navigation.selectSegment",
   "The segment grid must dispatch active-segment identity through application navigation."
 );
+for (const method of ["calculateWindow", "scheduleScroll", "scheduleRowUpdate", "ensureVisible", "findTargetEditor"]) {
+  assertIncludes(
+    segmentGridControllerJs,
+    method,
+    `The segment grid must retain checked ${method} ownership.`
+  );
+}
 assert(
   productionAssets.appVersion === packageJson.version,
   "Canonical production asset manifest appVersion must match package.json."

@@ -712,11 +712,7 @@ const state = {
   segmentFilterRevision: 0,
   segmentFilterCache: { key: "", indexes: [], positions: new Map() },
   projectAnalysisRun: 0,
-  segmentWindow: { start: 0, end: 0, total: 0, indexes: [] },
   importTask: "",
-  segmentScrollFrame: 0,
-  segmentRowFrame: 0,
-  pendingRowUpdates: new Set(),
   confirmingSegmentIds: new Set(),
   tmPretranslating: false,
   revisionHistoryFrame: 0,
@@ -1273,7 +1269,13 @@ const verticalFeatureState = (() => {
       preferencesRepository: appRuntime.preferencesRepository
     }),
     projects: factories.createProjectsController({ root: els.projectDashboard }),
-    segmentGrid: factories.createSegmentGridController({ navigation: applicationNavigation })
+    segmentGrid: factories.createSegmentGridController({
+      navigation: applicationNavigation,
+      viewport: els.segmentGridWrap,
+      rowHeight: SEGMENT_ROW_HEIGHT,
+      rowBuffer: SEGMENT_ROW_BUFFER,
+      requestFrame: requestAnimationFrame
+    })
   });
 })();
 verticalFeatureState?.inspector?.mount?.();
@@ -6267,19 +6269,14 @@ function renderStatusCell(row, segment) {
 }
 
 function segmentWindow(indexes) {
-  const wrap = els.segmentGridWrap;
-  const viewportRows = Math.ceil((wrap?.clientHeight || 720) / SEGMENT_ROW_HEIGHT);
-  const scrollRows = Math.floor((wrap?.scrollTop || 0) / SEGMENT_ROW_HEIGHT);
-  const start = Math.max(0, scrollRows - SEGMENT_ROW_BUFFER);
-  const end = Math.min(indexes.length, scrollRows + viewportRows + SEGMENT_ROW_BUFFER);
-  return { start, end, total: indexes.length, indexes: indexes.slice(start, end) };
+  return verticalFeatureState.segmentGrid.calculateWindow(indexes);
 }
 
 function renderSegments(options = {}) {
   const indexes = filteredSegmentIndexes();
   const scrollTop = els.segmentGridWrap?.scrollTop || 0;
   if (!indexes.length) {
-    state.segmentWindow = { start: 0, end: 0, total: 0, indexes: [] };
+    verticalFeatureState.segmentGrid.resetWindow();
     const row = document.createElement("tr");
     const cell = document.createElement("td");
     cell.colSpan = 4;
@@ -6290,11 +6287,12 @@ function renderSegments(options = {}) {
     return;
   }
   const win = segmentWindow(indexes);
+  const previousWindow = verticalFeatureState.segmentGrid.getWindow();
   if (
     options.fromScroll &&
-    win.start === state.segmentWindow.start &&
-    win.end === state.segmentWindow.end &&
-    win.total === state.segmentWindow.total
+    win.start === previousWindow.start &&
+    win.end === previousWindow.end &&
+    win.total === previousWindow.total
   ) {
     return;
   }
@@ -6302,7 +6300,7 @@ function renderSegments(options = {}) {
   if (options.fromScroll && els.segmentGridWrap.contains(activeElement) && !win.indexes.includes(currentActiveIndex())) {
     activeElement.blur();
   }
-  state.segmentWindow = win;
+  verticalFeatureState.segmentGrid.commitWindow(win);
   const topHeight = win.start * SEGMENT_ROW_HEIGHT;
   const bottomHeight = (indexes.length - win.end) * SEGMENT_ROW_HEIGHT;
   const fragment = document.createDocumentFragment();
@@ -6326,15 +6324,7 @@ function updateRow(index) {
 }
 
 function scheduleRowUpdate(index) {
-  if (!Number.isInteger(index) || index < 0) return;
-  state.pendingRowUpdates.add(index);
-  if (state.segmentRowFrame) return;
-  state.segmentRowFrame = requestAnimationFrame(() => {
-    state.segmentRowFrame = 0;
-    const indexes = Array.from(state.pendingRowUpdates);
-    state.pendingRowUpdates.clear();
-    indexes.forEach(updateRow);
-  });
+  verticalFeatureState.segmentGrid.scheduleRowUpdate(index, (indexes) => indexes.forEach(updateRow));
 }
 
 function scheduleRevisionHistoryRender() {
@@ -6386,12 +6376,7 @@ function renderProgress(options = {}) {
 function ensureSegmentVisible(index) {
   const position = filteredSegmentPosition(index);
   if (position === -1) return;
-  const { start, end } = state.segmentWindow;
-  if (position >= start && position < end) return;
-  if (els.segmentGridWrap) {
-    els.segmentGridWrap.scrollTop = Math.max(0, position * SEGMENT_ROW_HEIGHT - SEGMENT_ROW_HEIGHT);
-  }
-  renderSegments();
+  verticalFeatureState.segmentGrid.ensureVisible(position, renderSegments);
 }
 
 async function setActiveSegment(index) {
@@ -6447,7 +6432,7 @@ function updateSegmentDraft(index, target) {
   } else if (passedFiltersAfter) {
     scheduleRowUpdate(index);
   } else {
-    state.pendingRowUpdates.delete(index);
+    verticalFeatureState.segmentGrid.cancelRowUpdate(index);
   }
   renderProgress({ previousStatus, nextStatus: segment.status });
   scheduleRevisionHistoryRender();
@@ -7304,7 +7289,7 @@ async function openConcordanceSearch() {
 
 function focusActiveTextarea(selection = null) {
   ensureSegmentVisible(currentActiveIndex());
-  const textarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
+  const textarea = verticalFeatureState.segmentGrid.findTargetEditor(els.segmentBody, currentActiveIndex());
   textarea?.focus();
   if (textarea && selection) {
     const normalized = normalizedTargetSelection(selection, textarea.value.length);
@@ -13634,9 +13619,7 @@ function wireEvents() {
   });
   window.addEventListener("keydown", handleGlobalKeydown, true);
   els.segmentGridWrap.addEventListener("scroll", () => {
-    if (state.segmentScrollFrame) return;
-    state.segmentScrollFrame = requestAnimationFrame(() => {
-      state.segmentScrollFrame = 0;
+    verticalFeatureState.segmentGrid.scheduleScroll(() => {
       renderSegments({ fromScroll: true, preserveScroll: true });
     });
   });
