@@ -1955,6 +1955,35 @@ const qualityReviewController = appRuntime?.featureFactories?.createQualityRevie
   onError: (error) => setSaveStatus(error?.message || "Quality or review action failed.", "dirty")
 });
 qualityReviewController?.mount?.();
+const qualityProfileController = appRuntime.featureFactories.createQualityProfileController({
+  editorSessionStore,
+  profile: {
+    normalize: defaultQualityProfile,
+    buildRiskQueue: currentQualityRiskQueue
+  },
+  persistence: {
+    saveProject: updateProject,
+    refreshSummaries: refreshProjectSummaries
+  },
+  activity: {
+    log: (qualityProfile) =>
+      logOptionalProjectActivity(
+        "quality-profile",
+        "Quality profile saved",
+        {
+          standard: qualityProfile.standard,
+          reviewDepth: qualityProfile.reviewDepth,
+          riskTolerance: qualityProfile.riskTolerance,
+          terminologyStrictness: qualityProfile.terminologyStrictness,
+          aiDisclosure: qualityProfile.aiDisclosure
+        },
+        "Quality profile save"
+      )
+  },
+  presentation: { renderWorkbench: renderQualityWorkbench },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus }
+});
 const reviewMetadataController = appRuntime.featureFactories.createReviewMetadataController({
   editorSessionStore,
   selection: { getActiveIndex: currentActiveIndex },
@@ -7460,33 +7489,7 @@ function renderQualityWorkbench() {
 }
 
 async function saveQualityProfileFromForm(values = qualityReviewController?.readProfile?.()) {
-  if (!currentProject()) return false;
-  const previousProject = structuredClone(currentProject());
-  const previousProjects = currentProjects().map((project) => structuredClone(project));
-  const qualityProfile = defaultQualityProfile(values);
-  try {
-    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), qualityProfile }));
-    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
-    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
-    await refreshProjectSummaries();
-    markWorkspaceDirty();
-    renderQualityWorkbench();
-    const activityLogged = await logOptionalProjectActivity("quality-profile", "Quality profile saved", {
-      standard: qualityProfile.standard,
-      reviewDepth: qualityProfile.reviewDepth,
-      riskTolerance: qualityProfile.riskTolerance,
-      terminologyStrictness: qualityProfile.terminologyStrictness,
-      aiDisclosure: qualityProfile.aiDisclosure
-    }, "Quality profile save");
-    setSaveStatus(appendActivityWarning("Quality profile saved", activityLogged), exportStatusMode("saved", activityLogged));
-    return true;
-  } catch (error) {
-    editorSessionStore.replaceProject(previousProject);
-    editorSessionStore.replaceProjects(previousProjects);
-    renderQualityWorkbench();
-    setSaveStatus(error.message || "Quality profile save failed", "dirty");
-    return false;
-  }
+  return qualityProfileController.save(values);
 }
 
 async function saveQualityDecisionFromForm(values = qualityReviewController?.readDecision?.()) {

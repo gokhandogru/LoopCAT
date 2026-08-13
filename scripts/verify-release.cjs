@@ -185,6 +185,7 @@ const requiredReleaseFiles = [
   "src/features/ai/ai-administration-controller.js",
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
+  "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-decision-controller.js",
   "src/features/quality/quality-review-controller.js",
   "src/features/quality/review-metadata-controller.js",
@@ -216,6 +217,7 @@ const requiredReleaseFiles = [
   "tests/unit/opus-cat-provider-adapter.test.cjs",
   "tests/unit/perplexity-provider-adapter.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
+  "tests/unit/quality-profile-controller.test.cjs",
   "tests/unit/quality-decision-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
   "tests/unit/review-metadata-controller.test.cjs",
@@ -293,6 +295,8 @@ const segmentConfirmationControllerUnitTests = readText("tests/unit/segment-conf
 const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
+const qualityProfileControllerJs = readText("src/features/quality/quality-profile-controller.js");
+const qualityProfileControllerUnitTests = readText("tests/unit/quality-profile-controller.test.cjs");
 const qualityDecisionControllerJs = readText("src/features/quality/quality-decision-controller.js");
 const qualityDecisionControllerUnitTests = readText("tests/unit/quality-decision-controller.test.cjs");
 const reviewMetadataControllerJs = readText("src/features/quality/review-metadata-controller.js");
@@ -1909,6 +1913,65 @@ assertIncludes(
   "filter membership changes preserve scroll while producer failure restores the exact target patch and caret",
   "focused target-producer tests must characterize rendering and failure recovery."
 );
+assertIncludes(
+  appBootstrapJs,
+  "createQualityProfileController",
+  "The application runtime must expose the checked quality-profile controller boundary."
+);
+for (const boundary of [
+  "const qualityProfile = profile.normalize(values)",
+  "await persistence.saveProject({ ...editorSessionStore.getProject(), qualityProfile })",
+  "editorSessionStore.replaceProject(savedProject)",
+  "editorSessionStore.replaceProjects(",
+  "editorSessionStore.replaceQualityRiskQueue(profile.buildRiskQueue())",
+  "await persistence.refreshSummaries()",
+  "workspace.markDirty()",
+  "presentation.renderWorkbench()",
+  "const activityLogged = await activity.log(qualityProfile)",
+  "editorSessionStore.replaceProject(previousProject)",
+  "editorSessionStore.replaceProjects(previousProjects)"
+]) {
+  assertIncludes(
+    qualityProfileControllerJs,
+    boundary,
+    `QualityProfileController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return qualityProfileController.save(values)",
+  "app.js must retain only the checked quality-profile compatibility facade."
+);
+const qualityProfileFacade = functionBody(
+  appJs,
+  "async function saveQualityProfileFromForm",
+  "async function saveQualityDecisionFromForm"
+);
+assert(
+  !qualityProfileFacade.includes("structuredClone(") &&
+    !qualityProfileFacade.includes("defaultQualityProfile(") &&
+    !qualityProfileFacade.includes("updateProject(") &&
+    !qualityProfileFacade.includes("replaceProject(") &&
+    !qualityProfileFacade.includes("replaceProjects(") &&
+    !qualityProfileFacade.includes("replaceQualityRiskQueue(") &&
+    !qualityProfileFacade.includes("refreshProjectSummaries(") &&
+    !qualityProfileFacade.includes("logOptionalProjectActivity(") &&
+    !qualityProfileFacade.includes("renderQualityWorkbench(") &&
+    !qualityProfileFacade.includes("setSaveStatus("),
+  "app.js must not regain quality-profile normalization, snapshot, persistence, risk, summary, activity, presentation, status, or rollback orchestration."
+);
+for (const testName of [
+  "quality profile normalizes, persists, synchronizes the selected project, and refreshes derived state",
+  "primary quality profile persistence failure restores the exact project and project-list snapshots",
+  "summary refresh failure rolls back project records after the existing risk replacement boundary",
+  "secondary quality profile activity failure keeps the saved profile and reports a dirty warning"
+]) {
+  assertIncludes(
+    qualityProfileControllerUnitTests,
+    testName,
+    `focused quality-profile tests must characterize ${testName}.`
+  );
+}
 assertIncludes(
   appBootstrapJs,
   "createQualityDecisionController",

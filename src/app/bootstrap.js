@@ -57,6 +57,7 @@ import { createOpusCatHelpController } from "../features/ai/opus-cat-help-contro
 import { createTmPretranslationDialogController } from "../features/resources/tm-pretranslation-dialog-controller.js";
 import { createResourcesController } from "../features/resources/resources-controller.js";
 import { createQualityReviewController } from "../features/quality/quality-review-controller.js";
+import { createQualityProfileController } from "../features/quality/quality-profile-controller.js";
 import { createQualityDecisionController } from "../features/quality/quality-decision-controller.js";
 import { createReviewStateController } from "../features/quality/review-state-controller.js";
 import { createReviewMetadataController } from "../features/quality/review-metadata-controller.js";
@@ -142,6 +143,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createProjectDialogController,
       createProjectsController,
       createQualityReviewController,
+      createQualityProfileController,
       createQualityDecisionController,
       createReviewMetadataController,
       createReviewStateController,
