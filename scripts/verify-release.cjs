@@ -162,6 +162,7 @@ const requiredReleaseFiles = [
   "src/ai/providers/native-chat-provider-adapters.js",
   "src/ai/providers/native-openai-provider-adapters.js",
   "src/ai/providers/openai-compatible-hosted-provider-adapter.js",
+  "src/ai/providers/openai-compatible-provider-adapter.js",
   "src/ai/providers/ollama-provider-adapter.js",
   "src/ai/providers/openai-responses-provider-adapter.js",
   "src/ai/providers/perplexity-provider-adapter.js",
@@ -185,6 +186,7 @@ const requiredReleaseFiles = [
   "tests/unit/native-chat-provider-adapters.test.cjs",
   "tests/unit/native-openai-provider-adapters.test.cjs",
   "tests/unit/ollama-provider-adapter.test.cjs",
+  "tests/unit/openai-compatible-provider-adapter.test.cjs",
   "tests/unit/perplexity-provider-adapter.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
@@ -262,6 +264,7 @@ const geminiProviderAdapterJs = readText("src/ai/providers/gemini-provider-adapt
 const groqProviderAdapterJs = readText("src/ai/providers/groq-provider-adapter.js");
 const hostedProviderAdaptersJs = readText("src/ai/providers/hosted-provider-adapters.js");
 const hostedProviderAdapterCoreJs = readText("src/ai/providers/openai-compatible-hosted-provider-adapter.js");
+const openAiCompatibleProviderAdapterJs = readText("src/ai/providers/openai-compatible-provider-adapter.js");
 const nativeChatProviderAdaptersJs = readText("src/ai/providers/native-chat-provider-adapters.js");
 const nativeOpenAiProviderAdaptersJs = readText("src/ai/providers/native-openai-provider-adapters.js");
 const openAiResponsesProviderAdapterJs = readText("src/ai/providers/openai-responses-provider-adapter.js");
@@ -276,6 +279,7 @@ const hostedProviderAdaptersUnitTests = readText("tests/unit/hosted-provider-ada
 const nativeChatProviderAdaptersUnitTests = readText("tests/unit/native-chat-provider-adapters.test.cjs");
 const nativeOpenAiProviderAdaptersUnitTests = readText("tests/unit/native-openai-provider-adapters.test.cjs");
 const ollamaProviderAdapterUnitTests = readText("tests/unit/ollama-provider-adapter.test.cjs");
+const openAiCompatibleProviderAdapterUnitTests = readText("tests/unit/openai-compatible-provider-adapter.test.cjs");
 const perplexityProviderAdapterUnitTests = readText("tests/unit/perplexity-provider-adapter.test.cjs");
 const productionEntryJs = readText("src/entry/production.js");
 const qualityReviewControllerJs = readText("src/features/quality/quality-review-controller.js");
@@ -2417,7 +2421,7 @@ const defaultLocalAiSettingsFunction = functionBody(
   "function defaultLocalAiSettings",
   "function readLocalAiSettings"
 );
-const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function openAiCompatibleStatusError");
+const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function genericPromptSystem");
 assertIncludes(
   aiJs,
   `const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"`,
@@ -2729,6 +2733,47 @@ assert(
   !aiJs.includes("const OllamaProvider = {") && !aiJs.includes("function ollamaStatusError") && !aiJs.includes("async function ollamaJson"),
   "ai.js must not retain the extracted Ollama provider implementation."
 );
+assertIncludes(
+  openAiCompatibleProviderAdapterJs,
+  'id: "openai-compatible"',
+  "The checked OpenAI-compatible adapter must implement the local/allowlisted provider."
+);
+assertIncludes(
+  openAiCompatibleProviderAdapterJs,
+  "assertOpenAiCompatibleHostedAllowed",
+  "The OpenAI-compatible adapter must enforce the explicit hosted endpoint allowlist before requests."
+);
+assertIncludes(
+  openAiCompatibleProviderAdapterJs,
+  '"/chat/completions"',
+  "The OpenAI-compatible adapter must retain chat-completions translation and commands."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installOpenAiCompatibleProviderAdapter",
+  "The extracted-provider installer must register the OpenAI-compatible adapter."
+);
+assertIncludes(
+  aiJs,
+  'aiProviderRegistry.reserve("openai-compatible")',
+  "The legacy registry must preserve the OpenAI-compatible provider order while its adapter installs."
+);
+assertIncludes(
+  openAiCompatibleProviderAdapterJs,
+  "ai.OpenAICompatibleProvider = provider",
+  "The OpenAI-compatible adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  openAiCompatibleProviderAdapterUnitTests,
+  "blocks unapproved hosts before fetch and requires hosted credentials",
+  "The OpenAI-compatible adapter must retain focused allowlist and hosted-auth characterization."
+);
+assert(
+  !aiJs.includes("const OpenAICompatibleProvider = {") &&
+    !aiJs.includes("function openAiCompatibleStatusError") &&
+    !aiJs.includes("async function openAiCompatibleJson"),
+  "ai.js must not retain the extracted OpenAI-compatible provider implementation."
+);
 for (const provider of [
   ["openai", "OpenAIProvider", "OpenAI"],
   ["xai", "XAIProvider", "xAI Grok"],
@@ -3039,9 +3084,9 @@ assertIncludes(
   "aiCommandService must support AI project brief generation."
 );
 assertIncludes(
-  aiJs,
-  ".completePrompt = async function completePrompt",
-  "AI providers must expose a generic prompt-completion method for non-translation commands."
+  openAiCompatibleProviderAdapterJs,
+  "async completePrompt",
+  "The checked OpenAI-compatible provider must expose generic prompt completion for non-translation commands."
 );
 assertIncludes(aiJs, "const LOCAL_AI_PROVIDER_PRESETS = [", "ai.js must centralize Local AI provider presets.");
 assertIncludes(

@@ -4984,6 +4984,7 @@
             providerIds.indexOf("mistral") === providerIds.indexOf("cohere") + 1 &&
             providerIds.indexOf("azure-openai") === providerIds.indexOf("mistral") + 1 &&
             providerIds.indexOf("openai-compatible") === providerIds.indexOf("azure-openai") + 1 &&
+            providerIds.indexOf("opus-cat") === providerIds.indexOf("openai-compatible") + 1 &&
             window.CatHan.ai.localAiProviderPresetForSettings({ providerId: "groq", baseUrl: "https://api.groq.com" })?.id === "groq" &&
             window.CatHan.ai.localAiProviderNeedsApiKey("groq", "https://api.groq.com/openai/v1") &&
             window.CatHan.ai.localAiProviderSharesExternally("groq", "https://api.groq.com/openai/v1"),
@@ -5564,7 +5565,8 @@
           targetCode: "tr"
         });
         assert(
-          openAiCompatibleModelsRequest?.url === "http://localhost:1234/v1/models" &&
+          window.CatHan.ai.OpenAICompatibleProvider === openAiCompatibleProvider &&
+            openAiCompatibleModelsRequest?.url === "http://localhost:1234/v1/models" &&
             openAiCompatibleModelsRequest.authorization === "" &&
             openAiCompatibleModels.models[0].name === "local-qwen-translate" &&
             openAiCompatibleChatRequest?.url === "http://localhost:1234/v1/chat/completions" &&

@@ -1792,119 +1792,6 @@ const OpusCatProvider = {
   }
 };
 
-function openAiCompatibleStatusError(data, status, model = "") {
-  const raw = redactSensitiveText(data?.error?.message || data?.message || data?.error || "").trim();
-  if (status === 401 || status === 403) return "The OpenAI-compatible provider rejected the request. Add or check the provider API key.";
-  if ((status === 404 || /model/i.test(raw)) && model) return `Model ${model} was not found by the OpenAI-compatible provider.`;
-  return raw || `OpenAI-compatible request failed with status ${status}.`;
-}
-
-async function openAiCompatibleJson(endpoint, options = {}, config = {}) {
-  const url = openAiCompatibleApiUrl(config.baseUrl || LM_STUDIO_DEFAULT_BASE_URL, endpoint);
-  let result = null;
-  try {
-    result = await fetchJsonWithTimeout(url, options, config);
-  } catch (error) {
-    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
-    throw new Error(`OpenAI-compatible provider is not reachable at ${normalizeOpenAiCompatibleBaseUrl(config.baseUrl || LM_STUDIO_DEFAULT_BASE_URL)}.`);
-  }
-  if (!result.response?.ok) {
-    throw new Error(openAiCompatibleStatusError(result.data, result.response?.status, config.model));
-  }
-  return result.data;
-}
-
-const OpenAICompatibleProvider = {
-  id: "openai-compatible",
-  name: "LM Studio / OpenAI-compatible",
-  defaultBaseUrl: LM_STUDIO_DEFAULT_BASE_URL,
-  defaultModel: DEFAULT_LOCAL_AI_MODEL,
-  async testConnection(config = {}) {
-    const baseUrl = normalizeOpenAiCompatibleBaseUrl(config.baseUrl || LM_STUDIO_DEFAULT_BASE_URL);
-    assertOpenAiCompatibleHostedAllowed(baseUrl);
-    if (localAiProviderNeedsApiKey("openai-compatible", baseUrl) && !String(config.apiKey || "").trim()) {
-      throw new Error("Add a provider API key before using this hosted OpenAI-compatible endpoint.");
-    }
-    const data = await openAiCompatibleJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    return {
-      ok: true,
-      provider: "OpenAI-compatible",
-      baseUrl,
-      modelCount: Array.isArray(data?.data) ? data.data.length : 0
-    };
-  },
-  async listModels(config = {}) {
-    const baseUrl = normalizeOpenAiCompatibleBaseUrl(config.baseUrl || LM_STUDIO_DEFAULT_BASE_URL);
-    assertOpenAiCompatibleHostedAllowed(baseUrl);
-    if (localAiProviderNeedsApiKey("openai-compatible", baseUrl) && !String(config.apiKey || "").trim()) {
-      throw new Error("Add a provider API key before refreshing models.");
-    }
-    const data = await openAiCompatibleJson("/models", { method: "GET", headers: bearerAuthHeaders(config) }, { ...config, baseUrl });
-    const models = Array.isArray(data?.data)
-      ? data.data.map((model) => {
-        const created = Number(model.created);
-        return {
-          name: String(model.id || model.name || "").trim(),
-          size: model.size || 0,
-          modifiedAt: Number.isFinite(created) ? new Date(created * 1000).toISOString() : ""
-        };
-      }).filter((model) => model.name)
-      : [];
-    return { models, raw: data };
-  },
-  async translateSegment(config = {}, request = {}) {
-    const settings = defaultLocalAiSettings({ ...config, providerId: "openai-compatible", model: config.model || request.model }, request.project);
-    const baseUrl = normalizeOpenAiCompatibleBaseUrl(config.baseUrl || settings.baseUrl || LM_STUDIO_DEFAULT_BASE_URL);
-    const model = String(config.model || request.model || settings.model || DEFAULT_LOCAL_AI_MODEL).trim() || DEFAULT_LOCAL_AI_MODEL;
-    const sourceText = String(request.text ?? request.segment?.source ?? "");
-    if (!sourceText.trim()) throw new Error("The segment has no source text.");
-    assertOpenAiCompatibleHostedAllowed(baseUrl);
-    if (localAiProviderNeedsApiKey("openai-compatible", baseUrl) && !String(config.apiKey || "").trim()) {
-      throw new Error("Add a provider API key before sending source text to this hosted endpoint.");
-    }
-    const prompt = request.prompt || buildTranslateGemmaPrompt({
-      sourceLanguage: request.sourceLanguage || settings.sourceLanguage,
-      sourceCode: request.sourceCode || settings.sourceCode,
-      targetLanguage: request.targetLanguage || settings.targetLanguage,
-      targetCode: request.targetCode || settings.targetCode,
-      text: sourceText,
-      segment: request.segment,
-      glossaryTerms: request.glossaryTerms,
-      tmMatches: request.tmMatches,
-      surroundingSegments: request.surroundingSegments
-    });
-    const startedAt = localAiStartedAt();
-    const data = await openAiCompatibleJson("/chat/completions", {
-      method: "POST",
-      headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        stream: false,
-        temperature: 0.1
-      })
-    }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-    const rawOutput = data?.choices?.[0]?.message?.content;
-    if (typeof rawOutput !== "string") throw new Error("The OpenAI-compatible provider returned a malformed chat response.");
-    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
-    if (!translatedText.trim()) throw new Error("The model returned an empty translation for this segment.");
-    return {
-      translatedText,
-      rawOutput,
-      provider: "OpenAI-compatible",
-      providerId: "openai-compatible",
-      model,
-      durationMs: requestDurationMs(startedAt),
-      prompt,
-      metadata: {
-        promptTokens: data?.usage?.prompt_tokens || 0,
-        completionTokens: data?.usage?.completion_tokens || 0,
-        totalTokens: data?.usage?.total_tokens || 0
-      }
-    };
-  }
-};
-
 function genericPromptSystem() {
   return "You are a professional translation assistant inside LoopCAT. Follow the user's CAT-tool instruction exactly and keep the response concise.";
 }
@@ -1934,6 +1821,7 @@ function genericPromptResult(provider, providerId, model, prompt, rawOutput, sta
 const providerAdapterRuntime = Object.freeze({
   OLLAMA_DEFAULT_BASE_URL,
   DEFAULT_LOCAL_AI_MODEL,
+  LM_STUDIO_DEFAULT_BASE_URL,
   OPENAI_DEFAULT_BASE_URL,
   OPENAI_DEFAULT_MODEL,
   GEMINI_DEFAULT_BASE_URL,
@@ -1968,6 +1856,7 @@ const providerAdapterRuntime = Object.freeze({
   anthropicAuthHeaders,
   cohereAuthHeaders,
   bearerAuthHeaders,
+  assertOpenAiCompatibleHostedAllowed,
   buildTranslateGemmaPrompt,
   cleanModelTranslationOutput,
   defaultLocalAiSettings,
@@ -1995,6 +1884,8 @@ const providerAdapterRuntime = Object.freeze({
   localAiProviderNeedsApiKey,
   normalizeOllamaBaseUrl,
   ollamaApiUrl,
+  normalizeOpenAiCompatibleBaseUrl,
+  openAiCompatibleApiUrl,
   normalizeOpenAiBaseUrl,
   normalizeGeminiBaseUrl,
   normalizeAnthropicBaseUrl,
@@ -2014,36 +1905,6 @@ const providerAdapterRuntime = Object.freeze({
   redactSensitiveText,
   requestDurationMs
 });
-
-OpenAICompatibleProvider.completePrompt = async function completePrompt(config = {}, request = {}) {
-  const settings = defaultLocalAiSettings({ ...config, providerId: "openai-compatible", model: config.model || request.model }, request.project);
-  const baseUrl = normalizeOpenAiCompatibleBaseUrl(config.baseUrl || settings.baseUrl || LM_STUDIO_DEFAULT_BASE_URL);
-  const model = String(config.model || request.model || settings.model || DEFAULT_LOCAL_AI_MODEL).trim() || DEFAULT_LOCAL_AI_MODEL;
-  assertOpenAiCompatibleHostedAllowed(baseUrl);
-  if (localAiProviderNeedsApiKey("openai-compatible", baseUrl) && !String(config.apiKey || "").trim()) {
-    throw new Error("Add a provider API key before sending source text to this hosted endpoint.");
-  }
-  const prompt = promptTextOrThrow(request);
-  const startedAt = localAiStartedAt();
-  const data = await openAiCompatibleJson("/chat/completions", {
-    method: "POST",
-    headers: bearerAuthHeaders(config, { "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: request.system || genericPromptSystem() },
-        { role: "user", content: prompt }
-      ],
-      stream: false,
-      temperature: 0.1
-    })
-  }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-  return genericPromptResult("OpenAI-compatible", "openai-compatible", model, prompt, data?.choices?.[0]?.message?.content, startedAt, {
-    promptTokens: data?.usage?.prompt_tokens || 0,
-    completionTokens: data?.usage?.completion_tokens || 0,
-    totalTokens: data?.usage?.total_tokens || 0
-  });
-};
 
 const aiProviderRegistry = (() => {
   const providers = new Map();
@@ -2083,7 +1944,7 @@ aiProviderRegistry.reserve("anthropic");
 aiProviderRegistry.reserve("cohere");
 aiProviderRegistry.reserve("mistral");
 aiProviderRegistry.reserve("azure-openai");
-aiProviderRegistry.register(OpenAICompatibleProvider);
+aiProviderRegistry.reserve("openai-compatible");
 aiProviderRegistry.register(OpusCatProvider);
 
 function isLockedSegment(segment = {}) {
@@ -2722,7 +2583,6 @@ window.CatHan.ai = {
   localAiProviderGuidance,
   defaultLocalAiSettings,
   localAISettingsStore,
-  OpenAICompatibleProvider,
   OpusCatProvider,
   providerAdapterRuntime,
   aiProviderRegistry,

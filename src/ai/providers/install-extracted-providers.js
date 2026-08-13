@@ -6,6 +6,7 @@ import { installHostedProviderAdapters } from "./hosted-provider-adapters.js";
 import { installNativeChatProviderAdapters } from "./native-chat-provider-adapters.js";
 import { installNativeOpenAiProviderAdapters } from "./native-openai-provider-adapters.js";
 import { installOllamaProviderAdapter } from "./ollama-provider-adapter.js";
+import { installOpenAiCompatibleProviderAdapter } from "./openai-compatible-provider-adapter.js";
 import { installPerplexityProviderAdapter } from "./perplexity-provider-adapter.js";
 
 installOllamaProviderAdapter(globalThis.window?.CatHan?.ai);
@@ -17,3 +18,4 @@ installAnthropicProviderAdapter(globalThis.window?.CatHan?.ai);
 installCohereProviderAdapter(globalThis.window?.CatHan?.ai);
 installGroqProviderAdapter(globalThis.window?.CatHan?.ai);
 installHostedProviderAdapters(globalThis.window?.CatHan?.ai);
+installOpenAiCompatibleProviderAdapter(globalThis.window?.CatHan?.ai);
