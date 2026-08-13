@@ -1471,6 +1471,67 @@ const targetProducerController = appRuntime.featureFactories.createTargetProduce
   status: { set: setSaveStatus }
 });
 targetProducerController.mount();
+const targetReplacementController = appRuntime.featureFactories.createTargetReplacementController({
+  elements: {
+    findInput: els.replaceFindInput,
+    replacementInput: els.replaceWithInput,
+    visibleButton: els.replaceVisibleBtn,
+    allButton: els.replaceAllBtn
+  },
+  editorSessionStore,
+  filters: {
+    getOptions: () => ({
+      regex: currentEditorFilters().regex,
+      caseSensitive: currentEditorFilters().caseSensitive
+    }),
+    getIndexes: (scope) => (scope === "all" ? projectSegmentIndexes() : filteredSegmentIndexes())
+  },
+  transform: { replace: replaceOutsideProtectedTokens },
+  commands: {
+    bus: appRuntime.commands.bus,
+    create: appRuntime.commands.createReplaceTargetsCommand,
+    changed: renderUndoControls
+  },
+  persistence: {
+    flush: flushPendingSegmentSaves,
+    clearPending: clearPendingSave,
+    save: saveSegments
+  },
+  mutation: {
+    applyTarget: setSegmentTargetAndStatus,
+    touch: touchSegment,
+    restore: (segment, snapshot) => {
+      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
+      Object.assign(segment, snapshot);
+    },
+    prepareHistory: prepareSegmentHistoryState,
+    hasTagIssue
+  },
+  restoration: { restoreSnapshots: restoreSegmentCommandSnapshots },
+  selection: {
+    getActiveSegmentId: () => currentSegment()?.id || "",
+    focusTarget: focusActiveTextarea
+  },
+  presentation: {
+    renderSegments,
+    renderProgress,
+    refreshSidebar,
+    renderHistory: renderRevisionHistory
+  },
+  activity: {
+    log: (details) => logProjectActivity("replace-target", "Target text replaced", details)
+  },
+  status: { set: setSaveStatus },
+  testHooks: {
+    beforeSave: (segments) => {
+      if (LOOPCAT_TEST_BUILD && segments.some((segment) => segment[REPLACE_SAVE_FAILURE_TEST_FLAG])) {
+        throw new Error("Simulated replace save failure");
+      }
+    }
+  },
+  logger: console
+});
+targetReplacementController.mount();
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
     splitButton: els.splitSegmentBtn,
@@ -6894,104 +6955,7 @@ async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
 }
 
 async function replaceTargetText(scope = "visible") {
-  if (!currentProject()) return { segmentCount: 0, replacementCount: 0 };
-  const findText = els.replaceFindInput.value;
-  const replacement = els.replaceWithInput.value;
-  if (!findText) {
-    setSaveStatus("Enter target text to replace.", "dirty");
-    els.replaceFindInput.focus();
-    return { segmentCount: 0, replacementCount: 0 };
-  }
-  const options = {
-    regex: currentEditorFilters().regex,
-    caseSensitive: currentEditorFilters().caseSensitive
-  };
-  const indexes = scope === "all" ? projectSegmentIndexes() : filteredSegmentIndexes();
-  let replacementCount = 0;
-  const proposals = [];
-  try {
-    indexes.forEach((index) => {
-      const segment = currentSegments()[index];
-      if (!segment) return;
-      const result = replaceOutsideProtectedTokens(segment.target || "", findText, replacement, options);
-      if (!result.count || result.text === segment.target) return;
-      proposals.push({ segment, text: result.text, count: result.count });
-      replacementCount += result.count;
-    });
-  } catch (error) {
-    setSaveStatus(error.message || "Replace failed.", "dirty");
-    return { segmentCount: 0, replacementCount: 0 };
-  }
-  if (!proposals.length) {
-    setSaveStatus(`No target matches in ${scope === "all" ? "the project" : "the visible segments"}.`, "saved");
-    return { segmentCount: 0, replacementCount: 0 };
-  }
-  const snapshots = new Map();
-  const updated = [];
-  try {
-    await flushPendingSegmentSaves(currentProject().id);
-    proposals.forEach(({ segment }) => snapshots.set(segment.id, structuredClone(segment)));
-    const command = appRuntime.commands.createReplaceTargetsCommand({
-      projectId: currentProject().id,
-      segmentIds: proposals.map(({ segment }) => segment.id),
-      beforeSnapshots: proposals.map(({ segment }) => snapshots.get(segment.id)),
-      restoreSnapshots: (nextSnapshots) =>
-        restoreSegmentCommandSnapshots(nextSnapshots, { activeSegmentId: currentSegment()?.id || "" }),
-      applyFirst: async () => {
-        proposals.forEach(({ segment, text }) => {
-          setSegmentTargetAndStatus(segment, text, text.trim() ? "draft" : "empty", "replace");
-          touchSegment(segment);
-          updated.push(segment);
-        });
-        updated.forEach(clearPendingSave);
-        if (LOOPCAT_TEST_BUILD && updated.some((segment) => segment[REPLACE_SAVE_FAILURE_TEST_FLAG])) {
-          throw new Error("Simulated replace save failure");
-        }
-        await saveSegments(updated);
-        renderSegments({ preserveScroll: true });
-        renderProgress();
-        await refreshSidebar();
-        try {
-          await logProjectActivity("replace-target", "Target text replaced", {
-            scope,
-            segmentCount: updated.length,
-            replacementCount,
-            regex: options.regex,
-            caseSensitive: options.caseSensitive
-          });
-        } catch (activityError) {
-          console.warn("Replace activity log failed.", activityError);
-        }
-        return {
-          snapshots: updated.map((segment) => structuredClone(segment)),
-          activeSegmentId: currentSegment()?.id || updated[0]?.id || ""
-        };
-      }
-    });
-    await appRuntime.commands.bus.execute(command);
-    renderUndoControls();
-    const tagIssueCount = updated.filter(hasTagIssue).length;
-    const warning = tagIssueCount ? ` ${tagIssueCount} segment${tagIssueCount === 1 ? "" : "s"} still need tag QA.` : "";
-    setSaveStatus(
-      `Replaced ${replacementCount} match${replacementCount === 1 ? "" : "es"} in ${updated.length} target segment${updated.length === 1 ? "" : "s"}.${warning} Undo is available.`,
-      tagIssueCount ? "dirty" : "saved"
-    );
-    return { segmentCount: updated.length, replacementCount };
-  } catch (error) {
-    updated.forEach((segment) => {
-      const snapshot = snapshots.get(segment.id);
-      if (!snapshot) return;
-      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-      Object.assign(segment, snapshot);
-      prepareSegmentHistoryState(segment);
-    });
-    renderSegments({ preserveScroll: true });
-    renderProgress();
-    renderRevisionHistory();
-    focusActiveTextarea();
-    setSaveStatus(error.message || "Replace failed.", "dirty");
-    return { segmentCount: 0, replacementCount: 0 };
-  }
+  return targetReplacementController.replace(scope);
 }
 
 function debounceSave(segment) {
@@ -13285,8 +13249,6 @@ function wireEvents() {
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
-  els.replaceVisibleBtn.addEventListener("click", () => replaceTargetText("visible"));
-  els.replaceAllBtn.addEventListener("click", () => replaceTargetText("all"));
   els.segmentStatusFilter.addEventListener("change", async () => {
     filterPresetController?.markCustom?.();
     updateEditorFilters({ status: els.segmentStatusFilter.value });

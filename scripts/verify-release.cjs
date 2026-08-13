@@ -190,6 +190,7 @@ const requiredReleaseFiles = [
   "src/features/quality/quality-review-controller.js",
   "src/features/quality/review-metadata-controller.js",
   "src/features/quality/review-state-controller.js",
+  "src/features/editor/target-replacement-controller.js",
   "src/features/resources/resources-controller.js",
   "src/features/resources/tm-pretranslation-dialog-controller.js",
   "src/features/import-export/import-export-controller.js",
@@ -205,6 +206,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-confirmation-controller.test.cjs",
   "tests/unit/target-edit-controller.test.cjs",
   "tests/unit/target-producer-controller.test.cjs",
+  "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
   "tests/app-workflow/workflow-driver.inc.js",
   "tests/unit/gemini-provider-adapter.test.cjs",
@@ -289,11 +291,13 @@ const autosaveServiceJs = readText("src/features/editor/autosave-service.js");
 const segmentConfirmationControllerJs = readText("src/features/editor/segment-confirmation-controller.js");
 const targetEditControllerJs = readText("src/features/editor/target-edit-controller.js");
 const targetProducerControllerJs = readText("src/features/editor/target-producer-controller.js");
+const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
 const autosaveServiceUnitTests = readText("tests/unit/autosave-service.test.cjs");
 const segmentConfirmationControllerUnitTests = readText("tests/unit/segment-confirmation-controller.test.cjs");
 const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
+const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
 const qualityProfileControllerJs = readText("src/features/quality/quality-profile-controller.js");
 const qualityProfileControllerUnitTests = readText("tests/unit/quality-profile-controller.test.cjs");
@@ -1913,6 +1917,64 @@ assertIncludes(
   "filter membership changes preserve scroll while producer failure restores the exact target patch and caret",
   "focused target-producer tests must characterize rendering and failure recovery."
 );
+assertIncludes(
+  appBootstrapJs,
+  "createTargetReplacementController",
+  "The application runtime must expose the checked target-replacement controller boundary."
+);
+for (const boundary of [
+  "const findText = elements.findInput.value",
+  "const indexes = filters.getIndexes(scope)",
+  'transform.replace(segment.target || "", findText, replacement, replaceOptions)',
+  "await persistence.flush(editorSessionStore.getProject().id)",
+  "const command = commands.create({",
+  "await persistence.save(updated)",
+  "await activity.log({",
+  "await commands.bus.execute(command)",
+  "mutation.restore(segment, snapshot)",
+  "selection.focusTarget()"
+]) {
+  assertIncludes(
+    targetReplacementControllerJs,
+    boundary,
+    `TargetReplacementController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "targetReplacementController.mount()",
+  "app.js must delegate replacement button lifecycle to TargetReplacementController."
+);
+assertIncludes(
+  appJs,
+  "return targetReplacementController.replace(scope)",
+  "app.js must retain only the checked target-replacement compatibility facade."
+);
+const targetReplacementFacade = functionBody(appJs, "async function replaceTargetText", "function debounceSave");
+assert(
+  !targetReplacementFacade.includes("replaceOutsideProtectedTokens(") &&
+    !targetReplacementFacade.includes("flushPendingSegmentSaves(") &&
+    !targetReplacementFacade.includes("createReplaceTargetsCommand(") &&
+    !targetReplacementFacade.includes("saveSegments(") &&
+    !targetReplacementFacade.includes("logProjectActivity(") &&
+    !targetReplacementFacade.includes("renderSegments(") &&
+    !targetReplacementFacade.includes("Reflect.ownKeys") &&
+    !appJs.includes('els.replaceVisibleBtn.addEventListener("click"') &&
+    !appJs.includes('els.replaceAllBtn.addEventListener("click"'),
+  "app.js must not regain target-replacement input, event, mutation, command, persistence, activity, presentation, or rollback orchestration."
+);
+for (const testName of [
+  "target replacement owns visible/all button lifecycle and sequences one atomic ReplaceTargets command",
+  "project-wide replacement preserves counts, filter options, and tag-QA warning status",
+  "primary target replacement persistence failure restores exact snapshots, presentation, history, and focus",
+  "secondary replacement activity failure keeps the saved command and original success status"
+]) {
+  assertIncludes(
+    targetReplacementControllerUnitTests,
+    testName,
+    `focused target-replacement tests must characterize ${testName}.`
+  );
+}
 assertIncludes(
   appBootstrapJs,
   "createQualityProfileController",
