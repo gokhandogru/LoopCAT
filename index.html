@@ -191,12 +191,30 @@
               </div>
             </div>
 
-            <div class="resource-tabs">
-              <button id="tmResourceTab" class="active" type="button">Translation memories</button>
-              <button id="tbResourceTab" type="button">Termbases</button>
+            <div class="resource-tabs" role="tablist" aria-label="Resource type">
+              <button
+                id="tmResourceTab"
+                class="active"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="tmResourcesPanel"
+              >
+                Translation memories
+              </button>
+              <button
+                id="tbResourceTab"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="tbResourcesPanel"
+                tabindex="-1"
+              >
+                Termbases
+              </button>
             </div>
 
-            <section id="tmResourcesPanel" class="resource-panel">
+            <section id="tmResourcesPanel" class="resource-panel" role="tabpanel" aria-labelledby="tmResourceTab">
               <div class="resource-import-row">
                 <label class="compact-field"
                   ><span>Memory name</span><input id="tmResourceNameInput" placeholder="TM name"
@@ -228,7 +246,13 @@
               <div id="tmResourceDetail" class="resource-detail hidden"></div>
             </section>
 
-            <section id="tbResourcesPanel" class="resource-panel hidden">
+            <section
+              id="tbResourcesPanel"
+              class="resource-panel hidden"
+              role="tabpanel"
+              aria-labelledby="tbResourceTab"
+              hidden
+            >
               <div class="resource-import-row">
                 <label class="compact-field"
                   ><span>Termbase name</span><input id="tbResourceNameInput" placeholder="TB name"
@@ -382,7 +406,7 @@
                   Inspector
                 </button>
                 <details class="menu">
-                  <summary>Segment tools</summary>
+                  <summary id="segmentToolsMenuSummary">Segment tools</summary>
                   <div class="menu-panel">
                     <button id="saveTmBtn" type="button">Save target to TM</button>
                     <button id="pretranslateBtn" type="button">Pretranslate from TM</button>

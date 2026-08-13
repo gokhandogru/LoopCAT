@@ -58,6 +58,145 @@ test("NavigationController emits stable domain events", async () => {
   });
 });
 
+test("navigation flow preserves stable identity across Projects, dashboard, editor, and segment selection", async () => {
+  const [{ createAppStore }, { createApplicationEvents }, { createNavigationController }] = await Promise.all([
+    moduleAt("src/app/app-store.js"),
+    moduleAt("src/app/events.js"),
+    moduleAt("src/app/navigation-controller.js")
+  ]);
+  const store = createAppStore();
+  const navigation = createNavigationController({ store, events: createApplicationEvents() });
+
+  assert.deepEqual(store.getState().navigation, {
+    view: "projects",
+    projectId: null,
+    documentId: "",
+    segmentId: "",
+    activeIndex: -1
+  });
+
+  navigation.openProject("project-1", 0);
+  assert.deepEqual(store.getState().navigation, {
+    view: "project",
+    projectId: "project-1",
+    documentId: "",
+    segmentId: "",
+    activeIndex: 0
+  });
+
+  navigation.openEditor({
+    projectId: "project-1",
+    documentId: "document-1",
+    segmentId: "segment-1",
+    activeIndex: 2
+  });
+  navigation.selectSegment({ segmentId: "segment-2", activeIndex: 3 });
+  assert.deepEqual(store.getState().navigation, {
+    view: "editor",
+    projectId: "project-1",
+    documentId: "document-1",
+    segmentId: "segment-2",
+    activeIndex: 3
+  });
+
+  navigation.openProjects();
+  assert.equal(store.getState().navigation.view, "projects");
+  assert.equal(store.getState().navigation.projectId, "project-1");
+  assert.equal(store.getState().navigation.documentId, "document-1");
+  assert.equal(store.getState().navigation.segmentId, "segment-2");
+});
+
+test("restored navigation is normalized and Focus mode remains editor-only", async () => {
+  const { createAppStore } = await moduleAt("src/app/app-store.js");
+  const store = createAppStore({
+    navigation: {
+      view: "editor",
+      projectId: "project-restored",
+      documentId: "document-restored",
+      segmentId: "segment-restored",
+      activeIndex: 7
+    },
+    interface: { focusMode: true, locale: "tr-TR" }
+  });
+
+  assert.deepEqual(store.getState(), {
+    navigation: {
+      view: "editor",
+      projectId: "project-restored",
+      documentId: "document-restored",
+      segmentId: "segment-restored",
+      activeIndex: 7
+    },
+    interface: { focusMode: true, locale: "tr-TR" }
+  });
+
+  store.dispatch({ type: "navigation/changed", payload: { view: "project" } });
+  assert.equal(store.getState().interface.focusMode, false);
+  store.dispatch({ type: "interface/focus-mode-changed", payload: { enabled: true } });
+  assert.equal(store.getState().interface.focusMode, false);
+});
+
+test("legacy navigation synchronization is characterized before writer migration", async () => {
+  const [{ createAppStore }, { createApplicationEvents }, { createNavigationController }] = await Promise.all([
+    moduleAt("src/app/app-store.js"),
+    moduleAt("src/app/events.js"),
+    moduleAt("src/app/navigation-controller.js")
+  ]);
+  const store = createAppStore();
+  const navigation = createNavigationController({ store, events: createApplicationEvents() });
+
+  const synchronized = navigation.syncLegacy({
+    view: "editor",
+    projectId: "legacy-project",
+    documentId: "legacy-document",
+    segmentId: "legacy-segment",
+    activeIndex: 5
+  });
+
+  assert.deepEqual(synchronized, {
+    view: "editor",
+    projectId: "legacy-project",
+    documentId: "legacy-document",
+    segmentId: "legacy-segment",
+    activeIndex: 5
+  });
+  assert.deepEqual(store.getState().navigation, synchronized);
+});
+
+test("NavigationController owns document and project selection identity", async () => {
+  const [{ createAppStore }, { createApplicationEvents }, { createNavigationController }] = await Promise.all([
+    moduleAt("src/app/app-store.js"),
+    moduleAt("src/app/events.js"),
+    moduleAt("src/app/navigation-controller.js")
+  ]);
+  const store = createAppStore();
+  const navigation = createNavigationController({ store, events: createApplicationEvents() });
+
+  navigation.openEditor({
+    projectId: "project-1",
+    documentId: "document-1",
+    segmentId: "segment-1",
+    activeIndex: 2
+  });
+  navigation.selectDocument({ documentId: "document-2", segmentId: "segment-5", activeIndex: 6 });
+  assert.deepEqual(store.getState().navigation, {
+    view: "editor",
+    projectId: "project-1",
+    documentId: "document-2",
+    segmentId: "segment-5",
+    activeIndex: 6
+  });
+
+  navigation.clearSelection();
+  assert.deepEqual(store.getState().navigation, {
+    view: "editor",
+    projectId: null,
+    documentId: "",
+    segmentId: "",
+    activeIndex: -1
+  });
+});
+
 test("PreferencesRepository ignores unknown versions and stores only its scoped record", async () => {
   const { createPreferencesRepository } = await moduleAt("src/data/preferences-repository.js");
   const records = new Map([["modernization.preferences", { key: "modernization.preferences", version: 99 }]]);

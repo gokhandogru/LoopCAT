@@ -32,6 +32,22 @@ export function createNavigationController({ store, events }) {
       events?.emit?.(APPLICATION_EVENTS.SEGMENT_SELECTED, navigation);
       return navigation;
     },
+    /** @param {{ documentId?: string, segmentId?: string, activeIndex?: number }} [selection] */
+    selectDocument({ documentId = "", segmentId, activeIndex } = {}) {
+      /** @type {{ documentId: string, segmentId?: string, activeIndex?: number }} */
+      const payload = { documentId };
+      if (segmentId !== undefined) payload.segmentId = segmentId;
+      if (activeIndex !== undefined) payload.activeIndex = activeIndex;
+      store.dispatch({ type: "selection/changed", payload });
+      return store.getState().navigation;
+    },
+    clearSelection() {
+      store.dispatch({
+        type: "selection/changed",
+        payload: { projectId: null, documentId: "", segmentId: "", activeIndex: -1 }
+      });
+      return store.getState().navigation;
+    },
     syncLegacy(payload) {
       store.dispatch({ type: "legacy/navigation-synced", payload });
       return store.getState().navigation;

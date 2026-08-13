@@ -46,10 +46,15 @@ function decodeJsString(raw) {
 function templateMessage(raw) {
   const content = raw.slice(1, -1);
   let index = 0;
-  return content.replace(/\$\{[^}]+\}/g, () => {
-    index += 1;
-    return `{value${index}}`;
-  }).replace(/\\`/g, "`").replace(/\\n/g, "\n").replace(/\\'/g, "'").replace(/\\"/g, '"');
+  return content
+    .replace(/\$\{[^}]+\}/g, () => {
+      index += 1;
+      return `{value${index}}`;
+    })
+    .replace(/\\`/g, "`")
+    .replace(/\\n/g, "\n")
+    .replace(/\\'/g, "'")
+    .replace(/\\"/g, '"');
 }
 
 function looksHuman(value) {
@@ -71,7 +76,9 @@ function looksHuman(value) {
 }
 
 function add(messagesByText, text, description, location) {
-  const message = String(text || "").replace(/\s+/g, " ").trim();
+  const message = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!looksHuman(message)) return;
   if (!messagesByText.has(message)) {
     messagesByText.set(message, { description, locations: [] });
@@ -100,12 +107,14 @@ function extractHtmlTemplateText(messagesByText, value, location, sourceName = "
 
 function extractScript(messagesByText, filePath, sourceName) {
   const full = read(filePath);
-  const app = full.split("async function runAppWorkflowTest()")[0] || full;
-  const lines = app.split(/\r?\n/);
+  const lines = full.split(/\r?\n/);
   const stringPattern = /(["'`])(?:\\.|(?!\1)[\s\S])*?\1/g;
   lines.forEach((line, index) => {
     const location = `${sourceName}:${index + 1}`;
-    const likelyUiLine = /uiSource\(|reportText\(|reportHtml\(|textContent\s*=|innerHTML\s*=|setSaveStatus\(|setLocalAiStatus\(|window\.confirm\(|confirmExternalAiPromptShare\(|new Error\(|throw new Error\(|message:|fixHint:|label:|title:|aria-label|placeholder|button\.textContent|option\.textContent|return \{|\[/.test(line);
+    const likelyUiLine =
+      /uiSource\(|reportText\(|reportHtml\(|textContent\s*=|innerHTML\s*=|setSaveStatus\(|setLocalAiStatus\(|window\.confirm\(|confirmExternalAiPromptShare\(|new Error\(|throw new Error\(|message:|fixHint:|label:|title:|aria-label|placeholder|button\.textContent|option\.textContent|return \{|\[/.test(
+        line
+      );
     if (!likelyUiLine) return;
     for (const match of line.matchAll(stringPattern)) {
       const raw = match[0];
@@ -133,7 +142,9 @@ function main() {
   extractScript(messagesByText, qaPath, "qa.js");
 
   const existing = existingMessages();
-  const existingByMessage = new Map(Object.entries(existing).map(([key, entry]) => [String(entry.message || entry), key]));
+  const existingByMessage = new Map(
+    Object.entries(existing).map(([key, entry]) => [String(entry.message || entry), key])
+  );
   const messages = { ...existing };
   for (const [message, info] of messagesByText.entries()) {
     const key = existingByMessage.get(message) || `auto.${slug(message)}.${hash(message)}`;

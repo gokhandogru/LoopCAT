@@ -11,7 +11,9 @@ export function createStorageRepository(storageApi) {
     replaceAtomically: storageApi.replaceStoresAtomically.bind(storageApi),
     moveProjectToTrash: storageApi.moveProjectToTrash.bind(storageApi),
     moveProjectDocumentToTrash: storageApi.moveProjectDocumentToTrash.bind(storageApi),
+    moveResourceRecordsToTrash: storageApi.moveResourceRecordsToTrash.bind(storageApi),
     restoreTrashRecords: storageApi.restoreTrashRecords.bind(storageApi),
+    restoreResourceTrashRecords: storageApi.restoreResourceTrashRecords.bind(storageApi),
     constants: Object.freeze({ ...(storageApi.constants || {}) })
   });
 }

@@ -1,0 +1,23 @@
+import { installGroqProviderAdapter } from "./groq-provider-adapter.js";
+import { installAnthropicProviderAdapter } from "./anthropic-provider-adapter.js";
+import { installCohereProviderAdapter } from "./cohere-provider-adapter.js";
+import { installGeminiProviderAdapter } from "./gemini-provider-adapter.js";
+import { installHostedProviderAdapters } from "./hosted-provider-adapters.js";
+import { installNativeChatProviderAdapters } from "./native-chat-provider-adapters.js";
+import { installNativeOpenAiProviderAdapters } from "./native-openai-provider-adapters.js";
+import { installOllamaProviderAdapter } from "./ollama-provider-adapter.js";
+import { installOpenAiCompatibleProviderAdapter } from "./openai-compatible-provider-adapter.js";
+import { installOpusCatProviderAdapter } from "./opus-cat-provider-adapter.js";
+import { installPerplexityProviderAdapter } from "./perplexity-provider-adapter.js";
+
+installOllamaProviderAdapter(globalThis.window?.CatHan?.ai);
+installNativeOpenAiProviderAdapters(globalThis.window?.CatHan?.ai);
+installNativeChatProviderAdapters(globalThis.window?.CatHan?.ai);
+installPerplexityProviderAdapter(globalThis.window?.CatHan?.ai);
+installGeminiProviderAdapter(globalThis.window?.CatHan?.ai);
+installAnthropicProviderAdapter(globalThis.window?.CatHan?.ai);
+installCohereProviderAdapter(globalThis.window?.CatHan?.ai);
+installGroqProviderAdapter(globalThis.window?.CatHan?.ai);
+installHostedProviderAdapters(globalThis.window?.CatHan?.ai);
+installOpenAiCompatibleProviderAdapter(globalThis.window?.CatHan?.ai);
+installOpusCatProviderAdapter(globalThis.window?.CatHan?.ai);

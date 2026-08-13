@@ -7,8 +7,8 @@ const outputRoot = path.join(root, ".cache", "renderer");
 const productionDir = path.join(outputRoot, "production");
 const testDir = path.join(outputRoot, "test");
 const testBuildDeclaration = 'const LOOPCAT_TEST_BUILD = window.location.hash === "#app-workflow-test";';
-const workflowTestStart = "const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTest() {";
-const workflowTestEnd = "} : async function runAppWorkflowTestDisabled() {};";
+const workflowDriverMarker = "/* LOOPCAT_TEST_WORKFLOW_DRIVER */";
+const workflowDriverPath = path.join(root, "tests", "app-workflow", "workflow-driver.inc.js");
 const sourceCatalog = JSON.parse(fs.readFileSync(path.join(root, "i18n", "source.en-US.json"), "utf8"));
 const testOnlyMessageKeys = new Set(
   Object.entries(sourceCatalog.messages || {})
@@ -25,14 +25,12 @@ function productionSourcePlugin() {
         if (!source.includes(testBuildDeclaration)) {
           throw new Error("app.js is missing the explicit test-build declaration.");
         }
-        const testStart = source.indexOf(workflowTestStart);
-        const testEnd = source.indexOf(workflowTestEnd, testStart);
-        if (testStart === -1 || testEnd === -1) {
-          throw new Error("app.js workflow characterization driver boundary is missing.");
+        if (!source.includes(workflowDriverMarker)) {
+          throw new Error("app.js workflow characterization composition marker is missing.");
         }
-        const withoutWorkflowTest = `${source.slice(0, testStart)}${source.slice(testEnd + workflowTestEnd.length)}`;
         return {
-          contents: withoutWorkflowTest
+          contents: source
+            .replace(workflowDriverMarker, "")
             .replace(testBuildDeclaration, "")
             .replace(/\bLOOPCAT_TEST_BUILD\b/g, "false")
             .replace(/^const [A-Z0-9_]+_TEST_FLAG = Symbol\([^\r\n]+\);\r?\n/gm, "")
@@ -56,6 +54,27 @@ function productionSourcePlugin() {
           contents: `window.CatHan = window.CatHan || {};\nwindow.CatHan.i18n.${method}(${JSON.stringify({ ...catalog, messages })});\n`,
           loader: "js"
         };
+      });
+    }
+  };
+}
+
+function testSourcePlugin() {
+  return {
+    name: "loopcat-test-source",
+    setup(build) {
+      build.onLoad({ filter: /app\.js$/ }, async (args) => {
+        const [source, workflowDriver] = await Promise.all([
+          fs.promises.readFile(args.path, "utf8"),
+          fs.promises.readFile(workflowDriverPath, "utf8")
+        ]);
+        if (!source.includes(workflowDriverMarker)) {
+          throw new Error("app.js workflow characterization composition marker is missing.");
+        }
+        if (!workflowDriver.includes("async function runAppWorkflowTest()")) {
+          throw new Error("The external workflow characterization driver is incomplete.");
+        }
+        return { contents: source.replace(workflowDriverMarker, workflowDriver), loader: "js" };
       });
     }
   };
@@ -163,7 +182,8 @@ async function main() {
   });
   const testMeta = await buildVariant({
     entry: "src/entry/test.js",
-    outdir: testDir
+    outdir: testDir,
+    plugins: [testSourcePlugin()]
   });
   const productionAssets = rendererAssets(
     {

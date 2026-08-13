@@ -29,7 +29,9 @@ function assert(condition, message) {
 }
 
 function assertIncludes(text, snippet, message) {
-  assert(text.includes(snippet), message);
+  const workflowAssertion = /workflow|app\.js language catalog|production UI does not expose mock/i.test(message);
+  const source = workflowAssertion && text === appJs ? `${text}\n${appWorkflowDriverJs}` : text;
+  assert(source.includes(snippet), message);
 }
 
 function functionBody(text, startMarker, endMarker) {
@@ -153,10 +155,59 @@ const requiredReleaseFiles = [
   "src/entry/production.js",
   "src/entry/renderer-bootstrap.js",
   "src/entry/test.js",
+  "src/app/bootstrap.js",
+  "src/app/compatibility-module-registry.js",
+  "src/app/install-runtime.js",
+  "src/features/editor/editor-session-store.js",
+  "src/features/editor/editor-context-controller.js",
+  "src/features/editor/segment-grid-controller.js",
+  "src/ai/providers/anthropic-provider-adapter.js",
+  "src/ai/providers/cohere-provider-adapter.js",
+  "src/ai/providers/gemini-provider-adapter.js",
+  "src/ai/providers/groq-provider-adapter.js",
+  "src/ai/providers/hosted-provider-adapters.js",
+  "src/ai/providers/install-extracted-providers.js",
+  "src/ai/providers/native-chat-provider-adapters.js",
+  "src/ai/providers/native-openai-provider-adapters.js",
+  "src/ai/providers/openai-compatible-hosted-provider-adapter.js",
+  "src/ai/providers/openai-compatible-provider-adapter.js",
+  "src/ai/providers/ollama-provider-adapter.js",
+  "src/ai/providers/opus-cat-provider-adapter.js",
+  "src/ai/providers/openai-responses-provider-adapter.js",
+  "src/ai/providers/perplexity-provider-adapter.js",
   "src/commands/edit-target-session.js",
   "src/ui/dialog-controller.js",
+  "src/features/ai/ai-administration-controller.js",
+  "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
+  "src/features/quality/quality-review-controller.js",
+  "src/features/resources/resources-controller.js",
+  "src/features/resources/tm-pretranslation-dialog-controller.js",
+  "src/features/import-export/import-export-controller.js",
+  "src/features/workspace/recovery-workspace-controller.js",
+  "tests/unit/dialog-intent-controllers.test.cjs",
+  "tests/unit/ai-administration-controller.test.cjs",
+  "tests/unit/anthropic-provider-adapter.test.cjs",
+  "tests/unit/cohere-provider-adapter.test.cjs",
+  "tests/unit/compatibility-module-registry.test.cjs",
+  "tests/unit/editor-session-store.test.cjs",
+  "tests/unit/editor-context-controller.test.cjs",
+  "tests/app-workflow/workflow-driver.inc.js",
+  "tests/unit/gemini-provider-adapter.test.cjs",
+  "tests/unit/groq-provider-adapter.test.cjs",
+  "tests/unit/hosted-provider-adapters.test.cjs",
+  "tests/unit/native-chat-provider-adapters.test.cjs",
+  "tests/unit/native-openai-provider-adapters.test.cjs",
+  "tests/unit/ollama-provider-adapter.test.cjs",
+  "tests/unit/openai-compatible-provider-adapter.test.cjs",
+  "tests/unit/opus-cat-provider-adapter.test.cjs",
+  "tests/unit/perplexity-provider-adapter.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
+  "tests/unit/quality-review-controller.test.cjs",
+  "tests/unit/import-export-controller.test.cjs",
+  "tests/unit/recovery-workspace-controller.test.cjs",
+  "tests/unit/resource-trash.test.cjs",
+  "tests/unit/resources-controller.test.cjs",
   "scripts/generate-brand-icons.cjs",
   "scripts/publish-repository-downloads.cjs",
   "scripts/verify-web-artifact.cjs",
@@ -208,6 +259,14 @@ const manifest = readJson("manifest.webmanifest");
 const indexHtml = readText("index.html");
 const regressionHtml = readText("regression-test.html");
 const appJs = readText("app.js");
+const appWorkflowDriverJs = readText("tests/app-workflow/workflow-driver.inc.js");
+const appBootstrapJs = readText("src/app/bootstrap.js");
+const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-registry.js");
+const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-module-registry.test.cjs");
+const installRuntimeJs = readText("src/app/install-runtime.js");
+const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
+const editorContextControllerJs = readText("src/features/editor/editor-context-controller.js");
+const segmentGridControllerJs = readText("src/features/editor/segment-grid-controller.js");
 const commandBusJs = readText("src/commands/command-bus.js");
 const editTargetSessionJs = readText("src/commands/edit-target-session.js");
 const segmentCommandsJs = readText("src/commands/segment-commands.js");
@@ -216,6 +275,48 @@ const dialogControllerJs = readText("src/ui/dialog-controller.js");
 const dialogControllerUnitTests = readText("tests/unit/dialog-controller.test.cjs");
 const projectDialogControllerJs = readText("src/features/projects/project-dialog-controller.js");
 const projectDialogControllerUnitTests = readText("tests/unit/project-dialog-controller.test.cjs");
+const opusCatHelpControllerJs = readText("src/features/ai/opus-cat-help-controller.js");
+const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-pretranslation-dialog-controller.js");
+const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
+const aiAdministrationControllerJs = readText("src/features/ai/ai-administration-controller.js");
+const aiAdministrationControllerUnitTests = readText("tests/unit/ai-administration-controller.test.cjs");
+const anthropicProviderAdapterJs = readText("src/ai/providers/anthropic-provider-adapter.js");
+const cohereProviderAdapterJs = readText("src/ai/providers/cohere-provider-adapter.js");
+const geminiProviderAdapterJs = readText("src/ai/providers/gemini-provider-adapter.js");
+const groqProviderAdapterJs = readText("src/ai/providers/groq-provider-adapter.js");
+const hostedProviderAdaptersJs = readText("src/ai/providers/hosted-provider-adapters.js");
+const hostedProviderAdapterCoreJs = readText("src/ai/providers/openai-compatible-hosted-provider-adapter.js");
+const openAiCompatibleProviderAdapterJs = readText("src/ai/providers/openai-compatible-provider-adapter.js");
+const nativeChatProviderAdaptersJs = readText("src/ai/providers/native-chat-provider-adapters.js");
+const nativeOpenAiProviderAdaptersJs = readText("src/ai/providers/native-openai-provider-adapters.js");
+const openAiResponsesProviderAdapterJs = readText("src/ai/providers/openai-responses-provider-adapter.js");
+const ollamaProviderAdapterJs = readText("src/ai/providers/ollama-provider-adapter.js");
+const opusCatProviderAdapterJs = readText("src/ai/providers/opus-cat-provider-adapter.js");
+const perplexityProviderAdapterJs = readText("src/ai/providers/perplexity-provider-adapter.js");
+const extractedProviderInstallerJs = readText("src/ai/providers/install-extracted-providers.js");
+const anthropicProviderAdapterUnitTests = readText("tests/unit/anthropic-provider-adapter.test.cjs");
+const cohereProviderAdapterUnitTests = readText("tests/unit/cohere-provider-adapter.test.cjs");
+const geminiProviderAdapterUnitTests = readText("tests/unit/gemini-provider-adapter.test.cjs");
+const groqProviderAdapterUnitTests = readText("tests/unit/groq-provider-adapter.test.cjs");
+const hostedProviderAdaptersUnitTests = readText("tests/unit/hosted-provider-adapters.test.cjs");
+const nativeChatProviderAdaptersUnitTests = readText("tests/unit/native-chat-provider-adapters.test.cjs");
+const nativeOpenAiProviderAdaptersUnitTests = readText("tests/unit/native-openai-provider-adapters.test.cjs");
+const ollamaProviderAdapterUnitTests = readText("tests/unit/ollama-provider-adapter.test.cjs");
+const openAiCompatibleProviderAdapterUnitTests = readText("tests/unit/openai-compatible-provider-adapter.test.cjs");
+const opusCatProviderAdapterUnitTests = readText("tests/unit/opus-cat-provider-adapter.test.cjs");
+const perplexityProviderAdapterUnitTests = readText("tests/unit/perplexity-provider-adapter.test.cjs");
+const productionEntryJs = readText("src/entry/production.js");
+const qualityReviewControllerJs = readText("src/features/quality/quality-review-controller.js");
+const qualityReviewControllerUnitTests = readText("tests/unit/quality-review-controller.test.cjs");
+const recoveryWorkspaceControllerJs = readText("src/features/workspace/recovery-workspace-controller.js");
+const recoveryWorkspaceControllerUnitTests = readText("tests/unit/recovery-workspace-controller.test.cjs");
+const importExportControllerJs = readText("src/features/import-export/import-export-controller.js");
+const importExportControllerUnitTests = readText("tests/unit/import-export-controller.test.cjs");
+const resourcesControllerJs = readText("src/features/resources/resources-controller.js");
+const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
+const resourceTrashUnitTests = readText("tests/unit/resource-trash.test.cjs");
+const trashCommandsJs = readText("src/commands/trash-commands.js");
+const trashRepositoryJs = readText("src/data/trash-repository.js");
 const paletteControllerJs = readText("src/features/palette/palette-controller.js");
 const updateControllerJs = readText("src/features/update/update-controller.js");
 const safeHtmlJs = readText("src/security/safe-html.js");
@@ -236,10 +337,188 @@ const modernizationBaselineDocs = readText("docs/modernization-baseline.md");
 const modernizationFixture = readJson("tests/fixtures/modernization/baseline-backup.json");
 const bundleContract = readJson("scripts/bundle-contract.json");
 const baselineCaptureScript = readText("scripts/capture-modernization-baseline.cjs");
+const accessibilityVerificationScript = readText("scripts/verify-accessibility.cjs");
 const bundleContractScript = readText("scripts/verify-bundle-contract.cjs");
 const bundleContractSelfTestScript = readText("scripts/verify-bundle-contract-selftest.cjs");
 const productionAssetsScript = readText("config/production-assets.js");
 const productionAssets = require(path.join(root, "config", "production-assets.js"));
+assertIncludes(
+  installRuntimeJs,
+  "createCompatibilityModuleRegistry(window.CatHan)",
+  "The runtime installer must be the single compatibility edge that captures legacy modules."
+);
+assertIncludes(
+  appBootstrapJs,
+  "compatibilityModules.storage",
+  "The application runtime must inject storage through the compatibility module registry."
+);
+assertIncludes(
+  appBootstrapJs,
+  "compatibilityModules.project",
+  "The application runtime must inject projects through the compatibility module registry."
+);
+assertIncludes(
+  appBootstrapJs,
+  "compatibilityModules.i18n",
+  "The application runtime must inject localization through the compatibility module registry."
+);
+assertIncludes(
+  compatibilityModuleRegistryJs,
+  '"workspaceStorage"',
+  "The compatibility registry must include the workspace persistence boundary."
+);
+assertIncludes(
+  compatibilityModuleRegistryUnitTests,
+  "captures every legacy application API behind one immutable boundary",
+  "The compatibility registry must retain focused module-capture characterization."
+);
+assert(
+  (appJs.match(/window\.CatHan/g) || []).length === 1 && appJs.includes("const appRuntime = window.CatHan.appRuntime;"),
+  "app.js may read only the installed application runtime from window.CatHan; feature APIs must be injected."
+);
+assertIncludes(
+  appJs,
+  "const compatibilityModules = appRuntime.compatibilityModules;",
+  "app.js must resolve legacy feature APIs through the injected compatibility registry."
+);
+assert(
+  !appJs.includes("state.view"),
+  "AppStore must remain the only route/view owner; app.js cannot restore a legacy state.view field."
+);
+assert(
+  !appJs.includes("state.documentFilter"),
+  "AppStore must remain the only selected-document owner; app.js cannot restore a legacy state.documentFilter field."
+);
+assert(
+  !appJs.includes("state.activeIndex"),
+  "AppStore must remain the only active-segment owner; app.js cannot restore a legacy state.activeIndex field."
+);
+assert(
+  !appJs.includes("state.focusMode"),
+  "AppStore must remain the only Focus-mode owner; app.js cannot restore a legacy state.focusMode field."
+);
+for (const field of [
+  "segmentQuery",
+  "segmentSearchScope",
+  "segmentRegex",
+  "segmentCaseSensitive",
+  "segmentStatusFilter",
+  "reviewStateFilter",
+  "aiSegmentFilter"
+]) {
+  assert(
+    !appJs.includes(`state.${field}`),
+    `FilterStore must remain the only editor-filter owner; app.js cannot restore legacy state.${field}.`
+  );
+}
+assertIncludes(
+  appJs,
+  "const editorFilterStore = appRuntime.featureFactories.createFilterStore();",
+  "app.js must install one authoritative checked editor FilterStore."
+);
+assertIncludes(
+  appBootstrapJs,
+  "const editorSession = createEditorSessionStore();",
+  "The application runtime must own one checked EditorSessionStore."
+);
+for (const field of [
+  "projects",
+  "project",
+  "projectSummaries",
+  "projectSummaryRevisions",
+  "projectTerms",
+  "activityEvents",
+  "qaChecks",
+  "qualityRiskQueue",
+  "progressSummary",
+  "segments"
+]) {
+  assert(
+    !new RegExp(`\\bstate\\.${field}\\b`).test(appJs) &&
+      !new RegExp(`\\bstate\\.${field}\\b`).test(appWorkflowDriverJs),
+    `EditorSessionStore explicit APIs must remain the only ${field} owner.`
+  );
+}
+for (const method of [
+  "getProjects",
+  "replaceProjects",
+  "getProject",
+  "replaceProject",
+  "getProjectSummaries",
+  "replaceProjectSummaries",
+  "getProjectSummaryRevision",
+  "markProjectSummaryDirty",
+  "pruneProjectSummaryRevisions",
+  "getProjectTerms",
+  "replaceProjectTerms",
+  "getActivityEvents",
+  "replaceActivityEvents",
+  "prependActivityEvent",
+  "getQaChecks",
+  "replaceQaChecks",
+  "getQualityRiskQueue",
+  "replaceQualityRiskQueue",
+  "getProgressSummary",
+  "replaceProgressSummary",
+  "getSegments",
+  "replaceSegments",
+  "replaceSegmentAt"
+]) {
+  assertIncludes(editorSessionStoreJs, method, `EditorSessionStore must retain explicit ${method} ownership.`);
+}
+assert(
+  !editorSessionStoreJs.includes("attachCompatibility") && !appJs.includes("attachCompatibility"),
+  "The completed EditorSessionStore migration must not restore the temporary compatibility bridge."
+);
+const appStateStart = appJs.indexOf("const state = {");
+const appStateEnd = appJs.indexOf("\n};", appStateStart);
+const appStateBlock = appJs.slice(appStateStart, appStateEnd);
+for (const field of [
+  "projects",
+  "projectSummaries",
+  "projectSummaryRevisions",
+  "project",
+  "segments",
+  "progressSummary",
+  "projectTerms",
+  "activityEvents",
+  "qaChecks",
+  "qualityRiskQueue"
+]) {
+  assert(
+    !appStateBlock.includes(`${field}:`),
+    `EditorSessionStore must own ${field}; app.js cannot restore it to the legacy state literal.`
+  );
+}
+for (const field of ["segmentWindow", "segmentScrollFrame", "segmentRowFrame", "pendingRowUpdates"]) {
+  assert(
+    !appStateBlock.includes(`${field}:`),
+    `SegmentGridController must own ${field}; app.js cannot restore it to the legacy state literal.`
+  );
+}
+assertIncludes(
+  segmentGridControllerJs,
+  "navigation.selectSegment",
+  "The segment grid must dispatch active-segment identity through application navigation."
+);
+for (const method of ["calculateWindow", "scheduleScroll", "scheduleRowUpdate", "ensureVisible", "findTargetEditor"]) {
+  assertIncludes(segmentGridControllerJs, method, `The segment grid must retain checked ${method} ownership.`);
+}
+assertIncludes(
+  appBootstrapJs,
+  "createEditorContextController",
+  "The application runtime must expose the checked editor-context orchestration boundary."
+);
+assertIncludes(
+  editorContextControllerJs,
+  "await Promise.all",
+  "EditorContextController must coordinate asynchronous contextual services."
+);
+assertIncludes(
+  appJs,
+  "return editorContextController.refresh();",
+  "The legacy sidebar facade must delegate refresh ownership to EditorContextController."
+);
 assert(
   productionAssets.appVersion === packageJson.version,
   "Canonical production asset manifest appVersion must match package.json."
@@ -398,8 +677,19 @@ assert(
   "Bundle contract must characterize the isolated source test driver while production renderer checks enforce its exclusion."
 );
 assert(
-  bundleContract.knownMarkers?.["app.js"]?.runAppWorkflowTest === 4,
+  bundleContract.knownMarkers?.["app.js"]?.runAppWorkflowTest === 1,
   "Bundle contract must lock the characterized workflow-test entry count."
+);
+assert(
+  !appJs.includes("async function runAppWorkflowTest()") &&
+    appJs.includes("/* LOOPCAT_TEST_WORKFLOW_DRIVER */") &&
+    appWorkflowDriverJs.includes("async function runAppWorkflowTest()"),
+  "The lexical-scope workflow driver must live only in the external test composition source."
+);
+assertIncludes(
+  readText("scripts/build-renderer.cjs"),
+  "workflowDriverPath",
+  "The renderer builder must compose the external workflow driver only into the test graph."
 );
 assertIncludes(
   bundleContractScript,
@@ -802,6 +1092,11 @@ for (const requiredWebAsset of ["LICENSE", "NOTICE", "scripts/opus-cat-web-bridg
 }
 assertIncludes(indexHtml, `id="aboutBtn"`, "index.html must expose the product About button.");
 assertIncludes(indexHtml, `id="aboutDialog"`, "index.html must expose the product About dialog.");
+assertIncludes(
+  indexHtml,
+  `id="segmentToolsMenuSummary"`,
+  "the editor must expose a stable visible focus-return target for Segment tools dialogs."
+);
 assertIncludes(indexHtml, `id="opusCatHelpDialog"`, "index.html must expose actionable OPUS-CAT web connection help.");
 assertIncludes(
   indexHtml,
@@ -902,6 +1197,449 @@ assertIncludes(
   appJs,
   "project dialog controller opens the requested AI settings context",
   "the application workflow must characterize the AI settings project-dialog deep link."
+);
+assertIncludes(
+  tmPretranslationDialogControllerJs,
+  'id: "tm-pretranslation"',
+  "the checked TM prompt controller must register through the shared dialog lifecycle."
+);
+assertIncludes(
+  tmPretranslationDialogControllerJs,
+  'dialog.returnValue === "apply" ? thresholdInput.value : null',
+  "the checked TM prompt controller must preserve apply-versus-cancel intent without owning TM data."
+);
+assertIncludes(
+  opusCatHelpControllerJs,
+  'id: "opus-cat-help"',
+  "the checked OPUS-CAT help controller must register through the shared dialog lifecycle."
+);
+assertIncludes(
+  opusCatHelpControllerJs,
+  "await retryConnection()",
+  "the checked OPUS-CAT help controller must delegate connection retry instead of owning provider logic."
+);
+assertIncludes(
+  appJs,
+  "createTmPretranslationDialogController",
+  "app.js must compose the checked TM threshold prompt controller."
+);
+assertIncludes(
+  functionBody(appJs, "function requestTmPretranslationThreshold", "async function pretranslateFromTm"),
+  "returnTarget: els.segmentToolsMenuSummary",
+  "the TM prompt must restore focus to the visible Segment tools trigger rather than its collapsed menu item."
+);
+assertIncludes(appJs, "createOpusCatHelpController", "app.js must compose the checked OPUS-CAT help controller.");
+assert(
+  !appJs.includes("function showManagedDialog") &&
+    !appJs.includes('els.localAiOpusCatHelpBtn?.addEventListener("click"') &&
+    !appJs.includes('els.closeOpusCatHelpBtn?.addEventListener("click"') &&
+    !appJs.includes('els.retryOpusCatConnectionBtn?.addEventListener("click"') &&
+    !functionBody(appJs, "function requestTmPretranslationThreshold", "async function pretranslateFromTm").includes(
+      'addEventListener("close"'
+    ),
+  "migrated TM and OPUS-CAT dialogs must not retain superseded app.js lifecycle listeners."
+);
+assertIncludes(
+  dialogIntentControllerUnitTests,
+  "TM pretranslation dialog controller resolves apply and cancel intent through the shared lifecycle",
+  "focused tests must characterize TM threshold intent and lifecycle behavior."
+);
+assertIncludes(
+  dialogIntentControllerUnitTests,
+  "OPUS-CAT help controller owns visibility, dialog registration, retry, and listener cleanup",
+  "focused tests must characterize OPUS-CAT help entry points and retry ownership."
+);
+assertIncludes(
+  appJs,
+  "TM threshold cancellation restores focus to the visible Segment tools control",
+  "the app workflow must characterize TM prompt cancellation and focus return to the visible menu trigger."
+);
+assertIncludes(
+  appJs,
+  "OPUS-CAT help close restores focus to the visible connection-help entry point",
+  "the app workflow must characterize OPUS-CAT help focus return above Project settings."
+);
+assertIncludes(
+  aiAdministrationControllerJs,
+  'listen(elements.saveSettingsButton, "click"',
+  "the checked AI administration controller must own the global AI settings event lifecycle."
+);
+assertIncludes(
+  aiAdministrationControllerJs,
+  'listen(providerPresetSelect, "change"',
+  "the checked AI administration controller must own provider-preset selection events."
+);
+assertIncludes(
+  aiAdministrationControllerJs,
+  "renderProviderSummary(view.summary || {})",
+  "the checked AI administration controller must own provider-summary presentation."
+);
+assertIncludes(
+  aiAdministrationControllerJs,
+  "outputObserver?.disconnect?.()",
+  "the checked AI administration controller must clean up output-disclosure observation."
+);
+assertIncludes(
+  aiAdministrationControllerJs,
+  "function renderOutput",
+  "the checked AI administration controller must own command-centre output presentation."
+);
+assert(
+  !aiAdministrationControllerJs.includes("innerHTML") &&
+    !aiAdministrationControllerJs.includes("insertAdjacentHTML") &&
+    !aiAdministrationControllerJs.includes("localStorage") &&
+    !aiAdministrationControllerJs.includes("sessionStorage") &&
+    !aiAdministrationControllerJs.includes("fetch(") &&
+    !aiAdministrationControllerJs.includes("ai.js") &&
+    !aiAdministrationControllerJs.includes("command-bus") &&
+    !aiAdministrationControllerJs.includes("buildTranslate"),
+  "the AI administration controller must use safe DOM construction and must not own credentials, providers, prompts, network calls, or commands."
+);
+assertIncludes(
+  appJs,
+  "createAiAdministrationController",
+  "app.js must compose the checked AI administration controller with injected application actions."
+);
+assert(
+  !appJs.includes('els.saveAiSettingsBtn?.addEventListener("click"') &&
+    !appJs.includes('els.contextualAiTranslateBtn?.addEventListener("click"') &&
+    !appJs.includes('els.openAiSuggestionBtn.addEventListener("click"') &&
+    !appJs.includes('els.localAiPresetSelect?.addEventListener("change"') &&
+    !appJs.includes('els.localAiProviderSelect?.addEventListener("change"') &&
+    !appJs.includes('els.localAiPullModelBtn?.addEventListener("click"') &&
+    !appJs.includes('els.clearOpenAiKeyBtn.addEventListener("click"'),
+  "the migrated AI administration and command-centre surfaces must not retain superseded static listeners in app.js."
+);
+assert(
+  !functionBody(appJs, "function localAiSettingsFromForm", "function assertLocalAiEndpointAllowed").includes(
+    "els.localAi"
+  ) &&
+    !functionBody(appJs, "function renderLocalAiCommandCentre", "async function persistLocalAiSettings").includes(
+      "els.localAi"
+    ) &&
+    (appJs.match(/els\.localAiPromptOutput/g) || []).length === 1,
+  "AI provider form values, command-centre rendering, and output presentation must be owned by the checked controller."
+);
+assertIncludes(
+  aiAdministrationControllerUnitTests,
+  "owns provider and command action lifecycle without owning AI effects",
+  "focused tests must characterize AI administration event delegation and cleanup."
+);
+assertIncludes(
+  aiAdministrationControllerUnitTests,
+  "renders provider details with safe DOM construction",
+  "focused tests must characterize safe AI provider-summary rendering."
+);
+assertIncludes(
+  appJs,
+  "checked AI administration controller owns provider form values and safe summary rendering",
+  "the app workflow must characterize provider form ownership and safe rendering through the checked controller."
+);
+assertIncludes(
+  appJs,
+  "checked AI administration controller owns prompt preview events and output disclosure",
+  "the app workflow must characterize AI prompt events and output disclosure through the checked controller."
+);
+assertIncludes(
+  indexHtml,
+  'class="resource-tabs" role="tablist" aria-label="Resource type"',
+  "Resources must expose one semantic keyboard-operated tab list."
+);
+assertIncludes(
+  resourcesControllerJs,
+  'listen(viewButton, "click"',
+  "the checked Resources controller must own Resources navigation event lifecycle."
+);
+assertIncludes(
+  resourcesControllerJs,
+  'listen(tmDashboard, "click"',
+  "the checked Resources controller must delegate dynamic dashboard actions from one stable listener."
+);
+assertIncludes(
+  resourcesControllerJs,
+  'listen(tmDetail, "click"',
+  "the checked Resources controller must delegate dynamic row actions from one stable listener."
+);
+assertIncludes(
+  resourcesControllerJs,
+  'handleImport(tmImportInput, "TMX resource import"',
+  "the checked Resources controller must route empty-state and file-input TMX imports through the resource input."
+);
+assertIncludes(
+  appJs,
+  "createResourcesController",
+  "app.js must compose the checked Resources controller with injected domain actions."
+);
+assert(
+  !functionBody(appJs, "const state = {", "const els = {").includes('  resourceType: "tm",') &&
+    !functionBody(appJs, "const state = {", "const els = {").includes("  openResource: null,") &&
+    !functionBody(appJs, "const state = {", "const els = {").includes("  resourceTmEntries: [],") &&
+    !functionBody(appJs, "const state = {", "const els = {").includes("  resourceTerms: [],") &&
+    !appJs.includes('els.resourcesViewBtn.addEventListener("click"') &&
+    !appJs.includes('els.tmResourceTab.addEventListener("click"') &&
+    !appJs.includes('els.resourceTmxImportInput.addEventListener("change"'),
+  "the migrated Resources family must not retain view-local state or superseded static listeners in app.js."
+);
+assert(
+  !functionBody(appJs, "function renderResourceDashboard", "function canAddResourceToCurrentProject").includes(
+    "addEventListener"
+  ) &&
+    !functionBody(appJs, "function renderTmEntryRow", "function renderTermRow").includes("addEventListener") &&
+    !functionBody(appJs, "function renderTermRow", "async function confirmDeleteResource").includes("addEventListener"),
+  "Resources dashboards and rows must use controller-owned event delegation rather than per-render listeners."
+);
+assertIncludes(
+  resourcesControllerUnitTests,
+  "ResourcesController owns tab state, selection, rendering, and keyboard navigation",
+  "focused tests must characterize Resources view state and keyboard tab behavior."
+);
+assertIncludes(
+  resourcesControllerUnitTests,
+  "ResourcesController delegates imports, resource cards, rows, and cleanup without owning domain data",
+  "focused tests must characterize Resources event delegation and unmount cleanup."
+);
+assertIncludes(
+  appJs,
+  "checked Resources controller owns navigation, dashboard open intent, detail rendering, and initial focus",
+  "the app workflow must characterize the checked Resources controller in the real application."
+);
+assertIncludes(
+  appJs,
+  "Resources detail close restores focus to the originating resource card action",
+  "the app workflow must characterize visible focus return after closing resource detail."
+);
+assertIncludes(
+  qualityReviewControllerJs,
+  'listen(reviewForm, "submit"',
+  "the checked quality/review controller must own the review form event lifecycle."
+);
+assertIncludes(
+  qualityReviewControllerJs,
+  'listen(qualityForm, "submit"',
+  "the checked quality/review controller must own the quality-profile event lifecycle."
+);
+assertIncludes(
+  qualityReviewControllerJs,
+  'listen(qualityRiskList, "click"',
+  "the checked quality/review controller must delegate dynamic risk navigation from one stable listener."
+);
+assertIncludes(
+  qualityReviewControllerJs,
+  "restoreRiskFocus(activeRiskSegmentId)",
+  "the checked quality/review controller must restore risk-action focus across rendering."
+);
+assert(
+  !qualityReviewControllerJs.includes("innerHTML") && !qualityReviewControllerJs.includes("insertAdjacentHTML"),
+  "the extracted quality/review renderer must build user-visible evidence with safe DOM construction."
+);
+assertIncludes(
+  appJs,
+  "createQualityReviewController",
+  "app.js must compose the checked quality/review controller with injected domain actions."
+);
+assert(
+  !appJs.includes('els.reviewForm?.addEventListener("submit"') &&
+    !appJs.includes('els.qualityForm?.addEventListener("submit"') &&
+    !appJs.includes('els.qualityDecisionForm?.addEventListener("submit"') &&
+    !appJs.includes('els.refreshQualityRiskBtn?.addEventListener("click"') &&
+    !appJs.includes('els.nextQualityRiskBtn?.addEventListener("click"') &&
+    !appJs.includes('els.exportQualityPassportBtn?.addEventListener("click"'),
+  "the migrated quality/review family must not retain superseded static listeners in app.js."
+);
+assert(
+  !functionBody(appJs, "function renderReviewPanel", "function qualityLabel").includes("replaceSafeHtml") &&
+    !functionBody(appJs, "function renderQualityWorkbench", "async function saveQualityProfileFromForm").includes(
+      "createElement"
+    ),
+  "quality/review DOM construction must live in the checked controller rather than app.js."
+);
+assert(
+  !functionBody(appJs, "async function saveQualityProfileFromForm", "async function refreshQualityRiskQueue").includes(
+    ".value"
+  ) &&
+    !functionBody(appJs, "async function saveActiveReviewMetadata", "async function setActiveReviewState").includes(
+      ".value"
+    ),
+  "quality/review domain saves must consume controller values instead of reading form DOM directly."
+);
+assertIncludes(
+  qualityReviewControllerUnitTests,
+  "owns form and action events without owning domain mutations",
+  "focused tests must characterize quality/review event delegation and domain separation."
+);
+assertIncludes(
+  qualityReviewControllerUnitTests,
+  "preserves active form edits and restores risk focus across rendering",
+  "focused tests must characterize quality/review focus and in-progress form preservation."
+);
+assertIncludes(
+  appJs,
+  "checked quality/review controller owns review submit, persistence delegation, and form refresh",
+  "the app workflow must characterize the checked review form in the real application."
+);
+assertIncludes(
+  appJs,
+  "checked quality/review controller owns workbench rendering and redacted view state",
+  "the app workflow must characterize quality rendering through the checked controller."
+);
+assertIncludes(
+  recoveryWorkspaceControllerJs,
+  'listen(chooseWorkspaceButton, "click"',
+  "the checked recovery/workspace controller must own the primary workspace action lifecycle."
+);
+assertIncludes(
+  recoveryWorkspaceControllerJs,
+  'listen(saveRecoveryButton, "click"',
+  "the checked recovery/workspace controller must own recovery-save intent."
+);
+assertIncludes(
+  recoveryWorkspaceControllerJs,
+  "event.stopPropagation?.()",
+  "the recovery-folder action must not be cancelled by the application outside-click listener."
+);
+assertIncludes(
+  recoveryWorkspaceControllerJs,
+  "if (hadFocus) restoreMenuFocus()",
+  "the checked recovery/workspace controller must restore visible focus when recovery UI disappears."
+);
+assert(
+  !recoveryWorkspaceControllerJs.includes("innerHTML") && !recoveryWorkspaceControllerJs.includes("insertAdjacentHTML"),
+  "the extracted recovery/workspace renderer must build external folder and warning labels with safe DOM construction."
+);
+assert(
+  !recoveryWorkspaceControllerJs.includes("workspace-storage") &&
+    !recoveryWorkspaceControllerJs.includes("localStorage") &&
+    !recoveryWorkspaceControllerJs.includes("buildProjectPackage") &&
+    !recoveryWorkspaceControllerJs.includes("importProjectPackageData"),
+  "the recovery/workspace controller must not own directory handles, dirty-marker persistence, packages, or import policy."
+);
+assertIncludes(
+  appJs,
+  "createRecoveryWorkspaceController",
+  "app.js must compose the checked recovery/workspace controller with injected domain actions."
+);
+assert(
+  !appJs.includes('els.workspaceRecoverySaveBtn.addEventListener("click"') &&
+    !appJs.includes('els.workspaceRecoveryOpenBtn.addEventListener("click"') &&
+    !appJs.includes('els.workspaceRecoveryDismissBtn.addEventListener("click"') &&
+    !appJs.includes('els.chooseWorkspaceBtn.addEventListener("click"') &&
+    !appJs.includes('els.saveWorkspaceProjectBtn.addEventListener("click"') &&
+    !appJs.includes('els.syncWorkspaceBtn.addEventListener("click"') &&
+    !appJs.includes('els.workspaceBackupBtn.addEventListener("click"') &&
+    !appJs.includes('els.repairWorkspaceBtn.addEventListener("click"'),
+  "the migrated recovery/workspace family must not retain superseded static listeners in app.js."
+);
+assert(
+  !functionBody(appJs, "function renderWorkspaceStatus", "function workspaceRecoveryProjectIds").includes(
+    "replaceSafeHtml"
+  ) &&
+    !functionBody(appJs, "function renderWorkspaceRecoveryPanel", "function daysBetween").includes("replaceSafeHtml"),
+  "workspace health and recovery DOM construction must live in the checked controller rather than app.js."
+);
+assertIncludes(
+  recoveryWorkspaceControllerUnitTests,
+  "owns workspace actions without owning storage or recovery policy",
+  "focused tests must characterize recovery/workspace event delegation and domain separation."
+);
+assertIncludes(
+  recoveryWorkspaceControllerUnitTests,
+  "owns recovery dismissal and restores visible focus",
+  "focused tests must characterize recovery dismissal and focus restoration."
+);
+assertIncludes(
+  appJs,
+  "checked recovery/workspace controller renders startup recovery state without owning dirty markers",
+  "the app workflow must characterize startup recovery rendering through the checked controller."
+);
+assertIncludes(
+  appJs,
+  "checked recovery/workspace controller opens the workspace menu without document-click cancellation",
+  "the app workflow must characterize recovery folder access and focus in the real application."
+);
+assertIncludes(
+  importExportControllerJs,
+  'listen(projectFileImportInput, "change"',
+  "the checked import/export controller must own multi-file project import events."
+);
+assertIncludes(
+  importExportControllerJs,
+  'importSingle(projectPackageImportInput, "Project package import"',
+  "the checked import/export controller must own project-package import events."
+);
+assertIncludes(
+  importExportControllerJs,
+  'importSingle(backupImportInput, "Backup restore"',
+  "the checked import/export controller must own browser-backup restore events."
+);
+assertIncludes(
+  importExportControllerJs,
+  'listen(validationMeta, "click"',
+  "the checked import/export controller must own validation dismissal through one stable listener."
+);
+assertIncludes(
+  importExportControllerJs,
+  "restoreValidationFocus()",
+  "the checked import/export controller must restore visible focus after validation dismissal."
+);
+assert(
+  !importExportControllerJs.includes("innerHTML") &&
+    !importExportControllerJs.includes("insertAdjacentHTML") &&
+    !importExportControllerJs.includes("storage.js") &&
+    !importExportControllerJs.includes("workspace-storage") &&
+    !importExportControllerJs.includes("download(") &&
+    !importExportControllerJs.includes("parse"),
+  "the import/export controller must use safe DOM construction and must not own storage, parsing, or download policy."
+);
+assertIncludes(
+  appJs,
+  "createImportExportController",
+  "app.js must compose the checked import/export controller with injected domain actions."
+);
+assert(
+  !appJs.includes('els.projectFileImportBtn.addEventListener("click"') &&
+    !appJs.includes('els.projectsImportProjectBtn?.addEventListener("click"') &&
+    !appJs.includes('els.docxInput.addEventListener("change"') &&
+    !appJs.includes('els.localizationInput.addEventListener("change"') &&
+    !appJs.includes('els.projectFileImportInput.addEventListener("change"') &&
+    !appJs.includes('els.projectPackageImportInput.addEventListener("change"') &&
+    !appJs.includes('els.backupImportInput.addEventListener("change"') &&
+    !appJs.includes('els.tmxImportInput.addEventListener("change"') &&
+    !appJs.includes('els.tbxImportInput.addEventListener("change"') &&
+    !appJs.includes('els.termListImportInput.addEventListener("change"') &&
+    !appJs.includes('els.exportProjectReportBtn.addEventListener("click"') &&
+    !appJs.includes('els.backupExportBtn.addEventListener("click"'),
+  "the migrated import/export/report family must not retain superseded static listeners in app.js."
+);
+assert(
+  !functionBody(appJs, "function renderValidationReport", "async function renderProjectAnalysis").includes(
+    "replaceSafeHtml"
+  ),
+  "validation-report DOM construction must live in the checked controller rather than app.js."
+);
+assertIncludes(
+  importExportControllerUnitTests,
+  "owns project, package, backup, TM, termbase, and report actions",
+  "focused tests must characterize import/export/report event delegation and cleanup."
+);
+assertIncludes(
+  importExportControllerUnitTests,
+  "renders validation safely and restores focus on dismissal",
+  "focused tests must characterize safe validation rendering and focus restoration."
+);
+assertIncludes(
+  appJs,
+  "checked import/export controller owns shared busy state while an import task runs",
+  "the app workflow must characterize shared import busy state through the checked controller."
+);
+assertIncludes(
+  appJs,
+  "checked import/export controller delegates project report export",
+  "the app workflow must characterize report export through the checked controller."
+);
+assertIncludes(
+  appJs,
+  "checked import/export controller restores validation focus after dismissal",
+  "the app workflow must characterize validation dismissal and visible focus return."
 );
 assertIncludes(
   indexHtml,
@@ -1890,55 +2628,11 @@ assert(
 );
 assertIncludes(indexHtml, `object-src 'none'`, "Content Security Policy must disable plugin/object content.");
 const openAiHelperFunction = functionBody(aiJs, "async function openAiSuggestion(", "window.CatHan =");
-const geminiResponseParserFunction = functionBody(
-  aiJs,
-  "function extractGeminiResponseText",
-  "function geminiTokenCount"
-);
 const defaultLocalAiSettingsFunction = functionBody(
   aiJs,
   "function defaultLocalAiSettings",
   "function readLocalAiSettings"
 );
-const deepSeekProviderFunction = functionBody(aiJs, "const DeepSeekProvider = {", "function geminiProviderAuthError");
-const xAiProviderFunction = functionBody(aiJs, "const XAIProvider = {", "function geminiProviderAuthError");
-const perplexityProviderFunction = functionBody(
-  aiJs,
-  "const PerplexityProvider = {",
-  "function geminiProviderAuthError"
-);
-const groqProviderFunction = functionBody(aiJs, "const GroqProvider = {", "function geminiProviderAuthError");
-const togetherProviderFunction = functionBody(aiJs, "const TogetherProvider = {", "function geminiProviderAuthError");
-const openRouterProviderFunction = functionBody(
-  aiJs,
-  "const OpenRouterProvider = {",
-  "function geminiProviderAuthError"
-);
-const huggingFaceProviderFunction = functionBody(
-  aiJs,
-  "const HuggingFaceProvider = {",
-  "function deepInfraProviderAuthError"
-);
-const deepInfraProviderFunction = functionBody(aiJs, "const DeepInfraProvider = {", "function geminiProviderAuthError");
-const fireworksProviderFunction = functionBody(aiJs, "const FireworksProvider = {", "function geminiProviderAuthError");
-const geminiProviderFunction = functionBody(aiJs, "const GeminiProvider = {", "function openAiCompatibleStatusError");
-const anthropicProviderFunction = functionBody(
-  aiJs,
-  "const AnthropicProvider = {",
-  "function openAiCompatibleStatusError"
-);
-const cohereProviderFunction = functionBody(aiJs, "const CohereProvider = {", "function mistralProviderAuthError");
-const mistralProviderFunction = functionBody(
-  aiJs,
-  "const MistralProvider = {",
-  "function azureOpenAiProviderAuthError"
-);
-const azureOpenAiProviderFunction = functionBody(
-  aiJs,
-  "const AzureOpenAIProvider = {",
-  "function openAiCompatibleStatusError"
-);
-const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "const OpenAIProvider = {");
 assertIncludes(
   aiJs,
   `const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"`,
@@ -2029,70 +2723,321 @@ assertIncludes(
   `const OPUS_CAT_WEB_BRIDGE_BASE_URL = "http://127.0.0.1:8502"`,
   "ai.js must keep the OPUS-CAT browser bridge URL centralized."
 );
-assertIncludes(aiJs, "const GeminiProvider = {", "ai.js must implement the native Gemini provider.");
-assertIncludes(aiJs, "const DeepSeekProvider = {", "ai.js must implement the native DeepSeek provider.");
+for (const provider of [
+  ["deepseek", "DeepSeekProvider", "DeepSeek"],
+  ["mistral", "MistralProvider", "Mistral AI"]
+]) {
+  const [providerId, compatibilityExport, providerName] = provider;
+  assertIncludes(
+    nativeChatProviderAdaptersJs,
+    `id: "${providerId}"`,
+    `The checked native chat adapter family must implement ${providerName}.`
+  );
+  assertIncludes(
+    nativeChatProviderAdaptersJs,
+    `compatibilityExport: "${compatibilityExport}"`,
+    `The native chat adapter family must preserve the ${providerName} compatibility export.`
+  );
+  assertIncludes(
+    defaultLocalAiSettingsFunction,
+    `providerId === "${providerId}"`,
+    `ai.js must preserve ${providerName} default settings.`
+  );
+  assertIncludes(
+    aiJs,
+    `aiProviderRegistry.reserve("${providerId}")`,
+    `The provider registry must preserve ${providerName}'s original order before adapter installation.`
+  );
+}
+assert(
+  !["DeepSeekProvider", "MistralProvider"].some((providerName) => aiJs.includes(`const ${providerName} = {`)),
+  "ai.js must not retain extracted native chat-provider implementations."
+);
 assertIncludes(aiJs, "deepSeekApiUrl", "ai.js must normalize DeepSeek model-list and chat-completion endpoints.");
-assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "deepseek"',
-  "ai.js must default native DeepSeek settings to the DeepSeek base URL/model, not Ollama."
-);
-assertIncludes(
-  deepSeekProviderFunction,
-  "bearerAuthHeaders",
-  "ai.js DeepSeek requests must send API keys in authorization headers."
-);
-assertIncludes(
-  deepSeekProviderFunction,
-  "max_tokens: 1200",
-  "ai.js DeepSeek chat-completion requests must include bounded max_tokens."
-);
-assertIncludes(aiJs, "geminiAuthHeaders", "ai.js must send Gemini API keys in headers, not query strings.");
-assertIncludes(aiJs, "geminiApiUrl", "ai.js must normalize Gemini model-list and interaction endpoints.");
-assertIncludes(
-  geminiProviderFunction,
-  "store: false",
-  "ai.js Gemini Interactions requests must opt out of provider-side storage."
-);
-assertIncludes(
-  geminiResponseParserFunction,
-  "Array.isArray(step?.content)",
-  "ai.js Gemini response parser must read documented Interactions step content."
-);
-assertIncludes(aiJs, "const AnthropicProvider = {", "ai.js must implement the native Anthropic provider.");
-assertIncludes(aiJs, "anthropicAuthHeaders", "ai.js must send Anthropic API keys in headers, not query strings.");
-assertIncludes(aiJs, "anthropicApiUrl", "ai.js must normalize Anthropic model-list and message endpoints.");
-assertIncludes(
-  anthropicProviderFunction,
-  "max_tokens: 1200",
-  "ai.js Anthropic Messages requests must include bounded max_tokens."
-);
-assertIncludes(aiJs, "const CohereProvider = {", "ai.js must implement the native Cohere provider.");
-assertIncludes(aiJs, "cohereAuthHeaders", "ai.js must send Cohere API keys in headers, not query strings.");
-assertIncludes(aiJs, "cohereApiUrl", "ai.js must normalize Cohere model-list and chat endpoints.");
-assertIncludes(
-  cohereProviderFunction,
-  "max_tokens: 1200",
-  "ai.js Cohere Chat V2 requests must include bounded max_tokens."
-);
-assertIncludes(aiJs, "const MistralProvider = {", "ai.js must implement the native Mistral provider.");
 assertIncludes(aiJs, "mistralApiUrl", "ai.js must normalize Mistral model-list and chat-completion endpoints.");
 assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "mistral"',
-  "ai.js must default native Mistral settings to the Mistral base URL/model, not Ollama."
-);
-assertIncludes(
-  mistralProviderFunction,
+  hostedProviderAdapterCoreJs,
   "bearerAuthHeaders",
-  "ai.js Mistral requests must send API keys in authorization headers."
+  "Native chat adapters must send API keys in authorization headers."
 );
 assertIncludes(
-  mistralProviderFunction,
+  hostedProviderAdapterCoreJs,
   "max_tokens: 1200",
-  "ai.js Mistral chat-completion requests must include bounded max_tokens."
+  "Native chat adapters must keep chat-completion output bounded."
 );
-assertIncludes(aiJs, "const XAIProvider = {", "ai.js must implement the native xAI provider.");
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installNativeChatProviderAdapters",
+  "The extracted-provider installer must register the native chat provider family."
+);
+assertIncludes(
+  nativeChatProviderAdaptersUnitTests,
+  "preserve multipart parsing, payloads, aborts, provenance, and token metadata",
+  "Native chat adapters must retain focused parsing, request, abort, provenance, and token characterization."
+);
+assertIncludes(aiJs, '"x-goog-api-key"', "The Gemini runtime must send API keys in headers, not query strings.");
+assertIncludes(
+  geminiProviderAdapterJs,
+  "geminiAuthHeaders",
+  "The Gemini adapter must use the checked header-auth boundary."
+);
+assertIncludes(aiJs, "geminiApiUrl", "ai.js must normalize Gemini model-list and interaction endpoints.");
+assertIncludes(
+  defaultLocalAiSettingsFunction,
+  'providerId === "gemini"',
+  "ai.js must preserve Gemini's provider-specific default settings."
+);
+assertIncludes(
+  geminiProviderAdapterJs,
+  "store: false",
+  "The checked Gemini adapter must opt out of provider-side storage."
+);
+assertIncludes(
+  geminiProviderAdapterJs,
+  "Array.isArray(step?.content)",
+  "The checked Gemini response parser must read documented Interactions step content."
+);
+assertIncludes(
+  geminiProviderAdapterJs,
+  '"/interactions"',
+  "The checked Gemini adapter must use the native Interactions endpoint."
+);
+assertIncludes(
+  geminiProviderAdapterJs,
+  "async completePrompt",
+  "The checked Gemini adapter must route AI-native commands through Interactions."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installGeminiProviderAdapter",
+  "The extracted-provider installer must register the native Gemini provider."
+);
+assertIncludes(
+  aiJs,
+  'aiProviderRegistry.reserve("gemini")',
+  "The legacy registry must preserve Gemini's provider order while its adapter installs."
+);
+assertIncludes(
+  geminiProviderAdapterJs,
+  "ai.GeminiProvider = provider",
+  "The Gemini adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  geminiProviderAdapterUnitTests,
+  "preserves Interactions translation payload, abort, step parsing, provenance, and token metadata",
+  "The Gemini adapter must retain focused payload, abort, parsing, provenance, and token characterization."
+);
+assert(
+  !aiJs.includes("const GeminiProvider = {") && !aiJs.includes("function geminiProviderAuthError"),
+  "ai.js must not retain the extracted Gemini provider implementation."
+);
+assertIncludes(aiJs, '"x-api-key"', "The Anthropic runtime must send API keys in headers, not query strings.");
+assertIncludes(aiJs, '"anthropic-version"', "The Anthropic runtime must send the pinned API version header.");
+assertIncludes(
+  anthropicProviderAdapterJs,
+  "anthropicAuthHeaders",
+  "The Anthropic adapter must use the checked versioned header-auth boundary."
+);
+assertIncludes(aiJs, "anthropicApiUrl", "ai.js must normalize Anthropic model-list and message endpoints.");
+assertIncludes(
+  defaultLocalAiSettingsFunction,
+  'providerId === "anthropic"',
+  "ai.js must preserve Anthropic's provider-specific default settings."
+);
+assertIncludes(
+  anthropicProviderAdapterJs,
+  "max_tokens: 1200",
+  "The checked Anthropic adapter must keep Messages output bounded."
+);
+assertIncludes(
+  anthropicProviderAdapterJs,
+  '"/messages"',
+  "The checked Anthropic adapter must use the native Messages endpoint."
+);
+assertIncludes(
+  anthropicProviderAdapterJs,
+  "async completePrompt",
+  "The checked Anthropic adapter must route AI-native commands through Messages."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installAnthropicProviderAdapter",
+  "The extracted-provider installer must register the native Anthropic provider."
+);
+assertIncludes(
+  aiJs,
+  'aiProviderRegistry.reserve("anthropic")',
+  "The legacy registry must preserve Anthropic's provider order while its adapter installs."
+);
+assertIncludes(
+  anthropicProviderAdapterJs,
+  "ai.AnthropicProvider = provider",
+  "The Anthropic adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  anthropicProviderAdapterUnitTests,
+  "preserves Messages translation payload, abort, content parsing, provenance, and token metadata",
+  "The Anthropic adapter must retain focused payload, abort, parsing, provenance, and token characterization."
+);
+assert(
+  !aiJs.includes("const AnthropicProvider = {") && !aiJs.includes("function anthropicProviderAuthError"),
+  "ai.js must not retain the extracted Anthropic provider implementation."
+);
+assertIncludes(cohereProviderAdapterJs, 'id: "cohere"', "The checked Cohere adapter must implement Cohere Command.");
+assertIncludes(
+  cohereProviderAdapterJs,
+  "cohereAuthHeaders",
+  "The Cohere adapter must send API keys in headers, not query strings."
+);
+assertIncludes(
+  cohereProviderAdapterJs,
+  "cohereApiUrl",
+  "The Cohere adapter must normalize model-list and chat endpoints."
+);
+assertIncludes(
+  cohereProviderAdapterJs,
+  "max_tokens: 1200",
+  "The Cohere Chat V2 adapter must include bounded max_tokens."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installCohereProviderAdapter",
+  "The extracted-provider installer must register Cohere Command."
+);
+assertIncludes(
+  aiJs,
+  'aiProviderRegistry.reserve("cohere")',
+  "The legacy registry must preserve Cohere's provider order while its adapter installs."
+);
+assertIncludes(
+  cohereProviderAdapterJs,
+  "ai.CohereProvider = provider",
+  "The Cohere adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  cohereProviderAdapterUnitTests,
+  "preserves Chat V2 translation payload, abort, content parsing, provenance, and usage fallbacks",
+  "The Cohere adapter must retain focused payload, abort, parsing, provenance, and usage characterization."
+);
+assert(
+  !aiJs.includes("const CohereProvider = {") && !aiJs.includes("function cohereProviderAuthError"),
+  "ai.js must not retain the extracted Cohere provider implementation."
+);
+assertIncludes(ollamaProviderAdapterJs, 'id: "ollama"', "The checked Ollama adapter must implement Ollama.");
+assertIncludes(ollamaProviderAdapterJs, '"/version"', "The Ollama adapter must retain the local version health check.");
+assertIncludes(ollamaProviderAdapterJs, '"/tags"', "The Ollama adapter must retain local and hosted model discovery.");
+assertIncludes(ollamaProviderAdapterJs, '"/pull"', "The Ollama adapter must retain local model pull.");
+assertIncludes(ollamaProviderAdapterJs, '"/chat"', "The Ollama adapter must retain translation and command chat.");
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installOllamaProviderAdapter",
+  "The extracted-provider installer must register Ollama."
+);
+assertIncludes(
+  aiJs,
+  'aiProviderRegistry.reserve("ollama")',
+  "The legacy registry must preserve Ollama's provider order while its adapter installs."
+);
+assertIncludes(
+  ollamaProviderAdapterJs,
+  "ai.OllamaProvider = provider",
+  "The Ollama adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  ollamaProviderAdapterUnitTests,
+  "preserves translation and generic chat payloads, cancellation signal, provenance, and timing metadata",
+  "The Ollama adapter must retain focused chat, abort, provenance, and timing characterization."
+);
+assert(
+  !aiJs.includes("const OllamaProvider = {") &&
+    !aiJs.includes("function ollamaStatusError") &&
+    !aiJs.includes("async function ollamaJson"),
+  "ai.js must not retain the extracted Ollama provider implementation."
+);
+assertIncludes(
+  openAiCompatibleProviderAdapterJs,
+  'id: "openai-compatible"',
+  "The checked OpenAI-compatible adapter must implement the local/allowlisted provider."
+);
+assertIncludes(
+  openAiCompatibleProviderAdapterJs,
+  "assertOpenAiCompatibleHostedAllowed",
+  "The OpenAI-compatible adapter must enforce the explicit hosted endpoint allowlist before requests."
+);
+assertIncludes(
+  openAiCompatibleProviderAdapterJs,
+  '"/chat/completions"',
+  "The OpenAI-compatible adapter must retain chat-completions translation and commands."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installOpenAiCompatibleProviderAdapter",
+  "The extracted-provider installer must register the OpenAI-compatible adapter."
+);
+assertIncludes(
+  aiJs,
+  'aiProviderRegistry.reserve("openai-compatible")',
+  "The legacy registry must preserve the OpenAI-compatible provider order while its adapter installs."
+);
+assertIncludes(
+  openAiCompatibleProviderAdapterJs,
+  "ai.OpenAICompatibleProvider = provider",
+  "The OpenAI-compatible adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  openAiCompatibleProviderAdapterUnitTests,
+  "blocks unapproved hosts before fetch and requires hosted credentials",
+  "The OpenAI-compatible adapter must retain focused allowlist and hosted-auth characterization."
+);
+assert(
+  !aiJs.includes("const OpenAICompatibleProvider = {") &&
+    !aiJs.includes("function openAiCompatibleStatusError") &&
+    !aiJs.includes("async function openAiCompatibleJson"),
+  "ai.js must not retain the extracted OpenAI-compatible provider implementation."
+);
+for (const provider of [
+  ["openai", "OpenAIProvider", "OpenAI"],
+  ["xai", "XAIProvider", "xAI Grok"],
+  ["azure-openai", "AzureOpenAIProvider", "Azure OpenAI"]
+]) {
+  const [providerId, compatibilityExport, providerName] = provider;
+  assertIncludes(
+    nativeOpenAiProviderAdaptersJs,
+    `id: "${providerId}"`,
+    `The checked native OpenAI adapter family must implement ${providerName}.`
+  );
+  assertIncludes(
+    nativeOpenAiProviderAdaptersJs,
+    `compatibilityExport: "${compatibilityExport}"`,
+    `The native OpenAI adapter family must preserve the ${providerName} compatibility export.`
+  );
+  assertIncludes(
+    defaultLocalAiSettingsFunction,
+    `providerId === "${providerId}"`,
+    `ai.js must preserve ${providerName} default settings.`
+  );
+  assertIncludes(
+    aiJs,
+    `aiProviderRegistry.reserve("${providerId}")`,
+    `The provider registry must preserve ${providerName}'s original order before adapter installation.`
+  );
+}
+assert(
+  !["OpenAIProvider", "XAIProvider", "AzureOpenAIProvider"].some((providerName) =>
+    aiJs.includes(`const ${providerName} = {`)
+  ),
+  "ai.js must not retain extracted native OpenAI-family provider implementations."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installNativeOpenAiProviderAdapters",
+  "The extracted-provider installer must register the native OpenAI provider family."
+);
+assertIncludes(
+  nativeOpenAiProviderAdaptersUnitTests,
+  "preserve Responses payloads, aborts, output parsing, provenance, and token metadata",
+  "Native OpenAI adapters must retain focused request, abort, parsing, provenance, and token characterization."
+);
 assertIncludes(aiJs, "xAiApiUrl", "ai.js must normalize xAI model-list and Responses endpoints.");
 assertIncludes(
   defaultLocalAiSettingsFunction,
@@ -2100,16 +3045,15 @@ assertIncludes(
   "ai.js must default native xAI settings to the xAI base URL/model, not Ollama."
 );
 assertIncludes(
-  xAiProviderFunction,
+  openAiResponsesProviderAdapterJs,
   "store: false",
-  "ai.js xAI Responses requests must opt out of provider-side storage."
+  "Native OpenAI-family Responses requests must opt out of provider-side storage."
 );
 assertIncludes(
-  xAiProviderFunction,
+  openAiResponsesProviderAdapterJs,
   "max_output_tokens: 1200",
-  "ai.js xAI Responses requests must include bounded max_output_tokens."
+  "Native OpenAI-family Responses requests must include bounded max_output_tokens."
 );
-assertIncludes(aiJs, "const PerplexityProvider = {", "ai.js must implement the native Perplexity Sonar provider.");
 assertIncludes(aiJs, "perplexityApiUrl", "ai.js must normalize Perplexity Sonar model-list and Sonar endpoints.");
 assertIncludes(
   defaultLocalAiSettingsFunction,
@@ -2117,16 +3061,38 @@ assertIncludes(
   "ai.js must default native Perplexity settings to the Perplexity base URL/model, not Ollama."
 );
 assertIncludes(
-  perplexityProviderFunction,
+  perplexityProviderAdapterJs,
   "disable_search: true",
-  "ai.js Perplexity Sonar requests must disable web search for CAT-tool translation commands."
+  "The checked Perplexity adapter must disable web search for CAT-tool translation commands."
 );
 assertIncludes(
-  perplexityProviderFunction,
+  hostedProviderAdapterCoreJs,
   "max_tokens: 1200",
-  "ai.js Perplexity Sonar requests must include bounded max_tokens."
+  "The shared native chat transport must keep Perplexity Sonar output bounded."
 );
-assertIncludes(aiJs, "const GroqProvider = {", "ai.js must implement the native Groq provider.");
+assertIncludes(
+  perplexityProviderAdapterJs,
+  'chatEndpoint: "/sonar"',
+  "The checked Perplexity adapter must use the native Sonar endpoint."
+);
+assertIncludes(
+  perplexityProviderAdapterJs,
+  "citationCount",
+  "The checked Perplexity adapter must preserve citation metadata."
+);
+assert(
+  !aiJs.includes("const PerplexityProvider = {") && !aiJs.includes("function perplexityProviderAuthError"),
+  "ai.js must not retain the extracted Perplexity provider implementation."
+);
+assertIncludes(
+  groqProviderAdapterJs,
+  "export function createGroqProviderAdapter",
+  "The checked Groq adapter module must implement the native Groq provider."
+);
+assert(
+  !aiJs.includes("const GroqProvider = {") && !aiJs.includes("function groqProviderAuthError"),
+  "ai.js must not retain the extracted Groq provider implementation."
+);
 assertIncludes(aiJs, "groqApiUrl", "ai.js must normalize Groq model-list and chat-completion endpoints.");
 assertIncludes(
   defaultLocalAiSettingsFunction,
@@ -2134,122 +3100,78 @@ assertIncludes(
   "ai.js must default native Groq settings to the Groq base URL/model, not Ollama."
 );
 assertIncludes(
-  groqProviderFunction,
+  hostedProviderAdapterCoreJs,
   "bearerAuthHeaders",
-  "ai.js Groq requests must send API keys in authorization headers."
+  "The Groq adapter must send API keys in authorization headers."
 );
 assertIncludes(
-  groqProviderFunction,
+  hostedProviderAdapterCoreJs,
   "max_tokens: 1200",
-  "ai.js Groq chat-completion requests must include bounded max_tokens."
+  "The Groq adapter chat-completion requests must include bounded max_tokens."
 );
-assertIncludes(aiJs, "const TogetherProvider = {", "ai.js must implement the native Together AI provider.");
-assertIncludes(aiJs, "togetherApiUrl", "ai.js must normalize Together AI model-list and chat-completion endpoints.");
-assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "together"',
-  "ai.js must default native Together AI settings to the Together base URL/model, not Ollama."
+for (const provider of [
+  ["together", "TogetherProvider", "Together AI"],
+  ["openrouter", "OpenRouterProvider", "OpenRouter"],
+  ["huggingface", "HuggingFaceProvider", "Hugging Face Inference Providers"],
+  ["deepinfra", "DeepInfraProvider", "DeepInfra"],
+  ["fireworks", "FireworksProvider", "Fireworks AI"]
+]) {
+  const [providerId, compatibilityExport, providerName] = provider;
+  assertIncludes(
+    hostedProviderAdaptersJs,
+    `id: "${providerId}"`,
+    `The checked hosted adapter family must implement ${providerName}.`
+  );
+  assertIncludes(
+    hostedProviderAdaptersJs,
+    `compatibilityExport: "${compatibilityExport}"`,
+    `The hosted adapter family must preserve the ${providerName} compatibility export.`
+  );
+  assertIncludes(
+    defaultLocalAiSettingsFunction,
+    `providerId === "${providerId}"`,
+    `ai.js must preserve ${providerName} default settings.`
+  );
+  assertIncludes(
+    aiJs,
+    `aiProviderRegistry.reserve("${providerId}")`,
+    `The provider registry must preserve ${providerName}'s original order before adapter installation.`
+  );
+}
+assert(
+  !["TogetherProvider", "OpenRouterProvider", "HuggingFaceProvider", "DeepInfraProvider", "FireworksProvider"].some(
+    (providerName) => aiJs.includes(`const ${providerName} = {`)
+  ),
+  "ai.js must not retain extracted hosted-provider implementations."
 );
 assertIncludes(
-  togetherProviderFunction,
+  hostedProviderAdapterCoreJs,
   "bearerAuthHeaders",
-  "ai.js Together AI requests must send API keys in authorization headers."
+  "Hosted provider adapters must send credentials through authorization headers."
 );
 assertIncludes(
-  togetherProviderFunction,
+  hostedProviderAdapterCoreJs,
   "max_tokens: 1200",
-  "ai.js Together AI chat-completion requests must include bounded max_tokens."
+  "Hosted provider adapters must keep chat-completion output bounded."
 );
-assertIncludes(aiJs, "const OpenRouterProvider = {", "ai.js must implement the native OpenRouter provider.");
-assertIncludes(aiJs, "openRouterApiUrl", "ai.js must normalize OpenRouter model-list and chat-completion endpoints.");
-assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "openrouter"',
-  "ai.js must default native OpenRouter settings to the OpenRouter base URL/model, not Ollama."
-);
-assertIncludes(
-  openRouterProviderFunction,
-  "bearerAuthHeaders",
-  "ai.js OpenRouter requests must send API keys in authorization headers."
-);
-assertIncludes(
-  openRouterProviderFunction,
-  "max_tokens: 1200",
-  "ai.js OpenRouter chat-completion requests must include bounded max_tokens."
-);
-assertIncludes(
-  aiJs,
-  "const HuggingFaceProvider = {",
-  "ai.js must implement the native Hugging Face Inference Providers provider."
-);
-assertIncludes(
-  aiJs,
-  "huggingFaceApiUrl",
-  "ai.js must normalize Hugging Face model-list and chat-completion endpoints."
-);
-assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "huggingface"',
-  "ai.js must default native Hugging Face settings to the Hugging Face base URL/model, not Ollama."
-);
-assertIncludes(
-  huggingFaceProviderFunction,
-  "bearerAuthHeaders",
-  "ai.js Hugging Face requests must send tokens in authorization headers."
-);
-assertIncludes(
-  huggingFaceProviderFunction,
-  "max_tokens: 1200",
-  "ai.js Hugging Face chat-completion requests must include bounded max_tokens."
-);
-assertIncludes(aiJs, "const DeepInfraProvider = {", "ai.js must implement the native DeepInfra provider.");
-assertIncludes(aiJs, "deepInfraApiUrl", "ai.js must normalize DeepInfra model-list and chat-completion endpoints.");
-assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "deepinfra"',
-  "ai.js must default native DeepInfra settings to the DeepInfra base URL/model, not Ollama."
-);
-assertIncludes(
-  deepInfraProviderFunction,
-  "bearerAuthHeaders",
-  "ai.js DeepInfra requests must send API keys in authorization headers."
-);
-assertIncludes(
-  deepInfraProviderFunction,
-  "max_tokens: 1200",
-  "ai.js DeepInfra chat-completion requests must include bounded max_tokens."
-);
-assertIncludes(aiJs, "const FireworksProvider = {", "ai.js must implement the native Fireworks AI provider.");
-assertIncludes(aiJs, "fireworksApiUrl", "ai.js must normalize Fireworks AI model-list and chat-completion endpoints.");
-assertIncludes(
-  defaultLocalAiSettingsFunction,
-  'providerId === "fireworks"',
-  "ai.js must default native Fireworks AI settings to the Fireworks base URL/model, not Ollama."
-);
-assertIncludes(
-  fireworksProviderFunction,
-  "bearerAuthHeaders",
-  "ai.js Fireworks AI requests must send API keys in authorization headers."
-);
-assertIncludes(
-  fireworksProviderFunction,
-  "max_tokens: 1200",
-  "ai.js Fireworks AI chat-completion requests must include bounded max_tokens."
-);
-assertIncludes(aiJs, "const AzureOpenAIProvider = {", "ai.js must implement the native Azure OpenAI provider.");
+assertIncludes(aiJs, "togetherApiUrl", "ai.js must preserve Together AI endpoint normalization policy.");
+assertIncludes(aiJs, "openRouterApiUrl", "ai.js must preserve OpenRouter endpoint normalization policy.");
+assertIncludes(aiJs, "huggingFaceApiUrl", "ai.js must preserve Hugging Face endpoint normalization policy.");
+assertIncludes(aiJs, "deepInfraApiUrl", "ai.js must preserve DeepInfra endpoint normalization policy.");
+assertIncludes(aiJs, "fireworksApiUrl", "ai.js must preserve Fireworks AI endpoint normalization policy.");
 assertIncludes(aiJs, "azureOpenAiAuthHeaders", "ai.js must send Azure OpenAI API keys in headers, not query strings.");
 assertIncludes(aiJs, "azureOpenAiApiUrl", "ai.js must normalize Azure OpenAI v1 endpoints.");
 assertIncludes(
-  azureOpenAiProviderFunction,
-  "store: false",
-  "ai.js Azure OpenAI Responses requests must opt out of provider-side storage."
+  nativeOpenAiProviderAdaptersJs,
+  'authHeadersKey: "azureOpenAiAuthHeaders"',
+  "The checked Azure OpenAI adapter must preserve api-key authentication."
 );
 assertIncludes(
-  azureOpenAiProviderFunction,
-  "max_output_tokens: 1200",
-  "ai.js Azure OpenAI Responses requests must include bounded max_output_tokens."
+  nativeOpenAiProviderAdaptersJs,
+  "Azure OpenAI deployment ${model} was not found.",
+  "The checked Azure OpenAI adapter must preserve deployment-specific failures."
 );
-assertIncludes(aiJs, "const OpusCatProvider = {", "ai.js must implement the OPUS-CAT MT Engine provider.");
+assertIncludes(opusCatProviderAdapterJs, 'id: "opus-cat"', "The checked adapter must implement OPUS-CAT MT Engine.");
 assertIncludes(aiJs, "opusCatApiUrl", "ai.js must normalize OPUS-CAT MTRestService endpoints.");
 assertIncludes(
   aiJs,
@@ -2257,14 +3179,14 @@ assertIncludes(
   "ai.js must discover standard direct and bridged OPUS-CAT endpoints."
 );
 assertIncludes(
-  aiJs,
+  opusCatProviderAdapterJs,
   "OPUS-CAT connection failed. Open Connection help for setup steps.",
-  "ai.js must keep OPUS-CAT inline failure status concise and actionable."
+  "The OPUS-CAT adapter must keep inline failure status concise and actionable."
 );
 assertIncludes(
-  opusCatProviderFunction,
-  "connectionMode: opusCatConnectionMode(baseUrl)",
-  "ai.js OPUS-CAT connection tests must report the discovered connection route."
+  opusCatProviderAdapterJs,
+  "connectionMode: runtime.opusCatConnectionMode(baseUrl)",
+  "The OPUS-CAT connection test must report the discovered connection route."
 );
 assertIncludes(
   defaultLocalAiSettingsFunction,
@@ -2272,21 +3194,54 @@ assertIncludes(
   "ai.js must default OPUS-CAT settings to the OPUS-CAT base URL/model, not Ollama."
 );
 assertIncludes(
-  opusCatProviderFunction,
+  opusCatProviderAdapterJs,
   "ListSupportedLanguagePairs",
-  "ai.js OPUS-CAT provider must test and list installed language pairs."
+  "The OPUS-CAT adapter must test and list installed language pairs."
 );
 assertIncludes(
-  opusCatProviderFunction,
+  opusCatProviderAdapterJs,
   "GetLanguagePairModelTags",
-  "ai.js OPUS-CAT provider must list language-pair model tags."
+  "The OPUS-CAT adapter must list language-pair model tags."
 );
 assertIncludes(
-  opusCatProviderFunction,
+  opusCatProviderAdapterJs,
   "TranslateJson",
-  "ai.js OPUS-CAT provider must pretranslate through the OPUS-CAT TranslateJson endpoint."
+  "The OPUS-CAT adapter must pretranslate through the OPUS-CAT TranslateJson endpoint."
 );
-assertIncludes(aiJs, "aiProviderRegistry.register(OpusCatProvider)", "ai.js must register the OPUS-CAT provider.");
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installOpusCatProviderAdapter",
+  "The extracted-provider installer must register OPUS-CAT."
+);
+assertIncludes(
+  aiJs,
+  'aiProviderRegistry.reserve("opus-cat")',
+  "The legacy registry must preserve OPUS-CAT's provider order while its adapter installs."
+);
+assertIncludes(
+  opusCatProviderAdapterJs,
+  "ai.OpusCatProvider = provider",
+  "The OPUS-CAT adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  opusCatProviderAdapterUnitTests,
+  "preserves TranslateJson query encoding, default/custom model tags, abort, provenance, and segmented metadata",
+  "The OPUS-CAT adapter must retain focused query, model-tag, abort, provenance, and metadata characterization."
+);
+assert(
+  !aiJs.includes("const OpusCatProvider = {") &&
+    !aiJs.includes("async function opusCatJson") &&
+    !aiJs.includes("function opusCatStatusError"),
+  "ai.js must not retain the extracted OPUS-CAT provider implementation."
+);
+assert(
+  !/\bconst\s+[A-Za-z0-9_$]+Provider\s*=/.test(aiJs),
+  "ai.js must remain free of provider object implementations after provider extraction."
+);
+assert(
+  !aiJs.includes("aiProviderRegistry.register("),
+  "ai.js must reserve provider positions but leave provider registration to checked adapters."
+);
 assertIncludes(
   aiJs,
   'if (providerId === "opus-cat") return false;',
@@ -2383,102 +3338,150 @@ assertIncludes(
   "aiCommandService must support AI project brief generation."
 );
 assertIncludes(
-  aiJs,
-  ".completePrompt = async function completePrompt",
-  "AI providers must expose a generic prompt-completion method for non-translation commands."
+  openAiCompatibleProviderAdapterJs,
+  "async completePrompt",
+  "The checked OpenAI-compatible provider must expose generic prompt completion for non-translation commands."
 );
 assertIncludes(aiJs, "const LOCAL_AI_PROVIDER_PRESETS = [", "ai.js must centralize Local AI provider presets.");
 assertIncludes(
-  aiJs,
-  "DeepSeekProvider.completePrompt = async function completePrompt",
-  "ai.js must route DeepSeek AI-native commands through the native provider."
+  hostedProviderAdapterCoreJs,
+  "async completePrompt",
+  "The native chat adapter family must route AI-native commands through chat completions."
+);
+assertIncludes(
+  openAiResponsesProviderAdapterJs,
+  "async completePrompt",
+  "The native OpenAI adapter family must route AI-native commands through Responses."
+);
+assertIncludes(
+  perplexityProviderAdapterJs,
+  "createOpenAiCompatibleHostedProviderAdapter",
+  "The Perplexity adapter must route translations and AI-native commands through the checked provider core."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installPerplexityProviderAdapter",
+  "The extracted-provider installer must register the Perplexity provider."
 );
 assertIncludes(
   aiJs,
-  "aiProviderRegistry.register(DeepSeekProvider)",
-  "ai.js must register the native DeepSeek provider."
+  'aiProviderRegistry.reserve("perplexity")',
+  "The legacy registry must preserve Perplexity's provider order while its adapter installs."
+);
+assertIncludes(
+  perplexityProviderAdapterJs,
+  "ai.PerplexityProvider = provider",
+  "The Perplexity adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  perplexityProviderAdapterUnitTests,
+  "preserves Sonar no-search translation payload, abort, parsing, provenance, and citations",
+  "The Perplexity adapter must retain focused payload, abort, parsing, provenance, and citation characterization."
+);
+assertIncludes(
+  hostedProviderAdapterCoreJs,
+  "async completePrompt",
+  "The Groq adapter must route AI-native commands through the native provider."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installGroqProviderAdapter",
+  "The extracted-provider installer must register the native Groq provider."
 );
 assertIncludes(
   aiJs,
-  "MistralProvider.completePrompt = async function completePrompt",
-  "ai.js must route Mistral AI-native commands through the native provider."
+  'aiProviderRegistry.reserve("groq")',
+  "The legacy registry must preserve Groq's provider order while its adapter installs."
 );
 assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(MistralProvider)",
-  "ai.js must register the native Mistral provider."
+  productionEntryJs,
+  'import "../ai/providers/install-extracted-providers.js"',
+  "The production renderer must install extracted providers before app bootstrap."
+);
+assert(
+  productionEntryJs.indexOf('import "../../ai.js"') <
+    productionEntryJs.indexOf('import "../ai/providers/install-extracted-providers.js"'),
+  "The production renderer must load the AI façade before installing extracted providers."
 );
 assertIncludes(
-  aiJs,
-  "XAIProvider.completePrompt = async function completePrompt",
-  "ai.js must route xAI AI-native commands through the native provider."
-);
-assertIncludes(aiJs, "aiProviderRegistry.register(XAIProvider)", "ai.js must register the native xAI provider.");
-assertIncludes(
-  aiJs,
-  "PerplexityProvider.completePrompt = async function completePrompt",
-  "ai.js must route Perplexity AI-native commands through the native provider."
+  regressionHtml,
+  'import "./src/ai/providers/install-extracted-providers.js"',
+  "The standalone regression harness must install extracted providers through the production adapter boundary."
 );
 assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(PerplexityProvider)",
-  "ai.js must register the native Perplexity provider."
+  regressionHtml,
+  'providerIds.indexOf("openai") === providerIds.indexOf("ollama") + 1',
+  "The regression harness must preserve OpenAI's original provider order."
 );
 assertIncludes(
-  aiJs,
-  "GroqProvider.completePrompt = async function completePrompt",
-  "ai.js must route Groq AI-native commands through the native provider."
-);
-assertIncludes(aiJs, "aiProviderRegistry.register(GroqProvider)", "ai.js must register the native Groq provider.");
-assertIncludes(
-  aiJs,
-  "TogetherProvider.completePrompt = async function completePrompt",
-  "ai.js must route Together AI-native commands through the native provider."
+  regressionHtml,
+  'providerIds.indexOf("xai") === providerIds.indexOf("deepseek") + 1',
+  "The regression harness must preserve xAI's original provider order."
 );
 assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(TogetherProvider)",
-  "ai.js must register the native Together AI provider."
+  regressionHtml,
+  'providerIds.indexOf("together") === providerIds.indexOf("groq") + 1',
+  "The regression harness must characterize provider ordering across extracted adapters."
 );
 assertIncludes(
-  aiJs,
-  "OpenRouterProvider.completePrompt = async function completePrompt",
-  "ai.js must route OpenRouter AI-native commands through the native provider."
+  regressionHtml,
+  'providerIds.indexOf("fireworks") === providerIds.indexOf("deepinfra") + 1',
+  "The regression harness must preserve the complete hosted-provider family order."
 );
 assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(OpenRouterProvider)",
-  "ai.js must register the native OpenRouter provider."
+  regressionHtml,
+  'providerIds.indexOf("gemini") === providerIds.indexOf("fireworks") + 1',
+  "The regression harness must preserve Gemini's original provider order."
 );
 assertIncludes(
-  aiJs,
-  "HuggingFaceProvider.completePrompt = async function completePrompt",
-  "ai.js must route Hugging Face AI-native commands through the native provider."
+  regressionHtml,
+  'providerIds.indexOf("anthropic") === providerIds.indexOf("gemini") + 1',
+  "The regression harness must preserve Anthropic's original provider order."
 );
 assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(HuggingFaceProvider)",
-  "ai.js must register the native Hugging Face provider."
+  regressionHtml,
+  'providerIds.indexOf("cohere") === providerIds.indexOf("anthropic") + 1',
+  "The regression harness must preserve Cohere's original provider order."
 );
 assertIncludes(
-  aiJs,
-  "DeepInfraProvider.completePrompt = async function completePrompt",
-  "ai.js must route DeepInfra AI-native commands through the native provider."
+  regressionHtml,
+  'providerIds.indexOf("opus-cat") === providerIds.indexOf("openai-compatible") + 1',
+  "The regression harness must preserve the final OpenAI-compatible and OPUS-CAT provider positions."
 );
 assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(DeepInfraProvider)",
-  "ai.js must register the native DeepInfra provider."
+  regressionHtml,
+  'providerIds.indexOf("azure-openai") === providerIds.indexOf("mistral") + 1',
+  "The regression harness must preserve Azure OpenAI's original provider order."
 );
 assertIncludes(
-  aiJs,
-  "FireworksProvider.completePrompt = async function completePrompt",
-  "ai.js must route Fireworks AI-native commands through the native provider."
+  groqProviderAdapterJs,
+  "ai.GroqProvider = provider",
+  "The Groq adapter must retain the temporary compatibility export."
 );
 assertIncludes(
-  aiJs,
-  "aiProviderRegistry.register(FireworksProvider)",
-  "ai.js must register the native Fireworks AI provider."
+  groqProviderAdapterUnitTests,
+  "preserves translation payload, cancellation signal, response normalization, and provenance",
+  "The Groq adapter must retain focused request, abort, normalization, and provenance characterization."
+);
+assertIncludes(
+  hostedProviderAdapterCoreJs,
+  "async completePrompt",
+  "The hosted adapter core must route AI-native commands through each named provider."
+);
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installHostedProviderAdapters",
+  "The extracted-provider installer must register the remaining hosted provider family."
+);
+assertIncludes(
+  hostedProviderAdaptersUnitTests,
+  "preserve translation and generic-command payloads, aborts, normalization, and provenance",
+  "Hosted adapters must retain focused request, abort, normalization, and provenance characterization."
+);
+assertIncludes(
+  hostedProviderAdaptersUnitTests,
+  "preserve special, redacted, cancellation, and reachability failures",
+  "Hosted adapters must retain focused special-status, redaction, cancellation, and network-failure characterization."
 );
 assertIncludes(
   aiJs,
@@ -2627,7 +3630,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "function renderLocalAiProviderSummary",
+  "function localAiProviderSummaryView",
   "app.js must render AI provider locality, key, and endpoint details."
 );
 assertIncludes(
@@ -2641,9 +3644,9 @@ assertIncludes(
   "ai.js must derive provider guidance from the active provider locality."
 );
 assertIncludes(
-  appJs,
+  aiAdministrationControllerJs,
   "local-ai-provider-guidance",
-  "app.js must render provider best-fit guidance in the AI Command Centre summary."
+  "the checked AI administration controller must render provider best-fit guidance in the AI Command Centre summary."
 );
 assertIncludes(
   appJs,
@@ -2667,7 +3670,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "AI Command Centre prompt test previews and sends selected AI-native command prompts",
+  "checked AI administration controller owns prompt preview events and output disclosure",
   "app workflow test must verify mode-aware Prompt Test previews and sends non-translation prompts."
 );
 assertIncludes(
@@ -2756,20 +3759,20 @@ assertIncludes(
   "app.js must scope Local AI API-key storage by active provider settings."
 );
 assertIncludes(
-  appJs,
-  'localAiHostedKeyControls?.classList.toggle("hidden", !needsKey)',
-  "app.js must hide hosted Local AI key controls when the active provider does not need a key."
+  aiAdministrationControllerJs,
+  'hostedKeyControls?.classList.toggle("hidden", !view.needsKey)',
+  "the checked AI administration controller must hide hosted Local AI key controls when the active provider does not need a key."
 );
 assertIncludes(
-  appJs,
-  'localAiPullModelWrap?.classList.toggle("hidden", !canPull)',
-  "app.js must hide local model-pull controls when the active provider cannot pull models."
+  aiAdministrationControllerJs,
+  'pullModelWrap?.classList.toggle("hidden", !view.canPull)',
+  "the checked AI administration controller must hide local model-pull controls when the active provider cannot pull models."
 );
 assertIncludes(appJs, "window.LoopCATDesktop", "app.js must detect the optional LoopCAT desktop bridge.");
 assertIncludes(
-  appJs,
-  'localAiStartLmStudioBtn.classList.toggle("hidden", !canStartServer)',
-  "app.js must hide the LM Studio start button when the desktop helper is unavailable."
+  aiAdministrationControllerJs,
+  'startLmStudioButton.classList.toggle("hidden", !view.canStartServer)',
+  "the checked AI administration controller must hide the LM Studio start button when the desktop helper is unavailable."
 );
 assertIncludes(
   appJs,
@@ -3746,7 +4749,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "for (const segment of state.segments)",
+  "for (const segment of currentSegments())",
   "app.js must render project progress with one segment pass."
 );
 assertIncludes(
@@ -3872,8 +4875,8 @@ assertIncludes(
 assertIncludes(appJs, "projectAnalysisRun", "app.js must guard async project analysis renders against stale updates.");
 assertIncludes(
   appJs,
-  'state.view !== "project"',
-  "app.js must skip project analysis work when the project home panel is not visible."
+  'currentApplicationView() !== "project"',
+  "app.js must skip project analysis work when AppStore reports that the project home panel is not visible."
 );
 assertIncludes(
   appJs,
@@ -4334,12 +5337,12 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "TM whole resource delete failure reports visible status without partial deletion",
+  "TM whole resource delete failure preserves every live entry and creates no Trash item",
   "app workflow test must verify failed whole-TM deletes report visibly and do not partially delete entries."
 );
 assertIncludes(
   appJs,
-  "termbase whole resource delete failure reports visible status without partial deletion",
+  "termbase whole resource delete failure preserves every live term and creates no Trash item",
   "app workflow test must verify failed whole-termbase deletes report visibly and do not partially delete terms."
 );
 assertIncludes(
@@ -4399,8 +5402,8 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "async function importDocx(file)", "async function importLocalization(file)"),
-  "state.documentFilter = documentId",
-  "app.js DOCX import must select the newly imported document like other file imports."
+  "selectApplicationDocument(documentId",
+  "app.js DOCX import must select the newly imported document through AppStore like other file imports."
 );
 assertIncludes(
   functionBody(appJs, "async function importLocalization(file)", "async function importXliff(file)"),
@@ -4424,14 +5427,14 @@ assertIncludes(
 );
 assertIncludes(appJs, "function renderImportBusyState", "app.js must keep a visible import busy-state guard.");
 assertIncludes(
-  functionBody(appJs, "els.backupImportInput.addEventListener", "els.projectPackageImportInput.addEventListener"),
-  'runFileImportTask("Backup restore"',
-  "app.js must run browser backup restore through the import busy-state guard."
+  functionBody(appJs, "const importExportController", "const projectDialogController"),
+  "runImportTask: runFileImportTask",
+  "app.js must inject the shared import busy-state guard into the checked import/export controller."
 );
 assertIncludes(
-  functionBody(appJs, "els.projectPackageImportInput.addEventListener", 'window.addEventListener("beforeunload"'),
-  'runFileImportTask("Project package import"',
-  "app.js must run project package import through the import busy-state guard."
+  functionBody(appJs, "const importExportController", "const projectDialogController"),
+  "await flushPendingSegmentSaves();",
+  "app.js must flush pending edits before checked package-import and backup-restore boundaries."
 );
 assertIncludes(
   functionBody(appJs, "function shouldWarnBeforeUnload()", "function handleBeforeUnload"),
@@ -4450,13 +5453,18 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "function renderImportBusyState()", "function stableLower"),
-  "els.syncWorkspaceBtn",
-  "app.js must disable workspace sync while import or restore tasks are active."
+  "importExportController?.renderBusy",
+  "app.js must delegate shared import-control busy state to the checked import/export controller."
 );
 assertIncludes(
-  functionBody(appJs, "els.syncWorkspaceBtn.addEventListener", "els.workspaceBackupBtn.addEventListener"),
+  functionBody(appJs, "function renderImportBusyState()", "function stableLower"),
+  "recoveryWorkspaceController?.renderBusy",
+  "app.js must delegate workspace-sync busy state while import or restore tasks are active."
+);
+assertIncludes(
+  functionBody(appJs, "const recoveryWorkspaceController", "const projectDialogController"),
   'runFileImportTask("Workspace sync"',
-  "app.js must run workspace sync through the import busy-state guard."
+  "the checked recovery/workspace controller must receive workspace sync through the import busy-state guard."
 );
 assertIncludes(
   appJs,
@@ -4567,7 +5575,7 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "function projectDocuments()", "function projectDocumentType"),
-  "projectDocumentManifest(state.project)",
+  "projectDocumentManifest(currentProject())",
   "app.js document lists must include saved project document metadata even when a document has no segment rows."
 );
 assertIncludes(
@@ -4637,7 +5645,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  'draftProjectActivityEvent(state.project, "export", "Project package exported"',
+  'draftProjectActivityEvent(currentProject(), "export", "Project package exported"',
   "app.js must draft project-package export activity before download so success history can be committed only after download succeeds."
 );
 assertIncludes(
@@ -4697,8 +5705,8 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "review metadata save persists review note and comment",
-  "app workflow test must verify review notes and comments can be saved."
+  "checked quality/review controller owns review submit, persistence delegation, and form refresh",
+  "app workflow test must verify the checked review form saves notes and comments."
 );
 assertIncludes(
   appJs,
@@ -5777,6 +6785,169 @@ assertIncludes(
   "app workflow test must verify project-file Trash recovery."
 );
 assertIncludes(
+  storageJs,
+  "async function moveResourceRecordsToTrash(resourceType, trashEntry)",
+  "schema-6 storage must expose one atomic resource-to-Trash boundary."
+);
+assertIncludes(
+  storageJs,
+  'db.transaction([config.entityStore, config.indexStore, "trashEntries"], "readwrite")',
+  "resource deletion must remove live records and token indexes in the same Trash transaction."
+);
+assertIncludes(
+  storageJs,
+  'db.transaction([config.entityStore, "appMeta", "trashEntries"], "readwrite")',
+  "resource restoration must recreate records, dirty search indexes, and consume Trash atomically."
+);
+assertIncludes(
+  storageJs,
+  "The Trash item was preserved.",
+  "resource restore conflicts must explicitly preserve the Trash recovery item."
+);
+assertIncludes(
+  trashRepositoryJs,
+  "async moveResourceEntry(resourceType, entityId)",
+  "TrashRepository must support individual TM and termbase entry recovery."
+);
+assertIncludes(
+  trashRepositoryJs,
+  "async moveResource(resourceType, descriptor = {})",
+  "TrashRepository must support whole translation-memory and termbase recovery."
+);
+assertIncludes(
+  trashCommandsJs,
+  "createDeleteResourceEntryCommand",
+  "resource entry deletion must use a reversible domain command."
+);
+assertIncludes(
+  trashCommandsJs,
+  "createDeleteResourceCommand",
+  "whole-resource deletion must use a reversible domain command."
+);
+assert(
+  !functionBody(appJs, "async function deleteTmResourceEntry", "async function deleteTermResourceEntry").includes(
+    "deleteTmEntry("
+  ) &&
+    !functionBody(appJs, "async function deleteTermResourceEntry", "function renderTmResourceDetail").includes(
+      "deleteTerm("
+    ) &&
+    !functionBody(appJs, "async function confirmDeleteResource", "function exportResource").includes(
+      "deleteTmEntries("
+    ) &&
+    !functionBody(appJs, "async function confirmDeleteResource", "function exportResource").includes("deleteTerms("),
+  "user-facing Resources deletion paths must not bypass persistent Trash with hard-delete services."
+);
+assertIncludes(
+  resourceTrashUnitTests,
+  "moves only the selected translation memory name and language pair",
+  "focused tests must characterize whole-resource selection without cross-language deletion."
+);
+assertIncludes(
+  resourceTrashUnitTests,
+  "refresh their recovery token on Redo",
+  "focused tests must characterize resource Trash Undo/Redo recovery-token replacement."
+);
+assertIncludes(
+  appJs,
+  "TM resource row Undo restores exact content, rebuildable search indexes, and removes its Trash token",
+  "the app workflow must characterize exact individual TM recovery and index rebuilding."
+);
+assertIncludes(
+  appJs,
+  "term resource row Undo restores exact metadata, rebuildable search indexes, and removes its Trash token",
+  "the app workflow must characterize exact individual term recovery and index rebuilding."
+);
+assertIncludes(
+  appJs,
+  "TM whole resource restore conflict preserves both the Trash item and live resource",
+  "the app workflow must characterize conflict-safe whole-resource restoration."
+);
+assertIncludes(
+  appJs,
+  "resource Trash transaction conflict rolls back every live record and preserves the existing Trash item",
+  "the app workflow must force a real IndexedDB resource-Trash transaction abort and verify rollback."
+);
+assertIncludes(
+  appJs,
+  "schema-6 backup preserves resource Trash while project-package schema remains independent",
+  "the app workflow must characterize resource Trash backup compatibility without changing project packages."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'captureState("03", "resource-trash-populated")',
+  "visual checkpoints must include populated resource Trash at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'captureState("03", "resource-trash-empty-after-restore")',
+  "visual checkpoints must include the actionable empty Trash state after resource restoration."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'captureState("05", "review-comments-inspector")',
+  "visual checkpoints must include the populated Comments inspector at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'captureState("05", "quality-workbench-inspector")',
+  "visual checkpoints must include the populated Quality Workbench at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'captureState("01", "workspace-recovery-local")',
+  "visual checkpoints must include the local workspace recovery state at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'captureState("01", "workspace-local-status-menu")',
+  "visual checkpoints must include the local workspace status menu at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'captureState("05", "editor-import-validation-error")',
+  "visual checkpoints must include an actionable import-validation error at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'captureState("05", "ai-provider-administration")',
+  "visual checkpoints must include AI provider administration at all required viewports."
+);
+assertIncludes(
+  baselineCaptureScript,
+  "const expectedScreenshotCount = 81;",
+  "the deterministic visual checkpoint count must include validation, quality, review, recovery/workspace, and AI administration states."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'audit("Review comments populated")',
+  "automated accessibility checks must cover the populated Comments inspector."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'audit("Quality Workbench populated")',
+  "automated accessibility checks must cover the populated Quality Workbench."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'audit("Workspace recovery visible")',
+  "automated accessibility checks must cover the actionable local recovery state."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'audit("Workspace local status menu")',
+  "automated accessibility checks must cover local workspace status and storage warnings."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'audit("Import validation error")',
+  "automated accessibility checks must cover import-validation semantics and focus recovery."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'audit("AI provider administration and command centre")',
+  "automated accessibility checks must cover AI provider administration and its dialog focus lifecycle."
+);
+assertIncludes(
   appJs,
   "workspace folder connection marks local projects missing from the folder dirty",
   "app workflow test must verify connecting a folder marks local browser-cache projects missing from that folder as needing package saves."
@@ -6182,7 +7353,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "buildProjectPackage(state.project, packageSourceSegments)",
+  "buildProjectPackage(currentProject(), packageSourceSegments)",
   "app workflow package-copy fixture must build from current project metadata so segment document IDs match the exported manifest."
 );
 assertIncludes(

@@ -21,7 +21,9 @@
     <script src="./ai.js"></script>
     <script src="./worker-client.js"></script>
     <script src="./project.js"></script>
-    <script>
+    <script type="module">
+      import "./src/ai/providers/install-extracted-providers.js";
+
       (async () => {
         const out = [];
         const assert = (condition, label) => {
@@ -4103,7 +4105,8 @@
           targetCode: "tr"
         });
         assert(
-          lastOllamaChat?.url === "http://localhost:11434/api/chat" &&
+          window.CatHan.ai.OllamaProvider === ollamaProvider &&
+            lastOllamaChat?.url === "http://localhost:11434/api/chat" &&
             lastOllamaChat.body.model === "translategemma" &&
             lastOllamaChat.body.stream === false &&
             lastOllamaChat.body.messages[0].content.includes("Please translate the following English text into Turkish:\n\nHello {name}") &&
@@ -4371,8 +4374,33 @@
           targetLanguage: "Turkish",
           targetCode: "tr"
         });
+        let geminiPromptRequest = null;
+        const geminiPromptResult = await geminiProvider.completePrompt({
+          baseUrl: "https://generativelanguage.googleapis.com",
+          apiKey: "gemini-api-key",
+          model: "models/gemini-3.5-flash",
+          fetchImpl: async (url, options = {}) => {
+            geminiPromptRequest = {
+              url: String(url),
+              apiKey: options.headers?.["x-goog-api-key"] || "",
+              body: JSON.parse(String(options.body || "{}"))
+            };
+            return {
+              ok: true,
+              json: async () => ({
+                candidates: [{ content: { parts: [{ text: "Gemini QA note" }] } }],
+                usageMetadata: { promptTokenCount: 6, candidatesTokenCount: 3, totalTokenCount: 9 }
+              })
+            };
+          }
+        }, {
+          prompt: "Check this translation.",
+          system: "You are a translation QA assistant.",
+          project: null
+        });
         assert(
-          window.CatHan.ai.geminiApiUrl("https://generativelanguage.googleapis.com", "/models") === "https://generativelanguage.googleapis.com/v1beta/models" &&
+          window.CatHan.ai.GeminiProvider === geminiProvider &&
+            window.CatHan.ai.geminiApiUrl("https://generativelanguage.googleapis.com", "/models") === "https://generativelanguage.googleapis.com/v1beta/models" &&
             geminiModelsRequest?.url === "https://generativelanguage.googleapis.com/v1beta/models" &&
             geminiModelsRequest.apiKey === "gemini-api-key" &&
             geminiModels.models[0].name === "gemini-3.5-flash" &&
@@ -4385,6 +4413,14 @@
             geminiPretranslateRequest.body.generation_config.temperature === 0.1 &&
             geminiPretranslation.translatedText === "Merhaba Gemini." &&
             geminiPretranslation.metadata.totalTokens === 18 &&
+            geminiPromptRequest?.url === "https://generativelanguage.googleapis.com/v1beta/interactions" &&
+            geminiPromptRequest.apiKey === "gemini-api-key" &&
+            geminiPromptRequest.body.model === "gemini-3.5-flash" &&
+            geminiPromptRequest.body.system_instruction === "You are a translation QA assistant." &&
+            geminiPromptRequest.body.store === false &&
+            geminiPromptResult.text === "Gemini QA note" &&
+            geminiPromptResult.providerId === "gemini" &&
+            geminiPromptResult.metadata.totalTokens === 9 &&
             window.CatHan.ai.localAiProviderNeedsApiKey("gemini", "https://generativelanguage.googleapis.com/v1beta") &&
             window.CatHan.ai.localAiProviderSharesExternally("gemini", "https://generativelanguage.googleapis.com/v1beta"),
           "Gemini provider lists models and pretranslates through Interactions with header auth and storage disabled"
@@ -4433,8 +4469,34 @@
           targetLanguage: "Turkish",
           targetCode: "tr"
         });
+        let anthropicPromptRequest = null;
+        const anthropicPromptResult = await anthropicProvider.completePrompt({
+          baseUrl: "https://api.anthropic.com",
+          apiKey: "anthropic-api-key",
+          model: "claude-sonnet-4-6",
+          fetchImpl: async (url, options = {}) => {
+            anthropicPromptRequest = {
+              url: String(url),
+              apiKey: options.headers?.["x-api-key"] || "",
+              version: options.headers?.["anthropic-version"] || "",
+              body: JSON.parse(String(options.body || "{}"))
+            };
+            return {
+              ok: true,
+              json: async () => ({
+                content: [{ type: "text", text: "Anthropic QA note" }],
+                usage: { input_tokens: 6, output_tokens: 3 }
+              })
+            };
+          }
+        }, {
+          prompt: "Check this translation.",
+          system: "You are a translation QA assistant.",
+          project: null
+        });
         assert(
-          window.CatHan.ai.anthropicApiUrl("https://api.anthropic.com", "/messages") === "https://api.anthropic.com/v1/messages" &&
+          window.CatHan.ai.AnthropicProvider === anthropicProvider &&
+            window.CatHan.ai.anthropicApiUrl("https://api.anthropic.com", "/messages") === "https://api.anthropic.com/v1/messages" &&
             anthropicModelsRequest?.url === "https://api.anthropic.com/v1/models" &&
             anthropicModelsRequest.apiKey === "anthropic-api-key" &&
             anthropicModelsRequest.version === window.CatHan.ai.ANTHROPIC_VERSION &&
@@ -4447,6 +4509,15 @@
             anthropicPretranslateRequest.body.messages[0].content.includes("Please translate the following English text into Turkish:\n\nHello Claude.") &&
             anthropicPretranslation.translatedText === "Merhaba Claude." &&
             anthropicPretranslation.metadata.totalTokens === 20 &&
+            anthropicPromptRequest?.url === "https://api.anthropic.com/v1/messages" &&
+            anthropicPromptRequest.apiKey === "anthropic-api-key" &&
+            anthropicPromptRequest.version === window.CatHan.ai.ANTHROPIC_VERSION &&
+            anthropicPromptRequest.body.model === "claude-sonnet-4-6" &&
+            anthropicPromptRequest.body.max_tokens === 1200 &&
+            anthropicPromptRequest.body.system === "You are a translation QA assistant." &&
+            anthropicPromptResult.text === "Anthropic QA note" &&
+            anthropicPromptResult.providerId === "anthropic" &&
+            anthropicPromptResult.metadata.totalTokens === 9 &&
             window.CatHan.ai.localAiProviderNeedsApiKey("anthropic", "https://api.anthropic.com/v1") &&
             window.CatHan.ai.localAiProviderSharesExternally("anthropic", "https://api.anthropic.com/v1"),
           "Anthropic provider lists models and pretranslates through Messages with header auth"
@@ -4496,7 +4567,8 @@
           targetCode: "tr"
         });
         assert(
-          window.CatHan.ai.cohereApiUrl("https://api.cohere.com/v2", "/v1/models") === "https://api.cohere.com/v1/models" &&
+          window.CatHan.ai.CohereProvider === cohereProvider &&
+            window.CatHan.ai.cohereApiUrl("https://api.cohere.com/v2", "/v1/models") === "https://api.cohere.com/v1/models" &&
             window.CatHan.ai.cohereApiUrl("https://api.cohere.com/v1", "/v2/chat") === "https://api.cohere.com/v2/chat" &&
             cohereModelsRequest?.url === "https://api.cohere.com/v1/models" &&
             cohereModelsRequest.authorization === "Bearer cohere-api-key" &&
@@ -4773,7 +4845,8 @@
         });
         const perplexityDefaultSettings = window.CatHan.ai.localAISettingsStore.defaults({ providerId: "perplexity" });
         assert(
-          window.CatHan.ai.normalizePerplexityBaseUrl("https://api.perplexity.ai") === "https://api.perplexity.ai/v1" &&
+          window.CatHan.ai.PerplexityProvider === perplexityProvider &&
+            window.CatHan.ai.normalizePerplexityBaseUrl("https://api.perplexity.ai") === "https://api.perplexity.ai/v1" &&
             window.CatHan.ai.perplexityApiUrl("https://api.perplexity.ai/v1", "/sonar") === "https://api.perplexity.ai/v1/sonar" &&
             perplexityModelsRequest?.url === "https://api.perplexity.ai/v1/models" &&
             perplexityModelsRequest.authorization === "Bearer perplexity-api-key" &&
@@ -4871,6 +4944,7 @@
           project: null
         });
         const groqDefaultSettings = window.CatHan.ai.localAISettingsStore.defaults({ providerId: "groq" });
+        const providerIds = window.CatHan.ai.aiProviderRegistry.list().map((provider) => provider.id);
         assert(
           window.CatHan.ai.normalizeGroqBaseUrl("https://api.groq.com") === "https://api.groq.com/openai/v1" &&
             window.CatHan.ai.groqApiUrl("https://api.groq.com/openai/v1", "/chat/completions") === "https://api.groq.com/openai/v1/chat/completions" &&
@@ -4894,6 +4968,23 @@
             groqPromptResult.metadata.totalTokens === 10 &&
             groqDefaultSettings.baseUrl === "https://api.groq.com/openai/v1" &&
             groqDefaultSettings.model === "llama-3.3-70b-versatile" &&
+            providerIds.indexOf("openai") === providerIds.indexOf("ollama") + 1 &&
+            providerIds.indexOf("deepseek") === providerIds.indexOf("openai") + 1 &&
+            providerIds.indexOf("xai") === providerIds.indexOf("deepseek") + 1 &&
+            providerIds.indexOf("perplexity") === providerIds.indexOf("xai") + 1 &&
+            providerIds.indexOf("groq") === providerIds.indexOf("perplexity") + 1 &&
+            providerIds.indexOf("together") === providerIds.indexOf("groq") + 1 &&
+            providerIds.indexOf("openrouter") === providerIds.indexOf("together") + 1 &&
+            providerIds.indexOf("huggingface") === providerIds.indexOf("openrouter") + 1 &&
+            providerIds.indexOf("deepinfra") === providerIds.indexOf("huggingface") + 1 &&
+            providerIds.indexOf("fireworks") === providerIds.indexOf("deepinfra") + 1 &&
+            providerIds.indexOf("gemini") === providerIds.indexOf("fireworks") + 1 &&
+            providerIds.indexOf("anthropic") === providerIds.indexOf("gemini") + 1 &&
+            providerIds.indexOf("cohere") === providerIds.indexOf("anthropic") + 1 &&
+            providerIds.indexOf("mistral") === providerIds.indexOf("cohere") + 1 &&
+            providerIds.indexOf("azure-openai") === providerIds.indexOf("mistral") + 1 &&
+            providerIds.indexOf("openai-compatible") === providerIds.indexOf("azure-openai") + 1 &&
+            providerIds.indexOf("opus-cat") === providerIds.indexOf("openai-compatible") + 1 &&
             window.CatHan.ai.localAiProviderPresetForSettings({ providerId: "groq", baseUrl: "https://api.groq.com" })?.id === "groq" &&
             window.CatHan.ai.localAiProviderNeedsApiKey("groq", "https://api.groq.com/openai/v1") &&
             window.CatHan.ai.localAiProviderSharesExternally("groq", "https://api.groq.com/openai/v1"),
@@ -5474,7 +5565,8 @@
           targetCode: "tr"
         });
         assert(
-          openAiCompatibleModelsRequest?.url === "http://localhost:1234/v1/models" &&
+          window.CatHan.ai.OpenAICompatibleProvider === openAiCompatibleProvider &&
+            openAiCompatibleModelsRequest?.url === "http://localhost:1234/v1/models" &&
             openAiCompatibleModelsRequest.authorization === "" &&
             openAiCompatibleModels.models[0].name === "local-qwen-translate" &&
             openAiCompatibleChatRequest?.url === "http://localhost:1234/v1/chat/completions" &&
@@ -5549,7 +5641,8 @@
           opusCatSetupError = error;
         }
         assert(
-          window.CatHan.ai.normalizeOpusCatBaseUrl("http://localhost:8500/MTRestService") === "http://localhost:8500" &&
+          window.CatHan.ai.OpusCatProvider === opusCatProvider &&
+            window.CatHan.ai.normalizeOpusCatBaseUrl("http://localhost:8500/MTRestService") === "http://localhost:8500" &&
             window.CatHan.ai.opusCatApiUrl("http://localhost:8500", "/TranslateJson") === "http://localhost:8500/MTRestService/TranslateJson" &&
             window.CatHan.ai.opusCatConnectionCandidates("http://localhost:8500").join("|") === "http://localhost:8500|http://127.0.0.1:8500|http://127.0.0.1:8502|http://localhost:8502" &&
             opusCatModels.models.some((model) => model.name === "default") &&

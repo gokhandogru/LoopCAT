@@ -39,3 +39,53 @@ export function createDeleteDocumentCommand({ project, documentId, trashReposito
     }
   };
 }
+
+export function createDeleteResourceEntryCommand({ resourceType, entityId, projectId = null, trashRepository }) {
+  let entryId = "";
+  return {
+    id: "delete-resource-entry",
+    label: resourceType === "tm" ? "Delete translation memory entry" : "Delete termbase entry",
+    undoLabel: resourceType === "tm" ? "Undo translation memory entry deletion" : "Undo termbase entry deletion",
+    projectId,
+    scope: "resource-entry",
+    affectedIds: [entityId],
+    provenance: { origin: "user", channel: "resources" },
+    async execute() {
+      const entry = await trashRepository.moveResourceEntry(resourceType, entityId);
+      entryId = entry.id;
+      return { recoveryToken: entry.id, entry };
+    },
+    undo() {
+      if (!entryId) throw new Error("Resource entry deletion has no recovery token.");
+      return trashRepository.restore(entryId);
+    }
+  };
+}
+
+export function createDeleteResourceCommand({
+  resourceType,
+  descriptor,
+  affectedIds = [],
+  projectId = null,
+  trashRepository
+}) {
+  let entryId = "";
+  return {
+    id: "delete-resource",
+    label: resourceType === "tm" ? "Delete translation memory" : "Delete termbase",
+    undoLabel: resourceType === "tm" ? "Undo translation memory deletion" : "Undo termbase deletion",
+    projectId,
+    scope: "resource",
+    affectedIds: affectedIds.length ? [...affectedIds] : [String(descriptor?.key || descriptor?.name || "resource")],
+    provenance: { origin: "user", channel: "resources" },
+    async execute() {
+      const entry = await trashRepository.moveResource(resourceType, descriptor);
+      entryId = entry.id;
+      return { recoveryToken: entry.id, entry };
+    },
+    undo() {
+      if (!entryId) throw new Error("Resource deletion has no recovery token.");
+      return trashRepository.restore(entryId);
+    }
+  };
+}

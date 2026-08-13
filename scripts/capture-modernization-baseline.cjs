@@ -230,6 +230,68 @@ app
     await waitFor("document.querySelector('.project-tile button.primary')", "populated projects");
     await captureState("01", "projects-populated");
 
+    const recoveryProjectId = fixture.projects?.[0]?.id;
+    if (!recoveryProjectId) throw new Error("Modernization fixture has no project for workspace recovery capture.");
+    await windowRef.webContents.executeJavaScript(
+      `localStorage.setItem("loopcat.workspace.dirtyProjectIds", ${JSON.stringify(JSON.stringify([recoveryProjectId]))})`,
+      true
+    );
+    await windowRef.reload();
+    await waitFor("document.querySelector('.project-tile button.primary')", "workspace recovery project");
+    await waitFor(
+      "!document.querySelector('#workspaceRecoveryPanel').classList.contains('hidden')",
+      "local workspace recovery panel"
+    );
+    await captureState("01", "workspace-recovery-local");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#workspaceMenuSummary').click()", true);
+    await waitFor("document.querySelector('.workspace-menu').open", "local workspace status menu");
+    await captureState("01", "workspace-local-status-menu");
+    await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const dismiss = document.querySelector("#workspaceRecoveryDismissBtn");
+        dismiss.focus();
+        dismiss.click();
+      })()`,
+      true
+    );
+    await waitFor(
+      "document.querySelector('#workspaceRecoveryPanel').classList.contains('hidden')",
+      "dismissed workspace recovery panel"
+    );
+
+    await windowRef.webContents.executeJavaScript("document.querySelector('#resourcesViewBtn').click()", true);
+    await waitFor("document.querySelector('#tmResourceDashboard .resource-card')", "TM resources dashboard");
+    await captureState("02", "resources-translation-memories");
+    await windowRef.webContents.executeJavaScript(
+      "document.querySelector('#tmResourceDashboard [data-resource-action=\"open\"]').click()",
+      true
+    );
+    await waitFor("!document.querySelector('#tmResourceDetail').classList.contains('hidden')", "TM resource detail");
+    await captureState("02", "resource-translation-memory-detail");
+    await windowRef.webContents.executeJavaScript(
+      "document.querySelector('#tmResourceDetail [data-resource-action=\"delete-entry\"]').click()",
+      true
+    );
+    await waitFor("document.querySelector('#trashBtn').textContent.includes('Trash (1)')", "Resource in Trash");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#trashBtn').click()", true);
+    await waitFor("document.querySelector('#trashDialog').open", "resource Trash dialog");
+    await waitFor("document.querySelector('#trashList .trash-item')", "resource Trash item");
+    await captureState("03", "resource-trash-populated");
+    await windowRef.webContents.executeJavaScript(
+      "document.querySelector('#trashList .trash-item-actions button').click()",
+      true
+    );
+    await waitFor("document.querySelector('#trashList .muted')", "empty Trash after resource restore");
+    await captureState("03", "resource-trash-empty-after-restore");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#closeTrashBtn').click()", true);
+    await waitFor("!document.querySelector('#trashDialog').open", "closed resource Trash dialog");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#tbResourceTab').click()", true);
+    await waitFor("document.querySelector('#tbResourceTab').getAttribute('aria-selected') === 'true'", "Termbase tab");
+    await waitFor("document.querySelector('#tbResourceDashboard .resource-card')", "Termbase resources dashboard");
+    await captureState("02", "resources-termbases");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#projectsViewBtn').click()", true);
+    await waitFor("document.querySelector('.project-tile button.primary')", "populated projects return");
+
     await windowRef.webContents.executeJavaScript(
       "document.querySelector('.project-tile button.primary').click()",
       true
@@ -245,12 +307,70 @@ app
     await captureState("04", "new-project-dialog");
     await windowRef.webContents.executeJavaScript("document.querySelector('#projectDialog').close()", true);
 
+    await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const dialog = document.querySelector("#tmPretranslateDialog");
+        dialog.showModal();
+        document.querySelector("#tmPretranslateThresholdInput").focus();
+      })()`,
+      true
+    );
+    await waitFor("document.querySelector('#tmPretranslateDialog').open", "TM threshold dialog");
+    await captureState("05", "tm-pretranslation-threshold-dialog");
+    await windowRef.webContents.executeJavaScript(
+      "document.querySelector('#tmPretranslateDialog').close('cancel')",
+      true
+    );
+
+    await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const dialog = document.querySelector("#opusCatHelpDialog");
+        dialog.showModal();
+        document.querySelector("#closeOpusCatHelpBtn").focus();
+      })()`,
+      true
+    );
+    await waitFor("document.querySelector('#opusCatHelpDialog').open", "OPUS-CAT help dialog");
+    await captureState("06", "opus-cat-help-dialog");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#opusCatHelpDialog').close()", true);
+
     await windowRef.webContents.executeJavaScript("document.querySelector('.file-card button.primary').click()", true);
     await waitFor(
       "!document.querySelector('#editorView').classList.contains('hidden') && document.querySelector('#segmentBody textarea')",
       "translation editor"
     );
     await captureState("03", "translation-editor");
+
+    await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const returnTarget = document.querySelector("#focusModeBtn");
+        const input = document.querySelector("#projectPackageImportInput");
+        returnTarget.focus();
+        Object.defineProperty(input, "files", {
+          configurable: true,
+          value: [new File(["{"], "invalid-project.loopcat.json", { type: "application/json" })]
+        });
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      })()`,
+      true
+    );
+    await waitFor(
+      "!document.querySelector('#validationReportPanel').classList.contains('hidden') && document.querySelector('#validationReportList').textContent.includes('not valid JSON')",
+      "editor import validation error"
+    );
+    await captureState("05", "editor-import-validation-error");
+    await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const dismiss = document.querySelector("#validationReportMeta .validation-dismiss");
+        dismiss.focus();
+        dismiss.click();
+      })()`,
+      true
+    );
+    await waitFor(
+      "document.querySelector('#validationReportPanel').classList.contains('hidden') && document.activeElement === document.querySelector('#focusModeBtn')",
+      "editor import validation dismissal"
+    );
 
     await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorToggleBtn').click()", true);
     await waitFor(
@@ -291,6 +411,19 @@ app
       true
     );
 
+    await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorTabReview').click()", true);
+    await waitFor(
+      "document.querySelector('#inspectorTabReview').getAttribute('aria-selected') === 'true'",
+      "review inspector tab"
+    );
+    await captureState("05", "review-comments-inspector");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorTabQuality').click()", true);
+    await waitFor(
+      "document.querySelector('#inspectorTabQuality').getAttribute('aria-selected') === 'true'",
+      "quality inspector tab"
+    );
+    await captureState("05", "quality-workbench-inspector");
+
     const aiTabState = await windowRef.webContents.executeJavaScript(
       `(() => {
         document.querySelector('#inspectorTabAi').click();
@@ -306,6 +439,21 @@ app
       throw new Error(`Contextual AI inspector did not activate: ${JSON.stringify(aiTabState)}`);
     }
     await captureState("05", "contextual-ai-inspector");
+    await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const opener = document.querySelector("#openProjectAiSettingsBtn");
+        opener.focus();
+        opener.click();
+      })()`,
+      true
+    );
+    await waitFor(
+      "document.querySelector('#projectDialog').open && document.querySelector('#projectAiOptions').open",
+      "AI provider administration dialog"
+    );
+    await captureState("05", "ai-provider-administration");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#cancelProjectBtn').click()", true);
+    await waitFor("!document.querySelector('#projectDialog').open", "AI provider administration dialog close");
     await windowRef.webContents.executeJavaScript(
       "document.querySelector('[data-inspector-tab=\"matches\"]').click()",
       true
@@ -379,7 +527,7 @@ app
     };
     await fsPromises.writeFile(path.join(outputDir, "baseline.json"), `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 
-    const expectedScreenshotCount = 42;
+    const expectedScreenshotCount = 81;
     if (screenshots.length !== expectedScreenshotCount) {
       throw new Error(`Expected ${expectedScreenshotCount} screenshots, captured ${screenshots.length}.`);
     }

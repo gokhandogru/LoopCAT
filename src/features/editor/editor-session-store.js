@@ -1,0 +1,141 @@
+const ARRAY_FIELDS = new Set([
+  "projects",
+  "projectSummaries",
+  "segments",
+  "projectTerms",
+  "activityEvents",
+  "qaChecks"
+]);
+
+function createDefaultSession() {
+  return {
+    projects: [],
+    projectSummaries: [],
+    projectSummaryRevisions: new Map(),
+    project: null,
+    segments: [],
+    progressSummary: null,
+    projectTerms: [],
+    activityEvents: [],
+    qaChecks: [],
+    qualityRiskQueue: null
+  };
+}
+
+export const EDITOR_SESSION_FIELDS = Object.freeze(Object.keys(createDefaultSession()));
+
+function normalizeField(name, value) {
+  if (ARRAY_FIELDS.has(name) && !Array.isArray(value)) {
+    throw new TypeError(`EditorSessionStore ${name} must be an array.`);
+  }
+  if (name === "projectSummaryRevisions" && !(value instanceof Map)) {
+    throw new TypeError("EditorSessionStore projectSummaryRevisions must be a Map.");
+  }
+  if (name === "projectSummaryRevisions") return new Map(value);
+  return value;
+}
+
+export function createEditorSessionStore(initialState = {}) {
+  const defaults = createDefaultSession();
+  let state = Object.freeze({
+    ...defaults,
+    ...Object.fromEntries(
+      Object.entries(initialState)
+        .filter(([name]) => EDITOR_SESSION_FIELDS.includes(name))
+        .map(([name, value]) => [name, normalizeField(name, value)])
+    )
+  });
+  const listeners = new Set();
+
+  function replace(patch = {}) {
+    const entries = Object.entries(patch).filter(([name]) => EDITOR_SESSION_FIELDS.includes(name));
+    if (!entries.length) return state;
+    const previous = state;
+    const acceptedPatch = Object.freeze(
+      Object.fromEntries(entries.map(([name, value]) => [name, normalizeField(name, value)]))
+    );
+    state = Object.freeze({
+      ...state,
+      ...acceptedPatch
+    });
+    listeners.forEach((listener) => listener(state, previous, acceptedPatch));
+    return state;
+  }
+
+  return Object.freeze({
+    getState: () => state,
+    getActivityEvents: () => state.activityEvents,
+    getProject: () => state.project,
+    getProjects: () => state.projects,
+    getProjectTerms: () => state.projectTerms,
+    getProjectSummaries: () => state.projectSummaries,
+    getProgressSummary: () => state.progressSummary,
+    getQaChecks: () => state.qaChecks,
+    getQualityRiskQueue: () => state.qualityRiskQueue,
+    getSegments: () => state.segments,
+    getProjectSummaryRevision(projectId) {
+      return Number(state.projectSummaryRevisions.get(String(projectId || "")) || 0);
+    },
+    markProjectSummaryDirty(projectId) {
+      const normalizedProjectId = String(projectId || "");
+      if (!normalizedProjectId) return state.projectSummaryRevisions;
+      const revisions = new Map(state.projectSummaryRevisions);
+      revisions.set(normalizedProjectId, Number(revisions.get(normalizedProjectId) || 0) + 1);
+      return replace({ projectSummaryRevisions: revisions }).projectSummaryRevisions;
+    },
+    pruneProjectSummaryRevisions(projectIds) {
+      const retainedProjectIds = new Set(Array.from(projectIds || [], (projectId) => String(projectId || "")));
+      const revisions = new Map(
+        Array.from(state.projectSummaryRevisions).filter(([projectId]) => retainedProjectIds.has(projectId))
+      );
+      if (revisions.size === state.projectSummaryRevisions.size) return state.projectSummaryRevisions;
+      return replace({ projectSummaryRevisions: revisions }).projectSummaryRevisions;
+    },
+    replace,
+    prependActivityEvent(activityEvent) {
+      const activityEvents = [activityEvent, ...state.activityEvents.filter((item) => item.id !== activityEvent.id)];
+      return replace({ activityEvents }).activityEvents;
+    },
+    replaceActivityEvents(activityEvents) {
+      return replace({ activityEvents }).activityEvents;
+    },
+    replaceProject(project) {
+      return replace({ project }).project;
+    },
+    replaceProjects(projects) {
+      return replace({ projects }).projects;
+    },
+    replaceProjectTerms(projectTerms) {
+      return replace({ projectTerms }).projectTerms;
+    },
+    replaceProgressSummary(progressSummary) {
+      return replace({ progressSummary }).progressSummary;
+    },
+    replaceQaChecks(qaChecks) {
+      return replace({ qaChecks }).qaChecks;
+    },
+    replaceQualityRiskQueue(qualityRiskQueue) {
+      return replace({ qualityRiskQueue }).qualityRiskQueue;
+    },
+    replaceSegmentAt(index, segment) {
+      if (!Number.isInteger(index) || index < 0 || index >= state.segments.length) {
+        throw new RangeError("EditorSessionStore segment index is out of range.");
+      }
+      const segments = state.segments.slice();
+      segments[index] = segment;
+      replace({ segments });
+      return segment;
+    },
+    replaceSegments(segments) {
+      return replace({ segments }).segments;
+    },
+    replaceProjectSummaries(projectSummaries) {
+      return replace({ projectSummaries }).projectSummaries;
+    },
+    subscribe(listener) {
+      if (typeof listener !== "function") throw new TypeError("EditorSessionStore listener must be a function.");
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    }
+  });
+}

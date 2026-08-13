@@ -70,13 +70,13 @@ The provider map was rechecked against official provider documentation on 2026-0
 | LM Studio | OpenAI-compatible local API | `GET /v1/models` | `POST /v1/chat/completions` | Existing `OpenAICompatibleProvider` |
 | OPUS-CAT MT Engine | OPUS-CAT local HTTP API | `GET /MTRestService/ListSupportedLanguagePairs` and `GET /MTRestService/GetLanguagePairModelTags` | `GET /MTRestService/TranslateJson` | Existing `OpusCatProvider`, pre-translation only |
 | OpenAI | Responses API and Chat Completions | `GET /v1/models` | `POST /v1/responses` or `/v1/chat/completions` | Existing `OpenAIProvider` uses Responses for suggestions and pretranslation |
-| Google Gemini | Gemini Developer API Interactions | `GET /v1beta/models` | `POST /v1beta/interactions` | Existing `GeminiProvider` |
-| Anthropic Claude | Messages API | `GET /v1/models` | `POST /v1/messages` | Existing `AnthropicProvider` |
+| Google Gemini | Gemini Developer API Interactions | `GET /v1beta/models` | `POST /v1beta/interactions` | Checked Gemini adapter with storage disabled |
+| Anthropic Claude | Messages API | `GET /v1/models` | `POST /v1/messages` | Checked Anthropic adapter with versioned header auth |
 | Mistral AI | Mistral chat completion API | `GET /v1/models` | `POST /v1/chat/completions` | Existing `MistralProvider` |
 | DeepSeek | DeepSeek chat completion API | `GET /models` | `POST /chat/completions` | Existing `DeepSeekProvider` without automatic `/v1` base-path insertion |
 | Cohere | Cohere Chat API v2 | `GET /v1/models` | `POST /v2/chat` | Existing `CohereProvider` |
 | xAI | xAI Responses API | `GET /v1/models` | `POST /v1/responses` | Existing `XAIProvider` with `store: false` |
-| Perplexity | Sonar API | `GET /v1/models` | `POST /v1/sonar` | Existing `PerplexityProvider` with search disabled |
+| Perplexity | Sonar API | `GET /v1/models` | `POST /v1/sonar` | Checked Perplexity adapter with search disabled |
 | Groq | OpenAI-compatible chat API | `GET /openai/v1/models` | `POST /openai/v1/chat/completions` | Existing `GroqProvider` |
 | Together AI | OpenAI-compatible chat API | `GET /v1/models` | `POST /v1/chat/completions` | Existing `TogetherProvider` |
 | OpenRouter | OpenAI-compatible routing API | `GET /api/v1/models` | `POST /api/v1/chat/completions` | Existing `OpenRouterProvider` |

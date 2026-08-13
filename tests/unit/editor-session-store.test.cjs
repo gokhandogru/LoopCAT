@@ -1,0 +1,157 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+const path = require("node:path");
+const { pathToFileURL } = require("node:url");
+const test = require("node:test");
+
+const root = path.resolve(__dirname, "../..");
+const moduleAt = (relativePath) => import(pathToFileURL(path.join(root, relativePath)).href);
+
+test("EditorSessionStore owns current project data behind a checked immutable snapshot", async () => {
+  const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
+  const store = createEditorSessionStore();
+  const changes = [];
+  store.subscribe((next, previous, patch) => changes.push({ next, previous, patch }));
+
+  const project = { id: "project-1", name: "Project" };
+  const segments = [{ id: "segment-1", projectId: project.id }];
+  const next = store.replace({ project, segments, ignored: true });
+
+  assert.equal(Object.isFrozen(next), true);
+  assert.equal(next.project, project);
+  assert.equal(next.segments, segments);
+  assert.equal("ignored" in next, false);
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0].previous.project, null);
+  assert.deepEqual(changes[0].patch, { project, segments });
+});
+
+test("EditorSessionStore explicitly owns project summaries and copy-on-write revisions", async () => {
+  const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
+  const store = createEditorSessionStore({
+    projectSummaries: [{ id: "project-1", wordCount: 4 }],
+    projectSummaryRevisions: new Map([
+      ["project-1", 2],
+      ["removed-project", 7]
+    ])
+  });
+  const originalRevisionMap = store.getState().projectSummaryRevisions;
+
+  store.markProjectSummaryDirty("project-1");
+  assert.equal(store.getProjectSummaryRevision("project-1"), 3);
+  assert.equal(originalRevisionMap.get("project-1"), 2);
+
+  store.pruneProjectSummaryRevisions(new Set(["project-1"]));
+  assert.equal(store.getProjectSummaryRevision("removed-project"), 0);
+  assert.deepEqual(Array.from(store.getState().projectSummaryRevisions), [["project-1", 3]]);
+
+  const summaries = [{ id: "project-1", wordCount: 8 }];
+  assert.equal(store.replaceProjectSummaries(summaries), summaries);
+  assert.equal(store.getProjectSummaries(), summaries);
+});
+
+test("EditorSessionStore explicitly owns project terms and deduplicated activity events", async () => {
+  const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
+  const originalTerm = { id: "term-1", sourceTerm: "source" };
+  const originalEvent = { id: "activity-1", type: "project-opened" };
+  const store = createEditorSessionStore({
+    projectTerms: [originalTerm],
+    activityEvents: [originalEvent]
+  });
+
+  assert.deepEqual(store.getProjectTerms(), [originalTerm]);
+  assert.deepEqual(store.getActivityEvents(), [originalEvent]);
+
+  const projectTerms = [{ id: "term-2", sourceTerm: "updated" }];
+  assert.equal(store.replaceProjectTerms(projectTerms), projectTerms);
+  assert.equal(store.getProjectTerms(), projectTerms);
+
+  const olderEvent = { id: "activity-2", type: "import" };
+  const updatedOriginalEvent = { ...originalEvent, summary: "Opened again" };
+  store.replaceActivityEvents([originalEvent, olderEvent]);
+  const activityEvents = store.prependActivityEvent(updatedOriginalEvent);
+
+  assert.deepEqual(activityEvents, [updatedOriginalEvent, olderEvent]);
+  assert.equal(store.getActivityEvents(), activityEvents);
+  assert.throws(() => store.replaceProjectTerms(null), /projectTerms must be an array/);
+  assert.throws(() => store.replaceActivityEvents(null), /activityEvents must be an array/);
+});
+
+test("EditorSessionStore explicitly owns QA checks and the derived quality-risk queue", async () => {
+  const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
+  const originalCheck = { id: "qa-1", type: "terminology", segmentId: "segment-1" };
+  const originalQueue = { projectId: "project-1", totalRiskItems: 1, items: [] };
+  const store = createEditorSessionStore({
+    qaChecks: [originalCheck],
+    qualityRiskQueue: originalQueue
+  });
+
+  assert.deepEqual(store.getQaChecks(), [originalCheck]);
+  assert.equal(store.getQualityRiskQueue(), originalQueue);
+
+  const qaChecks = [{ id: "qa-2", type: "formatting", segmentId: "segment-2" }];
+  const qualityRiskQueue = { projectId: "project-1", totalRiskItems: 2, items: [] };
+  assert.equal(store.replaceQaChecks(qaChecks), qaChecks);
+  assert.equal(store.replaceQualityRiskQueue(qualityRiskQueue), qualityRiskQueue);
+  assert.equal(store.getQaChecks(), qaChecks);
+  assert.equal(store.getQualityRiskQueue(), qualityRiskQueue);
+
+  assert.equal(store.replaceQualityRiskQueue(null), null);
+  assert.throws(() => store.replaceQaChecks(null), /qaChecks must be an array/);
+});
+
+test("EditorSessionStore explicitly owns the derived progress summary", async () => {
+  const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
+  const originalSummary = { projectId: "project-1", total: 3, confirmed: 1, words: 12 };
+  const store = createEditorSessionStore({ progressSummary: originalSummary });
+
+  assert.equal(store.getProgressSummary(), originalSummary);
+
+  const progressSummary = { projectId: "project-1", total: 3, confirmed: 2, words: 12 };
+  assert.equal(store.replaceProgressSummary(progressSummary), progressSummary);
+  assert.equal(store.getProgressSummary(), progressSummary);
+  assert.equal(store.replaceProgressSummary(null), null);
+});
+
+test("EditorSessionStore explicitly owns the project collection and current project record", async () => {
+  const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
+  const originalProject = { id: "project-1", name: "Original" };
+  const store = createEditorSessionStore({ projects: [originalProject], project: originalProject });
+
+  assert.deepEqual(store.getProjects(), [originalProject]);
+  assert.equal(store.getProject(), originalProject);
+
+  const updatedProject = { ...originalProject, name: "Updated" };
+  const projects = [updatedProject, { id: "project-2", name: "Second" }];
+  assert.equal(store.replaceProject(updatedProject), updatedProject);
+  assert.equal(store.replaceProjects(projects), projects);
+  assert.equal(store.getProject(), updatedProject);
+  assert.equal(store.getProjects(), projects);
+
+  assert.equal(store.replaceProject(null), null);
+  assert.throws(() => store.replaceProjects(null), /projects must be an array/);
+});
+
+test("EditorSessionStore explicitly owns segment collection and indexed replacement", async () => {
+  const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
+  const originalSegments = [
+    { id: "segment-1", target: "First" },
+    { id: "segment-2", target: "Second" }
+  ];
+  const store = createEditorSessionStore({ segments: originalSegments });
+
+  assert.equal(store.getSegments(), originalSegments);
+  assert.equal("attachCompatibility" in store, false);
+
+  const replacement = { id: "segment-2", target: "Updated" };
+  assert.equal(store.replaceSegmentAt(1, replacement), replacement);
+  assert.deepEqual(store.getSegments(), [originalSegments[0], replacement]);
+  assert.notEqual(store.getSegments(), originalSegments);
+
+  const reloadedSegments = [{ id: "segment-3", target: "Reloaded" }];
+  assert.equal(store.replaceSegments(reloadedSegments), reloadedSegments);
+  assert.equal(store.getSegments(), reloadedSegments);
+  assert.throws(() => store.replaceSegmentAt(1, replacement), /segment index is out of range/);
+  assert.throws(() => store.replaceSegments(null), /segments must be an array/);
+});

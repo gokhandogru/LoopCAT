@@ -1,17 +1,22 @@
 (() => {
-const { buildBilingualDocx, buildTargetDocx, detectProtectedTags, extractDocxSegments } = window.CatHan.docx;
-const { appendProjectSegments, appendProjectSegmentsAndUpdateProject, createProject, deleteProject, deleteProjectDocument, deleteSegment, getProjectSegments, listProjects, replaceProjectSegments, saveSegment, saveSegments, saveSegmentStructure, updateProject } = window.CatHan.project;
-const { bulkPut, constants: storageConstants, createPortableSanitizerContext, exportAllData, getAll, getAllByIndex, importAllData, importProjectPackageRecords, listActivityEvents, makeId, recordActivityEvent, sanitizePortableValue } = window.CatHan.storage;
-const { deleteTmEntry, deleteTmEntries, getTmMatchCandidates, getTmMatchCandidateBatches, importTmEntries, listTmEntries, rebuildAllTmIndexes, saveTmEntry, scoreTmEntries, updateTmEntry } = window.CatHan.tm;
-const { buildTmx, parseTmx, parseTmxAsync } = window.CatHan.tmx;
-const { deleteTerm, deleteTerms, findTerms, importTerms, listTerms, parseTermList, parseTermWorkbook, rebuildAllTermIndexes, saveTerm, termRanges, updateTerm } = window.CatHan.termbase;
-const { buildTbx, parseTbx, parseTbxAsync } = window.CatHan.tbx;
-const { buildTargetXliff, buildXliff, buildXliff22, parseXliffFile, xliffMimeType } = window.CatHan.xliff;
-const { buildLocalizationFile, parseLocalizationFile } = window.CatHan.localization;
-const { runQaChecks } = window.CatHan.qa;
-const { validateProjectPackage: validatePackage, validateBackupFile, planDeliveryExport, validateExportReadiness, reportCount, reportSummary } = window.CatHan.validation;
-const { analyzeProject } = window.CatHan.analysis;
-const { buildQualityPassportData, buildRiskQueue, defaultQualityProfile, qualityCategoryLabel: baseQualityCategoryLabel, scoreSegment } = window.CatHan.quality;
+const appRuntime = window.CatHan.appRuntime;
+const compatibilityModules = appRuntime.compatibilityModules;
+const storageApi = compatibilityModules.storage;
+const encodingApi = compatibilityModules.encoding;
+const xliffApi = compatibilityModules.xliff;
+const { buildBilingualDocx, buildTargetDocx, detectProtectedTags, extractDocxSegments } = compatibilityModules.docx;
+const { appendProjectSegments, appendProjectSegmentsAndUpdateProject, createProject, deleteProject, deleteProjectDocument, deleteSegment, getProjectSegments, listProjects, replaceProjectSegments, saveSegment, saveSegments, saveSegmentStructure, updateProject } = compatibilityModules.project;
+const { bulkPut, constants: storageConstants, createPortableSanitizerContext, exportAllData, getAll, getAllByIndex, importAllData, importProjectPackageRecords, listActivityEvents, makeId, recordActivityEvent, sanitizePortableValue } = storageApi;
+const { deleteTmEntry, deleteTmEntries, getTmMatchCandidates, getTmMatchCandidateBatches, importTmEntries, listTmEntries, rebuildAllTmIndexes, saveTmEntry, scoreTmEntries, updateTmEntry } = compatibilityModules.tm;
+const { buildTmx, parseTmx, parseTmxAsync } = compatibilityModules.tmx;
+const { deleteTerm, deleteTerms, findTerms, importTerms, listTerms, parseTermList, parseTermWorkbook, rebuildAllTermIndexes, saveTerm, termRanges, updateTerm } = compatibilityModules.termbase;
+const { buildTbx, parseTbx, parseTbxAsync } = compatibilityModules.tbx;
+const { buildTargetXliff, buildXliff, buildXliff22, parseXliffFile, xliffMimeType } = xliffApi;
+const { buildLocalizationFile, parseLocalizationFile } = compatibilityModules.localization;
+const { runQaChecks } = compatibilityModules.qa;
+const { validateProjectPackage: validatePackage, validateBackupFile, planDeliveryExport, validateExportReadiness, reportCount, reportSummary } = compatibilityModules.validation;
+const { analyzeProject } = compatibilityModules.analysis;
+const { buildQualityPassportData, buildRiskQueue, defaultQualityProfile, qualityCategoryLabel: baseQualityCategoryLabel, scoreSegment } = compatibilityModules.quality;
 const {
   DEFAULT_LOCAL_AI_MODEL,
   GEMINI_DEFAULT_MODEL,
@@ -64,12 +69,11 @@ const {
   openAiSuggestion,
   parseAiReviewRisk,
   preTranslationService
-} = window.CatHan.ai;
-const workerClient = window.CatHan.workerClient;
-const workspaceStorage = window.CatHan.workspaceStorage;
-const uiI18n = window.CatHan.i18n;
-const focusController = window.CatHan.focusController?.createFocusController?.();
-const appRuntime = window.CatHan.appRuntime;
+} = compatibilityModules.ai;
+const workerClient = compatibilityModules.workerClient;
+const workspaceStorage = compatibilityModules.workspaceStorage;
+const uiI18n = compatibilityModules.i18n;
+const focusController = compatibilityModules.focusController.createFocusController();
 const replaceSafeHtml = appRuntime.safeHtml.replace;
 const finalizeReportDocument = appRuntime.reports.finalize;
 const aiProviderService = appRuntime.featureFactories.createAiProviderService(aiProviderRegistry);
@@ -700,51 +704,22 @@ const CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG = Symbol("create-project-activit
 const WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG = Symbol("workspace-save-activity-failure-test");
 const RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS = new Set();
 const segmentSourceWordCounts = new WeakMap();
+const editorFilterStore = appRuntime.featureFactories.createFilterStore();
 
 const state = {
-  projects: [],
-  projectSummaries: [],
-  projectSummaryRevisions: new Map(),
-  project: null,
-  segments: [],
-  progressSummary: null,
-  activeIndex: -1,
   saveTimers: new Map(),
-  view: "projects",
-  focusMode: false,
   inspectorOpen: true,
-  documentFilter: "",
-  segmentQuery: "",
-  segmentSearchScope: "both",
-  segmentRegex: false,
-  segmentCaseSensitive: false,
-  segmentStatusFilter: "all",
-  reviewStateFilter: "",
-  aiSegmentFilter: "",
-  resourceType: "tm",
-  openResource: null,
-  resourceTmEntries: [],
-  resourceTerms: [],
-  projectTerms: [],
   segmentFilterRevision: 0,
   segmentFilterCache: { key: "", indexes: [], positions: new Map() },
   projectAnalysisRun: 0,
-  segmentWindow: { start: 0, end: 0, total: 0, indexes: [] },
   importTask: "",
-  segmentScrollFrame: 0,
-  segmentRowFrame: 0,
-  pendingRowUpdates: new Set(),
   confirmingSegmentIds: new Set(),
   tmPretranslating: false,
   revisionHistoryFrame: 0,
   saveStatusTimer: 0,
-  validationReportTimer: 0,
   workspaceAutosaveTimer: 0,
   workspaceAutosaving: false,
-  activityEvents: [],
-  qaChecks: [],
   qaFilter: "",
-  qualityRiskQueue: null,
   lastValidationReport: null,
   commandQuery: "",
   commandProjectId: "",
@@ -753,7 +728,6 @@ const state = {
   storageDurability: { checked: false, supported: false, persisted: false, requested: false, usageBytes: 0, quotaBytes: 0 },
   workspaceDirtyProjectIds: new Set(),
   workspaceRecoveryProjectIds: new Set(),
-  workspaceRecoveryDismissed: false,
   localAi: {
     connectionStatus: "disconnected",
     statusText: "Disconnected",
@@ -765,15 +739,92 @@ const state = {
     promptBusy: false
   }
 };
+const editorSessionStore = appRuntime.editorSession;
+
+function currentProjects() {
+  return editorSessionStore.getProjects();
+}
+
+function currentProject() {
+  return editorSessionStore.getProject();
+}
+
+function currentSegments() {
+  return editorSessionStore.getSegments();
+}
+
+function currentProjectSummaries() {
+  return editorSessionStore.getProjectSummaries();
+}
+
+function currentProjectTerms() {
+  return editorSessionStore.getProjectTerms();
+}
+
+function currentActivityEvents() {
+  return editorSessionStore.getActivityEvents();
+}
+
+function currentQaChecks() {
+  return editorSessionStore.getQaChecks();
+}
+
+function storedQualityRiskQueue() {
+  return editorSessionStore.getQualityRiskQueue();
+}
+
+function currentProgressSummary() {
+  return editorSessionStore.getProgressSummary();
+}
+
+function currentApplicationView() {
+  return applicationStore.getState().navigation.view;
+}
+
+function currentProjectId() {
+  return applicationStore.getState().navigation.projectId;
+}
+
+function currentDocumentId() {
+  return applicationStore.getState().navigation.documentId;
+}
+
+function currentActiveIndex() {
+  return applicationStore.getState().navigation.activeIndex;
+}
+
+function currentSegmentId() {
+  return applicationStore.getState().navigation.segmentId;
+}
+
+function currentFocusMode() {
+  return applicationStore.getState().interface.focusMode;
+}
+
+function currentEditorFilters() {
+  return editorFilterStore.getState();
+}
+
+function updateEditorFilters(patch) {
+  return editorFilterStore.update(patch);
+}
+
+function selectApplicationSegment(activeIndex, segmentId = currentSegments()[activeIndex]?.id || "") {
+  return applicationNavigation.selectSegment({ activeIndex, segmentId });
+}
+
+function selectApplicationDocument(documentId, selection = {}) {
+  return applicationNavigation.selectDocument({ documentId, ...selection });
+}
 
 function applicationNavigationPayload(overrides = {}) {
-  const activeSegment = state.segments[state.activeIndex] || null;
+  const navigation = applicationStore.getState().navigation;
   return {
-    view: state.view,
-    projectId: state.project?.id || null,
-    documentId: state.documentFilter || "",
-    segmentId: activeSegment?.id || "",
-    activeIndex: state.activeIndex,
+    view: navigation.view,
+    projectId: currentProjectId(),
+    documentId: navigation.documentId,
+    segmentId: navigation.segmentId,
+    activeIndex: navigation.activeIndex,
     ...overrides
   };
 }
@@ -781,21 +832,10 @@ function applicationNavigationPayload(overrides = {}) {
 function syncLegacyApplicationState(overrides = {}) {
   const navigation = applicationNavigation?.syncLegacy?.(applicationNavigationPayload(overrides));
   applicationStore?.dispatch?.({
-    type: "interface/focus-mode-changed",
-    payload: { enabled: state.focusMode }
-  });
-  applicationStore?.dispatch?.({
     type: "interface/locale-changed",
     payload: { locale: uiI18n?.getLocale?.() || "" }
   });
   return navigation;
-}
-
-function applyApplicationNavigation(navigation) {
-  if (!navigation) return;
-  state.view = navigation.view;
-  state.documentFilter = navigation.documentId || "";
-  state.activeIndex = Number.isInteger(navigation.activeIndex) ? navigation.activeIndex : state.activeIndex;
 }
 
 const els = {
@@ -978,6 +1018,7 @@ const els = {
   confirmBtn: document.querySelector("#confirmBtn"),
   saveTmBtn: document.querySelector("#saveTmBtn"),
   pretranslateBtn: document.querySelector("#pretranslateBtn"),
+  segmentToolsMenuSummary: document.querySelector("#segmentToolsMenuSummary"),
   tmMatches: document.querySelector("#tmMatches"),
   termSuggestions: document.querySelector("#termSuggestions"),
   progressText: document.querySelector("#progressText"),
@@ -1124,15 +1165,129 @@ const aiContextController = appRuntime?.featureFactories?.createAiContextControl
 });
 aiContextController?.mount?.();
 
+const aiAdministrationController = appRuntime?.featureFactories?.createAiAdministrationController?.({
+  elements: {
+    saveSettingsButton: els.saveAiSettingsBtn,
+    aiEnabledInput: els.aiEnabledInput,
+    aiProviderInput: els.aiProviderInput,
+    aiModelInput: els.aiModelInput,
+    openAiApiKeyInput: els.openAiApiKeyInput,
+    rememberOpenAiKeyInput: els.rememberOpenAiKeyInput,
+    clearOpenAiKeyButton: els.clearOpenAiKeyBtn,
+    aiConnectionStatus: els.aiConnectionStatus,
+    aiSendSourceInput: els.aiSendSourceInput,
+    aiUseTmInput: els.aiUseTmInput,
+    aiUseTbInput: els.aiUseTbInput,
+    aiStyleGuideInput: els.aiStyleGuideInput,
+    contextualTranslateButton: els.contextualAiTranslateBtn,
+    contextualReviewButton: els.contextualAiReviewBtn,
+    contextualRepairButton: els.contextualAiRepairBtn,
+    contextualPolishButton: els.contextualAiPolishBtn,
+    contextualVariantsButton: els.contextualAiVariantsBtn,
+    contextualApplyTermsButton: els.contextualAiApplyTermsBtn,
+    contextualOpenAiButton: els.contextualOpenAiSuggestionBtn,
+    contextualCancelButton: els.contextualAiCancelBtn,
+    openAiSuggestionButton: els.openAiSuggestionBtn,
+    privacyNote: els.localAiPrivacyNote,
+    providerPresetSelect: els.localAiPresetSelect,
+    providerSelect: els.localAiProviderSelect,
+    baseUrlInput: els.localAiBaseUrlInput,
+    localCloudPresetButton: els.localAiLocalCloudPresetBtn,
+    cloudPresetButton: els.localAiCloudPresetBtn,
+    status: els.localAiStatus,
+    statusText: els.localAiStatusText,
+    providerSummary: els.localAiProviderSummary,
+    hostedKeyControls: els.localAiHostedKeyControls,
+    localAiApiKeyInput: els.localAiApiKeyInput,
+    rememberLocalAiKeyInput: els.rememberLocalAiKeyInput,
+    clearLocalAiKeyButton: els.clearLocalAiKeyBtn,
+    testConnectionButton: els.localAiTestBtn,
+    startLmStudioButton: els.localAiStartLmStudioBtn,
+    refreshModelsButton: els.localAiRefreshModelsBtn,
+    modelSelect: els.localAiModelSelect,
+    modelInput: els.localAiModelInput,
+    pullModelWrap: els.localAiPullModelWrap,
+    pullModelButton: els.localAiPullModelBtn,
+    sourceLanguageInput: els.localAiSourceLangInput,
+    sourceCodeInput: els.localAiSourceCodeInput,
+    targetLanguageInput: els.localAiTargetLangInput,
+    targetCodeInput: els.localAiTargetCodeInput,
+    modeSelect: els.localAiModeSelect,
+    concurrencyInput: els.localAiConcurrencyInput,
+    timeoutInput: els.localAiTimeoutInput,
+    overwriteInput: els.localAiOverwriteInput,
+    includeContextInput: els.localAiIncludeContextInput,
+    preserveConfirmedInput: els.localAiPreserveConfirmedInput,
+    pretranslateButton: els.localAiPretranslateBtn,
+    cancelButton: els.localAiCancelBtn,
+    progress: els.localAiProgress,
+    promptModeSelect: els.localAiPromptModeSelect,
+    sampleInput: els.localAiSampleInput,
+    promptPreview: els.localAiPromptPreview,
+    promptTestButton: els.localAiPromptTestBtn,
+    reviewSegmentButton: els.localAiReviewSegmentBtn,
+    reviewBatchButton: els.localAiReviewBatchBtn,
+    repairSegmentButton: els.localAiRepairTagsBtn,
+    repairBatchButton: els.localAiRepairTagsBatchBtn,
+    polishSegmentButton: els.localAiPolishDraftBtn,
+    polishBatchButton: els.localAiPolishBatchBtn,
+    adaptModeSelect: els.localAiAdaptModeSelect,
+    adaptSegmentButton: els.localAiAdaptDraftBtn,
+    adaptBatchButton: els.localAiAdaptBatchBtn,
+    variantModeSelect: els.localAiVariantModeSelect,
+    variantsSegmentButton: els.localAiSuggestVariantsBtn,
+    variantsBatchButton: els.localAiSuggestVariantsBatchBtn,
+    applyTermsSegmentButton: els.localAiApplyTermsBtn,
+    applyTermsBatchButton: els.localAiApplyTermsBatchBtn,
+    extractTermsSegmentButton: els.localAiExtractTermsBtn,
+    extractTermsBatchButton: els.localAiExtractTermsBatchBtn,
+    projectBriefButton: els.localAiProjectBriefBtn,
+    outputDrawer: els.localAiOutputDrawer,
+    promptOutput: els.localAiPromptOutput
+  },
+  actions: {
+    saveSettings: saveAiSettings,
+    contextualTranslate: pretranslateWithLocalAi,
+    reviewSegment: reviewActiveSegmentWithLocalAi,
+    repairSegment: repairActiveSegmentTagsWithLocalAi,
+    polishSegment: polishActiveSegmentDraftWithLocalAi,
+    variantsSegment: suggestActiveSegmentVariantsWithLocalAi,
+    applyTermsSegment: applyActiveSegmentTerminologyWithLocalAi,
+    openAiSuggestion: createOpenAiSuggestion,
+    cancel: cancelLocalAiBatch,
+    testConnection: testLocalAiConnection,
+    startLmStudio: startLmStudioServerAndTestConnection,
+    refreshModels: refreshLocalAiModels,
+    pullModel: pullLocalAiModel,
+    promptTest: testLocalAiPrompt,
+    reviewBatch: reviewBatchWithLocalAi,
+    repairBatch: repairBatchTagsWithLocalAi,
+    polishBatch: polishBatchDraftsWithLocalAi,
+    adaptSegment: adaptActiveSegmentDraftWithLocalAi,
+    adaptBatch: adaptBatchDraftsWithLocalAi,
+    variantsBatch: suggestBatchSegmentVariantsWithLocalAi,
+    applyTermsBatch: applyBatchTerminologyWithLocalAi,
+    extractTermsSegment: extractActiveSegmentTermsWithLocalAi,
+    extractTermsBatch: extractBatchTermsWithLocalAi,
+    pretranslate: pretranslateWithLocalAi,
+    projectBrief: generateProjectBriefWithLocalAi,
+    presetChange: handleLocalAiPresetChange,
+    providerChange: handleLocalAiProviderChange,
+    baseUrlInput: handleLocalAiBaseUrlInput,
+    clearLocalKey: handleClearLocalAiKey,
+    clearOpenAiKey: handleClearOpenAiKey,
+    formChanged: handleLocalAiFormChanged,
+    languageChanged: handleLocalAiLanguageChanged
+  },
+  source: uiSource,
+  onError: (error) => setSaveStatus(error?.message || "AI action failed.", "dirty")
+});
+aiAdministrationController?.mount?.();
+
 const verticalFeatureState = (() => {
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "creating vertical feature controllers";
   const factories = appRuntime?.featureFactories;
   if (!factories) return null;
-  const selectionStore = factories.createSelectionStore({
-    activeIndex: state.activeIndex,
-    segmentId: ""
-  });
-  const filterStore = factories.createFilterStore();
   return Object.freeze({
     dashboard: factories.createDashboardController({ root: els.projectHomeView }),
     editor: factories.createEditorController({
@@ -1144,26 +1299,42 @@ const verticalFeatureState = (() => {
       emptyView: els.emptyState,
       editorView: els.editorView
     }),
-    filters: filterStore,
+    filters: editorFilterStore,
     inspector: factories.createInspectorController({
       root: els.sidebar,
       preferencesRepository: appRuntime.preferencesRepository
     }),
     projects: factories.createProjectsController({ root: els.projectDashboard }),
-    segmentGrid: factories.createSegmentGridController({ selectionStore }),
-    selection: selectionStore
+    segmentGrid: factories.createSegmentGridController({
+      navigation: applicationNavigation,
+      viewport: els.segmentGridWrap,
+      rowHeight: SEGMENT_ROW_HEIGHT,
+      rowBuffer: SEGMENT_ROW_BUFFER,
+      requestFrame: requestAnimationFrame
+    })
   });
 })();
 verticalFeatureState?.inspector?.mount?.();
 
+const editorContextController = appRuntime?.featureFactories?.createEditorContextController?.({
+  getContext: () => ({
+    projectId: currentProject()?.id || "",
+    segmentId: currentSegment()?.id || ""
+  }),
+  renderReview: () => renderReviewPanel(),
+  renderHistory: () => renderRevisionHistory(),
+  renderAi: () => renderAiSuggestions(),
+  renderQuality: () => renderQualityWorkbench(),
+  refreshMatches: () => refreshTmMatches(),
+  refreshTerms: () => refreshTerms()
+});
+
 const filterPresetController = appRuntime?.featureFactories?.createFilterPresetController?.({
   select: els.filterPresetSelect,
   preferencesRepository: appRuntime.preferencesRepository,
-  getProjectId: () => state.project?.id || "",
+  getProjectId: () => currentProject()?.id || "",
   applyFilters: async (preset) => {
-    state.segmentStatusFilter = preset.status;
-    state.reviewStateFilter = preset.reviewState;
-    state.aiSegmentFilter = preset.aiState;
+    updateEditorFilters({ status: preset.status, reviewState: preset.reviewState, aiState: preset.aiState });
     els.segmentStatusFilter.value = preset.status;
     if (els.reviewStateFilter) els.reviewStateFilter.value = preset.reviewState;
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = preset.aiState;
@@ -1228,7 +1399,7 @@ const diagnosticsService = appRuntime?.featureFactories?.createDiagnosticsServic
     const counts = new Map();
     for (const segment of segments) counts.set(segment.projectId, (counts.get(segment.projectId) || 0) + 1);
     return {
-      projectCount: state.projects.length,
+      projectCount: currentProjects().length,
       segmentCount: segments.length,
       largestProjectSegmentCount: Math.max(0, ...counts.values())
     };
@@ -1294,6 +1465,131 @@ dialogLifecycleController?.register?.({
   initialFocus: els.closeTrashBtn,
   beforeOpen: renderTrashList
 });
+const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecoveryWorkspaceController?.({
+  elements: {
+    menu: els.workspaceMenu,
+    menuSummary: els.workspaceMenuSummary,
+    health: els.workspaceHealth,
+    chooseWorkspaceButton: els.chooseWorkspaceBtn,
+    saveProjectButton: els.saveWorkspaceProjectBtn,
+    syncWorkspaceButton: els.syncWorkspaceBtn,
+    exportWorkspaceBackupButton: els.workspaceBackupBtn,
+    repairWorkspaceButton: els.repairWorkspaceBtn,
+    recoveryPanel: els.workspaceRecoveryPanel,
+    recoveryMessage: els.workspaceRecoveryMessage,
+    recoveryList: els.workspaceRecoveryList,
+    saveRecoveryButton: els.workspaceRecoverySaveBtn,
+    openRecoveryButton: els.workspaceRecoveryOpenBtn,
+    dismissRecoveryButton: els.workspaceRecoveryDismissBtn,
+    backupReminderPanel: els.backupReminderPanel,
+    backupReminderMessage: els.backupReminderMessage,
+    exportRecoveryCopyButton: els.backupReminderExportBtn,
+    dismissBackupReminderButton: els.backupReminderDismissBtn,
+    projectStorageStatus: els.projectStorageStatus,
+    saveProjectToFolderInput: els.saveProjectToFolderInput,
+    projectChooseWorkspaceButton: els.projectChooseWorkspaceBtn
+  },
+  translate: uiT,
+  source: uiSource,
+  label: uiLabel,
+  formatDateTime,
+  safeText: displaySafeText,
+  chooseWorkspace: chooseWorkspaceFolder,
+  saveProject: saveCurrentProjectPackageToWorkspace,
+  syncWorkspace: () => runFileImportTask("Workspace sync", () => syncWorkspaceFromFolder()),
+  exportWorkspaceBackup: exportWorkspaceBackupToFolder,
+  repairWorkspace: repairWorkspaceLinks,
+  saveRecovery: saveWorkspaceRecoveryPackages,
+  exportRecoveryCopy: exportProjectPackage,
+  dismissBackupReminder: () => dismissBackupReminder(),
+  scheduleFrame: requestAnimationFrame,
+  onError: (error, context) => {
+    if (error?.name === "AbortError" && context?.phase === "choose-workspace") return;
+    const fallback = {
+      "choose-workspace": uiSource("Could not choose workspace folder"),
+      "save-project": uiSource("Project package save failed"),
+      "sync-workspace": uiSource("Workspace sync failed"),
+      "export-workspace-backup": uiSource("Workspace backup failed"),
+      "repair-workspace": uiSource("Workspace repair check failed"),
+      "save-recovery": uiSource("Workspace recovery save failed"),
+      "export-recovery-copy": uiSource("Recovery copy export failed"),
+      "dismiss-backup-reminder": uiSource("Backup reminder could not be dismissed")
+    }[context?.phase] || uiSource("Workspace action failed");
+    setSaveStatus(error?.message || fallback, "dirty");
+    if (context?.phase === "save-recovery") renderWorkspaceRecoveryPanel();
+  }
+});
+recoveryWorkspaceController?.mount?.();
+const importExportController = appRuntime?.featureFactories?.createImportExportController?.({
+  elements: {
+    projectFileImportButton: els.projectFileImportBtn,
+    projectsImportProjectButton: els.projectsImportProjectBtn,
+    projectFileImportInput: els.projectFileImportInput,
+    docxInput: els.docxInput,
+    localizationInput: els.localizationInput,
+    projectPackageImportInput: els.projectPackageImportInput,
+    backupImportInput: els.backupImportInput,
+    tmxImportInput: els.tmxImportInput,
+    tbxImportInput: els.tbxImportInput,
+    termListImportInput: els.termListImportInput,
+    projectPackageExportButton: els.projectPackageExportBtn,
+    exportTargetDocxButton: els.exportDocxBtn,
+    exportBilingualDocxButton: els.exportBilingualDocxBtn,
+    exportTargetTextButton: els.exportTargetBtn,
+    exportLocalizationButton: els.exportLocalizationBtn,
+    exportXliff12Button: els.exportXliffBtn,
+    exportXliff22Button: els.exportXliff22Btn,
+    exportProjectReportButton: els.exportProjectReportBtn,
+    exportQualityPassportButton: els.exportQualityPassportMenuBtn,
+    exportAnonymizedReportButton: els.exportAnonymizedProjectReportBtn,
+    tmxExportButton: els.tmxExportBtn,
+    tbxExportButton: els.tbxExportBtn,
+    backupExportButton: els.backupExportBtn,
+    validationPanel: els.validationReportPanel,
+    validationMeta: els.validationReportMeta,
+    validationList: els.validationReportList,
+    fileEncodingSelect: els.fileEncodingSelect,
+    resourceTmxImportInput: els.resourceTmxImportInput,
+    resourceTbxImportInput: els.resourceTbxImportInput,
+    resourceTermListImportInput: els.resourceTermListImportInput
+  },
+  hasProject: () => Boolean(currentProject()),
+  runImportTask: runFileImportTask,
+  importProjectFile: importProjectDocument,
+  importProjectPackage: async (file) => {
+    await flushPendingSegmentSaves();
+    return importProjectPackage(file);
+  },
+  restoreBackup: async (file) => {
+    await flushPendingSegmentSaves();
+    return restoreBackupFile(file);
+  },
+  importTmx: handleTmxImport,
+  importTbx: handleTbxImport,
+  importTermList: handleTermListImport,
+  exportProjectPackage,
+  exportTargetDocx,
+  exportBilingualDocx,
+  exportTargetText,
+  exportLocalization,
+  exportXliff12: () => exportXliff(),
+  exportXliff22,
+  exportProjectReport: () => exportProjectReport(),
+  exportQualityPassport,
+  exportAnonymizedReport: () => exportProjectReport({ anonymized: true }),
+  exportTmx: handleTmxExport,
+  exportTbx: handleTbxExport,
+  exportBackup: exportBrowserBackup,
+  onValidationDismiss: () => {
+    state.lastValidationReport = null;
+  },
+  scheduleFrame: requestAnimationFrame,
+  onError: (error, context) => {
+    console.warn(`Import/export action failed (${context?.phase || "unknown"}).`, error);
+    setSaveStatus(error?.message || uiSource("Import or export action failed."), "dirty");
+  }
+});
+importExportController?.mount?.();
 const projectDialogController = appRuntime?.featureFactories?.createProjectDialogController?.({
   dialogLifecycle: dialogLifecycleController,
   elements: {
@@ -1326,7 +1622,7 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
     { element: els.editorProjectSettingsBtn, mode: "edit" },
     { element: els.openProjectAiSettingsBtn, mode: "edit", focusAi: true }
   ],
-  getProject: () => state.project,
+  getProject: () => currentProject(),
   refreshResources,
   suggestedCreatorName,
   cleanCreatorName,
@@ -1343,6 +1639,110 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
   onError: (error) => setSaveStatus(error?.message || "Dialog could not be opened.", "dirty")
 });
 projectDialogController?.mount?.();
+const tmPretranslationDialogController = appRuntime?.featureFactories?.createTmPretranslationDialogController?.({
+  dialogLifecycle: dialogLifecycleController,
+  elements: {
+    dialog: els.tmPretranslateDialog,
+    thresholdInput: els.tmPretranslateThresholdInput
+  },
+  defaultThreshold: 85,
+  scheduleFrame: requestAnimationFrame,
+  onError: (error) => setSaveStatus(error?.message || "TM pretranslation settings could not be opened.", "dirty")
+});
+const opusCatHelpController = appRuntime?.featureFactories?.createOpusCatHelpController?.({
+  dialogLifecycle: dialogLifecycleController,
+  elements: {
+    dialog: els.opusCatHelpDialog,
+    opener: els.localAiOpusCatHelpBtn,
+    closer: els.closeOpusCatHelpBtn,
+    retryButton: els.retryOpusCatConnectionBtn
+  },
+  retryConnection: testLocalAiConnection,
+  onError: (error) => setSaveStatus(error?.message || "OPUS-CAT connection help could not complete the action.", "dirty")
+});
+opusCatHelpController?.mount?.();
+const resourcesController = appRuntime?.featureFactories?.createResourcesController?.({
+  elements: {
+    viewButton: els.resourcesViewBtn,
+    tmTab: els.tmResourceTab,
+    tbTab: els.tbResourceTab,
+    tmPanel: els.tmResourcesPanel,
+    tbPanel: els.tbResourcesPanel,
+    tmDashboard: els.tmResourceDashboard,
+    tbDashboard: els.tbResourceDashboard,
+    tmDetail: els.tmResourceDetail,
+    tbDetail: els.tbResourceDetail,
+    tmSourceLanguageInput: els.tmResourceSourceLangInput,
+    tmTargetLanguageInput: els.tmResourceTargetLangInput,
+    tbSourceLanguageInput: els.tbResourceSourceLangInput,
+    tbTargetLanguageInput: els.tbResourceTargetLangInput,
+    tmImportInput: els.resourceTmxImportInput,
+    tbImportInput: els.resourceTbxImportInput,
+    termListImportInput: els.resourceTermListImportInput
+  },
+  navigate: () => setView("resources"),
+  render: renderResourcesContent,
+  keyForItem: (item, type) => resourceKey(item, type === "tm" ? "tmName" : "termBaseName"),
+  normalizeLanguageInput: normalizeLanguageInputElement,
+  runImportTask: runFileImportTask,
+  importTm: handleResourceTmxImport,
+  importTb: handleResourceTbxImport,
+  importTermList: handleResourceTermListImport,
+  deleteResource: confirmDeleteResource,
+  exportResource,
+  saveTmEntry: saveEditedTmResourceEntry,
+  deleteTmEntry: deleteTmResourceEntry,
+  saveTerm: saveEditedTermResourceEntry,
+  deleteTerm: deleteTermResourceEntry,
+  scheduleFrame: requestAnimationFrame,
+  onError: (error) => setSaveStatus(error?.message || "Resource action failed.", "dirty")
+});
+resourcesController?.mount?.();
+const qualityReviewController = appRuntime?.featureFactories?.createQualityReviewController?.({
+  elements: {
+    reviewForm: els.reviewForm,
+    reviewStateSelect: els.reviewStateSelect,
+    reviewNoteInput: els.reviewNoteInput,
+    reviewCommentInput: els.reviewCommentInput,
+    reviewCommentsList: els.reviewCommentsList,
+    qualityForm: els.qualityForm,
+    qualityStandardSelect: els.qualityStandardSelect,
+    qualityReviewDepthSelect: els.qualityReviewDepthSelect,
+    qualityRiskToleranceSelect: els.qualityRiskToleranceSelect,
+    qualityTerminologyStrictnessSelect: els.qualityTerminologyStrictnessSelect,
+    qualityAiDisclosureSelect: els.qualityAiDisclosureSelect,
+    qualityAudienceInput: els.qualityAudienceInput,
+    qualityToneInput: els.qualityToneInput,
+    qualitySummary: els.qualitySummary,
+    qualityActiveEvidence: els.qualityActiveEvidence,
+    qualityDecisionForm: els.qualityDecisionForm,
+    qualityIssueCategorySelect: els.qualityIssueCategorySelect,
+    qualityIssueSeveritySelect: els.qualityIssueSeveritySelect,
+    qualityDecisionNoteInput: els.qualityDecisionNoteInput,
+    saveQualityDecisionBtn: els.saveQualityDecisionBtn,
+    refreshQualityRiskBtn: els.refreshQualityRiskBtn,
+    nextQualityRiskBtn: els.nextQualityRiskBtn,
+    exportQualityPassportBtn: els.exportQualityPassportBtn,
+    qualityRiskList: els.qualityRiskList
+  },
+  defaultProfile: defaultQualityProfile,
+  source: uiSource,
+  label: uiLabel,
+  profileLabel: qualityLabel,
+  categoryLabel: qualityCategoryName,
+  riskLevelLabel: qualityRiskLevelLabel,
+  formatDate,
+  saveReview: saveActiveReviewMetadata,
+  saveProfile: saveQualityProfileFromForm,
+  saveDecision: saveQualityDecisionFromForm,
+  refreshRisks: refreshQualityRiskQueue,
+  nextRisk: goToNextQualityRisk,
+  exportPassport: exportQualityPassport,
+  openRisk: goToQualityRiskItem,
+  scheduleFrame: requestAnimationFrame,
+  onError: (error) => setSaveStatus(error?.message || "Quality or review action failed.", "dirty")
+});
+qualityReviewController?.mount?.();
 dialogLifecycleController?.mount?.();
 
 function uiT(key, values = {}) {
@@ -1404,10 +1804,10 @@ function refreshLocalizedUi() {
   renderFocusMode();
   renderWorkspaceStatus();
   renderProjectStorageStatus();
-  if (state.view === "projects") renderProjectsView();
-  if (state.view === "resources") renderResourcesView();
-  if (state.project) {
-    if (state.view === "project") {
+  if (currentApplicationView() === "projects") renderProjectsView();
+  if (currentApplicationView() === "resources") renderResourcesView();
+  if (currentProject()) {
+    if (currentApplicationView() === "project") {
       renderProjectHome();
       void renderProjectAnalysis();
     }
@@ -1453,8 +1853,8 @@ function setSaveStatus(text, mode = "") {
   appRuntime?.status?.controller?.fromLegacy?.({
     text: displayText,
     mode,
-    projectId: state.project?.id || null,
-    segmentId: state.segments[state.activeIndex]?.id || ""
+    projectId: currentProject()?.id || null,
+    segmentId: currentSegmentId()
   });
   els.saveStatus.textContent = uiSource(displayText);
   els.saveStatus.className = `save-status ${mode}`;
@@ -1470,33 +1870,63 @@ function setSaveStatus(text, mode = "") {
 }
 
 function renderUndoControls() {
-  const projectId = state.commandProjectId || state.project?.id || null;
+  const projectId = state.commandProjectId || currentProject()?.id || null;
   if (els.undoBtn) els.undoBtn.disabled = !appRuntime?.commands?.bus?.canUndo?.(projectId);
   if (els.redoBtn) els.redoBtn.disabled = !appRuntime?.commands?.bus?.canRedo?.(projectId);
 }
 
+function isResourceTrashEntry(entry) {
+  return Boolean(
+    entry && ["tm-entry", "term", "translation-memory", "termbase"].includes(entry.entityType)
+  );
+}
+
+function resourceTrashEntryFromCommandResult(commandResult) {
+  const value = commandResult?.result;
+  if (isResourceTrashEntry(value)) return value;
+  return isResourceTrashEntry(value?.entry) ? value.entry : null;
+}
+
+async function synchronizeResourceTrashChange(entry, { refreshSuggestions = false } = {}) {
+  if (!isResourceTrashEntry(entry)) return false;
+  const linkType = entry.resourceType === "tm" ? "tm" : "termbase";
+  markProjectsUsingResourceDirty(linkType, entry.resourceName, entry.sourceLang, entry.targetLang);
+  await refreshResources();
+  if (entry.resourceType === "tb") {
+    await refreshProjectTerms({ rerender: currentApplicationView() === "editor" });
+    if (refreshSuggestions || currentApplicationView() === "editor") await refreshTerms();
+  } else if (currentApplicationView() === "editor") {
+    await refreshSidebar();
+  }
+  if (els.trashDialog?.open) await renderTrashList();
+  else await refreshTrashSummary();
+  return true;
+}
+
 async function undoLastCommand() {
-  const projectId = state.commandProjectId || state.project?.id || null;
+  const projectId = state.commandProjectId || currentProject()?.id || null;
   finalizePendingEditCommands(projectId || "");
   const result = await appRuntime?.commands?.bus?.undo?.(projectId);
   if (!result) return false;
   const requestedActiveSegmentId = result.result?.activeSegmentId || "";
   await loadProjects(false);
-  if (state.project?.id === projectId) {
-    state.project = state.projects.find((project) => project.id === projectId) || state.project;
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
+  if (currentProject()?.id === projectId) {
+    editorSessionStore.replaceProject(currentProjects().find((project) => project.id === projectId) || currentProject());
+    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(projectId)));
     const requestedIndex = requestedActiveSegmentId
-      ? state.segments.findIndex((segment) => segment.id === requestedActiveSegmentId)
+      ? currentSegments().findIndex((segment) => segment.id === requestedActiveSegmentId)
       : -1;
-    state.activeIndex = state.segments.length
+    const nextIndex = currentSegments().length
       ? requestedIndex >= 0
         ? requestedIndex
-        : Math.max(0, Math.min(state.activeIndex, state.segments.length - 1))
+        : Math.max(0, Math.min(currentActiveIndex(), currentSegments().length - 1))
       : -1;
+    selectApplicationSegment(nextIndex);
     renderAll();
-  } else if (!state.project && projectId && state.projects.some((project) => project.id === projectId)) {
+  } else if (!currentProject() && projectId && currentProjects().some((project) => project.id === projectId)) {
     await openProject(projectId);
   }
+  await synchronizeResourceTrashChange(resourceTrashEntryFromCommandResult(result));
   setSaveStatus(result.receipt.undoLabel, "saved");
   renderUndoControls();
   if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
@@ -1506,28 +1936,33 @@ async function undoLastCommand() {
 }
 
 async function redoLastCommand() {
-  const projectId = state.commandProjectId || state.project?.id || null;
+  const projectId = state.commandProjectId || currentProject()?.id || null;
   finalizePendingEditCommands(projectId || "");
   const result = await appRuntime?.commands?.bus?.redo?.(projectId);
   if (!result) return false;
   const requestedActiveSegmentId = result.result?.activeSegmentId || "";
-  if (result.receipt.commandId === "delete-project" && state.project?.id === projectId) {
-    state.project = null;
-    state.segments = [];
+  if (result.receipt.commandId === "delete-project" && currentProject()?.id === projectId) {
+    editorSessionStore.replaceProject(null);
+    editorSessionStore.replaceSegments([]);
     setView("projects");
+    applicationNavigation.clearSelection();
   }
   await loadProjects(false);
-  if (result.receipt.commandId === "delete-document" && state.project?.id === projectId) {
-    state.project = state.projects.find((project) => project.id === projectId) || state.project;
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
-    state.activeIndex = state.segments.length ? Math.max(0, Math.min(state.activeIndex, state.segments.length - 1)) : -1;
+  if (result.receipt.commandId === "delete-document" && currentProject()?.id === projectId) {
+    editorSessionStore.replaceProject(currentProjects().find((project) => project.id === projectId) || currentProject());
+    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(projectId)));
+    const nextIndex = currentSegments().length
+      ? Math.max(0, Math.min(currentActiveIndex(), currentSegments().length - 1))
+      : -1;
+    selectApplicationSegment(nextIndex);
     renderAll();
-  } else if (state.project?.id === projectId && requestedActiveSegmentId) {
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
-    const requestedIndex = state.segments.findIndex((segment) => segment.id === requestedActiveSegmentId);
-    if (requestedIndex >= 0) state.activeIndex = requestedIndex;
+  } else if (currentProject()?.id === projectId && requestedActiveSegmentId) {
+    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(projectId)));
+    const requestedIndex = currentSegments().findIndex((segment) => segment.id === requestedActiveSegmentId);
+    if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
     renderAll();
   }
+  await synchronizeResourceTrashChange(resourceTrashEntryFromCommandResult(result));
   setSaveStatus(result.receipt.undoLabel.replace(/^Undo\s+/i, "Redid "), "saved");
   renderUndoControls();
   if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
@@ -1548,6 +1983,7 @@ async function restoreTrashEntry(entryId) {
   try {
     const entry = await appRuntime.trashRepository.restore(entryId);
     await loadProjects(false);
+    await synchronizeResourceTrashChange(entry, { refreshSuggestions: true });
     await renderTrashList();
     setSaveStatus(`${entry.label || "Item"} restored from Trash`, "saved");
     renderUndoControls();
@@ -1564,7 +2000,7 @@ async function renderTrashList() {
   if (!entries.length) {
     const empty = document.createElement("div");
     empty.className = "muted";
-    empty.textContent = uiSource("Trash is empty. Deleted projects and files will appear here.");
+    empty.textContent = uiSource("Trash is empty. Deleted projects, files, memories, and termbases will appear here.");
     els.trashList.replaceChildren(empty);
     els.emptyTrashBtn.disabled = true;
     return entries;
@@ -1577,7 +2013,15 @@ async function renderTrashList() {
     const title = document.createElement("strong");
     title.textContent = displaySafeText(entry.label, uiSource("Deleted item"));
     const meta = document.createElement("p");
-    meta.textContent = `${entry.entityType === "document" ? uiSource("Project file") : uiSource("Project")} · ${formatDate(entry.deletedAt)}`;
+    const entityLabel =
+      entry.entityType === "document"
+        ? uiSource("Project file")
+        : entry.entityType === "project"
+          ? uiSource("Project")
+          : entry.resourceType === "tm"
+            ? uiSource("Translation memory")
+            : uiSource("Termbase");
+    meta.textContent = `${entityLabel} · ${formatDate(entry.deletedAt)}`;
     copy.append(title, meta);
     const actions = document.createElement("div");
     actions.className = "trash-item-actions";
@@ -1610,14 +2054,6 @@ async function emptyTrashPermanently() {
   return true;
 }
 
-function showManagedDialog(dialog, initialFocus) {
-  if (!dialog || dialog.open || typeof dialog.showModal !== "function") return false;
-  if (focusController?.showModal) return focusController.showModal(dialog, { initialFocus });
-  dialog.showModal();
-  queueMicrotask(() => initialFocus?.focus?.({ preventScroll: true }));
-  return true;
-}
-
 function syncPanelToggleState(button) {
   const panel = button?.closest?.("[data-collapsible-panel]");
   if (!panel) return;
@@ -1634,7 +2070,7 @@ function syncAllPanelToggleStates() {
 }
 
 function renderFocusMode() {
-  const active = Boolean(state.focusMode && state.view === "editor" && state.project);
+  const active = Boolean(currentFocusMode() && currentApplicationView() === "editor" && currentProject());
   document.body.classList.toggle("focus-mode", active);
   els.workspace.classList.toggle("focus-mode", active);
   if (els.focusModeBtn) {
@@ -1649,22 +2085,21 @@ function renderFocusMode() {
 }
 
 function setFocusMode(enabled) {
-  state.focusMode = Boolean(enabled && state.view === "editor" && state.project);
   applicationStore?.dispatch?.({
     type: "interface/focus-mode-changed",
-    payload: { enabled: state.focusMode }
+    payload: { enabled: Boolean(enabled && currentProject()) }
   });
   renderFocusMode();
   document.querySelectorAll(".menu[open]").forEach((menu) => menu.removeAttribute("open"));
-  if (!state.project) return;
+  if (!currentProject()) return;
   requestAnimationFrame(() => {
     renderSegments({ preserveScroll: true });
-    if (state.focusMode) focusActiveTextarea();
+    if (currentFocusMode()) focusActiveTextarea();
   });
 }
 
 function toggleFocusMode() {
-  setFocusMode(!state.focusMode);
+  setFocusMode(!currentFocusMode());
 }
 
 function invalidateSegmentFilterCache() {
@@ -1674,29 +2109,8 @@ function invalidateSegmentFilterCache() {
 
 function renderImportBusyState() {
   const busy = Boolean(state.importTask);
-  [
-    els.projectFileImportBtn,
-    els.docxInput,
-    els.localizationInput,
-    els.projectFileImportInput,
-    els.fileEncodingSelect,
-    els.tmxImportInput,
-    els.tbxImportInput,
-    els.termListImportInput,
-    els.resourceTmxImportInput,
-    els.resourceTbxImportInput,
-    els.resourceTermListImportInput,
-    els.projectPackageImportInput,
-    els.backupImportInput
-  ].filter(Boolean).forEach((control) => {
-    control.disabled = busy;
-    control.setAttribute("aria-busy", String(busy));
-  });
-  if (els.syncWorkspaceBtn) {
-    const status = state.workspaceStatus || {};
-    els.syncWorkspaceBtn.disabled = busy || !status.supported || !status.connected;
-    els.syncWorkspaceBtn.setAttribute("aria-busy", String(busy));
-  }
+  importExportController?.renderBusy?.(busy);
+  recoveryWorkspaceController?.renderBusy?.({ busy, status: state.workspaceStatus || {} });
 }
 
 function formatFileSize(bytes) {
@@ -1923,7 +2337,7 @@ function sourceWordCount(segment) {
 }
 
 function currentSegment() {
-  return state.segments[state.activeIndex] || null;
+  return currentSegments()[currentActiveIndex()] || null;
 }
 
 function setHiddenSegmentField(segment, field, value) {
@@ -1948,7 +2362,7 @@ function prepareSegmentHistoryState(segment) {
   return segment;
 }
 
-function prepareSegmentHistoryStates(segments = state.segments) {
+function prepareSegmentHistoryStates(segments = currentSegments()) {
   (segments || []).forEach(prepareSegmentHistoryState);
   return segments;
 }
@@ -2050,7 +2464,7 @@ function touchSegment(segment, options = {}) {
   return segment;
 }
 
-function languagePair(project = state.project) {
+function languagePair(project = currentProject()) {
   return project ? languagePairDisplay(project.sourceLang, project.targetLang) : "";
 }
 
@@ -2204,16 +2618,15 @@ function clearOpenAiKey() {
   try {
     saveOpenAiKey("", false);
   } catch (error) {
-    if (els.aiConnectionStatus) {
-      els.aiConnectionStatus.textContent = redactSensitiveText(error.message || "OpenAI key could not be cleared.");
-    }
+    aiAdministrationController?.renderGlobalConnectionStatus?.(
+      redactSensitiveText(error.message || "OpenAI key could not be cleared.")
+    );
     return false;
   }
-  if (els.openAiApiKeyInput) els.openAiApiKeyInput.value = "";
-  if (els.rememberOpenAiKeyInput) els.rememberOpenAiKeyInput.checked = false;
-  if (els.aiConnectionStatus) {
-    els.aiConnectionStatus.textContent = "OpenAI key: Not saved. API keys stay in this browser and are never exported with project packages.";
-  }
+  aiAdministrationController?.clearOpenAiSecret?.();
+  aiAdministrationController?.renderGlobalConnectionStatus?.(
+    "OpenAI key: Not saved. API keys stay in this browser and are never exported with project packages."
+  );
   return true;
 }
 
@@ -2235,7 +2648,7 @@ function localAiStorage(kind) {
 
 function localAiKeyStorageKey(settings = localAiSettingsFromForm()) {
   const clean = localAISettingsStore?.defaults
-    ? localAISettingsStore.defaults(settings || {}, state.project)
+    ? localAISettingsStore.defaults(settings || {}, currentProject())
     : (settings || {});
   const providerId = String(clean.providerId || clean.provider || "ollama").trim() || "ollama";
   const fallbackBaseUrl = clean.baseUrl || (providerId === "ollama" ? OLLAMA_DEFAULT_BASE_URL : OPENAI_DEFAULT_BASE_URL);
@@ -2362,8 +2775,7 @@ function clearLocalAiKey() {
     setLocalAiStatus("error", redactSensitiveText(error.message || "Local AI key could not be cleared."));
     return false;
   }
-  if (els.localAiApiKeyInput) els.localAiApiKeyInput.value = "";
-  if (els.rememberLocalAiKeyInput) els.rememberLocalAiKeyInput.checked = false;
+  aiAdministrationController?.clearLocalAiSecret?.();
   setLocalAiStatus("disconnected", "Local AI key cleared for this provider");
   return true;
 }
@@ -2381,17 +2793,17 @@ function markOpenAiProjectRollbackDirty(projectId) {
 
 async function restoreProjectAfterOpenAiSetupFailure(previousProject, previousProjects, projectPersisted) {
   if (!projectPersisted) {
-    state.project = previousProject;
-    state.projects = previousProjects;
+    editorSessionStore.replaceProject(previousProject);
+    editorSessionStore.replaceProjects(previousProjects);
     return;
   }
   try {
-    state.project = await updateProject(previousProject);
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    editorSessionStore.replaceProject(await updateProject(previousProject));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   } catch (rollbackError) {
     console.warn("Project AI settings rollback failed.", rollbackError);
-    state.project = previousProject;
-    state.projects = previousProjects;
+    editorSessionStore.replaceProject(previousProject);
+    editorSessionStore.replaceProjects(previousProjects);
     markOpenAiProjectRollbackDirty(previousProject.id);
   }
 }
@@ -2551,7 +2963,7 @@ async function suggestedCreatorName() {
   return "This computer";
 }
 
-function projectDocumentManifest(project = state.project) {
+function projectDocumentManifest(project = currentProject()) {
   const seen = new Set();
   return (Array.isArray(project?.documents) ? project.documents : [])
     .map((documentInfo) => {
@@ -2615,23 +3027,23 @@ function projectResourceLinks(project) {
   return links;
 }
 
-function mainTmName(project = state.project) {
+function mainTmName(project = currentProject()) {
   return projectResourceLinks(project).find((link) => link.type === "tm" && link.role === "main")?.name || cleanProjectText(project?.mainTmName, cleanProjectText(project?.tmName, "Default TM"));
 }
 
-function projectTmNames(project = state.project) {
+function projectTmNames(project = currentProject()) {
   return uniqueNames([mainTmName(project), ...projectResourceLinks(project).filter((link) => link.type === "tm").map((link) => link.name)]);
 }
 
-function projectTermBaseNames(project = state.project) {
+function projectTermBaseNames(project = currentProject()) {
   return uniqueNames(projectResourceLinks(project).filter((link) => link.type === "termbase").map((link) => link.name));
 }
 
-function primaryTermBaseName(project = state.project) {
+function primaryTermBaseName(project = currentProject()) {
   return projectTermBaseNames(project)[0] || cleanProjectText(project?.termBaseName, "Default TB");
 }
 
-function projectResourceSummary(project = state.project) {
+function projectResourceSummary(project = currentProject()) {
   const tmNames = projectTmNames(project);
   const tbNames = projectTermBaseNames(project);
   return {
@@ -2725,7 +3137,7 @@ function segmentHasAiSuggestions(segment = {}) {
 }
 
 function segmentPassesAiFilter(segment = {}) {
-  const filter = state.aiSegmentFilter;
+  const filter = currentEditorFilters().aiState;
   if (!filter) return true;
   if (filter === "ai-draft") return segmentHasAiDraft(segment);
   if (filter === "ai-suggestions") return segmentHasAiSuggestions(segment);
@@ -2735,12 +3147,13 @@ function segmentPassesAiFilter(segment = {}) {
 }
 
 function segmentQueryMatcher() {
-  const query = state.segmentQuery;
+  const filters = currentEditorFilters();
+  const query = filters.query;
   if (!query) return () => true;
-  const scope = state.segmentSearchScope;
-  if (state.segmentRegex) {
+  const scope = filters.scope;
+  if (filters.regex) {
     try {
-      const pattern = new RegExp(query, state.segmentCaseSensitive ? "" : "i");
+      const pattern = new RegExp(query, filters.caseSensitive ? "" : "i");
       return (segment) => {
         const source = segment.source || "";
         const target = segment.target || "";
@@ -2751,7 +3164,7 @@ function segmentQueryMatcher() {
       return () => false;
     }
   }
-  if (state.segmentCaseSensitive) {
+  if (filters.caseSensitive) {
     return (segment) => {
       const source = segment.source || "";
       const target = segment.target || "";
@@ -2769,13 +3182,14 @@ function segmentQueryMatcher() {
 }
 
 function segmentPassesFilters(segment, queryMatches = segmentQueryMatcher()) {
-  const status = state.segmentStatusFilter;
-  if (state.documentFilter && segment.documentId !== state.documentFilter) return false;
-  if (state.reviewStateFilter) {
+  const filters = currentEditorFilters();
+  const status = filters.status;
+  if (currentDocumentId() && segment.documentId !== currentDocumentId()) return false;
+  if (filters.reviewState) {
     const comments = (segment.comments || []).length + ((segment.reviewNote || "").trim() ? 1 : 0);
-    if (state.reviewStateFilter === "comments") {
+    if (filters.reviewState === "comments") {
       if (!comments) return false;
-    } else if (segment.reviewState !== state.reviewStateFilter) {
+    } else if (segment.reviewState !== filters.reviewState) {
       return false;
     }
   }
@@ -2789,20 +3203,21 @@ function segmentPassesFilters(segment, queryMatches = segmentQueryMatcher()) {
 }
 
 function projectSegmentIndexes() {
-  return state.segments.map((_, index) => index);
+  return currentSegments().map((_, index) => index);
 }
 
 function segmentFilterCacheKey() {
+  const filters = currentEditorFilters();
   return [
     state.segmentFilterRevision,
-    state.documentFilter,
-    state.segmentQuery,
-    state.segmentSearchScope,
-    state.segmentRegex ? "regex" : "plain",
-    state.segmentCaseSensitive ? "case" : "fold",
-    state.segmentStatusFilter,
-    state.reviewStateFilter,
-    state.aiSegmentFilter
+    currentDocumentId(),
+    filters.query,
+    filters.scope,
+    filters.regex ? "regex" : "plain",
+    filters.caseSensitive ? "case" : "fold",
+    filters.status,
+    filters.reviewState,
+    filters.aiState
   ].join("\u001f");
 }
 
@@ -2811,7 +3226,7 @@ function filteredSegmentIndexes() {
   if (state.segmentFilterCache.key === key) return state.segmentFilterCache.indexes;
   const indexes = [];
   const queryMatches = segmentQueryMatcher();
-  state.segments.forEach((segment, index) => {
+  currentSegments().forEach((segment, index) => {
     if (segmentPassesFilters(segment, queryMatches)) indexes.push(index);
   });
   const positions = new Map(indexes.map((segmentIndex, position) => [segmentIndex, position]));
@@ -2831,21 +3246,21 @@ function firstVisibleSegmentIndex() {
 
 function projectDocuments() {
   const map = new Map();
-  projectDocumentManifest(state.project).forEach((documentInfo) => {
+  projectDocumentManifest(currentProject()).forEach((documentInfo) => {
     const id = documentInfo?.id || "";
     if (!id || map.has(id)) return;
     map.set(id, {
       id,
-      name: documentInfo.name || state.project?.sourceFileName || "Document",
+      name: documentInfo.name || currentProject()?.sourceFileName || "Document",
       type: stableLower(documentInfo.type || "docx") || "docx"
     });
   });
-  state.segments.forEach((segment) => {
+  currentSegments().forEach((segment) => {
     const id = segment.documentId || "default-document";
     if (!map.has(id)) {
       map.set(id, {
         id,
-        name: segment.documentName || state.project?.sourceFileName || "Document",
+        name: segment.documentName || currentProject()?.sourceFileName || "Document",
         type: stableLower(segment.documentType || "docx") || "docx"
       });
       return;
@@ -2853,7 +3268,7 @@ function projectDocuments() {
     const current = map.get(id);
     map.set(id, {
       ...current,
-      name: current.name || segment.documentName || state.project?.sourceFileName || "Document",
+      name: current.name || segment.documentName || currentProject()?.sourceFileName || "Document",
       type: stableLower(current.type || segment.documentType || "docx") || "docx"
     });
   });
@@ -2866,7 +3281,7 @@ function projectDocumentType(documentInfo) {
 
 function exportDocumentForTypes(supportedTypes, selectedTypeMessage, missingMessage) {
   const docs = projectDocuments();
-  const selected = state.documentFilter ? docs.find((item) => item.id === state.documentFilter) : null;
+  const selected = currentDocumentId() ? docs.find((item) => item.id === currentDocumentId()) : null;
   if (selected) {
     if (supportedTypes.has(projectDocumentType(selected))) return selected;
     setSaveStatus(selectedTypeMessage, "dirty");
@@ -2878,7 +3293,7 @@ function exportDocumentForTypes(supportedTypes, selectedTypeMessage, missingMess
 }
 
 function documentSegments(documentId) {
-  return state.segments.filter((segment) => segment.documentId === documentId);
+  return currentSegments().filter((segment) => segment.documentId === documentId);
 }
 
 function emptyDocumentStats() {
@@ -2901,7 +3316,7 @@ function finalizeDocumentStats(stats) {
 
 function projectDocumentStats(documents = projectDocuments()) {
   const map = new Map(documents.map((documentInfo) => [documentInfo.id, emptyDocumentStats()]));
-  state.segments.forEach((segment) => {
+  currentSegments().forEach((segment) => {
     const id = segment.documentId || "default-document";
     if (!map.has(id)) map.set(id, emptyDocumentStats());
     addSegmentToDocumentStats(map.get(id), segment);
@@ -2924,33 +3339,33 @@ function aggregateDocumentStats(statsById) {
 
 function documentStats(documentId) {
   const stats = emptyDocumentStats();
-  state.segments.forEach((segment) => {
+  currentSegments().forEach((segment) => {
     if (segment.documentId === documentId) addSegmentToDocumentStats(stats, segment);
   });
   return finalizeDocumentStats(stats);
 }
 
 function currentDocumentSegments() {
-  return state.documentFilter
-    ? state.segments.filter((segment) => segment.documentId === state.documentFilter)
-    : state.segments;
+  return currentDocumentId()
+    ? currentSegments().filter((segment) => segment.documentId === currentDocumentId())
+    : currentSegments();
 }
 
 function currentSelectedDocument() {
-  if (!state.documentFilter) return null;
-  return projectDocuments().find((documentInfo) => documentInfo.id === state.documentFilter) || null;
+  if (!currentDocumentId()) return null;
+  return projectDocuments().find((documentInfo) => documentInfo.id === currentDocumentId()) || null;
 }
 
 function deliveryExportScope() {
   const documentInfo = currentSelectedDocument();
   return {
     documentInfo,
-    segments: documentInfo ? state.segments.filter((segment) => segment.documentId === documentInfo.id) : state.segments
+    segments: documentInfo ? currentSegments().filter((segment) => segment.documentId === documentInfo.id) : currentSegments()
   };
 }
 
 function scopedExportBaseName(baseName, documentInfo) {
-  const base = fileSafeName(baseName || state.project?.name || "project");
+  const base = fileSafeName(baseName || currentProject()?.name || "project");
   return documentInfo ? `${base}_${fileSafeName(documentInfo.name || "current-file")}` : base;
 }
 
@@ -3109,11 +3524,11 @@ function shouldLiveSyncLanguageInput(input) {
   return Boolean(LANGUAGE_ALIAS_CODES[lookup]) || lookup === stableLanguageLookupKey(code);
 }
 
-function languagePairKey(project = state.project) {
+function languagePairKey(project = currentProject()) {
   return project ? `${normalizeLanguageInputValue(project.sourceLang)}::${normalizeLanguageInputValue(project.targetLang)}` : "";
 }
 
-function targetSpellcheckLanguage(project = state.project) {
+function targetSpellcheckLanguage(project = currentProject()) {
   return normalizeLanguageInputValue(project?.targetLang || "");
 }
 
@@ -3174,7 +3589,7 @@ function renderLanguageDatalists() {
 
 function renderTextEncodingOptions() {
   if (!els.fileEncodingSelect) return;
-  const options = window.CatHan.encoding?.TEXT_ENCODING_OPTIONS || [["auto", "Auto"], ["utf-8", "UTF-8"]];
+  const options = encodingApi.TEXT_ENCODING_OPTIONS || [["auto", "Auto"], ["utf-8", "UTF-8"]];
   replaceSafeHtml(
     els.fileEncodingSelect,
     options.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("")
@@ -3191,7 +3606,7 @@ function textDecodingOptions() {
 }
 
 function recentLanguagePairs(limit = 4) {
-  return [...state.projects]
+  return [...currentProjects()]
     .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
     .map((project) => [normalizeLanguageInputValue(project.sourceLang), normalizeLanguageInputValue(project.targetLang)])
     .filter(([source, target]) => source && target)
@@ -3211,21 +3626,24 @@ function renderFrequentLanguagePairs() {
   }).join(""));
 }
 
-function syncLocalAiLanguageFields(changedInput = null) {
-  const sourceCode = changedInput === els.localAiSourceLangInput
-    ? normalizeLanguageInputValue(els.localAiSourceLangInput?.value || state.project?.sourceLang || "")
-    : normalizeLanguageInputValue(els.localAiSourceCodeInput?.value || els.localAiSourceLangInput?.value || state.project?.sourceLang || "");
-  const targetCode = changedInput === els.localAiTargetLangInput
-    ? normalizeLanguageInputValue(els.localAiTargetLangInput?.value || state.project?.targetLang || "")
-    : normalizeLanguageInputValue(els.localAiTargetCodeInput?.value || els.localAiTargetLangInput?.value || state.project?.targetLang || "");
+function syncLocalAiLanguageFields(changedField = "") {
+  const form = aiAdministrationController?.readLocalForm?.() || {};
+  const sourceCode = changedField === "sourceLanguage"
+    ? normalizeLanguageInputValue(form.sourceLanguage || currentProject()?.sourceLang || "")
+    : normalizeLanguageInputValue(form.sourceCode || form.sourceLanguage || currentProject()?.sourceLang || "");
+  const targetCode = changedField === "targetLanguage"
+    ? normalizeLanguageInputValue(form.targetLanguage || currentProject()?.targetLang || "")
+    : normalizeLanguageInputValue(form.targetCode || form.targetLanguage || currentProject()?.targetLang || "");
+  const fields = {};
   if (sourceCode) {
-    if (changedInput !== els.localAiSourceLangInput && els.localAiSourceLangInput) els.localAiSourceLangInput.value = languageNameForUi(sourceCode);
-    if (changedInput !== els.localAiSourceCodeInput && els.localAiSourceCodeInput) els.localAiSourceCodeInput.value = sourceCode;
+    if (changedField !== "sourceLanguage") fields.sourceLanguage = languageNameForUi(sourceCode);
+    if (changedField !== "sourceCode") fields.sourceCode = sourceCode;
   }
   if (targetCode) {
-    if (changedInput !== els.localAiTargetLangInput && els.localAiTargetLangInput) els.localAiTargetLangInput.value = languageNameForUi(targetCode);
-    if (changedInput !== els.localAiTargetCodeInput && els.localAiTargetCodeInput) els.localAiTargetCodeInput.value = targetCode;
+    if (changedField !== "targetLanguage") fields.targetLanguage = languageNameForUi(targetCode);
+    if (changedField !== "targetCode") fields.targetCode = targetCode;
   }
+  aiAdministrationController?.setLanguageFields?.(fields);
 }
 
 function selectedEditorText() {
@@ -3326,7 +3744,7 @@ function canMergeSegmentStructures(segment, next) {
 function nextSegmentForMerge(segment = currentSegment()) {
   if (!segment) return null;
   return (
-    state.segments.find(
+    currentSegments().find(
       (item) => item.index > segment.index && item.documentId === segment.documentId
     ) || null
   );
@@ -3482,46 +3900,46 @@ function segmentStatusLabel(status) {
 }
 
 function commandList() {
-  const commandProjectId = state.commandProjectId || state.project?.id || null;
+  const commandProjectId = state.commandProjectId || currentProject()?.id || null;
   const commands = [
     { id: "undo", label: "Undo last action", run: undoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canUndo?.(commandProjectId)) },
     { id: "redo", label: "Redo last action", run: redoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canRedo?.(commandProjectId)) },
     { id: "trash", label: "Open Trash", run: openTrash, enabled: Boolean(appRuntime?.trashRepository) },
     { id: "confirm", label: "Confirm segment", run: confirmCurrentSegment, enabled: Boolean(currentSegment()?.target?.trim()) },
-    { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(state.segments.length) },
-    { id: "focus-mode", label: state.focusMode ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(state.view === "editor" && state.project) },
+    { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(currentSegments().length) },
+    { id: "focus-mode", label: currentFocusMode() ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(currentApplicationView() === "editor" && currentProject()) },
     { id: "copy-source", label: "Copy source", run: copySourceToTarget, enabled: Boolean(currentSegment()) },
     { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: splitCurrentSegment, enabled: Boolean(currentSegment() && canSplitSegmentStructure(currentSegment())) },
     { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: mergeWithNextSegment, enabled: Boolean(currentSegment() && canMergeSegmentStructures(currentSegment(), nextSegmentForMerge(currentSegment()))) },
     { id: "save-tm", label: "Save segment to TM", run: saveActiveSegmentToTm, enabled: Boolean(currentSegment()?.target?.trim()) },
-    { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(state.project) },
-    { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(state.project) },
-    { id: "quality-passport", label: "Export Quality Passport", run: exportQualityPassport, enabled: Boolean(state.project) },
-    { id: "next-quality-risk", label: "Next quality risk", run: goToNextQualityRisk, enabled: Boolean(state.project) },
-    { id: "concordance", label: "Open concordance", run: openConcordanceSearch, enabled: Boolean(state.project) },
-    { id: "replace-target", label: "Find and replace target text", run: openReplacePanel, enabled: Boolean(state.project) },
-    { id: "preset-translate", label: "Use Translate filter preset", group: "Filters", keywords: ["open", "segments", "matches"], run: () => filterPresetController?.applyPreset?.("translate"), enabled: Boolean(state.project) },
-    { id: "preset-review", label: "Use Review filter preset", group: "Filters", keywords: ["needs review", "comments"], run: () => filterPresetController?.applyPreset?.("review"), enabled: Boolean(state.project) },
-    { id: "preset-qa-fixes", label: "Use QA fixes filter preset", group: "Filters", keywords: ["quality", "blocked", "fixes"], run: () => filterPresetController?.applyPreset?.("qa-fixes"), enabled: Boolean(state.project) },
-    { id: "preset-ai-review", label: "Use AI review filter preset", group: "Filters", keywords: ["AI", "risk", "suggestions"], run: () => filterPresetController?.applyPreset?.("ai-review"), enabled: Boolean(state.project) },
-    { id: "project-report", label: "Export project report", run: exportProjectReport, enabled: Boolean(state.project) },
-    { id: "anonymized-report", label: "Export anonymized report", run: () => exportProjectReport({ anonymized: true }), enabled: Boolean(state.project) },
-    { id: "local-ai-pretranslate", label: "Local AI pre-translate", run: pretranslateWithLocalAi, enabled: Boolean(state.project && !state.localAi.running) },
+    { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(currentProject()) },
+    { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(currentProject()) },
+    { id: "quality-passport", label: "Export Quality Passport", run: exportQualityPassport, enabled: Boolean(currentProject()) },
+    { id: "next-quality-risk", label: "Next quality risk", run: goToNextQualityRisk, enabled: Boolean(currentProject()) },
+    { id: "concordance", label: "Open concordance", run: openConcordanceSearch, enabled: Boolean(currentProject()) },
+    { id: "replace-target", label: "Find and replace target text", run: openReplacePanel, enabled: Boolean(currentProject()) },
+    { id: "preset-translate", label: "Use Translate filter preset", group: "Filters", keywords: ["open", "segments", "matches"], run: () => filterPresetController?.applyPreset?.("translate"), enabled: Boolean(currentProject()) },
+    { id: "preset-review", label: "Use Review filter preset", group: "Filters", keywords: ["needs review", "comments"], run: () => filterPresetController?.applyPreset?.("review"), enabled: Boolean(currentProject()) },
+    { id: "preset-qa-fixes", label: "Use QA fixes filter preset", group: "Filters", keywords: ["quality", "blocked", "fixes"], run: () => filterPresetController?.applyPreset?.("qa-fixes"), enabled: Boolean(currentProject()) },
+    { id: "preset-ai-review", label: "Use AI review filter preset", group: "Filters", keywords: ["AI", "risk", "suggestions"], run: () => filterPresetController?.applyPreset?.("ai-review"), enabled: Boolean(currentProject()) },
+    { id: "project-report", label: "Export project report", run: exportProjectReport, enabled: Boolean(currentProject()) },
+    { id: "anonymized-report", label: "Export anonymized report", run: () => exportProjectReport({ anonymized: true }), enabled: Boolean(currentProject()) },
+    { id: "local-ai-pretranslate", label: "Local AI pre-translate", run: pretranslateWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running) },
     { id: "local-ai-review", label: "AI review active segment", run: reviewActiveSegmentWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-review-batch", label: "AI QA batch", run: reviewBatchWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-review-batch", label: "AI QA batch", run: reviewBatchWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-tag-repair", label: "Suggest AI tag repair", run: repairActiveSegmentTagsWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-tag-repair-batch", label: "Repair AI tags batch", run: repairBatchTagsWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-tag-repair-batch", label: "Repair AI tags batch", run: repairBatchTagsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-polish-draft", label: "Polish active draft with AI", run: polishActiveSegmentDraftWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-polish-batch", label: "Polish AI drafts batch", run: polishBatchDraftsWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-polish-batch", label: "Polish AI drafts batch", run: polishBatchDraftsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-adapt-draft", label: "Adapt active draft with AI", run: adaptActiveSegmentDraftWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-adapt-batch", label: "Adapt AI drafts batch", run: adaptBatchDraftsWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-adapt-batch", label: "Adapt AI drafts batch", run: adaptBatchDraftsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-variants", label: "Suggest AI alternatives", run: suggestActiveSegmentVariantsWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-variants-batch", label: "Suggest AI alternatives batch", run: suggestBatchSegmentVariantsWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-variants-batch", label: "Suggest AI alternatives batch", run: suggestBatchSegmentVariantsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-apply-terms", label: "Apply AI terminology", run: applyActiveSegmentTerminologyWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-apply-terms-batch", label: "Apply AI terminology batch", run: applyBatchTerminologyWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-apply-terms-batch", label: "Apply AI terminology batch", run: applyBatchTerminologyWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-terms", label: "Extract AI terms", run: extractActiveSegmentTermsWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-terms-batch", label: "Extract AI terms batch", run: extractBatchTermsWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-project-brief", label: "Generate AI project brief", run: generateProjectBriefWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-terms-batch", label: "Extract AI terms batch", run: extractBatchTermsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-project-brief", label: "Generate AI project brief", run: generateProjectBriefWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "openai-ai", label: "Create OpenAI suggestion", run: createOpenAiSuggestion, enabled: Boolean(currentSegment()) }
   ];
   const shortcuts = {
@@ -3574,7 +3992,7 @@ function queueSegmentSave(segment, delay = 450) {
       finalizePendingEditCommand(segment.id);
       setSaveStatus("Saving...");
       const record = state.saveTimers.get(segment.id);
-      const latest = state.segments.find((item) => item.id === segment.id) || record?.segment || segment;
+      const latest = currentSegments().find((item) => item.id === segment.id) || record?.segment || segment;
       if (LOOPCAT_TEST_BUILD && latest[AUTOSAVE_SAVE_FAILURE_TEST_FLAG]) {
         Reflect.deleteProperty(latest, AUTOSAVE_SAVE_FAILURE_TEST_FLAG);
         throw new Error("Simulated autosave save failure");
@@ -3585,7 +4003,7 @@ function queueSegmentSave(segment, delay = 450) {
       renderRevisionHistory();
     } catch (error) {
       const record = state.saveTimers.get(segment.id);
-      const latest = state.segments.find((item) => item.id === segment.id) || record?.segment || segment;
+      const latest = currentSegments().find((item) => item.id === segment.id) || record?.segment || segment;
       if (state.saveTimers.get(segment.id)?.timer === timer) {
         state.saveTimers.delete(segment.id);
         queueSegmentSave(latest, AUTOSAVE_RETRY_DELAY_MS);
@@ -3671,11 +4089,11 @@ function restoreWorkspaceDirtyIds() {
   const ids = readStoredWorkspaceDirtyIds();
   state.workspaceDirtyProjectIds = new Set(ids);
   state.workspaceRecoveryProjectIds = new Set(ids);
-  state.workspaceRecoveryDismissed = false;
+  recoveryWorkspaceController?.resetRecoveryDismissal?.();
 }
 
 function pruneWorkspaceDirtyProjectIds() {
-  const knownIds = new Set(state.projects.map((project) => project.id).filter(Boolean));
+  const knownIds = new Set(currentProjects().map((project) => project.id).filter(Boolean));
   const nextIds = workspaceDirtyIds().filter((id) => knownIds.has(id));
   const nextRecoveryIds = Array.from(state.workspaceRecoveryProjectIds).filter((id) => knownIds.has(id) && nextIds.includes(id));
   const dirtyChanged = nextIds.length !== state.workspaceDirtyProjectIds.size;
@@ -3705,7 +4123,7 @@ function handleBeforeUnload(event) {
   event.returnValue = "";
 }
 
-function markWorkspaceDirty(projectId = state.project?.id) {
+function markWorkspaceDirty(projectId = currentProject()?.id) {
   if (!projectId) return;
   const changed = !state.workspaceDirtyProjectIds.has(projectId);
   state.workspaceDirtyProjectIds.add(projectId);
@@ -3736,14 +4154,14 @@ function projectUsesResource(project, type, name, sourceLang = "", targetLang = 
 }
 
 function markProjectsUsingResourceDirty(type, name, sourceLang = "", targetLang = "") {
-  const projectIds = state.projects
+  const projectIds = currentProjects()
     .filter((project) => projectUsesResource(project, type, name, sourceLang, targetLang))
     .map((project) => project.id);
   markWorkspaceProjectsDirty(projectIds);
   return projectIds.length;
 }
 
-function clearWorkspaceDirty(projectId = state.project?.id) {
+function clearWorkspaceDirty(projectId = currentProject()?.id) {
   if (projectId) state.workspaceDirtyProjectIds.delete(projectId);
   if (projectId) state.workspaceRecoveryProjectIds.delete(projectId);
   persistWorkspaceDirtyIds();
@@ -3753,7 +4171,7 @@ function clearWorkspaceDirty(projectId = state.project?.id) {
 function clearWorkspaceDirtyMarkers() {
   state.workspaceDirtyProjectIds.clear();
   state.workspaceRecoveryProjectIds.clear();
-  state.workspaceRecoveryDismissed = false;
+  recoveryWorkspaceController?.resetRecoveryDismissal?.();
   persistWorkspaceDirtyIds();
   renderWorkspaceStatus();
 }
@@ -3764,46 +4182,19 @@ function clearWorkspaceDirtyMemoryOnly() {
   renderWorkspaceStatus();
 }
 
-function workspaceStatusLine(status = state.workspaceStatus) {
-  return uiT("workspace.menu.summary");
-}
-
 function renderWorkspaceStatus() {
-  if (!els.workspaceMenuSummary || !workspaceStorage) return;
+  if (!workspaceStorage) return;
   const status = state.workspaceStatus || {};
   const dirtyCount = visibleWorkspaceDirtyCount(status);
-  els.workspaceMenuSummary.textContent = dirtyCount
-    ? uiT("workspace.menu.summaryDirty", { count: dirtyCount })
-    : workspaceStatusLine(status);
-  const mode = status.connected ? uiT("workspace.status.folderTitle") : uiT("workspace.status.localTitle");
-  const folderSupport = status.supported
-    ? uiT("workspace.status.localDetail")
-    : uiT("workspace.status.unsupportedDetail");
   const storageWarnings = storageDurabilityWarnings(state.storageDurability);
-  const folderName = displaySafeText(status.name, uiT("workspace.status.workspaceFolder"));
-  const countLine = status.connected
-    ? uiT("workspace.status.folderContents", {
-      packages: status.projectCount || 0,
-      resources: status.resourceCount || 0,
-      backups: status.backupCount || 0
-    })
-    : "";
-  replaceSafeHtml(els.workspaceHealth, `
-    <strong>${escapeHtml(mode)}</strong>
-    <span>${status.connected ? escapeHtml(uiT("workspace.status.folderDetail", { name: folderName })) : escapeHtml(folderSupport)}</span>
-    <span>${escapeHtml(uiSource(storageDurabilityLine(state.storageDurability)))}</span>
-    ${status.connected ? `<span>${escapeHtml(uiT("workspace.status.lastSync", { date: formatDateTime(status.lastSyncedAt) }))}</span>` : ""}
-    ${countLine ? `<span>${escapeHtml(countLine)}</span>` : ""}
-    ${dirtyCount ? `<span class="workspace-warning">${escapeHtml(uiT("workspace.status.dirtyWarning", { count: dirtyCount }))}</span>` : ""}
-    ${storageWarnings.map((warning) => `<span class="workspace-warning">${escapeHtml(uiSource(warning))}</span>`).join("")}
-    ${(status.warnings || []).length ? `<span class="workspace-warning">${escapeHtml(status.warnings[0])}${status.warnings.length > 1 ? ` (${status.warnings.length} total)` : ""}</span>` : ""}
-  `);
-  els.chooseWorkspaceBtn.disabled = !status.supported;
-  els.saveWorkspaceProjectBtn.disabled = !status.supported || !status.connected || !state.project;
-  els.syncWorkspaceBtn.disabled = Boolean(state.importTask) || !status.supported || !status.connected;
-  els.workspaceBackupBtn.disabled = !status.supported || !status.connected;
-  els.repairWorkspaceBtn.disabled = !status.supported || !status.connected;
-  renderProjectStorageStatus();
+  recoveryWorkspaceController?.renderStatus?.({
+    status,
+    dirtyCount,
+    storageLine: storageDurabilityLine(state.storageDurability),
+    storageWarnings,
+    importBusy: Boolean(state.importTask),
+    hasProject: Boolean(currentProject())
+  });
   renderWorkspaceRecoveryPanel();
 }
 
@@ -3812,23 +4203,15 @@ function workspaceRecoveryProjectIds() {
 }
 
 function renderWorkspaceRecoveryPanel() {
-  if (!els.workspaceRecoveryPanel) return;
   const ids = workspaceRecoveryProjectIds();
-  const supported = Boolean(state.workspaceStatus?.supported);
-  const shouldShow = supported && !state.workspaceRecoveryDismissed && ids.length > 0;
-  els.workspaceRecoveryPanel.classList.toggle("hidden", !shouldShow);
-  if (!shouldShow) return;
-  const connected = Boolean(state.workspaceStatus?.connected);
-  els.workspaceRecoveryMessage.textContent = connected
-    ? "Your edits are saved in LoopCAT but have not yet been copied to your workspace folder."
-    : "Your edits are saved in this browser. Choose your workspace folder to keep a visible recovery copy.";
-  replaceSafeHtml(els.workspaceRecoveryList, ids
-    .map((id) => {
+  recoveryWorkspaceController?.renderRecovery?.({
+    status: state.workspaceStatus || {},
+    projects: ids.map((id) => {
       const project = knownProjectById(id);
-      return `<li>${displaySafeHtml(project?.name || id)}</li>`;
-    })
-    .join(""));
-  els.workspaceRecoverySaveBtn.disabled = !supported || state.workspaceAutosaving;
+      return { id, name: project?.name || id };
+    }),
+    autosaving: state.workspaceAutosaving
+  });
 }
 
 function daysBetween(fromIso, toDate = new Date()) {
@@ -3852,7 +4235,7 @@ function isBackupReminderDismissed(projectId, now = new Date()) {
   return until ? new Date(until).getTime() > now.getTime() : false;
 }
 
-function dismissBackupReminder(projectId = state.project?.id, hours = BACKUP_REMINDER_DISMISS_HOURS) {
+function dismissBackupReminder(projectId = currentProject()?.id, hours = BACKUP_REMINDER_DISMISS_HOURS) {
   if (!projectId) return;
   const dismissed = backupReminderDismissals();
   dismissed[projectId] = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
@@ -3864,12 +4247,12 @@ function dismissBackupReminder(projectId = state.project?.id, hours = BACKUP_REM
   renderBackupReminder();
 }
 
-function latestProjectPackageExport(project = state.project) {
+function latestProjectPackageExport(project = currentProject()) {
   const history = (project?.exportHistory || []).filter((entry) => entry.type === "project-package" && entry.createdAt);
   return history.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0] || null;
 }
 
-function backupReminderInfo(project = state.project, activityEvents = state.activityEvents, now = new Date()) {
+function backupReminderInfo(project = currentProject(), activityEvents = currentActivityEvents(), now = new Date()) {
   if (!project || isBackupReminderDismissed(project.id, now)) return null;
   const latestExport = latestProjectPackageExport(project);
   const projectAgeDays = daysBetween(project.createdAt, now);
@@ -3891,17 +4274,14 @@ function backupReminderInfo(project = state.project, activityEvents = state.acti
 }
 
 function renderBackupReminder() {
-  if (!els.backupReminderPanel) return;
   const info = backupReminderInfo();
-  els.backupReminderPanel.classList.toggle("hidden", !info);
-  if (!info) return;
-  els.backupReminderMessage.textContent = `${info.reason} Export a portable project package so this work can be recovered outside this browser profile.`;
+  recoveryWorkspaceController?.renderBackupReminder?.({ info });
 }
 
 function knownProjectById(projectId) {
-  return state.project?.id === projectId
-    ? state.project
-    : state.projects.find((project) => project.id === projectId) || state.projectSummaries.find((project) => project.id === projectId) || null;
+  return currentProject()?.id === projectId
+    ? currentProject()
+    : currentProjects().find((project) => project.id === projectId) || currentProjectSummaries().find((project) => project.id === projectId) || null;
 }
 
 async function refreshWorkspaceStatus() {
@@ -3920,20 +4300,8 @@ async function markLocalProjectsMissingFromWorkspaceDirty() {
 }
 
 function renderProjectStorageStatus() {
-  if (!els.projectStorageStatus || !workspaceStorage) return;
-  const status = state.workspaceStatus || {};
-  if (!status.supported) {
-    els.projectStorageStatus.textContent = uiSource("Folder saving is unavailable in this browser. Project packages can still be imported and exported manually.");
-    els.saveProjectToFolderInput.checked = false;
-    els.saveProjectToFolderInput.disabled = true;
-    els.projectChooseWorkspaceBtn.disabled = true;
-    return;
-  }
-  els.saveProjectToFolderInput.disabled = false;
-  els.projectChooseWorkspaceBtn.disabled = false;
-  els.projectStorageStatus.textContent = status.connected
-    ? uiLabel("projectStorageFolder", { name: displaySafeText(status.name, uiT("workspace.status.workspaceFolder")) })
-    : uiLabel("projectStorageDefault");
+  if (!workspaceStorage) return;
+  recoveryWorkspaceController?.renderProjectStorage?.({ status: state.workspaceStatus || {} });
 }
 
 function projectProgress(segments) {
@@ -3951,12 +4319,11 @@ function projectProgress(segments) {
 }
 
 function projectSummaryRevision(projectId) {
-  return Number(state.projectSummaryRevisions.get(projectId) || 0);
+  return editorSessionStore.getProjectSummaryRevision(projectId);
 }
 
 function markProjectSummaryDirty(projectId) {
-  if (!projectId) return;
-  state.projectSummaryRevisions.set(projectId, projectSummaryRevision(projectId) + 1);
+  editorSessionStore.markProjectSummaryDirty(projectId);
 }
 
 function projectSummaryRecord(project, segments, summaryRevision = projectSummaryRevision(project.id)) {
@@ -3978,8 +4345,8 @@ async function summarizeProject(project, segments = null, summaryRevision = proj
 }
 
 async function refreshProjectSummaries() {
-  const cachedById = new Map(state.projectSummaries.map((summary) => [summary.id, summary]));
-  state.projectSummaries = await Promise.all(state.projects.map((project) => {
+  const cachedById = new Map(currentProjectSummaries().map((summary) => [summary.id, summary]));
+  const projectSummaries = await Promise.all(currentProjects().map((project) => {
     const revision = projectSummaryRevision(project.id);
     const cached = cachedById.get(project.id);
     if (cached && cached.updatedAt === project.updatedAt && cached.summaryRevision === revision) {
@@ -3993,51 +4360,42 @@ async function refreshProjectSummaries() {
         summaryRevision: revision
       };
     }
-    const inMemorySegments = state.project?.id === project.id ? state.segments : null;
+    const inMemorySegments = currentProject()?.id === project.id ? currentSegments() : null;
     return summarizeProject(project, inMemorySegments, revision);
   }));
+  editorSessionStore.replaceProjectSummaries(projectSummaries);
   renderLanguagePairFilter();
   renderProjectsView();
 }
 
 async function loadProjects(selectFirst = false) {
-  state.projects = await listProjects();
-  const knownProjectIds = new Set(state.projects.map((project) => project.id));
-  for (const projectId of state.projectSummaryRevisions.keys()) {
-    if (!knownProjectIds.has(projectId)) state.projectSummaryRevisions.delete(projectId);
-  }
+  editorSessionStore.replaceProjects(await listProjects());
+  const knownProjectIds = new Set(currentProjects().map((project) => project.id));
+  editorSessionStore.pruneProjectSummaryRevisions(knownProjectIds);
   pruneWorkspaceDirtyProjectIds();
   await refreshProjectSummaries();
   renderProjectList();
   renderEditor();
   void refreshTrashSummary();
-  if (selectFirst && !state.project && state.projects[0]) {
-    await openProject(state.projects[0].id);
+  if (selectFirst && !currentProject() && currentProjects()[0]) {
+    await openProject(currentProjects()[0].id);
   }
 }
 
 function setView(view) {
-  const navigation = view === "projects"
-    ? applicationNavigation?.openProjects?.()
-    : view === "resources"
-      ? applicationNavigation?.openResources?.()
-      : applicationNavigation?.syncLegacy?.(applicationNavigationPayload({ view }));
-  if (navigation) applyApplicationNavigation(navigation);
-  else state.view = view;
-  if (view !== "editor") state.focusMode = false;
+  if (view === "projects") applicationNavigation?.openProjects?.();
+  else if (view === "resources") applicationNavigation?.openResources?.();
+  else if (view === "project") applicationNavigation?.openProject?.(currentProject()?.id || null, currentActiveIndex());
+  else applicationNavigation?.openEditor?.(applicationNavigationPayload({ view: "editor" }));
   renderEditor();
   if (view === "projects") refreshProjectSummaries();
   if (view === "resources") refreshResources();
 }
 
 function showProjectHome() {
-  if (!state.project) return;
-  state.focusMode = false;
-  state.documentFilter = "";
-  state.activeIndex = state.segments.length ? 0 : -1;
-  const navigation = applicationNavigation?.openProject?.(state.project.id, state.activeIndex);
-  if (navigation) applyApplicationNavigation(navigation);
-  else state.view = "project";
+  if (!currentProject()) return;
+  const activeIndex = currentSegments().length ? 0 : -1;
+  applicationNavigation?.openProject?.(currentProject().id, activeIndex);
   renderAll();
 }
 
@@ -4079,7 +4437,8 @@ function summarizeResources(items, nameField) {
 
 function matchingResourceSummaries(type, sourceLang, targetLang, selectedNames = []) {
   const isTm = type === "tm";
-  const summaries = summarizeResources(isTm ? state.resourceTmEntries : state.resourceTerms, isTm ? "tmName" : "termBaseName")
+  const resourceState = resourcesController?.getState?.() || { tmEntries: [], terms: [] };
+  const summaries = summarizeResources(isTm ? resourceState.tmEntries : resourceState.terms, isTm ? "tmName" : "termBaseName")
     .filter((resource) => resource.sourceLang === sourceLang && resource.targetLang === targetLang);
   selectedNames.forEach((name) => {
     if (summaries.some((resource) => resource.name === name)) return;
@@ -4123,7 +4482,7 @@ function resourceOptionHtml(resource, type, selected, main) {
   `;
 }
 
-function renderProjectResourcePickers(project = state.project) {
+function renderProjectResourcePickers(project = currentProject()) {
   const { sourceLang, targetLang } = projectDialogValues();
   if (!sourceLang || !targetLang) return;
   const editing = projectDialogController?.getMode?.() === "edit";
@@ -4194,40 +4553,38 @@ function collectProjectResourceSettings(existingProject = null) {
 
 async function refreshResources() {
   const [tmEntries, terms] = await Promise.all([listTmEntries(), getAll("terms")]);
-  state.resourceTmEntries = tmEntries;
-  state.resourceTerms = terms;
-  renderResourcesView();
+  return resourcesController?.setResources?.({ tmEntries, terms }) || { tmEntries, terms };
 }
 
 async function refreshProjectTerms({ rerender = false } = {}) {
-  if (!state.project) {
-    state.projectTerms = [];
+  if (!currentProject()) {
+    editorSessionStore.replaceProjectTerms([]);
     return;
   }
-  state.projectTerms = await listTerms({
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+  editorSessionStore.replaceProjectTerms(await listTerms({
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     termBaseNames: projectTermBaseNames()
-  });
+  }));
   invalidateSegmentFilterCache();
   renderTermbaseSelect();
   if (rerender) renderSegments({ preserveScroll: true });
 }
 
 async function projectTermsForValidation() {
-  if (!state.project) return [];
+  if (!currentProject()) return [];
   return listTerms({
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     termBaseNames: projectTermBaseNames()
   });
 }
 
-async function logProjectActivity(type, summary, detail = {}, project = state.project) {
+async function logProjectActivity(type, summary, detail = {}, project = currentProject()) {
   if (!project) return null;
   const event = await recordActivityEvent({ projectId: project.id, type, summary, detail });
-  if (event && state.project?.id === project.id) {
-    state.activityEvents = [event, ...state.activityEvents.filter((item) => item.id !== event.id)];
+  if (event && currentProject()?.id === project.id) {
+    editorSessionStore.prependActivityEvent(event);
     renderBackupReminder();
   }
   markWorkspaceDirty(project.id);
@@ -4252,29 +4609,29 @@ function draftProjectActivityEvent(project, type, summary, detail = {}) {
 
 async function logOptionalProjectActivity(type, summary, detail = {}, label = summary || type) {
   try {
-    if (LOOPCAT_TEST_BUILD && ["export", "resource-export"].includes(type) && state.project?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]) {
+    if (LOOPCAT_TEST_BUILD && ["export", "resource-export"].includes(type) && currentProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]) {
       throw new Error("Simulated export activity log failure");
     }
-    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || state.project?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
+    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || currentProject()?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
       throw new Error("Simulated import activity log failure");
     }
     await logProjectActivity(type, summary, detail);
     return true;
   } catch (activityError) {
     console.warn(`${label} activity log failed.`, activityError);
-    if (state.project?.id) markWorkspaceDirty(state.project.id);
+    if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
     return false;
   }
 }
 
 async function logOptionalActivityForProject(projectId, type, summary, detail = {}, label = summary || type) {
   try {
-    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || state.project?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
+    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || currentProject()?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
       throw new Error("Simulated import activity log failure");
     }
     const event = await recordActivityEvent({ projectId, type, summary, detail });
-    if (state.project?.id === projectId) {
-      state.activityEvents = await listActivityEvents(projectId);
+    if (currentProject()?.id === projectId) {
+      editorSessionStore.replaceActivityEvents(await listActivityEvents(projectId));
       renderBackupReminder();
     }
     markWorkspaceDirty(projectId);
@@ -4313,45 +4670,33 @@ function validationAlertText(report, fallback = "Validation failed.") {
 }
 
 function renderValidationReport(report) {
-  if (state.validationReportTimer) {
-    clearTimeout(state.validationReportTimer);
-    state.validationReportTimer = 0;
-  }
   const displayReport = sanitizeValidationReportForDisplay(report);
   state.lastValidationReport = displayReport;
-  els.validationReportPanel.classList.toggle("hidden", !displayReport);
-  if (!displayReport) return;
-  replaceSafeHtml(els.validationReportMeta, `
-    <span>${escapeHtml(reportSummary(displayReport))}</span>
-    <button class="validation-dismiss" type="button" aria-label="${translatedSourceHtml("Dismiss validation report")}">${translatedSourceHtml("Dismiss")}</button>
-  `);
-  els.validationReportMeta.querySelector(".validation-dismiss").addEventListener("click", () => renderValidationReport(null));
-  const groups = [
-    ["errors", uiLabel("errors")],
-    ["risky", uiLabel("risk")],
-    ["warnings", uiSource("Warnings")],
-    ["simplified", uiLabel("simplified")],
-    ["skipped", uiLabel("skipped")],
-    ["preserved", uiLabel("preserved")]
-  ];
-  const html = groups
-    .flatMap(([key, label]) => (displayReport[key] || []).map((message) => `<div class="validation-item"><strong>${label}</strong>: ${escapeHtml(message)}</div>`))
-    .join("");
-  replaceSafeHtml(els.validationReportList, html ? `<div class="validation-items">${html}</div>` : `<div class="muted">${translatedSourceHtml("No validation issues.")}</div>`);
-  if (displayReport.ok) {
-    state.validationReportTimer = setTimeout(() => {
-      renderValidationReport(null);
-    }, reportCount(displayReport) ? 12000 : 7000);
-  }
+  importExportController?.renderValidation?.({
+    report: displayReport,
+    summary: displayReport ? reportSummary(displayReport) : "",
+    groups: [
+      { key: "errors", label: uiLabel("errors") },
+      { key: "risky", label: uiLabel("risk") },
+      { key: "warnings", label: uiSource("Warnings") },
+      { key: "simplified", label: uiLabel("simplified") },
+      { key: "skipped", label: uiLabel("skipped") },
+      { key: "preserved", label: uiLabel("preserved") }
+    ],
+    dismissLabel: uiSource("Dismiss validation report"),
+    dismissText: uiSource("Dismiss"),
+    emptyLabel: uiSource("No validation issues."),
+    autoDismissMs: displayReport?.ok ? (reportCount(displayReport) ? 12000 : 7000) : 0
+  });
 }
 
 async function renderProjectAnalysis() {
   const run = (state.projectAnalysisRun += 1);
-  const project = state.project;
-  if (!project || state.view !== "project" || !els.projectAnalysis) return;
-  const segments = state.segments;
+  const project = currentProject();
+  if (!project || currentApplicationView() !== "project" || !els.projectAnalysis) return;
+  const segments = currentSegments();
   const tmEntries = await getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`);
-  if (run !== state.projectAnalysisRun || state.view !== "project" || state.project?.id !== project.id) return;
+  if (run !== state.projectAnalysisRun || currentApplicationView() !== "project" || currentProject()?.id !== project.id) return;
   const tmNames = new Set(projectTmNames(project));
   const analysis = analyzeProject(project, segments, tmEntries.filter((entry) => tmNames.has(entry.tmName)));
   const ai = analysis.ai || {};
@@ -4372,14 +4717,14 @@ async function renderProjectAnalysis() {
 }
 
 function renderProjectList() {
-  if (!state.projects.length) {
+  if (!currentProjects().length) {
     replaceSafeHtml(els.projectList, `<div class="muted">${translatedSourceHtml("No projects yet.")}</div>`);
     return;
   }
   const fragment = document.createDocumentFragment();
-  state.projects.forEach((project) => {
+  currentProjects().forEach((project) => {
     const button = document.createElement("button");
-    button.className = `project-item ${state.project?.id === project.id ? "active" : ""}`;
+    button.className = `project-item ${currentProject()?.id === project.id ? "active" : ""}`;
     replaceSafeHtml(button, `<strong>${displaySafeHtml(project.name)}</strong><span>${escapeHtml(languagePair(project))}</span><span>${project.sourceFileName ? displaySafeHtml(project.sourceFileName) : uiLabelHtml("noSourceFile")}</span>`);
     button.addEventListener("click", () => openProject(project.id));
     fragment.append(button);
@@ -4389,35 +4734,28 @@ function renderProjectList() {
 
 async function openProject(projectId) {
   await flushPendingSegmentSaves();
-  state.project = state.projects.find((project) => project.id === projectId) || null;
-  state.commandProjectId = state.project?.id || projectId || "";
-  state.segments = prepareSegmentHistoryStates(state.project ? await getProjectSegments(projectId) : []);
-  state.activityEvents = state.project ? await listActivityEvents(projectId) : [];
+  editorSessionStore.replaceProject(currentProjects().find((project) => project.id === projectId) || null);
+  state.commandProjectId = currentProject()?.id || projectId || "";
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(currentProject() ? await getProjectSegments(projectId) : []));
+  editorSessionStore.replaceActivityEvents(currentProject() ? await listActivityEvents(projectId) : []);
   await refreshProjectTerms();
-  state.activeIndex = state.segments.length ? 0 : -1;
-  state.documentFilter = "";
+  const activeIndex = currentSegments().length ? 0 : -1;
   await filterPresetReady;
-  await filterPresetController?.restoreForProject?.(state.project?.id || projectId);
-  const navigation = applicationNavigation?.openProject?.(state.project?.id || projectId, state.activeIndex);
-  if (navigation) applyApplicationNavigation(navigation);
-  else state.view = "project";
+  await filterPresetController?.restoreForProject?.(currentProject()?.id || projectId);
+  applicationNavigation?.openProject?.(currentProject()?.id || projectId, activeIndex);
   renderAll();
-  if (state.view === "editor") await refreshSidebar();
+  if (currentApplicationView() === "editor") await refreshSidebar();
 }
 
 async function openProjectFile(documentId) {
-  if (!state.project) return;
-  state.documentFilter = documentId;
-  const first = state.segments.findIndex((segment) => segment.documentId === documentId);
-  state.activeIndex = first;
-  const navigation = applicationNavigation?.openEditor?.({
-    projectId: state.project.id,
+  if (!currentProject()) return;
+  const first = currentSegments().findIndex((segment) => segment.documentId === documentId);
+  applicationNavigation?.openEditor?.({
+    projectId: currentProject().id,
     documentId,
-    segmentId: state.segments[first]?.id || "",
+    segmentId: currentSegments()[first]?.id || "",
     activeIndex: first
   });
-  if (navigation) applyApplicationNavigation(navigation);
-  else state.view = "editor";
   renderAll();
   await refreshSidebar();
 }
@@ -4435,34 +4773,35 @@ function renderAll() {
 
 function localAiSettingsFromForm() {
   const projectSettings = localAISettingsStore?.projectSettings
-    ? localAISettingsStore.projectSettings(state.project)
+    ? localAISettingsStore.projectSettings(currentProject())
     : {};
-  const formSourceCode = normalizeLanguageInputValue(els.localAiSourceCodeInput?.value || els.localAiSourceLangInput?.value || projectSettings.sourceCode || state.project?.sourceLang);
-  const formTargetCode = normalizeLanguageInputValue(els.localAiTargetCodeInput?.value || els.localAiTargetLangInput?.value || projectSettings.targetCode || state.project?.targetLang);
-  const formSourceLanguage = els.localAiSourceLangInput?.value
-    ? languageNameForUi(normalizeLanguageInputValue(els.localAiSourceLangInput.value))
+  const form = aiAdministrationController?.readLocalForm?.() || {};
+  const formSourceCode = normalizeLanguageInputValue(form.sourceCode || form.sourceLanguage || projectSettings.sourceCode || currentProject()?.sourceLang);
+  const formTargetCode = normalizeLanguageInputValue(form.targetCode || form.targetLanguage || projectSettings.targetCode || currentProject()?.targetLang);
+  const formSourceLanguage = form.sourceLanguage
+    ? languageNameForUi(normalizeLanguageInputValue(form.sourceLanguage))
     : projectSettings.sourceLanguage;
-  const formTargetLanguage = els.localAiTargetLangInput?.value
-    ? languageNameForUi(normalizeLanguageInputValue(els.localAiTargetLangInput.value))
+  const formTargetLanguage = form.targetLanguage
+    ? languageNameForUi(normalizeLanguageInputValue(form.targetLanguage))
     : projectSettings.targetLanguage;
   return localAISettingsStore.defaults({
     ...projectSettings,
-    providerId: els.localAiProviderSelect?.value || projectSettings.providerId,
-    baseUrl: els.localAiBaseUrlInput?.value || projectSettings.baseUrl || OLLAMA_DEFAULT_BASE_URL,
-    model: els.localAiModelInput?.value || els.localAiModelSelect?.value || projectSettings.model || DEFAULT_LOCAL_AI_MODEL,
+    providerId: form.providerId || projectSettings.providerId,
+    baseUrl: form.baseUrl || projectSettings.baseUrl || OLLAMA_DEFAULT_BASE_URL,
+    model: form.model || projectSettings.model || DEFAULT_LOCAL_AI_MODEL,
     sourceLanguage: formSourceLanguage,
-    sourceCode: formSourceCode || projectSettings.sourceCode || state.project?.sourceLang,
+    sourceCode: formSourceCode || projectSettings.sourceCode || currentProject()?.sourceLang,
     targetLanguage: formTargetLanguage,
-    targetCode: formTargetCode || projectSettings.targetCode || state.project?.targetLang,
-    mode: els.localAiModeSelect?.value || projectSettings.mode,
-    variantMode: els.localAiVariantModeSelect?.value || projectSettings.variantMode,
-    adaptMode: els.localAiAdaptModeSelect?.value || projectSettings.adaptMode,
-    concurrency: els.localAiConcurrencyInput?.value || projectSettings.concurrency,
-    timeoutMs: els.localAiTimeoutInput?.value || projectSettings.timeoutMs,
-    overwriteExisting: Boolean(els.localAiOverwriteInput?.checked),
-    includeNearbyContext: els.localAiIncludeContextInput?.checked !== false,
-    preserveConfirmedLocked: els.localAiPreserveConfirmedInput?.checked !== false
-  }, state.project);
+    targetCode: formTargetCode || projectSettings.targetCode || currentProject()?.targetLang,
+    mode: form.mode || projectSettings.mode,
+    variantMode: form.variantMode || projectSettings.variantMode,
+    adaptMode: form.adaptMode || projectSettings.adaptMode,
+    concurrency: form.concurrency || projectSettings.concurrency,
+    timeoutMs: form.timeoutMs || projectSettings.timeoutMs,
+    overwriteExisting: Boolean(form.overwriteExisting),
+    includeNearbyContext: form.includeNearbyContext !== false,
+    preserveConfirmedLocked: form.preserveConfirmedLocked !== false
+  }, currentProject());
 }
 
 function assertLocalAiEndpointAllowed(settings) {
@@ -4477,9 +4816,10 @@ function assertLocalAiEndpointAllowed(settings) {
 
 function localAiRuntimeConfig(settings = localAiSettingsFromForm()) {
   assertLocalAiEndpointAllowed(settings);
-  const typedKey = String(els.localAiApiKeyInput?.value || "").trim();
+  const secrets = aiAdministrationController?.readSecrets?.() || {};
+  const typedKey = String(secrets.localAiKey || "").trim();
   if (typedKey) {
-    saveLocalAiKey(typedKey, Boolean(els.rememberLocalAiKeyInput?.checked), settings);
+    saveLocalAiKey(typedKey, Boolean(secrets.rememberLocalAiKey), settings);
   }
   const apiKey = typedKey || storedLocalAiKey(settings) || (settings.providerId === "openai" ? storedOpenAiKey() : "");
   return {
@@ -4499,48 +4839,29 @@ function assertLocalAiRuntimeReady(settings, config, actionLabel = "using this p
 function setLocalAiStatus(status, text) {
   state.localAi.connectionStatus = status || "disconnected";
   state.localAi.statusText = redactSensitiveText(text || "");
-  if (els.localAiStatus) {
-    els.localAiStatus.className = `local-ai-status ${state.localAi.connectionStatus}`;
-  }
-  if (els.localAiStatusText) {
-    els.localAiStatusText.textContent = uiSource(state.localAi.statusText || "Disconnected");
-  }
+  aiAdministrationController?.renderStatus?.({
+    connectionStatus: state.localAi.connectionStatus,
+    text: state.localAi.statusText || "Disconnected"
+  });
 }
 
 function renderLocalAiModelOptions(settings) {
-  if (!els.localAiModelSelect) return;
   const currentModel = settings.model || DEFAULT_LOCAL_AI_MODEL;
   const models = state.localAi.models || [];
-  els.localAiModelSelect.replaceChildren();
-  if (!models.length) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = uiSource("Refresh models");
-    els.localAiModelSelect.append(option);
-  }
-  models.forEach((model) => {
-    const option = document.createElement("option");
-    option.value = model.name;
-    option.textContent = model.name;
-    els.localAiModelSelect.append(option);
+  aiAdministrationController?.renderModels?.({
+    models,
+    currentModel,
+    emptyLabel: "Refresh models",
+    manualLabel: uiSource("{value1} (manual)", { value1: currentModel })
   });
-  if (currentModel && !models.some((model) => model.name === currentModel)) {
-    const option = document.createElement("option");
-    option.value = currentModel;
-    option.textContent = uiSource("{value1} (manual)", { value1: currentModel });
-    els.localAiModelSelect.prepend(option);
-  }
-  els.localAiModelSelect.value = currentModel && Array.from(els.localAiModelSelect.options).some((option) => option.value === currentModel)
-    ? currentModel
-    : "";
 }
 
 function localAiSampleText() {
-  return els.localAiSampleInput?.value || currentSegment()?.source || "";
+  return aiAdministrationController?.readPromptState?.().sample || currentSegment()?.source || "";
 }
 
 function localAiPromptMode() {
-  return els.localAiPromptModeSelect?.value || "pretranslate";
+  return aiAdministrationController?.readPromptState?.().mode || "pretranslate";
 }
 
 function localAiPromptModeLabel(mode = localAiPromptMode()) {
@@ -4581,10 +4902,11 @@ function localAiPromptTestContextLabels(mode = localAiPromptMode()) {
 }
 
 function localAiPreviewTermsForSegment(segment = currentSegment()) {
-  if (!Array.isArray(state.projectTerms) || !state.projectTerms.length) return [];
+  const projectTerms = currentProjectTerms();
+  if (!projectTerms.length) return [];
   const source = stableLower(String(segment?.source || ""));
   const target = stableLower(String(segment?.target || ""));
-  const matching = state.projectTerms.filter((term) => {
+  const matching = projectTerms.filter((term) => {
     const sourceTerm = stableLower(term.sourceTerm || "");
     const targetTerm = stableLower(term.targetTerm || "");
     return Boolean(
@@ -4592,7 +4914,7 @@ function localAiPreviewTermsForSegment(segment = currentSegment()) {
         (targetTerm && target.includes(targetTerm))
     );
   });
-  return (matching.length ? matching : state.projectTerms).slice(0, 12);
+  return (matching.length ? matching : projectTerms).slice(0, 12);
 }
 
 function localAiPromptPreviewRequest(settings = localAiSettingsFromForm(), mode = localAiPromptMode()) {
@@ -4606,7 +4928,7 @@ function localAiPromptPreviewRequest(settings = localAiSettingsFromForm(), mode 
   };
   const glossaryTerms = localAiPreviewTermsForSegment(previewSegment);
   const common = {
-    project: state.project,
+    project: currentProject(),
     segment: previewSegment,
     sourceLanguage: settings.sourceLanguage,
     sourceCode: settings.sourceCode,
@@ -4618,7 +4940,7 @@ function localAiPromptPreviewRequest(settings = localAiSettingsFromForm(), mode 
     glossaryTerms,
     terms: glossaryTerms,
     tmMatches: [],
-    styleGuide: state.project?.aiSettings?.styleGuide || "",
+    styleGuide: currentProject()?.aiSettings?.styleGuide || "",
     variantMode: settings.variantMode,
     adaptMode: settings.adaptMode,
     surroundingSegments: settings.includeNearbyContext && activeSegment
@@ -4637,7 +4959,7 @@ function localAiPromptPreviewRequest(settings = localAiSettingsFromForm(), mode 
       ...common,
       documents: projectDocuments(),
       sampleSegments: projectBriefSampleSegments(),
-      terms: (state.projectTerms || []).slice(0, 12)
+      terms: currentProjectTerms().slice(0, 12)
     })
   }[mode]?.() || buildTranslateGemmaPrompt({
     ...common,
@@ -4655,61 +4977,35 @@ function localAiPromptPreviewRequest(settings = localAiSettingsFromForm(), mode 
 }
 
 function renderLocalAiPromptPreview() {
-  if (!els.localAiPromptPreview) return;
   const settings = localAiSettingsFromForm();
-  els.localAiPromptPreview.value = localAiPromptPreviewRequest(settings).prompt;
+  aiAdministrationController?.renderPromptPreview?.(localAiPromptPreviewRequest(settings).prompt);
 }
 
 function renderLocalAiProgress() {
-  if (!els.localAiProgress) return;
-  const progress = state.localAi.progress;
-  els.localAiProgress.classList.toggle("running", Boolean(state.localAi.running));
-  if (!progress) {
-    els.localAiProgress.textContent = state.localAi.running ? "Starting local AI batch..." : "No local AI batch running.";
-    return;
-  }
-  const pieces = [
-    `${progress.completed || 0}/${progress.total || 0} completed`,
-    `${progress.failed || 0} failed`,
-    `${progress.skipped || 0} skipped`
-  ];
-  if (progress.canceled) pieces.push("canceled");
-  els.localAiProgress.textContent = pieces.join(" - ");
-}
-
-function bindLocalAiOutputDrawer() {
-  if (!els.localAiOutputDrawer || !els.localAiPromptOutput || typeof MutationObserver === "undefined") return;
-  const revealWhenUseful = () => {
-    const hasUsefulOutput = Boolean(String(els.localAiPromptOutput.textContent || "").trim()) && !els.localAiPromptOutput.classList.contains("muted");
-    if (hasUsefulOutput) els.localAiOutputDrawer.open = true;
-  };
-  new MutationObserver(revealWhenUseful).observe(els.localAiPromptOutput, {
-    attributes: true,
-    attributeFilter: ["class"],
-    childList: true,
-    characterData: true,
-    subtree: true
+  aiAdministrationController?.renderProgress?.({
+    running: state.localAi.running,
+    value: state.localAi.progress
   });
-  revealWhenUseful();
 }
 
-function renderLocalAiPrivacyNote(settings) {
-  if (!els.localAiPrivacyNote) return;
+function renderLocalAiOutput(value, options) {
+  aiAdministrationController?.renderOutput?.(value, options);
+}
+
+function localAiPrivacyText(settings) {
   const sharesExternally = localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model);
   const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
   if (sharesExternally) {
     if (settings.providerId === "ollama" && !needsKey) {
-      els.localAiPrivacyNote.textContent = "Ollama cloud model mode: requests are sent to local Ollama first, and cloud-suffixed models may be processed through Ollama Cloud after confirmation.";
-    } else {
-      els.localAiPrivacyNote.textContent = needsKey
-        ? "Hosted AI mode: source text is sent to the configured provider URL after confirmation. API keys stay in this browser and are never exported with project packages."
-        : "Network AI mode: source text is sent to the configured provider URL after confirmation.";
+      return "Ollama cloud model mode: requests are sent to local Ollama first, and cloud-suffixed models may be processed through Ollama Cloud after confirmation.";
     }
-  } else {
-    els.localAiPrivacyNote.textContent = settings.providerId === "ollama"
-      ? "Local AI mode: requests are sent to the loopback provider URL below. Ollama is the default local provider."
-      : "Local AI mode: requests are sent only to the loopback provider URL below.";
+    return needsKey
+      ? "Hosted AI mode: source text is sent to the configured provider URL after confirmation. API keys stay in this browser and are never exported with project packages."
+      : "Network AI mode: source text is sent to the configured provider URL after confirmation.";
   }
+  return settings.providerId === "ollama"
+    ? "Local AI mode: requests are sent to the loopback provider URL below. Ollama is the default local provider."
+    : "Local AI mode: requests are sent only to the loopback provider URL below.";
 }
 
 function endpointPathLabel(url) {
@@ -4855,8 +5151,7 @@ function localAiProviderCapabilityLabels(settings, provider) {
   return labels.length ? labels : ["No AI commands available"];
 }
 
-function renderLocalAiProviderSummary(settings) {
-  if (!els.localAiProviderSummary) return;
+function localAiProviderSummaryView(settings) {
   const provider = aiProviderService.get(settings.providerId);
   const preset = localAiProviderPresetForSettings(settings);
   const sharesExternally = localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model);
@@ -4871,43 +5166,40 @@ function renderLocalAiProviderSummary(settings) {
     canPull ? uiLabel("pullSupported") : uiLabel("manualModel"),
     settings.includeNearbyContext !== false ? uiLabel("nearbyContextOn") : uiLabel("nearbyContextOff")
   ];
-  replaceSafeHtml(els.localAiProviderSummary, `
-    <div class="local-ai-provider-summary-head">
-      <strong>${displaySafeHtml(preset?.label || provider?.name || settings.providerId || "AI provider")}</strong>
-      <span>${displaySafeHtml(settings.model || DEFAULT_LOCAL_AI_MODEL)}</span>
-    </div>
-    <div class="local-ai-provider-badges">
-      ${badges.map((badge) => `<span>${escapeHtml(badge)}</span>`).join("")}
-    </div>
-    <p class="local-ai-provider-guidance">${displaySafeHtml(uiSource(guidance))}</p>
-    <dl>
-      <div><dt>${uiLabelHtml("base")}</dt><dd>${displaySafeHtml(settings.baseUrl || OLLAMA_DEFAULT_BASE_URL)}</dd></div>
-      <div><dt>${uiLabelHtml("tools")}</dt><dd>${escapeHtml(capabilities.map((item) => uiSource(item)).join(" - "))}</dd></div>
-      <div><dt>${uiLabelHtml("models")}</dt><dd>${escapeHtml(endpoints.models)}</dd></div>
-      <div><dt>${uiLabelHtml("translate")}</dt><dd>${escapeHtml(endpoints.translate)}</dd></div>
-    </dl>
-  `);
+  return {
+    name: preset?.label || provider?.name || settings.providerId || "AI provider",
+    model: settings.model || DEFAULT_LOCAL_AI_MODEL,
+    badges,
+    guidance: uiSource(guidance),
+    baseLabel: uiLabel("base"),
+    baseUrl: settings.baseUrl || OLLAMA_DEFAULT_BASE_URL,
+    toolsLabel: uiLabel("tools"),
+    capabilities: capabilities.map((item) => uiSource(item)).join(" - "),
+    modelsLabel: uiLabel("models"),
+    modelsEndpoint: endpoints.models,
+    translateLabel: uiLabel("translate"),
+    translateEndpoint: endpoints.translate
+  };
 }
 
 function renderLocalAiProviderControls(settings) {
-  renderLocalAiPrivacyNote(settings);
-  renderLocalAiProviderSummary(settings);
   const provider = aiProviderService.get(settings.providerId);
   const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
-  if (els.localAiPullModelBtn) {
-    const canPull = localAiCanPullModel(settings, provider);
-    els.localAiPullModelBtn.disabled = state.localAi.running || !canPull;
-    els.localAiPullModelBtn.textContent = canPull ? uiSource("Pull {value1}", { value1: settings.model || DEFAULT_LOCAL_AI_MODEL }) : uiSource("Pull unavailable");
-    els.localAiPullModelWrap?.classList.toggle("hidden", !canPull);
-  }
-  if (els.localAiStartLmStudioBtn) {
-    const canStartServer = canStartLmStudioServer(settings);
-    els.localAiStartLmStudioBtn.classList.toggle("hidden", !canStartServer);
-    els.localAiStartLmStudioBtn.disabled = state.localAi.running || state.localAi.promptBusy || !canStartServer;
-  }
-  els.localAiHostedKeyControls?.classList.toggle("hidden", !needsKey);
-  if (els.rememberLocalAiKeyInput) els.rememberLocalAiKeyInput.checked = Boolean(localAiKeySnapshot(settings).local);
-  if (els.localAiApiKeyInput && document.activeElement !== els.localAiApiKeyInput) els.localAiApiKeyInput.value = storedLocalAiKey(settings);
+  const canPull = localAiCanPullModel(settings, provider);
+  aiAdministrationController?.renderProvider?.({
+    privacyText: localAiPrivacyText(settings),
+    summary: localAiProviderSummaryView(settings),
+    running: state.localAi.running,
+    promptBusy: state.localAi.promptBusy,
+    canPull,
+    pullLabel: canPull
+      ? uiSource("Pull {value1}", { value1: settings.model || DEFAULT_LOCAL_AI_MODEL })
+      : uiSource("Pull unavailable"),
+    canStartServer: canStartLmStudioServer(settings),
+    needsKey,
+    rememberLocalKey: Boolean(localAiKeySnapshot(settings).local),
+    storedLocalKey: storedLocalAiKey(settings)
+  });
 }
 
 function localAiPresetGroupLabel(preset) {
@@ -4920,38 +5212,30 @@ function localAiPresetGroupLabel(preset) {
 }
 
 function renderLocalAiPresetOptions(settings) {
-  if (!els.localAiPresetSelect) return;
   const currentPreset = localAiProviderPresetForSettings(settings);
   const currentValue = currentPreset?.id || "custom";
-  els.localAiPresetSelect.replaceChildren();
-  const customOption = document.createElement("option");
-  customOption.value = "custom";
-  customOption.textContent = uiSource("Custom provider");
-  els.localAiPresetSelect.append(customOption);
   const groups = new Map();
   LOCAL_AI_PROVIDER_PRESETS.forEach((preset) => {
     const groupLabel = localAiPresetGroupLabel(preset);
-    let group = groups.get(groupLabel);
-    if (!group) {
-      group = document.createElement("optgroup");
-      group.label = groupLabel;
-      groups.set(groupLabel, group);
-      els.localAiPresetSelect.append(group);
-    }
-    const option = document.createElement("option");
-    option.value = preset.id;
-    option.textContent = preset.label;
-    group.append(option);
+    const group = groups.get(groupLabel) || [];
+    group.push({ id: preset.id, label: preset.label });
+    groups.set(groupLabel, group);
   });
-  els.localAiPresetSelect.value = currentValue;
+  aiAdministrationController?.renderPresets?.({
+    groups: Array.from(groups, ([label, options]) => ({ label, options })),
+    currentPresetId: currentValue,
+    customLabel: "Custom provider"
+  });
 }
 
 function applyLocalAiProviderPreset(presetId) {
   const preset = localAiProviderPresetById(presetId);
   if (!preset) return;
-  if (els.localAiProviderSelect) els.localAiProviderSelect.value = preset.providerId;
-  if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = preset.baseUrl;
-  if (els.localAiModelInput) els.localAiModelInput.value = preset.model;
+  aiAdministrationController?.setProviderFields?.({
+    providerId: preset.providerId,
+    baseUrl: preset.baseUrl,
+    model: preset.model
+  });
   state.localAi.models = [];
   setOpusCatConnectionHelpVisible(false);
   setLocalAiStatus("disconnected", `${preset.label} selected`);
@@ -4962,64 +5246,130 @@ function applyLocalAiProviderPreset(presetId) {
   renderLocalAiPromptPreview();
 }
 
-function renderLocalAiCommandCentre() {
-  if (!els.localAiProviderSelect) return;
-  const settings = localAISettingsStore.projectSettings(state.project);
-  renderLocalAiPresetOptions(settings);
-  els.localAiProviderSelect.value = settings.providerId;
-  els.localAiBaseUrlInput.value = settings.baseUrl;
-  els.localAiModelInput.value = settings.model;
-  els.localAiSourceLangInput.value = settings.sourceLanguage || languageNameForUi(settings.sourceCode || state.project?.sourceLang);
-  els.localAiSourceCodeInput.value = normalizeLanguageInputValue(settings.sourceCode || state.project?.sourceLang);
-  els.localAiTargetLangInput.value = settings.targetLanguage || languageNameForUi(settings.targetCode || state.project?.targetLang);
-  els.localAiTargetCodeInput.value = normalizeLanguageInputValue(settings.targetCode || state.project?.targetLang);
-  els.localAiModeSelect.value = settings.mode;
-  els.localAiConcurrencyInput.value = String(settings.concurrency);
-  els.localAiTimeoutInput.value = String(settings.timeoutMs);
-  els.localAiOverwriteInput.checked = Boolean(settings.overwriteExisting);
-  if (els.localAiVariantModeSelect) els.localAiVariantModeSelect.value = settings.variantMode || "standard";
-  if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = settings.adaptMode || "simplify";
-  if (els.localAiIncludeContextInput) els.localAiIncludeContextInput.checked = settings.includeNearbyContext !== false;
-  els.localAiPreserveConfirmedInput.checked = settings.preserveConfirmedLocked !== false;
-  if (els.rememberLocalAiKeyInput) els.rememberLocalAiKeyInput.checked = Boolean(localAiKeySnapshot(settings).local);
-  if (els.localAiApiKeyInput && document.activeElement !== els.localAiApiKeyInput) els.localAiApiKeyInput.value = storedLocalAiKey(settings);
-  renderLocalAiModelOptions(settings);
-  renderLocalAiProviderControls(settings);
-  setLocalAiStatus(state.localAi.connectionStatus, state.localAi.statusText);
-  renderLocalAiProgress();
+function handleLocalAiPresetChange(presetId) {
+  if (presetId !== "custom") {
+    applyLocalAiProviderPreset(presetId);
+    return;
+  }
+  renderLocalAiProviderControls(localAiSettingsFromForm());
   renderLocalAiPromptPreview();
-  if (els.localAiPretranslateBtn) els.localAiPretranslateBtn.disabled = state.localAi.running || !state.project;
-  if (els.localAiCancelBtn) els.localAiCancelBtn.disabled = !state.localAi.running;
-  if (els.localAiPromptTestBtn) els.localAiPromptTestBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiReviewSegmentBtn) els.localAiReviewSegmentBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiReviewBatchBtn) els.localAiReviewBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiRepairTagsBtn) els.localAiRepairTagsBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiRepairTagsBatchBtn) els.localAiRepairTagsBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiPolishDraftBtn) els.localAiPolishDraftBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiPolishBatchBtn) els.localAiPolishBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiAdaptDraftBtn) els.localAiAdaptDraftBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiAdaptBatchBtn) els.localAiAdaptBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiSuggestVariantsBtn) els.localAiSuggestVariantsBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiSuggestVariantsBatchBtn) els.localAiSuggestVariantsBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiApplyTermsBtn) els.localAiApplyTermsBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiApplyTermsBatchBtn) els.localAiApplyTermsBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiExtractTermsBtn) els.localAiExtractTermsBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.localAiExtractTermsBatchBtn) els.localAiExtractTermsBatchBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  if (els.localAiProjectBriefBtn) els.localAiProjectBriefBtn.disabled = state.localAi.running || state.localAi.promptBusy || !state.project;
-  const contextualBusy = state.localAi.running || state.localAi.promptBusy || !state.project || !currentSegment();
-  if (els.contextualAiTranslateBtn) els.contextualAiTranslateBtn.disabled = state.localAi.running || !state.project || !currentSegment();
-  if (els.contextualAiReviewBtn) els.contextualAiReviewBtn.disabled = contextualBusy;
-  if (els.contextualAiRepairBtn) els.contextualAiRepairBtn.disabled = contextualBusy;
-  if (els.contextualAiPolishBtn) els.contextualAiPolishBtn.disabled = contextualBusy;
-  if (els.contextualAiVariantsBtn) els.contextualAiVariantsBtn.disabled = contextualBusy;
-  if (els.contextualAiApplyTermsBtn) els.contextualAiApplyTermsBtn.disabled = contextualBusy;
-  if (els.contextualOpenAiSuggestionBtn) els.contextualOpenAiSuggestionBtn.disabled = contextualBusy;
-  if (els.contextualAiCancelBtn) els.contextualAiCancelBtn.disabled = !state.localAi.running;
+}
+
+function handleLocalAiProviderChange(providerId) {
+  const provider = aiProviderService.get(providerId);
+  aiAdministrationController?.setProviderFields?.({
+    providerId,
+    baseUrl: provider?.defaultBaseUrl || OLLAMA_DEFAULT_BASE_URL,
+    model:
+      provider?.defaultModel ||
+      (providerId === "openai"
+        ? OPENAI_DEFAULT_MODEL
+        : providerId === "gemini"
+          ? GEMINI_DEFAULT_MODEL
+          : DEFAULT_LOCAL_AI_MODEL)
+  });
+  state.localAi.models = [];
+  setOpusCatConnectionHelpVisible(false);
+  setLocalAiStatus("disconnected", "Disconnected");
+  const settings = localAiSettingsFromForm();
+  renderLocalAiPresetOptions(settings);
+  renderLocalAiProviderControls(settings);
+  renderLocalAiModelOptions(settings);
+  renderLocalAiPromptPreview();
+}
+
+function handleLocalAiBaseUrlInput() {
+  setOpusCatConnectionHelpVisible(false);
+  setLocalAiStatus("disconnected", "Disconnected");
+  const settings = localAiSettingsFromForm();
+  renderLocalAiPresetOptions(settings);
+  renderLocalAiProviderControls(settings);
+}
+
+function handleClearLocalAiKey() {
+  if (clearLocalAiKey()) setSaveStatus("Local AI key cleared from this browser", "saved");
+}
+
+function handleClearOpenAiKey() {
+  if (clearOpenAiKey()) setSaveStatus("OpenAI key cleared from this browser", "saved");
+}
+
+function handleLocalAiFormChanged({ providerChanged = false } = {}) {
+  if (providerChanged) renderLocalAiProviderControls(localAiSettingsFromForm());
+  renderLocalAiPromptPreview();
+}
+
+function handleLocalAiLanguageChanged(field, value, eventType) {
+  if (eventType !== "input" || shouldLiveSyncLanguageInput({ value })) syncLocalAiLanguageFields(field);
+  renderLocalAiPromptPreview();
+}
+
+function renderLocalAiCommandCentre() {
+  const settings = localAISettingsStore.projectSettings(currentProject());
+  const currentPreset = localAiProviderPresetForSettings(settings);
+  const groups = new Map();
+  LOCAL_AI_PROVIDER_PRESETS.forEach((preset) => {
+    const groupLabel = localAiPresetGroupLabel(preset);
+    const group = groups.get(groupLabel) || [];
+    group.push({ id: preset.id, label: preset.label });
+    groups.set(groupLabel, group);
+  });
+  const provider = aiProviderService.get(settings.providerId);
+  const canPull = localAiCanPullModel(settings, provider);
+  const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
+  aiAdministrationController?.render?.({
+    settings: {
+      ...settings,
+      sourceLanguage: settings.sourceLanguage || languageNameForUi(settings.sourceCode || currentProject()?.sourceLang),
+      sourceCode: normalizeLanguageInputValue(settings.sourceCode || currentProject()?.sourceLang),
+      targetLanguage: settings.targetLanguage || languageNameForUi(settings.targetCode || currentProject()?.targetLang),
+      targetCode: normalizeLanguageInputValue(settings.targetCode || currentProject()?.targetLang)
+    },
+    presets: {
+      groups: Array.from(groups, ([label, options]) => ({ label, options })),
+      currentPresetId: currentPreset?.id || "custom",
+      customLabel: "Custom provider"
+    },
+    models: {
+      models: state.localAi.models || [],
+      currentModel: settings.model || DEFAULT_LOCAL_AI_MODEL,
+      emptyLabel: "Refresh models",
+      manualLabel: uiSource("{value1} (manual)", { value1: settings.model || DEFAULT_LOCAL_AI_MODEL })
+    },
+    provider: {
+      privacyText: localAiPrivacyText(settings),
+      summary: localAiProviderSummaryView(settings),
+      running: state.localAi.running,
+      promptBusy: state.localAi.promptBusy,
+      canPull,
+      pullLabel: canPull
+        ? uiSource("Pull {value1}", { value1: settings.model || DEFAULT_LOCAL_AI_MODEL })
+        : uiSource("Pull unavailable"),
+      canStartServer: canStartLmStudioServer(settings),
+      needsKey,
+      rememberLocalKey: Boolean(localAiKeySnapshot(settings).local),
+      storedLocalKey: storedLocalAiKey(settings)
+    },
+    status: {
+      connectionStatus: state.localAi.connectionStatus,
+      text: state.localAi.statusText || "Disconnected"
+    },
+    progress: {
+      running: state.localAi.running,
+      value: state.localAi.progress
+    },
+    promptPreview: localAiPromptPreviewRequest(settings).prompt,
+    availability: {
+      hasProject: Boolean(currentProject()),
+      hasSegment: Boolean(currentSegment()),
+      running: state.localAi.running,
+      promptBusy: state.localAi.promptBusy
+    }
+  });
 }
 
 async function persistLocalAiSettings(options = {}) {
-  if (!state.project) return localAiSettingsFromForm();
+  if (!currentProject()) return localAiSettingsFromForm();
   const settings = localAiSettingsFromForm();
   try {
     assertLocalAiEndpointAllowed(settings);
@@ -5028,11 +5378,11 @@ async function persistLocalAiSettings(options = {}) {
   }
   localAISettingsStore.save(settings);
   const aiSettings = defaultAiSettings({
-    ...state.project.aiSettings,
-    ...localAISettingsStore.projectUpdateFields(settings, state.project)
+    ...currentProject().aiSettings,
+    ...localAISettingsStore.projectUpdateFields(settings, currentProject())
   });
-  state.project = await updateProject({ ...state.project, aiSettings });
-  state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+  editorSessionStore.replaceProject(await updateProject({ ...currentProject(), aiSettings }));
+  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   markWorkspaceDirty();
   if (!options.silent) setSaveStatus("Local AI settings saved", "saved");
   return settings;
@@ -5040,77 +5390,57 @@ async function persistLocalAiSettings(options = {}) {
 
 function renderEditor() {
   syncLegacyApplicationState();
-  const hasProject = Boolean(state.project);
+  const hasProject = Boolean(currentProject());
   void syncDesktopSpellcheckLanguage();
   renderWorkspaceStatus();
   renderBackupReminder();
   if (verticalFeatureState?.editor) {
-    verticalFeatureState.editor.renderShell({ view: state.view, hasProject, inspectorOpen: state.inspectorOpen });
-    verticalFeatureState.inspector.setVisible(state.view === "editor" && state.inspectorOpen);
-    verticalFeatureState.dashboard.setVisible(state.view === "project" && hasProject);
-    verticalFeatureState.filters.update({
-      documentId: state.documentFilter,
-      query: state.segmentQuery,
-      scope: state.segmentSearchScope,
-      regex: state.segmentRegex,
-      caseSensitive: state.segmentCaseSensitive,
-      status: state.segmentStatusFilter,
-      reviewState: state.reviewStateFilter,
-      aiState: state.aiSegmentFilter
-    });
+    verticalFeatureState.editor.renderShell({ view: currentApplicationView(), hasProject, inspectorOpen: state.inspectorOpen });
+    verticalFeatureState.inspector.setVisible(currentApplicationView() === "editor" && state.inspectorOpen);
+    verticalFeatureState.dashboard.setVisible(currentApplicationView() === "project" && hasProject);
   } else {
-    els.workspace.classList.toggle("projects-mode", state.view !== "editor");
-    els.sidebar.classList.toggle("hidden", state.view !== "editor");
-    els.projectsView.classList.toggle("hidden", state.view !== "projects");
-    els.resourcesView.classList.toggle("hidden", state.view !== "resources");
-    els.projectHomeView.classList.toggle("hidden", state.view !== "project" || !hasProject);
-    els.emptyState.classList.toggle("hidden", state.view !== "editor" || hasProject);
-    els.editorView.classList.toggle("hidden", state.view !== "editor" || !hasProject);
+    els.workspace.classList.toggle("projects-mode", currentApplicationView() !== "editor");
+    els.sidebar.classList.toggle("hidden", currentApplicationView() !== "editor");
+    els.projectsView.classList.toggle("hidden", currentApplicationView() !== "projects");
+    els.resourcesView.classList.toggle("hidden", currentApplicationView() !== "resources");
+    els.projectHomeView.classList.toggle("hidden", currentApplicationView() !== "project" || !hasProject);
+    els.emptyState.classList.toggle("hidden", currentApplicationView() !== "editor" || hasProject);
+    els.editorView.classList.toggle("hidden", currentApplicationView() !== "editor" || !hasProject);
   }
   renderFocusMode();
   if (els.inspectorToggleBtn) {
     els.inspectorToggleBtn.setAttribute("aria-expanded", String(state.inspectorOpen));
     els.inspectorToggleBtn.textContent = state.inspectorOpen ? uiSource("Hide inspector") : uiSource("Show inspector");
   }
-  if (!state.project) return;
+  if (!currentProject()) return;
 
   const resources = projectResourceSummary();
-  els.projectTitle.textContent = displaySafeText(state.project.name);
+  els.projectTitle.textContent = displaySafeText(currentProject().name);
   els.projectMeta.textContent = `${languagePair()} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
-  els.projectDomainEditInput.value = state.project.domain || "";
+  els.projectDomainEditInput.value = currentProject().domain || "";
   els.domainForm.classList.add("clean");
-  els.domainForm.classList.toggle("hidden", Boolean((state.project.domain || "").trim()));
+  els.domainForm.classList.toggle("hidden", Boolean((currentProject().domain || "").trim()));
   replaceSafeHtml(els.projectInfo, `
-    <dt>${uiLabelHtml("name")}</dt><dd>${displaySafeHtml(state.project.name)}</dd>
-    <dt>${translatedSourceHtml("Creator")}</dt><dd>${displaySafeHtml(state.project.creatorName || uiLabel("notSet"))}</dd>
-    <dt>${translatedSourceHtml("Domain")}</dt><dd>${displaySafeHtml(state.project.domain || uiLabel("notSet"))}</dd>
+    <dt>${uiLabelHtml("name")}</dt><dd>${displaySafeHtml(currentProject().name)}</dd>
+    <dt>${translatedSourceHtml("Creator")}</dt><dd>${displaySafeHtml(currentProject().creatorName || uiLabel("notSet"))}</dd>
+    <dt>${translatedSourceHtml("Domain")}</dt><dd>${displaySafeHtml(currentProject().domain || uiLabel("notSet"))}</dd>
     <dt>${uiLabelHtml("languages")}</dt><dd>${escapeHtml(languagePair())}</dd>
-    <dt>${translatedSourceHtml("Workspace")}</dt><dd>${escapeHtml(state.project.workspaceId || "local-workspace")}</dd>
-    <dt>${uiLabelHtml("sourceFile")}</dt><dd>${displaySafeHtml(state.project.sourceFileName || uiLabel("notImported"))}</dd>
+    <dt>${translatedSourceHtml("Workspace")}</dt><dd>${escapeHtml(currentProject().workspaceId || "local-workspace")}</dd>
+    <dt>${uiLabelHtml("sourceFile")}</dt><dd>${displaySafeHtml(currentProject().sourceFileName || uiLabel("notImported"))}</dd>
     <dt>${uiLabelHtml("mainTm")}</dt><dd>${displaySafeHtml(resources.mainTm)}</dd>
     <dt>${uiLabelHtml("linkedTms")}</dt><dd>${displaySafeHtml(resources.tmNames.join(", "))}</dd>
     <dt>${uiLabelHtml("linkedTbs")}</dt><dd>${displaySafeHtml(resources.tbNames.join(", "))}</dd>
     <dt>${translatedSourceHtml("Documents")}</dt><dd>${projectDocuments().length || 0}</dd>
-    <dt>${uiLabelHtml("segmentsTitle")}</dt><dd>${state.segments.length}</dd>
-    <dt>${uiLabelHtml("activity")}</dt><dd>${uiLabelHtml("eventCount", { count: state.activityEvents.length })}</dd>
+    <dt>${uiLabelHtml("segmentsTitle")}</dt><dd>${currentSegments().length}</dd>
+    <dt>${uiLabelHtml("activity")}</dt><dd>${uiLabelHtml("eventCount", { count: currentActivityEvents().length })}</dd>
   `);
-  const ai = defaultAiSettings(state.project.aiSettings);
-  els.aiEnabledInput.checked = Boolean(ai.enabled);
-  els.aiProviderInput.value = ai.provider || "";
-  els.aiModelInput.value = ai.model || "";
-  if (els.openAiApiKeyInput && document.activeElement !== els.openAiApiKeyInput) {
-    els.openAiApiKeyInput.value = storedOpenAiKey();
-  }
-  if (els.rememberOpenAiKeyInput) {
-    els.rememberOpenAiKeyInput.checked = Boolean(openAiKeySnapshot().local);
-  }
-  if (els.aiConnectionStatus) {
-    els.aiConnectionStatus.textContent = `OpenAI key: ${openAiKeyStorageLabel()}. API keys stay in this browser and are never exported with project packages.`;
-  }
-  els.aiSendSourceInput.checked = Boolean(ai.sendSourceToAi);
-  els.aiUseTmInput.checked = ai.useTmContext !== false;
-  els.aiUseTbInput.checked = ai.useTermbaseContext !== false;
-  els.aiStyleGuideInput.value = ai.styleGuide || "";
+  const ai = defaultAiSettings(currentProject().aiSettings);
+  aiAdministrationController?.renderGlobalSettings?.({
+    settings: ai,
+    storedKey: storedOpenAiKey(),
+    rememberKey: Boolean(openAiKeySnapshot().local),
+    storageText: `OpenAI key: ${openAiKeyStorageLabel()}. API keys stay in this browser and are never exported with project packages.`
+  });
   renderLocalAiCommandCentre();
   renderQualityWorkbench();
   renderTermbaseSelect();
@@ -5132,18 +5462,18 @@ function renderTermbaseSelect() {
 }
 
 function renderProjectHome() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   const documents = projectDocuments();
   const documentStatsById = projectDocumentStats(documents);
   const total = aggregateDocumentStats(documentStatsById);
   const sourceWords = total.words;
   const resources = projectResourceSummary();
-  els.projectHomeTitle.textContent = displaySafeText(state.project.name);
-  els.projectHomeMeta.textContent = `${languagePair()} - ${displaySafeText(state.project.domain || uiLabel("noDomain"))} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
+  els.projectHomeTitle.textContent = displaySafeText(currentProject().name);
+  els.projectHomeMeta.textContent = `${languagePair()} - ${displaySafeText(currentProject().domain || uiLabel("noDomain"))} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
   replaceSafeHtml(els.projectHomeStats, `
     <div><strong>${total.percent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
     <div><strong>${documents.length}</strong><span>${uiLabelHtml("files")}</span></div>
-    <div><strong>${state.segments.length}</strong><span>${uiLabelHtml("segments")}</span></div>
+    <div><strong>${currentSegments().length}</strong><span>${uiLabelHtml("segments")}</span></div>
     <div><strong>${sourceWords}</strong><span>${uiLabelHtml("sourceWords")}</span></div>
   `);
   els.fileCountText.textContent = documents.length ? uiLabel("fileCount", { count: documents.length }) : uiSource("No files imported");
@@ -5195,7 +5525,7 @@ function renderProjectHome() {
 }
 
 function renderDocumentFilter() {
-  const current = state.documentFilter;
+  const current = currentDocumentId();
   const documents = projectDocuments();
   const fragment = document.createDocumentFragment();
   const allOption = document.createElement("option");
@@ -5210,12 +5540,12 @@ function renderDocumentFilter() {
   });
   els.documentFilter.replaceChildren(fragment);
   els.documentFilter.value = documents.some((documentInfo) => documentInfo.id === current) ? current : "";
-  state.documentFilter = els.documentFilter.value;
+  if (els.documentFilter.value !== current) selectApplicationDocument(els.documentFilter.value);
 }
 
 function renderLanguagePairFilter() {
   const current = els.languagePairFilter.value;
-  const pairs = Array.from(new Set(state.projects.map((project) => languagePairKey(project)).filter((pair) => pair !== "::"))).sort();
+  const pairs = Array.from(new Set(currentProjects().map((project) => languagePairKey(project)).filter((pair) => pair !== "::"))).sort();
   const fragment = document.createDocumentFragment();
   const allOption = document.createElement("option");
   allOption.value = "";
@@ -5301,7 +5631,7 @@ function projectEmptyState({ hasProjects }) {
 function renderProjectsView() {
   const query = stableLower(els.projectSearchInput.value.trim());
   const pair = els.languagePairFilter.value;
-  const summaries = state.projectSummaries.map((project) => ({
+  const summaries = currentProjectSummaries().map((project) => ({
     ...project,
     searchText: project.searchText || stableLower(`${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`),
     languagePairKey: project.languagePairKey || languagePairKey(project)
@@ -5320,8 +5650,8 @@ function renderProjectsView() {
   els.projectDashboard.replaceChildren(...(visible.length ? visible.map(createProjectTile) : [projectEmptyState({ hasProjects: summaries.length > 0 })]));
 }
 
-async function confirmDeleteProject(projectId = state.project?.id) {
-  const project = state.projects.find((item) => item.id === projectId);
+async function confirmDeleteProject(projectId = currentProject()?.id) {
+  const project = currentProjects().find((item) => item.id === projectId);
   if (!project) return false;
   const ok = uiConfirm(`Move project "${displaySafeText(project.name)}" and all of its files to Trash?`);
   if (!ok) return false;
@@ -5333,12 +5663,11 @@ async function confirmDeleteProject(projectId = state.project?.id) {
     await appRuntime.commands.bus.execute(command);
     state.commandProjectId = project.id;
     clearWorkspaceDirty(project.id);
-    if (state.project?.id === project.id) {
-      state.project = null;
-      state.segments = [];
-      state.activeIndex = -1;
-      state.documentFilter = "";
-      state.view = "projects";
+    if (currentProject()?.id === project.id) {
+      editorSessionStore.replaceProject(null);
+      editorSessionStore.replaceSegments([]);
+      applicationNavigation.openProjects();
+      applicationNavigation.clearSelection();
     }
     await loadProjects(false);
     setSaveStatus("Project moved to Trash. Undo is available.", "saved");
@@ -5351,24 +5680,24 @@ async function confirmDeleteProject(projectId = state.project?.id) {
 }
 
 async function confirmDeleteFile(documentInfo) {
-  if (!state.project || !documentInfo) return false;
+  if (!currentProject() || !documentInfo) return false;
   const ok = uiConfirm(`Move file "${displaySafeText(documentInfo.name)}" to Trash?`);
   if (!ok) return false;
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
     if (LOOPCAT_TEST_BUILD && documentInfo[FILE_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated file delete failure");
     const command = appRuntime?.commands?.createDeleteDocumentCommand?.({
-      project: state.project,
+      project: currentProject(),
       documentId: documentInfo.id
     });
     if (!command) throw new Error("The reversible file deletion service is unavailable.");
     const commandResult = await appRuntime.commands.bus.execute(command);
-    state.commandProjectId = state.project.id;
-    state.project = commandResult.result.project;
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
-    state.documentFilter = "";
-    state.activeIndex = state.segments.length ? 0 : -1;
+    state.commandProjectId = currentProject().id;
+    editorSessionStore.replaceProject(commandResult.result.project);
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
+    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
+    selectApplicationDocument("");
+    selectApplicationSegment(currentSegments().length ? 0 : -1);
     markWorkspaceDirty();
     let fileDeleteActivityFailed = false;
     try {
@@ -5390,26 +5719,20 @@ async function confirmDeleteFile(documentInfo) {
   }
 }
 
-function setResourceType(type) {
-  state.resourceType = type;
-  state.openResource = null;
-  renderResourcesView();
-}
-
 function renderResourcesView() {
-  els.tmResourceTab.classList.toggle("active", state.resourceType === "tm");
-  els.tbResourceTab.classList.toggle("active", state.resourceType === "tb");
-  els.tmResourcesPanel.classList.toggle("hidden", state.resourceType !== "tm");
-  els.tbResourcesPanel.classList.toggle("hidden", state.resourceType !== "tb");
-  renderResourceDashboard("tm");
-  renderResourceDashboard("tb");
-  renderResourceDetail();
+  resourcesController?.render?.();
 }
 
-function renderResourceDashboard(type) {
+function renderResourcesContent(resourceState) {
+  renderResourceDashboard("tm", resourceState);
+  renderResourceDashboard("tb", resourceState);
+  renderResourceDetail(resourceState);
+}
+
+function renderResourceDashboard(type, resourceState) {
   const isTm = type === "tm";
   const dashboard = isTm ? els.tmResourceDashboard : els.tbResourceDashboard;
-  const summaries = summarizeResources(isTm ? state.resourceTmEntries : state.resourceTerms, isTm ? "tmName" : "termBaseName");
+  const summaries = summarizeResources(isTm ? resourceState.tmEntries : resourceState.terms, isTm ? "tmName" : "termBaseName");
   if (!summaries.length) {
     const empty = document.createElement("div");
     empty.className = "empty-file-state actionable-empty-state";
@@ -5419,7 +5742,8 @@ function renderResourceDashboard(type) {
     action.type = "button";
     action.className = "primary";
     action.textContent = uiSource(isTm ? "Import a TMX file" : "Import a TBX or term-list file");
-    action.addEventListener("click", () => (isTm ? els.tmxImportInput : els.tbxImportInput).click());
+    action.dataset.resourceAction = "import";
+    action.dataset.resourceType = type;
     empty.append(message, action);
     dashboard.replaceChildren(empty);
     return;
@@ -5452,22 +5776,24 @@ function renderResourceDashboard(type) {
     deleteButton.type = "button";
     deleteButton.textContent = uiSource("Delete");
     deleteButton.setAttribute("aria-label", uiSource("Delete resource {value1}", { value1: resourceLabel }));
-    deleteButton.addEventListener("click", () => confirmDeleteResource(type, resource.key));
+    deleteButton.dataset.resourceAction = "delete-resource";
+    deleteButton.dataset.resourceType = type;
+    deleteButton.dataset.resourceKey = resource.key;
     const exportButton = document.createElement("button");
     exportButton.type = "button";
     exportButton.textContent = uiSource("Export");
     exportButton.setAttribute("aria-label", uiSource("Export resource {value1}", { value1: resourceLabel }));
-    exportButton.addEventListener("click", () => exportResource(type, resource.key));
+    exportButton.dataset.resourceAction = "export";
+    exportButton.dataset.resourceType = type;
+    exportButton.dataset.resourceKey = resource.key;
     const openButton = document.createElement("button");
     openButton.className = "primary";
     openButton.type = "button";
     openButton.textContent = uiSource("Open");
     openButton.setAttribute("aria-label", uiSource("Open resource {value1}", { value1: resourceLabel }));
-    openButton.addEventListener("click", () => {
-      state.resourceType = type;
-      state.openResource = resource.key;
-      renderResourcesView();
-    });
+    openButton.dataset.resourceAction = "open";
+    openButton.dataset.resourceType = type;
+    openButton.dataset.resourceKey = resource.key;
     card.querySelector(".resource-card-actions").append(deleteButton, exportButton, openButton);
     fragment.append(card);
   });
@@ -5475,23 +5801,23 @@ function renderResourceDashboard(type) {
 }
 
 function canAddResourceToCurrentProject(type, resource) {
-  if (!state.project) return false;
-  if (resource.sourceLang !== state.project.sourceLang || resource.targetLang !== state.project.targetLang) return false;
+  if (!currentProject()) return false;
+  if (resource.sourceLang !== currentProject().sourceLang || resource.targetLang !== currentProject().targetLang) return false;
   const names = type === "tm" ? projectTmNames() : projectTermBaseNames();
   return !names.includes(resource.name);
 }
 
 async function addResourceToCurrentProject(type, resource) {
-  if (!state.project || !canAddResourceToCurrentProject(type, resource)) return;
-  const links = projectResourceLinks(state.project);
+  if (!currentProject() || !canAddResourceToCurrentProject(type, resource)) return;
+  const links = projectResourceLinks(currentProject());
   links.push({
     id: makeId("resource-link"),
     type: type === "tm" ? "tm" : "termbase",
     name: resource.name,
     role: type === "tm" ? "reference" : undefined
   });
-  state.project = await updateProject({ ...state.project, resourceLinks: links });
-  state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+  editorSessionStore.replaceProject(await updateProject({ ...currentProject(), resourceLinks: links }));
+  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   await refreshProjectTerms({ rerender: true });
   await refreshProjectSummaries();
   renderAll();
@@ -5501,18 +5827,13 @@ async function addResourceToCurrentProject(type, resource) {
   setSaveStatus(`${type === "tm" ? "TM" : "TB"} added to project`, "saved");
 }
 
-function resourceItems(type, key = state.openResource) {
-  if (!key) return [];
-  const isTm = type === "tm";
-  const nameField = isTm ? "tmName" : "termBaseName";
-  return (isTm ? state.resourceTmEntries : state.resourceTerms)
-    .filter((item) => resourceKey(item, nameField) === key)
-    .sort((a, b) => (a.source || a.sourceTerm || "").localeCompare(b.source || b.sourceTerm || ""));
+function resourceItems(type, key) {
+  return resourcesController?.getItems?.(type, key) || [];
 }
 
-function renderResourceDetail() {
-  renderTmResourceDetail();
-  renderTbResourceDetail();
+function renderResourceDetail(resourceState) {
+  renderTmResourceDetail(resourceState);
+  renderTbResourceDetail(resourceState);
 }
 
 function replaceResourceTableRows(table, items, renderRow) {
@@ -5560,44 +5881,74 @@ async function saveEditedTermResourceEntry(term, values) {
   }
 }
 
+async function executeResourceTrashCommand(command, { refreshSuggestions = false } = {}) {
+  if (!command) throw new Error("The reversible resource deletion service is unavailable.");
+  const commandResult = await appRuntime.commands.bus.execute(command);
+  state.commandProjectId = command.projectId || "";
+  const entry = resourceTrashEntryFromCommandResult(commandResult);
+  let refreshFailed = false;
+  try {
+    await synchronizeResourceTrashChange(entry, { refreshSuggestions });
+  } catch (error) {
+    refreshFailed = true;
+    console.warn("Resource views could not refresh after moving an item to Trash.", error);
+  }
+  renderUndoControls();
+  return { entry, refreshFailed };
+}
+
 async function deleteTmResourceEntry(entry) {
   try {
     if (LOOPCAT_TEST_BUILD && entry[RESOURCE_TM_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated TM resource delete failure");
-    await deleteTmEntry(entry.id);
-    markProjectsUsingResourceDirty("tm", entry.tmName, entry.sourceLang, entry.targetLang);
-    await refreshResources();
-    setSaveStatus("TM entry deleted", "saved");
+    const command = appRuntime?.commands?.createDeleteResourceEntryCommand?.({
+      resourceType: "tm",
+      entityId: entry.id,
+      projectId: currentProject()?.id || null
+    });
+    const result = await executeResourceTrashCommand(command);
+    setSaveStatus(
+      result.refreshFailed
+        ? "TM entry moved to Trash; the resource view could not refresh. Undo is available."
+        : "TM entry moved to Trash. Undo is available.",
+      "saved"
+    );
     return true;
   } catch (error) {
-    setSaveStatus(error.message || "TM entry delete failed", "dirty");
+    setSaveStatus(error.message || "TM entry could not be moved to Trash. Existing work was preserved.", "dirty");
     return false;
   }
 }
 
 async function deleteTermResourceEntry(term, options = {}) {
-  const { refreshResourceView = true, refreshSuggestions = false } = options;
+  const { refreshSuggestions = false } = options;
   try {
     if (LOOPCAT_TEST_BUILD && term[RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated term resource delete failure");
-    await deleteTerm(term.id);
-    markProjectsUsingResourceDirty("termbase", term.termBaseName, term.sourceLang, term.targetLang);
-    if (refreshResourceView) await refreshResources();
-    await refreshProjectTerms({ rerender: true });
-    if (refreshSuggestions) await refreshTerms();
-    setSaveStatus("Term deleted", "saved");
+    const command = appRuntime?.commands?.createDeleteResourceEntryCommand?.({
+      resourceType: "tb",
+      entityId: term.id,
+      projectId: currentProject()?.id || null
+    });
+    const result = await executeResourceTrashCommand(command, { refreshSuggestions });
+    setSaveStatus(
+      result.refreshFailed
+        ? "Term moved to Trash; terminology views could not refresh. Undo is available."
+        : "Term moved to Trash. Undo is available.",
+      "saved"
+    );
     return true;
   } catch (error) {
-    setSaveStatus(error.message || "Term delete failed", "dirty");
+    setSaveStatus(error.message || "Term could not be moved to Trash. Existing work was preserved.", "dirty");
     return false;
   }
 }
 
-function renderTmResourceDetail() {
-  if (state.resourceType !== "tm" || !state.openResource) {
+function renderTmResourceDetail(resourceState) {
+  if (resourceState.type !== "tm" || !resourceState.openKey) {
     els.tmResourceDetail.classList.add("hidden");
     return;
   }
-  const info = resourceLabelFromKey(state.openResource);
-  const entries = resourceItems("tm");
+  const info = resourceLabelFromKey(resourceState.openKey);
+  const entries = resourceItems("tm", resourceState.openKey);
   els.tmResourceDetail.classList.remove("hidden");
   replaceSafeHtml(els.tmResourceDetail, `
     <div class="resource-detail-header">
@@ -5605,25 +5956,21 @@ function renderTmResourceDetail() {
         <h3>${displaySafeHtml(info.name)}</h3>
         <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${uiLabelHtml("entryCount", { count: entries.length })}</p>
       </div>
-      <button id="closeTmResourceBtn" type="button">${translatedSourceHtml("Close")}</button>
+      <button id="closeTmResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tm">${translatedSourceHtml("Close")}</button>
     </div>
     <div class="resource-table"></div>
   `);
-  els.tmResourceDetail.querySelector("#closeTmResourceBtn").addEventListener("click", () => {
-    state.openResource = null;
-    renderResourcesView();
-  });
   const table = els.tmResourceDetail.querySelector(".resource-table");
   replaceResourceTableRows(table, entries, renderTmEntryRow);
 }
 
-function renderTbResourceDetail() {
-  if (state.resourceType !== "tb" || !state.openResource) {
+function renderTbResourceDetail(resourceState) {
+  if (resourceState.type !== "tb" || !resourceState.openKey) {
     els.tbResourceDetail.classList.add("hidden");
     return;
   }
-  const info = resourceLabelFromKey(state.openResource);
-  const terms = resourceItems("tb");
+  const info = resourceLabelFromKey(resourceState.openKey);
+  const terms = resourceItems("tb", resourceState.openKey);
   els.tbResourceDetail.classList.remove("hidden");
   replaceSafeHtml(els.tbResourceDetail, `
     <div class="resource-detail-header">
@@ -5631,14 +5978,10 @@ function renderTbResourceDetail() {
         <h3>${displaySafeHtml(info.name)}</h3>
         <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${uiLabelHtml("termCount", { count: terms.length })}</p>
       </div>
-      <button id="closeTbResourceBtn" type="button">${translatedSourceHtml("Close")}</button>
+      <button id="closeTbResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tb">${translatedSourceHtml("Close")}</button>
     </div>
     <div class="resource-table"></div>
   `);
-  els.tbResourceDetail.querySelector("#closeTbResourceBtn").addEventListener("click", () => {
-    state.openResource = null;
-    renderResourcesView();
-  });
   const table = els.tbResourceDetail.querySelector(".resource-table");
   replaceResourceTableRows(table, terms, renderTermRow);
 }
@@ -5646,6 +5989,8 @@ function renderTbResourceDetail() {
 function renderTmEntryRow(entry) {
   const row = document.createElement("article");
   row.className = "resource-row";
+  row.dataset.resourceRow = "tm";
+  row.dataset.resourceId = entry.id;
   replaceSafeHtml(row, `
     <textarea data-field="source" aria-label="${translatedSourceHtml("Source")}">${escapeHtml(entry.source)}</textarea>
     <textarea data-field="target" aria-label="${translatedSourceHtml("Target")}">${escapeHtml(entry.target)}</textarea>
@@ -5655,20 +6000,16 @@ function renderTmEntryRow(entry) {
   const saveButton = document.createElement("button");
   saveButton.type = "button";
   saveButton.textContent = uiSource("Save");
-  saveButton.addEventListener("click", async () => {
-    await saveEditedTmResourceEntry(entry, {
-      source: row.querySelector('[data-field="source"]').value,
-      target: row.querySelector('[data-field="target"]').value
-    });
-  });
+  saveButton.dataset.resourceAction = "save-entry";
+  saveButton.dataset.resourceType = "tm";
+  saveButton.dataset.resourceId = entry.id;
   const deleteButton = document.createElement("button");
   deleteButton.className = "danger-small";
   deleteButton.type = "button";
   deleteButton.textContent = uiSource("Delete");
-  deleteButton.addEventListener("click", async () => {
-    if (!uiConfirm("Delete this TM entry? This cannot be undone.")) return;
-    await deleteTmResourceEntry(entry);
-  });
+  deleteButton.dataset.resourceAction = "delete-entry";
+  deleteButton.dataset.resourceType = "tm";
+  deleteButton.dataset.resourceId = entry.id;
   actions.append(saveButton, deleteButton);
   return row;
 }
@@ -5676,6 +6017,8 @@ function renderTmEntryRow(entry) {
 function renderTermRow(term) {
   const row = document.createElement("article");
   row.className = "resource-row term-resource-row";
+  row.dataset.resourceRow = "tb";
+  row.dataset.resourceId = term.id;
   replaceSafeHtml(row, `
     <input data-field="sourceTerm" aria-label="${translatedSourceHtml("Source term")}" value="${escapeHtml(term.sourceTerm)}">
     <input data-field="targetTerm" aria-label="${translatedSourceHtml("Target term")}" value="${escapeHtml(term.targetTerm)}">
@@ -5687,44 +6030,50 @@ function renderTermRow(term) {
   const saveButton = document.createElement("button");
   saveButton.type = "button";
   saveButton.textContent = uiSource("Save");
-  saveButton.addEventListener("click", async () => {
-    await saveEditedTermResourceEntry(term, {
-      sourceTerm: row.querySelector('[data-field="sourceTerm"]').value,
-      targetTerm: row.querySelector('[data-field="targetTerm"]').value,
-      notes: row.querySelector('[data-field="notes"]').value,
-      isForbidden: row.querySelector('[data-field="isForbidden"]').checked
-    });
-  });
+  saveButton.dataset.resourceAction = "save-entry";
+  saveButton.dataset.resourceType = "tb";
+  saveButton.dataset.resourceId = term.id;
   const deleteButton = document.createElement("button");
   deleteButton.className = "danger-small";
   deleteButton.type = "button";
   deleteButton.textContent = uiSource("Delete");
-  deleteButton.addEventListener("click", async () => {
-    if (!uiConfirm("Delete this term? This cannot be undone.")) return;
-    await deleteTermResourceEntry(term);
-  });
+  deleteButton.dataset.resourceAction = "delete-entry";
+  deleteButton.dataset.resourceType = "tb";
+  deleteButton.dataset.resourceId = term.id;
   actions.append(saveButton, deleteButton);
   return row;
 }
 
 async function confirmDeleteResource(type, key) {
   const info = resourceLabelFromKey(key);
-  const label = type === "tm" ? uiLabel("translationMemory") : uiLabel("termbase");
-  if (!window.confirm(uiLabel("deleteResourceConfirm", { type: label, name: displaySafeText(info.name), pair: languagePairDisplay(info.sourceLang, info.targetLang) }))) return false;
   try {
     if (LOOPCAT_TEST_BUILD && RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.has(`${type}:${key}`)) throw new Error(`Simulated ${type === "tm" ? "TM" : "termbase"} resource delete failure`);
     const items = resourceItems(type, key);
-    const itemIds = items.map((item) => item.id);
-    if (type === "tm") await deleteTmEntries(itemIds);
-    else await deleteTerms(itemIds);
-    markProjectsUsingResourceDirty(type === "tm" ? "tm" : "termbase", info.name, info.sourceLang, info.targetLang);
-    state.openResource = null;
-    await refreshResources();
-    if (type === "tb") await refreshProjectTerms({ rerender: true });
-    setSaveStatus(`${type === "tm" ? "TM" : "TB"} deleted`, "saved");
+    const command = appRuntime?.commands?.createDeleteResourceCommand?.({
+      resourceType: type,
+      descriptor: {
+        key,
+        name: info.name,
+        sourceLang: info.sourceLang,
+        targetLang: info.targetLang,
+        languagePair: info.languagePair
+      },
+      affectedIds: items.map((item) => item.id),
+      projectId: currentProject()?.id || null
+    });
+    const result = await executeResourceTrashCommand(command, { refreshSuggestions: type === "tb" });
+    setSaveStatus(
+      result.refreshFailed
+        ? `${type === "tm" ? "Translation memory" : "Termbase"} moved to Trash; resource views could not refresh. Undo is available.`
+        : `${type === "tm" ? "Translation memory" : "Termbase"} moved to Trash. Undo is available.`,
+      "saved"
+    );
     return true;
   } catch (error) {
-    setSaveStatus(error.message || `${type === "tm" ? "TM" : "TB"} delete failed`, "dirty");
+    setSaveStatus(
+      error.message || `${type === "tm" ? "Translation memory" : "Termbase"} could not be moved to Trash. Existing work was preserved.`,
+      "dirty"
+    );
     return false;
   }
 }
@@ -5789,7 +6138,7 @@ function rangesOverlap(a, b) {
 function appendTextWithSourceMarkup(container, segment) {
   const text = segment.source || "";
   const tagMarkers = sourceTagMarkers(text, segmentTags(segment));
-  const termMarkers = termRanges(text, state.projectTerms)
+  const termMarkers = termRanges(text, currentProjectTerms())
     .filter((range) => !tagMarkers.some((tagMarker) => rangesOverlap(range, tagMarker)))
     .map((range) => ({ type: "term", index: range.index, length: range.length, range }));
   const markers = [...tagMarkers, ...termMarkers].sort((a, b) => a.index - b.index || (a.type === "tag" ? -1 : 1));
@@ -5874,10 +6223,10 @@ function spacerRow(height) {
 }
 
 function renderSegmentRow(index) {
-  const segment = state.segments[index];
+  const segment = currentSegments()[index];
   const row = els.rowTemplate.content.firstElementChild.cloneNode(true);
   row.dataset.index = String(index);
-  row.classList.toggle("active", index === state.activeIndex);
+  row.classList.toggle("active", index === currentActiveIndex());
   row.classList.toggle("tag-warning-row", hasTagIssue(segment));
   row.querySelector(".num-col").textContent = String(index + 1);
   const sourceCell = row.querySelector(".source-cell");
@@ -5968,19 +6317,14 @@ function renderStatusCell(row, segment) {
 }
 
 function segmentWindow(indexes) {
-  const wrap = els.segmentGridWrap;
-  const viewportRows = Math.ceil((wrap?.clientHeight || 720) / SEGMENT_ROW_HEIGHT);
-  const scrollRows = Math.floor((wrap?.scrollTop || 0) / SEGMENT_ROW_HEIGHT);
-  const start = Math.max(0, scrollRows - SEGMENT_ROW_BUFFER);
-  const end = Math.min(indexes.length, scrollRows + viewportRows + SEGMENT_ROW_BUFFER);
-  return { start, end, total: indexes.length, indexes: indexes.slice(start, end) };
+  return verticalFeatureState.segmentGrid.calculateWindow(indexes);
 }
 
 function renderSegments(options = {}) {
   const indexes = filteredSegmentIndexes();
   const scrollTop = els.segmentGridWrap?.scrollTop || 0;
   if (!indexes.length) {
-    state.segmentWindow = { start: 0, end: 0, total: 0, indexes: [] };
+    verticalFeatureState.segmentGrid.resetWindow();
     const row = document.createElement("tr");
     const cell = document.createElement("td");
     cell.colSpan = 4;
@@ -5991,19 +6335,20 @@ function renderSegments(options = {}) {
     return;
   }
   const win = segmentWindow(indexes);
+  const previousWindow = verticalFeatureState.segmentGrid.getWindow();
   if (
     options.fromScroll &&
-    win.start === state.segmentWindow.start &&
-    win.end === state.segmentWindow.end &&
-    win.total === state.segmentWindow.total
+    win.start === previousWindow.start &&
+    win.end === previousWindow.end &&
+    win.total === previousWindow.total
   ) {
     return;
   }
   const activeElement = document.activeElement;
-  if (options.fromScroll && els.segmentGridWrap.contains(activeElement) && !win.indexes.includes(state.activeIndex)) {
+  if (options.fromScroll && els.segmentGridWrap.contains(activeElement) && !win.indexes.includes(currentActiveIndex())) {
     activeElement.blur();
   }
-  state.segmentWindow = win;
+  verticalFeatureState.segmentGrid.commitWindow(win);
   const topHeight = win.start * SEGMENT_ROW_HEIGHT;
   const bottomHeight = (indexes.length - win.end) * SEGMENT_ROW_HEIGHT;
   const fragment = document.createDocumentFragment();
@@ -6018,24 +6363,16 @@ function renderSegments(options = {}) {
 
 function updateRow(index) {
   const row = els.segmentBody.querySelector(`tr[data-index="${index}"]`);
-  const segment = state.segments[index];
+  const segment = currentSegments()[index];
   if (!row || !segment) return;
-  row.classList.toggle("active", index === state.activeIndex);
+  row.classList.toggle("active", index === currentActiveIndex());
   row.classList.toggle("tag-warning-row", hasTagIssue(segment));
   renderTargetTagPreview(row, segment);
   renderStatusCell(row, segment);
 }
 
 function scheduleRowUpdate(index) {
-  if (!Number.isInteger(index) || index < 0) return;
-  state.pendingRowUpdates.add(index);
-  if (state.segmentRowFrame) return;
-  state.segmentRowFrame = requestAnimationFrame(() => {
-    state.segmentRowFrame = 0;
-    const indexes = Array.from(state.pendingRowUpdates);
-    state.pendingRowUpdates.clear();
-    indexes.forEach(updateRow);
-  });
+  verticalFeatureState.segmentGrid.scheduleRowUpdate(index, (indexes) => indexes.forEach(updateRow));
 }
 
 function scheduleRevisionHistoryRender() {
@@ -6047,24 +6384,24 @@ function scheduleRevisionHistoryRender() {
 }
 
 function calculateProgressSummary() {
-  const total = state.segments.length;
+  const total = currentSegments().length;
   let confirmed = 0;
   let words = 0;
-  for (const segment of state.segments) {
+  for (const segment of currentSegments()) {
     if (segment.status === "confirmed") confirmed += 1;
     words += sourceWordCount(segment);
   }
-  return { projectId: state.project?.id || "", total, confirmed, words };
+  return { projectId: currentProject()?.id || "", total, confirmed, words };
 }
 
 function renderProgress(options = {}) {
   const previousStatus = options.previousStatus;
   const nextStatus = options.nextStatus;
-  const cached = state.progressSummary;
+  const cached = currentProgressSummary();
   const canApplyStatusDelta =
     cached &&
-    cached.projectId === (state.project?.id || "") &&
-    cached.total === state.segments.length &&
+    cached.projectId === (currentProject()?.id || "") &&
+    cached.total === currentSegments().length &&
     previousStatus !== undefined &&
     nextStatus !== undefined;
   let summary;
@@ -6076,7 +6413,7 @@ function renderProgress(options = {}) {
   } else {
     summary = calculateProgressSummary();
   }
-  state.progressSummary = summary;
+  editorSessionStore.replaceProgressSummary(summary);
   const { total, confirmed, words } = summary;
   const open = total - confirmed;
   els.progressText.textContent = uiLabel("progressSummary", { confirmed, open, total });
@@ -6087,26 +6424,15 @@ function renderProgress(options = {}) {
 function ensureSegmentVisible(index) {
   const position = filteredSegmentPosition(index);
   if (position === -1) return;
-  const { start, end } = state.segmentWindow;
-  if (position >= start && position < end) return;
-  if (els.segmentGridWrap) {
-    els.segmentGridWrap.scrollTop = Math.max(0, position * SEGMENT_ROW_HEIGHT - SEGMENT_ROW_HEIGHT);
-  }
-  renderSegments();
+  verticalFeatureState.segmentGrid.ensureVisible(position, renderSegments);
 }
 
 async function setActiveSegment(index) {
-  if (index < 0 || index >= state.segments.length) return;
-  if (index === state.activeIndex) return;
-  const oldIndex = state.activeIndex;
-  state.activeIndex = index;
-  verticalFeatureState?.segmentGrid?.selectSegment(index, state.segments[index]?.id || "");
-  verticalFeatureState?.inspector?.setContext({ segmentId: state.segments[index]?.id || "" });
-  const navigation = applicationNavigation?.selectSegment?.({
-    segmentId: state.segments[index]?.id || "",
-    activeIndex: index
-  });
-  if (navigation) applyApplicationNavigation(navigation);
+  if (index < 0 || index >= currentSegments().length) return;
+  if (index === currentActiveIndex()) return;
+  const oldIndex = currentActiveIndex();
+  verticalFeatureState?.segmentGrid?.selectSegment(index, currentSegments()[index]?.id || "");
+  verticalFeatureState?.inspector?.setContext({ segmentId: currentSegments()[index]?.id || "" });
   renderConfirmBusyState();
   ensureSegmentVisible(index);
   updateRow(oldIndex);
@@ -6116,15 +6442,15 @@ async function setActiveSegment(index) {
 }
 
 async function goToNextOpenSegment() {
-  if (!state.segments.length) return;
-  const start = Math.max(state.activeIndex + 1, 0);
-  const afterCurrent = state.segments.findIndex((segment, index) => index >= start && isOpenSegment(segment));
-  const beforeCurrent = state.segments.findIndex((segment, index) => index < start && isOpenSegment(segment));
+  if (!currentSegments().length) return;
+  const start = Math.max(currentActiveIndex() + 1, 0);
+  const afterCurrent = currentSegments().findIndex((segment, index) => index >= start && isOpenSegment(segment));
+  const beforeCurrent = currentSegments().findIndex((segment, index) => index < start && isOpenSegment(segment));
   const next = afterCurrent !== -1 ? afterCurrent : beforeCurrent;
   if (next === -1) return;
   await setActiveSegment(next);
-  if (!segmentPassesFilters(state.segments[next])) {
-    state.segmentStatusFilter = "all";
+  if (!segmentPassesFilters(currentSegments()[next])) {
+    updateEditorFilters({ status: "all" });
     els.segmentStatusFilter.value = "all";
     renderSegments();
   }
@@ -6132,12 +6458,12 @@ async function goToNextOpenSegment() {
 }
 
 function updateSegmentDraft(index, target) {
-  const segment = state.segments[index];
+  const segment = currentSegments()[index];
   if (!segment) return;
   const editTargetSessions = appRuntime?.commands?.editTargetSessions;
   if (editTargetSessions && !editTargetSessions.has(segment.id)) {
     editTargetSessions.begin({
-      projectId: segment.projectId || state.project?.id,
+      projectId: segment.projectId || currentProject()?.id,
       segmentId: segment.id,
       beforePatch: targetCommandPatch(segment),
       restorePatch: (patch, context) => restoreSegmentEditCommandPatch(segment.id, patch, context)
@@ -6154,7 +6480,7 @@ function updateSegmentDraft(index, target) {
   } else if (passedFiltersAfter) {
     scheduleRowUpdate(index);
   } else {
-    state.pendingRowUpdates.delete(index);
+    verticalFeatureState.segmentGrid.cancelRowUpdate(index);
   }
   renderProgress({ previousStatus, nextStatus: segment.status });
   scheduleRevisionHistoryRender();
@@ -6181,9 +6507,9 @@ function prepareCommandRestoreSegmentSnapshot(snapshot, current) {
 }
 
 async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}) {
-  const index = state.segments.findIndex((item) => item.id === segmentId);
+  const index = currentSegments().findIndex((item) => item.id === segmentId);
   if (index < 0) throw new Error("The affected segment is no longer available.");
-  const segment = state.segments[index];
+  const segment = currentSegments()[index];
   const currentPatch = targetCommandPatch(segment);
   const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
   try {
@@ -6193,7 +6519,6 @@ async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}
     applyTargetCommandPatch(segment, restoredPatch);
     clearPendingSave(segment);
     await saveSegment(segment);
-    state.activeIndex = index;
     verticalFeatureState?.segmentGrid?.selectSegment(index, segment.id);
     verticalFeatureState?.inspector?.setContext({ segmentId: segment.id });
     invalidateSegmentFilterCache();
@@ -6228,15 +6553,15 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
   }
   const currentById = new Map();
   const indexes = segmentIds.map((segmentId) => {
-    const index = state.segments.findIndex((segment) => segment.id === segmentId);
+    const index = currentSegments().findIndex((segment) => segment.id === segmentId);
     if (index < 0) throw new Error("An affected pretranslation segment is no longer available.");
-    currentById.set(segmentId, targetCommandPatch(state.segments[index]));
+    currentById.set(segmentId, targetCommandPatch(currentSegments()[index]));
     return index;
   });
   const previousActiveId = currentSegment()?.id || "";
   try {
     const restored = patches.map((patch, offset) => {
-      const segment = state.segments[indexes[offset]];
+      const segment = currentSegments()[indexes[offset]];
       const currentPatch = currentById.get(segment.id);
       const restoredPatch = structuredClone(patch);
       restoredPatch.revision = Math.max(
@@ -6250,8 +6575,8 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
     });
     await saveSegments(restored);
     const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
-    const requestedIndex = state.segments.findIndex((segment) => segment.id === requestedActiveId);
-    if (requestedIndex >= 0) state.activeIndex = requestedIndex;
+    const requestedIndex = currentSegments().findIndex((segment) => segment.id === requestedActiveId);
+    if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
     invalidateSegmentFilterCache();
     markWorkspaceDirty();
     renderAll();
@@ -6265,8 +6590,8 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
     };
   } catch (error) {
     currentById.forEach((patch, segmentId) => {
-      const index = state.segments.findIndex((segment) => segment.id === segmentId);
-      if (index >= 0) applyTargetCommandPatch(state.segments[index], patch);
+      const index = currentSegments().findIndex((segment) => segment.id === segmentId);
+      if (index >= 0) applyTargetCommandPatch(currentSegments()[index], patch);
     });
     invalidateSegmentFilterCache();
     renderAll();
@@ -6279,23 +6604,23 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
   const currentById = new Map();
   const indexes = [];
   for (const snapshot of snapshots) {
-    const index = state.segments.findIndex((segment) => segment.id === snapshot?.id);
+    const index = currentSegments().findIndex((segment) => segment.id === snapshot?.id);
     if (index < 0) throw new Error("An affected segment is no longer available.");
     indexes.push(index);
-    currentById.set(snapshot.id, structuredClone(state.segments[index]));
+    currentById.set(snapshot.id, structuredClone(currentSegments()[index]));
   }
   const previousActiveId = currentSegment()?.id || "";
   try {
     const restored = snapshots.map((snapshot, offset) => {
       const next = prepareCommandRestoreSegmentSnapshot(snapshot, currentById.get(snapshot.id));
-      state.segments[indexes[offset]] = next;
+      editorSessionStore.replaceSegmentAt(indexes[offset], next);
       clearPendingSave(next);
       return next;
     });
     await saveSegments(restored);
     const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
-    const requestedIndex = state.segments.findIndex((segment) => segment.id === requestedActiveId);
-    if (requestedIndex >= 0) state.activeIndex = requestedIndex;
+    const requestedIndex = currentSegments().findIndex((segment) => segment.id === requestedActiveId);
+    if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
     markWorkspaceDirty();
     renderAll();
     await refreshSidebar();
@@ -6306,8 +6631,8 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
     };
   } catch (error) {
     for (const [segmentId, snapshot] of currentById) {
-      const index = state.segments.findIndex((segment) => segment.id === segmentId);
-      if (index >= 0) state.segments[index] = prepareSegmentHistoryState(snapshot);
+      const index = currentSegments().findIndex((segment) => segment.id === segmentId);
+      if (index >= 0) editorSessionStore.replaceSegmentAt(index, prepareSegmentHistoryState(snapshot));
     }
     renderAll();
     throw error;
@@ -6330,11 +6655,11 @@ function normalizeStructuralSegmentOrder(segments) {
 }
 
 async function restoreSplitSegmentCommandSegments(nextSnapshots, options = {}) {
-  if (!state.project?.id) throw new Error("The split segment project is no longer open.");
+  if (!currentProject()?.id) throw new Error("The split segment project is no longer open.");
   const snapshots = Array.isArray(nextSnapshots) ? nextSnapshots : [];
   const snapshotIds = new Set();
   snapshots.forEach((snapshot) => {
-    if (!snapshot?.id || snapshot.projectId !== state.project.id || snapshotIds.has(snapshot.id)) {
+    if (!snapshot?.id || snapshot.projectId !== currentProject().id || snapshotIds.has(snapshot.id)) {
       throw new Error("The split segment snapshot is invalid for the current project.");
     }
     snapshotIds.add(snapshot.id);
@@ -6343,12 +6668,12 @@ async function restoreSplitSegmentCommandSegments(nextSnapshots, options = {}) {
     throw new Error("The split segment snapshot does not contain the original segment.");
   }
 
-  const currentSegments = state.segments.map((segment) => structuredClone(segment));
-  const currentById = new Map(currentSegments.map((segment) => [segment.id, segment]));
+  const currentSegmentSnapshots = currentSegments().map((segment) => structuredClone(segment));
+  const currentById = new Map(currentSegmentSnapshots.map((segment) => [segment.id, segment]));
   if (!currentById.has(options.originalSegmentId)) {
     throw new Error("The original split segment is no longer available.");
   }
-  const preservedCurrentSegments = currentSegments.filter(
+  const preservedCurrentSegments = currentSegmentSnapshots.filter(
     (segment) => !snapshotIds.has(segment.id) && segment.id !== options.createdSegmentId
   );
   const restored = normalizeStructuralSegmentOrder(
@@ -6365,13 +6690,13 @@ async function restoreSplitSegmentCommandSegments(nextSnapshots, options = {}) {
     if (record) clearTimeout(record.timer || record);
     state.saveTimers.delete(segmentId);
   });
-  state.segments = prepareSegmentHistoryStates(savedSegments);
-  const requestedIndex = state.segments.findIndex((segment) => segment.id === options.activeSegmentId);
-  state.activeIndex = requestedIndex >= 0 ? requestedIndex : Math.max(0, state.activeIndex);
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
+  const requestedIndex = currentSegments().findIndex((segment) => segment.id === options.activeSegmentId);
+  selectApplicationSegment(requestedIndex >= 0 ? requestedIndex : Math.max(0, currentActiveIndex()));
   invalidateSegmentFilterCache();
   markWorkspaceDirty();
   return {
-    segments: state.segments.map((segment) => structuredClone(segment)),
+    segments: currentSegments().map((segment) => structuredClone(segment)),
     activeSegmentId: currentSegment()?.id || options.activeSegmentId || options.originalSegmentId,
     affectedCount: 2,
     focusTarget: true
@@ -6379,11 +6704,11 @@ async function restoreSplitSegmentCommandSegments(nextSnapshots, options = {}) {
 }
 
 async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
-  if (!state.project?.id) throw new Error("The merged segment project is no longer open.");
+  if (!currentProject()?.id) throw new Error("The merged segment project is no longer open.");
   const snapshots = Array.isArray(nextSnapshots) ? nextSnapshots : [];
   const snapshotIds = new Set();
   snapshots.forEach((snapshot) => {
-    if (!snapshot?.id || snapshot.projectId !== state.project.id || snapshotIds.has(snapshot.id)) {
+    if (!snapshot?.id || snapshot.projectId !== currentProject().id || snapshotIds.has(snapshot.id)) {
       throw new Error("The merged segment snapshot is invalid for the current project.");
     }
     snapshotIds.add(snapshot.id);
@@ -6396,12 +6721,12 @@ async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
     throw new Error("The merged segment snapshot does not match the requested restore direction.");
   }
 
-  const currentSegments = state.segments.map((segment) => structuredClone(segment));
-  const currentById = new Map(currentSegments.map((segment) => [segment.id, segment]));
+  const currentSegmentSnapshots = currentSegments().map((segment) => structuredClone(segment));
+  const currentById = new Map(currentSegmentSnapshots.map((segment) => [segment.id, segment]));
   if (!currentById.has(options.segmentId)) {
     throw new Error("The surviving merged segment is no longer available.");
   }
-  const preservedCurrentSegments = currentSegments.filter(
+  const preservedCurrentSegments = currentSegmentSnapshots.filter(
     (segment) => !snapshotIds.has(segment.id) && segment.id !== options.mergedSegmentId
   );
   const restored = normalizeStructuralSegmentOrder(
@@ -6418,13 +6743,13 @@ async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
     if (record) clearTimeout(record.timer || record);
     state.saveTimers.delete(segmentId);
   });
-  state.segments = prepareSegmentHistoryStates(savedSegments);
-  const requestedIndex = state.segments.findIndex((segment) => segment.id === options.activeSegmentId);
-  state.activeIndex = requestedIndex >= 0 ? requestedIndex : Math.max(0, state.activeIndex);
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
+  const requestedIndex = currentSegments().findIndex((segment) => segment.id === options.activeSegmentId);
+  selectApplicationSegment(requestedIndex >= 0 ? requestedIndex : Math.max(0, currentActiveIndex()));
   invalidateSegmentFilterCache();
   markWorkspaceDirty();
   return {
-    segments: state.segments.map((segment) => structuredClone(segment)),
+    segments: currentSegments().map((segment) => structuredClone(segment)),
     activeSegmentId: currentSegment()?.id || options.activeSegmentId || options.segmentId,
     affectedCount: 2,
     focusTarget: true
@@ -6432,7 +6757,7 @@ async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
 }
 
 async function replaceTargetText(scope = "visible") {
-  if (!state.project) return { segmentCount: 0, replacementCount: 0 };
+  if (!currentProject()) return { segmentCount: 0, replacementCount: 0 };
   const findText = els.replaceFindInput.value;
   const replacement = els.replaceWithInput.value;
   if (!findText) {
@@ -6441,15 +6766,15 @@ async function replaceTargetText(scope = "visible") {
     return { segmentCount: 0, replacementCount: 0 };
   }
   const options = {
-    regex: state.segmentRegex,
-    caseSensitive: state.segmentCaseSensitive
+    regex: currentEditorFilters().regex,
+    caseSensitive: currentEditorFilters().caseSensitive
   };
   const indexes = scope === "all" ? projectSegmentIndexes() : filteredSegmentIndexes();
   let replacementCount = 0;
   const proposals = [];
   try {
     indexes.forEach((index) => {
-      const segment = state.segments[index];
+      const segment = currentSegments()[index];
       if (!segment) return;
       const result = replaceOutsideProtectedTokens(segment.target || "", findText, replacement, options);
       if (!result.count || result.text === segment.target) return;
@@ -6467,10 +6792,10 @@ async function replaceTargetText(scope = "visible") {
   const snapshots = new Map();
   const updated = [];
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
     proposals.forEach(({ segment }) => snapshots.set(segment.id, structuredClone(segment)));
     const command = appRuntime.commands.createReplaceTargetsCommand({
-      projectId: state.project.id,
+      projectId: currentProject().id,
       segmentIds: proposals.map(({ segment }) => segment.id),
       beforeSnapshots: proposals.map(({ segment }) => snapshots.get(segment.id)),
       restoreSnapshots: (nextSnapshots) =>
@@ -6545,19 +6870,16 @@ function renderConfirmBusyState() {
 }
 
 async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = {}) {
-  const index = state.segments.findIndex((item) => item.id === segmentId);
+  const index = currentSegments().findIndex((item) => item.id === segmentId);
   if (index < 0) throw new Error("The affected segment is no longer available.");
-  const currentSnapshot = structuredClone(state.segments[index]);
+  const currentSnapshot = structuredClone(currentSegments()[index]);
   try {
     const restored = prepareCommandRestoreSegmentSnapshot(nextSnapshot, currentSnapshot);
-    state.segments[index] = restored;
+    editorSessionStore.replaceSegmentAt(index, restored);
     clearPendingSave(restored);
     await saveSegment(restored);
-    state.activeIndex = index;
     verticalFeatureState?.segmentGrid?.selectSegment(index, restored.id);
     verticalFeatureState?.inspector?.setContext({ segmentId: restored.id });
-    const navigation = applicationNavigation?.selectSegment?.({ segmentId: restored.id, activeIndex: index });
-    if (navigation) applyApplicationNavigation(navigation);
     markWorkspaceDirty();
     renderAll();
     await refreshSidebar();
@@ -6568,7 +6890,7 @@ async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = 
       activeSegmentId: currentSegment()?.id || restored.id
     };
   } catch (error) {
-    state.segments[index] = prepareSegmentHistoryState(currentSnapshot);
+    editorSessionStore.replaceSegmentAt(index, prepareSegmentHistoryState(currentSnapshot));
     renderAll();
     throw error;
   }
@@ -6581,12 +6903,12 @@ async function confirmCurrentSegment() {
   const missing = missingTags(segment);
   if (missing.length) {
     setSaveStatus(`Cannot confirm: missing ${missing.map(tagDisplayText).join(", ")}`, "dirty");
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     focusActiveTextarea();
     return;
   }
-  const segmentIndex = state.activeIndex;
-  const project = state.project;
+  const segmentIndex = currentActiveIndex();
+  const project = currentProject();
   const previousStatus = segment.status;
   const passedFiltersBefore = segmentPassesFilters(segment);
   const previous = structuredClone(segment);
@@ -6692,7 +7014,7 @@ async function confirmCurrentSegment() {
   }
 }
 
-async function saveSegmentToTm(segment, project = state.project) {
+async function saveSegmentToTm(segment, project = currentProject()) {
   if (!segment || !project || !segment.source.trim() || !segment.target.trim()) return null;
       if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG]) throw new Error("Simulated TM save failure");
   const entry = await saveTmEntry({
@@ -6710,9 +7032,9 @@ async function saveSegmentToTm(segment, project = state.project) {
 async function saveActiveSegmentToTm(options = {}) {
   const { reportStatus = true } = options || {};
   const segment = currentSegment();
-  if (!segment || !state.project || !segment.source.trim() || !segment.target.trim()) return null;
+  if (!segment || !currentProject() || !segment.source.trim() || !segment.target.trim()) return null;
   try {
-    const entry = await saveSegmentToTm(segment, state.project);
+    const entry = await saveSegmentToTm(segment, currentProject());
     await refreshTmMatches();
     if (reportStatus) setSaveStatus("Segment saved to TM", "saved");
     return entry;
@@ -6724,33 +7046,18 @@ async function saveActiveSegmentToTm(options = {}) {
 }
 
 function requestTmPretranslationThreshold() {
-  const dialog = els.tmPretranslateDialog;
-  const input = els.tmPretranslateThresholdInput;
-  if (!dialog || !input || typeof dialog.showModal !== "function") {
+  if (!tmPretranslationDialogController?.request) {
     throw new Error("TM pretranslation settings are unavailable in this browser.");
   }
-  input.value = "85";
-  dialog.returnValue = "";
-  return new Promise((resolve) => {
-    dialog.addEventListener("close", () => {
-      resolve(dialog.returnValue === "apply" ? input.value : null);
-    }, { once: true });
-    showManagedDialog(dialog, input);
-    requestAnimationFrame(() => {
-      input.focus();
-      input.select();
-    });
-  });
+  return tmPretranslationDialogController.request({ returnTarget: els.segmentToolsMenuSummary });
 }
 
 async function pretranslateFromTm() {
-  if (!state.project || state.tmPretranslating) return null;
+  if (!currentProject() || state.tmPretranslating) return null;
   const beforePatches = new Map();
   const beforeSnapshots = new Map();
   const updated = [];
   state.tmPretranslating = true;
-  els.pretranslateBtn.disabled = true;
-  els.pretranslateBtn.setAttribute("aria-busy", "true");
   try {
     const raw = await requestTmPretranslationThreshold();
     if (raw === null) return null;
@@ -6770,6 +7077,8 @@ async function pretranslateFromTm() {
       setSaveStatus("No empty segments to pretranslate.", "saved");
       return null;
     }
+    els.pretranslateBtn.disabled = true;
+    els.pretranslateBtn.setAttribute("aria-busy", "true");
     setSaveStatus("Pretranslating...");
     await yieldToUi();
     const tmNames = projectTmNames();
@@ -6779,8 +7088,8 @@ async function pretranslateFromTm() {
       const sources = uniqueSources.slice(offset, offset + TM_PRETRANSLATE_BATCH_SIZE);
       const options = sources.map((source) => ({
         source,
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
         tmNames,
         limit: 1
       }));
@@ -6800,14 +7109,14 @@ async function pretranslateFromTm() {
       setSaveStatus(`No TM matches at ${threshold}% or higher.`, "saved");
       return null;
     }
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
     const activeSegmentId = currentSegment()?.id || proposals[0].segment.id;
     proposals.forEach(({ segment }) => {
       beforePatches.set(segment.id, targetCommandPatch(segment));
       beforeSnapshots.set(segment.id, structuredClone(segment));
     });
     const command = appRuntime.commands.createTmPretranslationCommand({
-      projectId: state.project.id,
+      projectId: currentProject().id,
       segmentIds: proposals.map(({ segment }) => segment.id),
       beforePatches: proposals.map(({ segment }) => beforePatches.get(segment.id)),
       provenance: {
@@ -6864,7 +7173,7 @@ async function pretranslateFromTm() {
     return commandExecution;
   } catch (error) {
     beforeSnapshots.forEach((snapshot, segmentId) => {
-      const segment = state.segments.find((item) => item.id === segmentId);
+      const segment = currentSegments().find((item) => item.id === segmentId);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -6922,7 +7231,7 @@ function handleGlobalKeydown(event) {
   const key = stableLower(event.key);
   const editableTarget = event.target?.matches?.("input, textarea, [contenteditable='true']");
   if ((event.ctrlKey || event.metaKey) && key === "z" && !editableTarget) {
-    const projectId = state.commandProjectId || state.project?.id || null;
+    const projectId = state.commandProjectId || currentProject()?.id || null;
     const canRun = event.shiftKey
       ? appRuntime?.commands?.bus?.canRedo?.(projectId)
       : appRuntime?.commands?.bus?.canUndo?.(projectId);
@@ -6946,14 +7255,14 @@ function handleGlobalKeydown(event) {
     openCommandPalette();
     return;
   }
-  if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "f" && state.view === "editor" && state.project) {
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "f" && currentApplicationView() === "editor" && currentProject()) {
     event.preventDefault();
     event.stopPropagation();
     toggleFocusMode();
     return;
   }
   const concordanceShortcut = isK && (event.ctrlKey || event.metaKey) && event.altKey;
-  if (concordanceShortcut && state.view === "editor") {
+  if (concordanceShortcut && currentApplicationView() === "editor") {
     event.preventDefault();
     event.stopPropagation();
     openConcordanceSearch();
@@ -6969,14 +7278,14 @@ function handleGlobalKeydown(event) {
     closeCommandPalette();
     return;
   }
-  if (event.key === "Escape" && state.focusMode) {
+  if (event.key === "Escape" && currentFocusMode()) {
     event.preventDefault();
     setFocusMode(false);
   }
 }
 
 async function openConcordanceSearch() {
-  if (state.view !== "editor" || !state.project) return;
+  if (currentApplicationView() !== "editor" || !currentProject()) return;
   const keyword = selectedConcordanceKeyword();
   if (!keyword) {
     setSaveStatus("Select a source word, then press Ctrl+K or Alt+K.", "dirty");
@@ -6986,7 +7295,7 @@ async function openConcordanceSearch() {
   const entries = await listTmEntries();
   const tmNames = new Set(projectTmNames());
   const results = entries
-    .filter((entry) => entry.sourceLang === state.project.sourceLang && entry.targetLang === state.project.targetLang)
+    .filter((entry) => entry.sourceLang === currentProject().sourceLang && entry.targetLang === currentProject().targetLang)
     .filter((entry) => tmNames.has(entry.tmName))
     .filter((entry) => stableLower(entry.source).includes(query))
     .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
@@ -7027,8 +7336,8 @@ async function openConcordanceSearch() {
 }
 
 function focusActiveTextarea(selection = null) {
-  ensureSegmentVisible(state.activeIndex);
-  const textarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+  ensureSegmentVisible(currentActiveIndex());
+  const textarea = verticalFeatureState.segmentGrid.findTargetEditor(els.segmentBody, currentActiveIndex());
   textarea?.focus();
   if (textarea && selection) {
     const normalized = normalizedTargetSelection(selection, textarea.value.length);
@@ -7039,8 +7348,8 @@ function focusActiveTextarea(selection = null) {
 function handleEditorKeydown(event, index) {
   const key = stableLower(event.key);
   if ((event.ctrlKey || event.metaKey) && key === "z" && !event.altKey) {
-    finalizePendingEditCommand(state.segments[index]?.id || "");
-    const projectId = state.commandProjectId || state.project?.id || null;
+    finalizePendingEditCommand(currentSegments()[index]?.id || "");
+    const projectId = state.commandProjectId || currentProject()?.id || null;
     const canRun = event.shiftKey
       ? appRuntime?.commands?.bus?.canRedo?.(projectId)
       : appRuntime?.commands?.bus?.canUndo?.(projectId);
@@ -7073,61 +7382,11 @@ function handleEditorKeydown(event, index) {
 }
 
 async function refreshSidebar() {
-  renderReviewPanel();
-  renderRevisionHistory();
-  renderAiSuggestions();
-  renderQualityWorkbench();
-  await Promise.all([refreshTmMatches(), refreshTerms()]);
+  return editorContextController.refresh();
 }
 
-function renderReviewPanel() {
-  if (!els.reviewForm) return;
-  const segment = currentSegment();
-  if (!segment) {
-    els.reviewStateSelect.value = "";
-    els.reviewNoteInput.value = "";
-    els.reviewCommentInput.value = "";
-    els.reviewCommentsList.replaceChildren();
-    els.reviewForm.classList.add("empty-review");
-    return;
-  }
-  els.reviewForm.classList.remove("empty-review");
-  els.reviewStateSelect.value = segment.reviewState || "";
-  els.reviewNoteInput.value = segment.reviewNote || "";
-  els.reviewCommentInput.value = "";
-  const comments = segment.comments || [];
-  replaceSafeHtml(els.reviewCommentsList, comments.length
-    ? comments.map((comment) => `
-      <article class="comment-card">
-        <header><strong>${escapeHtml(uiSource(comment.state || "open"))}</strong><span>${escapeHtml(formatDate(comment.updatedAt || comment.createdAt))}</span></header>
-        <div>${escapeHtml(comment.body)}</div>
-      </article>
-    `).join("")
-    : `<div class="muted">${uiLabelHtml("noStructuredComments")}</div>`);
-}
-
-function qualityProfileFromForm() {
-  return defaultQualityProfile({
-    standard: els.qualityStandardSelect?.value,
-    reviewDepth: els.qualityReviewDepthSelect?.value,
-    riskTolerance: els.qualityRiskToleranceSelect?.value,
-    terminologyStrictness: els.qualityTerminologyStrictnessSelect?.value,
-    aiDisclosure: els.qualityAiDisclosureSelect?.value,
-    audience: els.qualityAudienceInput?.value,
-    tone: els.qualityToneInput?.value
-  });
-}
-
-function renderQualityProfileForm() {
-  if (!els.qualityForm || !state.project) return;
-  const profile = defaultQualityProfile(state.project.qualityProfile);
-  els.qualityStandardSelect.value = profile.standard;
-  els.qualityReviewDepthSelect.value = profile.reviewDepth;
-  els.qualityRiskToleranceSelect.value = profile.riskTolerance;
-  els.qualityTerminologyStrictnessSelect.value = profile.terminologyStrictness;
-  els.qualityAiDisclosureSelect.value = profile.aiDisclosure;
-  els.qualityAudienceInput.value = profile.audience || "";
-  els.qualityToneInput.value = profile.tone || "";
+function renderReviewPanel(options = {}) {
+  qualityReviewController?.renderReview?.({ segment: currentSegment(), force: Boolean(options.force) });
 }
 
 function qualityLabel(value) {
@@ -7186,7 +7445,7 @@ function qualityDecisionCategory(value) {
     : "review";
 }
 
-function qualityQaBySegment(qaChecks = state.qaChecks) {
+function qualityQaBySegment(qaChecks = currentQaChecks()) {
   const map = new Map();
   (qaChecks || []).forEach((check) => {
     const segmentId = check?.segmentId || "";
@@ -7197,13 +7456,13 @@ function qualityQaBySegment(qaChecks = state.qaChecks) {
   return map;
 }
 
-function currentQualityRiskQueue(qaChecks = state.qaChecks) {
-  if (!state.project) return null;
+function currentQualityRiskQueue(qaChecks = currentQaChecks()) {
+  if (!currentProject()) return null;
   return buildRiskQueue({
-    project: state.project,
+    project: currentProject(),
     segments: currentDocumentSegments(),
     qaChecks,
-    profile: state.project.qualityProfile
+    profile: currentProject().qualityProfile
   });
 }
 
@@ -7220,112 +7479,42 @@ function qualityRiskLevelLabel(level) {
 
 function activeQualityEvidence(queue = null) {
   const segment = currentSegment();
-  if (!state.project || !segment) return null;
+  if (!currentProject() || !segment) return null;
   const queuedItem = (queue?.items || []).find((item) => item.segmentId === segment.id);
   if (queuedItem) return queuedItem;
-  return scoreSegment(segment, state.activeIndex, {
-    profile: state.project.qualityProfile,
+  return scoreSegment(segment, currentActiveIndex(), {
+    profile: currentProject().qualityProfile,
     qaBySegment: qualityQaBySegment()
   });
 }
 
-function renderQualityActiveEvidence(queue) {
-  if (!els.qualityActiveEvidence || !els.qualityDecisionForm) return;
-  const segment = currentSegment();
-  if (!state.project || !segment) {
-    els.qualityActiveEvidence.textContent = uiSource("No active segment.");
-    els.qualityActiveEvidence.classList.add("muted");
-    if (els.saveQualityDecisionBtn) els.saveQualityDecisionBtn.disabled = true;
-    return;
-  }
-  if (els.saveQualityDecisionBtn) els.saveQualityDecisionBtn.disabled = false;
-  const evidence = activeQualityEvidence(queue);
-  const categories = Object.entries(evidence?.categoryCounts || {})
-    .sort((a, b) => b[1] - a[1] || qualityCategoryName(a[0]).localeCompare(qualityCategoryName(b[0])));
-  const categoryPills = categories.length
-    ? categories.map(([category, count]) => `<span class="quality-category-pill">${escapeHtml(qualityCategoryName(category))} ${count}</span>`).join("")
-    : `<span class="quality-category-pill">${translatedSourceHtml("Clear")}</span>`;
-  const reasonItems = (evidence?.reasons || []).slice(0, 4).map((reason) => (
-    `<li>${escapeHtml(qualityCategoryName(reason.category))}: ${escapeHtml(reason.label)}</li>`
-  )).join("");
-  els.qualityActiveEvidence.classList.remove("muted");
-  replaceSafeHtml(els.qualityActiveEvidence, `
-    <header>
-      <strong>#${escapeHtml(String((evidence?.index ?? state.activeIndex) + 1))}</strong>
-      <span>${escapeHtml(qualityRiskLevelLabel(evidence?.level))} ${evidence?.score || 0}</span>
-    </header>
-    <div class="quality-category-row">${categoryPills}</div>
-    ${reasonItems ? `<ul>${reasonItems}</ul>` : `<p class="muted">${uiLabelHtml("noActiveQualitySignals")}</p>`}
-  `);
-}
-
 function renderQualityWorkbench() {
-  if (!els.qualitySummary || !els.qualityRiskList) return;
-  if (!state.project) {
-    els.qualitySummary.textContent = uiSource("No project.");
-    els.qualitySummary.classList.add("muted");
-    els.qualityRiskList.textContent = uiSource("No risk queue yet.");
-    els.qualityRiskList.classList.add("muted");
-    renderQualityActiveEvidence(null);
-    return;
-  }
-  if (!els.qualityForm?.contains(document.activeElement)) renderQualityProfileForm();
-  const queue = state.qualityRiskQueue?.projectId === state.project.id ? state.qualityRiskQueue : currentQualityRiskQueue();
-  state.qualityRiskQueue = queue;
-  const profile = defaultQualityProfile(state.project.qualityProfile);
-  els.qualitySummary.classList.remove("muted");
-  replaceSafeHtml(els.qualitySummary, `
-    <div class="quality-summary-grid">
-      <div><strong>${queue.totalRiskItems}</strong><span>${uiLabelHtml("riskItems")}</span></div>
-      <div><strong>${queue.highRiskCount}</strong><span>${uiLabelHtml("highRisk")}</span></div>
-      <div><strong>${queue.averageScore}</strong><span>${uiLabelHtml("avgRisk")}</span></div>
-    </div>
-    <p>${escapeHtml(qualityLabel(profile.standard))} - ${escapeHtml(qualityLabel(profile.reviewDepth))} - ${escapeHtml(qualityLabel(profile.riskTolerance))}</p>
-  `);
-  renderQualityActiveEvidence(queue);
-  if (!queue.items.length) {
-    els.qualityRiskList.textContent = uiSource("No unresolved quality risks in this scope.");
-    els.qualityRiskList.classList.add("muted");
-    return;
-  }
-  els.qualityRiskList.classList.remove("muted");
-  const fragment = document.createDocumentFragment();
-  queue.items.slice(0, 8).forEach((item) => {
-    const card = document.createElement("article");
-    card.className = `quality-risk-card ${item.level}`;
-    const reasonText = item.reasons.slice(0, 2).map((reason) => reason.label).join(" ");
-    const categoryText = Object.entries(item.categoryCounts || {})
-      .sort((a, b) => b[1] - a[1] || qualityCategoryName(a[0]).localeCompare(qualityCategoryName(b[0])))
-      .map(([category]) => qualityCategoryName(category))
-      .slice(0, 3)
-      .join(", ") || qualityCategoryName(item.category);
-    replaceSafeHtml(card, `
-      <header>
-        <strong>${escapeHtml(qualityRiskLevelLabel(item.level))} ${item.score}</strong>
-        <span>#${escapeHtml(item.label)}</span>
-      </header>
-      <p>${escapeHtml(item.documentName || uiLabel("document"))}</p>
-      <p class="muted">${escapeHtml(categoryText)}: ${escapeHtml(reasonText || uiLabel("riskSignalRecorded"))}</p>
-    `);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = uiLabel("go");
-    button.addEventListener("click", () => goToQualityRiskItem(item));
-    card.append(button);
-    fragment.append(card);
+  const storedQueue = storedQualityRiskQueue();
+  const queue = currentProject()
+    ? storedQueue?.projectId === currentProject().id
+      ? storedQueue
+      : currentQualityRiskQueue()
+    : null;
+  if (currentProject()) editorSessionStore.replaceQualityRiskQueue(queue);
+  qualityReviewController?.renderQuality?.({
+    project: currentProject(),
+    segment: currentSegment(),
+    activeIndex: currentActiveIndex(),
+    profile: currentProject()?.qualityProfile,
+    queue,
+    evidence: activeQualityEvidence(queue)
   });
-  els.qualityRiskList.replaceChildren(fragment);
 }
 
-async function saveQualityProfileFromForm() {
-  if (!state.project || !els.qualityForm) return false;
-  const previousProject = structuredClone(state.project);
-  const previousProjects = state.projects.map((project) => structuredClone(project));
-  const qualityProfile = qualityProfileFromForm();
+async function saveQualityProfileFromForm(values = qualityReviewController?.readProfile?.()) {
+  if (!currentProject()) return false;
+  const previousProject = structuredClone(currentProject());
+  const previousProjects = currentProjects().map((project) => structuredClone(project));
+  const qualityProfile = defaultQualityProfile(values);
   try {
-    state.project = await updateProject({ ...state.project, qualityProfile });
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
-    state.qualityRiskQueue = currentQualityRiskQueue();
+    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), qualityProfile }));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
+    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
     await refreshProjectSummaries();
     markWorkspaceDirty();
     renderQualityWorkbench();
@@ -7339,22 +7528,22 @@ async function saveQualityProfileFromForm() {
     setSaveStatus(appendActivityWarning("Quality profile saved", activityLogged), exportStatusMode("saved", activityLogged));
     return true;
   } catch (error) {
-    state.project = previousProject;
-    state.projects = previousProjects;
+    editorSessionStore.replaceProject(previousProject);
+    editorSessionStore.replaceProjects(previousProjects);
     renderQualityWorkbench();
     setSaveStatus(error.message || "Quality profile save failed", "dirty");
     return false;
   }
 }
 
-async function saveQualityDecisionFromForm() {
-  if (!state.project || !els.qualityDecisionForm) return false;
+async function saveQualityDecisionFromForm(values = qualityReviewController?.readDecision?.()) {
+  if (!currentProject()) return false;
   const segment = currentSegment();
   if (!segment) return false;
   const snapshot = structuredClone(segment);
-  const category = qualityDecisionCategory(els.qualityIssueCategorySelect?.value);
-  const severity = qualityDecisionSeverity(els.qualityIssueSeveritySelect?.value);
-  const note = (els.qualityDecisionNoteInput?.value || "").trim();
+  const category = qualityDecisionCategory(values?.category);
+  const severity = qualityDecisionSeverity(values?.severity);
+  const note = String(values?.note || "").trim();
   const decisionTitle = `Quality decision: ${qualityCategoryName(category)} (${qualityDecisionSeverityLabel(severity)})`;
   const now = new Date().toISOString();
   try {
@@ -7373,11 +7562,11 @@ async function saveQualityDecisionFromForm() {
     touchSegment(segment);
     clearPendingSave(segment);
     await saveSegment(segment);
-    if (els.qualityDecisionNoteInput) els.qualityDecisionNoteInput.value = "";
-    state.qualityRiskQueue = currentQualityRiskQueue();
-    renderReviewPanel();
+    qualityReviewController?.clearDecisionNote?.();
+    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
+    renderReviewPanel({ force: true });
     renderQualityWorkbench();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     markWorkspaceDirty();
     const activityLogged = await logOptionalProjectActivity("quality-decision", "Quality decision saved", {
       segmentId: segment.id,
@@ -7390,39 +7579,36 @@ async function saveQualityDecisionFromForm() {
     Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
     Object.assign(segment, snapshot);
     prepareSegmentHistoryState(segment);
-    renderReviewPanel();
+    renderReviewPanel({ force: true });
     renderQualityWorkbench();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     setSaveStatus(error.message || "Quality decision save failed", "dirty");
     return false;
   }
 }
 
 async function refreshQualityRiskQueue() {
-  if (!state.project) return null;
+  if (!currentProject()) return null;
   const checks = await runProjectQa();
   if (!checks) return null;
-  state.qualityRiskQueue = currentQualityRiskQueue(checks);
+  editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue(checks));
   renderQualityWorkbench();
-  return state.qualityRiskQueue;
+  return storedQualityRiskQueue();
 }
 
 async function goToQualityRiskItem(item) {
-  const index = state.segments.findIndex((segment) => segment.id === item?.segmentId);
+  const index = currentSegments().findIndex((segment) => segment.id === item?.segmentId);
   if (index === -1) return;
-  const segment = state.segments[index];
+  const segment = currentSegments()[index];
   if (!segmentPassesFilters(segment)) {
-    if (state.documentFilter && segment.documentId !== state.documentFilter) {
-      state.documentFilter = "";
-      els.documentFilter.value = state.documentFilter;
+    if (currentDocumentId() && segment.documentId !== currentDocumentId()) {
+      selectApplicationDocument("");
+      els.documentFilter.value = currentDocumentId();
     }
-    state.segmentQuery = "";
+    updateEditorFilters({ query: "", status: "all", reviewState: "", aiState: "" });
     els.segmentSearchInput.value = "";
-    state.segmentStatusFilter = "all";
     els.segmentStatusFilter.value = "all";
-    state.reviewStateFilter = "";
     if (els.reviewStateFilter) els.reviewStateFilter.value = "";
-    state.aiSegmentFilter = "";
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
     renderSegments();
   }
@@ -7432,11 +7618,12 @@ async function goToQualityRiskItem(item) {
 }
 
 async function goToNextQualityRisk() {
-  if (!state.project) return;
-  if (!state.qualityRiskQueue || state.qualityRiskQueue.projectId !== state.project.id) {
-    state.qualityRiskQueue = currentQualityRiskQueue();
+  if (!currentProject()) return;
+  const storedQueue = storedQualityRiskQueue();
+  if (!storedQueue || storedQueue.projectId !== currentProject().id) {
+    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
   }
-  const queue = state.qualityRiskQueue;
+  const queue = storedQualityRiskQueue();
   if (!queue?.items?.length) {
     setSaveStatus("No quality risks in this scope", "saved");
     return;
@@ -7444,11 +7631,11 @@ async function goToNextQualityRisk() {
   const indexedItems = queue.items
     .map((item) => ({
       ...item,
-      globalIndex: state.segments.findIndex((segment) => segment.id === item.segmentId)
+      globalIndex: currentSegments().findIndex((segment) => segment.id === item.segmentId)
     }))
     .filter((item) => item.globalIndex !== -1)
     .sort((a, b) => a.globalIndex - b.globalIndex);
-  const afterActive = indexedItems.find((item) => item.globalIndex > state.activeIndex);
+  const afterActive = indexedItems.find((item) => item.globalIndex > currentActiveIndex());
   await goToQualityRiskItem(afterActive || indexedItems[0] || queue.items[0]);
 }
 
@@ -7495,14 +7682,14 @@ function renderRevisionHistory() {
   `).join(""));
 }
 
-async function saveActiveReviewMetadata() {
+async function saveActiveReviewMetadata(values = qualityReviewController?.readReview?.()) {
   const segment = currentSegment();
-  if (!segment || !els.reviewForm) return;
+  if (!segment) return;
   const snapshot = structuredClone(segment);
   try {
-    segment.reviewState = els.reviewStateSelect.value;
-    segment.reviewNote = els.reviewNoteInput.value.trim();
-    const commentBody = els.reviewCommentInput.value.trim();
+    segment.reviewState = String(values?.reviewState || "");
+    segment.reviewNote = String(values?.reviewNote || "").trim();
+    const commentBody = String(values?.commentBody || "").trim();
     if (commentBody) {
       const now = new Date().toISOString();
       segment.comments = [
@@ -7525,16 +7712,16 @@ async function saveActiveReviewMetadata() {
     } catch (activityError) {
       console.warn("Review activity log failed.", activityError);
     }
-    renderReviewPanel();
-    updateRow(state.activeIndex);
+    renderReviewPanel({ force: true });
+    updateRow(currentActiveIndex());
     markWorkspaceDirty();
     setSaveStatus("Review saved", "saved");
   } catch (error) {
     Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
     Object.assign(segment, snapshot);
     prepareSegmentHistoryState(segment);
-    renderReviewPanel();
-    updateRow(state.activeIndex);
+    renderReviewPanel({ force: true });
+    updateRow(currentActiveIndex());
     renderRevisionHistory();
     setSaveStatus(error.message || "Review save failed", "dirty");
   }
@@ -7542,18 +7729,18 @@ async function saveActiveReviewMetadata() {
 
 async function setActiveReviewState(reviewState) {
   const segment = currentSegment();
-  if (!segment || !els.reviewStateSelect) return;
+  if (!currentProject() || !segment) return;
   const snapshot = structuredClone(segment);
   try {
     const command = appRuntime.commands.createChangeReviewStateCommand({
-      projectId: state.project.id,
+      projectId: currentProject().id,
       segmentId: segment.id,
       beforeSnapshot: snapshot,
       restoreSnapshot: (nextSnapshot) => restoreSegmentCommandSnapshot(segment.id, nextSnapshot),
       applyFirst: async () => {
         segment.reviewState = segment.reviewState === reviewState ? "" : reviewState;
         touchSegment(segment);
-        els.reviewStateSelect.value = segment.reviewState;
+        qualityReviewController?.syncReviewState?.(segment.reviewState);
         clearPendingSave(segment);
         if (LOOPCAT_TEST_BUILD && segment[REVIEW_STATE_SAVE_FAILURE_TEST_FLAG]) {
           throw new Error("Simulated review state save failure");
@@ -7568,7 +7755,7 @@ async function setActiveReviewState(reviewState) {
         } catch (activityError) {
           console.warn("Review activity log failed.", activityError);
         }
-        updateRow(state.activeIndex);
+        updateRow(currentActiveIndex());
         markWorkspaceDirty();
         return { snapshot: structuredClone(segment), activeSegmentId: segment.id };
       }
@@ -7584,7 +7771,7 @@ async function setActiveReviewState(reviewState) {
     Object.assign(segment, snapshot);
     prepareSegmentHistoryState(segment);
     renderReviewPanel();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     renderRevisionHistory();
     setSaveStatus(error.message || "Review state save failed", "dirty");
   }
@@ -7607,21 +7794,22 @@ function qaCheckFixHint(check) {
 }
 
 function renderQaResults() {
-  const checks = state.qaFilter ? state.qaChecks.filter((check) => check.type === state.qaFilter) : state.qaChecks;
-  if (!state.qaChecks.length) {
+  const qaChecks = currentQaChecks();
+  const checks = state.qaFilter ? qaChecks.filter((check) => check.type === state.qaFilter) : qaChecks;
+  if (!qaChecks.length) {
     els.qaResults.textContent = uiSource("No QA issues found.");
     els.qaResults.classList.add("muted");
     return;
   }
   els.qaResults.classList.remove("muted");
-  const summary = qaSummary(state.qaChecks);
+  const summary = qaSummary(qaChecks);
   const fragment = document.createDocumentFragment();
   const summaryWrap = document.createElement("div");
   summaryWrap.className = "qa-summary";
   const allButton = document.createElement("button");
   allButton.type = "button";
   allButton.className = state.qaFilter ? "" : "active";
-  allButton.textContent = uiSource("All {value1}", { value1: state.qaChecks.length });
+  allButton.textContent = uiSource("All {value1}", { value1: qaChecks.length });
   allButton.addEventListener("click", () => {
     state.qaFilter = "";
     renderQaResults();
@@ -7648,7 +7836,7 @@ function renderQaResults() {
     button.type = "button";
     button.textContent = uiLabel("go");
     button.addEventListener("click", async () => {
-      const index = state.segments.findIndex((segment) => segment.id === check.segmentId);
+      const index = currentSegments().findIndex((segment) => segment.id === check.segmentId);
       if (index !== -1) {
         await setActiveSegment(index);
         renderSegments();
@@ -7663,20 +7851,20 @@ function renderQaResults() {
 
 async function refreshTmMatches() {
   const segment = currentSegment();
-  if (!segment || !state.project) {
+  if (!segment || !currentProject()) {
     els.tmMatches.textContent = uiSource("No active segment.");
     els.tmMatches.classList.add("muted");
     return;
   }
   const segmentId = segment.id;
-  const projectId = state.project.id;
+  const projectId = currentProject().id;
   const matches = await findProjectTmMatches({
     source: segment.source,
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     tmNames: projectTmNames()
   });
-  if (state.project?.id !== projectId || currentSegment()?.id !== segmentId) return;
+  if (currentProject()?.id !== projectId || currentSegment()?.id !== segmentId) return;
   els.tmMatches.classList.toggle("muted", !matches.length);
   if (!matches.length) {
     els.tmMatches.textContent = uiSource("No TM matches.");
@@ -7706,20 +7894,20 @@ async function refreshTmMatches() {
 
 async function refreshTerms() {
   const segment = currentSegment();
-  if (!segment || !state.project) {
+  if (!segment || !currentProject()) {
     els.termSuggestions.textContent = uiSource("No active segment.");
     els.termSuggestions.classList.add("muted");
     return;
   }
   const segmentId = segment.id;
-  const projectId = state.project.id;
+  const projectId = currentProject().id;
   const suggestions = await findTerms({
     source: segment.source,
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     termBaseNames: projectTermBaseNames()
   });
-  if (state.project?.id !== projectId || currentSegment()?.id !== segmentId) return;
+  if (currentProject()?.id !== projectId || currentSegment()?.id !== segmentId) return;
   els.termSuggestions.classList.toggle("muted", !suggestions.length);
   if (!suggestions.length) {
     els.termSuggestions.textContent = uiSource("No terms found in this segment.");
@@ -7743,7 +7931,7 @@ async function refreshTerms() {
 }
 
 async function saveTermFromForm() {
-  if (!state.project || !els.sourceTermInput.value.trim() || !els.targetTermInput.value.trim()) return null;
+  if (!currentProject() || !els.sourceTermInput.value.trim() || !els.targetTermInput.value.trim()) return null;
   const termBaseName = els.termBaseSelect.value || primaryTermBaseName();
   try {
     if (LOOPCAT_TEST_BUILD && els.termForm[TERM_FORM_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated term form save failure");
@@ -7751,12 +7939,12 @@ async function saveTermFromForm() {
       sourceTerm: els.sourceTermInput.value,
       targetTerm: els.targetTermInput.value,
       notes: els.termNotesInput.value,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseName,
       isForbidden: els.termForbiddenInput?.checked
     });
-    markProjectsUsingResourceDirty("termbase", termBaseName, state.project.sourceLang, state.project.targetLang);
+    markProjectsUsingResourceDirty("termbase", termBaseName, currentProject().sourceLang, currentProject().targetLang);
     els.termForm.reset();
     renderTermbaseSelect();
     try {
@@ -7774,12 +7962,12 @@ async function saveTermFromForm() {
 }
 
 async function runProjectQa() {
-  if (!state.project) return null;
+  if (!currentProject()) return null;
   try {
-    if (LOOPCAT_TEST_BUILD && state.project[QA_RUN_FAILURE_TEST_FLAG]) throw new Error("Simulated QA run failure");
+    if (LOOPCAT_TEST_BUILD && currentProject()[QA_RUN_FAILURE_TEST_FLAG]) throw new Error("Simulated QA run failure");
     const terms = await listTerms({
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
     const qaSegments = currentDocumentSegments().map((segment) => ({
@@ -7790,14 +7978,14 @@ async function runProjectQa() {
     const checks = workerClient?.runQaChecks
       ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
       : await fallback();
-    state.qaChecks = checks;
+    editorSessionStore.replaceQaChecks(checks);
     state.qaFilter = "";
     renderQaResults();
-    state.qualityRiskQueue = currentQualityRiskQueue(checks);
+    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue(checks));
     renderQualityWorkbench();
     try {
-    if (LOOPCAT_TEST_BUILD && state.project[QA_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated QA activity log failure");
-      await logProjectActivity("qa-run", "QA checks run", { issueCount: checks.length, documentId: state.documentFilter || "" });
+    if (LOOPCAT_TEST_BUILD && currentProject()[QA_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated QA activity log failure");
+      await logProjectActivity("qa-run", "QA checks run", { issueCount: checks.length, documentId: currentDocumentId() });
     } catch (activityError) {
       console.warn("QA activity log failed.", activityError);
     }
@@ -7819,7 +8007,7 @@ function normalizedTargetSelection(selection, targetLength) {
 }
 
 function activeTargetSelection(segment) {
-  const textarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+  const textarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
   const length = String(segment?.target || "").length;
   return normalizedTargetSelection(
     textarea
@@ -7838,7 +8026,7 @@ async function runTargetProducerCommand({
   successMessage
 }) {
   const segment = currentSegment();
-  const projectId = state.project?.id || segment?.projectId || "";
+  const projectId = currentProject()?.id || segment?.projectId || "";
   if (!segment || !projectId || typeof createCommand !== "function") return null;
 
   finalizePendingEditCommand(segment.id);
@@ -7942,61 +8130,63 @@ function insertTagIntoTarget(tagText) {
 }
 
 async function saveProjectDomainFromForm() {
-  if (!state.project) return false;
-  const previousProject = structuredClone(state.project);
-  const previousProjects = state.projects.map((project) => structuredClone(project));
+  if (!currentProject()) return false;
+  const previousProject = structuredClone(currentProject());
+  const previousProjects = currentProjects().map((project) => structuredClone(project));
   const domain = els.projectDomainEditInput.value.trim();
   try {
-    if (LOOPCAT_TEST_BUILD && state.project[PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated project domain save failure");
-    state.project = await updateProject({ ...state.project, domain });
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    if (LOOPCAT_TEST_BUILD && currentProject()[PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated project domain save failure");
+    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), domain }));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
     await refreshProjectSummaries();
     renderAll();
-    els.domainForm.classList.toggle("hidden", Boolean((state.project.domain || "").trim()));
+    els.domainForm.classList.toggle("hidden", Boolean((currentProject().domain || "").trim()));
     markWorkspaceDirty();
     setSaveStatus("Project domain saved", "saved");
     return true;
   } catch (error) {
-    state.project = previousProject;
-    state.projects = previousProjects;
-    els.domainForm.classList.toggle("clean", domain === (state.project.domain || ""));
+    editorSessionStore.replaceProject(previousProject);
+    editorSessionStore.replaceProjects(previousProjects);
+    els.domainForm.classList.toggle("clean", domain === (currentProject().domain || ""));
     setSaveStatus(error.message || "Project domain save failed", "dirty");
     return false;
   }
 }
 
 async function saveAiSettings() {
-  if (!state.project) return;
-  const previousProject = structuredClone(state.project);
-  const previousProjects = state.projects.map((project) => structuredClone(project));
+  if (!currentProject()) return;
+  const previousProject = structuredClone(currentProject());
+  const previousProjects = currentProjects().map((project) => structuredClone(project));
   const previousOpenAiKey = openAiKeySnapshot();
-  const apiKeyInput = els.openAiApiKeyInput.value;
-  const rememberApiKey = els.rememberOpenAiKeyInput.checked;
-  const localAiKeyInput = els.localAiApiKeyInput?.value || "";
-  const rememberLocalAiKey = Boolean(els.rememberLocalAiKeyInput?.checked);
+  const globalForm = aiAdministrationController?.readGlobalForm?.() || {};
+  const secrets = aiAdministrationController?.readSecrets?.() || {};
+  const apiKeyInput = secrets.openAiKey || "";
+  const rememberApiKey = Boolean(secrets.rememberOpenAiKey);
+  const localAiKeyInput = secrets.localAiKey || "";
+  const rememberLocalAiKey = Boolean(secrets.rememberLocalAiKey);
   const localAiSettings = localAiSettingsFromForm();
   const previousLocalAiKey = localAiKeySnapshot(localAiSettings);
   let projectPersisted = false;
   let activityLogged = true;
   const aiSettings = defaultAiSettings({
-    enabled: els.aiEnabledInput.checked,
-    provider: els.aiProviderInput.value.trim() || "OpenAI",
-    model: els.aiModelInput.value.trim() || OPENAI_DEFAULT_MODEL,
-    sendSourceToAi: els.aiSendSourceInput.checked,
-    useTmContext: els.aiUseTmInput.checked,
-    useTermbaseContext: els.aiUseTbInput.checked,
-    styleGuide: els.aiStyleGuideInput.value.trim(),
-    ...localAISettingsStore.projectUpdateFields(localAiSettings, state.project)
+    enabled: Boolean(globalForm.enabled),
+    provider: globalForm.provider || "OpenAI",
+    model: globalForm.model || OPENAI_DEFAULT_MODEL,
+    sendSourceToAi: Boolean(globalForm.sendSourceToAi),
+    useTmContext: globalForm.useTmContext !== false,
+    useTermbaseContext: globalForm.useTermbaseContext !== false,
+    styleGuide: globalForm.styleGuide || "",
+    ...localAISettingsStore.projectUpdateFields(localAiSettings, currentProject())
   });
   const shouldUpdateOpenAiKey = Boolean(String(apiKeyInput || "").trim()) && isOpenAiProvider({ aiSettings });
   const shouldUpdateLocalAiKey = Boolean(String(localAiKeyInput || "").trim());
   try {
     assertLocalAiEndpointAllowed(localAiSettings);
-  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && state.project[AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG]);
-  if (LOOPCAT_TEST_BUILD && state.project[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
-    state.project = await updateProject({ ...state.project, aiSettings });
+  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && currentProject()[AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG]);
+  if (LOOPCAT_TEST_BUILD && currentProject()[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
+    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), aiSettings }));
     projectPersisted = true;
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
     if (shouldUpdateOpenAiKey) saveOpenAiKey(apiKeyInput, rememberApiKey);
     if (shouldUpdateLocalAiKey) saveLocalAiKey(localAiKeyInput, rememberLocalAiKey, localAiSettings);
     try {
@@ -8012,7 +8202,7 @@ async function saveAiSettings() {
     } catch (activityError) {
       activityLogged = false;
       console.warn("AI settings activity log failed.", activityError);
-      if (state.project?.id) markWorkspaceDirty(state.project.id);
+      if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
     }
     renderEditor();
     markWorkspaceDirty();
@@ -8104,14 +8294,14 @@ async function aiContextForSegment(segment, ai) {
   return Promise.all([
     ai.useTmContext ? findProjectTmMatches({
       source: segment.source,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       tmNames: projectTmNames()
     }) : [],
     ai.useTermbaseContext ? findTerms({
       source: segment.source,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     }) : []
   ]);
@@ -8162,7 +8352,7 @@ async function appendAiSuggestion(segment, suggestion, activityType, activityMes
     } catch (activityError) {
       activityLogged = false;
       console.warn("AI suggestion activity log failed.", activityError);
-      if (state.project?.id) markWorkspaceDirty(state.project.id);
+      if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
     }
     renderAiSuggestions();
     markWorkspaceDirty();
@@ -8188,7 +8378,7 @@ async function applyAiSuggestion(suggestionId, options = {}) {
     return false;
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before applying AI suggestion failed", "dirty");
     return false;
@@ -8197,12 +8387,12 @@ async function applyAiSuggestion(suggestionId, options = {}) {
   const snapshot = structuredClone(segment);
   const segmentId = segment.id;
   const restoreSnapshot = async (nextSnapshot) => {
-    const index = state.segments.findIndex((item) => item.id === segmentId);
+    const index = currentSegments().findIndex((item) => item.id === segmentId);
     if (index < 0) throw new Error("The affected segment is no longer available.");
-    const currentSnapshot = structuredClone(state.segments[index]);
+    const currentSnapshot = structuredClone(currentSegments()[index]);
     try {
       const restored = prepareCommandRestoreSegmentSnapshot(nextSnapshot, currentSnapshot);
-      state.segments[index] = restored;
+      editorSessionStore.replaceSegmentAt(index, restored);
       clearPendingSave(restored);
       await saveSegment(restored);
       renderSegments();
@@ -8213,7 +8403,7 @@ async function applyAiSuggestion(suggestionId, options = {}) {
       markWorkspaceDirty();
       return restored;
     } catch (error) {
-      state.segments[index] = prepareSegmentHistoryState(currentSnapshot);
+      editorSessionStore.replaceSegmentAt(index, prepareSegmentHistoryState(currentSnapshot));
       renderAll();
       throw error;
     }
@@ -8222,7 +8412,7 @@ async function applyAiSuggestion(suggestionId, options = {}) {
   let activityLogged = true;
   try {
     const command = appRuntime.commands.createApplyAiSuggestionCommand({
-      projectId: state.project.id,
+      projectId: currentProject().id,
       segmentId,
       suggestion,
       beforeSnapshot: snapshot,
@@ -8253,7 +8443,7 @@ async function applyAiSuggestion(suggestionId, options = {}) {
         } catch (activityError) {
           activityLogged = false;
           console.warn("AI suggestion activity log failed.", activityError);
-          if (state.project?.id) markWorkspaceDirty(state.project.id);
+          if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
         }
         renderSegments();
         renderProgress();
@@ -8289,16 +8479,18 @@ async function applyAiSuggestion(suggestionId, options = {}) {
 
 async function createOpenAiSuggestion() {
   const segment = currentSegment();
-  if (!state.project || !segment) return;
+  if (!currentProject() || !segment) return;
+  const globalForm = aiAdministrationController?.readGlobalForm?.() || {};
+  const secrets = aiAdministrationController?.readSecrets?.() || {};
   const aiSettings = defaultAiSettings({
-    ...state.project.aiSettings,
-    enabled: els.aiEnabledInput.checked,
-    provider: els.aiProviderInput.value.trim() || "OpenAI",
-    model: els.aiModelInput.value.trim() || OPENAI_DEFAULT_MODEL,
-    sendSourceToAi: els.aiSendSourceInput.checked,
-    useTmContext: els.aiUseTmInput.checked,
-    useTermbaseContext: els.aiUseTbInput.checked,
-    styleGuide: els.aiStyleGuideInput.value.trim()
+    ...currentProject().aiSettings,
+    enabled: Boolean(globalForm.enabled),
+    provider: globalForm.provider || "OpenAI",
+    model: globalForm.model || OPENAI_DEFAULT_MODEL,
+    sendSourceToAi: Boolean(globalForm.sendSourceToAi),
+    useTmContext: globalForm.useTmContext !== false,
+    useTermbaseContext: globalForm.useTermbaseContext !== false,
+    styleGuide: globalForm.styleGuide || ""
   });
   if (!aiSettings.enabled) {
     setSaveStatus("Enable AI helpers before requesting an OpenAI suggestion.", "dirty");
@@ -8320,7 +8512,7 @@ async function createOpenAiSuggestion() {
     setSaveStatus("OpenAI suggestions need an internet connection. LoopCAT appears to be offline; no source text, API key, or AI settings were sent or saved.", "dirty");
     return;
   }
-  const apiKey = String(els.openAiApiKeyInput.value || "").trim() || storedOpenAiKey();
+  const apiKey = String(secrets.openAiKey || "").trim() || storedOpenAiKey();
   if (!apiKey) {
     setSaveStatus("Add your OpenAI API key first.", "dirty");
     return;
@@ -8334,16 +8526,16 @@ async function createOpenAiSuggestion() {
     setSaveStatus("OpenAI suggestion canceled", "dirty");
     return;
   }
-  const previousProject = structuredClone(state.project);
-  const previousProjects = state.projects.map((project) => structuredClone(project));
+  const previousProject = structuredClone(currentProject());
+  const previousProjects = currentProjects().map((project) => structuredClone(project));
   const previousOpenAiKey = openAiKeySnapshot();
   let projectPersisted = false;
   try {
-    if (LOOPCAT_TEST_BUILD && state.project[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
-    state.project = await updateProject({ ...state.project, aiSettings });
+    if (LOOPCAT_TEST_BUILD && currentProject()[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
+    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), aiSettings }));
     projectPersisted = true;
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
-    saveOpenAiKey(apiKey, els.rememberOpenAiKeyInput.checked);
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
+    saveOpenAiKey(apiKey, Boolean(secrets.rememberOpenAiKey));
     markWorkspaceDirty();
     renderEditor();
     setSaveStatus("Requesting OpenAI suggestion...");
@@ -8356,7 +8548,7 @@ async function createOpenAiSuggestion() {
   }
   try {
     const [tmMatches, terms] = await aiContextForSegment(segment, aiSettings);
-    const suggestion = await openAiSuggestion({ apiKey, segment, tmMatches, terms, project: state.project });
+    const suggestion = await openAiSuggestion({ apiKey, segment, tmMatches, terms, project: currentProject() });
     const saved = await appendAiSuggestion(segment, suggestion, "ai-openai-suggestion", "OpenAI suggestion created");
     if (saved?.ok) {
       setSaveStatus(saved.activityLogged ? "OpenAI suggestion ready for review" : "OpenAI suggestion ready for review; activity log failed", saved.activityLogged ? "saved" : "dirty");
@@ -8390,13 +8582,11 @@ function localAiConnectionErrorLooksStartable(error) {
 }
 
 function setOpusCatConnectionHelpVisible(visible) {
-  els.localAiOpusCatHelpBtn?.classList.toggle("hidden", !visible);
+  opusCatHelpController?.setVisible?.(visible);
 }
 
 function showOpusCatConnectionHelp() {
-  setOpusCatConnectionHelpVisible(true);
-  if (!els.opusCatHelpDialog || typeof els.opusCatHelpDialog.showModal !== "function" || els.opusCatHelpDialog.open) return;
-  showManagedDialog(els.opusCatHelpDialog, els.closeOpusCatHelpBtn);
+  return opusCatHelpController?.open?.();
 }
 
 async function finishLocalAiConnection(settings, provider, result, saveMessage = "AI provider connection works") {
@@ -8406,7 +8596,7 @@ async function finishLocalAiConnection(settings, provider, result, saveMessage =
     discoveredBaseUrl &&
     normalizedProviderBaseUrl("opus-cat", discoveredBaseUrl) !== normalizedProviderBaseUrl("opus-cat", settings.baseUrl)
   ) {
-    els.localAiBaseUrlInput.value = discoveredBaseUrl;
+    aiAdministrationController?.setBaseUrl?.(discoveredBaseUrl);
     const rememberedSettings = await persistLocalAiSettings({ silent: true });
     renderLocalAiPresetOptions(rememberedSettings);
     renderLocalAiProviderControls(rememberedSettings);
@@ -8440,7 +8630,7 @@ async function startLmStudioServerFromUi(settings = localAiSettingsFromForm()) {
 }
 
 async function startLmStudioServerAndTestConnection() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   const settings = await persistLocalAiSettings({ silent: true });
   try {
     await startLmStudioServerFromUi(settings);
@@ -8453,7 +8643,7 @@ async function startLmStudioServerAndTestConnection() {
 }
 
 async function testLocalAiConnection(options = {}) {
-  if (!state.project) return;
+  if (!currentProject()) return;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -8499,7 +8689,7 @@ async function testLocalAiConnection(options = {}) {
 }
 
 async function refreshLocalAiModels() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -8542,7 +8732,7 @@ async function refreshLocalAiModels() {
 }
 
 async function pullLocalAiModel() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -8554,7 +8744,7 @@ async function pullLocalAiModel() {
     return;
   }
   const provider = currentLocalAiProvider(settings);
-  const model = (els.localAiModelInput?.value || settings.model || DEFAULT_LOCAL_AI_MODEL).trim() || DEFAULT_LOCAL_AI_MODEL;
+  const model = (aiAdministrationController?.readLocalForm?.().model || settings.model || DEFAULT_LOCAL_AI_MODEL).trim() || DEFAULT_LOCAL_AI_MODEL;
   if (!provider?.pullModel) {
     const message = "Model pull is available for Ollama in this build.";
     setSaveStatus(message, "dirty");
@@ -8576,7 +8766,7 @@ async function pullLocalAiModel() {
 }
 
 async function testLocalAiPrompt() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return;
   const mode = localAiPromptMode();
   const source = localAiSampleText();
   if (mode !== "project-brief" && !String(source || "").trim()) {
@@ -8622,7 +8812,7 @@ async function testLocalAiPrompt() {
   try {
     const result = mode === "pretranslate"
       ? await provider.translateSegment(config, {
-        project: state.project,
+        project: currentProject(),
         text: promptRequest.sourceText,
         sourceLanguage: settings.sourceLanguage,
         sourceCode: settings.sourceCode,
@@ -8633,24 +8823,18 @@ async function testLocalAiPrompt() {
         prompt: promptRequest.prompt
       })
       : await provider.completePrompt(config, {
-        project: state.project,
+        project: currentProject(),
         prompt: promptRequest.prompt,
         system: promptRequest.system,
         model: settings.model
       });
     state.localAi.promptOutput = result.rawOutput || result.translatedText || result.text || "";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = state.localAi.promptOutput;
-      els.localAiPromptOutput.classList.toggle("muted", !state.localAi.promptOutput);
-    }
+    renderLocalAiOutput(state.localAi.promptOutput);
     setSaveStatus(`${promptRequest.label} prompt returned output`, "saved");
     return true;
   } catch (error) {
     const message = error.message || "Local AI prompt test failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -8749,7 +8933,7 @@ function appendAiReviewComment(segment, result = {}) {
 }
 
 async function reviewActiveSegmentWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before running AI review.", "dirty");
@@ -8797,13 +8981,13 @@ async function reviewActiveSegmentWithLocalAi() {
   try {
     const glossaryTerms = await findTerms({
       source: segment.source,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
     const result = await aiCommandService.reviewSegment({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment,
       settings,
       config,
@@ -8828,12 +9012,9 @@ async function reviewActiveSegmentWithLocalAi() {
       console.warn("AI review activity log failed.", activityError);
       markWorkspaceDirty();
     }
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = aiReviewOutputText(result);
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    renderLocalAiOutput(aiReviewOutputText(result));
     renderReviewPanel();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     markWorkspaceDirty();
     setSaveStatus("AI review added to the active segment", "saved");
     return true;
@@ -8842,12 +9023,9 @@ async function reviewActiveSegmentWithLocalAi() {
     Object.assign(segment, snapshot);
     prepareSegmentHistoryState(segment);
     renderReviewPanel();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     const message = error.message || "AI review failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -8859,8 +9037,8 @@ async function reviewActiveSegmentWithLocalAi() {
 function localAiReviewScopeSegments(settings = {}) {
   const mode = settings.mode || "untranslated";
   if (mode === "selected") return currentSegment() ? [currentSegment()] : [];
-  if (mode === "visible") return filteredSegmentIndexes().map((index) => state.segments[index]).filter(Boolean);
-  if (mode === "project") return state.segments;
+  if (mode === "visible") return filteredSegmentIndexes().map((index) => currentSegments()[index]).filter(Boolean);
+  if (mode === "project") return currentSegments();
   return currentDocumentSegments();
 }
 
@@ -8887,7 +9065,7 @@ function selectLocalAiReviewSegments(settings = {}) {
 }
 
 async function reviewBatchWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -8916,7 +9094,7 @@ async function reviewBatchWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before batch AI QA failed", "dirty");
     return false;
@@ -8974,13 +9152,13 @@ async function reviewBatchWithLocalAi() {
       try {
         const glossaryTerms = await findTerms({
           source: segment.source,
-          sourceLang: state.project.sourceLang,
-          targetLang: state.project.targetLang,
+          sourceLang: currentProject().sourceLang,
+          targetLang: currentProject().targetLang,
           termBaseNames: projectTermBaseNames()
         });
         const result = await aiCommandService.reviewSegment({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment,
           settings,
           config,
@@ -9041,7 +9219,7 @@ async function reviewBatchWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -9053,24 +9231,21 @@ async function reviewBatchWithLocalAi() {
     const noIssueText = summary.noIssue ? `; ${summary.noIssue} no issues found` : "";
     const highestRiskText = summary.highestRisk && summary.highestRisk !== "none" ? `; highest risk ${summary.highestRisk}` : "";
     const canceledText = summary.canceled ? " canceled" : "";
-    if (els.localAiPromptOutput) {
-      const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-      const riskLines = ["critical", "high", "medium", "low"]
-        .filter((level) => summary.riskCounts[level])
-        .map((level) => `${aiReviewRiskLabel(level)}: ${summary.riskCounts[level]}`);
-      els.localAiPromptOutput.textContent = [
-        `${summary.commented} review comment${summary.commented === 1 ? "" : "s"} saved.`,
-        riskLines.join("\n"),
-        `${summary.noIssue} segment${summary.noIssue === 1 ? "" : "s"} returned no issues.`,
-        failureLines.join("\n")
-      ].filter(Boolean).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
+    const riskLines = ["critical", "high", "medium", "low"]
+      .filter((level) => summary.riskCounts[level])
+      .map((level) => `${aiReviewRiskLabel(level)}: ${summary.riskCounts[level]}`);
+    renderLocalAiOutput([
+      `${summary.commented} review comment${summary.commented === 1 ? "" : "s"} saved.`,
+      riskLines.join("\n"),
+      `${summary.noIssue} segment${summary.noIssue === 1 ? "" : "s"} returned no issues.`,
+      failureLines.join("\n")
+    ].filter(Boolean).join("\n"));
     setSaveStatus(`Batch AI QA${canceledText}: ${summary.commented} review comment${summary.commented === 1 ? "" : "s"} saved${highestRiskText}${noIssueText}${failureText}${skippedText}`, summary.failed ? "dirty" : "saved");
     return summary;
   } catch (error) {
     snapshots.forEach((snapshot, id) => {
-      const segment = state.segments.find((item) => item.id === id);
+      const segment = currentSegments().find((item) => item.id === id);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -9081,10 +9256,7 @@ async function reviewBatchWithLocalAi() {
     renderRevisionHistory();
     renderReviewPanel();
     const message = error.message || "Batch AI QA failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -9096,7 +9268,7 @@ async function reviewBatchWithLocalAi() {
 }
 
 async function repairActiveSegmentTagsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before requesting AI tag repair.", "dirty");
@@ -9144,7 +9316,7 @@ async function repairActiveSegmentTagsWithLocalAi() {
     const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
     const result = await aiCommandService.repairSegmentTags({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment: { ...segment, tags: segmentTags(segment) },
       settings,
       config,
@@ -9155,10 +9327,7 @@ async function repairActiveSegmentTagsWithLocalAi() {
       protectedTokens
     });
     if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
-      if (els.localAiPromptOutput) {
-        els.localAiPromptOutput.textContent = "AI did not propose a different tag repair.";
-        els.localAiPromptOutput.classList.remove("muted");
-      }
+      renderLocalAiOutput("AI did not propose a different tag repair.", { muted: false });
       setSaveStatus("AI did not propose a different tag repair.", "saved");
       return true;
     }
@@ -9177,10 +9346,7 @@ async function repairActiveSegmentTagsWithLocalAi() {
       status: "review"
     };
     const saved = await appendAiSuggestion(segment, suggestion, "ai-tag-repair", "AI tag repair suggestion created");
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = result.suggestedTarget;
-      els.localAiPromptOutput.classList.toggle("muted", !result.suggestedTarget);
-    }
+    renderLocalAiOutput(result.suggestedTarget);
     if (saved?.ok) {
       setSaveStatus(saved.activityLogged ? "AI tag repair suggestion ready for review" : "AI tag repair suggestion ready; activity log failed", saved.activityLogged ? "saved" : "dirty");
       return true;
@@ -9189,10 +9355,7 @@ async function repairActiveSegmentTagsWithLocalAi() {
     return false;
   } catch (error) {
     const message = error.message || "AI tag repair failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -9224,7 +9387,7 @@ function selectLocalAiTagRepairSegments(settings = {}) {
 }
 
 async function repairBatchTagsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -9269,7 +9432,7 @@ async function repairBatchTagsWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before batch AI tag repair failed", "dirty");
     return false;
@@ -9311,7 +9474,7 @@ async function repairBatchTagsWithLocalAi() {
         const missingTokens = missingTags(segment).map(tagDisplayText).filter(Boolean);
         const result = await aiCommandService.repairSegmentTags({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment: { ...segment, tags: segmentTags(segment) },
           settings,
           config,
@@ -9383,7 +9546,7 @@ async function repairBatchTagsWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -9394,20 +9557,17 @@ async function repairBatchTagsWithLocalAi() {
     const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
     const unchangedText = summary.unchanged ? `; ${summary.unchanged} unchanged` : "";
     const canceledText = summary.canceled ? " canceled" : "";
-    if (els.localAiPromptOutput) {
-      const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-      els.localAiPromptOutput.textContent = [
-        `${summary.suggested} tag repair suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
-        `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
-        failureLines.join("\n")
-      ].filter(Boolean).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
+    renderLocalAiOutput([
+      `${summary.suggested} tag repair suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
+      `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
+      failureLines.join("\n")
+    ].filter(Boolean).join("\n"));
     setSaveStatus(`Batch AI tag repair${canceledText}: ${summary.suggested} suggestion${summary.suggested === 1 ? "" : "s"} saved${unchangedText}${failureText}${skippedText}${activityLogged ? "" : "; activity log failed"}`, summary.failed || !activityLogged || summary.canceled ? "dirty" : "saved");
     return summary;
   } catch (error) {
     snapshots.forEach((snapshot, id) => {
-      const segment = state.segments.find((item) => item.id === id);
+      const segment = currentSegments().find((item) => item.id === id);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -9415,10 +9575,7 @@ async function repairBatchTagsWithLocalAi() {
     });
     renderAll();
     const message = error.message || "Batch AI tag repair failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -9430,7 +9587,7 @@ async function repairBatchTagsWithLocalAi() {
 }
 
 async function suggestActiveSegmentVariantsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before requesting AI alternatives.", "dirty");
@@ -9474,14 +9631,14 @@ async function suggestActiveSegmentVariantsWithLocalAi() {
   try {
     const glossaryTerms = await findTerms({
       source: segment.source,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
     const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
     const result = await aiCommandService.suggestSegmentVariants({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment: { ...segment, tags: segmentTags(segment) },
       settings,
       config,
@@ -9499,10 +9656,7 @@ async function suggestActiveSegmentVariantsWithLocalAi() {
       return suggestedTarget && (!currentTarget || suggestedTarget !== currentTarget);
     });
     if (!variants.length) {
-      if (els.localAiPromptOutput) {
-        els.localAiPromptOutput.textContent = "AI did not propose alternatives different from the current target.";
-        els.localAiPromptOutput.classList.remove("muted");
-      }
+      renderLocalAiOutput("AI did not propose alternatives different from the current target.", { muted: false });
       setSaveStatus("AI did not propose different alternatives.", "saved");
       return true;
     }
@@ -9539,12 +9693,9 @@ async function suggestActiveSegmentVariantsWithLocalAi() {
       console.warn("AI alternatives activity log failed.", activityError);
       markWorkspaceDirty();
     }
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = variants.map((variant) => `${variant.label || "Alternative"}: ${variant.suggestedTarget}`).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    renderLocalAiOutput(variants.map((variant) => `${variant.label || "Alternative"}: ${variant.suggestedTarget}`).join("\n"));
     renderAiSuggestions();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     markWorkspaceDirty();
     setSaveStatus(activityLogged ? "AI alternatives ready for review" : "AI alternatives ready; activity log failed", activityLogged ? "saved" : "dirty");
     return true;
@@ -9553,12 +9704,9 @@ async function suggestActiveSegmentVariantsWithLocalAi() {
     Object.assign(segment, snapshot);
     prepareSegmentHistoryState(segment);
     renderAiSuggestions();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     const message = error.message || "AI alternatives failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -9568,7 +9716,7 @@ async function suggestActiveSegmentVariantsWithLocalAi() {
 }
 
 async function suggestBatchSegmentVariantsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -9613,7 +9761,7 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before batch AI alternatives failed", "dirty");
     return false;
@@ -9655,7 +9803,7 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
         const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
         const result = await aiCommandService.suggestSegmentVariants({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment: { ...segment, tags: segmentTags(segment) },
           settings,
           config,
@@ -9736,7 +9884,7 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -9747,20 +9895,17 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
     const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
     const unchangedText = summary.unchanged ? `; ${summary.unchanged} unchanged` : "";
     const canceledText = summary.canceled ? " canceled" : "";
-    if (els.localAiPromptOutput) {
-      const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-      els.localAiPromptOutput.textContent = [
-        `${summary.suggested} alternative suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
-        `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
-        failureLines.join("\n")
-      ].filter(Boolean).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
+    renderLocalAiOutput([
+      `${summary.suggested} alternative suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
+      `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
+      failureLines.join("\n")
+    ].filter(Boolean).join("\n"));
     setSaveStatus(`Batch AI alternatives${canceledText}: ${summary.suggested} suggestion${summary.suggested === 1 ? "" : "s"} saved${unchangedText}${failureText}${skippedText}${activityLogged ? "" : "; activity log failed"}`, summary.failed || !activityLogged || summary.canceled ? "dirty" : "saved");
     return summary;
   } catch (error) {
     snapshots.forEach((snapshot, id) => {
-      const segment = state.segments.find((item) => item.id === id);
+      const segment = currentSegments().find((item) => item.id === id);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -9768,10 +9913,7 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
     });
     renderAll();
     const message = error.message || "Batch AI alternatives failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -9783,7 +9925,7 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
 }
 
 async function applyActiveSegmentTerminologyWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before applying AI terminology.", "dirty");
@@ -9821,10 +9963,7 @@ async function applyActiveSegmentTerminologyWithLocalAi() {
   }
   if (!glossaryTerms.length) {
     setSaveStatus("No matching project terminology found for the active segment.", "saved");
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = "No matching project terminology found for the active segment.";
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput("No matching project terminology found for the active segment.", { muted: false });
     return true;
   }
   if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) {
@@ -9846,7 +9985,7 @@ async function applyActiveSegmentTerminologyWithLocalAi() {
     const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
     const result = await aiCommandService.applyTerminology({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment: { ...segment, tags: segmentTags(segment) },
       settings,
       config,
@@ -9858,10 +9997,7 @@ async function applyActiveSegmentTerminologyWithLocalAi() {
       glossaryTerms
     });
     if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
-      if (els.localAiPromptOutput) {
-        els.localAiPromptOutput.textContent = "AI did not propose a different terminology revision.";
-        els.localAiPromptOutput.classList.remove("muted");
-      }
+      renderLocalAiOutput("AI did not propose a different terminology revision.", { muted: false });
       setSaveStatus("AI did not propose a different terminology revision.", "saved");
       return true;
     }
@@ -9881,10 +10017,7 @@ async function applyActiveSegmentTerminologyWithLocalAi() {
       status: "review"
     };
     const saved = await appendAiSuggestion(segment, suggestion, "ai-apply-terminology", "AI terminology suggestion created");
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = result.suggestedTarget;
-      els.localAiPromptOutput.classList.toggle("muted", !result.suggestedTarget);
-    }
+    renderLocalAiOutput(result.suggestedTarget);
     if (saved?.ok) {
       setSaveStatus(saved.activityLogged ? "AI terminology suggestion ready for review" : "AI terminology suggestion ready; activity log failed", saved.activityLogged ? "saved" : "dirty");
       return true;
@@ -9896,12 +10029,9 @@ async function applyActiveSegmentTerminologyWithLocalAi() {
     Object.assign(segment, snapshot);
     prepareSegmentHistoryState(segment);
     renderAiSuggestions();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     const message = error.message || "AI terminology application failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -9915,7 +10045,7 @@ function selectLocalAiTerminologyApplicationSegments(settings = {}) {
 }
 
 async function applyBatchTerminologyWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -9961,7 +10091,7 @@ async function applyBatchTerminologyWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before batch AI terminology application failed", "dirty");
     return false;
@@ -10009,7 +10139,7 @@ async function applyBatchTerminologyWithLocalAi() {
         const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
         const result = await aiCommandService.applyTerminology({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment: { ...segment, tags: segmentTags(segment) },
           settings,
           config,
@@ -10083,7 +10213,7 @@ async function applyBatchTerminologyWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -10095,21 +10225,18 @@ async function applyBatchTerminologyWithLocalAi() {
     const unchangedText = summary.unchanged ? `; ${summary.unchanged} unchanged` : "";
     const noTermText = summary.noTerms ? `; ${summary.noTerms} no termbase hits` : "";
     const canceledText = summary.canceled ? " canceled" : "";
-    if (els.localAiPromptOutput) {
-      const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-      els.localAiPromptOutput.textContent = [
-        `${summary.suggested} terminology suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
-        `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
-        `${summary.noTerms} segment${summary.noTerms === 1 ? "" : "s"} had no matching termbase hits.`,
-        failureLines.join("\n")
-      ].filter(Boolean).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
+    renderLocalAiOutput([
+      `${summary.suggested} terminology suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
+      `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
+      `${summary.noTerms} segment${summary.noTerms === 1 ? "" : "s"} had no matching termbase hits.`,
+      failureLines.join("\n")
+    ].filter(Boolean).join("\n"));
     setSaveStatus(`Batch AI terminology${canceledText}: ${summary.suggested} suggestion${summary.suggested === 1 ? "" : "s"} saved${unchangedText}${noTermText}${failureText}${skippedText}${activityLogged ? "" : "; activity log failed"}`, summary.failed || !activityLogged || summary.canceled ? "dirty" : "saved");
     return summary;
   } catch (error) {
     snapshots.forEach((snapshot, id) => {
-      const segment = state.segments.find((item) => item.id === id);
+      const segment = currentSegments().find((item) => item.id === id);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -10117,10 +10244,7 @@ async function applyBatchTerminologyWithLocalAi() {
     });
     renderAll();
     const message = error.message || "Batch AI terminology application failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -10132,7 +10256,7 @@ async function applyBatchTerminologyWithLocalAi() {
 }
 
 async function polishActiveSegmentDraftWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before polishing a draft.", "dirty");
@@ -10184,7 +10308,7 @@ async function polishActiveSegmentDraftWithLocalAi() {
     const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
     const result = await aiCommandService.polishSegmentStyle({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment: { ...segment, tags: segmentTags(segment) },
       settings,
       config,
@@ -10195,13 +10319,10 @@ async function polishActiveSegmentDraftWithLocalAi() {
       protectedTokens,
       glossaryTerms,
       tmMatches,
-      styleGuide: state.project.aiSettings?.styleGuide || ""
+      styleGuide: currentProject().aiSettings?.styleGuide || ""
     });
     if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
-      if (els.localAiPromptOutput) {
-        els.localAiPromptOutput.textContent = "AI did not propose a different polished draft.";
-        els.localAiPromptOutput.classList.remove("muted");
-      }
+      renderLocalAiOutput("AI did not propose a different polished draft.", { muted: false });
       setSaveStatus("AI did not propose a different polish.", "saved");
       return true;
     }
@@ -10222,10 +10343,7 @@ async function polishActiveSegmentDraftWithLocalAi() {
       status: "review"
     };
     const saved = await appendAiSuggestion(segment, suggestion, "ai-polish-draft", "AI draft polish suggestion created");
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = result.suggestedTarget;
-      els.localAiPromptOutput.classList.toggle("muted", !result.suggestedTarget);
-    }
+    renderLocalAiOutput(result.suggestedTarget);
     if (saved?.ok) {
       setSaveStatus(saved.activityLogged ? "AI polish suggestion ready for review" : "AI polish suggestion ready; activity log failed", saved.activityLogged ? "saved" : "dirty");
       return true;
@@ -10234,10 +10352,7 @@ async function polishActiveSegmentDraftWithLocalAi() {
     return false;
   } catch (error) {
     const message = error.message || "AI draft polish failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -10247,7 +10362,7 @@ async function polishActiveSegmentDraftWithLocalAi() {
 }
 
 async function adaptActiveSegmentDraftWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before adapting a draft.", "dirty");
@@ -10299,7 +10414,7 @@ async function adaptActiveSegmentDraftWithLocalAi() {
     const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
     const result = await aiCommandService.adaptSegmentDraft({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment: { ...segment, tags: segmentTags(segment) },
       settings,
       config,
@@ -10310,14 +10425,11 @@ async function adaptActiveSegmentDraftWithLocalAi() {
       protectedTokens,
       glossaryTerms,
       tmMatches,
-      styleGuide: state.project.aiSettings?.styleGuide || "",
+      styleGuide: currentProject().aiSettings?.styleGuide || "",
       adaptMode: settings.adaptMode
     });
     if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
-      if (els.localAiPromptOutput) {
-        els.localAiPromptOutput.textContent = "AI did not propose a different adapted draft.";
-        els.localAiPromptOutput.classList.remove("muted");
-      }
+      renderLocalAiOutput("AI did not propose a different adapted draft.", { muted: false });
       setSaveStatus("AI did not propose a different adaptation.", "saved");
       return true;
     }
@@ -10338,10 +10450,7 @@ async function adaptActiveSegmentDraftWithLocalAi() {
       status: "review"
     };
     const saved = await appendAiSuggestion(segment, suggestion, "ai-adapt-draft", "AI draft adaptation suggestion created");
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = result.suggestedTarget;
-      els.localAiPromptOutput.classList.toggle("muted", !result.suggestedTarget);
-    }
+    renderLocalAiOutput(result.suggestedTarget);
     if (saved?.ok) {
       setSaveStatus(saved.activityLogged ? "AI adaptation suggestion ready for review" : "AI adaptation suggestion ready; activity log failed", saved.activityLogged ? "saved" : "dirty");
       return true;
@@ -10350,10 +10459,7 @@ async function adaptActiveSegmentDraftWithLocalAi() {
     return false;
   } catch (error) {
     const message = error.message || "AI draft adaptation failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -10367,7 +10473,7 @@ function selectLocalAiDraftSegments(settings = {}) {
 }
 
 async function adaptBatchDraftsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -10412,7 +10518,7 @@ async function adaptBatchDraftsWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before batch AI adaptation failed", "dirty");
     return false;
@@ -10457,7 +10563,7 @@ async function adaptBatchDraftsWithLocalAi() {
         const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
         const result = await aiCommandService.adaptSegmentDraft({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment: { ...segment, tags: segmentTags(segment) },
           settings,
           config,
@@ -10468,7 +10574,7 @@ async function adaptBatchDraftsWithLocalAi() {
           protectedTokens,
           glossaryTerms,
           tmMatches,
-          styleGuide: state.project.aiSettings?.styleGuide || "",
+          styleGuide: currentProject().aiSettings?.styleGuide || "",
           adaptMode: settings.adaptMode,
           signal: state.localAi.abortController.signal
         });
@@ -10535,7 +10641,7 @@ async function adaptBatchDraftsWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -10546,20 +10652,17 @@ async function adaptBatchDraftsWithLocalAi() {
     const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
     const unchangedText = summary.unchanged ? `; ${summary.unchanged} unchanged` : "";
     const canceledText = summary.canceled ? " canceled" : "";
-    if (els.localAiPromptOutput) {
-      const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-      els.localAiPromptOutput.textContent = [
-        `${summary.suggested} adaptation suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
-        `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
-        failureLines.join("\n")
-      ].filter(Boolean).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
+    renderLocalAiOutput([
+      `${summary.suggested} adaptation suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
+      `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
+      failureLines.join("\n")
+    ].filter(Boolean).join("\n"));
     setSaveStatus(`Batch AI adaptation${canceledText}: ${summary.suggested} suggestion${summary.suggested === 1 ? "" : "s"} saved${unchangedText}${failureText}${skippedText}${activityLogged ? "" : "; activity log failed"}`, summary.failed || !activityLogged || summary.canceled ? "dirty" : "saved");
     return summary;
   } catch (error) {
     snapshots.forEach((snapshot, id) => {
-      const segment = state.segments.find((item) => item.id === id);
+      const segment = currentSegments().find((item) => item.id === id);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -10567,10 +10670,7 @@ async function adaptBatchDraftsWithLocalAi() {
     });
     renderAll();
     const message = error.message || "Batch AI adaptation failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -10582,7 +10682,7 @@ async function adaptBatchDraftsWithLocalAi() {
 }
 
 async function polishBatchDraftsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -10627,7 +10727,7 @@ async function polishBatchDraftsWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before batch AI polish failed", "dirty");
     return false;
@@ -10672,7 +10772,7 @@ async function polishBatchDraftsWithLocalAi() {
         const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
         const result = await aiCommandService.polishSegmentStyle({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment: { ...segment, tags: segmentTags(segment) },
           settings,
           config,
@@ -10683,7 +10783,7 @@ async function polishBatchDraftsWithLocalAi() {
           protectedTokens,
           glossaryTerms,
           tmMatches,
-          styleGuide: state.project.aiSettings?.styleGuide || "",
+          styleGuide: currentProject().aiSettings?.styleGuide || "",
           signal: state.localAi.abortController.signal
         });
         if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
@@ -10748,7 +10848,7 @@ async function polishBatchDraftsWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -10759,20 +10859,17 @@ async function polishBatchDraftsWithLocalAi() {
     const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
     const unchangedText = summary.unchanged ? `; ${summary.unchanged} unchanged` : "";
     const canceledText = summary.canceled ? " canceled" : "";
-    if (els.localAiPromptOutput) {
-      const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-      els.localAiPromptOutput.textContent = [
-        `${summary.suggested} polish suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
-        `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
-        failureLines.join("\n")
-      ].filter(Boolean).join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
+    renderLocalAiOutput([
+      `${summary.suggested} polish suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
+      `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
+      failureLines.join("\n")
+    ].filter(Boolean).join("\n"));
     setSaveStatus(`Batch AI polish${canceledText}: ${summary.suggested} suggestion${summary.suggested === 1 ? "" : "s"} saved${unchangedText}${failureText}${skippedText}${activityLogged ? "" : "; activity log failed"}`, summary.failed || !activityLogged || summary.canceled ? "dirty" : "saved");
     return summary;
   } catch (error) {
     snapshots.forEach((snapshot, id) => {
-      const segment = state.segments.find((item) => item.id === id);
+      const segment = currentSegments().find((item) => item.id === id);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -10780,10 +10877,7 @@ async function polishBatchDraftsWithLocalAi() {
     });
     renderAll();
     const message = error.message || "Batch AI polish failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -10796,8 +10890,8 @@ async function polishBatchDraftsWithLocalAi() {
 
 async function saveAiTermCandidates(terms = [], termBaseName = primaryTermBaseName()) {
   const existingTerms = await listTerms({
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     termBaseNames: [termBaseName]
   });
   const existingKeys = new Set(existingTerms.map((term) => `${stableLower(term.sourceTerm)}::${stableLower(term.targetTerm)}`));
@@ -10813,14 +10907,14 @@ async function saveAiTermCandidates(terms = [], termBaseName = primaryTermBaseNa
       sourceTerm: term.sourceTerm,
       targetTerm: term.targetTerm,
       notes: ["AI extracted term candidate. Review before relying on it.", term.note].filter(Boolean).join(" "),
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseName,
       isForbidden: false
     });
     savedTerms.push(saved);
   }
-  if (savedTerms.length) markProjectsUsingResourceDirty("termbase", termBaseName, state.project.sourceLang, state.project.targetLang);
+  if (savedTerms.length) markProjectsUsingResourceDirty("termbase", termBaseName, currentProject().sourceLang, currentProject().targetLang);
   return {
     savedTerms,
     duplicateCount: Math.max(0, (terms || []).length - savedTerms.length)
@@ -10828,16 +10922,16 @@ async function saveAiTermCandidates(terms = [], termBaseName = primaryTermBaseNa
 }
 
 function localAiTerminologySegments(settings = localAiSettingsFromForm()) {
-  if (!state.project) return [];
+  if (!currentProject()) return [];
   if (settings.mode === "selected") return currentSegment() ? [currentSegment()] : [];
-  if (settings.mode === "visible") return filteredSegmentIndexes().map((index) => state.segments[index]).filter(Boolean);
-  if (settings.mode === "project") return state.segments;
+  if (settings.mode === "visible") return filteredSegmentIndexes().map((index) => currentSegments()[index]).filter(Boolean);
+  if (settings.mode === "project") return currentSegments();
   if (settings.mode === "untranslated") return currentDocumentSegments().filter((segment) => !String(segment.target || "").trim());
   return currentDocumentSegments();
 }
 
 async function extractActiveSegmentTermsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before extracting AI terms.", "dirty");
@@ -10881,7 +10975,7 @@ async function extractActiveSegmentTermsWithLocalAi() {
   try {
     const result = await aiCommandService.extractSegmentTerms({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment,
       settings,
       config,
@@ -10892,12 +10986,12 @@ async function extractActiveSegmentTermsWithLocalAi() {
     });
     const { savedTerms } = await saveAiTermCandidates(result.terms || [], termBaseName);
     if (!savedTerms.length) {
-      if (els.localAiPromptOutput) {
-        els.localAiPromptOutput.textContent = result.terms?.length
+      renderLocalAiOutput(
+        result.terms?.length
           ? "AI term candidates already exist in the current termbase."
-          : "AI did not find reusable term candidates in the active segment.";
-        els.localAiPromptOutput.classList.remove("muted");
-      }
+          : "AI did not find reusable term candidates in the active segment.",
+        { muted: false }
+      );
       setSaveStatus(result.terms?.length ? "AI term candidates already exist" : "AI did not find term candidates", "saved");
       return true;
     }
@@ -10921,20 +11015,14 @@ async function extractActiveSegmentTermsWithLocalAi() {
     } catch (refreshError) {
       console.warn("Term refresh failed after AI extraction.", refreshError);
     }
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = savedTerms
-        .map((term) => `${term.sourceTerm} -> ${term.targetTerm}${term.notes ? ` (${term.notes})` : ""}`)
-        .join("\n");
-      els.localAiPromptOutput.classList.toggle("muted", !els.localAiPromptOutput.textContent);
-    }
+    renderLocalAiOutput(
+      savedTerms.map((term) => `${term.sourceTerm} -> ${term.targetTerm}${term.notes ? ` (${term.notes})` : ""}`).join("\n")
+    );
     setSaveStatus(activityLogged ? `Saved ${savedTerms.length} AI term candidate${savedTerms.length === 1 ? "" : "s"}` : `Saved ${savedTerms.length} AI term candidate${savedTerms.length === 1 ? "" : "s"}; activity log failed`, activityLogged ? "saved" : "dirty");
     return true;
   } catch (error) {
     const message = error.message || "AI term extraction failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -10944,7 +11032,7 @@ async function extractActiveSegmentTermsWithLocalAi() {
 }
 
 async function extractBatchTermsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -11000,7 +11088,7 @@ async function extractBatchTermsWithLocalAi() {
       try {
         const result = await aiCommandService.extractSegmentTerms({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment,
           settings,
           config,
@@ -11051,16 +11139,13 @@ async function extractBatchTermsWithLocalAi() {
       `failed ${failures.length}`
     ];
     if (state.localAi.progress.canceled) statusPieces.push("canceled");
-    if (els.localAiPromptOutput) {
-      const savedText = savedTerms.length
-        ? savedTerms.map((term) => `${term.sourceTerm} -> ${term.targetTerm}${term.notes ? ` (${term.notes})` : ""}`).join("\n")
-        : "No new AI term candidates were saved.";
-      const failureText = failures.length
-        ? `\n\nFailures:\n${failures.slice(0, 5).map((failure) => `- ${failure.segmentId}: ${failure.error}`).join("\n")}`
-        : "";
-      els.localAiPromptOutput.textContent = `${savedText}${failureText}`;
-      els.localAiPromptOutput.classList.toggle("muted", !savedTerms.length && !failures.length);
-    }
+    const savedText = savedTerms.length
+      ? savedTerms.map((term) => `${term.sourceTerm} -> ${term.targetTerm}${term.notes ? ` (${term.notes})` : ""}`).join("\n")
+      : "No new AI term candidates were saved.";
+    const failureText = failures.length
+      ? `\n\nFailures:\n${failures.slice(0, 5).map((failure) => `- ${failure.segmentId}: ${failure.error}`).join("\n")}`
+      : "";
+    renderLocalAiOutput(`${savedText}${failureText}`, { muted: !savedTerms.length && !failures.length });
     setSaveStatus(
       `${state.localAi.progress.canceled ? "Canceled" : "Finished"} batch AI term extraction: ${statusPieces.join(", ")}${activityLogged ? "" : "; activity log failed"}`,
       failures.length || !activityLogged || state.localAi.progress.canceled ? "dirty" : "saved"
@@ -11068,10 +11153,7 @@ async function extractBatchTermsWithLocalAi() {
     return { savedTerms, failures, duplicateCount, canceled: state.localAi.progress.canceled };
   } catch (error) {
     const message = error.message || "Batch AI term extraction failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -11084,7 +11166,7 @@ async function extractBatchTermsWithLocalAi() {
 
 function projectBriefSampleSegments(limit = 6) {
   const scoped = currentDocumentSegments();
-  const source = scoped.length ? scoped : state.segments;
+  const source = scoped.length ? scoped : currentSegments();
   const picked = [];
   for (const segment of source) {
     if (!String(segment.source || "").trim()) continue;
@@ -11098,7 +11180,7 @@ function projectBriefSampleSegments(limit = 6) {
 }
 
 async function generateProjectBriefWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -11127,20 +11209,20 @@ async function generateProjectBriefWithLocalAi() {
       return false;
     }
   }
-  const projectSnapshot = structuredClone(state.project);
+  const projectSnapshot = structuredClone(currentProject());
   state.localAi.promptBusy = true;
   renderLocalAiCommandCentre();
   setSaveStatus("Generating AI project brief...");
   try {
     const documents = projectDocuments();
     const terms = await listTerms({
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
     const result = await aiCommandService.generateProjectBrief({
       provider,
-      project: state.project,
+      project: currentProject(),
       settings,
       config,
       sourceLanguage: settings.sourceLanguage,
@@ -11151,17 +11233,17 @@ async function generateProjectBriefWithLocalAi() {
       sampleSegments,
       terms: terms.slice(0, 12)
     });
-    const existingStyle = String(state.project.aiSettings?.styleGuide || "").trim();
+    const existingStyle = String(currentProject().aiSettings?.styleGuide || "").trim();
     const generatedBlock = `AI project brief:\n${result.brief.trim()}`;
     const nextStyleGuide = existingStyle
       ? `${existingStyle}\n\n${generatedBlock}`
       : generatedBlock;
     const aiSettings = defaultAiSettings({
-      ...state.project.aiSettings,
+      ...currentProject().aiSettings,
       styleGuide: nextStyleGuide
     });
-    state.project = await updateProject({ ...state.project, aiSettings });
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), aiSettings }));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
     markWorkspaceDirty();
     let activityLogged = true;
     try {
@@ -11176,22 +11258,16 @@ async function generateProjectBriefWithLocalAi() {
       console.warn("AI project brief activity log failed.", activityError);
       markWorkspaceDirty();
     }
-    if (els.aiStyleGuideInput) els.aiStyleGuideInput.value = state.project.aiSettings.styleGuide || "";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = result.brief;
-      els.localAiPromptOutput.classList.toggle("muted", !result.brief);
-    }
+    aiAdministrationController?.setGlobalStyleGuide?.(currentProject().aiSettings.styleGuide || "");
+    renderLocalAiOutput(result.brief);
     setSaveStatus(activityLogged ? "AI project brief saved to style instructions" : "AI project brief saved; activity log failed", activityLogged ? "saved" : "dirty");
     return true;
   } catch (error) {
-    state.project = projectSnapshot;
-    state.projects = state.projects.map((project) => (project.id === projectSnapshot.id ? projectSnapshot : project));
-    if (els.aiStyleGuideInput) els.aiStyleGuideInput.value = defaultAiSettings(projectSnapshot.aiSettings).styleGuide || "";
+    editorSessionStore.replaceProject(projectSnapshot);
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === projectSnapshot.id ? projectSnapshot : project)));
+    aiAdministrationController?.setGlobalStyleGuide?.(defaultAiSettings(projectSnapshot.aiSettings).styleGuide || "");
     const message = error.message || "AI project brief failed.";
-    if (els.localAiPromptOutput) {
-      els.localAiPromptOutput.textContent = message;
-      els.localAiPromptOutput.classList.remove("muted");
-    }
+    renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
     return false;
   } finally {
@@ -11201,7 +11277,7 @@ async function generateProjectBriefWithLocalAi() {
 }
 
 function localAiPretranslationSegments(settings) {
-  if (settings.mode === "project" || settings.mode === "visible" || settings.mode === "selected") return state.segments;
+  if (settings.mode === "project" || settings.mode === "visible" || settings.mode === "selected") return currentSegments();
   return currentDocumentSegments();
 }
 
@@ -11209,18 +11285,18 @@ function localAiPretranslationOptions(settings) {
   return {
     mode: settings.mode,
     selectedSegmentIds: currentSegment()?.id ? [currentSegment().id] : [],
-    visibleSegmentIds: filteredSegmentIndexes().map((index) => state.segments[index]?.id).filter(Boolean)
+    visibleSegmentIds: filteredSegmentIndexes().map((index) => currentSegments()[index]?.id).filter(Boolean)
   };
 }
 
 async function localAiGlossaryTermsForSegment(segment) {
-  if (!state.project || !segment) return [];
-  if (defaultAiSettings(state.project.aiSettings).useTermbaseContext === false) return [];
+  if (!currentProject() || !segment) return [];
+  if (defaultAiSettings(currentProject().aiSettings).useTermbaseContext === false) return [];
   try {
     return await findTerms({
       source: segment.source,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
   } catch (error) {
@@ -11230,13 +11306,13 @@ async function localAiGlossaryTermsForSegment(segment) {
 }
 
 async function localAiTmMatchesForSegment(segment) {
-  if (!state.project || !segment) return [];
-  if (defaultAiSettings(state.project.aiSettings).useTmContext === false) return [];
+  if (!currentProject() || !segment) return [];
+  if (defaultAiSettings(currentProject().aiSettings).useTmContext === false) return [];
   try {
     return await findProjectTmMatches({
       source: segment.source,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       tmNames: projectTmNames(),
       limit: 3
     });
@@ -11247,10 +11323,10 @@ async function localAiTmMatchesForSegment(segment) {
 }
 
 function localAiSurroundingSegmentsForSegment(segment, options = {}) {
-  if (!state.project || !segment) return [];
+  if (!currentProject() || !segment) return [];
   const settings = options.settings || localAiSettingsFromForm();
   if (settings.includeNearbyContext === false) return [];
-  const segments = Array.isArray(options.segments) && options.segments.length ? options.segments : state.segments;
+  const segments = Array.isArray(options.segments) && options.segments.length ? options.segments : currentSegments();
   const segmentIndex = segments.findIndex((item) => item?.id === segment.id);
   if (segmentIndex < 0) return [];
   const sameDocument = (item) => {
@@ -11281,7 +11357,7 @@ function localAiSurroundingSegmentsForSegment(segment, options = {}) {
 }
 
 async function pretranslateWithLocalAi() {
-  if (!state.project || state.localAi.running) return;
+  if (!currentProject() || state.localAi.running) return;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -11303,8 +11379,8 @@ async function pretranslateWithLocalAi() {
       "configured provider URL",
       "batch segment text",
       settings.includeNearbyContext !== false ? "nearby segment context" : "",
-      defaultAiSettings(state.project.aiSettings).useTmContext !== false ? "TM matches" : "",
-      defaultAiSettings(state.project.aiSettings).useTermbaseContext !== false ? "termbase hints" : ""
+      defaultAiSettings(currentProject().aiSettings).useTmContext !== false ? "TM matches" : "",
+      defaultAiSettings(currentProject().aiSettings).useTermbaseContext !== false ? "termbase hints" : ""
     ].filter(Boolean);
     const ok = confirmExternalAiPromptShare({ provider: provider.name || settings.providerId, includesSourceText: true, contextLabels });
     if (!ok) {
@@ -11320,7 +11396,7 @@ async function pretranslateWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before local AI pre-translation failed", "dirty");
     return;
@@ -11330,7 +11406,7 @@ async function pretranslateWithLocalAi() {
   const selection = preTranslationService.selectSegments(segments, {
     ...pretranslationOptions,
     settings,
-    project: state.project
+    project: currentProject()
   });
   state.localAi.progress = {
     total: selection.candidates.length,
@@ -11354,7 +11430,7 @@ async function pretranslateWithLocalAi() {
     const summary = await preTranslationService.pretranslateSegments({
       segments,
       provider,
-      project: state.project,
+      project: currentProject(),
       settings,
       config,
       mode: settings.mode,
@@ -11376,11 +11452,11 @@ async function pretranslateWithLocalAi() {
       }
     });
     const updated = summary.updatedSegmentIds
-      .map((id) => state.segments.find((segment) => segment.id === id))
+      .map((id) => currentSegments().find((segment) => segment.id === id))
       .filter(Boolean);
     if (summary.canceled) {
       beforePatches.forEach((patch, segmentId) => {
-        const segment = state.segments.find((item) => item.id === segmentId);
+        const segment = currentSegments().find((item) => item.id === segmentId);
         if (segment) applyTargetCommandPatch(segment, patch);
       });
       invalidateSegmentFilterCache();
@@ -11400,7 +11476,7 @@ async function pretranslateWithLocalAi() {
       return null;
     }
     const command = appRuntime.commands.createAiPretranslationCommand({
-      projectId: state.project.id,
+      projectId: currentProject().id,
       segmentIds: updated.map((segment) => segment.id),
       beforePatches: updated.map((segment) => beforePatches.get(segment.id)),
       provenance: {
@@ -11441,7 +11517,7 @@ async function pretranslateWithLocalAi() {
       console.warn("Local AI pretranslation activity log failed.", activityError);
     }
     try {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
       renderAll();
       await refreshSidebar();
     } catch (refreshError) {
@@ -11458,7 +11534,7 @@ async function pretranslateWithLocalAi() {
     return { ...commandExecution, summary };
   } catch (error) {
     beforeSnapshots.forEach((snapshot, segmentId) => {
-      const segment = state.segments.find((item) => item.id === segmentId);
+      const segment = currentSegments().find((item) => item.id === segmentId);
       if (!segment) return;
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -11506,7 +11582,7 @@ function confirmExternalAiPromptShare({ provider, includesSourceText, contextLab
 
 async function splitCurrentSegment() {
   const segment = currentSegment();
-  const textarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+  const textarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
   if (!segment || !textarea) return null;
   if (!canSplitSegmentStructure(segment)) {
     setSaveStatus("Split is unavailable for structure-preserving localization files.", "dirty");
@@ -11527,16 +11603,16 @@ async function splitCurrentSegment() {
   const firstTarget = target.slice(0, targetSplit).trim();
   const secondTarget = target.slice(targetSplit).trim();
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before splitting failed", "dirty");
     return null;
   }
-  const beforeSegments = state.segments.map((item) => structuredClone(item));
+  const beforeSegments = currentSegments().map((item) => structuredClone(item));
   const createdSegmentId = `segment-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
   const createdAt = new Date().toISOString();
   const command = appRuntime?.commands?.createSplitSegmentCommand?.({
-    projectId: state.project.id,
+    projectId: currentProject().id,
     segmentId: segment.id,
     createdSegmentId,
     beforeSegments,
@@ -11567,12 +11643,12 @@ async function splitCurrentSegment() {
         throw new Error("Simulated split save failure");
       }
       const savedSegments = await saveSegmentStructure(ordered);
-      state.segments = prepareSegmentHistoryStates(savedSegments);
-      state.activeIndex = state.segments.findIndex((item) => item.id === createdSegmentId);
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
+      selectApplicationSegment(currentSegments().findIndex((item) => item.id === createdSegmentId));
       invalidateSegmentFilterCache();
       markWorkspaceDirty();
       return {
-        segments: state.segments.map((item) => structuredClone(item)),
+        segments: currentSegments().map((item) => structuredClone(item)),
         activeSegmentId: createdSegmentId,
         affectedCount: 2,
         focusTarget: true
@@ -11588,15 +11664,15 @@ async function splitCurrentSegment() {
   try {
     commandExecution = await appRuntime.commands.bus.execute(command);
   } catch (error) {
-    state.segments = prepareSegmentHistoryStates(beforeSegments);
-    state.activeIndex = Math.max(0, state.segments.findIndex((item) => item.id === segment.id));
+    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(beforeSegments));
+    selectApplicationSegment(Math.max(0, currentSegments().findIndex((item) => item.id === segment.id)));
     invalidateSegmentFilterCache();
     renderAll();
     focusActiveTextarea();
     setSaveStatus(error.message || "Segment split failed", "dirty");
     return null;
   }
-  state.commandProjectId = state.project.id;
+  state.commandProjectId = currentProject().id;
   renderAll();
   renderUndoControls();
   setSaveStatus("Segment split; Undo is available", "saved");
@@ -11614,16 +11690,16 @@ async function mergeWithNextSegment() {
     return null;
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before merging failed", "dirty");
     return null;
   }
-  const beforeSegments = state.segments.map((item) => structuredClone(item));
+  const beforeSegments = currentSegments().map((item) => structuredClone(item));
   const segmentId = segment.id;
   const mergedSegmentId = next.id;
   const command = appRuntime?.commands?.createMergeSegmentCommand?.({
-    projectId: state.project.id,
+    projectId: currentProject().id,
     segmentId,
     mergedSegmentId,
     beforeSegments,
@@ -11652,12 +11728,12 @@ async function mergeWithNextSegment() {
         throw new Error("Simulated merge transaction failure");
       }
       const savedSegments = await saveSegmentStructure(ordered, [mergedSegmentId]);
-      state.segments = prepareSegmentHistoryStates(savedSegments);
-      state.activeIndex = state.segments.findIndex((item) => item.id === segmentId);
+      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
+      selectApplicationSegment(currentSegments().findIndex((item) => item.id === segmentId));
       invalidateSegmentFilterCache();
       markWorkspaceDirty();
       return {
-        segments: state.segments.map((item) => structuredClone(item)),
+        segments: currentSegments().map((item) => structuredClone(item)),
         activeSegmentId: segmentId,
         affectedCount: 2,
         focusTarget: true
@@ -11673,15 +11749,15 @@ async function mergeWithNextSegment() {
   try {
     commandExecution = await appRuntime.commands.bus.execute(command);
   } catch (error) {
-    state.segments = prepareSegmentHistoryStates(beforeSegments);
-    state.activeIndex = Math.max(0, state.segments.findIndex((item) => item.id === segmentId));
+    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(beforeSegments));
+    selectApplicationSegment(Math.max(0, currentSegments().findIndex((item) => item.id === segmentId)));
     invalidateSegmentFilterCache();
     renderAll();
     focusActiveTextarea();
     setSaveStatus(error.message || "Segment merge failed", "dirty");
     return null;
   }
-  state.commandProjectId = state.project.id;
+  state.commandProjectId = currentProject().id;
   renderAll();
   renderUndoControls();
   setSaveStatus("Segments merged; Undo is available", "saved");
@@ -11695,20 +11771,23 @@ async function importDocx(file) {
   const result = await extractDocxSegments(file);
   await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
   const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  const documents = [...projectDocumentManifest(state.project), { id: documentId, name: result.fileName, type: "docx" }];
-  const docxStructures = { ...(state.project.docxStructures || {}), [documentId]: result.structure };
+  const documents = [...projectDocumentManifest(currentProject()), { id: documentId, name: result.fileName, type: "docx" }];
+  const docxStructures = { ...(currentProject().docxStructures || {}), [documentId]: result.structure };
   const importResult = await appendProjectSegmentsAndUpdateProject(
-    { ...state.project, sourceFileName: result.fileName, docxStructure: result.structure, docxStructures, documents },
+    { ...currentProject(), sourceFileName: result.fileName, docxStructure: result.structure, docxStructures, documents },
     result.segments,
     { documentId, documentName: result.fileName, documentType: "docx" }
   );
   await reportImportProgress("Refreshing project view", file);
-  state.project = importResult.project;
-  state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
-  state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
-  state.documentFilter = documentId;
+  editorSessionStore.replaceProject(importResult.project);
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
+  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   await refreshProjectSummaries();
-  state.activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
+  const activeIndex = currentSegments().findIndex((segment) => segment.documentId === documentId);
+  selectApplicationDocument(documentId, {
+    segmentId: currentSegments()[activeIndex]?.id || "",
+    activeIndex
+  });
   const extractedParts = result.structure?.textPartSummary?.filter((part) => part.segments > 0).length || 1;
   const activityLogged = await logOptionalProjectActivity("import", "DOCX imported", { fileName: file.name, segmentCount: result.segments.length, documentId }, "DOCX import");
   markWorkspaceDirty();
@@ -11723,22 +11802,25 @@ async function importLocalization(file) {
   const result = await parseLocalizationFile(file, textDecodingOptions());
   await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
   const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  const documents = [...projectDocumentManifest(state.project), { id: documentId, name: result.fileName, type: result.documentType }];
+  const documents = [...projectDocumentManifest(currentProject()), { id: documentId, name: result.fileName, type: result.documentType }];
   const localizationStructures = result.structure
-    ? { ...(state.project.localizationStructures || {}), [documentId]: result.structure }
-    : state.project.localizationStructures;
+    ? { ...(currentProject().localizationStructures || {}), [documentId]: result.structure }
+    : currentProject().localizationStructures;
   const importResult = await appendProjectSegmentsAndUpdateProject(
-    { ...state.project, documents, localizationStructures },
+    { ...currentProject(), documents, localizationStructures },
     result.segments,
     { documentId, documentName: result.fileName, documentType: result.documentType }
   );
   await reportImportProgress("Refreshing project view", file);
-  state.project = importResult.project;
-  state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
-  state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
-  state.documentFilter = documentId;
+  editorSessionStore.replaceProject(importResult.project);
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
+  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   await refreshProjectSummaries();
-  state.activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
+  const activeIndex = currentSegments().findIndex((segment) => segment.documentId === documentId);
+  selectApplicationDocument(documentId, {
+    segmentId: currentSegments()[activeIndex]?.id || "",
+    activeIndex
+  });
   const activityLogged = await logOptionalProjectActivity("import", "Localization file imported", { fileName: file.name, documentType: result.documentType, segmentCount: result.segments.length, documentId }, "Localization import");
   markWorkspaceDirty();
   setSaveStatus(appendActivityWarning("Saved", activityLogged), exportStatusMode("saved", activityLogged));
@@ -11752,23 +11834,26 @@ async function importXliff(file) {
   const result = await parseXliffFile(file, textDecodingOptions());
   await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
   const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  const documents = [...projectDocumentManifest(state.project), { id: documentId, name: result.fileName, type: result.documentType }];
+  const documents = [...projectDocumentManifest(currentProject()), { id: documentId, name: result.fileName, type: result.documentType }];
   const localizationStructures = {
-    ...(state.project.localizationStructures || {}),
+    ...(currentProject().localizationStructures || {}),
     [documentId]: result.structure
   };
   const importResult = await appendProjectSegmentsAndUpdateProject(
-    { ...state.project, documents, localizationStructures },
+    { ...currentProject(), documents, localizationStructures },
     result.segments,
     { documentId, documentName: result.fileName, documentType: result.documentType }
   );
   await reportImportProgress("Refreshing project view", file);
-  state.project = importResult.project;
-  state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
-  state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
-  state.documentFilter = documentId;
+  editorSessionStore.replaceProject(importResult.project);
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
+  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   await refreshProjectSummaries();
-  state.activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
+  const activeIndex = currentSegments().findIndex((segment) => segment.documentId === documentId);
+  selectApplicationDocument(documentId, {
+    segmentId: currentSegments()[activeIndex]?.id || "",
+    activeIndex
+  });
   const activityLogged = await logOptionalProjectActivity("import", "XLIFF imported", { fileName: file.name, segmentCount: result.segments.length, documentId }, "XLIFF import");
   markWorkspaceDirty();
   setSaveStatus(appendActivityWarning(`Imported ${result.segments.length} XLIFF segment${result.segments.length === 1 ? "" : "s"}`, activityLogged), exportStatusMode("saved", activityLogged));
@@ -11788,7 +11873,7 @@ function confirmDuplicateImport(file) {
 }
 
 async function importProjectDocument(file) {
-  if (!state.project || !file) return;
+  if (!currentProject() || !file) return;
   assertFileSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);
   if (!confirmDuplicateImport(file)) {
     setSaveStatus("Import canceled", "saved");
@@ -11826,7 +11911,7 @@ function clonePortableRecord(record) {
 
 function importedCopyName(name) {
   const base = `${String(name || "Imported project").trim() || "Imported project"} (copy)`;
-  const usedNames = new Set(state.projects.map((project) => project.name).filter(Boolean));
+  const usedNames = new Set(currentProjects().map((project) => project.name).filter(Boolean));
   if (!usedNames.has(base)) return base;
   let counter = 2;
   while (usedNames.has(`${base} ${counter}`)) counter += 1;
@@ -11912,8 +11997,8 @@ async function parseJsonFile(file, label) {
     throw new Error(`${label} is too large. Choose a LoopCAT JSON file under 50 MB.`);
   }
   try {
-    const decoded = window.CatHan.encoding
-      ? await window.CatHan.encoding.decodeTextFile(file, textDecodingOptions())
+    const decoded = encodingApi
+      ? await encodingApi.decodeTextFile(file, textDecodingOptions())
       : { text: await file.text() };
     return JSON.parse(decoded.text);
   } catch {
@@ -11922,7 +12007,7 @@ async function parseJsonFile(file, label) {
 }
 
 async function readImportTextFile(file, options = textDecodingOptions()) {
-  if (window.CatHan.encoding) return (await window.CatHan.encoding.decodeTextFile(file, options)).text;
+  if (encodingApi) return (await encodingApi.decodeTextFile(file, options)).text;
   return file.text();
 }
 
@@ -11961,10 +12046,10 @@ async function runFileImportTask(label, action) {
   }
 }
 
-async function buildProjectPackage(project = state.project, segmentRecords = null, options = {}) {
+async function buildProjectPackage(project = currentProject(), segmentRecords = null, options = {}) {
   if (!project) return null;
   await flushPendingSegmentSaves(project.id);
-  const projectSegments = segmentRecords || (project.id === state.project?.id ? state.segments : await getProjectSegments(project.id));
+  const projectSegments = segmentRecords || (project.id === currentProject()?.id ? currentSegments() : await getProjectSegments(project.id));
   const [tmEntries, terms, activityEvents] = await Promise.all([
     getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`),
     listTerms({
@@ -12049,6 +12134,31 @@ async function buildBackupExport() {
   return { backup, validation };
 }
 
+async function exportBrowserBackup() {
+  try {
+    const { backup, validation } = await buildBackupExport();
+    download(
+      `loopcat-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      JSON.stringify(backup, null, 2),
+      "application/json"
+    );
+    renderValidationReport(validation);
+    const noteCount = reportCount(validation);
+    setSaveStatus(
+      noteCount
+        ? `Backup exported with ${noteCount} validation note${noteCount === 1 ? "" : "s"}`
+        : "Backup exported",
+      noteCount ? "dirty" : "saved"
+    );
+    return true;
+  } catch (error) {
+    const message = error.message || "Backup export failed.";
+    renderValidationReport(error.validation || portableFileErrorReport(message));
+    setSaveStatus(message, "dirty");
+    return false;
+  }
+}
+
 function reportProjectPackageExportFailure(error, pkg = null) {
   const message = error?.message || "Project package export failed";
   renderValidationReport(error?.validation || pkg?.validation || portableFileErrorReport(message));
@@ -12056,8 +12166,8 @@ function reportProjectPackageExportFailure(error, pkg = null) {
 }
 
 async function exportProjectPackage() {
-  if (!state.project) return;
-  const base = fileSafeName(state.project.name || "project");
+  if (!currentProject()) return;
+  const base = fileSafeName(currentProject().name || "project");
   const filename = `${base}.loopcat.json`;
   let previewPackage = null;
   try {
@@ -12070,17 +12180,17 @@ async function exportProjectPackage() {
   const warnings = reportCount(previewPackage.validation);
   const exportHistoryEntry = { id: `export-${Date.now()}`, type: "project-package", filename, warningCount: warnings, createdAt: new Date().toISOString() };
   const pendingProject = {
-    ...state.project,
+    ...currentProject(),
     exportHistory: [
-      ...(state.project.exportHistory || []),
+      ...(currentProject().exportHistory || []),
       exportHistoryEntry
     ].slice(-25)
   };
   const activityDetail = { filename, warningCount: warnings };
-  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && state.project?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]);
+  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && currentProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]);
   const pendingActivityEvent = shouldSimulateActivityFailure
     ? null
-    : draftProjectActivityEvent(state.project, "export", "Project package exported", activityDetail);
+    : draftProjectActivityEvent(currentProject(), "export", "Project package exported", activityDetail);
   let pkg = null;
   try {
     pkg = await buildProjectPackage(pendingProject, null, {
@@ -12099,11 +12209,11 @@ async function exportProjectPackage() {
     return;
   }
   try {
-    state.project = await updateProject(pendingProject);
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    editorSessionStore.replaceProject(await updateProject(pendingProject));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   } catch (error) {
     console.warn("Project package export history update failed.", error);
-    markWorkspaceDirty(state.project?.id);
+    markWorkspaceDirty(currentProject()?.id);
     renderValidationReport(pkg.validation);
     renderEditor();
     setSaveStatus("Project package exported; local export history failed", "dirty");
@@ -12114,14 +12224,14 @@ async function exportProjectPackage() {
     if (shouldSimulateActivityFailure) throw new Error("Simulated export activity log failure");
     if (pendingActivityEvent) {
       await bulkPut("activityEvents", [pendingActivityEvent]);
-      state.activityEvents = await listActivityEvents(state.project.id);
+      editorSessionStore.replaceActivityEvents(await listActivityEvents(currentProject().id));
     }
-    markWorkspaceDirty(state.project.id);
+    markWorkspaceDirty(currentProject().id);
     renderBackupReminder();
   } catch (activityError) {
     activityLogged = false;
     console.warn("Project package export activity log failed.", activityError);
-    if (state.project?.id) markWorkspaceDirty(state.project.id);
+    if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
   }
   renderValidationReport(pkg.validation);
   renderEditor();
@@ -12139,7 +12249,7 @@ async function importProjectPackageData(pkg, options = {}) {
     setSaveStatus("Project package import failed validation", "dirty");
     return null;
   }
-  const existing = state.projects.find((project) => project.id === pkg.project.id);
+  const existing = currentProjects().find((project) => project.id === pkg.project.id);
   let importAsCopy = false;
   if (existing) {
     const replace = options.replaceExisting ?? uiConfirm(`A project named "${displaySafeText(existing.name)}" already exists. Replace it with this package?`);
@@ -12175,9 +12285,10 @@ async function importProjectPackageData(pkg, options = {}) {
   await reportImportProgress("Refreshing projects", { name: sourceName });
   const activityResult = await logOptionalActivityForProject(prepared.project.id, "import", "Project package imported", { fileName: sourceName, warningCount: reportCount(importReport), importAsCopy }, "Project package import");
   const activityLogged = activityResult.ok;
-  state.project = null;
-  state.segments = [];
-  state.view = "projects";
+  editorSessionStore.replaceProject(null);
+  editorSessionStore.replaceSegments([]);
+  applicationNavigation.openProjects();
+  applicationNavigation.clearSelection();
   await loadProjects(false);
   if (options.open !== false) await openProject(prepared.project.id);
   renderValidationReport(importReport);
@@ -12210,11 +12321,12 @@ async function restoreBackupData(backup) {
   await rebuildAllTmIndexes();
   await rebuildAllTermIndexes();
   await reportImportProgress("Refreshing projects");
-  state.project = null;
-  state.segments = [];
-  state.view = "projects";
+  editorSessionStore.replaceProject(null);
+  editorSessionStore.replaceSegments([]);
+  applicationNavigation.openProjects();
+  applicationNavigation.clearSelection();
   await loadProjects(false);
-  const restoredProjectIds = state.projects.map((project) => project.id).filter(Boolean);
+  const restoredProjectIds = currentProjects().map((project) => project.id).filter(Boolean);
   if (state.workspaceStatus?.connected) {
     clearWorkspaceDirtyMarkers();
     markWorkspaceProjectsDirty(restoredProjectIds);
@@ -12266,17 +12378,17 @@ async function chooseWorkspaceFolder() {
 }
 
 async function saveCurrentProjectPackageToWorkspace() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   await flushPendingSegmentSaves();
   if (!state.workspaceStatus?.connected) await chooseWorkspaceFolder();
   if (!state.workspaceStatus?.connected) return;
-  const previewPackage = await buildProjectPackage(state.project);
+  const previewPackage = await buildProjectPackage(currentProject());
   assertValidProjectPackageForWrite(previewPackage, "save project package to workspace");
   const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && state[WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG]);
   const pendingActivityEvent = shouldSimulateActivityFailure
     ? null
-    : draftProjectActivityEvent(state.project, "workspace-save", "Project package saved to workspace folder");
-  const { pkg, result } = await saveProjectPackageToWorkspaceById(state.project.id, {
+    : draftProjectActivityEvent(currentProject(), "workspace-save", "Project package saved to workspace folder");
+  const { pkg, result } = await saveProjectPackageToWorkspaceById(currentProject().id, {
     activityEvents: pendingActivityEvent ? [pendingActivityEvent] : []
   });
   let activityLogged = true;
@@ -12284,14 +12396,14 @@ async function saveCurrentProjectPackageToWorkspace() {
     if (shouldSimulateActivityFailure) throw new Error("Simulated workspace save activity failure");
     if (pendingActivityEvent) {
       await bulkPut("activityEvents", [pendingActivityEvent]);
-      state.activityEvents = await listActivityEvents(state.project.id);
+      editorSessionStore.replaceActivityEvents(await listActivityEvents(currentProject().id));
     }
     renderBackupReminder();
   } catch (activityError) {
     activityLogged = false;
     console.warn("Workspace save activity log failed.", activityError);
   }
-  if (!activityLogged) markWorkspaceDirty(state.project.id);
+  if (!activityLogged) markWorkspaceDirty(currentProject().id);
   state.workspaceStatus = await workspaceStorage.getStatus();
   renderValidationReport(pkg.validation);
   const validationReportWarning = result.validationReportSaved === false ? "; validation report sidecar failed" : "";
@@ -12309,7 +12421,7 @@ async function saveProjectPackageToWorkspaceById(projectId, options = {}) {
     const pkg = await buildProjectPackage(project, null, options);
     assertValidProjectPackageForWrite(pkg, "save project package to workspace");
     const result = await workspaceStorage.saveProjectPackage(pkg);
-    if (state.project?.id === projectId) {
+    if (currentProject()?.id === projectId) {
       state.workspaceStatus = await workspaceStorage.getStatus();
     }
     clearWorkspaceDirty(projectId);
@@ -12362,7 +12474,7 @@ function startWorkspaceAutosave() {
 }
 
 async function maybeSaveProjectPackageFromSettings(shouldSaveToFolder = Boolean(els.saveProjectToFolderInput?.checked)) {
-  if (!shouldSaveToFolder || !state.project) return false;
+  if (!shouldSaveToFolder || !currentProject()) return false;
   if (!workspaceStorage?.isSupported()) return false;
   try {
     if (!state.workspaceStatus?.connected) await chooseWorkspaceFolder();
@@ -12384,8 +12496,8 @@ async function saveProjectFromDialog() {
     setSaveStatus("Complete required project fields.", "dirty");
     return false;
   }
-  const editing = projectDialogController?.getMode?.() === "edit" && Boolean(state.project);
-  const settings = collectProjectResourceSettings(editing ? state.project : null);
+  const editing = projectDialogController?.getMode?.() === "edit" && Boolean(currentProject());
+  const settings = collectProjectResourceSettings(editing ? currentProject() : null);
   const shouldSaveToFolder = Boolean(els.saveProjectToFolderInput?.checked);
   if (shouldSaveToFolder && workspaceStorage?.isSupported() && !state.workspaceStatus?.connected) {
     try {
@@ -12396,17 +12508,17 @@ async function saveProjectFromDialog() {
       renderProjectStorageStatus();
     }
   }
-  if (editing && state.project) {
+  if (editing && currentProject()) {
     const creatorName = rememberCreatorName(els.projectCreatorInput?.value || "");
-    state.project = await updateProject({
-      ...state.project,
+    editorSessionStore.replaceProject(await updateProject({
+      ...currentProject(),
       name: els.projectNameInput.value.trim(),
       creatorName,
-      creatorOrigin: state.project.creatorOrigin || "manual",
+      creatorOrigin: currentProject().creatorOrigin || "manual",
       domain: els.projectDomainInput.value.trim(),
       ...settings
-    });
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    }));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
     await refreshProjectTerms({ rerender: true });
     await refreshProjectSummaries();
     renderAll();
@@ -12434,7 +12546,7 @@ async function saveProjectFromDialog() {
         activityLogged ? "saved" : "dirty"
       );
     }
-    return state.project;
+    return currentProject();
   }
 
   const creatorName = rememberCreatorName(els.projectCreatorInput?.value || "");
@@ -12509,9 +12621,10 @@ async function syncWorkspaceFromFolder() {
       addWorkspaceSyncWarning(`${ref.name || ref.id}: ${error.message}`);
     }
   }
-  state.project = null;
-  state.segments = [];
-  state.view = "projects";
+  editorSessionStore.replaceProject(null);
+  editorSessionStore.replaceSegments([]);
+  applicationNavigation.openProjects();
+  applicationNavigation.clearSelection();
   await loadProjects(false);
   state.workspaceStatus = await workspaceStorage.getStatus();
   const finalWarnings = Array.from(new Set([...(state.workspaceStatus.warnings || []), ...warnings].map((warning) => redactSensitiveText(warning || "").trim()).filter(Boolean)));
@@ -12552,7 +12665,7 @@ async function repairWorkspaceLinks() {
   state.workspaceStatus = await workspaceStorage.getStatus();
   const [tmEntries, terms] = await Promise.all([listTmEntries(), getAll("terms")]);
   const report = await workspaceStorage.buildHealthReport({
-    projects: state.projects,
+    projects: currentProjects(),
     tmEntries,
     terms,
     dirtyProjectIds: workspaceDirtyIds()
@@ -12629,29 +12742,29 @@ async function buildProjectReportData() {
   await flushPendingSegmentSaves();
   const tmNames = new Set(projectTmNames());
   const [tmEntries, terms, activityEvents] = await Promise.all([
-    getAllByIndex("tmEntries", "languagePair", `${state.project.sourceLang}::${state.project.targetLang}`),
+    getAllByIndex("tmEntries", "languagePair", `${currentProject().sourceLang}::${currentProject().targetLang}`),
     listTerms({
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     }),
-    listActivityEvents(state.project.id)
+    listActivityEvents(currentProject().id)
   ]);
   const scopedTm = tmEntries.filter((entry) => tmNames.has(entry.tmName));
   const reportActivityEvents = sanitizePortableValue(activityEvents, "activityEvents");
-  const validation = validateExportReadiness({ project: state.project, segments: state.segments, format: "project-report", terms });
-  const analysis = analyzeProject(state.project, state.segments, scopedTm);
-  const qaSegments = state.segments.map((segment) => ({
+  const validation = validateExportReadiness({ project: currentProject(), segments: currentSegments(), format: "project-report", terms });
+  const analysis = analyzeProject(currentProject(), currentSegments(), scopedTm);
+  const qaSegments = currentSegments().map((segment) => ({
     ...segment,
     tags: segmentTags(segment)
   }));
-  const fallback = () => Promise.resolve(runQaChecks(state.segments, terms, { missingTags }));
+  const fallback = () => Promise.resolve(runQaChecks(currentSegments(), terms, { missingTags }));
   const qaChecks = workerClient?.runQaChecks
     ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
     : await fallback();
   const qualityPassport = buildQualityPassportData({
-    project: state.project,
-    segments: state.segments,
+    project: currentProject(),
+    segments: currentSegments(),
     qaChecks,
     validation,
     analysis,
@@ -12660,25 +12773,25 @@ async function buildProjectReportData() {
     tmEntries: scopedTm,
     tmEntryCount: scopedTm.length,
     termCount: terms.length,
-    profile: state.project.qualityProfile
+    profile: currentProject().qualityProfile
   });
   return {
     generatedAt: new Date().toISOString(),
-    project: state.project,
-    resources: projectResourceSummary(state.project),
+    project: currentProject(),
+    resources: projectResourceSummary(currentProject()),
     analysis,
     validation,
     qualityPassport,
     qaChecks,
     qaBySeverity: countBy(qaChecks, (check) => check.severity),
     qaByType: countBy(qaChecks, (check) => check.type),
-    reviewByState: countBy(state.segments.filter((segment) => segment.reviewState), (segment) => segment.reviewState),
+    reviewByState: countBy(currentSegments().filter((segment) => segment.reviewState), (segment) => segment.reviewState),
     activityEvents: reportActivityEvents,
     activityByType: countBy(reportActivityEvents, (event) => event.type),
     tmEntryCount: scopedTm.length,
     termCount: terms.length,
     forbiddenTermCount: terms.filter((term) => term.isForbidden).length,
-    revisionCount: state.segments.reduce((sum, segment) => sum + (Array.isArray(segment.targetHistory) ? segment.targetHistory.length : 0), 0),
+    revisionCount: currentSegments().reduce((sum, segment) => sum + (Array.isArray(segment.targetHistory) ? segment.targetHistory.length : 0), 0),
     terms: terms
       .map((term) => ({
         sourceTerm: term.sourceTerm || "",
@@ -13009,16 +13122,16 @@ function qualityPassportHtml(data) {
 }
 
 async function exportQualityPassport() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     const data = await buildProjectReportData();
-    state.qaChecks = data.qaChecks;
+    editorSessionStore.replaceQaChecks(data.qaChecks);
     state.qaFilter = "";
-    state.qualityRiskQueue = data.qualityPassport.riskQueue;
+    editorSessionStore.replaceQualityRiskQueue(data.qualityPassport.riskQueue);
     renderQaResults();
     renderQualityWorkbench();
     renderValidationReport(data.validation);
-    const base = fileSafeName(state.project.name || "project");
+    const base = fileSafeName(currentProject().name || "project");
     download(`${base}_quality-passport.html`, finalizeReportDocument(qualityPassportHtml(data)), "text/html");
     const activityLogged = await logOptionalProjectActivity("export", "Quality Passport exported", {
       segmentCount: data.analysis.totals.segments,
@@ -13036,15 +13149,15 @@ async function exportQualityPassport() {
 }
 
 async function exportProjectReport(options = {}) {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     const anonymized = Boolean(options.anonymized);
     const data = await buildProjectReportData();
-    state.qaChecks = data.qaChecks;
+    editorSessionStore.replaceQaChecks(data.qaChecks);
     state.qaFilter = "";
     renderQaResults();
     renderValidationReport(data.validation);
-    const base = fileSafeName(state.project.name || "project");
+    const base = fileSafeName(currentProject().name || "project");
     download(
       `${base}_${anonymized ? "anonymized-" : ""}project-report.html`,
       finalizeReportDocument(projectReportHtml(data, { anonymized })),
@@ -13066,24 +13179,24 @@ async function exportProjectReport(options = {}) {
 }
 
 async function exportTargetText() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     await flushPendingSegmentSaves();
     const { documentInfo, segments } = deliveryExportScope();
     const exportPlan = planDeliveryExport({ format: "txt", documentInfo, segments });
-    const report = validateExportReadiness({ project: state.project, segments, format: "txt", terms: await projectTermsForValidation(), exportPlan });
+    const report = validateExportReadiness({ project: currentProject(), segments, format: "txt", terms: await projectTermsForValidation(), exportPlan });
     addScopedExportReportNote(report, documentInfo, "Target TXT");
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, documentInfo, state.project.name || "project")) {
+    if (!confirmIncompleteExport(exportPlan, documentInfo, currentProject().name || "project")) {
       cancelIncompleteExport();
       return;
     }
     const content = exportPlan.segments
       .map((segment) => segment.target.trim())
       .join("\n\n");
-    const base = scopedExportBaseName(state.project.name || "project", documentInfo);
-    download(`${base}_${state.project.targetLang}.txt`, content, "text/plain");
+    const base = scopedExportBaseName(currentProject().name || "project", documentInfo);
+    download(`${base}_${currentProject().targetLang}.txt`, content, "text/plain");
     const activityLogged = await logOptionalProjectActivity("export", "Target TXT exported", {
       documentId: documentInfo?.id || "",
       fileName: documentInfo?.name || "",
@@ -13098,24 +13211,24 @@ async function exportTargetText() {
 }
 
 async function exportTargetDocx() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     await flushPendingSegmentSaves();
     const documentInfo = exportDocumentForTypes(new Set(["docx"]), "The selected file is not a DOCX document.", "Select a DOCX document to export.");
     if (!documentInfo) return;
-    const segments = state.segments.filter((segment) => segment.documentId === documentInfo.id);
+    const segments = currentSegments().filter((segment) => segment.documentId === documentInfo.id);
     const exportPlan = planDeliveryExport({ format: "docx", documentInfo, segments });
-    const report = validateExportReadiness({ project: state.project, segments, documentInfo, format: "docx", terms: await projectTermsForValidation(), exportPlan });
+    const report = validateExportReadiness({ project: currentProject(), segments, documentInfo, format: "docx", terms: await projectTermsForValidation(), exportPlan });
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, documentInfo, state.project.name || "project")) {
+    if (!confirmIncompleteExport(exportPlan, documentInfo, currentProject().name || "project")) {
       cancelIncompleteExport();
       return;
     }
-    const docxStructure = state.project.docxStructures?.[documentInfo.id] || state.project.docxStructure;
-    const base = fileSafeName(state.project.name || "project");
-    const bytes = await buildTargetDocx({ ...state.project, docxStructure }, exportPlan.segments);
-    download(`${base}_${fileSafeName(documentInfo.name)}_${state.project.targetLang}.docx`, bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    const docxStructure = currentProject().docxStructures?.[documentInfo.id] || currentProject().docxStructure;
+    const base = fileSafeName(currentProject().name || "project");
+    const bytes = await buildTargetDocx({ ...currentProject(), docxStructure }, exportPlan.segments);
+    download(`${base}_${fileSafeName(documentInfo.name)}_${currentProject().targetLang}.docx`, bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     const activityLogged = await logOptionalProjectActivity("export", "Target DOCX exported", {
       documentId: documentInfo.id,
       fileName: documentInfo.name,
@@ -13130,28 +13243,28 @@ async function exportTargetDocx() {
 }
 
 async function exportBilingualDocx() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     await flushPendingSegmentSaves();
     const terms = await projectTermsForValidation();
-    const report = validateExportReadiness({ project: state.project, segments: state.segments, format: "bilingual-docx", terms });
+    const report = validateExportReadiness({ project: currentProject(), segments: currentSegments(), format: "bilingual-docx", terms });
     renderValidationReport(report);
     if (!canRunBilingualDocxExport(report)) return;
-    const qaSegments = state.segments.map((segment) => ({
+    const qaSegments = currentSegments().map((segment) => ({
       ...segment,
       tags: segmentTags(segment)
     }));
-    const fallback = () => Promise.resolve(runQaChecks(state.segments, terms, { missingTags }));
+    const fallback = () => Promise.resolve(runQaChecks(currentSegments(), terms, { missingTags }));
     const qaChecks = workerClient?.runQaChecks
       ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
       : await fallback();
-    state.qaChecks = qaChecks;
+    editorSessionStore.replaceQaChecks(qaChecks);
     state.qaFilter = "";
     renderQaResults();
-    const base = fileSafeName(state.project.name || "project");
-    const bytes = buildBilingualDocx(state.project, state.segments, { qaChecks });
+    const base = fileSafeName(currentProject().name || "project");
+    const bytes = buildBilingualDocx(currentProject(), currentSegments(), { qaChecks });
     download(`${base}_bilingual.docx`, bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    const activityLogged = await logOptionalProjectActivity("export", "Bilingual DOCX exported", { segmentCount: state.segments.length, qaIssueCount: qaChecks.length, validationNoteCount: reportCount(report) }, "Bilingual DOCX export");
+    const activityLogged = await logOptionalProjectActivity("export", "Bilingual DOCX exported", { segmentCount: currentSegments().length, qaIssueCount: qaChecks.length, validationNoteCount: reportCount(report) }, "Bilingual DOCX export");
     const message = reportCount(report) || qaChecks.length ? "Bilingual DOCX exported with notes" : "Bilingual DOCX exported";
     setSaveStatus(appendActivityWarning(message, activityLogged), exportStatusMode(reportCount(report) || qaChecks.length ? "dirty" : "saved", activityLogged));
   } catch (error) {
@@ -13161,7 +13274,7 @@ async function exportBilingualDocx() {
 
 async function exportLocalization() {
   try {
-    if (!state.project) return;
+    if (!currentProject()) return;
     await flushPendingSegmentSaves();
     const documentInfo = exportDocumentForTypes(
       LOCALIZATION_EXPORT_TYPES,
@@ -13171,11 +13284,11 @@ async function exportLocalization() {
     if (!documentInfo) return;
     const documentType = projectDocumentType(documentInfo);
     const exportDocumentInfo = { ...documentInfo, type: documentType };
-    const segments = state.segments.filter((segment) => segment.documentId === documentInfo.id);
-    const structure = state.project.localizationStructures?.[documentInfo.id];
+    const segments = currentSegments().filter((segment) => segment.documentId === documentInfo.id);
+    const structure = currentProject().localizationStructures?.[documentInfo.id];
     const exportPlan = planDeliveryExport({ format: documentType, documentInfo: exportDocumentInfo, structure, segments });
     const report = validateExportReadiness({
-      project: state.project,
+      project: currentProject(),
       segments,
       documentInfo: exportDocumentInfo,
       format: documentType,
@@ -13185,16 +13298,16 @@ async function exportLocalization() {
     });
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, exportDocumentInfo, state.project.name || "project")) {
+    if (!confirmIncompleteExport(exportPlan, exportDocumentInfo, currentProject().name || "project")) {
       cancelIncompleteExport();
       return;
     }
     const content = XLIFF_DOCUMENT_TYPES.has(documentType)
-      ? buildTargetXliff(state.project, exportPlan.segments, structure)
+      ? buildTargetXliff(currentProject(), exportPlan.segments, structure)
       : await buildLocalizationFile(documentType, exportPlan.segments, structure);
     const ext = documentType === "yml" ? "yaml" : documentType === "markdown" ? "md" : documentType;
     const type = localizationDownloadMimeType(ext, structure);
-    download(`${fileSafeName(documentInfo.name)}_${state.project.targetLang}.${ext}`, content, type);
+    download(`${fileSafeName(documentInfo.name)}_${currentProject().targetLang}.${ext}`, content, type);
     const activityLogged = await logOptionalProjectActivity("export", "Localization file exported", {
       documentId: documentInfo.id,
       documentType,
@@ -13209,26 +13322,26 @@ async function exportLocalization() {
 }
 
 async function exportXliff(version = "1.2") {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     await flushPendingSegmentSaves();
     const { documentInfo, segments } = deliveryExportScope();
     const exportPlan = planDeliveryExport({ format: "xliff", documentInfo, segments });
-    const report = validateExportReadiness({ project: state.project, segments, format: "xliff", terms: await projectTermsForValidation(), exportPlan });
+    const report = validateExportReadiness({ project: currentProject(), segments, format: "xliff", terms: await projectTermsForValidation(), exportPlan });
     addScopedExportReportNote(report, documentInfo, "XLIFF");
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, documentInfo, state.project.name || "project")) {
+    if (!confirmIncompleteExport(exportPlan, documentInfo, currentProject().name || "project")) {
       cancelIncompleteExport();
       return;
     }
-    const base = scopedExportBaseName(state.project.name || "project", documentInfo);
-    const exportProject = documentInfo ? { ...state.project, sourceFileName: documentInfo.name } : state.project;
+    const base = scopedExportBaseName(currentProject().name || "project", documentInfo);
+    const exportProject = documentInfo ? { ...currentProject(), sourceFileName: documentInfo.name } : currentProject();
     const isXliff22 = version === "2.2";
     const content = isXliff22 ? buildXliff22(exportProject, exportPlan.segments) : buildXliff(exportProject, exportPlan.segments);
     const label = isXliff22 ? "XLIFF 2.2" : "XLIFF";
     const exportedMessage = isXliff22 ? "XLIFF 2.2 exported" : "XLIFF exported";
-    download(`${base}_${state.project.sourceLang}-${state.project.targetLang}.xlf`, content, xliffMimeType(version));
+    download(`${base}_${currentProject().sourceLang}-${currentProject().targetLang}.xlf`, content, xliffMimeType(version));
     const activityLogged = await logOptionalProjectActivity("export", exportedMessage, {
       documentId: documentInfo?.id || "",
       fileName: documentInfo?.name || "",
@@ -13248,16 +13361,16 @@ async function exportXliff22() {
 }
 
 async function handleTmxImport(file) {
-  if (!state.project) return;
+  if (!currentProject()) return;
   assertFileSize(file, "TMX file", MAX_RESOURCE_IMPORT_BYTES);
   await reportImportProgress("Reading TMX", file);
   const text = await readImportTextFile(file);
   await reportImportProgress("Parsing TMX", file);
   const entries = await parseTmxAsync(text, {
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     tmName: mainTmName(),
-    projectName: `${state.project.name} TMX import`
+    projectName: `${currentProject().name} TMX import`
   }, {
     yieldFn: yieldToUi,
     onProgress: (progress) => reportImportProgress(
@@ -13279,7 +13392,7 @@ async function handleTmxImport(file) {
       importProgressDetail(progress.saved, progress.total, "index rows")
     )
   });
-  markProjectsUsingResourceDirty("tm", mainTmName(), state.project.sourceLang, state.project.targetLang);
+  markProjectsUsingResourceDirty("tm", mainTmName(), currentProject().sourceLang, currentProject().targetLang);
   await reportImportProgress("Refreshing TM matches", file);
   await refreshTmMatches();
   const activityLogged = await logOptionalProjectActivity("resource-import", "TMX imported", { fileName: file.name, entryCount: entries.length, tmName: mainTmName() }, "TMX import");
@@ -13287,12 +13400,12 @@ async function handleTmxImport(file) {
 }
 
 async function handleTmxExport() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     const tmNames = new Set(projectTmNames());
-    const entries = (await getAllByIndex("tmEntries", "languagePair", `${state.project.sourceLang}::${state.project.targetLang}`))
+    const entries = (await getAllByIndex("tmEntries", "languagePair", `${currentProject().sourceLang}::${currentProject().targetLang}`))
       .filter((entry) => tmNames.has(entry.tmName));
-    download(`${fileSafeName(state.project.name)}_project-tms.tmx`, buildTmx(entries, { ...state.project, tmName: mainTmName() }), "application/xml");
+    download(`${fileSafeName(currentProject().name)}_project-tms.tmx`, buildTmx(entries, { ...currentProject(), tmName: mainTmName() }), "application/xml");
     const activityLogged = await logOptionalProjectActivity("resource-export", "TMX exported", { entryCount: entries.length, tmNames: Array.from(tmNames) }, "TMX export");
     setSaveStatus(appendActivityWarning(`Exported ${entries.length} project TM entr${entries.length === 1 ? "y" : "ies"}`, activityLogged), exportStatusMode("saved", activityLogged));
   } catch (error) {
@@ -13301,14 +13414,14 @@ async function handleTmxExport() {
 }
 
 async function handleTbxImport(file) {
-  if (!state.project) return;
+  if (!currentProject()) return;
   assertFileSize(file, "TBX file", MAX_RESOURCE_IMPORT_BYTES);
   await reportImportProgress("Reading TBX", file);
   const text = await readImportTextFile(file);
   await reportImportProgress("Parsing TBX", file);
   const terms = await parseTbxAsync(text, {
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     termBaseName: els.termBaseSelect.value || primaryTermBaseName()
   }, {
     yieldFn: yieldToUi,
@@ -13331,7 +13444,7 @@ async function handleTbxImport(file) {
       importProgressDetail(progress.saved, progress.total, "index rows")
     )
   });
-  markProjectsUsingResourceDirty("termbase", els.termBaseSelect.value || primaryTermBaseName(), state.project.sourceLang, state.project.targetLang);
+  markProjectsUsingResourceDirty("termbase", els.termBaseSelect.value || primaryTermBaseName(), currentProject().sourceLang, currentProject().targetLang);
   await reportImportProgress("Refreshing terms", file);
   await refreshProjectTerms({ rerender: true });
   await refreshTerms();
@@ -13347,13 +13460,13 @@ async function parseTermListFile(file, options) {
 }
 
 async function handleTermListImport(file) {
-  if (!state.project) return;
+  if (!currentProject()) return;
   assertFileSize(file, "Term list file", MAX_RESOURCE_IMPORT_BYTES);
   const termBaseName = els.termBaseSelect.value || primaryTermBaseName();
   await reportImportProgress("Reading term list", file);
   const terms = await parseTermListFile(file, {
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     termBaseName,
     fileName: file.name
   });
@@ -13370,7 +13483,7 @@ async function handleTermListImport(file) {
       importProgressDetail(progress.saved, progress.total, "index rows")
     )
   });
-  markProjectsUsingResourceDirty("termbase", termBaseName, state.project.sourceLang, state.project.targetLang);
+  markProjectsUsingResourceDirty("termbase", termBaseName, currentProject().sourceLang, currentProject().targetLang);
   await reportImportProgress("Refreshing terms", file);
   await refreshProjectTerms({ rerender: true });
   await refreshTerms();
@@ -13379,14 +13492,14 @@ async function handleTermListImport(file) {
 }
 
 async function handleTbxExport() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     const terms = await listTerms({
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
-    download(`${fileSafeName(state.project.name)}_project-termbases.tbx`, buildTbx(terms, { ...state.project, termBaseName: primaryTermBaseName() }), "application/xml");
+    download(`${fileSafeName(currentProject().name)}_project-termbases.tbx`, buildTbx(terms, { ...currentProject(), termBaseName: primaryTermBaseName() }), "application/xml");
     const activityLogged = await logOptionalProjectActivity("resource-export", "TBX exported", { termCount: terms.length, termBaseNames: projectTermBaseNames() }, "TBX export");
     setSaveStatus(appendActivityWarning(`Exported ${terms.length} project term${terms.length === 1 ? "" : "s"}`, activityLogged), exportStatusMode("saved", activityLogged));
   } catch (error) {
@@ -13434,8 +13547,10 @@ async function handleResourceTmxImport(file) {
   });
   markProjectsUsingResourceDirty("tm", tmName, sourceLang, targetLang);
   await reportImportProgress("Refreshing resources", file);
-  state.resourceType = "tm";
-  state.openResource = `${tmName}::${sourceLang}::${targetLang}`;
+  resourcesController?.openResource?.("tm", `${tmName}::${sourceLang}::${targetLang}`, {
+    render: false,
+    focus: false
+  });
   await refreshResources();
   setSaveStatus(`Imported ${entries.length} TM entries`, "saved");
 }
@@ -13479,8 +13594,10 @@ async function handleResourceTbxImport(file) {
   });
   markProjectsUsingResourceDirty("termbase", termBaseName, sourceLang, targetLang);
   await reportImportProgress("Refreshing resources", file);
-  state.resourceType = "tb";
-  state.openResource = `${termBaseName}::${sourceLang}::${targetLang}`;
+  resourcesController?.openResource?.("tb", `${termBaseName}::${sourceLang}::${targetLang}`, {
+    render: false,
+    focus: false
+  });
   await refreshResources();
   await refreshProjectTerms({ rerender: true });
   setSaveStatus(`Imported ${terms.length} terms`, "saved");
@@ -13517,8 +13634,10 @@ async function handleResourceTermListImport(file) {
   });
   markProjectsUsingResourceDirty("termbase", termBaseName, sourceLang, targetLang);
   await reportImportProgress("Refreshing resources", file);
-  state.resourceType = "tb";
-  state.openResource = `${termBaseName}::${sourceLang}::${targetLang}`;
+  resourcesController?.openResource?.("tb", `${termBaseName}::${sourceLang}::${targetLang}`, {
+    render: false,
+    focus: false
+  });
   await refreshResources();
   await refreshProjectTerms({ rerender: true });
   setSaveStatus(`Imported ${terms.length} term${terms.length === 1 ? "" : "s"}`, "saved");
@@ -13547,9 +13666,7 @@ function wireEvents() {
   });
   window.addEventListener("keydown", handleGlobalKeydown, true);
   els.segmentGridWrap.addEventListener("scroll", () => {
-    if (state.segmentScrollFrame) return;
-    state.segmentScrollFrame = requestAnimationFrame(() => {
-      state.segmentScrollFrame = 0;
+    verticalFeatureState.segmentGrid.scheduleScroll(() => {
       renderSegments({ fromScroll: true, preserveScroll: true });
     });
   });
@@ -13559,18 +13676,11 @@ function wireEvents() {
     setView("projects");
   });
   els.projectsViewBtn.addEventListener("click", () => setView("projects"));
-  els.resourcesViewBtn.addEventListener("click", () => setView("resources"));
   els.emptyTrashBtn?.addEventListener("click", emptyTrashPermanently);
   els.undoBtn?.addEventListener("click", undoLastCommand);
   els.redoBtn?.addEventListener("click", redoLastCommand);
   els.reloadUpdateBtn?.addEventListener("click", () => void offlineUpdateController?.activate?.());
   els.deferUpdateBtn?.addEventListener("click", () => offlineUpdateController?.defer?.());
-  els.localAiOpusCatHelpBtn?.addEventListener("click", showOpusCatConnectionHelp);
-  els.closeOpusCatHelpBtn?.addEventListener("click", () => els.opusCatHelpDialog?.close());
-  els.retryOpusCatConnectionBtn?.addEventListener("click", async () => {
-    els.opusCatHelpDialog?.close();
-    await testLocalAiConnection();
-  });
   els.uiLocaleSelect?.addEventListener("change", async () => {
     await appRuntime.localeLoader.ensure(els.uiLocaleSelect.value);
     uiI18n?.setLocale?.(els.uiLocaleSelect.value);
@@ -13578,64 +13688,7 @@ function wireEvents() {
   });
   els.uiLocaleImportInput?.addEventListener("change", importUiLocaleFile);
   els.exportUiSourceBtn?.addEventListener("click", exportUiSourceCatalog);
-  els.workspaceRecoverySaveBtn.addEventListener("click", async () => {
-    try {
-      await saveWorkspaceRecoveryPackages();
-    } catch (error) {
-      setSaveStatus(error.message || "Workspace recovery save failed", "dirty");
-      renderWorkspaceRecoveryPanel();
-    }
-  });
-  els.workspaceRecoveryOpenBtn.addEventListener("click", () => {
-    if (els.workspaceMenu) els.workspaceMenu.open = true;
-    els.workspaceMenuSummary?.focus();
-  });
-  els.workspaceRecoveryDismissBtn.addEventListener("click", () => {
-    state.workspaceRecoveryDismissed = true;
-    renderWorkspaceRecoveryPanel();
-  });
-  els.backupReminderExportBtn.addEventListener("click", exportProjectPackage);
-  els.backupReminderDismissBtn.addEventListener("click", () => dismissBackupReminder());
-  els.chooseWorkspaceBtn.addEventListener("click", async () => {
-    try {
-      await chooseWorkspaceFolder();
-    } catch (error) {
-      if (error.name !== "AbortError") setSaveStatus(error.message || "Could not choose workspace folder", "dirty");
-    }
-  });
-  els.saveWorkspaceProjectBtn.addEventListener("click", async () => {
-    try {
-      await saveCurrentProjectPackageToWorkspace();
-    } catch (error) {
-      setSaveStatus(error.message || "Project package save failed", "dirty");
-    }
-  });
-  els.syncWorkspaceBtn.addEventListener("click", async () => {
-    try {
-      await runFileImportTask("Workspace sync", () => syncWorkspaceFromFolder());
-    } catch (error) {
-      setSaveStatus(error.message || "Workspace sync failed", "dirty");
-    }
-  });
-  els.workspaceBackupBtn.addEventListener("click", async () => {
-    try {
-      await exportWorkspaceBackupToFolder();
-    } catch (error) {
-      setSaveStatus(error.message || "Workspace backup failed", "dirty");
-    }
-  });
-  els.repairWorkspaceBtn.addEventListener("click", async () => {
-    try {
-      await repairWorkspaceLinks();
-    } catch (error) {
-      setSaveStatus(error.message || "Workspace repair check failed", "dirty");
-    }
-  });
-  els.tmResourceTab.addEventListener("click", () => setResourceType("tm"));
-  els.tbResourceTab.addEventListener("click", () => setResourceType("tb"));
   els.projectFilesBtn.addEventListener("click", showProjectHome);
-  els.projectFileImportBtn.addEventListener("click", () => els.projectFileImportInput.click());
-  els.projectPackageExportBtn.addEventListener("click", exportProjectPackage);
   els.projectHomeDeleteBtn.addEventListener("click", () => confirmDeleteProject());
   els.focusModeBtn?.addEventListener("click", toggleFocusMode);
   els.exitFocusModeBtn?.addEventListener("click", () => setFocusMode(false));
@@ -13651,59 +13704,11 @@ function wireEvents() {
   });
   els.commandPaletteBtn.addEventListener("click", openCommandPalette);
   els.projectSearchInput.addEventListener("input", renderProjectsView);
-  els.projectsImportProjectBtn?.addEventListener("click", () => els.projectPackageImportInput.click());
   els.languagePairFilter.addEventListener("change", renderProjectsView);
-  [
-    els.tmResourceSourceLangInput,
-    els.tmResourceTargetLangInput,
-    els.tbResourceSourceLangInput,
-    els.tbResourceTargetLangInput
-  ].filter(Boolean).forEach((input) => {
-    input.addEventListener("change", () => normalizeLanguageInputElement(input));
-    input.addEventListener("blur", () => normalizeLanguageInputElement(input));
-  });
-
-  els.docxInput.addEventListener("change", async () => {
-    const file = els.docxInput.files?.[0];
-    try {
-      if (file && state.project) await runFileImportTask("Project file import", () => importProjectDocument(file));
-    } finally {
-      els.docxInput.value = "";
-    }
-  });
-
-  els.localizationInput.addEventListener("change", async () => {
-    const file = els.localizationInput.files?.[0];
-    try {
-      if (file && state.project) await runFileImportTask("Project file import", () => importProjectDocument(file));
-    } finally {
-      els.localizationInput.value = "";
-    }
-  });
-
-  els.projectFileImportInput.addEventListener("change", async () => {
-    const files = Array.from(els.projectFileImportInput.files || []);
-    try {
-      for (const file of files) {
-        if (state.project) await runFileImportTask("Project file import", () => importProjectDocument(file));
-      }
-    } finally {
-      els.projectFileImportInput.value = "";
-    }
-  });
 
   els.confirmBtn.addEventListener("click", confirmCurrentSegment);
   els.saveTmBtn.addEventListener("click", saveActiveSegmentToTm);
   els.pretranslateBtn.addEventListener("click", pretranslateFromTm);
-  els.exportDocxBtn.addEventListener("click", exportTargetDocx);
-  els.exportBilingualDocxBtn.addEventListener("click", exportBilingualDocx);
-  els.exportTargetBtn.addEventListener("click", exportTargetText);
-  els.exportLocalizationBtn.addEventListener("click", exportLocalization);
-  els.exportXliffBtn.addEventListener("click", exportXliff);
-  els.exportXliff22Btn.addEventListener("click", exportXliff22);
-  els.exportProjectReportBtn.addEventListener("click", exportProjectReport);
-  els.exportQualityPassportMenuBtn?.addEventListener("click", exportQualityPassport);
-  els.exportAnonymizedProjectReportBtn.addEventListener("click", () => exportProjectReport({ anonymized: true }));
   els.copySourceBtn.addEventListener("click", copySourceToTarget);
   els.nextOpenBtn.addEventListener("click", goToNextOpenSegment);
   els.splitSegmentBtn.addEventListener("click", splitCurrentSegment);
@@ -13724,32 +13729,32 @@ function wireEvents() {
     });
   });
   els.documentFilter.addEventListener("change", async () => {
-    state.documentFilter = els.documentFilter.value;
+    selectApplicationDocument(els.documentFilter.value);
     renderSegments();
     renderProgress();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
   els.segmentSearchInput.addEventListener("input", async () => {
-    state.segmentQuery = els.segmentSearchInput.value.trim();
+    updateEditorFilters({ query: els.segmentSearchInput.value.trim() });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
   els.segmentSearchScope.addEventListener("change", async () => {
-    state.segmentSearchScope = els.segmentSearchScope.value;
+    updateEditorFilters({ scope: els.segmentSearchScope.value });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
   els.segmentRegexInput.addEventListener("change", async () => {
-    state.segmentRegex = els.segmentRegexInput.checked;
+    updateEditorFilters({ regex: els.segmentRegexInput.checked });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
   els.segmentCaseInput.addEventListener("change", async () => {
-    state.segmentCaseSensitive = els.segmentCaseInput.checked;
+    updateEditorFilters({ caseSensitive: els.segmentCaseInput.checked });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
@@ -13758,21 +13763,21 @@ function wireEvents() {
   els.replaceAllBtn.addEventListener("click", () => replaceTargetText("all"));
   els.segmentStatusFilter.addEventListener("change", async () => {
     filterPresetController?.markCustom?.();
-    state.segmentStatusFilter = els.segmentStatusFilter.value;
+    updateEditorFilters({ status: els.segmentStatusFilter.value });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
   els.reviewStateFilter?.addEventListener("change", async () => {
     filterPresetController?.markCustom?.();
-    state.reviewStateFilter = els.reviewStateFilter.value;
+    updateEditorFilters({ reviewState: els.reviewStateFilter.value });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
   els.aiSegmentFilter?.addEventListener("change", async () => {
     filterPresetController?.markCustom?.();
-    state.aiSegmentFilter = els.aiSegmentFilter.value;
+    updateEditorFilters({ aiState: els.aiSegmentFilter.value });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
@@ -13787,237 +13792,14 @@ function wireEvents() {
     event.preventDefault();
     await saveProjectDomainFromForm();
   });
-  els.reviewForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await saveActiveReviewMetadata();
-  });
-  els.qualityForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await saveQualityProfileFromForm();
-  });
-  els.qualityDecisionForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await saveQualityDecisionFromForm();
-  });
-  els.refreshQualityRiskBtn?.addEventListener("click", refreshQualityRiskQueue);
-  els.nextQualityRiskBtn?.addEventListener("click", goToNextQualityRisk);
-  els.exportQualityPassportBtn?.addEventListener("click", exportQualityPassport);
-  els.saveAiSettingsBtn?.addEventListener("click", saveAiSettings);
-  els.contextualAiTranslateBtn?.addEventListener("click", () => {
-    if (els.localAiModeSelect) els.localAiModeSelect.value = "selected";
-    void pretranslateWithLocalAi();
-  });
-  els.contextualAiReviewBtn?.addEventListener("click", reviewActiveSegmentWithLocalAi);
-  els.contextualAiRepairBtn?.addEventListener("click", repairActiveSegmentTagsWithLocalAi);
-  els.contextualAiPolishBtn?.addEventListener("click", polishActiveSegmentDraftWithLocalAi);
-  els.contextualAiVariantsBtn?.addEventListener("click", suggestActiveSegmentVariantsWithLocalAi);
-  els.contextualAiApplyTermsBtn?.addEventListener("click", applyActiveSegmentTerminologyWithLocalAi);
-  els.contextualOpenAiSuggestionBtn?.addEventListener("click", createOpenAiSuggestion);
-  els.contextualAiCancelBtn?.addEventListener("click", cancelLocalAiBatch);
-  els.openAiSuggestionBtn.addEventListener("click", createOpenAiSuggestion);
-  els.localAiPresetSelect?.addEventListener("change", () => {
-    if (els.localAiPresetSelect.value !== "custom") {
-      applyLocalAiProviderPreset(els.localAiPresetSelect.value);
-      return;
-    }
-    renderLocalAiProviderControls(localAiSettingsFromForm());
-    renderLocalAiPromptPreview();
-  });
-  els.localAiProviderSelect?.addEventListener("change", () => {
-    const provider = aiProviderService.get(els.localAiProviderSelect.value);
-    els.localAiBaseUrlInput.value = provider?.defaultBaseUrl || OLLAMA_DEFAULT_BASE_URL;
-    if (els.localAiModelInput) els.localAiModelInput.value = provider?.defaultModel || (els.localAiProviderSelect.value === "openai" ? OPENAI_DEFAULT_MODEL : els.localAiProviderSelect.value === "gemini" ? GEMINI_DEFAULT_MODEL : DEFAULT_LOCAL_AI_MODEL);
-    state.localAi.models = [];
-    setOpusCatConnectionHelpVisible(false);
-    setLocalAiStatus("disconnected", "Disconnected");
-    renderLocalAiPresetOptions(localAiSettingsFromForm());
-    renderLocalAiProviderControls(localAiSettingsFromForm());
-    renderLocalAiModelOptions(localAiSettingsFromForm());
-    renderLocalAiPromptPreview();
-  });
-  els.localAiBaseUrlInput?.addEventListener("input", () => {
-    setOpusCatConnectionHelpVisible(false);
-    setLocalAiStatus("disconnected", "Disconnected");
-    const settings = localAiSettingsFromForm();
-    renderLocalAiPresetOptions(settings);
-    renderLocalAiProviderControls(settings);
-  });
-  els.localAiLocalCloudPresetBtn?.addEventListener("click", () => {
-    applyLocalAiProviderPreset("ollama-local-cloud");
-  });
-  els.localAiCloudPresetBtn?.addEventListener("click", () => {
-    applyLocalAiProviderPreset("ollama-cloud");
-  });
-  els.clearLocalAiKeyBtn?.addEventListener("click", () => {
-    clearLocalAiKey();
-    setSaveStatus("Local AI key cleared from this browser", "saved");
-  });
-  els.localAiTestBtn?.addEventListener("click", testLocalAiConnection);
-  els.localAiStartLmStudioBtn?.addEventListener("click", startLmStudioServerAndTestConnection);
-  els.localAiRefreshModelsBtn?.addEventListener("click", refreshLocalAiModels);
-  els.localAiModelSelect?.addEventListener("change", () => {
-    if (els.localAiModelSelect.value) els.localAiModelInput.value = els.localAiModelSelect.value;
-    renderLocalAiProviderControls(localAiSettingsFromForm());
-    renderLocalAiPromptPreview();
-  });
-  [
-    els.localAiModelInput,
-    els.localAiSampleInput
-  ].filter(Boolean).forEach((input) => input.addEventListener("input", renderLocalAiPromptPreview));
-  [
-    els.localAiSourceLangInput,
-    els.localAiSourceCodeInput,
-    els.localAiTargetLangInput,
-    els.localAiTargetCodeInput
-  ].filter(Boolean).forEach((input) => {
-    input.addEventListener("input", () => {
-      if (shouldLiveSyncLanguageInput(input)) syncLocalAiLanguageFields(input);
-      renderLocalAiPromptPreview();
-    });
-    input.addEventListener("change", () => {
-      syncLocalAiLanguageFields(input);
-      renderLocalAiPromptPreview();
-    });
-    input.addEventListener("blur", () => {
-      syncLocalAiLanguageFields(input);
-      renderLocalAiPromptPreview();
-    });
-  });
-  els.localAiModelInput?.addEventListener("input", () => renderLocalAiProviderControls(localAiSettingsFromForm()));
-  [
-    els.localAiPromptModeSelect,
-    els.localAiModeSelect,
-    els.localAiConcurrencyInput,
-    els.localAiTimeoutInput,
-    els.localAiOverwriteInput,
-    els.localAiIncludeContextInput,
-    els.localAiPreserveConfirmedInput,
-    els.localAiAdaptModeSelect,
-    els.localAiVariantModeSelect
-  ].filter(Boolean).forEach((input) => input.addEventListener("change", renderLocalAiPromptPreview));
-  els.localAiPullModelBtn?.addEventListener("click", pullLocalAiModel);
-  els.localAiPromptTestBtn?.addEventListener("click", testLocalAiPrompt);
-  els.localAiReviewSegmentBtn?.addEventListener("click", reviewActiveSegmentWithLocalAi);
-  els.localAiReviewBatchBtn?.addEventListener("click", reviewBatchWithLocalAi);
-  els.localAiRepairTagsBtn?.addEventListener("click", repairActiveSegmentTagsWithLocalAi);
-  els.localAiRepairTagsBatchBtn?.addEventListener("click", repairBatchTagsWithLocalAi);
-  els.localAiPolishDraftBtn?.addEventListener("click", polishActiveSegmentDraftWithLocalAi);
-  els.localAiPolishBatchBtn?.addEventListener("click", polishBatchDraftsWithLocalAi);
-  els.localAiAdaptDraftBtn?.addEventListener("click", adaptActiveSegmentDraftWithLocalAi);
-  els.localAiAdaptBatchBtn?.addEventListener("click", adaptBatchDraftsWithLocalAi);
-  els.localAiSuggestVariantsBtn?.addEventListener("click", suggestActiveSegmentVariantsWithLocalAi);
-  els.localAiSuggestVariantsBatchBtn?.addEventListener("click", suggestBatchSegmentVariantsWithLocalAi);
-  els.localAiApplyTermsBtn?.addEventListener("click", applyActiveSegmentTerminologyWithLocalAi);
-  els.localAiApplyTermsBatchBtn?.addEventListener("click", applyBatchTerminologyWithLocalAi);
-  els.localAiExtractTermsBtn?.addEventListener("click", extractActiveSegmentTermsWithLocalAi);
-  els.localAiExtractTermsBatchBtn?.addEventListener("click", extractBatchTermsWithLocalAi);
-  els.localAiPretranslateBtn?.addEventListener("click", pretranslateWithLocalAi);
-  els.localAiCancelBtn?.addEventListener("click", cancelLocalAiBatch);
-  els.localAiProjectBriefBtn?.addEventListener("click", generateProjectBriefWithLocalAi);
-  els.clearOpenAiKeyBtn.addEventListener("click", () => {
-    clearOpenAiKey();
-    setSaveStatus("OpenAI key cleared from this browser", "saved");
-  });
   els.projectDomainEditInput.addEventListener("input", () => {
-    const current = state.project?.domain || "";
+    const current = currentProject()?.domain || "";
     els.domainForm.classList.toggle("clean", els.projectDomainEditInput.value.trim() === current);
   });
 
-  els.tmxImportInput.addEventListener("change", async () => {
-    const file = els.tmxImportInput.files?.[0];
-    try {
-      if (file) await runFileImportTask("TMX import", () => handleTmxImport(file));
-    } finally {
-      els.tmxImportInput.value = "";
-    }
-  });
-  els.tmxExportBtn.addEventListener("click", handleTmxExport);
-
-  els.tbxImportInput.addEventListener("change", async () => {
-    const file = els.tbxImportInput.files?.[0];
-    try {
-      if (file) await runFileImportTask("TBX import", () => handleTbxImport(file));
-    } finally {
-      els.tbxImportInput.value = "";
-    }
-  });
-  els.termListImportInput.addEventListener("change", async () => {
-    const file = els.termListImportInput.files?.[0];
-    try {
-      if (file) await runFileImportTask("Term list import", () => handleTermListImport(file));
-    } finally {
-      els.termListImportInput.value = "";
-    }
-  });
-  els.tbxExportBtn.addEventListener("click", handleTbxExport);
   els.closeConcordanceBtn.addEventListener("click", closeConcordance);
   els.concordanceOverlay.addEventListener("click", (event) => {
     if (event.target === els.concordanceOverlay) closeConcordance();
-  });
-
-  els.resourceTmxImportInput.addEventListener("change", async () => {
-    const file = els.resourceTmxImportInput.files?.[0];
-    try {
-      if (file) await runFileImportTask("TMX resource import", () => handleResourceTmxImport(file));
-    } finally {
-      els.resourceTmxImportInput.value = "";
-    }
-  });
-
-  els.resourceTbxImportInput.addEventListener("change", async () => {
-    const file = els.resourceTbxImportInput.files?.[0];
-    try {
-      if (file) await runFileImportTask("TBX resource import", () => handleResourceTbxImport(file));
-    } finally {
-      els.resourceTbxImportInput.value = "";
-    }
-  });
-  els.resourceTermListImportInput.addEventListener("change", async () => {
-    const file = els.resourceTermListImportInput.files?.[0];
-    try {
-      if (file) await runFileImportTask("Term list resource import", () => handleResourceTermListImport(file));
-    } finally {
-      els.resourceTermListImportInput.value = "";
-    }
-  });
-
-  els.backupExportBtn.addEventListener("click", async () => {
-    try {
-      const { backup, validation } = await buildBackupExport();
-      download(`loopcat-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup, null, 2), "application/json");
-      renderValidationReport(validation);
-      setSaveStatus(reportCount(validation) ? `Backup exported with ${reportCount(validation)} validation note${reportCount(validation) === 1 ? "" : "s"}` : "Backup exported", reportCount(validation) ? "dirty" : "saved");
-    } catch (error) {
-      const message = error.message || "Backup export failed.";
-      renderValidationReport(error.validation || portableFileErrorReport(message));
-      setSaveStatus(message, "dirty");
-    }
-  });
-
-  els.backupImportInput.addEventListener("change", async () => {
-    const file = els.backupImportInput.files?.[0];
-    if (!file) return;
-    try {
-      await runFileImportTask("Backup restore", async () => {
-        await flushPendingSegmentSaves();
-        return restoreBackupFile(file);
-      });
-    } finally {
-      els.backupImportInput.value = "";
-    }
-  });
-
-  els.projectPackageImportInput.addEventListener("change", async () => {
-    const file = els.projectPackageImportInput.files?.[0];
-    if (!file) return;
-    try {
-      await runFileImportTask("Project package import", async () => {
-        await flushPendingSegmentSaves();
-        return importProjectPackage(file);
-      });
-    } finally {
-      els.projectPackageImportInput.value = "";
-    }
   });
 
   window.addEventListener("beforeunload", handleBeforeUnload);
@@ -14035,6001 +13817,7 @@ function wireEvents() {
   });
 }
 
-const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTest() {
-  if (window.location.hash !== "#app-workflow-test") return;
-  const out = [];
-  const publishProgress = () => {
-    let output = document.querySelector("#appWorkflowTestResults");
-    if (!output) {
-      output = document.createElement("pre");
-      output.id = "appWorkflowTestResults";
-      output.hidden = true;
-      document.body.append(output);
-    }
-    output.textContent = `APP WORKFLOW TEST RUNNING\n${out.join("\n")}`;
-  };
-  const assert = (condition, label) => {
-    if (!condition) throw new Error(label);
-    out.push(`PASS ${label}`);
-    window.__loopcatAppWorkflowProgress = label;
-    try {
-      if (window.parent && window.parent !== window) {
-        window.parent.document.title = `LoopCAT Browser Test Runner - APP WORKFLOW PROGRESS ${label}`;
-      }
-    } catch {}
-    publishProgress();
-  };
-  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const waitFor = async (predicate, label) => {
-    const startedAt = Date.now();
-    while (Date.now() - startedAt < 10000) {
-      const value = predicate();
-      if (value) return value;
-      await delay(50);
-    }
-    throw new Error(`Timed out waiting for ${label}`);
-  };
-  const publish = (ok, error = null) => {
-    const resultText = ok
-      ? `APP WORKFLOW TEST PASS\n${out.join("\n")}`
-      : `APP WORKFLOW TEST FAIL\n${error?.stack || error?.message || error}`;
-    let output = document.querySelector("#appWorkflowTestResults");
-    if (!output) {
-      output = document.createElement("pre");
-      output.id = "appWorkflowTestResults";
-      output.hidden = true;
-      document.body.append(output);
-    }
-    output.textContent = resultText;
-    window.parent?.postMessage({ type: "loopcat-test-result", name: "App workflow", text: resultText }, "*");
-  };
-
-  try {
-    assert(Boolean(document.querySelector('link[rel="manifest"]')), "installable app manifest linked");
-    const workflowDatabase = await window.CatHan.storage.openDatabase();
-    assert(
-      workflowDatabase.version === 6 &&
-        workflowDatabase.objectStoreNames.contains("trashEntries") &&
-        storageConstants.PROJECT_PACKAGE_SCHEMA_VERSION === 5 &&
-        storageConstants.BACKUP_SCHEMA_VERSION === 6,
-      "schema 6 adds Trash while project packages remain schema 5"
-    );
-    const productionMockAiSelector = "#mock" + "AiSuggestionBtn";
-    assert(!document.querySelector(productionMockAiSelector), "production UI does not expose mock AI suggestions");
-    assert(
-      Boolean(document.querySelector('label.compact-field input#tmResourceNameInput')) &&
-        Boolean(document.querySelector('#sourceTermInput[aria-label="Source term"]')),
-      "resource creation controls keep persistent and assistive labels"
-    );
-    const originalStorageDurability = state.storageDurability;
-    state.storageDurability = { checked: true, supported: true, persisted: true, requested: true, usageBytes: 10 * 1024 * 1024, quotaBytes: 1000 * 1024 * 1024 };
-    renderWorkspaceStatus();
-    assert(
-      els.workspaceHealth.textContent.includes("Storage: persistent") &&
-        els.workspaceHealth.textContent.includes("10 MB of 1000 MB used"),
-      "persistent storage status is visible in workspace health"
-    );
-    state.storageDurability = { checked: true, supported: true, persisted: false, requested: true, usageBytes: 920 * 1024 * 1024, quotaBytes: 1000 * 1024 * 1024 };
-    renderWorkspaceStatus();
-    assert(
-      els.workspaceHealth.textContent.includes("Storage: best-effort") &&
-        els.workspaceHealth.textContent.includes("export project packages") &&
-        els.workspaceHealth.textContent.includes("Local storage is nearly full"),
-      "best-effort and nearly-full storage states warn before long offline projects grow"
-    );
-    state.storageDurability = originalStorageDurability;
-    renderWorkspaceStatus();
-    let finishLongImport = null;
-    const longImportFile = { name: "large-import.docx", size: 12 * 1024 * 1024 };
-    const longImportTask = runFileImportTask("Project file import", () => new Promise((resolve) => {
-      setImportProgress("Reading large project file", longImportFile);
-      finishLongImport = resolve;
-    }));
-    assert(
-      els.projectFileImportBtn.disabled &&
-        els.docxInput.disabled &&
-        els.localizationInput.disabled &&
-        els.projectPackageImportInput.disabled &&
-        els.backupImportInput.disabled &&
-        els.syncWorkspaceBtn.disabled,
-      "import, restore, and workspace sync controls are disabled while an import task runs"
-    );
-    assert(
-      els.saveStatus.textContent.includes("Project file import: Reading large project file") &&
-        els.saveStatus.textContent.includes("large-import.docx") &&
-        els.saveStatus.textContent.includes(formatFileSize(longImportFile.size)),
-      "active import progress reports phase, file name, and file size"
-    );
-    let overlappingImportRan = false;
-    const overlappingImportResult = await runFileImportTask("TMX import", () => {
-      overlappingImportRan = true;
-    });
-    assert(!overlappingImportResult && !overlappingImportRan && els.saveStatus.textContent.includes("still running"), "overlapping import task is blocked before it mutates project data");
-    let overlappingWorkspaceSyncRan = false;
-    const overlappingWorkspaceSyncResult = await runFileImportTask("Workspace sync", () => {
-      overlappingWorkspaceSyncRan = true;
-    });
-    assert(!overlappingWorkspaceSyncResult && !overlappingWorkspaceSyncRan && els.saveStatus.textContent.includes("still running"), "overlapping workspace sync is blocked before it reads package data");
-    const importBeforeUnloadEvent = {
-      prevented: false,
-      returnValue: null,
-      preventDefault() {
-        this.prevented = true;
-      }
-    };
-    handleBeforeUnload(importBeforeUnloadEvent);
-    assert(importBeforeUnloadEvent.prevented && importBeforeUnloadEvent.returnValue === "", "active import task warns before closing");
-    finishLongImport?.();
-    assert(
-      (await longImportTask) &&
-        !els.projectFileImportBtn.disabled &&
-        !els.docxInput.disabled &&
-        !els.localizationInput.disabled &&
-        !els.projectPackageImportInput.disabled &&
-        !els.backupImportInput.disabled,
-      "import and restore controls are restored after an import task finishes"
-    );
-    const splitFixture = "First <b>bold part</b> continues. Second sentence.";
-    const splitFixtureIndex = mappedSourceSplitIndex(splitFixture, "Hedef metin burada daha uzun olabilir.", 16);
-    assert(splitFixtureIndex > 0 && splitFixtureIndex < splitFixture.length && !splitProtectedRanges(splitFixture).some((range) => splitFixtureIndex > range.start && splitFixtureIndex < range.end), "segment split maps target cursor to safe source boundary");
-    els.newProjectBtn.focus();
-    await openProjectDialog("create");
-    assert(
-      projectDialogController?.getMode?.() === "create" &&
-        els.projectDialogTitle.textContent === "New project" &&
-        els.saveProjectBtn.textContent === "Create",
-      "checked project dialog controller prepares create mode before opening"
-    );
-    assert(document.activeElement === document.querySelector("#projectNameInput"), "project dialog moves focus to its first required field");
-    const catalanTurkishQuickPair = Array.from(els.frequentLanguagePairs.querySelectorAll("button"))
-      .find((button) => button.dataset.sourceLang === "ca" && button.dataset.targetLang === "tr");
-    const languageOptionValues = Array.from(els.languageOptions.querySelectorAll("option")).map((option) => option.value);
-    assert(
-      Boolean(catalanTurkishQuickPair) &&
-        normalizeLanguageInputValue("English (en)") === "en" &&
-        normalizeLanguageInputValue("Turkish (tr)") === "tr" &&
-        normalizeLanguageInputValue("English (USA)") === "en-US" &&
-        normalizeLanguageInputValue("Spanish (Latin America) (es-419)") === "es-419" &&
-        normalizeLanguageInputValue("Urdu (Latin script) (ur-Latn-PK)") === "ur-Latn-PK" &&
-        languageOptionValues.length > 500 &&
-        languageOptionValues.includes("Acehnese (ace-ID)") &&
-        languageOptionValues.includes("Catalan (Valencia) (cav-ES)") &&
-        languageOptionValues.includes("Spanish (Latin America) (es-419)") &&
-        languageOptionValues.includes("Urdu (Latin script) (ur-Latn-PK)"),
-      "language pair dropdowns expose bundled locale labels while normalizing to codes"
-    );
-    catalanTurkishQuickPair.click();
-    assert(
-      projectDialogValues().sourceLang === "ca" &&
-        projectDialogValues().targetLang === "tr" &&
-        document.querySelector("#sourceLangInput").value === languageOptionValue("ca") &&
-        document.querySelector("#targetLangInput").value === languageOptionValue("tr"),
-      "frequent language pair chips update project language fields as normalized codes"
-    );
-    document.querySelector("#projectNameInput").value = "";
-    document.querySelector("#sourceLangInput").value = languageOptionValue("en");
-    document.querySelector("#targetLangInput").value = languageOptionValue("tr");
-    const invalidDialogProjectCount = state.projects.length;
-    const invalidDialogProject = await saveProjectFromDialog();
-    assert(
-      !invalidDialogProject &&
-        state.projects.length === invalidDialogProjectCount &&
-        els.saveStatus.textContent === "Complete required project fields.",
-      "project dialog blocks missing required fields before creation"
-    );
-    els.projectDialog.close();
-    await Promise.resolve();
-    assert(document.activeElement === els.newProjectBtn, "project dialog restores focus to its opener");
-
-    els.aboutBtn.focus();
-    els.aboutBtn.click();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    assert(
-      els.aboutDialog.open && document.activeElement === els.closeAboutBtn,
-      "dialog lifecycle controller opens About with contained initial focus"
-    );
-    els.closeAboutBtn.click();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    assert(
-      !els.aboutDialog.open && document.activeElement === els.aboutBtn,
-      "dialog lifecycle controller restores the About opener after close"
-    );
-
-    els.diagnosticsBtn.focus();
-    els.diagnosticsBtn.click();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    assert(
-      els.diagnosticsDialog.open && document.activeElement === els.closeDiagnosticsBtn,
-      "dialog lifecycle controller opens Diagnostics without taking ownership of feature data"
-    );
-    els.closeDiagnosticsBtn.click();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    assert(
-      !els.diagnosticsDialog.open && document.activeElement === els.workspaceMenuSummary,
-      "dialog lifecycle controller restores the visible Diagnostics menu trigger after close"
-    );
-
-    els.trashBtn.focus();
-    const trashOpenResult = await openTrash();
-    assert(
-      trashOpenResult &&
-        els.trashDialog.open &&
-        document.activeElement === els.closeTrashBtn &&
-        Boolean(els.trashList.textContent.trim()),
-      "dialog lifecycle controller prepares Trash before opening with contained focus"
-    );
-    els.trashDialog.dispatchEvent(new Event("cancel"));
-    els.trashDialog.close();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    assert(
-      !els.trashDialog.open && document.activeElement === els.trashBtn,
-      "dialog lifecycle controller restores the Trash opener after cancel and close"
-    );
-
-    const project = await createProject({
-      name: `Workflow ${Date.now()}`,
-      domain: "Regression",
-      sourceLang: "en",
-      targetLang: "tr",
-      tmName: "Workflow TM",
-      termBaseName: "Workflow TB"
-    });
-    await loadProjects(false);
-    await openProject(project.id);
-    assert(state.project?.id === project.id, "real app project creation");
-    els.localAiSourceCodeInput.value = "en";
-    els.localAiSourceLangInput.value = languageOptionValue("es");
-    syncLocalAiLanguageFields(els.localAiSourceLangInput);
-    els.localAiTargetLangInput.value = "Turkish";
-    els.localAiTargetCodeInput.value = languageOptionValue("ca");
-    syncLocalAiLanguageFields(els.localAiTargetCodeInput);
-    const syncedLocalAiSettings = localAiSettingsFromForm();
-    assert(
-      syncedLocalAiSettings.sourceCode === "es" &&
-        syncedLocalAiSettings.sourceLanguage === languageNameForUi("es") &&
-        syncedLocalAiSettings.targetCode === "ca" &&
-        syncedLocalAiSettings.targetLanguage === languageNameForUi("ca"),
-      "local AI language dropdowns keep language names and codes synchronized for prompts"
-    );
-    const malformedResourceSummary = projectResourceSummary({
-      ...state.project,
-      resourceLinks: [
-        null,
-        { id: "legacy-workflow-main-tm", type: "tm", name: "Workflow TM", role: "main" },
-        { id: "legacy-workflow-invalid-link", type: "glossary", name: "Ignored glossary" },
-        { id: "legacy-workflow-tb", type: "termbase", name: "Workflow TB" },
-        { id: "legacy-workflow-duplicate-tm", type: "tm", name: "Workflow TM" }
-      ]
-    });
-    assert(
-      malformedResourceSummary.mainTm === "Workflow TM" &&
-        malformedResourceSummary.tmNames.length === 1 &&
-        malformedResourceSummary.tbNames.includes("Workflow TB"),
-      "local project resource summaries tolerate malformed legacy links"
-    );
-    const delimiterResourceKey = resourceKey({ tmName: "Workflow::TM", sourceLang: "en", targetLang: "tr" }, "tmName");
-    const delimiterResourceInfo = resourceLabelFromKey(delimiterResourceKey);
-    assert(
-      delimiterResourceKey === "Workflow::TM::en::tr" &&
-        delimiterResourceInfo.name === "Workflow::TM" &&
-        delimiterResourceInfo.sourceLang === "en" &&
-        delimiterResourceInfo.targetLang === "tr",
-      "resource keys preserve names containing double-colon delimiters"
-    );
-    const legacyDocumentManifest = projectDocumentManifest({
-      ...state.project,
-      sourceFileName: "legacy-source.html",
-      documents: [
-        null,
-        { id: "legacy-workflow-doc", name: "Legacy workflow.HTML", type: "HTML" },
-        { id: "legacy-workflow-doc", name: "Duplicate legacy workflow.html", type: "html" },
-        { name: "Missing id.html", type: "html" }
-      ]
-    });
-    assert(
-      legacyDocumentManifest.length === 1 &&
-        legacyDocumentManifest[0].id === "legacy-workflow-doc" &&
-        legacyDocumentManifest[0].type === "html",
-      "local project document manifests tolerate malformed legacy entries"
-    );
-    const originalWorkflowProject = state.project;
-    state.project = { ...state.project, documents: { malformed: true } };
-    renderProjectHome();
-    renderDocumentFilter();
-    assert(
-      projectDocuments().every((documentInfo) => documentInfo.id) &&
-        !els.projectFileList.textContent.includes("[object Object]"),
-      "project file views tolerate malformed legacy document manifests"
-    );
-    state.project = originalWorkflowProject;
-    const originalProjectDomain = state.project.domain;
-    els.projectDomainEditInput.value = "Unstored workflow domain";
-    setHiddenSegmentField(state.project, PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG, true);
-    const failedDomainSave = await saveProjectDomainFromForm();
-    assert(
-      !failedDomainSave &&
-        els.saveStatus.textContent.includes("Simulated project domain save failure") &&
-        state.project.domain === originalProjectDomain &&
-        els.projectDomainEditInput.value === "Unstored workflow domain",
-      "project domain save failure reports visible status without changing project metadata"
-    );
-    Reflect.deleteProperty(state.project, PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG);
-    els.projectDomainEditInput.value = "Workflow saved domain";
-    const successfulDomainSave = await saveProjectDomainFromForm();
-    assert(successfulDomainSave && state.project.domain === "Workflow saved domain", "project domain save persists metadata");
-    await openProjectDialog("edit");
-    assert(
-      projectDialogController?.isEditing?.() &&
-        els.projectDialogTitle.textContent === "Project settings" &&
-        els.saveProjectBtn.textContent === "Save settings" &&
-        els.projectAdvancedOptions.open,
-      "checked project dialog controller prepares edit mode from current project state"
-    );
-    const legacyDialogSettings = collectProjectResourceSettings({
-      ...state.project,
-      resourceLinks: [
-        null,
-        { id: "legacy-dialog-main-tm", type: "tm", name: mainTmName(state.project), role: "main" },
-        { id: "legacy-dialog-invalid-link", type: "glossary", name: "Ignored glossary" },
-        { id: "legacy-dialog-tb", type: "termbase", name: primaryTermBaseName(state.project) }
-      ]
-    });
-    assert(
-      legacyDialogSettings.resourceLinks.some((link) => link.id === "legacy-dialog-main-tm") &&
-        legacyDialogSettings.resourceLinks.some((link) => link.id === "legacy-dialog-tb") &&
-        !legacyDialogSettings.resourceLinks.some((link) => link.type === "glossary"),
-      "project settings dialog tolerates malformed legacy resource links"
-    );
-    document.querySelector("#projectDomainInput").value = "Settings activity warning";
-    if (els.saveProjectToFolderInput) els.saveProjectToFolderInput.checked = false;
-    setHiddenSegmentField(els.projectForm, PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const settingsActivityProject = await saveProjectFromDialog();
-    assert(
-      settingsActivityProject?.id === project.id &&
-        state.project.domain === "Settings activity warning" &&
-        els.saveStatus.textContent.includes("activity log failed") &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "project settings activity log failure reports warning after successful settings save"
-    );
-    Reflect.deleteProperty(els.projectForm, PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG);
-
-    const file = new File(["<!doctype html><html><body><p>Hello world.</p></body></html>"], "workflow.html", { type: "text/html" });
-    await importLocalization(file);
-    const documentInfo = state.project.documents.find((item) => item.name === "workflow.html");
-    assert(Boolean(documentInfo), "real app HTML file import");
-    const workflowSegmentIndex = state.segments.findIndex((segment) => segment.documentId === documentInfo.id);
-    state.segments[workflowSegmentIndex].target = "Merhaba dunya.";
-    state.segments[workflowSegmentIndex].status = "draft";
-    touchSegment(state.segments[workflowSegmentIndex]);
-    await saveSegment(state.segments[workflowSegmentIndex]);
-    state.project = await updateProject({
-      ...state.project,
-      documents: state.project.documents.map((item) => (item.id === documentInfo.id ? { ...item, type: "HTML" } : item))
-    });
-    state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-    state.documentFilter = documentInfo.id;
-    const caseInsensitiveTypeDownloads = [];
-    const originalCaseCreateObjectUrl = URL.createObjectURL.bind(URL);
-    const originalCaseAnchorClick = HTMLAnchorElement.prototype.click;
-    const originalCaseConfirm = window.confirm;
-    URL.createObjectURL = (blob) => {
-      caseInsensitiveTypeDownloads.push({ type: blob.type, blob });
-      return originalCaseCreateObjectUrl(blob);
-    };
-    HTMLAnchorElement.prototype.click = function noopCaseInsensitiveTypeClick() {};
-    window.confirm = () => true;
-    try {
-      await exportLocalization();
-      assert(
-        caseInsensitiveTypeDownloads.some((item) => item.type === "text/html") &&
-          projectDocuments().find((item) => item.id === documentInfo.id)?.type === "html",
-        "localization export normalizes stored document type casing"
-      );
-    } finally {
-      URL.createObjectURL = originalCaseCreateObjectUrl;
-      HTMLAnchorElement.prototype.click = originalCaseAnchorClick;
-      window.confirm = originalCaseConfirm;
-    }
-    state.project = await updateProject({
-      ...state.project,
-      documents: state.project.documents.map((item) => (item.id === documentInfo.id ? { ...item, type: "html" } : item))
-    });
-    state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-    const roundTripLocalizationFixture = async (name, sourceText, targetTextValue, expectedText = targetTextValue) => {
-      const parsed = await parseLocalizationFile(new File([sourceText], name, { type: "text/plain" }));
-      const translated = parsed.segments.map((segment) => ({
-        ...segment,
-        target: segment.text === "Hello world" || segment.source === "Hello world" ? targetTextValue : (segment.target || segment.text),
-        status: "draft"
-      }));
-      const output = await buildLocalizationFile(parsed.documentType, translated, parsed.structure);
-      const outputText = typeof output === "string" ? output : new TextDecoder().decode(output);
-      assert(outputText.includes(expectedText), `${name} other format round-trip`);
-    };
-    const sdlxliffFixture = `<?xml version="1.0" encoding="UTF-8"?><xliff version="1.2"><file original="workflow.sdlxliff" source-language="en" target-language="tr"><body><trans-unit id="1"><source>Hello world</source><target></target></trans-unit></body></file></xliff>`;
-    const sdlxliffParsed = await parseXliffFile(new File([sdlxliffFixture], "workflow.sdlxliff", { type: "application/x-xliff+xml" }));
-    assert(sdlxliffParsed.documentType === "sdlxliff", "SDLXLIFF import preserves document type");
-    const sdlxliffOutput = buildTargetXliff(state.project, sdlxliffParsed.segments.map((segment) => ({ ...segment, target: "Merhaba dunya", status: "draft" })), sdlxliffParsed.structure);
-    assert(sdlxliffOutput.includes("Merhaba dunya"), "SDLXLIFF target export updates original XLIFF structure");
-    await roundTripLocalizationFixture("workflow.xhtml", `<html xmlns="http://www.w3.org/1999/xhtml"><body><p>Hello world</p></body></html>`, "Merhaba dunya");
-    await roundTripLocalizationFixture("workflow.txml", `<txml><segment><source>Hello world</source><target></target></segment></txml>`, "Merhaba dunya");
-    await roundTripLocalizationFixture("workflow.resx", `<root><data name="Greeting"><value>Hello world</value></data></root>`, "Merhaba dunya");
-    await roundTripLocalizationFixture("workflow.ts", `<TS><context><message><source>Hello world</source><translation type="unfinished"></translation></message></context></TS>`, "Merhaba dunya");
-    await roundTripLocalizationFixture("workflow.properties", "greeting=Hello world", "Merhaba dunya");
-    await roundTripLocalizationFixture("workflow.vtt", "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello world\n", "Merhaba dunya");
-    await roundTripLocalizationFixture("workflow.txt", "Hello world\n\nSecond paragraph", "Merhaba dunya");
-    await roundTripLocalizationFixture("workflow.dtd", `<!ENTITY greeting "Hello world">`, "Merhaba dunya");
-    await roundTripLocalizationFixture("workflow.php", `<?php return ["greeting" => "Hello world"];`, "Merhaba dunya");
-    await roundTripLocalizationFixture("workflow.mif", "<String `Hello world'>", "Merhaba dunya");
-    assert(
-      els.fileEncodingSelect &&
-        Array.from(els.fileEncodingSelect.options).some((option) => option.value === "windows-1256") &&
-        Array.from(els.fileEncodingSelect.options).some((option) => option.value === "shift_jis"),
-      "text import encoding override offers Arabic and Japanese legacy encodings"
-    );
-    const windows1254Text = "Istanbul ışık\n\nÇeviri";
-    const windows1254Bytes = window.CatHan.encoding.encodeText(windows1254Text, "windows-1254").content;
-    const windows1254Parsed = await parseLocalizationFile(new File([windows1254Bytes], "workflow-windows-1254.txt", { type: "text/plain" }), { encoding: "windows-1254" });
-    assert(
-      windows1254Parsed.segments[0]?.text === "Istanbul ışık" &&
-        windows1254Parsed.structure?.sourceEncoding?.encoding === "windows-1254",
-      "Windows-1254 Turkish text import preserves dotted and dotless Turkish characters"
-    );
-    const windows1254Output = await buildLocalizationFile("txt", [{ ...windows1254Parsed.segments[0], target: "Işık çıktı" }], windows1254Parsed.structure);
-    assert(
-      windows1254Output instanceof Uint8Array &&
-        window.CatHan.encoding.decodeTextBytes(windows1254Output, { encoding: "windows-1254" }).text.includes("Işık çıktı"),
-      "text export preserves single-byte legacy encoding when every target character is encodable"
-    );
-    const arabicBytes = window.CatHan.encoding.encodeText("سلام", "windows-1256").content;
-    const arabicParsed = await parseLocalizationFile(new File([arabicBytes], "workflow-arabic.txt", { type: "text/plain" }), { encoding: "windows-1256" });
-    assert(arabicParsed.segments[0]?.text === "سلام", "Windows-1256 Arabic text import decodes Arabic script");
-    const cyrillicBytes = window.CatHan.encoding.encodeText("Привет", "windows-1251").content;
-    const cyrillicParsed = await parseLocalizationFile(new File([cyrillicBytes], "workflow-cyrillic.txt", { type: "text/plain" }), { encoding: "windows-1251" });
-    assert(cyrillicParsed.segments[0]?.text === "Привет", "Windows-1251 Cyrillic text import decodes Cyrillic script");
-    const shiftJisBytes = new Uint8Array([0x93, 0xfa, 0x96, 0x7b, 0x8c, 0xea]);
-    const shiftJisParsed = await parseLocalizationFile(new File([shiftJisBytes], "workflow-shift-jis.txt", { type: "text/plain" }), { encoding: "shift_jis" });
-    assert(shiftJisParsed.segments[0]?.text === "日本語", "Shift_JIS Japanese text import decodes Japanese script");
-    const utf16Bytes = window.CatHan.encoding.encodeText("שלום", { encoding: "utf-16le", bom: true }).content;
-    const utf16Parsed = await parseLocalizationFile(new File([utf16Bytes], "workflow-utf16.txt", { type: "text/plain" }));
-    assert(
-      utf16Parsed.segments[0]?.text === "שלום" &&
-        utf16Parsed.structure?.sourceEncoding?.encoding === "utf-16le" &&
-        utf16Parsed.structure?.sourceEncoding?.bom,
-      "UTF-16 BOM text import detects encoding before parsing"
-    );
-    const windows1254TmxText = `<?xml version="1.0" encoding="windows-1254"?>
-<tmx version="1.4">
-  <body>
-    <tu>
-      <tuv xml:lang="en"><seg>Light source</seg></tuv>
-      <tuv xml:lang="tr"><seg>I\u015f\u0131k \u00e7\u0131kt\u0131</seg></tuv>
-    </tu>
-  </body>
-</tmx>`;
-    const windows1254TmxEntries = parseTmx(
-      await readImportTextFile(new File([window.CatHan.encoding.encodeText(windows1254TmxText, "windows-1254").content], "workflow-windows-1254.tmx", { type: "application/xml" })),
-      { sourceLang: "en", targetLang: "tr", tmName: "Encoding TM", projectName: "Encoding test" }
-    );
-    assert(windows1254TmxEntries[0]?.target === "I\u015f\u0131k \u00e7\u0131kt\u0131", "TMX import decodes Windows-1254 translation memory text");
-    const windows1254TbxText = `<?xml version="1.0" encoding="windows-1254"?>
-<tbx>
-  <text>
-    <body>
-      <termEntry id="encoding-term">
-        <langSet xml:lang="en"><tig><term>light term</term></tig></langSet>
-        <langSet xml:lang="tr"><tig><term>\u0131\u015f\u0131k terimi</term></tig></langSet>
-        <descrip type="context">\u00c7al\u0131\u015fma notu</descrip>
-      </termEntry>
-    </body>
-  </text>
-</tbx>`;
-    const windows1254TbxTerms = parseTbx(
-      await readImportTextFile(new File([window.CatHan.encoding.encodeText(windows1254TbxText, "windows-1254").content], "workflow-windows-1254.tbx", { type: "application/xml" })),
-      { sourceLang: "en", targetLang: "tr", termBaseName: "Encoding TB" }
-    );
-    assert(
-      windows1254TbxTerms[0]?.targetTerm === "\u0131\u015f\u0131k terimi" &&
-        windows1254TbxTerms[0]?.notes === "\u00c7al\u0131\u015fma notu",
-      "TBX import decodes Windows-1254 termbase text"
-    );
-    await setActiveSegment(workflowSegmentIndex);
-    const regionalLocaleTmx = `<?xml version="1.0" encoding="UTF-8"?>
-<tmx version="1.4">
-  <body>
-    <tu>
-      <tuv xml:lang="en-US"><seg>Hello world.</seg></tuv>
-      <tuv xml:lang="tr-TR"><seg>Merhaba dunya.</seg></tuv>
-    </tu>
-    <tu>
-      <tuv><seg>No locale TM source.</seg></tuv>
-      <tuv><seg>Yerelsiz TM hedefi.</seg></tuv>
-    </tu>
-  </body>
-</tmx>`;
-    const regionalLocaleTmxOk = await runFileImportTask("TMX import", () => handleTmxImport(new File([regionalLocaleTmx], "workflow-regional.tmx", { type: "application/xml" })));
-    const importedRegionalTmEntries = await listTmEntries({ sourceLang: "en", targetLang: "tr", tmNames: [mainTmName()] });
-    assert(
-      regionalLocaleTmxOk &&
-        importedRegionalTmEntries.some((entry) => entry.source === "Hello world." && entry.target === "Merhaba dunya." && entry.sourceLang === "en" && entry.targetLang === "tr") &&
-        importedRegionalTmEntries.some((entry) => entry.source === "No locale TM source." && entry.target === "Yerelsiz TM hedefi."),
-      "TMX import accepts regional and missing locale metadata while storing project languages"
-    );
-    assert(
-      Array.from(els.tmMatches.querySelectorAll(".match-card")).some((card) => card.textContent.includes("100%") && card.textContent.includes("Merhaba dunya.")),
-      "TMX import refreshes sidebar matches with match rates"
-    );
-    const regionalLocaleTbx = `<?xml version="1.0" encoding="UTF-8"?>
-<tbx>
-  <text>
-    <body>
-      <termEntry id="regional-term">
-        <langSet xml:lang="en-GB"><tig><term>Hello</term></tig></langSet>
-        <langSet xml:lang="tr-TR"><tig><term>Merhaba</term></tig></langSet>
-      </termEntry>
-      <termEntry id="missing-locale-term">
-        <langSet><tig><term>world</term></tig></langSet>
-        <langSet><tig><term>dunya</term></tig></langSet>
-      </termEntry>
-    </body>
-  </text>
-</tbx>`;
-    const regionalLocaleTbxOk = await runFileImportTask("TBX import", () => handleTbxImport(new File([regionalLocaleTbx], "workflow-regional.tbx", { type: "application/xml" })));
-    const importedRegionalTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: projectTermBaseNames() });
-    assert(
-      regionalLocaleTbxOk &&
-        importedRegionalTerms.some((term) => term.sourceTerm === "Hello" && term.targetTerm === "Merhaba" && term.sourceLang === "en" && term.targetLang === "tr") &&
-        importedRegionalTerms.some((term) => term.sourceTerm === "world" && term.targetTerm === "dunya"),
-      "TBX import accepts regional and missing locale metadata while storing project languages"
-    );
-    assert(
-      Array.from(els.termSuggestions.querySelectorAll(".term-card")).some((card) => card.textContent.includes("Hello") && card.textContent.includes("Merhaba")),
-      "TBX import refreshes termbase sidebar suggestions"
-    );
-    const previousEncodingSelection = els.fileEncodingSelect.value;
-    els.fileEncodingSelect.value = "windows-1254";
-    try {
-      const windows1254TermCsvText = "source,target,notes\nlight,\u0131\u015f\u0131k,\u00c7al\u0131\u015fma notu";
-      const windows1254CsvTerms = await parseTermListFile(
-        new File([window.CatHan.encoding.encodeText(windows1254TermCsvText, "windows-1254").content], "workflow-windows-1254.csv", { type: "text/csv" }),
-        { sourceLang: "en", targetLang: "tr", termBaseName: "Encoding TB", fileName: "workflow-windows-1254.csv" }
-      );
-      assert(
-        windows1254CsvTerms[0]?.targetTerm === "\u0131\u015f\u0131k" &&
-          windows1254CsvTerms[0]?.notes === "\u00c7al\u0131\u015fma notu",
-        "CSV term list import uses manual Windows-1254 override for terminology text"
-      );
-    } finally {
-      els.fileEncodingSelect.value = previousEncodingSelection || "auto";
-    }
-    const openXmlBytes = buildBilingualDocx(
-      { name: "Workflow OpenXML", sourceLang: "en", targetLang: "tr" },
-      [{ source: "Hello world", target: "", status: "empty" }]
-    );
-    const docmParsed = await parseLocalizationFile(new File([openXmlBytes], "workflow.docm", { type: "application/vnd.ms-word.document.macroEnabled.12" }));
-    const docmTranslated = docmParsed.segments.map((segment) => ({
-      ...segment,
-      target: segment.text.includes("Hello world") ? "Merhaba dunya" : segment.text,
-      status: "draft"
-    }));
-    const docmOutput = await buildLocalizationFile(docmParsed.documentType, docmTranslated, docmParsed.structure);
-    const docmRoundTrip = await parseLocalizationFile(new File([docmOutput], "workflow.docm", { type: "application/vnd.ms-word.document.macroEnabled.12" }));
-    assert(docmRoundTrip.segments.some((segment) => segment.text.includes("Merhaba dunya")), "DOCM OpenXML package round-trips translated text");
-    const metadataOnlyDocument = { id: `doc-empty-${Date.now()}`, name: "metadata-only.html", type: "html" };
-    state.project = await updateProject({
-      ...state.project,
-      documents: [...(state.project.documents || []), metadataOnlyDocument]
-    });
-    state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-    renderProjectHome();
-    renderDocumentFilter();
-    assert(
-      projectDocuments().some((item) => item.id === metadataOnlyDocument.id) &&
-        els.projectFileList.textContent.includes("metadata-only.html") &&
-        Array.from(els.documentFilter.options).some((option) => option.value === metadataOnlyDocument.id),
-      "metadata-only project documents remain visible without segment rows"
-    );
-    const originalMetadataOnlyConfirm = window.confirm;
-    window.confirm = () => true;
-    try {
-      const deletedMetadataOnlyDocument = await confirmDeleteFile(metadataOnlyDocument);
-      assert(
-        deletedMetadataOnlyDocument &&
-          !projectDocuments().some((item) => item.id === metadataOnlyDocument.id) &&
-          !Array.from(els.documentFilter.options).some((option) => option.value === metadataOnlyDocument.id),
-        "metadata-only project documents can be deleted without orphan segments"
-      );
-    } finally {
-      window.confirm = originalMetadataOnlyConfirm;
-    }
-    const atomicImportDocumentCount = state.project.documents.length;
-    state.project.__atomicImportFailureProbe = () => {};
-    let atomicImportError = "";
-    try {
-      await importLocalization(new File(["<!doctype html><html><body><p>Atomic import failure.</p></body></html>"], "workflow-atomic-import-failure.html", { type: "text/html" }));
-    } catch (error) {
-      atomicImportError = error.message || String(error);
-    } finally {
-      delete state.project.__atomicImportFailureProbe;
-    }
-    const storedProjectAfterAtomicImportFailure = (await listProjects()).find((item) => item.id === project.id);
-    const storedSegmentsAfterAtomicImportFailure = await getProjectSegments(project.id);
-    assert(
-      atomicImportError &&
-        state.project.documents.length === atomicImportDocumentCount &&
-        (storedProjectAfterAtomicImportFailure?.documents || []).length === atomicImportDocumentCount &&
-        !storedSegmentsAfterAtomicImportFailure.some((segment) => segment.documentName === "workflow-atomic-import-failure.html"),
-      "file import metadata failure leaves no orphan segments"
-    );
-    setHiddenSegmentField(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const importActivityFailureDocumentCount = state.project.documents.length;
-    await importLocalization(new File(["<!doctype html><html><body><p>Import activity warning.</p></body></html>"], "workflow-import-activity-warning.html", { type: "text/html" }));
-    const importActivityFailureDocument = state.project.documents.find((item) => item.name === "workflow-import-activity-warning.html");
-    const importActivityFailureSegmentIndex = state.segments.findIndex((segment) => segment.documentId === importActivityFailureDocument?.id);
-    assert(
-      Boolean(importActivityFailureDocument) &&
-        state.project.documents.length === importActivityFailureDocumentCount + 1 &&
-        importActivityFailureSegmentIndex >= 0 &&
-        els.saveStatus.textContent.includes("activity log failed") &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "localization import activity log failure reports warning after successful import"
-    );
-    assert(
-      "IMPORT".toLocaleLowerCase("tr") !== "import" &&
-        projectHasDocumentNamed("WORKFLOW-IMPORT-ACTIVITY-WARNING.HTML"),
-      "duplicate file detection is stable under Turkish locale casing"
-    );
-    Reflect.deleteProperty(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG);
-    const docxLandingBytes = buildBilingualDocx(
-      { name: "Workflow DOCX landing", sourceLang: "en", targetLang: "tr" },
-      [{ source: "DOCX import landing source.", target: "", status: "empty" }]
-    );
-    await importDocx(new File([docxLandingBytes], "workflow-docx-landing.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
-    const docxLandingDocument = state.project.documents.find((item) => item.name === "workflow-docx-landing.docx");
-    assert(
-      docxLandingDocument &&
-        state.documentFilter === docxLandingDocument.id &&
-        els.documentFilter.value === docxLandingDocument.id &&
-        state.activeIndex >= 0 &&
-        state.segments[state.activeIndex]?.documentId === docxLandingDocument.id,
-      "DOCX import selects newly imported document"
-    );
-    const completedDocxLandingSegments = state.segments
-      .filter((segment) => segment.documentId === docxLandingDocument.id)
-      .map((segment) => ({ ...segment, target: segment.source || "DOCX landing target", status: "draft" }));
-    await saveSegments(completedDocxLandingSegments);
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
-    updateSegmentDraft(importActivityFailureSegmentIndex, "İçe aktarma etkinlik uyarısı hedefi");
-    await flushPendingSegmentSaves(project.id);
-    await openProjectFile(documentInfo.id);
-    state.inspectorOpen = true;
-    verticalFeatureState?.inspector?.setContext?.({ tab: "ai" });
-    renderEditor();
-    els.openProjectAiSettingsBtn.focus();
-    els.openProjectAiSettingsBtn.click();
-    await waitFor(
-      () => els.projectDialog.open && els.projectAiOptions.open && document.activeElement === els.localAiPresetSelect,
-      "project AI settings deep link"
-    );
-    assert(
-      projectDialogController?.isEditing?.() && els.projectAdvancedOptions.open,
-      "project dialog controller opens the requested AI settings context"
-    );
-    els.cancelProjectBtn.click();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    assert(
-      document.activeElement === els.openProjectAiSettingsBtn,
-      "project dialog controller restores the AI settings opener after close"
-    );
-    verticalFeatureState?.inspector?.setContext?.({ tab: "matches" });
-    renderEditor();
-    const segmentIndex = state.segments.findIndex((segment) => segment.documentId === documentInfo.id);
-    const projectToolbarBounds = document.querySelector(".project-toolbar")?.getBoundingClientRect();
-    const toolbarActionsBounds = document.querySelector(".project-toolbar .toolbar-actions")?.getBoundingClientRect();
-    const progressBounds = document.querySelector(".progress-wrap")?.getBoundingClientRect();
-    assert(
-      Boolean(projectToolbarBounds && toolbarActionsBounds && progressBounds) &&
-        toolbarActionsBounds.bottom <= projectToolbarBounds.bottom + 1 &&
-        toolbarActionsBounds.bottom <= progressBounds.top + 1,
-      "responsive editor toolbar keeps every action above the progress panel"
-    );
-    const editorAreaBounds = document.querySelector(".editor-area")?.getBoundingClientRect();
-    const editorImportMenu = document.querySelector("#editorImportMenu");
-    editorImportMenu.open = true;
-    const editorImportPanelBounds = editorImportMenu.querySelector(":scope > .menu-panel")?.getBoundingClientRect();
-    editorImportMenu.open = false;
-    assert(
-      Boolean(editorAreaBounds && editorImportPanelBounds) &&
-        editorImportPanelBounds.left >= editorAreaBounds.left - 1 &&
-        editorImportPanelBounds.right <= editorAreaBounds.right + 1,
-      "editor Import menu opens fully inside the rounded editor surface"
-    );
-    assert(
-      document.querySelectorAll("#newProjectBtn").length === 1 && !document.querySelector("#newProjectFromDashboardBtn"),
-      "Projects view exposes one non-duplicated New project action"
-    );
-    const saveStatusStyle = getComputedStyle(els.saveStatus);
-    assert(
-      saveStatusStyle.display.endsWith("flex") && saveStatusStyle.alignItems === "center" && saveStatusStyle.justifyContent === "center",
-      "save status pill centers its label in both axes"
-    );
-    assert(
-      els.saveStatus.getAttribute("role") === "status" &&
-        els.saveStatus.getAttribute("aria-live") === "polite" &&
-        els.saveStatus.getAttribute("aria-atomic") === "true",
-      "save and operation status exposes one polite atomic live region"
-    );
-    els.confirmBtn.focus();
-    openCommandPalette();
-    await Promise.resolve();
-    const paletteFocusable = focusController?.visibleFocusableElements?.(els.commandPaletteOverlay) || [];
-    const paletteLast = paletteFocusable.at(-1);
-    assert(document.activeElement === els.commandPaletteInput, "command palette moves focus to command search");
-    paletteLast?.focus();
-    paletteLast?.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
-    assert(document.activeElement === paletteFocusable[0], "command palette contains forward Tab focus");
-    closeCommandPalette();
-    await Promise.resolve();
-    assert(document.activeElement === els.confirmBtn, "command palette restores focus to its opener");
-    els.brandHomeLink.click();
-    assert(
-      state.view === "projects" && !els.projectsView.classList.contains("hidden"),
-      "LoopCAT brand navigates to the Projects view"
-    );
-    showProjectHome();
-    const analysisPanel = document.querySelector(".analysis-panel");
-    const analysisToggle = analysisPanel?.querySelector("[data-panel-toggle]");
-    analysisToggle?.click();
-    assert(
-      analysisPanel?.classList.contains("collapsed") &&
-        analysisToggle?.getAttribute("aria-expanded") === "false" &&
-        analysisToggle?.getAttribute("aria-label")?.startsWith(uiSource("Expand")) &&
-        getComputedStyle(document.querySelector("#projectAnalysisContent")).display === "none",
-      "Project analysis can be collapsed"
-    );
-    analysisToggle?.click();
-    assert(
-      !analysisPanel?.classList.contains("collapsed") &&
-        analysisToggle?.getAttribute("aria-expanded") === "true" &&
-        analysisToggle?.getAttribute("aria-label")?.startsWith(uiSource("Minimize")),
-      "Project analysis can be expanded"
-    );
-    await openProjectFile(documentInfo.id);
-    const activeTargetEditor = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
-    assert(
-      activeTargetEditor?.getAttribute("aria-label") === uiSource("Target translation for segment {value1}", { value1: segmentIndex + 1 }),
-      "segment target editors expose a segment-specific accessible name"
-    );
-    assert(
-      els.projectList.closest(".project-rail").scrollWidth <= els.projectList.closest(".project-rail").clientWidth + 2,
-      "project navigation labels wrap without horizontal scrolling"
-    );
-    assert(Boolean(els.focusModeBtn && els.exitFocusModeBtn), "focus view controls are available in the editor");
-    setFocusMode(true);
-    assert(
-      state.focusMode &&
-        document.body.classList.contains("focus-mode") &&
-        els.workspace.classList.contains("focus-mode") &&
-        els.focusModeBtn.getAttribute("aria-pressed") === "true" &&
-        !els.exitFocusModeBtn.classList.contains("hidden") &&
-        Boolean(els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`)),
-      "focus view switches the editor into a noise-free segment layout"
-    );
-    setFocusMode(false);
-    assert(
-      !state.focusMode &&
-        !document.body.classList.contains("focus-mode") &&
-        !els.workspace.classList.contains("focus-mode") &&
-        els.focusModeBtn.getAttribute("aria-pressed") === "false" &&
-        els.exitFocusModeBtn.classList.contains("hidden"),
-      "focus view returns to the full editor layout"
-    );
-    const autosaveRetryText = `Otomatik kayit yeniden deneme hedefi ${Date.now()}`;
-    setHiddenSegmentField(state.segments[segmentIndex], AUTOSAVE_SAVE_FAILURE_TEST_FLAG, true);
-    updateSegmentDraft(segmentIndex, autosaveRetryText);
-    await waitFor(() => els.saveStatus.textContent.includes("retrying autosave") && state.saveTimers.has(state.segments[segmentIndex].id), "autosave retry after transient failure");
-    assert(state.saveTimers.has(state.segments[segmentIndex].id), "timed autosave failure stays queued for retry");
-    await waitFor(() => !state.saveTimers.has(state.segments[segmentIndex].id), "autosave retry saved target");
-    const autosaveRetryStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-    assert(autosaveRetryStored?.target === autosaveRetryText, "timed autosave retry persists target after transient failure");
-    const editTargetBefore = targetCommandPatch(state.segments[segmentIndex]);
-    const editTargetSteps = [
-      `Birlesik duzenleme ilk ${Date.now()}`,
-      `Birlesik duzenleme ikinci ${Date.now()}`,
-      `Birlesik duzenleme son ${Date.now()}`
-    ];
-    editTargetSteps.forEach((value) => updateSegmentDraft(segmentIndex, value));
-    assert(
-      appRuntime.commands.editTargetSessions.has(state.segments[segmentIndex].id),
-      "continuous target typing keeps one in-memory EditTarget session"
-    );
-    await flushPendingSegmentSaves(project.id);
-    assert(
-      !appRuntime.commands.editTargetSessions.has(state.segments[segmentIndex].id),
-      "pending-save flush finalizes the coalesced EditTarget session"
-    );
-    const editTargetApplied = targetCommandPatch(state.segments[segmentIndex]);
-    const editTargetUndo = await undoLastCommand();
-    const editTargetStoredAfterUndo = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[segmentIndex].id
-    );
-    assert(
-      editTargetUndo?.receipt?.commandId === "edit-target" &&
-        state.segments[segmentIndex].target === editTargetBefore.target &&
-        state.segments[segmentIndex].status === editTargetBefore.status &&
-        JSON.stringify(state.segments[segmentIndex].targetHistory) === JSON.stringify(editTargetBefore.targetHistory) &&
-        JSON.stringify(targetCommandPatch(state.segments[segmentIndex]).tmPretranslation) ===
-          JSON.stringify(editTargetBefore.tmPretranslation) &&
-        JSON.stringify(targetCommandPatch(state.segments[segmentIndex]).aiApplication) ===
-          JSON.stringify(editTargetBefore.aiApplication) &&
-        editTargetStoredAfterUndo?.target === editTargetBefore.target &&
-        state.activeIndex === segmentIndex,
-      "one coalesced EditTarget Undo restores target state, history, provenance, persistence, and selection"
-    );
-    const editTargetUndoRevision = Number(state.segments[segmentIndex].revision || 0);
-    await redoLastCommand();
-    const editTargetStoredAfterRedo = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[segmentIndex].id
-    );
-    assert(
-      state.segments[segmentIndex].target === editTargetApplied.target &&
-        state.segments[segmentIndex].status === editTargetApplied.status &&
-        JSON.stringify(state.segments[segmentIndex].targetHistory) === JSON.stringify(editTargetApplied.targetHistory) &&
-        Number(state.segments[segmentIndex].revision || 0) > editTargetUndoRevision &&
-        editTargetStoredAfterRedo?.target === editTargetApplied.target &&
-        state.activeIndex === segmentIndex,
-      "EditTarget Redo reapplies the coalesced patch with a monotonic revision"
-    );
-    const keyboardEditBefore = targetCommandPatch(state.segments[segmentIndex]);
-    const keyboardEditTarget = `Klavye geri alma hedefi ${Date.now()}`;
-    const keyboardEditTextarea = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
-    keyboardEditTextarea.value = keyboardEditTarget;
-    keyboardEditTextarea.dispatchEvent(new Event("input", { bubbles: true }));
-    const keyboardUndoEvent = new KeyboardEvent("keydown", {
-      key: "z",
-      code: "KeyZ",
-      ctrlKey: true,
-      bubbles: true,
-      cancelable: true
-    });
-    keyboardEditTextarea.dispatchEvent(keyboardUndoEvent);
-    await waitFor(
-      () =>
-        state.segments[segmentIndex]?.target === keyboardEditBefore.target &&
-        els.saveStatus.textContent.includes("Undo target edit") &&
-        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] textarea`),
-      "coalesced EditTarget keyboard Undo"
-    );
-    const keyboardUndoStored = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[segmentIndex].id
-    );
-    assert(
-      keyboardUndoEvent.defaultPrevented &&
-        keyboardUndoStored?.target === keyboardEditBefore.target &&
-        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] textarea`),
-      "Ctrl/Cmd+Z inside the target editor uses coalesced EditTarget Undo and restores focus"
-    );
-    const keyboardRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
-    const keyboardRedoEvent = new KeyboardEvent("keydown", {
-      key: "z",
-      code: "KeyZ",
-      ctrlKey: true,
-      shiftKey: true,
-      bubbles: true,
-      cancelable: true
-    });
-    keyboardRedoTextarea.dispatchEvent(keyboardRedoEvent);
-    await waitFor(
-      () =>
-        state.segments[segmentIndex]?.target === keyboardEditTarget &&
-        els.saveStatus.textContent.includes("Redid target edit") &&
-        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] textarea`),
-      "coalesced EditTarget keyboard Redo"
-    );
-    const keyboardRedoStored = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[segmentIndex].id
-    );
-    assert(
-      keyboardRedoEvent.defaultPrevented &&
-        keyboardRedoStored?.target === keyboardEditTarget &&
-        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] textarea`),
-      "Ctrl/Cmd+Shift+Z inside the target editor redoes the coalesced EditTarget command"
-    );
-    const targetText = `Aninda yedeklenen hedef ${Date.now()}`;
-    updateSegmentDraft(segmentIndex, targetText);
-    assert(state.saveTimers.size > 0, "pending save created");
-    assert(state.segments[segmentIndex].targetHistory?.some((entry) => entry.reason === "edit" && entry.toTarget === targetText), "segment edit records target revision history");
-    setHiddenSegmentField(state.segments[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
-    let pendingFlushError = "";
-    try {
-      await flushPendingSegmentSaves(project.id);
-    } catch (error) {
-      pendingFlushError = error.message || String(error);
-    }
-    assert(pendingFlushError.includes("Simulated pending save flush failure") && state.saveTimers.has(state.segments[segmentIndex].id), "failed pending save flush keeps autosave queued");
-    Reflect.deleteProperty(state.segments[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG);
-    await flushPendingSegmentSaves(project.id);
-    assert(!state.saveTimers.has(state.segments[segmentIndex].id), "recovered pending save flush clears autosave queue");
-    const restoreGuardBackup = await exportAllData();
-    const restoreGuardText = `Geri yukleme oncesi bekleyen hedef ${Date.now()}`;
-    updateSegmentDraft(segmentIndex, restoreGuardText);
-    setHiddenSegmentField(state.segments[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
-    let restoreGuardError = "";
-    try {
-      await restoreBackupData(restoreGuardBackup);
-    } catch (error) {
-      restoreGuardError = error.message || String(error);
-    }
-    assert(
-      restoreGuardError.includes("Simulated pending save flush failure") &&
-        state.project?.id === project.id &&
-        state.saveTimers.has(state.segments[segmentIndex].id),
-      "backup restore stops before destructive restore when pending save flush fails"
-    );
-    Reflect.deleteProperty(state.segments[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG);
-    await flushPendingSegmentSaves(project.id);
-    const replaceGuardPackage = await buildProjectPackage(state.project);
-    const replaceGuardText = `Paket degisimi oncesi bekleyen hedef ${Date.now()}`;
-    updateSegmentDraft(segmentIndex, replaceGuardText);
-    setHiddenSegmentField(state.segments[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
-    let replaceGuardError = "";
-    try {
-      await importProjectPackageData(replaceGuardPackage, {
-        replaceExisting: true,
-        sourceName: "pending-flush-replace-guard.loopcat.json",
-        suppressAlert: true,
-        open: false
-      });
-    } catch (error) {
-      replaceGuardError = error.message || String(error);
-    }
-    assert(
-      replaceGuardError.includes("Simulated pending save flush failure") &&
-        state.project?.id === project.id &&
-        state.saveTimers.has(state.segments[segmentIndex].id),
-      "project package replacement stops before destructive import when pending save flush fails"
-    );
-    Reflect.deleteProperty(state.segments[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG);
-    await flushPendingSegmentSaves(project.id);
-    const backupTargetText = `Aninda yedeklenen hedef ${Date.now()}`;
-    updateSegmentDraft(segmentIndex, backupTargetText);
-    assert(state.saveTimers.size > 0, "pending save recreated before backup export");
-
-    const capturedDownloads = [];
-    const originalCreateObjectUrl = URL.createObjectURL.bind(URL);
-    const originalAnchorClick = HTMLAnchorElement.prototype.click;
-    URL.createObjectURL = (blob) => {
-      blob.text().then((text) => capturedDownloads.push({ type: blob.type, text }));
-      return originalCreateObjectUrl(blob);
-    };
-    HTMLAnchorElement.prototype.click = function noopDownloadClick() {};
-    try {
-      els.backupExportBtn.click();
-      const backupDownload = await waitFor(() => capturedDownloads.find((item) => item.type === "application/json"), "backup download");
-      const backup = JSON.parse(backupDownload.text);
-      assert((backup.segments || []).some((segment) => segment.target === backupTargetText), "browser backup flushes pending segment edits");
-      assert((backup.segments || []).some((segment) => segment.targetHistory?.some((entry) => entry.reason === "edit" && entry.toTarget === backupTargetText)), "browser backup preserves segment revision history");
-    } finally {
-      URL.createObjectURL = originalCreateObjectUrl;
-      HTMLAnchorElement.prototype.click = originalAnchorClick;
-    }
-
-    els.replaceFindInput.value = "Aninda";
-    els.replaceWithInput.value = "AnÄ±nda";
-    const targetBeforeReplaceCommand = state.segments[segmentIndex].target;
-    clearWorkspaceDirtyMarkers();
-    const replaceResult = await replaceTargetText("visible");
-    assert(state.segments[segmentIndex].targetHistory?.some((entry) => entry.reason === "replace"), "replace records target revision history");
-    assert(replaceResult.replacementCount === 1 && state.segments[segmentIndex].target.startsWith("AnÄ±nda"), "visible target replace updates matching segment");
-    const replacedSegments = await getProjectSegments(project.id);
-    assert(replacedSegments.some((segment) => segment.target.startsWith("AnÄ±nda")), "target replace saves immediately");
-    const undoReplaceCommand = await undoLastCommand();
-    const undoReplaceStored = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[segmentIndex].id
-    );
-    assert(
-      state.segments[segmentIndex].target === targetBeforeReplaceCommand &&
-        undoReplaceStored?.target === targetBeforeReplaceCommand &&
-        state.activeIndex === segmentIndex,
-      `Undo restores target replacement atomically and preserves selection (${JSON.stringify({
-        visible: state.segments[segmentIndex].target,
-        stored: undoReplaceStored?.target,
-        expected: targetBeforeReplaceCommand,
-        activeIndex: state.activeIndex,
-        segmentIndex,
-        commandId: undoReplaceCommand?.receipt?.commandId || "none"
-      })})`
-    );
-    await redoLastCommand();
-    const redoReplaceStored = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[segmentIndex].id
-    );
-    assert(
-      state.segments[segmentIndex].target.startsWith("AnÄ±nda") && redoReplaceStored?.target.startsWith("AnÄ±nda"),
-      "Redo reapplies target replacement atomically"
-    );
-    assert(state.workspaceDirtyProjectIds.has(project.id), "target replace marks workspace package dirty");
-    assert(state.activityEvents.some((event) => event.type === "replace-target"), "target replace records project activity");
-    const beforeFailedReplaceTarget = state.segments[segmentIndex].target;
-    els.replaceFindInput.value = "hedef";
-    els.replaceWithInput.value = "Kaydedilemeyen";
-    setHiddenSegmentField(state.segments[segmentIndex], REPLACE_SAVE_FAILURE_TEST_FLAG, true);
-    const failedReplaceResult = await replaceTargetText("visible");
-    const afterFailedReplaceStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-    assert(
-      failedReplaceResult.segmentCount === 0 &&
-        els.saveStatus.textContent.includes("Simulated replace save failure") &&
-        state.segments[segmentIndex].target === beforeFailedReplaceTarget &&
-        afterFailedReplaceStored?.target === beforeFailedReplaceTarget,
-      "target replace save failure restores visible and persisted target text"
-    );
-    const protectedReplace = replaceOutsideProtectedTokens("<b>bold</b> %s b", "b", "strong", { regex: false, caseSensitive: true });
-    assert(protectedReplace.text === "<b>strongold</b> %s strong", "target replace skips protected tag and placeholder tokens");
-    const localeStableReplace = replaceOutsideProtectedTokens("INSTALL token", "install", "kur", { regex: false, caseSensitive: false });
-    assert(
-      "INSTALL".toLocaleLowerCase("tr") !== "install" && localeStableReplace.text === "kur token",
-      "case-insensitive target replace is stable under Turkish locale casing"
-    );
-
-    await setActiveSegment(segmentIndex);
-    assert(Boolean(els.reviewForm && els.reviewStateFilter), "review panel and review filter are available in the editor");
-    const reviewBaseline = structuredClone(state.segments[segmentIndex]);
-    els.reviewStateSelect.value = "needs-review";
-    els.reviewNoteInput.value = "This review note must roll back.";
-    els.reviewCommentInput.value = "This review comment must roll back.";
-    setHiddenSegmentField(state.segments[segmentIndex], REVIEW_METADATA_SAVE_FAILURE_TEST_FLAG, true);
-    await saveActiveReviewMetadata();
-    const failedReviewStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-    assert(
-      els.saveStatus.textContent.includes("Simulated review metadata save failure") &&
-        (state.segments[segmentIndex].reviewState || "") === (reviewBaseline.reviewState || "") &&
-        (state.segments[segmentIndex].reviewNote || "") === (reviewBaseline.reviewNote || "") &&
-        (state.segments[segmentIndex].comments || []).length === (reviewBaseline.comments || []).length &&
-        (failedReviewStored?.reviewNote || "") === (reviewBaseline.reviewNote || ""),
-      "review metadata save failure restores visible and persisted review fields"
-    );
-    els.reviewStateSelect.value = "needs-review";
-    els.reviewNoteInput.value = "Saved review note";
-    els.reviewCommentInput.value = "Saved review comment";
-    await saveActiveReviewMetadata();
-    const savedReviewStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-    assert(
-      els.saveStatus.textContent === "Review saved" &&
-        savedReviewStored?.reviewState === "needs-review" &&
-        savedReviewStored?.reviewNote === "Saved review note" &&
-        savedReviewStored?.comments?.some((comment) => comment.body === "Saved review comment"),
-      "review metadata save persists review note and comment"
-    );
-    setHiddenSegmentField(state.segments[segmentIndex], REVIEW_STATE_SAVE_FAILURE_TEST_FLAG, true);
-    await setActiveReviewState("reviewed");
-    const failedReviewStateStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-    assert(
-      els.saveStatus.textContent.includes("Simulated review state save failure") &&
-        state.segments[segmentIndex].reviewState === "needs-review" &&
-        failedReviewStateStored?.reviewState === "needs-review",
-      "quick review state failure restores visible and persisted review state"
-    );
-    await setActiveReviewState("reviewed");
-    const savedReviewStateStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-    assert(
-      els.saveStatus.textContent.includes("Marked reviewed") &&
-        savedReviewStateStored?.reviewState === "reviewed",
-      "quick review state saves selected review state"
-    );
-    await undoLastCommand();
-    const undoneReviewStateStored = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[segmentIndex].id
-    );
-    assert(
-      state.activeIndex === segmentIndex &&
-        state.segments[segmentIndex].reviewState === "needs-review" &&
-        undoneReviewStateStored?.reviewState === "needs-review",
-      "Undo restores quick review state and active segment"
-    );
-    await redoLastCommand();
-    const redoneReviewStateStored = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[segmentIndex].id
-    );
-    assert(
-      state.activeIndex === segmentIndex &&
-        state.segments[segmentIndex].reviewState === "reviewed" &&
-        redoneReviewStateStored?.reviewState === "reviewed",
-      "Redo reapplies quick review state and active segment"
-    );
-
-    const aiReviewProvider = aiProviderService.get("ollama");
-    const originalAiReviewCompletePrompt = aiReviewProvider.completePrompt;
-    const originalAiReviewSegmentFilter = state.aiSegmentFilter;
-    try {
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
-      if (els.localAiModelInput) els.localAiModelInput.value = "workflow-review-model";
-      setSegmentTargetAndStatus(state.segments[segmentIndex], "AI review target with 42", "draft", "edit");
-      touchSegment(state.segments[segmentIndex]);
-      clearPendingSave(state.segments[segmentIndex]);
-      await saveSegment(state.segments[segmentIndex]);
-      aiReviewProvider.completePrompt = async (_config, request) => {
-        assert(
-          request.prompt.includes("Review checklist:") &&
-            request.prompt.includes("Source English text:") &&
-            request.prompt.includes("Target Turkish text:") &&
-            request.system.includes("senior translation reviewer"),
-          "AI review command sends review prompt instead of translation prompt"
-        );
-        return {
-          text: "Warning | Number check | Confirm whether 42 is preserved naturally.",
-          provider: "Mock Review AI",
-          providerId: "ollama",
-          model: "workflow-review-model"
-        };
-      };
-      const aiReviewSaved = await reviewActiveSegmentWithLocalAi();
-      const aiReviewStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-      if (els.aiSegmentFilter) els.aiSegmentFilter.value = "ai-review-risk";
-      state.aiSegmentFilter = "ai-review-risk";
-      renderSegments();
-      assert(
-        aiReviewSaved &&
-          aiReviewStored?.reviewState === "needs-review" &&
-          aiReviewStored?.aiReviewRisk?.level === "medium" &&
-          filteredSegmentIndexes().includes(segmentIndex) &&
-          els.segmentBody.textContent.includes("Medium risk") &&
-          aiReviewStored?.comments?.some((comment) =>
-            comment.body.includes("AI review by Mock Review AI") &&
-              comment.body.includes("Risk: Medium") &&
-              comment.body.includes("Number check") &&
-              comment.aiReviewRisk?.level === "medium"
-          ) &&
-          els.localAiPromptOutput.textContent.includes("Risk: Medium") &&
-          els.localAiPromptOutput.textContent.includes("Number check"),
-        "AI review active segment saves risk-ranked review comment and marks segment needs-review"
-      );
-    } finally {
-      aiReviewProvider.completePrompt = originalAiReviewCompletePrompt;
-      state.aiSegmentFilter = originalAiReviewSegmentFilter;
-      if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalAiReviewSegmentFilter;
-      renderSegments();
-    }
-
-    const originalAiBatchReviewCompletePrompt = aiReviewProvider.completePrompt;
-    const aiBatchReviewIndexes = state.segments.map((_, index) => index).slice(0, 3);
-    const aiBatchReviewSnapshots = new Map(aiBatchReviewIndexes.map((index) => [state.segments[index].id, structuredClone(state.segments[index])]));
-    const originalBatchReviewFilters = {
-      documentFilter: state.documentFilter,
-      segmentQuery: state.segmentQuery,
-      segmentSearchScope: state.segmentSearchScope,
-      segmentRegex: state.segmentRegex,
-      segmentCaseSensitive: state.segmentCaseSensitive,
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
-      aiSegmentFilter: state.aiSegmentFilter,
-      localAiMode: els.localAiModeSelect?.value || ""
-    };
-    try {
-      assert(aiBatchReviewIndexes.length === 3, "workflow fixture has enough segments for batch AI QA");
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
-      if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-review-model";
-      if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
-      state.documentFilter = "";
-      state.segmentQuery = "workflow batch qa";
-      state.segmentSearchScope = "both";
-      state.segmentRegex = false;
-      state.segmentCaseSensitive = false;
-      state.segmentStatusFilter = "all";
-      state.reviewStateFilter = "";
-      state.aiSegmentFilter = "";
-      const issueSegment = state.segments[aiBatchReviewIndexes[0]];
-      const failedSegment = state.segments[aiBatchReviewIndexes[1]];
-      const lockedSegment = state.segments[aiBatchReviewIndexes[2]];
-      issueSegment.source = "Workflow batch QA source with number 42";
-      failedSegment.source = "Workflow batch QA source failure case";
-      lockedSegment.source = "Workflow batch QA source locked case";
-      issueSegment.locked = false;
-      failedSegment.locked = false;
-      lockedSegment.locked = true;
-      setSegmentTargetAndStatus(issueSegment, "Workflow batch QA target with number 24", "draft", "edit");
-      setSegmentTargetAndStatus(failedSegment, "Workflow batch QA target failure case", "draft", "edit");
-      setSegmentTargetAndStatus(lockedSegment, "Workflow batch QA target locked case", "draft", "edit");
-      [issueSegment, failedSegment, lockedSegment].forEach((segment) => {
-        touchSegment(segment);
-        clearPendingSave(segment);
-      });
-      await saveSegments([issueSegment, failedSegment, lockedSegment]);
-      const issueCommentBaseline = (issueSegment.comments || []).length;
-      const failedCommentBaseline = (failedSegment.comments || []).length;
-      const lockedCommentBaseline = (lockedSegment.comments || []).length;
-      aiReviewProvider.completePrompt = async (_config, request) => {
-        assert(
-          request.prompt.includes("Review checklist:") &&
-            request.prompt.includes("Source English text:") &&
-            request.prompt.includes("Target Turkish text:") &&
-            request.system.includes("senior translation reviewer"),
-          "AI batch QA sends review prompts instead of translation prompts"
-        );
-        if (request.prompt.includes("failure case")) throw new Error("Mock batch QA segment failure");
-        return {
-          text: "High | Number mismatch | Keep 42 instead of 24.",
-          provider: "Mock Batch QA",
-          providerId: "ollama",
-          model: "workflow-batch-review-model"
-        };
-      };
-      const batchReviewSummary = await reviewBatchWithLocalAi();
-      const batchReviewStored = await getProjectSegments(project.id);
-      const storedIssueSegment = batchReviewStored.find((segment) => segment.id === issueSegment.id);
-      const storedFailedSegment = batchReviewStored.find((segment) => segment.id === failedSegment.id);
-      const storedLockedSegment = batchReviewStored.find((segment) => segment.id === lockedSegment.id);
-      if (els.aiSegmentFilter) els.aiSegmentFilter.value = "high-ai-risk";
-      state.aiSegmentFilter = "high-ai-risk";
-      renderSegments();
-      assert(
-        batchReviewSummary?.commented === 1 &&
-          batchReviewSummary?.failed === 1 &&
-          batchReviewSummary?.skipped === 1 &&
-          batchReviewSummary?.riskCounts?.high === 1 &&
-          batchReviewSummary?.highestRisk === "high" &&
-          filteredSegmentIndexes().some((index) => state.segments[index]?.id === issueSegment.id) &&
-          els.segmentBody.textContent.includes("High risk") &&
-          storedIssueSegment?.reviewState === "needs-review" &&
-          storedIssueSegment?.aiReviewRisk?.level === "high" &&
-          (storedIssueSegment?.comments || []).length === issueCommentBaseline + 1 &&
-          storedIssueSegment?.comments?.some((comment) =>
-            comment.body.includes("AI review by Mock Batch QA") &&
-              comment.body.includes("Risk: High") &&
-              comment.body.includes("Number mismatch") &&
-              comment.aiReviewRisk?.level === "high"
-          ) &&
-          (storedFailedSegment?.comments || []).length === failedCommentBaseline &&
-          (storedLockedSegment?.comments || []).length === lockedCommentBaseline &&
-          els.localAiPromptOutput.textContent.includes("High risk: 1") &&
-          els.localAiPromptOutput.textContent.includes("Mock batch QA segment failure"),
-        "AI batch QA saves risk-ranked review comments, skips locked segments, and records segment failures"
-      );
-    } finally {
-      aiReviewProvider.completePrompt = originalAiBatchReviewCompletePrompt;
-      state.documentFilter = originalBatchReviewFilters.documentFilter;
-      state.segmentQuery = originalBatchReviewFilters.segmentQuery;
-      state.segmentSearchScope = originalBatchReviewFilters.segmentSearchScope;
-      state.segmentRegex = originalBatchReviewFilters.segmentRegex;
-      state.segmentCaseSensitive = originalBatchReviewFilters.segmentCaseSensitive;
-      state.segmentStatusFilter = originalBatchReviewFilters.segmentStatusFilter;
-      state.reviewStateFilter = originalBatchReviewFilters.reviewStateFilter;
-      state.aiSegmentFilter = originalBatchReviewFilters.aiSegmentFilter;
-      if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalBatchReviewFilters.aiSegmentFilter;
-      if (els.localAiModeSelect) els.localAiModeSelect.value = originalBatchReviewFilters.localAiMode;
-      const restoredBatchReviewSegments = Array.from(aiBatchReviewSnapshots.values()).map((snapshot) => {
-        const current = state.segments.find((segment) => segment.id === snapshot.id);
-        return {
-          ...snapshot,
-          revision: Math.max(Number(snapshot.revision || 0), Number(current?.revision || 0)) + 1,
-          updatedAt: new Date().toISOString()
-        };
-      });
-      if (restoredBatchReviewSegments.length) await saveSegments(restoredBatchReviewSegments);
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
-      state.activeIndex = Math.max(0, state.segments.findIndex((segment) => segment.id === state.segments[segmentIndex]?.id));
-      renderAll();
-    }
-
-    const aiRepairProvider = aiProviderService.get("ollama");
-    const originalAiRepairCompletePrompt = aiRepairProvider.completePrompt;
-    const aiRepairSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
-    try {
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
-      if (els.localAiModelInput) els.localAiModelInput.value = "workflow-repair-model";
-      state.segments[segmentIndex].tags = [{ text: "<0>" }, { text: "</0>" }, { text: "{name}" }, { text: "\\n" }];
-      setSegmentTargetAndStatus(state.segments[segmentIndex], "Open {name} with Ctrl+S.", "draft", "edit");
-      touchSegment(state.segments[segmentIndex]);
-      clearPendingSave(state.segments[segmentIndex]);
-      await saveSegment(state.segments[segmentIndex]);
-      const aiRepairOriginalTarget = state.segments[segmentIndex].target;
-      aiRepairProvider.completePrompt = async (_config, request) => {
-        assert(
-          request.prompt.includes("Return only the corrected target segment") &&
-            request.prompt.includes("Protected tokens that must appear exactly as written:") &&
-            request.prompt.includes("Source English text:") &&
-            request.prompt.includes("Current target Turkish text:") &&
-            request.system.includes("tag repair assistant"),
-          "AI tag repair command sends repair prompt instead of translation prompt"
-        );
-        return {
-          text: "Open <0>{name}</0> with Ctrl+S\\n.",
-          provider: "Mock Repair AI",
-          providerId: "ollama",
-          model: "workflow-repair-model"
-        };
-      };
-      const aiRepairSaved = await repairActiveSegmentTagsWithLocalAi();
-      const aiRepairStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-      assert(
-        aiRepairSaved &&
-          aiRepairStored?.target === aiRepairOriginalTarget &&
-          aiRepairStored?.aiSuggestions?.some((suggestion) => suggestion.provider === "Mock Repair AI" && suggestion.suggestedTarget.includes("<0>{name}</0>")) &&
-          els.localAiPromptOutput.textContent.includes("<0>{name}</0>"),
-        "AI tag repair active segment saves review suggestion without overwriting target"
-      );
-    } finally {
-      aiRepairProvider.completePrompt = originalAiRepairCompletePrompt;
-      const aiRepairRestoreRevision = Number(state.segments[segmentIndex]?.revision || 0);
-      Reflect.ownKeys(state.segments[segmentIndex]).forEach((key) => delete state.segments[segmentIndex][key]);
-      Object.assign(state.segments[segmentIndex], aiRepairSegmentSnapshot);
-      state.segments[segmentIndex].revision = Math.max(Number(aiRepairSegmentSnapshot.revision || 0), aiRepairRestoreRevision) + 1;
-      prepareSegmentHistoryState(state.segments[segmentIndex]);
-      clearPendingSave(state.segments[segmentIndex]);
-      const restoredAiRepairSegment = await saveSegment(state.segments[segmentIndex]);
-      Object.assign(state.segments[segmentIndex], restoredAiRepairSegment);
-      prepareSegmentHistoryState(state.segments[segmentIndex]);
-      updateRow(segmentIndex);
-    }
-
-    const originalAiBatchRepairCompletePrompt = aiRepairProvider.completePrompt;
-    const aiBatchRepairIndexes = state.segments.map((_, index) => index).slice(0, 3);
-    const aiBatchRepairSnapshots = new Map(aiBatchRepairIndexes.map((index) => [state.segments[index].id, structuredClone(state.segments[index])]));
-    const originalBatchRepairFilters = {
-      documentFilter: state.documentFilter,
-      segmentQuery: state.segmentQuery,
-      segmentSearchScope: state.segmentSearchScope,
-      segmentRegex: state.segmentRegex,
-      segmentCaseSensitive: state.segmentCaseSensitive,
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
-      localAiMode: els.localAiModeSelect?.value || ""
-    };
-    try {
-      assert(aiBatchRepairIndexes.length === 3, "workflow fixture has enough segments for batch AI tag repair");
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
-      if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-repair-model";
-      if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
-      state.documentFilter = "";
-      state.segmentQuery = "workflow batch tag repair";
-      state.segmentSearchScope = "both";
-      state.segmentRegex = false;
-      state.segmentCaseSensitive = false;
-      state.segmentStatusFilter = "all";
-      state.reviewStateFilter = "";
-      const repairedSegment = state.segments[aiBatchRepairIndexes[0]];
-      const failedSegment = state.segments[aiBatchRepairIndexes[1]];
-      const lockedSegment = state.segments[aiBatchRepairIndexes[2]];
-      repairedSegment.source = "Workflow batch tag repair alpha <0>{name}</0>.";
-      failedSegment.source = "Workflow batch tag repair failure case <0>{count}</0>.";
-      lockedSegment.source = "Workflow batch tag repair locked case <0>{name}</0>.";
-      repairedSegment.tags = [{ text: "<0>" }, { text: "</0>" }, { text: "{name}" }];
-      failedSegment.tags = [{ text: "<0>" }, { text: "</0>" }, { text: "{count}" }];
-      lockedSegment.tags = [{ text: "<0>" }, { text: "</0>" }, { text: "{name}" }];
-      repairedSegment.locked = false;
-      failedSegment.locked = false;
-      lockedSegment.locked = true;
-      setSegmentTargetAndStatus(repairedSegment, "Workflow batch tag repair alpha {name}.", "draft", "batch-repair-test");
-      setSegmentTargetAndStatus(failedSegment, "Workflow batch tag repair failure case {count}.", "draft", "batch-repair-test");
-      setSegmentTargetAndStatus(lockedSegment, "Workflow batch tag repair locked case {name}.", "draft", "batch-repair-test");
-      const repairedSuggestionBaseline = (repairedSegment.aiSuggestions || []).length;
-      const failedSuggestionBaseline = (failedSegment.aiSuggestions || []).length;
-      const lockedSuggestionBaseline = (lockedSegment.aiSuggestions || []).length;
-      [repairedSegment, failedSegment, lockedSegment].forEach((segment) => {
-        touchSegment(segment);
-        clearPendingSave(segment);
-      });
-      const savedAiBatchRepairSegments = await saveSegments([repairedSegment, failedSegment, lockedSegment]);
-      savedAiBatchRepairSegments.forEach((savedSegment) => {
-        const index = state.segments.findIndex((segment) => segment.id === savedSegment.id);
-        if (index === -1) return;
-        Object.assign(state.segments[index], savedSegment);
-        prepareSegmentHistoryState(state.segments[index]);
-      });
-      aiRepairProvider.completePrompt = async (_config, request) => {
-        assert(
-          request.prompt.includes("Return only the corrected target segment") &&
-            request.prompt.includes("Protected tokens that must appear exactly as written:") &&
-            request.prompt.includes("Current target Turkish text:") &&
-            request.system.includes("tag repair assistant"),
-          "AI batch tag repair sends repair prompts instead of translation prompts"
-        );
-        if (request.prompt.includes("failure case")) throw new Error("Mock batch tag repair failure");
-        return {
-          text: "Workflow batch tag repair alpha <0>{name}</0>.",
-          provider: "Mock Batch Repair AI",
-          providerId: "ollama",
-          model: "workflow-batch-repair-model"
-        };
-      };
-      const aiBatchRepairSummary = await repairBatchTagsWithLocalAi();
-      const aiBatchRepairStored = await getProjectSegments(project.id);
-      const storedRepairedSegment = aiBatchRepairStored.find((segment) => segment.id === repairedSegment.id);
-      const storedFailedRepairSegment = aiBatchRepairStored.find((segment) => segment.id === failedSegment.id);
-      const storedLockedRepairSegment = aiBatchRepairStored.find((segment) => segment.id === lockedSegment.id);
-      assert(aiBatchRepairSummary?.suggested === 1, "AI batch tag repair creates one review suggestion");
-      assert(aiBatchRepairSummary?.failed === 1, "AI batch tag repair records one segment failure");
-      assert(aiBatchRepairSummary?.skipped === 1, "AI batch tag repair skips the locked segment");
-      assert(storedRepairedSegment?.target === "Workflow batch tag repair alpha {name}.", "AI batch tag repair does not overwrite the repaired segment target");
-      assert((storedRepairedSegment?.aiSuggestions || []).length === repairedSuggestionBaseline + 1, "AI batch tag repair persists the repaired segment suggestion");
-      assert(
-        storedRepairedSegment?.aiSuggestions?.some((suggestion) => suggestion.provider === "Mock Batch Repair AI" && suggestion.suggestedTarget.includes("<0>{name}</0>")),
-        "AI batch tag repair stores the corrected protected-token suggestion"
-      );
-      assert((storedFailedRepairSegment?.aiSuggestions || []).length === failedSuggestionBaseline, "AI batch tag repair does not save suggestions for failed segments");
-      assert((storedLockedRepairSegment?.aiSuggestions || []).length === lockedSuggestionBaseline, "AI batch tag repair does not save suggestions for locked segments");
-      assert(els.localAiPromptOutput.textContent.includes("Mock batch tag repair failure"), "AI batch tag repair reports segment-level failures");
-      assert(
-        aiBatchRepairSummary?.suggested === 1 &&
-          aiBatchRepairSummary?.failed === 1 &&
-          aiBatchRepairSummary?.skipped === 1 &&
-          storedRepairedSegment?.target === "Workflow batch tag repair alpha {name}." &&
-          (storedRepairedSegment?.aiSuggestions || []).length === repairedSuggestionBaseline + 1 &&
-          storedRepairedSegment?.aiSuggestions?.some((suggestion) => suggestion.provider === "Mock Batch Repair AI" && suggestion.suggestedTarget.includes("<0>{name}</0>")) &&
-          (storedFailedRepairSegment?.aiSuggestions || []).length === failedSuggestionBaseline &&
-          (storedLockedRepairSegment?.aiSuggestions || []).length === lockedSuggestionBaseline &&
-          els.localAiPromptOutput.textContent.includes("Mock batch tag repair failure"),
-        "AI batch tag repair saves review suggestions, skips locked segments, and records failures"
-      );
-    } finally {
-      aiRepairProvider.completePrompt = originalAiBatchRepairCompletePrompt;
-      state.documentFilter = originalBatchRepairFilters.documentFilter;
-      state.segmentQuery = originalBatchRepairFilters.segmentQuery;
-      state.segmentSearchScope = originalBatchRepairFilters.segmentSearchScope;
-      state.segmentRegex = originalBatchRepairFilters.segmentRegex;
-      state.segmentCaseSensitive = originalBatchRepairFilters.segmentCaseSensitive;
-      state.segmentStatusFilter = originalBatchRepairFilters.segmentStatusFilter;
-      state.reviewStateFilter = originalBatchRepairFilters.reviewStateFilter;
-      if (els.localAiModeSelect) els.localAiModeSelect.value = originalBatchRepairFilters.localAiMode;
-      const restoredBatchRepairSegments = Array.from(aiBatchRepairSnapshots.values()).map((snapshot) => {
-        const current = state.segments.find((segment) => segment.id === snapshot.id);
-        return {
-          ...snapshot,
-          revision: Math.max(Number(snapshot.revision || 0), Number(current?.revision || 0)) + 1,
-          updatedAt: new Date().toISOString()
-        };
-      });
-      if (restoredBatchRepairSegments.length) await saveSegments(restoredBatchRepairSegments);
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
-      state.activeIndex = Math.max(0, state.segments.findIndex((segment) => segment.id === state.segments[segmentIndex]?.id));
-      renderAll();
-    }
-
-    const aiVariantsProvider = aiProviderService.get("ollama");
-    const originalAiVariantsCompletePrompt = aiVariantsProvider.completePrompt;
-    const aiVariantsSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
-    const aiVariantsProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
-    const originalAiVariantsMode = els.localAiVariantModeSelect?.value || "";
-    const originalAiVariantsFilters = {
-      documentFilter: state.documentFilter,
-      segmentQuery: state.segmentQuery,
-      segmentSearchScope: state.segmentSearchScope,
-      segmentRegex: state.segmentRegex,
-      segmentCaseSensitive: state.segmentCaseSensitive,
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
-      localAiMode: els.localAiModeSelect?.value || "",
-      activeSegmentId: state.segments[segmentIndex]?.id || ""
-    };
-    try {
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
-      if (els.localAiModelInput) els.localAiModelInput.value = "workflow-variants-model";
-      if (els.localAiVariantModeSelect) els.localAiVariantModeSelect.value = "concise";
-      setSegmentTargetAndStatus(state.segments[segmentIndex], "Workflow variants baseline target", "draft", "edit");
-      touchSegment(state.segments[segmentIndex]);
-      clearPendingSave(state.segments[segmentIndex]);
-      await saveSegment(state.segments[segmentIndex]);
-      const aiVariantsOriginalTarget = state.segments[segmentIndex].target;
-      const aiVariantsOriginalSuggestionCount = (state.segments[segmentIndex].aiSuggestions || []).length;
-      aiVariantsProvider.completePrompt = async (_config, request) => {
-        assert(
-          request.prompt.includes("Return exactly three alternatives") &&
-            request.prompt.includes("Concise: <target-language text>") &&
-            request.prompt.includes("Short UI: <target-language text>") &&
-            request.prompt.includes("Current target Turkish draft:") &&
-            request.system.includes("translation alternatives assistant"),
-          "AI alternatives command sends selected variant style prompt instead of translation prompt"
-        );
-        if (request.prompt.includes("Workflow batch variants failure draft")) throw new Error("Mock batch alternatives failure");
-        if (request.prompt.includes("Workflow batch variants alpha draft")) {
-          return {
-            text: [
-              "Concise: Workflow batch variants alpha concise",
-              "Short UI: Workflow batch variants alpha short UI",
-              "Concise-terminology-strict: Workflow batch variants alpha strict"
-            ].join("\n"),
-            provider: "Mock Variants AI",
-            providerId: "ollama",
-            model: "workflow-variants-model"
-          };
-        }
-        if (request.prompt.includes("Workflow batch variants beta draft")) {
-          return {
-            text: [
-              "Concise: Workflow batch variants beta concise",
-              "Short UI: Workflow batch variants beta short UI",
-              "Concise-terminology-strict: Workflow batch variants beta strict"
-            ].join("\n"),
-            provider: "Mock Variants AI",
-            providerId: "ollama",
-            model: "workflow-variants-model"
-          };
-        }
-        return {
-          text: [
-            "Concise: Workflow concise alternative",
-            "Short UI: Workflow short UI alternative",
-            "Concise-terminology-strict: Workflow concise terminology alternative"
-          ].join("\n"),
-          provider: "Mock Variants AI",
-          providerId: "ollama",
-          model: "workflow-variants-model"
-        };
-      };
-      const aiVariantsSaved = await suggestActiveSegmentVariantsWithLocalAi();
-      const aiVariantsStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-      assert(
-          aiVariantsSaved &&
-          aiVariantsStored?.target === aiVariantsOriginalTarget &&
-          (aiVariantsStored?.aiSuggestions || []).length === aiVariantsOriginalSuggestionCount + 3 &&
-          aiVariantsStored?.aiSuggestions?.some((suggestion) => suggestion.provider === "Mock Variants AI" && suggestion.suggestedTarget === "Workflow short UI alternative") &&
-          els.localAiPromptOutput.textContent.includes("Workflow concise terminology alternative"),
-        "AI alternatives active segment saves selected-style review suggestions without overwriting target"
-      );
-      await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch variants alpha source.</p><p>Workflow batch variants beta source.</p><p>Workflow batch variants failure source.</p><p>Workflow batch variants locked source.</p></body></html>"], "workflow-ai-batch-variants.html", { type: "text/html" }));
-      const aiBatchVariantsDocument = state.project.documents.find((item) => item.name === "workflow-ai-batch-variants.html");
-      await openProjectFile(aiBatchVariantsDocument.id);
-      state.segmentQuery = "";
-      state.segmentSearchScope = "both";
-      state.segmentRegex = false;
-      state.segmentCaseSensitive = false;
-      state.segmentStatusFilter = "all";
-      state.reviewStateFilter = "";
-      if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
-      if (els.localAiVariantModeSelect) els.localAiVariantModeSelect.value = "concise";
-      const aiBatchVariantsIndexes = state.segments
-        .map((segment, index) => ({ segment, index }))
-        .filter(({ segment }) => segment.documentId === aiBatchVariantsDocument.id);
-      for (const { segment } of aiBatchVariantsIndexes) {
-        const source = String(segment.source || "");
-        const target = source.includes("alpha")
-          ? "Workflow batch variants alpha draft"
-          : source.includes("beta")
-            ? "Workflow batch variants beta draft"
-            : source.includes("failure")
-              ? "Workflow batch variants failure draft"
-              : "Workflow batch variants locked draft";
-        setSegmentTargetAndStatus(segment, target, "draft", "batch-variants-test");
-        segment.locked = source.includes("locked");
-        touchSegment(segment);
-        clearPendingSave(segment);
-      }
-      const savedAiBatchVariantsSegments = await saveSegments(aiBatchVariantsIndexes.map(({ segment }) => segment));
-      savedAiBatchVariantsSegments.forEach((savedSegment) => {
-        const index = state.segments.findIndex((segment) => segment.id === savedSegment.id);
-        if (index === -1) return;
-        Object.assign(state.segments[index], savedSegment);
-        prepareSegmentHistoryState(state.segments[index]);
-      });
-      if (els.localAiVariantModeSelect) els.localAiVariantModeSelect.value = "concise";
-      const aiBatchVariantsSummary = await suggestBatchSegmentVariantsWithLocalAi();
-      const aiBatchVariantsStored = await getProjectSegments(project.id);
-      const aiBatchVariantsSegments = aiBatchVariantsStored.filter((segment) => segment.documentId === aiBatchVariantsDocument.id);
-      const failedBatchVariantsSegment = aiBatchVariantsSegments.find((segment) => String(segment.source || "").includes("failure"));
-      const lockedBatchVariantsSegment = aiBatchVariantsSegments.find((segment) => String(segment.source || "").includes("locked"));
-      assert(aiBatchVariantsSummary?.suggested === 6, "AI batch alternatives creates six review suggestions");
-      assert(aiBatchVariantsSummary?.failed === 1, "AI batch alternatives records one segment failure");
-      assert(aiBatchVariantsSummary?.skipped === 1, "AI batch alternatives skips the locked segment");
-      assert(aiBatchVariantsSegments.every((segment) => String(segment.target || "").includes("draft")), "AI batch alternatives does not overwrite draft targets");
-      assert(
-        aiBatchVariantsSegments.some((segment) => segment.aiSuggestions?.some((suggestion) => suggestion.suggestedTarget === "Workflow batch variants alpha short UI")) &&
-          aiBatchVariantsSegments.some((segment) => segment.aiSuggestions?.some((suggestion) => suggestion.suggestedTarget === "Workflow batch variants beta strict")),
-        "AI batch alternatives persists successful suggestions"
-      );
-      assert(!(failedBatchVariantsSegment?.aiSuggestions || []).some((suggestion) => suggestion.provider === "Mock Variants AI"), "AI batch alternatives does not save suggestions for failed segments");
-      assert(!(lockedBatchVariantsSegment?.aiSuggestions || []).some((suggestion) => suggestion.provider === "Mock Variants AI"), "AI batch alternatives does not save suggestions for locked segments");
-      assert(els.localAiPromptOutput.textContent.includes("6 alternative suggestions saved"), "AI batch alternatives reports saved suggestion count");
-      assert(els.localAiPromptOutput.textContent.includes("Mock batch alternatives failure"), "AI batch alternatives reports segment-level failures");
-      assert(
-        aiBatchVariantsSummary?.suggested === 6 &&
-          aiBatchVariantsSummary?.failed === 1 &&
-          aiBatchVariantsSummary?.skipped === 1 &&
-          aiBatchVariantsSegments.every((segment) => String(segment.target || "").includes("draft")) &&
-          aiBatchVariantsSegments.some((segment) => segment.aiSuggestions?.some((suggestion) => suggestion.suggestedTarget === "Workflow batch variants alpha short UI")) &&
-          aiBatchVariantsSegments.some((segment) => segment.aiSuggestions?.some((suggestion) => suggestion.suggestedTarget === "Workflow batch variants beta strict")) &&
-          !(failedBatchVariantsSegment?.aiSuggestions || []).some((suggestion) => suggestion.provider === "Mock Variants AI") &&
-          !(lockedBatchVariantsSegment?.aiSuggestions || []).some((suggestion) => suggestion.provider === "Mock Variants AI") &&
-          els.localAiPromptOutput.textContent.includes("Mock batch alternatives failure"),
-        "AI batch alternatives saves review suggestions without overwriting drafts"
-      );
-    } finally {
-      aiVariantsProvider.completePrompt = originalAiVariantsCompletePrompt;
-      if (els.localAiVariantModeSelect) els.localAiVariantModeSelect.value = originalAiVariantsMode;
-      if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiVariantsFilters.localAiMode;
-      state.documentFilter = originalAiVariantsFilters.documentFilter;
-      state.segmentQuery = originalAiVariantsFilters.segmentQuery;
-      state.segmentSearchScope = originalAiVariantsFilters.segmentSearchScope;
-      state.segmentRegex = originalAiVariantsFilters.segmentRegex;
-      state.segmentCaseSensitive = originalAiVariantsFilters.segmentCaseSensitive;
-      state.segmentStatusFilter = originalAiVariantsFilters.segmentStatusFilter;
-      state.reviewStateFilter = originalAiVariantsFilters.reviewStateFilter;
-      state.project = await updateProject({
-        ...state.project,
-        aiSettings: defaultAiSettings(aiVariantsProjectSettingsSnapshot)
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      const aiVariantsRestoreRevision = Number(state.segments[segmentIndex]?.revision || 0);
-      Reflect.ownKeys(state.segments[segmentIndex]).forEach((key) => delete state.segments[segmentIndex][key]);
-      Object.assign(state.segments[segmentIndex], aiVariantsSegmentSnapshot);
-      state.segments[segmentIndex].revision = Math.max(Number(aiVariantsSegmentSnapshot.revision || 0), aiVariantsRestoreRevision) + 1;
-      prepareSegmentHistoryState(state.segments[segmentIndex]);
-      clearPendingSave(state.segments[segmentIndex]);
-      const restoredAiVariantsSegment = await saveSegment(state.segments[segmentIndex]);
-      Object.assign(state.segments[segmentIndex], restoredAiVariantsSegment);
-      prepareSegmentHistoryState(state.segments[segmentIndex]);
-      renderDocumentFilter();
-      renderSegments();
-      const restoreAiVariantsIndex = state.segments.findIndex((segment) => segment.id === originalAiVariantsFilters.activeSegmentId);
-      if (restoreAiVariantsIndex >= 0) await setActiveSegment(restoreAiVariantsIndex);
-      updateRow(segmentIndex);
-    }
-
-    const aiApplyTermsProvider = aiProviderService.get("ollama");
-    const originalAiApplyTermsCompletePrompt = aiApplyTermsProvider.completePrompt;
-    const aiApplyTermsSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
-    let aiApplyTermsTerm = null;
-    try {
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
-      if (els.localAiModelInput) els.localAiModelInput.value = "workflow-apply-terms-model";
-      const applyTermsSourceTerm = `workflow apply terminology ${Date.now()}`;
-      const applyTermsTargetTerm = "workflow applied terminology";
-      state.segments[segmentIndex].source = `Use {name} with ${applyTermsSourceTerm}.`;
-      state.segments[segmentIndex].tags = [{ text: "{name}" }];
-      setSegmentTargetAndStatus(state.segments[segmentIndex], "Use {name} with draft wording.", "draft", "edit");
-      touchSegment(state.segments[segmentIndex]);
-      clearPendingSave(state.segments[segmentIndex]);
-      const savedAiApplyTermsFixtureSegment = await saveSegment(state.segments[segmentIndex]);
-      Object.assign(state.segments[segmentIndex], savedAiApplyTermsFixtureSegment);
-      prepareSegmentHistoryState(state.segments[segmentIndex]);
-      const aiApplyTermsOriginalTarget = state.segments[segmentIndex].target;
-      const aiApplyTermsOriginalSuggestionCount = (state.segments[segmentIndex].aiSuggestions || []).length;
-      aiApplyTermsTerm = await saveTerm({
-        sourceTerm: applyTermsSourceTerm,
-        targetTerm: applyTermsTargetTerm,
-        notes: "Workflow AI terminology application fixture.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        termBaseName: primaryTermBaseName()
-      });
-      aiApplyTermsProvider.completePrompt = async (_config, request) => {
-        assert(
-          request.prompt.includes("Apply approved terminology") &&
-            request.prompt.includes("Approved project terminology:") &&
-            request.prompt.includes(applyTermsTargetTerm) &&
-            request.prompt.includes("Current target Turkish draft:") &&
-            request.system.includes("terminology application assistant"),
-          "AI terminology application command sends termbase application prompt instead of translation prompt"
-        );
-        return {
-          text: `Use {name} with ${applyTermsTargetTerm}.`,
-          provider: "Mock Terminology AI",
-          providerId: "ollama",
-          model: "workflow-apply-terms-model"
-        };
-      };
-      const aiApplyTermsSaved = await applyActiveSegmentTerminologyWithLocalAi();
-      const aiApplyTermsStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-      assert(
-        aiApplyTermsSaved &&
-          aiApplyTermsStored?.target === aiApplyTermsOriginalTarget &&
-          (aiApplyTermsStored?.aiSuggestions || []).length === aiApplyTermsOriginalSuggestionCount + 1 &&
-          aiApplyTermsStored?.aiSuggestions?.some((suggestion) => suggestion.provider === "Mock Terminology AI" && suggestion.suggestedTarget.includes(applyTermsTargetTerm)) &&
-          els.localAiPromptOutput.textContent.includes(applyTermsTargetTerm),
-        "AI terminology application active segment saves review suggestion without overwriting target"
-      );
-    } finally {
-      aiApplyTermsProvider.completePrompt = originalAiApplyTermsCompletePrompt;
-      if (aiApplyTermsTerm?.id) await deleteTerm(aiApplyTermsTerm.id);
-      const aiApplyTermsRestoreRevision = Number(state.segments[segmentIndex]?.revision || 0);
-      Reflect.ownKeys(state.segments[segmentIndex]).forEach((key) => delete state.segments[segmentIndex][key]);
-      Object.assign(state.segments[segmentIndex], aiApplyTermsSegmentSnapshot);
-      state.segments[segmentIndex].revision = Math.max(Number(aiApplyTermsSegmentSnapshot.revision || 0), Number(aiApplyTermsRestoreRevision || 0)) + 1;
-      prepareSegmentHistoryState(state.segments[segmentIndex]);
-      clearPendingSave(state.segments[segmentIndex]);
-      const restoredAiApplyTermsSegment = await saveSegment(state.segments[segmentIndex]);
-      Object.assign(state.segments[segmentIndex], restoredAiApplyTermsSegment);
-      prepareSegmentHistoryState(state.segments[segmentIndex]);
-      updateRow(segmentIndex);
-    }
-
-    const originalAiBatchApplyTermsCompletePrompt = aiApplyTermsProvider.completePrompt;
-    const aiBatchApplyTermsIndexes = state.segments.map((_, index) => index).slice(0, 3);
-    const aiBatchApplyTermsSnapshots = new Map(aiBatchApplyTermsIndexes.map((index) => [state.segments[index].id, structuredClone(state.segments[index])]));
-    const originalBatchApplyTermsFilters = {
-      documentFilter: state.documentFilter,
-      segmentQuery: state.segmentQuery,
-      segmentSearchScope: state.segmentSearchScope,
-      segmentRegex: state.segmentRegex,
-      segmentCaseSensitive: state.segmentCaseSensitive,
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
-      localAiMode: els.localAiModeSelect?.value || ""
-    };
-    const aiBatchApplyTermsSavedTerms = [];
-    try {
-      assert(aiBatchApplyTermsIndexes.length === 3, "workflow fixture has enough segments for batch AI terminology application");
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
-      if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-apply-terms-model";
-      if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
-      state.documentFilter = "";
-      state.segmentQuery = "workflow batch apply terminology";
-      state.segmentSearchScope = "both";
-      state.segmentRegex = false;
-      state.segmentCaseSensitive = false;
-      state.segmentStatusFilter = "all";
-      state.reviewStateFilter = "";
-      const suggestedSegment = state.segments[aiBatchApplyTermsIndexes[0]];
-      const failedSegment = state.segments[aiBatchApplyTermsIndexes[1]];
-      const lockedSegment = state.segments[aiBatchApplyTermsIndexes[2]];
-      const batchApplySourceTerm = `workflow batch apply terminology ${Date.now()}`;
-      const batchApplyFailedTerm = `${batchApplySourceTerm} failure`;
-      const batchApplyLockedTerm = `${batchApplySourceTerm} locked`;
-      const batchApplyTargetTerm = "batch applied terminology";
-      suggestedSegment.source = `Use ${batchApplySourceTerm} in the workflow batch apply terminology segment.`;
-      failedSegment.source = `Use ${batchApplyFailedTerm} in the workflow batch apply terminology failure case.`;
-      lockedSegment.source = `Use ${batchApplyLockedTerm} in the workflow batch apply terminology locked case.`;
-      suggestedSegment.tags = [];
-      failedSegment.tags = [];
-      lockedSegment.tags = [];
-      suggestedSegment.locked = false;
-      failedSegment.locked = false;
-      lockedSegment.locked = true;
-      setSegmentTargetAndStatus(suggestedSegment, "Use old term in the workflow batch apply terminology segment.", "draft", "batch-apply-terms-test");
-      setSegmentTargetAndStatus(failedSegment, "Use old term in the workflow batch apply terminology failure case.", "draft", "batch-apply-terms-test");
-      setSegmentTargetAndStatus(lockedSegment, "Use old term in the workflow batch apply terminology locked case.", "draft", "batch-apply-terms-test");
-      const suggestedOriginalTarget = suggestedSegment.target;
-      const failedOriginalTarget = failedSegment.target;
-      const lockedOriginalTarget = lockedSegment.target;
-      const suggestedSuggestionBaseline = (suggestedSegment.aiSuggestions || []).length;
-      const failedSuggestionBaseline = (failedSegment.aiSuggestions || []).length;
-      const lockedSuggestionBaseline = (lockedSegment.aiSuggestions || []).length;
-      [suggestedSegment, failedSegment, lockedSegment].forEach((segment) => {
-        touchSegment(segment);
-        clearPendingSave(segment);
-      });
-      const savedAiBatchApplyTermsSegments = await saveSegments([suggestedSegment, failedSegment, lockedSegment]);
-      savedAiBatchApplyTermsSegments.forEach((savedSegment) => {
-        const index = state.segments.findIndex((segment) => segment.id === savedSegment.id);
-        if (index === -1) return;
-        Object.assign(state.segments[index], savedSegment);
-        prepareSegmentHistoryState(state.segments[index]);
-      });
-      aiBatchApplyTermsSavedTerms.push(await saveTerm({
-        sourceTerm: batchApplySourceTerm,
-        targetTerm: batchApplyTargetTerm,
-        notes: "Workflow batch AI terminology application fixture.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        termBaseName: primaryTermBaseName()
-      }));
-      aiBatchApplyTermsSavedTerms.push(await saveTerm({
-        sourceTerm: batchApplyFailedTerm,
-        targetTerm: "batch failed terminology",
-        notes: "Workflow batch AI terminology application failure fixture.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        termBaseName: primaryTermBaseName()
-      }));
-      aiApplyTermsProvider.completePrompt = async (_config, request) => {
-        assert(
-          request.prompt.includes("Apply approved terminology") &&
-            request.prompt.includes("Approved project terminology:") &&
-            request.prompt.includes("Current target Turkish draft:") &&
-            request.system.includes("terminology application assistant"),
-          "AI batch terminology application sends termbase application prompts instead of translation prompts"
-        );
-        if (request.prompt.includes("failure case")) throw new Error("Mock batch terminology application failure");
-        return {
-          text: `Use ${batchApplyTargetTerm} in the workflow batch apply terminology segment.`,
-          provider: "Mock Batch Terminology AI",
-          providerId: "ollama",
-          model: "workflow-batch-apply-terms-model"
-        };
-      };
-      const aiBatchApplyTermsSummary = await applyBatchTerminologyWithLocalAi();
-      const aiBatchApplyTermsStored = await getProjectSegments(project.id);
-      const storedSuggestedSegment = aiBatchApplyTermsStored.find((segment) => segment.id === suggestedSegment.id);
-      const storedFailedSegment = aiBatchApplyTermsStored.find((segment) => segment.id === failedSegment.id);
-      const storedLockedSegment = aiBatchApplyTermsStored.find((segment) => segment.id === lockedSegment.id);
-      assert(
-        aiBatchApplyTermsSummary?.suggested === 1 &&
-          aiBatchApplyTermsSummary?.failed === 1 &&
-          aiBatchApplyTermsSummary?.skipped === 1 &&
-          storedSuggestedSegment?.target === suggestedOriginalTarget &&
-          storedFailedSegment?.target === failedOriginalTarget &&
-          storedLockedSegment?.target === lockedOriginalTarget &&
-          (storedSuggestedSegment?.aiSuggestions || []).length === suggestedSuggestionBaseline + 1 &&
-          storedSuggestedSegment?.aiSuggestions?.some((suggestion) => suggestion.provider === "Mock Batch Terminology AI" && suggestion.suggestedTarget.includes(batchApplyTargetTerm)) &&
-          (storedFailedSegment?.aiSuggestions || []).length === failedSuggestionBaseline &&
-          (storedLockedSegment?.aiSuggestions || []).length === lockedSuggestionBaseline &&
-          els.localAiPromptOutput.textContent.includes("Mock batch terminology application failure"),
-        "AI batch terminology application saves review suggestions, skips locked segments, and records failures"
-      );
-    } finally {
-      aiApplyTermsProvider.completePrompt = originalAiBatchApplyTermsCompletePrompt;
-      await Promise.all(aiBatchApplyTermsSavedTerms.filter((term) => term?.id).map((term) => deleteTerm(term.id)));
-      state.documentFilter = originalBatchApplyTermsFilters.documentFilter;
-      state.segmentQuery = originalBatchApplyTermsFilters.segmentQuery;
-      state.segmentSearchScope = originalBatchApplyTermsFilters.segmentSearchScope;
-      state.segmentRegex = originalBatchApplyTermsFilters.segmentRegex;
-      state.segmentCaseSensitive = originalBatchApplyTermsFilters.segmentCaseSensitive;
-      state.segmentStatusFilter = originalBatchApplyTermsFilters.segmentStatusFilter;
-      state.reviewStateFilter = originalBatchApplyTermsFilters.reviewStateFilter;
-      if (els.localAiModeSelect) els.localAiModeSelect.value = originalBatchApplyTermsFilters.localAiMode;
-      const restoredBatchApplyTermsSegments = Array.from(aiBatchApplyTermsSnapshots.values()).map((snapshot) => {
-        const current = state.segments.find((segment) => segment.id === snapshot.id);
-        return {
-          ...snapshot,
-          revision: Math.max(Number(snapshot.revision || 0), Number(current?.revision || 0)) + 1,
-          updatedAt: new Date().toISOString()
-        };
-      });
-      if (restoredBatchApplyTermsSegments.length) await saveSegments(restoredBatchApplyTermsSegments);
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
-      state.activeIndex = Math.max(0, state.segments.findIndex((segment) => segment.id === state.segments[segmentIndex]?.id));
-      renderAll();
-    }
-
-    const aiPolishProvider = aiProviderService.get("ollama");
-    const originalAiPolishCompletePrompt = aiPolishProvider.completePrompt;
-    const aiPolishSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
-    const aiPolishProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
-    const originalAiPolishFilters = {
-      documentFilter: state.documentFilter,
-      segmentQuery: state.segmentQuery,
-      segmentSearchScope: state.segmentSearchScope,
-      segmentRegex: state.segmentRegex,
-      segmentCaseSensitive: state.segmentCaseSensitive,
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
-      localAiMode: els.localAiModeSelect?.value || "",
-      activeIndex: state.activeIndex
-    };
-    let aiPolishTerm = null;
-    let aiPolishTmEntry = null;
-    try {
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
-      if (els.localAiModelInput) els.localAiModelInput.value = "workflow-polish-model";
-      state.project = await updateProject({
-        ...state.project,
-        aiSettings: defaultAiSettings({
-          ...state.project.aiSettings,
-          styleGuide: "Workflow polish style: use concise UI wording."
-        })
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      const polishSourceTerm = `workflow polish term ${Date.now()}`;
-      const polishTargetTerm = "workflow polish target term";
-      state.segments[segmentIndex].source = `Open {name} with ${polishSourceTerm}.`;
-      state.segments[segmentIndex].tags = [{ text: "{name}" }];
-      setSegmentTargetAndStatus(state.segments[segmentIndex], "Open {name} with verbose workflow wording.", "draft", "edit");
-      touchSegment(state.segments[segmentIndex]);
-      clearPendingSave(state.segments[segmentIndex]);
-      const savedAiPolishFixtureSegment = await saveSegment(state.segments[segmentIndex]);
-      Object.assign(state.segments[segmentIndex], savedAiPolishFixtureSegment);
-      prepareSegmentHistoryState(state.segments[segmentIndex]);
-      const aiPolishOriginalTarget = state.segments[segmentIndex].target;
-      const aiPolishOriginalSuggestionCount = (state.segments[segmentIndex].aiSuggestions || []).length;
-      aiPolishTerm = await saveTerm({
-        sourceTerm: polishSourceTerm,
-        targetTerm: polishTargetTerm,
-        notes: "Workflow AI polish fixture.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        termBaseName: primaryTermBaseName()
-      });
-      aiPolishTmEntry = await saveTmEntry({
-        source: state.segments[segmentIndex].source,
-        target: "Open {name} using concise TM wording.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        projectName: state.project.name,
-        tmName: mainTmName()
-      });
-      aiPolishProvider.completePrompt = async (_config, request) => {
-        assert(
-          request.prompt.includes("Return only one improved target segment") &&
-            request.prompt.includes("Workflow polish style") &&
-            request.prompt.includes("Project style instructions:") &&
-            request.system.includes("style and terminology polishing assistant"),
-          "AI polish command sends style, TM, and termbase context"
-        );
-        if (request.prompt.includes(polishSourceTerm)) {
-          assert(
-            request.prompt.includes("Translation memory hints:") &&
-              request.prompt.includes("Project glossary hints:") &&
-              request.prompt.includes(polishTargetTerm),
-            "AI polish active command sends matched TM and termbase hints"
-          );
-        }
-        if (request.prompt.includes("Workflow batch polish alpha draft")) {
-          return {
-            text: "Workflow batch polish alpha improved",
-            provider: "Mock Polish AI",
-            providerId: "ollama",
-            model: "workflow-polish-model"
-          };
-        }
-        if (request.prompt.includes("Workflow batch polish beta draft")) {
-          return {
-            text: "Workflow batch polish beta improved",
-            provider: "Mock Polish AI",
-            providerId: "ollama",
-            model: "workflow-polish-model"
-          };
-        }
-        return {
-          text: "Open {name} using concise workflow wording.",
-          provider: "Mock Polish AI",
-          providerId: "ollama",
-          model: "workflow-polish-model"
-        };
-      };
-      const aiPolishSaved = await polishActiveSegmentDraftWithLocalAi();
-      const aiPolishStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-      assert(
-        aiPolishSaved &&
-          aiPolishStored?.target === aiPolishOriginalTarget &&
-          (aiPolishStored?.aiSuggestions || []).length === aiPolishOriginalSuggestionCount + 1 &&
-          aiPolishStored?.aiSuggestions?.some((suggestion) => suggestion.provider === "Mock Polish AI" && suggestion.suggestedTarget === "Open {name} using concise workflow wording.") &&
-          els.localAiPromptOutput.textContent.includes("concise workflow wording"),
-        "AI polish active segment saves review suggestion without overwriting target"
-      );
-      await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch polish alpha source.</p><p>Workflow batch polish beta source.</p></body></html>"], "workflow-ai-batch-polish.html", { type: "text/html" }));
-      const aiBatchPolishDocument = state.project.documents.find((item) => item.name === "workflow-ai-batch-polish.html");
-      await openProjectFile(aiBatchPolishDocument.id);
-      state.segmentQuery = "";
-      state.segmentSearchScope = "both";
-      state.segmentRegex = false;
-      state.segmentCaseSensitive = false;
-      state.segmentStatusFilter = "all";
-      state.reviewStateFilter = "";
-      if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
-      if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = "shorten";
-      const aiBatchPolishIndexes = state.segments
-        .map((segment, index) => ({ segment, index }))
-        .filter(({ segment }) => segment.documentId === aiBatchPolishDocument.id);
-      for (const { segment } of aiBatchPolishIndexes) {
-        setSegmentTargetAndStatus(segment, segment.source.includes("alpha") ? "Workflow batch polish alpha draft" : "Workflow batch polish beta draft", "draft", "batch-polish-test");
-        segment.locked = false;
-        touchSegment(segment);
-        clearPendingSave(segment);
-      }
-      const savedAiBatchPolishSegments = await saveSegments(aiBatchPolishIndexes.map(({ segment }) => segment));
-      savedAiBatchPolishSegments.forEach((savedSegment) => {
-        const index = state.segments.findIndex((segment) => segment.id === savedSegment.id);
-        if (index === -1) return;
-        Object.assign(state.segments[index], savedSegment);
-        prepareSegmentHistoryState(state.segments[index]);
-      });
-      const aiBatchPolishSummary = await polishBatchDraftsWithLocalAi();
-      const aiBatchPolishStored = await getProjectSegments(project.id);
-      const aiBatchPolishSegments = aiBatchPolishStored.filter((segment) => segment.documentId === aiBatchPolishDocument.id);
-      assert(
-        aiBatchPolishSummary?.suggested === 2 &&
-          aiBatchPolishSegments.every((segment) => String(segment.target || "").includes("draft")) &&
-          aiBatchPolishSegments.some((segment) => segment.aiSuggestions?.some((suggestion) => suggestion.suggestedTarget === "Workflow batch polish alpha improved")) &&
-          aiBatchPolishSegments.some((segment) => segment.aiSuggestions?.some((suggestion) => suggestion.suggestedTarget === "Workflow batch polish beta improved")) &&
-          els.localAiPromptOutput.textContent.includes("2 polish suggestions saved"),
-        "AI batch polish saves review suggestions without overwriting drafts"
-      );
-    } finally {
-      aiPolishProvider.completePrompt = originalAiPolishCompletePrompt;
-      if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiPolishFilters.localAiMode;
-      state.documentFilter = originalAiPolishFilters.documentFilter;
-      state.segmentQuery = originalAiPolishFilters.segmentQuery;
-      state.segmentSearchScope = originalAiPolishFilters.segmentSearchScope;
-      state.segmentRegex = originalAiPolishFilters.segmentRegex;
-      state.segmentCaseSensitive = originalAiPolishFilters.segmentCaseSensitive;
-      state.segmentStatusFilter = originalAiPolishFilters.segmentStatusFilter;
-      state.reviewStateFilter = originalAiPolishFilters.reviewStateFilter;
-      if (aiPolishTerm?.id) await deleteTerm(aiPolishTerm.id);
-      if (aiPolishTmEntry?.id) await deleteTmEntry(aiPolishTmEntry.id);
-      state.project = await updateProject({
-        ...state.project,
-        aiSettings: defaultAiSettings(aiPolishProjectSettingsSnapshot)
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      const aiPolishRestoreRevision = Number(state.segments[segmentIndex]?.revision || 0);
-      Reflect.ownKeys(state.segments[segmentIndex]).forEach((key) => delete state.segments[segmentIndex][key]);
-      Object.assign(state.segments[segmentIndex], aiPolishSegmentSnapshot);
-      state.segments[segmentIndex].revision = Math.max(Number(aiPolishSegmentSnapshot.revision || 0), aiPolishRestoreRevision) + 1;
-      prepareSegmentHistoryState(state.segments[segmentIndex]);
-      clearPendingSave(state.segments[segmentIndex]);
-      const restoredAiPolishSegment = await saveSegment(state.segments[segmentIndex]);
-      Object.assign(state.segments[segmentIndex], restoredAiPolishSegment);
-      prepareSegmentHistoryState(state.segments[segmentIndex]);
-      renderDocumentFilter();
-      renderSegments();
-      if (Number.isInteger(originalAiPolishFilters.activeIndex) && originalAiPolishFilters.activeIndex >= 0) await setActiveSegment(originalAiPolishFilters.activeIndex);
-      updateRow(segmentIndex);
-    }
-
-    const aiAdaptProvider = aiProviderService.get("ollama");
-    const originalAiAdaptCompletePrompt = aiAdaptProvider.completePrompt;
-    const aiAdaptSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
-    const aiAdaptProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
-    const originalAiAdaptMode = els.localAiAdaptModeSelect?.value || "";
-    let aiAdaptTerm = null;
-    let aiAdaptTmEntry = null;
-    try {
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
-      if (els.localAiModelInput) els.localAiModelInput.value = "workflow-adapt-model";
-      if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = "shorten";
-      state.project = await updateProject({
-        ...state.project,
-        aiSettings: defaultAiSettings({
-          ...state.project.aiSettings,
-          styleGuide: "Workflow adaptation style: keep target UI copy short."
-        })
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      const adaptSourceTerm = `workflow adapt term ${Date.now()}`;
-      const adaptTargetTerm = "workflow adapted term";
-      state.segments[segmentIndex].source = `Open {name} with ${adaptSourceTerm} before deployment.`;
-      state.segments[segmentIndex].tags = [{ text: "{name}" }];
-      setSegmentTargetAndStatus(state.segments[segmentIndex], "Open {name} with a long workflow adaptation draft before deployment.", "draft", "edit");
-      touchSegment(state.segments[segmentIndex]);
-      clearPendingSave(state.segments[segmentIndex]);
-      const savedAiAdaptFixtureSegment = await saveSegment(state.segments[segmentIndex]);
-      Object.assign(state.segments[segmentIndex], savedAiAdaptFixtureSegment);
-      prepareSegmentHistoryState(state.segments[segmentIndex]);
-      const aiAdaptOriginalTarget = state.segments[segmentIndex].target;
-      const aiAdaptOriginalSuggestionCount = (state.segments[segmentIndex].aiSuggestions || []).length;
-      aiAdaptTerm = await saveTerm({
-        sourceTerm: adaptSourceTerm,
-        targetTerm: adaptTargetTerm,
-        notes: "Workflow AI adaptation fixture.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        termBaseName: primaryTermBaseName()
-      });
-      aiAdaptTmEntry = await saveTmEntry({
-        source: state.segments[segmentIndex].source,
-        target: "Open {name} with concise adaptation TM wording.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        projectName: state.project.name,
-        tmName: mainTmName()
-      });
-      aiAdaptProvider.completePrompt = async (_config, request) => {
-        assert(
-          request.prompt.includes("Adaptation task: Shorten") &&
-            request.prompt.includes("Workflow adaptation style") &&
-            request.prompt.includes("Project style instructions:") &&
-            request.prompt.includes("Translation memory hints:") &&
-            request.prompt.includes("Project glossary hints:") &&
-            request.prompt.includes(adaptTargetTerm) &&
-            request.system.includes("target adaptation assistant"),
-          "AI draft adaptation command sends adaptation prompt with style, TM, and termbase context"
-        );
-        return {
-          text: `Open {name} with ${adaptTargetTerm}.`,
-          provider: "Mock Adapt AI",
-          providerId: "ollama",
-          model: "workflow-adapt-model"
-        };
-      };
-      const aiAdaptSaved = await adaptActiveSegmentDraftWithLocalAi();
-      const aiAdaptStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-      const aiAdaptStoredProject = (await listProjects()).find((item) => item.id === project.id);
-      assert(
-        aiAdaptSaved &&
-          aiAdaptStored?.target === aiAdaptOriginalTarget &&
-          (aiAdaptStored?.aiSuggestions || []).length === aiAdaptOriginalSuggestionCount + 1 &&
-          aiAdaptStored?.aiSuggestions?.some((suggestion) => suggestion.provider === "Mock Adapt AI" && suggestion.suggestedTarget.includes(adaptTargetTerm)) &&
-          aiAdaptStoredProject?.aiSettings?.localAdaptMode === "shorten" &&
-          els.localAiPromptOutput.textContent.includes(adaptTargetTerm),
-        "AI draft adaptation active segment saves review suggestion without overwriting target"
-      );
-    } finally {
-      aiAdaptProvider.completePrompt = originalAiAdaptCompletePrompt;
-      if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = originalAiAdaptMode;
-      if (aiAdaptTerm?.id) await deleteTerm(aiAdaptTerm.id);
-      if (aiAdaptTmEntry?.id) await deleteTmEntry(aiAdaptTmEntry.id);
-      state.project = await updateProject({
-        ...state.project,
-        aiSettings: defaultAiSettings(aiAdaptProjectSettingsSnapshot)
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      const aiAdaptRestoreRevision = Number(state.segments[segmentIndex]?.revision || 0);
-      Reflect.ownKeys(state.segments[segmentIndex]).forEach((key) => delete state.segments[segmentIndex][key]);
-      Object.assign(state.segments[segmentIndex], aiAdaptSegmentSnapshot);
-      state.segments[segmentIndex].revision = Math.max(Number(aiAdaptSegmentSnapshot.revision || 0), aiAdaptRestoreRevision) + 1;
-      prepareSegmentHistoryState(state.segments[segmentIndex]);
-      clearPendingSave(state.segments[segmentIndex]);
-      const restoredAiAdaptSegment = await saveSegment(state.segments[segmentIndex]);
-      Object.assign(state.segments[segmentIndex], restoredAiAdaptSegment);
-      prepareSegmentHistoryState(state.segments[segmentIndex]);
-      updateRow(segmentIndex);
-    }
-
-    const aiBatchAdaptProvider = aiProviderService.get("ollama");
-    const originalAiBatchAdaptCompletePrompt = aiBatchAdaptProvider.completePrompt;
-    const aiBatchAdaptProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
-    const originalAiBatchAdaptFilters = {
-      documentFilter: state.documentFilter,
-      segmentQuery: state.segmentQuery,
-      segmentSearchScope: state.segmentSearchScope,
-      segmentRegex: state.segmentRegex,
-      segmentCaseSensitive: state.segmentCaseSensitive,
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
-      localAiMode: els.localAiModeSelect?.value || "",
-      localAiAdaptMode: els.localAiAdaptModeSelect?.value || "",
-      activeSegmentId: state.segments[segmentIndex]?.id || ""
-    };
-    try {
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
-      if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-adapt-model";
-      if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = "shorten";
-      state.project = await updateProject({
-        ...state.project,
-        aiSettings: defaultAiSettings({
-          ...state.project.aiSettings,
-          styleGuide: "Workflow batch adaptation style: keep UI drafts compact."
-        })
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch adapt alpha source.</p><p>Workflow batch adapt beta source.</p><p>Workflow batch adapt failure source.</p><p>Workflow batch adapt locked source.</p></body></html>"], "workflow-ai-batch-adapt.html", { type: "text/html" }));
-      const aiBatchAdaptDocument = state.project.documents.find((item) => item.name === "workflow-ai-batch-adapt.html");
-      await openProjectFile(aiBatchAdaptDocument.id);
-      state.segmentQuery = "";
-      state.segmentSearchScope = "both";
-      state.segmentRegex = false;
-      state.segmentCaseSensitive = false;
-      state.segmentStatusFilter = "all";
-      state.reviewStateFilter = "";
-      if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
-      const aiBatchAdaptIndexes = state.segments
-        .map((segment, index) => ({ segment, index }))
-        .filter(({ segment }) => segment.documentId === aiBatchAdaptDocument.id);
-      for (const { segment } of aiBatchAdaptIndexes) {
-        const source = String(segment.source || "");
-        const target = source.includes("alpha")
-          ? "Workflow batch adapt alpha verbose draft"
-          : source.includes("beta")
-            ? "Workflow batch adapt beta verbose draft"
-            : source.includes("failure")
-              ? "Workflow batch adapt failure verbose draft"
-              : "Workflow batch adapt locked verbose draft";
-        setSegmentTargetAndStatus(segment, target, "draft", "batch-adapt-test");
-        segment.locked = source.includes("locked");
-        touchSegment(segment);
-        clearPendingSave(segment);
-      }
-      const savedAiBatchAdaptSegments = await saveSegments(aiBatchAdaptIndexes.map(({ segment }) => segment));
-      savedAiBatchAdaptSegments.forEach((savedSegment) => {
-        const index = state.segments.findIndex((segment) => segment.id === savedSegment.id);
-        if (index === -1) return;
-        Object.assign(state.segments[index], savedSegment);
-        prepareSegmentHistoryState(state.segments[index]);
-      });
-      aiBatchAdaptProvider.completePrompt = async (_config, request) => {
-        assert(
-          request.prompt.includes("Adaptation task: Shorten") &&
-            request.prompt.includes("Current target") &&
-            request.system.includes("target adaptation assistant"),
-          "AI batch draft adaptation sends adaptation prompts with mode and draft context"
-        );
-        if (request.prompt.includes("Workflow batch adapt failure verbose draft")) throw new Error("Mock batch adaptation failure");
-        if (request.prompt.includes("Workflow batch adapt alpha verbose draft")) {
-          return {
-            text: "Workflow batch adapt alpha short",
-            provider: "Mock Batch Adapt AI",
-            providerId: "ollama",
-            model: "workflow-batch-adapt-model"
-          };
-        }
-        if (request.prompt.includes("Workflow batch adapt beta verbose draft")) {
-          return {
-            text: "Workflow batch adapt beta short",
-            provider: "Mock Batch Adapt AI",
-            providerId: "ollama",
-            model: "workflow-batch-adapt-model"
-          };
-        }
-        return {
-          text: "Workflow batch adapt unchanged",
-          provider: "Mock Batch Adapt AI",
-          providerId: "ollama",
-          model: "workflow-batch-adapt-model"
-        };
-      };
-      if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = "shorten";
-      const aiBatchAdaptSummary = await adaptBatchDraftsWithLocalAi();
-      const aiBatchAdaptStored = await getProjectSegments(project.id);
-      const aiBatchAdaptSegments = aiBatchAdaptStored.filter((segment) => segment.documentId === aiBatchAdaptDocument.id);
-      const failedBatchAdaptSegment = aiBatchAdaptSegments.find((segment) => String(segment.source || "").includes("failure"));
-      const lockedBatchAdaptSegment = aiBatchAdaptSegments.find((segment) => String(segment.source || "").includes("locked"));
-      assert(aiBatchAdaptSummary?.total === 3, "AI batch adaptation selects eligible draft segments");
-      assert(aiBatchAdaptSummary?.suggested === 2, "AI batch adaptation creates two review suggestions");
-      assert(aiBatchAdaptSummary?.failed === 1, "AI batch adaptation records one segment failure");
-      assert(aiBatchAdaptSummary?.skipped === 1, "AI batch adaptation skips the locked segment");
-      assert(aiBatchAdaptSegments.every((segment) => String(segment.target || "").includes("draft")), "AI batch adaptation does not overwrite draft targets");
-      assert(
-        aiBatchAdaptSegments.some((segment) => segment.aiSuggestions?.some((suggestion) => suggestion.suggestedTarget === "Workflow batch adapt alpha short")) &&
-          aiBatchAdaptSegments.some((segment) => segment.aiSuggestions?.some((suggestion) => suggestion.suggestedTarget === "Workflow batch adapt beta short")),
-        "AI batch adaptation persists successful suggestions"
-      );
-      assert(!(failedBatchAdaptSegment?.aiSuggestions || []).some((suggestion) => suggestion.provider === "Mock Batch Adapt AI"), "AI batch adaptation does not save suggestions for failed segments");
-      assert(!(lockedBatchAdaptSegment?.aiSuggestions || []).some((suggestion) => suggestion.provider === "Mock Batch Adapt AI"), "AI batch adaptation does not save suggestions for locked segments");
-      assert(els.localAiPromptOutput.textContent.includes("2 adaptation suggestions saved"), "AI batch adaptation reports saved suggestion count");
-      assert(els.localAiPromptOutput.textContent.includes("Mock batch adaptation failure"), "AI batch adaptation reports segment-level failures");
-      assert(
-        aiBatchAdaptSummary?.suggested === 2 &&
-          aiBatchAdaptSummary?.failed === 1 &&
-          aiBatchAdaptSummary?.skipped === 1 &&
-          aiBatchAdaptSegments.every((segment) => String(segment.target || "").includes("draft")) &&
-          aiBatchAdaptSegments.some((segment) => segment.aiSuggestions?.some((suggestion) => suggestion.suggestedTarget === "Workflow batch adapt alpha short")) &&
-          aiBatchAdaptSegments.some((segment) => segment.aiSuggestions?.some((suggestion) => suggestion.suggestedTarget === "Workflow batch adapt beta short")) &&
-          !(failedBatchAdaptSegment?.aiSuggestions || []).some((suggestion) => suggestion.provider === "Mock Batch Adapt AI") &&
-          !(lockedBatchAdaptSegment?.aiSuggestions || []).some((suggestion) => suggestion.provider === "Mock Batch Adapt AI") &&
-          els.localAiPromptOutput.textContent.includes("2 adaptation suggestions saved") &&
-          els.localAiPromptOutput.textContent.includes("Mock batch adaptation failure"),
-        "AI batch adaptation saves review suggestions without overwriting drafts"
-      );
-    } finally {
-      aiBatchAdaptProvider.completePrompt = originalAiBatchAdaptCompletePrompt;
-      if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiBatchAdaptFilters.localAiMode;
-      if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = originalAiBatchAdaptFilters.localAiAdaptMode;
-      state.documentFilter = originalAiBatchAdaptFilters.documentFilter;
-      state.segmentQuery = originalAiBatchAdaptFilters.segmentQuery;
-      state.segmentSearchScope = originalAiBatchAdaptFilters.segmentSearchScope;
-      state.segmentRegex = originalAiBatchAdaptFilters.segmentRegex;
-      state.segmentCaseSensitive = originalAiBatchAdaptFilters.segmentCaseSensitive;
-      state.segmentStatusFilter = originalAiBatchAdaptFilters.segmentStatusFilter;
-      state.reviewStateFilter = originalAiBatchAdaptFilters.reviewStateFilter;
-      state.project = await updateProject({
-        ...state.project,
-        aiSettings: defaultAiSettings(aiBatchAdaptProjectSettingsSnapshot)
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
-      renderDocumentFilter();
-      renderSegments();
-      const restoreBatchAdaptIndex = state.segments.findIndex((segment) => segment.id === originalAiBatchAdaptFilters.activeSegmentId);
-      if (restoreBatchAdaptIndex >= 0) await setActiveSegment(restoreBatchAdaptIndex);
-    }
-
-    const aiTermsProvider = aiProviderService.get("ollama");
-    const originalAiTermsCompletePrompt = aiTermsProvider.completePrompt;
-    const originalAiTermsMode = els.localAiModeSelect?.value || "";
-    const originalAiTermsDocumentFilter = state.documentFilter;
-    const originalAiTermsActiveIndex = state.activeIndex;
-    let aiExtractedTermIds = [];
-    let aiTermsPromptCount = 0;
-    try {
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
-      if (els.localAiModelInput) els.localAiModelInput.value = "workflow-terms-model";
-      renderTermbaseSelect();
-      if (els.termBaseSelect) els.termBaseSelect.value = "Workflow TB";
-      aiTermsProvider.completePrompt = async (_config, request) => {
-        aiTermsPromptCount += 1;
-        assert(
-          request.prompt.includes("Return only a JSON array") &&
-            request.prompt.includes("sourceTerm, targetTerm, note") &&
-            request.prompt.includes("Source English text:") &&
-            request.system.includes("terminology extraction assistant"),
-          "AI term extraction command sends terminology prompt instead of translation prompt"
-        );
-        if (aiTermsPromptCount > 1) {
-          return {
-            text: JSON.stringify([
-              { sourceTerm: `workflow ai batch source term ${aiTermsPromptCount}`, targetTerm: `workflow ai batch target term ${aiTermsPromptCount}`, note: "Workflow batch candidate" }
-            ]),
-            provider: "Mock Terms AI",
-            providerId: "ollama",
-            model: "workflow-terms-model"
-          };
-        }
-        return {
-          text: JSON.stringify([
-            { sourceTerm: "workflow ai source term", targetTerm: "workflow ai target term", note: "Workflow test candidate" },
-            { sourceTerm: "workflow ai second term", targetTerm: "workflow ai second target", note: "Workflow test second candidate" }
-          ]),
-          provider: "Mock Terms AI",
-          providerId: "ollama",
-          model: "workflow-terms-model"
-        };
-      };
-      const aiTermsSaved = await extractActiveSegmentTermsWithLocalAi();
-      const aiTermsStored = (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang, termBaseNames: ["Workflow TB"] }))
-        .filter((term) => term.sourceTerm.startsWith("workflow ai "));
-      aiExtractedTermIds = aiTermsStored.map((term) => term.id);
-      assert(
-        aiTermsSaved &&
-          aiTermsStored.length === 2 &&
-          aiTermsStored.some((term) => term.sourceTerm === "workflow ai source term" && term.targetTerm === "workflow ai target term") &&
-          aiTermsStored.every((term) => term.notes.includes("AI extracted term candidate")) &&
-          els.localAiPromptOutput.textContent.includes("workflow ai second term"),
-        "AI term extraction active segment saves candidates to the project termbase"
-      );
-      await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch source alpha.</p><p>Workflow batch source beta.</p></body></html>"], "workflow-ai-batch-terms.html", { type: "text/html" }));
-      const aiBatchTermsDocument = state.project.documents.find((item) => item.name === "workflow-ai-batch-terms.html");
-      await openProjectFile(aiBatchTermsDocument.id);
-      if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
-      const batchTermsResult = await extractBatchTermsWithLocalAi();
-      const aiBatchTermsStored = (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang, termBaseNames: ["Workflow TB"] }))
-        .filter((term) => term.sourceTerm.startsWith("workflow ai batch source term"));
-      aiExtractedTermIds.push(...aiBatchTermsStored.map((term) => term.id));
-      assert(
-        batchTermsResult?.savedTerms?.length >= 2 &&
-          aiBatchTermsStored.length >= 2 &&
-          els.localAiPromptOutput.textContent.includes("workflow ai batch source term") &&
-          els.saveStatus.textContent.includes("batch AI term extraction"),
-        "AI batch term extraction saves candidates from visible segments"
-      );
-    } finally {
-      aiTermsProvider.completePrompt = originalAiTermsCompletePrompt;
-      if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiTermsMode;
-      state.documentFilter = originalAiTermsDocumentFilter;
-      renderDocumentFilter();
-      renderSegments();
-      if (Number.isInteger(originalAiTermsActiveIndex) && originalAiTermsActiveIndex >= 0) await setActiveSegment(originalAiTermsActiveIndex);
-      if (aiExtractedTermIds.length) {
-        await deleteTerms(aiExtractedTermIds);
-        markProjectsUsingResourceDirty("termbase", "Workflow TB", state.project.sourceLang, state.project.targetLang);
-        await refreshProjectTerms({ rerender: true });
-        await refreshTerms();
-      }
-    }
-
-    const aiBriefProvider = aiProviderService.get("ollama");
-    const originalAiBriefCompletePrompt = aiBriefProvider.completePrompt;
-    const originalAiBriefSettings = structuredClone(state.project.aiSettings || {});
-    try {
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
-      if (els.localAiModelInput) els.localAiModelInput.value = "workflow-brief-model";
-      els.aiStyleGuideInput.value = "Existing workflow style instruction.";
-      state.project = await updateProject({
-        ...state.project,
-        aiSettings: defaultAiSettings({
-          ...state.project.aiSettings,
-          styleGuide: els.aiStyleGuideInput.value
-        })
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      aiBriefProvider.completePrompt = async (_config, request) => {
-        assert(
-          request.prompt.includes("Create a concise translation project brief") &&
-            request.prompt.includes("Domain, Audience, Tone, Terminology, Formatting, Risks") &&
-            request.prompt.includes("Representative segments:") &&
-            request.system.includes("project brief assistant"),
-          "AI project brief command sends project context prompt instead of translation prompt"
-        );
-        return {
-          text: "Domain\n- Workflow localization.\nTone\n- Clear and action-oriented.\nRisks\n- Preserve UI labels.",
-          provider: "Mock Brief AI",
-          providerId: "ollama",
-          model: "workflow-brief-model"
-        };
-      };
-      const aiBriefSaved = await generateProjectBriefWithLocalAi();
-      const storedBriefProject = (await listProjects()).find((item) => item.id === state.project.id);
-      assert(
-        aiBriefSaved &&
-          state.project.aiSettings?.styleGuide.includes("Existing workflow style instruction.") &&
-          state.project.aiSettings?.styleGuide.includes("AI project brief:") &&
-          state.project.aiSettings?.styleGuide.includes("Workflow localization") &&
-          storedBriefProject?.aiSettings?.styleGuide === state.project.aiSettings?.styleGuide &&
-          els.aiStyleGuideInput.value.includes("AI project brief:") &&
-          els.localAiPromptOutput.textContent.includes("Preserve UI labels"),
-        "AI project brief saves generated instructions without replacing existing style guide"
-      );
-    } finally {
-      aiBriefProvider.completePrompt = originalAiBriefCompletePrompt;
-      state.project = await updateProject({
-        ...state.project,
-        aiSettings: defaultAiSettings(originalAiBriefSettings)
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      if (els.aiStyleGuideInput) els.aiStyleGuideInput.value = state.project.aiSettings?.styleGuide || "";
-    }
-
-    const aiSuggestionBaseline = structuredClone(state.segments[segmentIndex]);
-    const failedAiSuggestion = {
-      id: makeId("ai-suggestion"),
-      provider: "Test provider",
-      model: "workflow-test",
-      suggestedTarget: "Unsaved AI suggestion target",
-      explanation: ["Must roll back when suggestion save fails."]
-    };
-    setHiddenSegmentField(state.segments[segmentIndex], AI_APPEND_SAVE_FAILURE_TEST_FLAG, true);
-    const failedAiSuggestionSave = await appendAiSuggestion(state.segments[segmentIndex], failedAiSuggestion, "ai-test-suggestion", "AI suggestion created");
-    const failedAiSuggestionStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-    assert(
-      !failedAiSuggestionSave &&
-        els.saveStatus.textContent.includes("Simulated AI suggestion save failure") &&
-        (state.segments[segmentIndex].aiSuggestions || []).length === (aiSuggestionBaseline.aiSuggestions || []).length &&
-        (failedAiSuggestionStored?.aiSuggestions || []).length === (aiSuggestionBaseline.aiSuggestions || []).length,
-      "AI suggestion save failure restores visible and persisted suggestion list"
-    );
-    const savedAiSuggestion = {
-      id: makeId("ai-suggestion"),
-      provider: "Test provider",
-      model: "workflow-test",
-      source: "Duplicated AI suggestion source text must not be stored locally.",
-      suggestedTarget: "Saved AI suggestion target",
-      explanation: ["Saved local suggestion for workflow test."],
-      responseId: "workflow-response-id-that-must-not-store",
-      customEndpoint: "https://provider.example/trace-that-must-not-store"
-    };
-    const successfulAiSuggestionSave = await appendAiSuggestion(state.segments[segmentIndex], savedAiSuggestion, "ai-test-suggestion", "AI suggestion created");
-    const savedAiSuggestionStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-    const savedAiSuggestionRecordJson = JSON.stringify(savedAiSuggestionStored?.aiSuggestions?.find((suggestion) => suggestion.id === savedAiSuggestion.id) || {});
-    const savedAiSuggestionActivityJson = JSON.stringify(state.activityEvents.find((event) => event.type === "ai-test-suggestion" && event.detail?.segmentId === state.segments[segmentIndex].id) || {});
-    assert(
-      successfulAiSuggestionSave &&
-        savedAiSuggestionStored?.aiSuggestions?.some((suggestion) => suggestion.id === savedAiSuggestion.id),
-      "AI suggestion save persists suggestion list"
-    );
-    assert(
-      !savedAiSuggestionRecordJson.includes("Duplicated AI suggestion source text") &&
-        !savedAiSuggestionRecordJson.includes("workflow-response-id-that-must-not-store") &&
-        !savedAiSuggestionRecordJson.includes("trace-that-must-not-store") &&
-        !savedAiSuggestionActivityJson.includes("workflow-response-id-that-must-not-store"),
-      "AI suggestion save strips provider trace metadata before local storage"
-    );
-    const draftedPackageActivity = draftProjectActivityEvent(project, "export", "Package export Bearer workflow-draft-activity-summary-token-that-must-not-store", {
-      filename: "Bearer workflow-draft-activity-file-token-that-must-not-store.loopcat.json",
-      prompt: "Draft activity prompt trace must not be stored.",
-      promptTemplate: "Draft activity prompt template must not be stored.",
-      responseId: "workflow-draft-activity-response-id-that-must-not-store",
-      providerRequestId: "workflow-draft-activity-request-id-that-must-not-store",
-      providerResponseId: "workflow-draft-activity-provider-response-id-that-must-not-store",
-      customEndpoint: "https://provider.example/draft-activity-trace-that-must-not-store",
-      nested: {
-        keep: "ordinary draft detail",
-        authorizationHeader: "Bearer workflow-draft-activity-auth-token-that-must-not-store"
-      },
-      keep: "ordinary draft detail"
-    });
-    const draftedPackageActivityJson = JSON.stringify(draftedPackageActivity);
-    assert(
-      draftedPackageActivity.type === "export" &&
-        draftedPackageActivity.summary.includes("[redacted secret]") &&
-        draftedPackageActivity.detail.filename.includes("[redacted secret]") &&
-        draftedPackageActivity.detail.keep === "ordinary draft detail" &&
-        draftedPackageActivity.detail.nested.keep === "ordinary draft detail" &&
-        !draftedPackageActivityJson.includes("Draft activity prompt trace") &&
-        !draftedPackageActivityJson.includes("workflow-draft-activity-response-id") &&
-        !draftedPackageActivityJson.includes("workflow-draft-activity-request-id") &&
-        !draftedPackageActivityJson.includes("workflow-draft-activity-provider-response-id") &&
-        !draftedPackageActivityJson.includes("draft-activity-trace-that-must-not-store") &&
-        !draftedPackageActivityJson.includes("workflow-draft-activity-file-token-that-must-not-store") &&
-        !draftedPackageActivityJson.includes("workflow-draft-activity-auth-token-that-must-not-store"),
-      "draft project activity events strip provider trace metadata before direct package or workspace storage"
-    );
-    const activityWarningAiSuggestion = {
-      id: makeId("ai-suggestion"),
-      provider: "Test provider",
-      model: "workflow-test",
-      suggestedTarget: "AI suggestion saved while activity log fails",
-      explanation: ["Activity log failure warning fixture."]
-    };
-    setHiddenSegmentField(state.segments[segmentIndex], AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const aiSuggestionActivityWarning = await appendAiSuggestion(state.segments[segmentIndex], activityWarningAiSuggestion, "ai-test-suggestion", "AI suggestion created");
-    const aiSuggestionActivityWarningStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-    assert(
-      aiSuggestionActivityWarning?.ok &&
-        aiSuggestionActivityWarning.activityLogged === false &&
-        aiSuggestionActivityWarningStored?.aiSuggestions?.some((suggestion) => suggestion.id === activityWarningAiSuggestion.id) &&
-        els.saveStatus.textContent.includes("activity log failed") &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "AI suggestion activity log failure reports warning after successful suggestion save"
-    );
-    Reflect.deleteProperty(state.segments[segmentIndex], AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG);
-    const aiApplyTargetBeforeFailure = state.segments[segmentIndex].target;
-    const aiApplyHistoryBeforeFailure = state.segments[segmentIndex].targetHistory?.length || 0;
-    setHiddenSegmentField(state.segments[segmentIndex], AI_APPLY_SAVE_FAILURE_TEST_FLAG, true);
-    const failedAiApply = await applyAiSuggestion(savedAiSuggestion.id);
-    const failedAiApplyStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-    assert(
-      !failedAiApply &&
-        els.saveStatus.textContent.includes("Simulated AI apply save failure") &&
-        state.segments[segmentIndex].target === aiApplyTargetBeforeFailure &&
-        (state.segments[segmentIndex].targetHistory?.length || 0) === aiApplyHistoryBeforeFailure &&
-        failedAiApplyStored?.target === aiApplyTargetBeforeFailure,
-      "AI suggestion apply failure restores visible and persisted target text"
-    );
-    setHiddenSegmentField(state.segments[segmentIndex], AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const aiApplyActivityWarning = await applyAiSuggestion(activityWarningAiSuggestion.id);
-    const aiApplyActivityWarningStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-    assert(
-      aiApplyActivityWarning &&
-        aiApplyActivityWarningStored?.target === activityWarningAiSuggestion.suggestedTarget &&
-        els.saveStatus.textContent.includes("activity log failed") &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "AI suggestion apply activity log failure reports warning after successful target save"
-    );
-    Reflect.deleteProperty(state.segments[segmentIndex], AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG);
-    const successfulAiApply = await applyAiSuggestion(savedAiSuggestion.id);
-    const savedAiApplyStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-    assert(
-      successfulAiApply &&
-        savedAiApplyStored?.target === savedAiSuggestion.suggestedTarget,
-      "AI suggestion apply persists target text"
-    );
-
-    state.qaChecks = [{ id: "existing-qa-fixture", type: "existing", severity: "info", segmentId: state.segments[segmentIndex].id, label: "fixture", message: "Existing QA fixture." }];
-    renderQaResults();
-    setHiddenSegmentField(state.project, QA_RUN_FAILURE_TEST_FLAG, true);
-    const failedQaRun = await runProjectQa();
-    assert(
-      failedQaRun === null &&
-        els.saveStatus.textContent.includes("Simulated QA run failure") &&
-        state.qaChecks.some((check) => check.id === "existing-qa-fixture"),
-      "QA run failure reports visible status and preserves previous QA results"
-    );
-    Reflect.deleteProperty(state.project, QA_RUN_FAILURE_TEST_FLAG);
-    setHiddenSegmentField(state.project, QA_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const qaWithActivityFailure = await runProjectQa();
-    assert(
-      Array.isArray(qaWithActivityFailure) &&
-        els.saveStatus.textContent.startsWith("QA found") &&
-        !state.qaChecks.some((check) => check.id === "existing-qa-fixture"),
-      "QA activity log failure still renders fresh QA results"
-    );
-    Reflect.deleteProperty(state.project, QA_ACTIVITY_FAILURE_TEST_FLAG);
-    const successfulQaRun = await runProjectQa();
-    assert(Array.isArray(successfulQaRun) && els.saveStatus.textContent.startsWith("QA found"), "QA run reports visible result status");
-
-    clearWorkspaceDirtyMarkers();
-    await setActiveSegment(segmentIndex);
-    const originalWindowConfirm = window.confirm;
-    const originalFetch = window.fetch;
-    const originalStorageSetItem = Storage.prototype.setItem;
-    const originalAiSettings = state.project.aiSettings;
-    const originalLocalOpenAiKey = localStorage.getItem(OPENAI_KEY_STORAGE);
-    const originalSessionOpenAiKey = sessionStorage.getItem(OPENAI_KEY_STORAGE);
-    const openAiConfirms = [];
-    window.confirm = (message) => {
-      openAiConfirms.push(message);
-      return true;
-    };
-    try {
-      sessionStorage.removeItem(OPENAI_KEY_STORAGE);
-      localStorage.removeItem(OPENAI_KEY_STORAGE);
-      els.openAiApiKeyInput.value = "sk-blocked-openai-key";
-      els.rememberOpenAiKeyInput.checked = true;
-      els.aiProviderInput.value = "OpenAI";
-      els.aiModelInput.value = "test-model";
-      els.aiUseTmInput.checked = false;
-      els.aiUseTbInput.checked = false;
-      els.aiStyleGuideInput.value = "";
-      els.aiEnabledInput.checked = true;
-      els.aiSendSourceInput.checked = true;
-      setHiddenSegmentField(state.project, AI_SETTINGS_SAVE_FAILURE_TEST_FLAG, true);
-      const failedAiSettingsSave = await saveAiSettings();
-      assert(
-        !failedAiSettingsSave &&
-          els.saveStatus.textContent.includes("Simulated AI settings save failure") &&
-          !storedOpenAiKey() &&
-          JSON.stringify(state.project.aiSettings || {}) === JSON.stringify(originalAiSettings || {}),
-        "AI settings save failure reports visible status without storing API key"
-      );
-      Reflect.deleteProperty(state.project, AI_SETTINGS_SAVE_FAILURE_TEST_FLAG);
-      localStorage.setItem(OPENAI_KEY_STORAGE, "sk-existing-openai-key");
-      setHiddenSegmentField(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG, true);
-      const failedOpenAiKeyStorageSave = await saveAiSettings();
-      const storedProjectAfterKeyStorageFailure = (await listProjects()).find((item) => item.id === state.project.id);
-      assert(
-        !failedOpenAiKeyStorageSave &&
-          els.saveStatus.textContent.includes("Simulated OpenAI key storage failure") &&
-          storedOpenAiKey() === "sk-existing-openai-key" &&
-          JSON.stringify(state.project.aiSettings || {}) === JSON.stringify(originalAiSettings || {}) &&
-          JSON.stringify(storedProjectAfterKeyStorageFailure?.aiSettings || {}) === JSON.stringify(originalAiSettings || {}),
-        "OpenAI key storage failure restores previous key and project settings"
-      );
-      Reflect.deleteProperty(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG);
-      Storage.prototype.setItem = function setItemWithOpenAiFailure(key, value) {
-        if (this === localStorage && key === OPENAI_KEY_STORAGE && value === "sk-browser-storage-failure") {
-          throw new Error("Simulated browser OpenAI key storage failure");
-        }
-        return originalStorageSetItem.call(this, key, value);
-      };
-      els.openAiApiKeyInput.value = "sk-browser-storage-failure";
-      const failedBrowserOpenAiKeyStorageSave = await saveAiSettings();
-      const storedProjectAfterBrowserKeyFailure = (await listProjects()).find((item) => item.id === state.project.id);
-      assert(
-        !failedBrowserOpenAiKeyStorageSave &&
-          els.saveStatus.textContent.includes("OpenAI key could not be saved") &&
-          storedOpenAiKey() === "sk-existing-openai-key" &&
-          JSON.stringify(state.project.aiSettings || {}) === JSON.stringify(originalAiSettings || {}) &&
-          JSON.stringify(storedProjectAfterBrowserKeyFailure?.aiSettings || {}) === JSON.stringify(originalAiSettings || {}),
-        "browser OpenAI key storage method failure restores previous key and project settings"
-      );
-      Storage.prototype.setItem = originalStorageSetItem;
-      els.openAiApiKeyInput.value = "sk-blocked-openai-key";
-      const successfulAiSettingsSave = await saveAiSettings();
-      assert(
-        successfulAiSettingsSave &&
-          storedOpenAiKey() === "sk-blocked-openai-key" &&
-          state.project.aiSettings?.enabled === true,
-        "AI settings save persists project settings after storing API key"
-      );
-      els.openAiApiKeyInput.value = "";
-      els.aiModelInput.value = "test-model-key-preserved";
-      const preservedKeySettingsSave = await saveAiSettings();
-      assert(
-        preservedKeySettingsSave &&
-          storedOpenAiKey() === "sk-blocked-openai-key" &&
-          state.project.aiSettings?.model === "test-model-key-preserved",
-        "AI settings save with blank key field preserves existing browser key"
-      );
-      els.aiProviderInput.value = "Bearer workflow-ai-provider-token-that-must-redact";
-      els.aiModelInput.value = "Bearer workflow-ai-model-token-that-must-redact";
-      els.openAiApiKeyInput.value = "sk-ai-provider-model-redaction-key-that-must-not-store";
-      const redactedAiSettingsMetadataSave = await saveAiSettings();
-      const redactedAiSettingsMetadataActivity = state.activityEvents.find(
-        (event) =>
-          event.type === "ai-settings" &&
-          String(event.detail?.provider || "").includes("[redacted secret]") &&
-          String(event.detail?.model || "").includes("[redacted secret]")
-      );
-      const storedProjectAfterAiSettingsMetadataRedaction = (await listProjects()).find((item) => item.id === state.project.id);
-      assert(
-        redactedAiSettingsMetadataSave &&
-          storedOpenAiKey() === "sk-blocked-openai-key" &&
-          !JSON.stringify(state.project.aiSettings || {}).includes("workflow-ai-provider-token-that-must-redact") &&
-          !JSON.stringify(state.project.aiSettings || {}).includes("workflow-ai-model-token-that-must-redact") &&
-          JSON.stringify(state.project.aiSettings || {}).includes("[redacted secret]") &&
-          JSON.stringify(storedProjectAfterAiSettingsMetadataRedaction?.aiSettings || {}) === JSON.stringify(state.project.aiSettings || {}) &&
-          redactedAiSettingsMetadataActivity &&
-          !JSON.stringify(redactedAiSettingsMetadataActivity).includes("workflow-ai-provider-token-that-must-redact") &&
-          !JSON.stringify(redactedAiSettingsMetadataActivity).includes("workflow-ai-model-token-that-must-redact") &&
-          redactedAiSettingsMetadataActivity.detail?.keyStorage === "Not applicable",
-        "AI settings save redacts credential-looking provider and model metadata without storing typed OpenAI keys"
-      );
-      els.aiProviderInput.value = "Anthropic";
-      els.aiModelInput.value = "test-model-non-openai-provider";
-      els.openAiApiKeyInput.value = "sk-non-openai-provider-should-not-store";
-      const nonOpenAiProviderSettingsSave = await saveAiSettings();
-      const nonOpenAiProviderSettingsActivity = state.activityEvents.find(
-        (event) =>
-          event.type === "ai-settings" &&
-          event.detail?.provider === "Anthropic" &&
-          event.detail?.model === "test-model-non-openai-provider"
-      );
-      assert(
-        nonOpenAiProviderSettingsSave &&
-          storedOpenAiKey() === "sk-blocked-openai-key" &&
-          state.project.aiSettings?.provider === "Anthropic" &&
-          state.project.aiSettings?.model === "test-model-non-openai-provider" &&
-          nonOpenAiProviderSettingsActivity?.detail?.keyStorage === "Not applicable",
-        "AI settings save does not store typed OpenAI key or report OpenAI key storage when provider is not OpenAI"
-      );
-      els.aiProviderInput.value = "OpenAI";
-      state.project = await updateProject({
-        ...state.project,
-        aiSettings: {
-          ...state.project.aiSettings,
-          apiKey: "sk-local-ai-metadata-that-must-strip",
-          bearerToken: "bearer-local-ai-metadata-that-must-strip",
-          apiKeyMode: "sk-abused-api-key-mode-that-must-normalize",
-          styleGuide: "Use Bearer ai-style-token-that-must-redact"
-        }
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      const storedProjectAfterAiMetadataNormalization = (await listProjects()).find((item) => item.id === state.project.id);
-      assert(
-        !JSON.stringify(state.project.aiSettings || {}).includes("sk-local-ai-metadata") &&
-          !JSON.stringify(state.project.aiSettings || {}).includes("bearer-local-ai-metadata") &&
-          !JSON.stringify(state.project.aiSettings || {}).includes("ai-style-token-that-must-redact") &&
-          JSON.stringify(state.project.aiSettings || {}).includes("[redacted secret]") &&
-          state.project.aiSettings?.apiKeyMode === "bring-your-own" &&
-          JSON.stringify(storedProjectAfterAiMetadataNormalization?.aiSettings || {}) === JSON.stringify(state.project.aiSettings || {}),
-        "project updates normalize AI settings and strip secret-shaped metadata and style instructions"
-      );
-      els.aiModelInput.value = "test-model-activity-warning";
-      els.openAiApiKeyInput.value = "sk-ai-settings-activity-warning-key";
-      setHiddenSegmentField(state.project, AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG, true);
-      const aiSettingsActivityWarning = await saveAiSettings();
-      const storedProjectAfterAiSettingsActivityWarning = (await listProjects()).find((item) => item.id === state.project.id);
-      assert(
-        aiSettingsActivityWarning &&
-          storedOpenAiKey() === "sk-ai-settings-activity-warning-key" &&
-          state.project.aiSettings?.model === "test-model-activity-warning" &&
-          storedProjectAfterAiSettingsActivityWarning?.aiSettings?.model === "test-model-activity-warning" &&
-          els.saveStatus.textContent.includes("activity log failed") &&
-          state.workspaceDirtyProjectIds.has(project.id),
-        "AI settings activity log failure reports warning after successful settings save"
-      );
-      Reflect.deleteProperty(state.project, AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG);
-      sessionStorage.removeItem(OPENAI_KEY_STORAGE);
-      localStorage.removeItem(OPENAI_KEY_STORAGE);
-      els.aiEnabledInput.checked = false;
-      els.aiSendSourceInput.checked = true;
-      await createOpenAiSuggestion();
-      assert(!storedOpenAiKey() && els.saveStatus.textContent.includes("Enable AI helpers"), "blocked OpenAI suggestion does not save typed key when AI helpers are disabled");
-      els.aiEnabledInput.checked = true;
-      els.aiSendSourceInput.checked = false;
-      await createOpenAiSuggestion();
-      assert(!storedOpenAiKey() && els.saveStatus.textContent.includes("source sharing"), "blocked OpenAI suggestion does not save typed key when source sharing is disabled");
-      els.aiSendSourceInput.checked = true;
-      els.aiProviderInput.value = "Anthropic";
-      await createOpenAiSuggestion();
-      assert(!storedOpenAiKey() && els.saveStatus.textContent.includes("Choose OpenAI"), "blocked OpenAI suggestion does not save typed key when a different provider is selected");
-      els.aiProviderInput.value = "OpenAI";
-      els.aiModelInput.value = "model-empty-source-must-not-save";
-      els.openAiApiKeyInput.value = "sk-openai-empty-source-key";
-      els.rememberOpenAiKeyInput.checked = true;
-      const aiSettingsBeforeEmptySourceOpenAi = structuredClone(state.project.aiSettings || {});
-      const openAiConfirmCountBeforeEmptySource = openAiConfirms.length;
-      const sourceBeforeEmptySourceOpenAi = state.segments[segmentIndex].source;
-      state.segments[segmentIndex].source = "";
-      try {
-        await createOpenAiSuggestion();
-      } finally {
-        state.segments[segmentIndex].source = sourceBeforeEmptySourceOpenAi;
-      }
-      const storedProjectAfterEmptySourceOpenAi = (await listProjects()).find((item) => item.id === state.project.id);
-      assert(
-        !storedOpenAiKey() &&
-          els.saveStatus.textContent.includes("no source text") &&
-          openAiConfirms.length === openAiConfirmCountBeforeEmptySource &&
-          state.project.aiSettings?.model !== "model-empty-source-must-not-save" &&
-          JSON.stringify(storedProjectAfterEmptySourceOpenAi?.aiSettings || {}) === JSON.stringify(aiSettingsBeforeEmptySourceOpenAi),
-        "blocked OpenAI suggestion does not save typed key or changed project settings when source text is empty"
-      );
-      els.aiModelInput.value = "model-offline-no-key-must-not-save";
-      els.openAiApiKeyInput.value = "";
-      els.rememberOpenAiKeyInput.checked = true;
-      const aiSettingsBeforeOfflineNoKeyOpenAi = structuredClone(state.project.aiSettings || {});
-      const openAiConfirmCountBeforeOfflineNoKey = openAiConfirms.length;
-      const navigatorOnlineDescriptorForNoKey = Object.getOwnPropertyDescriptor(navigator, "onLine");
-      try {
-        Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
-        await createOpenAiSuggestion();
-      } finally {
-        if (navigatorOnlineDescriptorForNoKey) Object.defineProperty(navigator, "onLine", navigatorOnlineDescriptorForNoKey);
-        else Reflect.deleteProperty(navigator, "onLine");
-      }
-      const storedProjectAfterOfflineNoKeyOpenAi = (await listProjects()).find((item) => item.id === state.project.id);
-      assert(
-        !storedOpenAiKey() &&
-          els.saveStatus.textContent.includes("appears to be offline") &&
-          !els.saveStatus.textContent.includes("Add your OpenAI API key") &&
-          state.project.aiSettings?.model !== "model-offline-no-key-must-not-save" &&
-          JSON.stringify(storedProjectAfterOfflineNoKeyOpenAi?.aiSettings || {}) === JSON.stringify(aiSettingsBeforeOfflineNoKeyOpenAi) &&
-          openAiConfirms.length === openAiConfirmCountBeforeOfflineNoKey,
-        "offline OpenAI suggestion reports offline before API key requirement or settings save"
-      );
-      els.aiModelInput.value = "model-offline-must-not-save";
-      els.openAiApiKeyInput.value = "sk-openai-offline-key";
-      els.rememberOpenAiKeyInput.checked = true;
-      const aiSettingsBeforeOfflineOpenAi = structuredClone(state.project.aiSettings || {});
-      const openAiConfirmCountBeforeOffline = openAiConfirms.length;
-      const navigatorOnlineDescriptor = Object.getOwnPropertyDescriptor(navigator, "onLine");
-      try {
-        Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
-        await createOpenAiSuggestion();
-      } finally {
-        if (navigatorOnlineDescriptor) Object.defineProperty(navigator, "onLine", navigatorOnlineDescriptor);
-        else Reflect.deleteProperty(navigator, "onLine");
-      }
-      const storedProjectAfterOfflineOpenAi = (await listProjects()).find((item) => item.id === state.project.id);
-      assert(
-        !storedOpenAiKey() &&
-          els.saveStatus.textContent.includes("appears to be offline") &&
-          state.project.aiSettings?.model !== "model-offline-must-not-save" &&
-          JSON.stringify(storedProjectAfterOfflineOpenAi?.aiSettings || {}) === JSON.stringify(aiSettingsBeforeOfflineOpenAi) &&
-          openAiConfirms.length === openAiConfirmCountBeforeOffline,
-        "offline OpenAI suggestion fails before source sharing confirmation or key/settings save"
-      );
-      els.aiModelInput.value = "model-canceled-before-save";
-      els.openAiApiKeyInput.value = "sk-openai-canceled-key";
-      els.rememberOpenAiKeyInput.checked = true;
-      els.aiUseTmInput.checked = true;
-      els.aiUseTbInput.checked = true;
-      els.aiStyleGuideInput.value = "External AI confirmation style fixture";
-      window.confirm = (message) => {
-        openAiConfirms.push(message);
-        return false;
-      };
-      await createOpenAiSuggestion();
-      const storedProjectAfterOpenAiCancel = (await listProjects()).find((item) => item.id === state.project.id);
-      const canceledOpenAiConfirm = openAiConfirms.find((message) => message.includes("OpenAI") && message.includes("outside LoopCAT"));
-      assert(
-        canceledOpenAiConfirm &&
-          canceledOpenAiConfirm.includes("local TM matches") &&
-          canceledOpenAiConfirm.includes("local termbase hits") &&
-          canceledOpenAiConfirm.includes("style instructions") &&
-          !storedOpenAiKey() &&
-          els.saveStatus.textContent.includes("OpenAI suggestion canceled") &&
-          state.project.aiSettings?.model !== "model-canceled-before-save" &&
-          JSON.stringify(storedProjectAfterOpenAiCancel?.aiSettings || {}) === JSON.stringify(state.project.aiSettings || {}),
-        "OpenAI suggestion confirmation names optional local context before key or project settings are saved"
-      );
-      window.confirm = (message) => {
-        openAiConfirms.push(message);
-        return true;
-      };
-      els.aiModelInput.value = "model-that-must-not-save";
-      els.openAiApiKeyInput.value = "sk-openai-setup-failure-key";
-      els.rememberOpenAiKeyInput.checked = true;
-      setHiddenSegmentField(state.project, AI_SETTINGS_SAVE_FAILURE_TEST_FLAG, true);
-      await createOpenAiSuggestion();
-      assert(
-        !storedOpenAiKey() &&
-          els.saveStatus.textContent.includes("Simulated AI settings save failure") &&
-          state.project.aiSettings?.model !== "model-that-must-not-save",
-        "OpenAI suggestion setup failure does not store typed key or changed project settings"
-      );
-      Reflect.deleteProperty(state.project, AI_SETTINGS_SAVE_FAILURE_TEST_FLAG);
-      const aiSettingsBeforeOpenAiKeyFailure = structuredClone(state.project.aiSettings || {});
-      localStorage.setItem(OPENAI_KEY_STORAGE, "sk-existing-openai-key");
-      els.aiModelInput.value = "model-key-storage-failure";
-      els.openAiApiKeyInput.value = "sk-openai-key-storage-failure";
-      els.rememberOpenAiKeyInput.checked = true;
-      setHiddenSegmentField(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG, true);
-      await createOpenAiSuggestion();
-      const storedProjectAfterOpenAiKeyFailure = (await listProjects()).find((item) => item.id === state.project.id);
-      assert(
-        storedOpenAiKey() === "sk-existing-openai-key" &&
-          els.saveStatus.textContent.includes("Simulated OpenAI key storage failure") &&
-          JSON.stringify(state.project.aiSettings || {}) === JSON.stringify(aiSettingsBeforeOpenAiKeyFailure) &&
-          JSON.stringify(storedProjectAfterOpenAiKeyFailure?.aiSettings || {}) === JSON.stringify(aiSettingsBeforeOpenAiKeyFailure),
-        "OpenAI suggestion key storage failure restores previous key and project settings"
-      );
-      Reflect.deleteProperty(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG);
-      els.aiEnabledInput.checked = true;
-      els.aiSendSourceInput.checked = true;
-      els.aiProviderInput.value = "OpenAI";
-      els.aiModelInput.value = "model-provider-connection-failure";
-      els.openAiApiKeyInput.value = "sk-openai-provider-connection-failure";
-      els.rememberOpenAiKeyInput.checked = true;
-      els.aiUseTmInput.checked = false;
-      els.aiUseTbInput.checked = false;
-      els.aiStyleGuideInput.value = "";
-      window.confirm = (message) => {
-        openAiConfirms.push(message);
-        return true;
-      };
-      const suggestionCountBeforeOpenAiConnectionFailure = (state.segments[segmentIndex].aiSuggestions || []).length;
-      window.fetch = async () => {
-        throw new TypeError("Simulated OpenAI provider connection failure");
-      };
-      await createOpenAiSuggestion();
-      window.fetch = originalFetch;
-      const storedProjectAfterOpenAiConnectionFailure = (await listProjects()).find((item) => item.id === state.project.id);
-      const storedSegmentAfterOpenAiConnectionFailure = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
-      assert(
-        storedOpenAiKey() === "sk-openai-provider-connection-failure" &&
-          state.project.aiSettings?.model === "model-provider-connection-failure" &&
-          storedProjectAfterOpenAiConnectionFailure?.aiSettings?.model === "model-provider-connection-failure" &&
-          (state.segments[segmentIndex].aiSuggestions || []).length === suggestionCountBeforeOpenAiConnectionFailure &&
-          (storedSegmentAfterOpenAiConnectionFailure?.aiSuggestions || []).length === suggestionCountBeforeOpenAiConnectionFailure &&
-          els.saveStatus.textContent.includes("could not connect"),
-        "OpenAI provider connection failure keeps saved settings and does not create a suggestion"
-      );
-
-    } finally {
-      window.confirm = originalWindowConfirm;
-      window.fetch = originalFetch;
-      Storage.prototype.setItem = originalStorageSetItem;
-      sessionStorage.removeItem(OPENAI_KEY_STORAGE);
-      localStorage.removeItem(OPENAI_KEY_STORAGE);
-      if (originalLocalOpenAiKey !== null) localStorage.setItem(OPENAI_KEY_STORAGE, originalLocalOpenAiKey);
-      if (originalSessionOpenAiKey !== null) sessionStorage.setItem(OPENAI_KEY_STORAGE, originalSessionOpenAiKey);
-      state.project = await updateProject({ ...state.project, aiSettings: originalAiSettings });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      renderEditor();
-    }
-    await setActiveSegment(segmentIndex);
-    const producerBeforeTyping = targetCommandPatch(state.segments[segmentIndex]);
-    const producerPendingTyping = `Pending typing before copy ${Date.now()}`;
-    updateSegmentDraft(segmentIndex, producerPendingTyping);
-    assert(
-      appRuntime.commands.editTargetSessions.has(state.segments[segmentIndex].id),
-      "non-typing target producer starts with a pending EditTarget session"
-    );
-    clearWorkspaceDirtyMarkers();
-    const copySourceCommand = await copySourceToTarget();
-    const copiedSourcePatch = targetCommandPatch(state.segments[segmentIndex]);
-    assert(
-      copySourceCommand?.receipt?.commandId === "copy-source-to-target" &&
-        copySourceCommand.receipt.provenance?.producer === "copy-source" &&
-        !JSON.stringify(copySourceCommand.receipt).includes(state.segments[segmentIndex].source) &&
-        !appRuntime.commands.editTargetSessions.has(state.segments[segmentIndex].id) &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "copy source finalizes pending typing, records a redacted command, and marks the workspace dirty"
-    );
-    const undoCopySource = await undoLastCommand();
-    const storedAfterUndoCopy = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[segmentIndex].id
-    );
-    assert(
-      undoCopySource?.receipt?.commandId === "copy-source-to-target" &&
-        state.segments[segmentIndex].target === producerPendingTyping &&
-        storedAfterUndoCopy?.target === producerPendingTyping,
-      "first Undo after copy source restores the pending typed target and persistence"
-    );
-    const undoProducerTyping = await undoLastCommand();
-    assert(
-      undoProducerTyping?.receipt?.commandId === "edit-target" &&
-        state.segments[segmentIndex].target === producerBeforeTyping.target,
-      "second Undo after copy source restores the state before pending typing"
-    );
-    await redoLastCommand();
-    const copyRedoRevisionBefore = Number(state.segments[segmentIndex].revision || 0);
-    await redoLastCommand();
-    const storedAfterRedoCopy = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[segmentIndex].id
-    );
-    assert(
-      state.segments[segmentIndex].target === copiedSourcePatch.target &&
-        JSON.stringify(state.segments[segmentIndex].targetHistory) === JSON.stringify(copiedSourcePatch.targetHistory) &&
-        Number(state.segments[segmentIndex].revision || 0) > copyRedoRevisionBefore &&
-        storedAfterRedoCopy?.target === copiedSourcePatch.target,
-      "copy-source Redo restores target history and persistence with a monotonic revision"
-    );
-
-    clearWorkspaceDirtyMarkers();
-    await setActiveSegment(segmentIndex);
-    const beforeTmInsert = targetCommandPatch(state.segments[segmentIndex]);
-    const tmInsertedTarget = `TM inserted target ${Date.now()}`;
-    const tmInsertCommand = await insertTarget(tmInsertedTarget, { channel: "match", resourceId: "workflow-tm-match" });
-    assert(
-      tmInsertCommand?.receipt?.commandId === "insert-tm-target" &&
-        tmInsertCommand.receipt.provenance?.channel === "match" &&
-        tmInsertCommand.receipt.provenance?.resourceId === "workflow-tm-match" &&
-        !JSON.stringify(tmInsertCommand.receipt).includes(tmInsertedTarget) &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "TM match insertion records a redacted reversible command and marks the workspace dirty"
-    );
-    assert(
-      state.segments[segmentIndex].targetHistory?.some(
-        (entry) => entry.reason === "insert-target" && entry.toTarget === tmInsertedTarget
-      ),
-      "TM target insertion records target revision history"
-    );
-    const undoTmInsert = await undoLastCommand();
-    const tmUndoRevision = Number(state.segments[segmentIndex].revision || 0);
-    const storedAfterTmUndo = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[segmentIndex].id
-    );
-    assert(
-      undoTmInsert?.receipt?.commandId === "insert-tm-target" &&
-        state.segments[segmentIndex].target === beforeTmInsert.target &&
-        storedAfterTmUndo?.target === beforeTmInsert.target,
-      "TM target Undo restores target state and persistence"
-    );
-    await redoLastCommand();
-    const storedAfterTmRedo = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[segmentIndex].id
-    );
-    assert(
-      state.segments[segmentIndex].target === tmInsertedTarget &&
-        Number(state.segments[segmentIndex].revision || 0) > tmUndoRevision &&
-        storedAfterTmRedo?.target === tmInsertedTarget,
-      "TM target Redo persists the insertion with a monotonic revision"
-    );
-    const concordanceTarget = `Concordance inserted target ${Date.now()}`;
-    const concordanceCommand = await insertTarget(concordanceTarget, {
-      channel: "concordance",
-      resourceId: "workflow-concordance-entry"
-    });
-    const undoConcordance = await undoLastCommand();
-    assert(
-      concordanceCommand?.receipt?.provenance?.channel === "concordance" &&
-        undoConcordance?.receipt?.commandId === "insert-tm-target" &&
-        state.segments[segmentIndex].target === tmInsertedTarget,
-      "concordance insertion uses the same reversible target command with distinct provenance"
-    );
-    await redoLastCommand();
-    await saveTerm({
-      sourceTerm: "Hello",
-      targetTerm: "forbidden-report-term",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      notes: "Report terminology fixture Bearer report-term-note-token-that-must-not-appear",
-      termBaseName: "Workflow TB",
-      isForbidden: true
-    });
-    const forbiddenDeliveryReport = validateExportReadiness({
-      project: state.project,
-      segments: [{ ...state.segments[segmentIndex], target: "forbidden-report-term" }],
-      format: "txt",
-      terms: [{ sourceTerm: "Hello", targetTerm: "forbidden-report-term", isForbidden: true }]
-    });
-    assert(!canRunDeliveryExport(forbiddenDeliveryReport) && forbiddenDeliveryReport.risky.some((item) => item.includes("forbidden terminology")), "delivery export gate blocks forbidden terminology");
-    const emptyTargetDeliveryReport = validateExportReadiness({
-      project: state.project,
-      segments: [{ ...state.segments[segmentIndex], target: "" }],
-      format: "txt",
-      terms: []
-    });
-    assert(
-      canRunDeliveryExport(emptyTargetDeliveryReport) &&
-        emptyTargetDeliveryReport.warnings.some((item) => item.includes("will export source text")) &&
-        emptyTargetDeliveryReport.exportSummary.sourceFallbackCount === 1,
-      "delivery export gate permits empty target source fallback"
-    );
-    await setActiveSegment(segmentIndex);
-    let confirmRollbackSegment = state.segments[segmentIndex];
-    setHiddenSegmentField(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG, true);
-    const failedDirectTmSave = await saveActiveSegmentToTm();
-    assert(!failedDirectTmSave && els.saveStatus.textContent.includes("Simulated TM save failure"), "direct TM save failure reports visible status");
-    Reflect.deleteProperty(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG);
-    const successfulDirectTmSave = await saveActiveSegmentToTm();
-    assert(successfulDirectTmSave && els.saveStatus.textContent === "Segment saved to TM", "direct TM save reports visible success");
-
-    const pretranslateSource = "Pretranslate source phrase.";
-    const pretranslateTarget = `TM onayli hedef ${Date.now()}`;
-    const secondPretranslateSource = "Second pretranslate source phrase.";
-    const secondPretranslateTarget = `Ikinci TM hedefi ${Date.now()}`;
-    await importLocalization(
-      new File(
-        [`<!doctype html><html><body><p>${pretranslateSource}</p><p>${secondPretranslateSource}</p></body></html>`],
-        "workflow-pretranslate.html",
-        { type: "text/html" }
-      )
-    );
-    const pretranslateDocument = state.project.documents.find((item) => item.name === "workflow-pretranslate.html");
-    await saveTmEntry({
-      source: pretranslateSource,
-      target: pretranslateTarget,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      projectName: state.project.name,
-      tmName: mainTmName()
-    });
-    await saveTmEntry({
-      source: secondPretranslateSource,
-      target: secondPretranslateTarget,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      projectName: state.project.name,
-      tmName: mainTmName()
-    });
-    await openProjectFile(pretranslateDocument.id);
-    const pretranslateSegmentIndex = state.segments.findIndex((segment) => segment.documentId === pretranslateDocument.id);
-    const secondPretranslateSegmentIndex = state.segments.findIndex(
-      (segment) => segment.documentId === pretranslateDocument.id && segment.source === secondPretranslateSource
-    );
-    const pretranslateSegment = state.segments[pretranslateSegmentIndex];
-    const originalPrompt = window.prompt;
-    let browserPromptCalls = 0;
-    window.prompt = () => {
-      browserPromptCalls += 1;
-      return "80";
-    };
-    const runTmPretranslationFromDialog = async () => {
-      const pending = pretranslateFromTm();
-      assert(
-        els.tmPretranslateDialog.open && browserPromptCalls === 0,
-        "TM pretranslation uses the in-app threshold dialog instead of a browser prompt"
-      );
-      els.tmPretranslateThresholdInput.value = "80";
-      els.tmPretranslateDialog.close("apply");
-      return pending;
-    };
-    let tmPretranslationCommand = null;
-    try {
-      setHiddenSegmentField(pretranslateSegment, PRETRANSLATE_SAVE_FAILURE_TEST_FLAG, true);
-      await runTmPretranslationFromDialog();
-      const failedPretranslationSegments = (await getProjectSegments(project.id)).filter(
-        (segment) => segment.documentId === pretranslateDocument.id
-      );
-      assert(
-        els.saveStatus.textContent.includes("Simulated pretranslation save failure") &&
-          state.segments[pretranslateSegmentIndex].target === "" &&
-          state.segments[secondPretranslateSegmentIndex].target === "" &&
-          failedPretranslationSegments.every((segment) => segment.target === ""),
-        "TM pretranslation transaction failure restores every visible and persisted target"
-      );
-      tmPretranslationCommand = await runTmPretranslationFromDialog();
-    } finally {
-      window.prompt = originalPrompt;
-    }
-    const successfulPretranslationSegments = (await getProjectSegments(project.id)).filter(
-      (segment) => segment.documentId === pretranslateDocument.id
-    );
-    assert(
-      tmPretranslationCommand?.receipt?.commandId === "tm-pretranslate" &&
-        tmPretranslationCommand.receipt.provenance?.affectedCount === 2 &&
-        !JSON.stringify(tmPretranslationCommand.receipt).includes(pretranslateTarget) &&
-        els.saveStatus.textContent.includes("Pretranslated 2 segments") &&
-        successfulPretranslationSegments.some(
-          (segment) => segment.target === pretranslateTarget && segment.tmPretranslation?.score === 100
-        ) &&
-        successfulPretranslationSegments.some(
-          (segment) => segment.target === secondPretranslateTarget && segment.tmPretranslation?.score === 100
-        ),
-      "TM pretranslation saves one redacted atomic command for every matched target"
-    );
-    const undoTmPretranslation = await undoLastCommand();
-    const tmPretranslationUndoRevisions = state.segments
-      .filter((segment) => segment.documentId === pretranslateDocument.id)
-      .map((segment) => Number(segment.revision || 0));
-    const storedAfterTmPretranslationUndo = (await getProjectSegments(project.id)).filter(
-      (segment) => segment.documentId === pretranslateDocument.id
-    );
-    assert(
-      undoTmPretranslation?.receipt?.commandId === "tm-pretranslate" &&
-        state.segments
-          .filter((segment) => segment.documentId === pretranslateDocument.id)
-          .every((segment) => !segment.target && !segment.tmPretranslation) &&
-        storedAfterTmPretranslationUndo.every((segment) => !segment.target && !segment.tmPretranslation),
-      "TM pretranslation Undo restores every target, history provenance, persistence, and selection"
-    );
-    await redoLastCommand();
-    const storedAfterTmPretranslationRedo = (await getProjectSegments(project.id)).filter(
-      (segment) => segment.documentId === pretranslateDocument.id
-    );
-    assert(
-      state.segments
-        .filter((segment) => segment.documentId === pretranslateDocument.id)
-        .every(
-          (segment, index) =>
-            segment.targetHistory?.some((entry) => entry.reason === "pretranslate") &&
-            Number(segment.revision || 0) > tmPretranslationUndoRevisions[index]
-        ) &&
-        storedAfterTmPretranslationRedo.some((segment) => segment.target === pretranslateTarget) &&
-        storedAfterTmPretranslationRedo.some((segment) => segment.target === secondPretranslateTarget),
-      "TM pretranslation Redo restores every target patch with monotonic revisions"
-    );
-    assert(
-      Array.from(els.segmentBody.querySelectorAll(".tm-match-badge")).some((badge) => badge.textContent.includes("TM 100%")),
-      "pretranslation success shows TM match rate badge near segment status"
-    );
-
-    const localAiGlossaryProvider = aiProviderService.get("ollama");
-    const originalLocalAiGlossaryTranslateSegment = localAiGlossaryProvider.translateSegment;
-    const originalLocalAiGlossaryCompletePrompt = localAiGlossaryProvider.completePrompt;
-    const originalLocalAiGlossaryMode = els.localAiModeSelect?.value || "";
-    const originalLocalAiGlossaryAiFilter = state.aiSegmentFilter;
-    let localAiGlossaryTerm = null;
-    let localAiTmEntry = null;
-    let localAiGlossaryRequest = null;
-    try {
-      const localAiGlossarySourceTerm = `workflow local ai glossary term ${Date.now()}`;
-      const localAiGlossaryTargetTerm = "workflow local ai glossary target";
-      const localAiGlossarySource = `Translate this ${localAiGlossarySourceTerm} carefully.`;
-      const localAiContextBeforeSource = "Use the profile menu.";
-      const localAiContextAfterSource = "Save the profile changes.";
-      const localAiTmTarget = "Workflow TM context target";
-      await importLocalization(new File([`<!doctype html><html><body><p>${localAiContextBeforeSource}</p><p>${localAiGlossarySource}</p><p>${localAiContextAfterSource}</p></body></html>`], "workflow-local-ai-glossary.html", { type: "text/html" }));
-      const localAiGlossaryDocument = state.project.documents.find((item) => item.name === "workflow-local-ai-glossary.html");
-      localAiGlossaryTerm = await saveTerm({
-        sourceTerm: localAiGlossarySourceTerm,
-        targetTerm: localAiGlossaryTargetTerm,
-        notes: "Workflow Local AI glossary hint fixture.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        termBaseName: primaryTermBaseName()
-      });
-      localAiTmEntry = await saveTmEntry({
-        source: localAiGlossarySource,
-        target: localAiTmTarget,
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        projectName: state.project.name,
-        tmName: mainTmName()
-      });
-      await openProjectFile(localAiGlossaryDocument.id);
-      const localAiGlossarySegmentIndex = state.segments.findIndex((segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource);
-      await setActiveSegment(localAiGlossarySegmentIndex);
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
-      if (els.localAiModelInput) els.localAiModelInput.value = "workflow-glossary-pretranslate-model";
-      if (els.localAiModeSelect) els.localAiModeSelect.value = "selected";
-      if (els.localAiOverwriteInput) els.localAiOverwriteInput.checked = false;
-      if (els.localAiIncludeContextInput) els.localAiIncludeContextInput.checked = true;
-      renderLocalAiProviderControls(localAiSettingsFromForm());
-      assert(
-        els.localAiProviderSelect?.querySelector('optgroup[label="Local and Ollama"] option[value="ollama"]') &&
-          els.localAiProviderSelect.querySelector('optgroup[label="Hosted providers"] option[value="gemini"]') &&
-          els.localAiProviderSelect.querySelector('optgroup[label="Hosted routers"] option[value="openrouter"]') &&
-          els.localAiProviderSelect.querySelector('optgroup[label="Managed deployments"] option[value="azure-openai"]') &&
-          els.localAiPresetSelect?.querySelector('optgroup[label="Local runtimes"] option[value="ollama-local"]') &&
-          els.localAiPresetSelect.querySelector('optgroup[label="Ollama hosted and cloud"] option[value="ollama-cloud"]') &&
-          els.localAiPresetSelect.querySelector('optgroup[label="Hosted providers"] option[value="gemini"]') &&
-          els.localAiPresetSelect.querySelector('optgroup[label="Hosted routers"] option[value="openrouter"]'),
-        "AI Command Centre groups provider and preset choices by local, hosted, router, and managed workflows"
-      );
-      assert(
-          els.localAiProviderSummary?.textContent.includes("Ollama local") &&
-          els.localAiProviderSummary.textContent.includes("Local loopback") &&
-          els.localAiProviderSummary.textContent.includes("No API key") &&
-          els.localAiProviderSummary.textContent.includes("Pre-translate") &&
-          els.localAiProviderSummary.textContent.includes("Review/edit tools") &&
-          els.localAiProviderSummary.textContent.includes("Pull model") &&
-          els.localAiProviderSummary.textContent.includes("private offline pre-translation") &&
-          els.localAiProviderSummary.textContent.includes("POST /api/chat"),
-        "AI Command Centre explains selected provider locality, best-fit use, available tools, and endpoints"
-      );
-      if (els.localAiSampleInput) els.localAiSampleInput.value = "Workflow prompt preview source {name}.";
-      if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "review";
-      renderLocalAiPromptPreview();
-      const reviewPromptPreview = els.localAiPromptPreview?.value || "";
-      if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "tag-repair";
-      renderLocalAiPromptPreview();
-      const repairPromptPreview = els.localAiPromptPreview?.value || "";
-      if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "project-brief";
-      renderLocalAiPromptPreview();
-      const briefPromptPreview = els.localAiPromptPreview?.value || "";
-      localAiGlossaryProvider.completePrompt = async (_config, request) => {
-        assert(
-          request.prompt.includes("Review checklist:") &&
-            request.prompt.includes("Workflow prompt preview source {name}.") &&
-            request.system.includes("senior translation reviewer"),
-          "AI Command Centre prompt test sends the selected review prompt instead of the translation prompt"
-        );
-        return {
-          text: "Workflow prompt mode review output",
-          provider: "Mock Prompt Mode AI",
-          providerId: "ollama",
-          model: "workflow-glossary-pretranslate-model"
-        };
-      };
-      if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "review";
-      renderLocalAiPromptPreview();
-      const promptModeTested = await testLocalAiPrompt();
-      assert(
-        els.localAiPromptModeSelect?.querySelector('option[value="project-brief"]') &&
-          reviewPromptPreview.includes("Review checklist:") &&
-          reviewPromptPreview.includes("Workflow prompt preview source {name}.") &&
-          repairPromptPreview.includes("Protected tokens that must appear exactly as written") &&
-          repairPromptPreview.includes("{name}") &&
-          briefPromptPreview.includes("Create a concise translation project brief") &&
-          promptModeTested === true &&
-          els.localAiPromptOutput.textContent.includes("Workflow prompt mode review output"),
-        "AI Command Centre prompt test previews and sends selected AI-native command prompts"
-      );
-      if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "pretranslate";
-      renderLocalAiPromptPreview();
-      localAiGlossaryProvider.translateSegment = async (config, request) => {
-        localAiGlossaryRequest = request;
-        assert(
-          request.glossaryTerms?.some((term) => term.sourceTerm === localAiGlossarySourceTerm && term.targetTerm === localAiGlossaryTargetTerm),
-          "Local AI pretranslation sends matched termbase hints to provider requests"
-        );
-        assert(
-          request.tmMatches?.some((match) => match.source === localAiGlossarySource && match.target === localAiTmTarget),
-          "Local AI pretranslation sends matched TM hints to provider requests"
-        );
-        assert(
-          request.surroundingSegments?.some((context) => context.source === localAiContextBeforeSource) &&
-            request.surroundingSegments?.some((context) => context.source === localAiContextAfterSource),
-          "Local AI pretranslation sends nearby segment context to provider requests"
-        );
-        return {
-          translatedText: "Workflow context-informed AI target",
-          provider: "Mock Context AI",
-          providerId: "ollama",
-          model: config.model || "workflow-glossary-pretranslate-model"
-        };
-      };
-      const localAiPretranslationBefore = targetCommandPatch(state.segments[localAiGlossarySegmentIndex]);
-      const localAiPretranslationCommand = await pretranslateWithLocalAi();
-      let localAiGlossarySegment = state.segments.find(
-        (segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource
-      );
-      let localAiGlossaryStored = (await getProjectSegments(project.id)).find(
-        (segment) => segment.id === localAiGlossarySegment?.id
-      );
-      assert(
-        localAiPretranslationCommand?.receipt?.commandId === "ai-pretranslate" &&
-          localAiPretranslationCommand.receipt.provenance?.provider === "Ollama" &&
-          localAiPretranslationCommand.receipt.provenance?.affectedCount === 1 &&
-          !JSON.stringify(localAiPretranslationCommand.receipt).includes("Workflow context-informed AI target") &&
-          localAiGlossarySegment?.targetHistory?.some((entry) => entry.reason === "ai-pretranslate"),
-        "Local AI pretranslation records redacted provider provenance and target history"
-      );
-      const undoLocalAiPretranslation = await undoLastCommand();
-      const localAiPretranslationUndoRevision = Number(state.segments[localAiGlossarySegmentIndex].revision || 0);
-      const storedAfterLocalAiPretranslationUndo = (await getProjectSegments(project.id)).find(
-        (segment) => segment.id === localAiGlossarySegment?.id
-      );
-      assert(
-        undoLocalAiPretranslation?.receipt?.commandId === "ai-pretranslate" &&
-          state.segments[localAiGlossarySegmentIndex].target === localAiPretranslationBefore.target &&
-          JSON.stringify(state.segments[localAiGlossarySegmentIndex].targetHistory) ===
-            JSON.stringify(localAiPretranslationBefore.targetHistory) &&
-          !state.segments[localAiGlossarySegmentIndex].aiPretranslation &&
-          storedAfterLocalAiPretranslationUndo?.target === localAiPretranslationBefore.target &&
-          !storedAfterLocalAiPretranslationUndo?.aiPretranslation,
-        "Local AI pretranslation Undo restores target, history, AI provenance, review state, and persistence"
-      );
-      const redoLocalAiPretranslation = await redoLastCommand();
-      localAiGlossarySegment = state.segments.find(
-        (segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource
-      );
-      localAiGlossaryStored = (await getProjectSegments(project.id)).find(
-        (segment) => segment.id === localAiGlossarySegment?.id
-      );
-      assert(
-        localAiGlossaryStored?.target === "Workflow context-informed AI target" &&
-          localAiGlossaryStored?.reviewState === "needs-review" &&
-          localAiGlossaryStored?.aiPretranslation?.model === "workflow-glossary-pretranslate-model" &&
-          Number(localAiGlossarySegment?.revision || 0) > localAiPretranslationUndoRevision,
-        "Local AI pretranslation Redo restores review/provenance patches with a monotonic revision"
-      );
-      if (els.aiSegmentFilter) els.aiSegmentFilter.value = "ai-draft";
-      state.aiSegmentFilter = "ai-draft";
-      renderSegments();
-      assert(
-        localAiGlossaryRequest?.segment?.id === localAiGlossarySegment?.id &&
-          localAiGlossaryStored?.target === "Workflow context-informed AI target" &&
-          localAiGlossaryStored?.reviewState === "needs-review" &&
-          localAiGlossaryStored?.aiPretranslation?.model === "workflow-glossary-pretranslate-model",
-        "Local AI pretranslation uses project TM and termbase hints and saves AI initiated metadata"
-      );
-      assert(
-        filteredSegmentIndexes().some((index) => state.segments[index]?.id === localAiGlossarySegment?.id) &&
-          els.segmentBody.textContent.includes("AI initiated") &&
-          !els.segmentBody.textContent.includes("AI draft"),
-        "AI segment filter shows AI-pretranslated rows with AI initiated row badges"
-      );
-      const localAiConfirmedPreviousStatus = localAiGlossarySegment.status;
-      const localAiConfirmedPreviousReviewState = localAiGlossarySegment.reviewState;
-      localAiGlossarySegment.status = "confirmed";
-      localAiGlossarySegment.reviewState = "";
-      renderSegments();
-      const localAiGlossaryRow = els.segmentBody.querySelector(`tr[data-index="${state.segments.findIndex((segment) => segment.id === localAiGlossarySegment.id)}"]`);
-      assert(
-        localAiGlossaryRow?.textContent.includes("AI initiated") &&
-          !localAiGlossaryRow?.textContent.includes("AI draft") &&
-          !localAiGlossaryRow?.textContent.includes("Needs review"),
-        "confirmed AI-pretranslated segments show AI initiated row badge without needs-review"
-      );
-      localAiGlossarySegment.status = localAiConfirmedPreviousStatus;
-      localAiGlossarySegment.reviewState = localAiConfirmedPreviousReviewState;
-      state.aiSegmentFilter = originalLocalAiGlossaryAiFilter;
-      if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalLocalAiGlossaryAiFilter;
-      renderSegments();
-      setSegmentTargetAndStatus(localAiGlossarySegment, "", "draft", "ai-cancel-fixture");
-      Reflect.deleteProperty(localAiGlossarySegment, "aiPretranslation");
-      localAiGlossarySegment.reviewState = "";
-      touchSegment(localAiGlossarySegment);
-      await saveSegment(localAiGlossarySegment);
-      localAiGlossaryProvider.translateSegment = async (config) => {
-        state.localAi.abortController?.abort();
-        return {
-          translatedText: "Target that must be rolled back after cancellation",
-          provider: "Mock Canceled AI",
-          providerId: "ollama",
-          model: config.model || "workflow-glossary-pretranslate-model"
-        };
-      };
-      const canceledLocalAiPretranslation = await pretranslateWithLocalAi();
-      const storedAfterMidBatchCancellation = (await getProjectSegments(project.id)).find(
-        (segment) => segment.id === localAiGlossarySegment.id
-      );
-      const midBatchCancellationStatus = els.saveStatus.textContent;
-      const cancellationStackUndo = await undoLastCommand();
-      assert(
-        canceledLocalAiPretranslation === null &&
-          storedAfterMidBatchCancellation?.target === "" &&
-          !storedAfterMidBatchCancellation?.aiPretranslation &&
-          midBatchCancellationStatus.includes("canceled; no target changes were applied") &&
-          cancellationStackUndo?.receipt?.id === redoLocalAiPretranslation?.receipt?.id,
-        "mid-batch AI cancellation rolls back provider output and records no partial command"
-      );
-      localAiGlossarySegment = state.segments.find(
-        (segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource
-      );
-      const originalLocalAiCloudConfirm = window.confirm;
-      const localAiCloudConfirmMessages = [];
-      let localAiCloudProviderCalls = 0;
-      let localAiHostedProviderCalls = 0;
-      let localAiHostedConfig = null;
-      let localAiHostedRequest = null;
-      const localAiHostedConfirmMessages = [];
-      const hostedOllamaKeySettings = localAISettingsStore.defaults({
-        providerId: "ollama",
-        baseUrl: OLLAMA_CLOUD_BASE_URL,
-        model: "gpt-oss:120b"
-      }, state.project);
-      const hostedOllamaKeySnapshot = localAiKeySnapshot(hostedOllamaKeySettings);
-      const previousHostedOllamaKeyFieldValue = els.localAiApiKeyInput?.value || "";
-      const previousHostedOllamaRememberValue = Boolean(els.rememberLocalAiKeyInput?.checked);
-      try {
-        setSegmentTargetAndStatus(localAiGlossarySegment, "", "draft", "local-ai-cloud-confirm-fixture");
-        touchSegment(localAiGlossarySegment);
-        await saveSegment(localAiGlossarySegment);
-        await setActiveSegment(localAiGlossarySegmentIndex);
-        els.localAiCloudPresetBtn?.click();
-        assert(
-          els.localAiPresetSelect?.value === "ollama-cloud" &&
-            els.localAiBaseUrlInput?.value === OLLAMA_CLOUD_BASE_URL &&
-            els.localAiModelInput?.value === "gpt-oss:120b",
-          "AI Command Centre hosted Ollama quick button selects direct hosted Ollama"
-        );
-        els.localAiLocalCloudPresetBtn?.click();
-        if (els.localAiModeSelect) els.localAiModeSelect.value = "selected";
-        if (els.localAiOverwriteInput) els.localAiOverwriteInput.checked = false;
-        if (els.localAiIncludeContextInput) els.localAiIncludeContextInput.checked = true;
-        renderLocalAiProviderControls(localAiSettingsFromForm());
-        assert(
-          els.localAiPresetSelect?.value === "ollama-local-cloud" &&
-            els.localAiBaseUrlInput?.value === OLLAMA_DEFAULT_BASE_URL &&
-            els.localAiModelInput?.value === "gpt-oss:120b-cloud" &&
-            els.localAiPrivacyNote?.textContent.includes("cloud-suffixed models may be processed through Ollama Cloud") &&
-            els.localAiProviderSummary?.textContent.includes("Ollama cloud model via local Ollama") &&
-            els.localAiProviderSummary.textContent.includes("Hosted/network") &&
-            els.localAiProviderSummary.textContent.includes("No API key") &&
-            els.localAiProviderSummary.textContent.includes("larger Ollama-hosted models") &&
-            els.localAiPullModelBtn?.textContent.includes("gpt-oss:120b-cloud") &&
-            !els.localAiPullModelBtn.disabled,
-          "AI Command Centre distinguishes local Ollama cloud-offload models from direct hosted Ollama"
-        );
-        localAiGlossaryProvider.translateSegment = async (config, request) => {
-          localAiCloudProviderCalls += 1;
-          localAiGlossaryRequest = request;
-          return {
-            translatedText: "Workflow local Ollama cloud target",
-            provider: "Mock Local Ollama Cloud",
-            providerId: "ollama",
-            model: config.model || "gpt-oss:120b-cloud"
-          };
-        };
-        window.confirm = (message) => {
-          localAiCloudConfirmMessages.push(message);
-          return false;
-        };
-        await pretranslateWithLocalAi();
-        const storedAfterLocalAiCloudCancel = (await getProjectSegments(project.id)).find((segment) => segment.id === localAiGlossarySegment.id);
-        assert(
-          localAiCloudConfirmMessages.some((message) => message.includes("Ollama") && message.includes("outside LoopCAT")) &&
-            localAiCloudConfirmMessages.some((message) => message.includes("batch segment text")) &&
-            localAiCloudProviderCalls === 0 &&
-            storedAfterLocalAiCloudCancel?.target === "" &&
-            els.saveStatus.textContent.includes("AI pre-translation canceled"),
-          "Ollama local cloud-offload pretranslation asks before sending source text and honors cancellation"
-        );
-        window.confirm = (message) => {
-          localAiCloudConfirmMessages.push(message);
-          return true;
-        };
-        await pretranslateWithLocalAi();
-        const storedAfterLocalAiCloudAccept = (await getProjectSegments(project.id)).find((segment) => segment.id === localAiGlossarySegment.id);
-        assert(
-          localAiCloudProviderCalls === 1 &&
-            localAiGlossaryRequest?.segment?.id === localAiGlossarySegment.id &&
-            storedAfterLocalAiCloudAccept?.target === "Workflow local Ollama cloud target" &&
-            storedAfterLocalAiCloudAccept?.reviewState === "needs-review" &&
-            storedAfterLocalAiCloudAccept?.aiPretranslation?.model === "gpt-oss:120b-cloud",
-          "Ollama local cloud-offload pretranslation runs after confirmation and stores cloud model metadata"
-        );
-        const hostedOllamaSegmentIndex = state.segments.findIndex((segment) => segment.id === localAiGlossarySegment.id);
-        const hostedOllamaSegment = state.segments[hostedOllamaSegmentIndex];
-        setSegmentTargetAndStatus(hostedOllamaSegment, "", "draft", "hosted-ollama-confirm-fixture");
-        touchSegment(hostedOllamaSegment);
-        await saveSegment(hostedOllamaSegment);
-        await setActiveSegment(hostedOllamaSegmentIndex);
-        els.localAiCloudPresetBtn?.click();
-        if (els.localAiModeSelect) els.localAiModeSelect.value = "selected";
-        if (els.localAiOverwriteInput) els.localAiOverwriteInput.checked = false;
-        if (els.localAiIncludeContextInput) els.localAiIncludeContextInput.checked = true;
-        renderLocalAiProviderControls(localAiSettingsFromForm());
-        if (els.localAiApiKeyInput) els.localAiApiKeyInput.value = "workflow-hosted-ollama-key";
-        if (els.rememberLocalAiKeyInput) els.rememberLocalAiKeyInput.checked = false;
-        assert(
-          els.localAiPresetSelect?.value === "ollama-cloud" &&
-            els.localAiBaseUrlInput?.value === OLLAMA_CLOUD_BASE_URL &&
-            els.localAiModelInput?.value === "gpt-oss:120b" &&
-            els.localAiPrivacyNote?.textContent.includes("Hosted AI mode") &&
-            els.localAiProviderSummary?.textContent.includes("Ollama Cloud direct") &&
-            els.localAiProviderSummary.textContent.includes("Hosted/network") &&
-            els.localAiProviderSummary.textContent.includes("API key required") &&
-            els.localAiProviderSummary.textContent.includes("direct hosted Ollama models") &&
-            els.localAiProviderSummary.textContent.includes("Confirmation before send") &&
-            els.localAiProviderSummary.textContent.includes("Review/edit tools") &&
-            els.localAiPullModelBtn?.disabled,
-          "AI Command Centre direct hosted Ollama summary requires a key and disables local pull"
-        );
-        localAiGlossaryProvider.translateSegment = async (config, request) => {
-          localAiHostedProviderCalls += 1;
-          localAiHostedConfig = config;
-          localAiHostedRequest = request;
-          return {
-            translatedText: "Workflow direct hosted Ollama target",
-            provider: "Mock Hosted Ollama",
-            providerId: "ollama",
-            model: config.model || "gpt-oss:120b"
-          };
-        };
-        window.confirm = (message) => {
-          localAiHostedConfirmMessages.push(message);
-          return false;
-        };
-        await pretranslateWithLocalAi();
-        const storedAfterHostedOllamaCancel = (await getProjectSegments(project.id)).find((segment) => segment.id === hostedOllamaSegment.id);
-        assert(
-          localAiHostedConfirmMessages.some((message) => message.includes("Ollama") && message.includes("outside LoopCAT")) &&
-            localAiHostedConfirmMessages.some((message) => message.includes("configured provider URL")) &&
-            localAiHostedProviderCalls === 0 &&
-            storedAfterHostedOllamaCancel?.target === "" &&
-            els.saveStatus.textContent.includes("AI pre-translation canceled"),
-          "Direct hosted Ollama pretranslation asks before sending source text and honors cancellation"
-        );
-        window.confirm = (message) => {
-          localAiHostedConfirmMessages.push(message);
-          return true;
-        };
-        await pretranslateWithLocalAi();
-        const storedAfterHostedOllamaAccept = (await getProjectSegments(project.id)).find((segment) => segment.id === hostedOllamaSegment.id);
-        assert(localAiHostedProviderCalls === 1, "Direct hosted Ollama pretranslation calls the provider once after confirmation");
-        assert(localAiHostedConfig?.apiKey === "workflow-hosted-ollama-key", "Direct hosted Ollama pretranslation passes the hosted API key");
-        assert(localAiHostedConfig?.baseUrl === OLLAMA_CLOUD_BASE_URL, "Direct hosted Ollama pretranslation uses the hosted Ollama base URL");
-        assert(localAiHostedConfig?.model === "gpt-oss:120b", "Direct hosted Ollama pretranslation uses the hosted Ollama model");
-        assert(localAiHostedRequest?.segment?.id === hostedOllamaSegment.id, "Direct hosted Ollama pretranslation sends the selected segment");
-        assert(storedAfterHostedOllamaAccept?.target === "Workflow direct hosted Ollama target", "Direct hosted Ollama pretranslation writes the hosted draft target");
-        assert(storedAfterHostedOllamaAccept?.reviewState === "needs-review", "Direct hosted Ollama pretranslation marks the hosted draft for review");
-        assert(storedAfterHostedOllamaAccept?.aiPretranslation?.model === "gpt-oss:120b", "Direct hosted Ollama pretranslation stores the hosted model metadata");
-        assert(
-          localAiHostedProviderCalls === 1 &&
-            localAiHostedConfig?.apiKey === "workflow-hosted-ollama-key" &&
-            localAiHostedConfig?.baseUrl === OLLAMA_CLOUD_BASE_URL &&
-            localAiHostedConfig?.model === "gpt-oss:120b" &&
-            localAiHostedRequest?.segment?.id === hostedOllamaSegment.id &&
-            storedAfterHostedOllamaAccept?.target === "Workflow direct hosted Ollama target" &&
-            storedAfterHostedOllamaAccept?.reviewState === "needs-review" &&
-            storedAfterHostedOllamaAccept?.aiPretranslation?.model === "gpt-oss:120b",
-          "Direct hosted Ollama pretranslation runs after confirmation with hosted key and stores hosted model metadata"
-        );
-      } finally {
-        window.confirm = originalLocalAiCloudConfirm;
-        if (els.localAiApiKeyInput) els.localAiApiKeyInput.value = previousHostedOllamaKeyFieldValue;
-        if (els.rememberLocalAiKeyInput) els.rememberLocalAiKeyInput.checked = previousHostedOllamaRememberValue;
-        safeRestoreLocalAiKeySnapshot(hostedOllamaKeySnapshot);
-      }
-    } finally {
-      localAiGlossaryProvider.translateSegment = originalLocalAiGlossaryTranslateSegment;
-      localAiGlossaryProvider.completePrompt = originalLocalAiGlossaryCompletePrompt;
-      if (els.localAiModeSelect) els.localAiModeSelect.value = originalLocalAiGlossaryMode;
-      state.aiSegmentFilter = originalLocalAiGlossaryAiFilter;
-      if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalLocalAiGlossaryAiFilter;
-      if (localAiTmEntry?.id) await deleteTmEntry(localAiTmEntry.id);
-      if (localAiGlossaryTerm?.id) await deleteTerm(localAiGlossaryTerm.id);
-    }
-    const deepSeekKeySettings = localAISettingsStore.defaults({
-      providerId: "deepseek",
-      baseUrl: "https://api.deepseek.com",
-      model: "deepseek-v4-pro"
-    }, state.project);
-    const geminiKeySettings = localAISettingsStore.defaults({
-      providerId: "gemini",
-      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-      model: "gemini-3.5-flash"
-    }, state.project);
-    const deepSeekKeySnapshot = localAiKeySnapshot(deepSeekKeySettings);
-    const geminiKeySnapshot = localAiKeySnapshot(geminiKeySettings);
-    const previousLocalAiKeyFieldValue = els.localAiApiKeyInput?.value || "";
-    try {
-      if (els.localAiApiKeyInput) els.localAiApiKeyInput.value = "";
-      saveLocalAiKey("deepseek-provider-scoped-key", true, deepSeekKeySettings);
-      saveLocalAiKey("gemini-provider-scoped-key", false, geminiKeySettings);
-      assert(
-        storedLocalAiKey(deepSeekKeySettings) === "deepseek-provider-scoped-key" &&
-          storedLocalAiKey(geminiKeySettings) === "gemini-provider-scoped-key" &&
-          localAiRuntimeConfig(deepSeekKeySettings).apiKey === "deepseek-provider-scoped-key" &&
-          localAiRuntimeConfig(geminiKeySettings).apiKey === "gemini-provider-scoped-key" &&
-          localAiKeyStorageLabel(deepSeekKeySettings).includes("this provider") &&
-          localAiKeyStorageLabel(geminiKeySettings).includes("tab and provider") &&
-          !localStorage.getItem(LOCAL_AI_KEY_STORAGE) &&
-          !sessionStorage.getItem(LOCAL_AI_KEY_STORAGE),
-        "Local AI hosted provider keys are scoped by provider and base URL"
-      );
-    } finally {
-      if (els.localAiApiKeyInput) els.localAiApiKeyInput.value = previousLocalAiKeyFieldValue;
-      safeRestoreLocalAiKeySnapshot(geminiKeySnapshot);
-      safeRestoreLocalAiKeySnapshot(deepSeekKeySnapshot);
-    }
-    const unsupportedCompatibleSettings = localAISettingsStore.defaults({
-      providerId: "openai-compatible",
-      baseUrl: "https://example.com/v1",
-      model: "unsupported-compatible-model"
-    }, state.project);
-    const unsupportedCompatibleKeySnapshot = localAiKeySnapshot(unsupportedCompatibleSettings);
-    const unsupportedCompatiblePreviousKey = unsupportedCompatibleKeySnapshot.session || unsupportedCompatibleKeySnapshot.local || "";
-    const unsupportedCompatibleProjectAiSettings = structuredClone(state.project.aiSettings || {});
-    const previousLocalProviderValue = els.localAiProviderSelect?.value || "";
-    const previousLocalBaseUrlValue = els.localAiBaseUrlInput?.value || "";
-    const previousLocalModelValue = els.localAiModelInput?.value || "";
-    const previousLocalRememberValue = Boolean(els.rememberLocalAiKeyInput?.checked);
-    const previousLocalKeyValue = els.localAiApiKeyInput?.value || "";
-    try {
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = "openai-compatible";
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = "https://example.com/v1";
-      if (els.localAiModelInput) els.localAiModelInput.value = "unsupported-compatible-model";
-      if (els.localAiApiKeyInput) els.localAiApiKeyInput.value = "unsupported-compatible-key-that-must-not-save";
-      if (els.rememberLocalAiKeyInput) els.rememberLocalAiKeyInput.checked = true;
-      await testLocalAiConnection();
-      assert(
-        els.saveStatus.textContent.includes("explicit provider allowlist") &&
-          els.localAiStatusText.textContent.includes("explicit provider allowlist") &&
-          storedLocalAiKey(unsupportedCompatibleSettings) === unsupportedCompatiblePreviousKey &&
-          JSON.stringify(state.project.aiSettings || {}) === JSON.stringify(unsupportedCompatibleProjectAiSettings),
-        "AI Command Centre blocks unsupported hosted OpenAI-compatible endpoints before saving keys or settings"
-      );
-    } finally {
-      if (els.localAiProviderSelect) els.localAiProviderSelect.value = previousLocalProviderValue;
-      if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = previousLocalBaseUrlValue;
-      if (els.localAiModelInput) els.localAiModelInput.value = previousLocalModelValue;
-      if (els.localAiApiKeyInput) els.localAiApiKeyInput.value = previousLocalKeyValue;
-      if (els.rememberLocalAiKeyInput) els.rememberLocalAiKeyInput.checked = previousLocalRememberValue;
-      safeRestoreLocalAiKeySnapshot(unsupportedCompatibleKeySnapshot);
-      renderLocalAiProviderControls(localAiSettingsFromForm());
-    }
-    await openProjectFile(documentInfo.id);
-    await setActiveSegment(segmentIndex);
-    confirmRollbackSegment = state.segments[segmentIndex];
-
-    setSegmentTargetAndStatus(confirmRollbackSegment, "Confirm reviewed AI target", "draft", "confirm-ai-reviewed-fixture");
-    confirmRollbackSegment.reviewState = "needs-review";
-    confirmRollbackSegment.aiPretranslation = {
-      provider: "Mock AI",
-      providerId: "mock-local",
-      model: "workflow-confirm-model",
-      status: "AI initiated",
-      createdAt: new Date().toISOString()
-    };
-    touchSegment(confirmRollbackSegment);
-    await saveSegment(confirmRollbackSegment);
-    const originalConfirmReviewedFilters = {
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
-      aiSegmentFilter: state.aiSegmentFilter
-    };
-    state.segmentStatusFilter = "all";
-    state.reviewStateFilter = "";
-    state.aiSegmentFilter = "";
-    if (els.segmentStatusFilter) els.segmentStatusFilter.value = "all";
-    if (els.reviewStateFilter) els.reviewStateFilter.value = "";
-    if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
-    await confirmCurrentSegment();
-    await setActiveSegment(segmentIndex);
-    renderSegments();
-    const confirmedReviewedAiSegment = state.segments[segmentIndex];
-    const persistedConfirmedReviewedAiSegment = (await getProjectSegments(project.id)).find((segment) => segment.id === confirmedReviewedAiSegment.id);
-    const confirmedReviewedAiRow = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"]`);
-    assert(
-      confirmedReviewedAiSegment.status === "confirmed" &&
-        (confirmedReviewedAiSegment.reviewState || "") === "" &&
-        persistedConfirmedReviewedAiSegment?.status === "confirmed" &&
-        (persistedConfirmedReviewedAiSegment?.reviewState || "") === "" &&
-        confirmedReviewedAiRow?.textContent.includes("AI initiated") &&
-        !confirmedReviewedAiRow?.textContent.includes("Needs review") &&
-        !confirmedReviewedAiRow?.textContent.includes("AI draft"),
-      "confirming reviewed AI-pretranslated segment clears needs-review and shows AI initiated"
-    );
-    await undoLastCommand();
-    const undoneConfirmedSegment = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === confirmedReviewedAiSegment.id
-    );
-    assert(
-      state.segments[segmentIndex].status === "draft" &&
-        state.segments[segmentIndex].reviewState === "needs-review" &&
-        undoneConfirmedSegment?.status === "draft" &&
-        undoneConfirmedSegment?.reviewState === "needs-review" &&
-        state.activeIndex === segmentIndex,
-      "Undo restores confirmed segment status, review state, persistence, and selection"
-    );
-    await redoLastCommand();
-    const redoneConfirmedSegment = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === confirmedReviewedAiSegment.id
-    );
-    assert(
-      redoneConfirmedSegment?.status === "confirmed" &&
-        (redoneConfirmedSegment?.reviewState || "") === "",
-      "Redo reapplies confirmed segment state"
-    );
-    state.segmentStatusFilter = originalConfirmReviewedFilters.segmentStatusFilter;
-    state.reviewStateFilter = originalConfirmReviewedFilters.reviewStateFilter;
-    state.aiSegmentFilter = originalConfirmReviewedFilters.aiSegmentFilter;
-    if (els.segmentStatusFilter) els.segmentStatusFilter.value = originalConfirmReviewedFilters.segmentStatusFilter;
-    if (els.reviewStateFilter) els.reviewStateFilter.value = originalConfirmReviewedFilters.reviewStateFilter;
-    if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalConfirmReviewedFilters.aiSegmentFilter;
-    await setActiveSegment(segmentIndex);
-    confirmRollbackSegment = state.segments[segmentIndex];
-
-    setSegmentTargetAndStatus(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm rollback target", "draft", "confirm-rollback-fixture");
-    touchSegment(confirmRollbackSegment);
-    await saveSegment(confirmRollbackSegment);
-    const rollbackHistoryCount = confirmRollbackSegment.targetHistory?.length || 0;
-    setHiddenSegmentField(confirmRollbackSegment, CONFIRM_FAILURE_TEST_FLAG, true);
-    await confirmCurrentSegment();
-    assert(
-      els.saveStatus.textContent.includes("Simulated confirm save failure") &&
-        state.segments[segmentIndex].status === "draft" &&
-        (state.segments[segmentIndex].targetHistory?.length || 0) === rollbackHistoryCount &&
-        !Object.prototype.hasOwnProperty.call(state.segments[segmentIndex], CONFIRM_FAILURE_TEST_FLAG),
-      "confirm segment failure restores draft state and reports visible status"
-    );
-    setSegmentTargetAndStatus(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm persisted rollback target", "draft", "confirm-persisted-rollback-fixture");
-    touchSegment(confirmRollbackSegment);
-    await saveSegment(confirmRollbackSegment);
-    const persistedRollbackHistoryCount = confirmRollbackSegment.targetHistory?.length || 0;
-    setHiddenSegmentField(confirmRollbackSegment, CONFIRM_POST_SAVE_FAILURE_TEST_FLAG, true);
-    await confirmCurrentSegment();
-    const persistedAfterConfirmFailure = (await getProjectSegments(project.id)).find((segment) => segment.id === confirmRollbackSegment.id);
-    assert(
-      els.saveStatus.textContent.includes("Simulated post-save confirm failure") &&
-        state.segments[segmentIndex].status === "draft" &&
-        persistedAfterConfirmFailure?.status === "draft" &&
-        (persistedAfterConfirmFailure?.targetHistory?.length || 0) === persistedRollbackHistoryCount &&
-        !Object.prototype.hasOwnProperty.call(state.segments[segmentIndex], CONFIRM_POST_SAVE_FAILURE_TEST_FLAG),
-      "confirm segment post-save failure restores persisted draft state"
-    );
-    setSegmentTargetAndStatus(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm TM warning target", "draft", "confirm-tm-warning-fixture");
-    touchSegment(confirmRollbackSegment);
-    await saveSegment(confirmRollbackSegment);
-    setHiddenSegmentField(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG, true);
-    await confirmCurrentSegment();
-    const persistedAfterConfirmTmFailure = (await getProjectSegments(project.id)).find((segment) => segment.id === confirmRollbackSegment.id);
-    assert(
-      els.saveStatus.textContent.includes("TM save failed") &&
-        state.segments[segmentIndex].status === "confirmed" &&
-        persistedAfterConfirmTmFailure?.status === "confirmed" &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "confirm TM save failure keeps segment confirmed and reports warning"
-    );
-    Reflect.deleteProperty(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG);
-    await setActiveSegment(segmentIndex);
-    confirmRollbackSegment = state.segments[segmentIndex];
-    setSegmentTargetAndStatus(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm activity target", "draft", "confirm-activity-fixture");
-    touchSegment(confirmRollbackSegment);
-    await saveSegment(confirmRollbackSegment);
-    setHiddenSegmentField(confirmRollbackSegment, CONFIRM_ACTIVITY_FAILURE_TEST_FLAG, true);
-    await confirmCurrentSegment();
-    const persistedAfterConfirmActivityFailure = (await getProjectSegments(project.id)).find((segment) => segment.id === confirmRollbackSegment.id);
-    assert(
-      els.saveStatus.textContent.includes("activity log failed") &&
-        state.segments[segmentIndex].status === "confirmed" &&
-        persistedAfterConfirmActivityFailure?.status === "confirmed" &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "confirm activity log failure keeps segment confirmed and reports warning"
-    );
-    Reflect.deleteProperty(confirmRollbackSegment, CONFIRM_ACTIVITY_FAILURE_TEST_FLAG);
-
-    assert(
-      Boolean(
-        els.qualityForm &&
-          els.qualityActiveEvidence &&
-          els.qualityDecisionForm &&
-          els.qualityIssueCategorySelect &&
-          els.qualityIssueSeveritySelect &&
-          els.refreshQualityRiskBtn &&
-          els.exportQualityPassportBtn
-      ),
-      "quality workbench controls are available"
-    );
-    els.qualityStandardSelect.value = "agency-delivery";
-    els.qualityReviewDepthSelect.value = "lqa";
-    els.qualityRiskToleranceSelect.value = "strict";
-    els.qualityTerminologyStrictnessSelect.value = "strict";
-    els.qualityAiDisclosureSelect.value = "client-approved";
-    els.qualityAudienceInput.value = "Workflow client reviewers";
-    els.qualityToneInput.value = "Formal";
-    const qualityProfileSaved = await saveQualityProfileFromForm();
-    assert(
-      qualityProfileSaved &&
-        state.project.qualityProfile.standard === "agency-delivery" &&
-        state.project.qualityProfile.reviewDepth === "lqa" &&
-        state.project.qualityProfile.terminologyStrictness === "strict",
-      "quality profile persists project review contract"
-    );
-    state.qualityRiskQueue = currentQualityRiskQueue();
-    renderQualityWorkbench();
-    assert(
-      els.qualitySummary.textContent.includes("risk items") &&
-        els.qualityRiskList.textContent.length > 0,
-      "quality workbench renders risk summary"
-    );
-    const qualityDecisionSegment = currentSegment();
-    const qualityDecisionCommentCount = qualityDecisionSegment?.comments?.length || 0;
-    els.qualityIssueCategorySelect.value = "accuracy";
-    els.qualityIssueSeveritySelect.value = "high";
-    els.qualityDecisionNoteInput.value = "Quality evidence note";
-    const qualityDecisionSaved = await saveQualityDecisionFromForm();
-    const storedQualityDecisionSegment = (await getProjectSegments(project.id)).find((segment) => segment.id === qualityDecisionSegment?.id);
-    assert(
-      qualityDecisionSaved,
-      "quality decision save reports success"
-    );
-    assert(
-      storedQualityDecisionSegment?.reviewState === "needs-review",
-      "quality decision marks active segment needs-review"
-    );
-    assert(
-      (storedQualityDecisionSegment?.comments || []).length === qualityDecisionCommentCount + 1,
-      "quality decision persists one structured comment"
-    );
-    assert(
-      storedQualityDecisionSegment?.comments?.some((comment) =>
-        comment.body.includes("Quality decision: Accuracy (High)") &&
-          comment.body.includes("Quality evidence note") &&
-          comment.qualityDecision?.category === "accuracy" &&
-          comment.qualityDecision?.severity === "high"
-      ),
-      "quality decision persists category and severity metadata"
-    );
-    assert(
-      buildRiskQueue({
-        project: state.project,
-        segments: state.segments,
-        qaChecks: state.qaChecks,
-        profile: state.project.qualityProfile
-      })?.byCategory?.accuracy >= 1,
-      "quality decision contributes to category risk aggregation"
-    );
-    assert(
-      els.qualityActiveEvidence.textContent.includes("Accuracy"),
-      "quality decision renders active segment category evidence"
-    );
-
-    const reportDownloads = [];
-    const originalReportCreateObjectUrl = URL.createObjectURL.bind(URL);
-    const originalReportAnchorClick = HTMLAnchorElement.prototype.click;
-    URL.createObjectURL = (blob) => {
-      blob.text().then((text) => reportDownloads.push({ type: blob.type, text }));
-      return originalReportCreateObjectUrl(blob);
-    };
-    HTMLAnchorElement.prototype.click = function noopReportDownloadClick() {};
-    try {
-      clearWorkspaceDirtyMarkers();
-      await logProjectActivity("ai-action", "Sensitive AI prompt trace must not appear in report", {
-        provider: "OpenAI",
-        configuredProvider: "OpenAI",
-        prompt: "Report activity prompt trace must not appear.",
-        responseId: "report-response-id-that-must-not-appear",
-        customEndpoint: "https://ai.example.invalid/responses"
-      });
-      await logProjectActivity("qa-run", "Unsafe report Bearer report-summary-token-that-must-not-appear", {
-        issueCount: 0
-      });
-      await logProjectActivity("Bearer report-activity-type-token-that-must-not-appear", "Activity type privacy fixture", {
-        issueCount: 0
-      });
-      state.project = await updateProject({
-        ...state.project,
-        domain: "Bearer external-domain-token-that-must-redact"
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      const reportTargetText = state.segments[segmentIndex].target;
-      await exportProjectReport();
-      const reportDownload = await waitFor(() => reportDownloads.find((item) => item.type === "text/html"), "project report download");
-      assert(reportDownload.text.includes("LoopCAT Project Report") && reportDownload.text.includes(state.project.name), "project report export creates offline HTML report");
-      assert(reportDownload.text.includes(`Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`), "project report export includes restrictive CSP");
-      assert(
-        reportDownload.text.includes("AI Triage") &&
-          reportDownload.text.includes("AI initiated") &&
-          reportDownload.text.includes("High AI risk"),
-        "project report includes count-only AI triage metrics"
-      );
-      assert(
-        reportDownload.text.includes("Quality Passport") &&
-          reportDownload.text.includes("Quality score") &&
-          reportDownload.text.includes("Agency delivery") &&
-          reportDownload.text.includes("Quality categories") &&
-          reportDownload.text.includes("Accuracy"),
-        "project report includes quality passport metrics"
-      );
-      assert(
-        !reportDownload.text.includes("external-domain-token-that-must-redact") &&
-          reportDownload.text.includes("[redacted secret]"),
-        "project report redacts credential-looking project domain metadata"
-      );
-      const labelReportData = await buildProjectReportData();
-      const labelReportHtml = projectReportHtml({
-        ...labelReportData,
-        project: { ...labelReportData.project, name: "Bearer report-project-label-token-that-must-not-appear" },
-        analysis: {
-          ...labelReportData.analysis,
-          files: labelReportData.analysis.files.map((file) => ({
-            ...file,
-            name: "Bearer report-file-label-token-that-must-not-appear.html"
-          }))
-        },
-        resources: {
-          ...labelReportData.resources,
-          mainTm: "Bearer report-main-tm-label-token-that-must-not-appear",
-          tmNames: ["Bearer report-tm-label-token-that-must-not-appear"],
-          tbNames: ["Bearer report-tb-label-token-that-must-not-appear"]
-        },
-        validation: {
-          ...labelReportData.validation,
-          risky: ["Risk for Bearer report-validation-risk-token-that-must-not-appear"],
-          warnings: ["Warning for Bearer report-validation-warning-token-that-must-not-appear"],
-          preserved: ["Preserved Bearer report-validation-preserved-token-that-must-not-appear"]
-        },
-        terms: [{
-          sourceTerm: "report-label-source",
-          targetTerm: "report-label-target",
-          isForbidden: false,
-          termBaseName: "Bearer report-termbase-label-token-that-must-not-appear",
-          notes: ""
-        }]
-      });
-      assert(
-        !labelReportHtml.includes("report-project-label-token-that-must-not-appear") &&
-          !labelReportHtml.includes("report-file-label-token-that-must-not-appear") &&
-          !labelReportHtml.includes("report-main-tm-label-token-that-must-not-appear") &&
-          !labelReportHtml.includes("report-tm-label-token-that-must-not-appear") &&
-          !labelReportHtml.includes("report-tb-label-token-that-must-not-appear") &&
-          !labelReportHtml.includes("report-validation-risk-token-that-must-not-appear") &&
-          !labelReportHtml.includes("report-validation-warning-token-that-must-not-appear") &&
-          !labelReportHtml.includes("report-validation-preserved-token-that-must-not-appear") &&
-          !labelReportHtml.includes("report-termbase-label-token-that-must-not-appear") &&
-          labelReportHtml.includes("[redacted secret]"),
-        "project report redacts credential-looking project file resource and validation labels"
-      );
-      assert(
-        !reportDownload.text.includes("Academic Metadata") &&
-          !reportDownload.text.includes("Translation Tech 501") &&
-          !reportDownload.text.includes("Sensitive experiment note"),
-        "project report omits academic metadata"
-      );
-      assert(reportDownload.text.includes("forbidden-report-term") && reportDownload.text.includes("Forbidden"), "project report includes terminology status");
-      assert(
-        !reportDownload.text.includes("report-term-note-token-that-must-not-appear") &&
-          reportDownload.text.includes("Report terminology fixture [redacted secret]"),
-        "project report redacts credential-looking termbase notes"
-      );
-      assert(!reportDownload.text.includes(reportTargetText), "project report omits segment target text");
-      assert(
-        reportDownload.text.includes("AI activity recorded") &&
-          !reportDownload.text.includes("Sensitive AI prompt trace") &&
-          !reportDownload.text.includes("Report activity prompt trace") &&
-          !reportDownload.text.includes("report-response-id-that-must-not-appear") &&
-          !reportDownload.text.includes("customEndpoint"),
-        "project report redacts AI activity summaries and provider trace metadata"
-      );
-      assert(
-        !reportDownload.text.includes("report-summary-token-that-must-not-appear") &&
-          !reportDownload.text.includes("report-activity-type-token-that-must-not-appear") &&
-          reportDownload.text.includes("[redacted secret]"),
-        "project report redacts credential-looking activity summaries and types"
-      );
-      assert(state.activityEvents.some((event) => event.type === "export" && event.summary === "Project report exported"), "project report export records project activity");
-      assert(state.workspaceDirtyProjectIds.has(project.id), "project report export marks workspace package dirty");
-
-      await exportQualityPassport();
-      const qualityPassportDownload = await waitFor(() => reportDownloads.find((item) => item.text.includes("LoopCAT Quality Passport")), "quality passport download");
-      assert(
-        qualityPassportDownload.text.includes("Quality Contract") &&
-          qualityPassportDownload.text.includes("Delivery Evidence") &&
-          qualityPassportDownload.text.includes("Risk Queue") &&
-          qualityPassportDownload.text.includes("Quality Categories") &&
-          qualityPassportDownload.text.includes("Accuracy"),
-        "quality passport export creates evidence HTML"
-      );
-      assert(qualityPassportDownload.text.includes(`Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`), "quality passport export includes restrictive CSP");
-      assert(!qualityPassportDownload.text.includes(reportTargetText), "quality passport omits segment target text");
-      assert(state.activityEvents.some((event) => event.type === "export" && event.summary === "Quality Passport exported"), "quality passport export records project activity");
-
-      await exportProjectReport({ anonymized: true });
-      const anonymizedReportDownload = await waitFor(() => reportDownloads.find((item) => item.text.includes("LoopCAT Anonymized Project Report")), "anonymized project report download");
-      assert(anonymizedReportDownload.text.includes("Anonymized project") && !anonymizedReportDownload.text.includes(state.project.name), "anonymized project report redacts project name");
-      assert(anonymizedReportDownload.text.includes(`Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`), "anonymized project report includes restrictive CSP");
-      assert(!anonymizedReportDownload.text.includes("external-domain-token-that-must-redact"), "anonymized project report redacts credential-looking project domain metadata");
-      assert(
-        !anonymizedReportDownload.text.includes("Academic Metadata") &&
-          !anonymizedReportDownload.text.includes("Private Corpus Alpha") &&
-          !anonymizedReportDownload.text.includes("Sensitive experiment note") &&
-          !anonymizedReportDownload.text.includes("P01"),
-        "anonymized project report omits academic metadata"
-      );
-      assert(!anonymizedReportDownload.text.includes("forbidden-report-term") && !anonymizedReportDownload.text.includes("Workflow TM"), "anonymized project report redacts terminology and resource names");
-      assert(state.activityEvents.some((event) => event.type === "export" && event.summary === "Anonymized project report exported"), "anonymized project report export records project activity");
-    } finally {
-      URL.createObjectURL = originalReportCreateObjectUrl;
-      HTMLAnchorElement.prototype.click = originalReportAnchorClick;
-    }
-
-    const statusDownloads = [];
-    const statusDownloadNames = [];
-    const statusRevokedUrls = [];
-    const originalStatusCreateObjectUrl = URL.createObjectURL.bind(URL);
-    const originalStatusRevokeObjectUrl = URL.revokeObjectURL.bind(URL);
-    const originalStatusAnchorClick = HTMLAnchorElement.prototype.click;
-    const originalStatusConfirm = window.confirm;
-    const statusConfirmMessages = [];
-    URL.createObjectURL = (blob) => {
-      statusDownloads.push({ type: blob.type, blob });
-      return originalStatusCreateObjectUrl(blob);
-    };
-    URL.revokeObjectURL = (url) => {
-      statusRevokedUrls.push(url);
-      return originalStatusRevokeObjectUrl(url);
-    };
-    HTMLAnchorElement.prototype.click = function noopStatusDownloadClick() {
-      statusDownloadNames.push(this.download);
-    };
-    window.confirm = (message) => {
-      statusConfirmMessages.push(String(message || ""));
-      return true;
-    };
-    try {
-      download("../CON.txt", "unsafe filename fixture", "text/plain");
-      download("unsafe:name/target?.xlf", "unsafe filename fixture", "application/x-xliff+xml");
-      download("Bearer download-label-token-that-must-not-appear.txt", "unsafe filename fixture", "text/plain");
-      assert(
-        statusDownloadNames.includes("loopcat_CON.txt") &&
-          statusDownloadNames.includes("target_.xlf") &&
-          !statusDownloadNames.some((name) => /[<>:"/\\|?*\u0000-\u001f]/.test(name)) &&
-          !statusDownloadNames.some((name) => name.includes("download-label-token-that-must-not-appear")) &&
-          statusDownloadNames.some((name) => name.includes("[redacted secret]")),
-        "downloads sanitize reserved names path separators unsafe characters and credential-looking labels"
-      );
-      setSaveStatus("Bearer save-status-token-that-must-not-appear failed", "dirty");
-      assert(
-        els.saveStatus.textContent.includes("[redacted secret]") &&
-          !els.saveStatus.textContent.includes("save-status-token-that-must-not-appear"),
-        "save status redacts credential-looking text"
-      );
-      state[OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG] = "Bearer ai-connection-status-token-that-must-not-appear";
-      try {
-        clearOpenAiKey();
-        assert(
-          els.aiConnectionStatus.textContent.includes("[redacted secret]") &&
-            !els.aiConnectionStatus.textContent.includes("ai-connection-status-token-that-must-not-appear"),
-          "AI connection status redacts credential-looking key-storage errors"
-        );
-      } finally {
-        Reflect.deleteProperty(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG);
-      }
-      renderValidationReport({
-        ok: true,
-        errors: [],
-        risky: [],
-        warnings: ["Bearer validation-report-warning-token-that-must-not-appear"],
-        simplified: [],
-        skipped: [],
-        preserved: ["Bearer validation-report-preserved-token-that-must-not-appear"]
-      });
-      const validationReportText = `${els.validationReportPanel.textContent}\n${JSON.stringify(state.lastValidationReport || {})}`;
-      assert(
-        validationReportText.includes("[redacted secret]") &&
-          !validationReportText.includes("validation-report-warning-token-that-must-not-appear") &&
-          !validationReportText.includes("validation-report-preserved-token-that-must-not-appear"),
-        "validation report display redacts credential-looking app-added messages"
-      );
-      renderValidationReport(null);
-      const originalValidationAlert = window.alert;
-      const validationAlerts = [];
-      try {
-        window.alert = (message) => validationAlerts.push(String(message || ""));
-        const alertLeakPackage = await buildProjectPackage(state.project);
-        alertLeakPackage.activityEvents = [
-          {
-            id: "Bearer validation-alert-activity-token-that-must-not-appear",
-            projectId: state.project.id,
-            type: "import",
-            summary: "Alert duplicate fixture",
-            detail: {},
-            createdAt: new Date().toISOString()
-          },
-          {
-            id: "Bearer validation-alert-activity-token-that-must-not-appear",
-            projectId: state.project.id,
-            type: "import",
-            summary: "Alert duplicate fixture",
-            detail: {},
-            createdAt: new Date().toISOString()
-          }
-        ];
-        const alertLeakImport = await importProjectPackageData(alertLeakPackage, {
-          sourceName: "Bearer validation-alert-source-token-that-must-not-appear.loopcat.json"
-        });
-        const validationAlertText = validationAlerts.join("\n");
-        assert(
-          !alertLeakImport &&
-            validationAlertText.includes("[redacted secret]") &&
-            !validationAlertText.includes("validation-alert-activity-token-that-must-not-appear") &&
-            !els.saveStatus.textContent.includes("validation-alert-source-token-that-must-not-appear"),
-          "project package validation alert redacts credential-looking errors"
-        );
-      } finally {
-        window.alert = originalValidationAlert;
-      }
-      const originalLabelProject = state.project;
-      const originalLabelProjects = state.projects;
-      const originalLabelProjectSummaries = state.projectSummaries;
-      const originalLabelResourceTmEntries = state.resourceTmEntries;
-      const originalLabelResourceType = state.resourceType;
-      const originalLabelConfirm = window.confirm;
-      const originalDocuments = projectDocumentManifest(state.project);
-      const labelDocumentName = "Bearer ui-document-label-token-that-must-not-appear";
-      const labelProject = {
-        ...state.project,
-        name: "Bearer ui-project-label-token-that-must-not-appear",
-        sourceFileName: "Bearer ui-source-file-label-token-that-must-not-appear",
-        documents: originalDocuments.map((documentInfo, index) => index === 0 ? { ...documentInfo, name: labelDocumentName } : documentInfo)
-      };
-      const capturedLabelPrompts = [];
-      try {
-        state.project = labelProject;
-        state.projects = state.projects.map((item) => item.id === labelProject.id ? labelProject : item);
-        state.projectSummaries = state.projectSummaries.map((item) => item.id === labelProject.id ? { ...item, ...labelProject } : item);
-        window.confirm = (message) => {
-          capturedLabelPrompts.push(message);
-          return false;
-        };
-        renderAll();
-        renderProjectsView();
-        await confirmDeleteProject(labelProject.id);
-        await confirmDeleteFile(projectDocuments()[0]);
-        confirmDuplicateImport(new File(["duplicate"], labelDocumentName, { type: "text/plain" }));
-        const labelUiText = [
-          els.projectList.textContent,
-          els.projectHomeView.textContent,
-          els.editorView.textContent,
-          els.projectDashboard.textContent,
-          els.documentFilter.textContent,
-          capturedLabelPrompts.join("\n")
-        ].join("\n");
-        assert(
-          labelUiText.includes("[redacted secret]") &&
-            !labelUiText.includes("ui-project-label-token-that-must-not-appear") &&
-            !labelUiText.includes("ui-source-file-label-token-that-must-not-appear") &&
-            !labelUiText.includes("ui-document-label-token-that-must-not-appear"),
-          "project and document labels redact credential-looking text in visible UI and prompts"
-        );
-        state.resourceType = "tm";
-        state.resourceTmEntries = [{
-          id: "ui-resource-label-entry",
-          tmName: "Bearer ui-resource-label-token-that-must-not-appear",
-          source: "Resource source",
-          target: "Resource target",
-          sourceLang: state.project.sourceLang,
-          targetLang: state.project.targetLang,
-          languagePair: `${state.project.sourceLang}::${state.project.targetLang}`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }];
-        renderResourceDashboard("tm");
-        assert(
-          els.tmResourceDashboard.textContent.includes("[redacted secret]") &&
-            !els.tmResourceDashboard.textContent.includes("ui-resource-label-token-that-must-not-appear"),
-          "resource labels redact credential-looking text in visible UI"
-        );
-      } finally {
-        window.confirm = originalLabelConfirm;
-        state.project = originalLabelProject;
-        state.projects = originalLabelProjects;
-        state.projectSummaries = originalLabelProjectSummaries;
-        state.resourceTmEntries = originalLabelResourceTmEntries;
-        state.resourceType = originalLabelResourceType;
-        renderAll();
-        renderProjectsView();
-        renderResourcesView();
-      }
-      await exportTargetText();
-      assert(els.saveStatus.textContent.startsWith("Target TXT exported") && statusDownloads.some((item) => item.type === "text/plain"), "target TXT export reports success");
-      await exportBilingualDocx();
-      assert(els.saveStatus.textContent.startsWith("Bilingual DOCX exported") && statusDownloads.some((item) => item.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), "bilingual DOCX export reports success");
-      await exportLocalization();
-      assert(els.saveStatus.textContent.startsWith("Localization file exported") && statusDownloads.some((item) => item.type === "text/html"), "localization export reports success");
-      await exportXliff();
-      assert(els.saveStatus.textContent.startsWith("XLIFF exported") && statusDownloads.some((item) => item.type === "application/x-xliff+xml"), "XLIFF export reports success");
-      await exportXliff22();
-      assert(els.saveStatus.textContent.startsWith("XLIFF 2.2 exported") && statusDownloads.some((item) => item.type === "application/xliff+xml"), "XLIFF 2.2 export reports success with the registered MIME type");
-      assert(
-        statusConfirmMessages.every((message) => message.includes("incomplete translation work") && message.includes("Export anyway?")),
-        "incomplete delivery export confirmations describe the scoped warning"
-      );
-      await saveTmEntry({
-        source: "TMX origin privacy source.",
-        target: "TMX origin privacy target.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        projectName: "Bearer project-tmx-origin-token-that-must-not-appear",
-        tmName: mainTmName()
-      });
-      const xmlDownloadsBeforeProjectTmx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      await handleTmxExport();
-      const projectTmxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
-      const projectTmxDownload = projectTmxDownloads[projectTmxDownloads.length - 1];
-      const projectTmxText = await projectTmxDownload.blob.text();
-      assert(els.saveStatus.textContent.includes("project TM") && projectTmxDownloads.length > xmlDownloadsBeforeProjectTmx, "project TMX export reports success");
-      assert(
-        projectTmxText.includes("TMX origin privacy source.") &&
-          !projectTmxText.includes("project-tmx-origin-token-that-must-not-appear") &&
-          projectTmxText.includes("[redacted secret]"),
-        "project TMX export redacts credential-looking origin metadata"
-      );
-      await refreshResources();
-      const xmlDownloadsBeforeResourceTmx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      exportResource("tm", `${mainTmName()}::${state.project.sourceLang}::${state.project.targetLang}`);
-      const resourceTmxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
-      const resourceTmxDownload = resourceTmxDownloads[resourceTmxDownloads.length - 1];
-      const resourceTmxText = await resourceTmxDownload.blob.text();
-      assert(
-        resourceTmxDownloads.length > xmlDownloadsBeforeResourceTmx &&
-          resourceTmxText.includes("TMX origin privacy source.") &&
-          !resourceTmxText.includes("project-tmx-origin-token-that-must-not-appear") &&
-          resourceTmxText.includes("[redacted secret]"),
-        "standalone TMX resource export redacts credential-looking origin metadata"
-      );
-      const xmlDownloadsBeforeProjectTbx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      await handleTbxExport();
-      const projectTbxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
-      const projectTbxDownload = projectTbxDownloads[projectTbxDownloads.length - 1];
-      const projectTbxText = await projectTbxDownload.blob.text();
-      assert(
-        projectTbxDownloads.length > xmlDownloadsBeforeProjectTbx &&
-          !projectTbxText.includes("report-term-note-token-that-must-not-appear") &&
-          projectTbxText.includes("Report terminology fixture [redacted secret]"),
-        "project TBX export redacts credential-looking termbase notes"
-      );
-      await refreshResources();
-      const xmlDownloadsBeforeResourceTbx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      exportResource("tb", `${primaryTermBaseName()}::${state.project.sourceLang}::${state.project.targetLang}`);
-      const resourceTbxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
-      const resourceTbxDownload = resourceTbxDownloads[resourceTbxDownloads.length - 1];
-      const resourceTbxText = await resourceTbxDownload.blob.text();
-      assert(
-        resourceTbxDownloads.length > xmlDownloadsBeforeResourceTbx &&
-          !resourceTbxText.includes("report-term-note-token-that-must-not-appear") &&
-          resourceTbxText.includes("Report terminology fixture [redacted secret]"),
-        "standalone TBX resource export redacts credential-looking termbase notes"
-      );
-      const targetTxtDownloadCountBeforeActivityFailure = statusDownloads.filter((item) => item.type === "text/plain").length;
-      setHiddenSegmentField(state.project, EXPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
-      await exportTargetText();
-      assert(
-        els.saveStatus.textContent.includes("Target TXT exported") &&
-          els.saveStatus.textContent.includes("activity log failed") &&
-          statusDownloads.filter((item) => item.type === "text/plain").length > targetTxtDownloadCountBeforeActivityFailure &&
-          state.workspaceDirtyProjectIds.has(project.id),
-        "target TXT export activity log failure reports warning after successful download"
-      );
-      Reflect.deleteProperty(state.project, EXPORT_ACTIVITY_FAILURE_TEST_FLAG);
-      const revokedUrlCountBeforeClickFailure = statusRevokedUrls.length;
-      const temporaryDownloadLinksBeforeClickFailure = document.querySelectorAll("a[download]").length;
-      HTMLAnchorElement.prototype.click = function failingStatusDownloadClick() {
-        throw new Error("Simulated download click failure");
-      };
-      await exportTargetText();
-      assert(
-        els.saveStatus.textContent.includes("Simulated download click failure") &&
-          document.querySelectorAll("a[download]").length === temporaryDownloadLinksBeforeClickFailure &&
-          statusRevokedUrls.length > revokedUrlCountBeforeClickFailure,
-        "target TXT export click failure cleans up temporary download link and URL"
-      );
-      HTMLAnchorElement.prototype.click = function noopStatusDownloadClick() {
-        statusDownloadNames.push(this.download);
-      };
-      URL.createObjectURL = () => {
-        throw new Error("Simulated download failure");
-      };
-      await exportTargetText();
-      assert(els.saveStatus.textContent.includes("Simulated download failure"), "target TXT export failure reports visible status");
-      await exportXliff();
-      assert(els.saveStatus.textContent.includes("Simulated download failure"), "XLIFF export failure reports visible status");
-      await handleTmxExport();
-      assert(els.saveStatus.textContent.includes("Simulated download failure"), "project TMX export failure reports visible status");
-      await handleTbxExport();
-      assert(els.saveStatus.textContent.includes("Simulated download failure"), "project TBX export failure reports visible status");
-      exportResource("tm", `${mainTmName()}::${state.project.sourceLang}::${state.project.targetLang}`);
-      assert(els.saveStatus.textContent.includes("Simulated download failure"), "resource export failure reports visible status");
-    } finally {
-      URL.createObjectURL = originalStatusCreateObjectUrl;
-      URL.revokeObjectURL = originalStatusRevokeObjectUrl;
-      HTMLAnchorElement.prototype.click = originalStatusAnchorClick;
-      window.confirm = originalStatusConfirm;
-    }
-
-    const resourceTmEntry = await saveTmEntry({
-      source: "Resource row TM source",
-      target: "Resource row TM target",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      projectName: state.project.name,
-      tmName: mainTmName()
-    });
-    const resourceTerm = await saveTerm({
-      sourceTerm: "resource-row-term",
-      targetTerm: "resource-row-target",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      notes: "Resource row note",
-      termBaseName: primaryTermBaseName(),
-      isForbidden: false
-    });
-    await refreshResources();
-    const editableTmEntry = state.resourceTmEntries.find((entry) => entry.id === resourceTmEntry.id);
-    const editableTerm = state.resourceTerms.find((term) => term.id === resourceTerm.id);
-    assert(Boolean(editableTmEntry && editableTerm), "resource row edit fixtures are visible in resource state");
-    setHiddenSegmentField(editableTmEntry, RESOURCE_TM_SAVE_FAILURE_TEST_FLAG, true);
-    const failedResourceTmSave = await saveEditedTmResourceEntry(editableTmEntry, {
-      source: resourceTmEntry.source,
-      target: "Unsaved TM resource target"
-    });
-    const failedStoredTm = (await listTmEntries()).find((entry) => entry.id === resourceTmEntry.id);
-    assert(
-      !failedResourceTmSave &&
-        els.saveStatus.textContent.includes("Simulated TM resource save failure") &&
-        failedStoredTm?.target === resourceTmEntry.target,
-      "TM resource row save failure reports visible status without changing stored entry"
-    );
-    Reflect.deleteProperty(editableTmEntry, RESOURCE_TM_SAVE_FAILURE_TEST_FLAG);
-    clearWorkspaceDirtyMarkers();
-    const successfulResourceTmSave = await saveEditedTmResourceEntry(editableTmEntry, {
-      source: resourceTmEntry.source,
-      target: "Saved TM resource target"
-    });
-    const savedStoredTm = (await listTmEntries()).find((entry) => entry.id === resourceTmEntry.id);
-    assert(
-      successfulResourceTmSave &&
-        savedStoredTm?.target === "Saved TM resource target" &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "TM resource row save persists entry and marks linked project dirty"
-    );
-    setHiddenSegmentField(editableTmEntry, RESOURCE_TM_DELETE_FAILURE_TEST_FLAG, true);
-    const failedResourceTmDelete = await deleteTmResourceEntry(editableTmEntry);
-    const failedDeletedTm = (await listTmEntries()).find((entry) => entry.id === resourceTmEntry.id);
-    assert(
-      !failedResourceTmDelete &&
-        els.saveStatus.textContent.includes("Simulated TM resource delete failure") &&
-        Boolean(failedDeletedTm),
-      "TM resource row delete failure reports visible status without deleting stored entry"
-    );
-    Reflect.deleteProperty(editableTmEntry, RESOURCE_TM_DELETE_FAILURE_TEST_FLAG);
-    clearWorkspaceDirtyMarkers();
-    const successfulResourceTmDelete = await deleteTmResourceEntry(editableTmEntry);
-    assert(
-      successfulResourceTmDelete &&
-        !(await listTmEntries()).some((entry) => entry.id === resourceTmEntry.id) &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "TM resource row delete removes entry and marks linked project dirty"
-    );
-    setHiddenSegmentField(editableTerm, RESOURCE_TERM_SAVE_FAILURE_TEST_FLAG, true);
-    const failedResourceTermSave = await saveEditedTermResourceEntry(editableTerm, {
-      sourceTerm: resourceTerm.sourceTerm,
-      targetTerm: "unsaved-resource-term-target",
-      notes: "Unsaved resource term note",
-      isForbidden: true
-    });
-    const failedStoredTerm = (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
-    assert(
-      !failedResourceTermSave &&
-        els.saveStatus.textContent.includes("Simulated term resource save failure") &&
-        failedStoredTerm?.targetTerm === resourceTerm.targetTerm &&
-        failedStoredTerm?.isForbidden === false,
-      "term resource row save failure reports visible status without changing stored term"
-    );
-    Reflect.deleteProperty(editableTerm, RESOURCE_TERM_SAVE_FAILURE_TEST_FLAG);
-    clearWorkspaceDirtyMarkers();
-    const successfulResourceTermSave = await saveEditedTermResourceEntry(editableTerm, {
-      sourceTerm: resourceTerm.sourceTerm,
-      targetTerm: "saved-resource-term-target",
-      notes: "Saved resource term note",
-      isForbidden: true
-    });
-    const savedStoredTerm = (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
-    assert(
-      successfulResourceTermSave &&
-        savedStoredTerm?.targetTerm === "saved-resource-term-target" &&
-        savedStoredTerm?.isForbidden === true &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "term resource row save persists term and marks linked project dirty"
-    );
-    setHiddenSegmentField(editableTerm, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG, true);
-    const failedResourceTermDelete = await deleteTermResourceEntry(editableTerm);
-    const failedDeletedTerm = (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
-    assert(
-      !failedResourceTermDelete &&
-        els.saveStatus.textContent.includes("Simulated term resource delete failure") &&
-        Boolean(failedDeletedTerm),
-      "term resource row delete failure reports visible status without deleting stored term"
-    );
-    Reflect.deleteProperty(editableTerm, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG);
-    clearWorkspaceDirtyMarkers();
-    const successfulResourceTermDelete = await deleteTermResourceEntry(editableTerm);
-    assert(
-      successfulResourceTermDelete &&
-        !(await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang, termBaseNames: [primaryTermBaseName()] })).some((term) => term.id === resourceTerm.id) &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "term resource row delete removes term and marks linked project dirty"
-    );
-
-    const bulkTmName = `Workflow Bulk Delete TM ${Date.now()}`;
-    const bulkTbName = `Workflow Bulk Delete TB ${Date.now()}`;
-    await saveTmEntry({
-      source: "bulk delete tm source one",
-      target: "bulk delete tm target one",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      projectName: state.project.name,
-      tmName: bulkTmName
-    });
-    await saveTmEntry({
-      source: "bulk delete tm source two",
-      target: "bulk delete tm target two",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      projectName: state.project.name,
-      tmName: bulkTmName
-    });
-    await saveTerm({
-      sourceTerm: "bulk delete tb source one",
-      targetTerm: "bulk delete tb target one",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      termBaseName: bulkTbName
-    });
-    await saveTerm({
-      sourceTerm: "bulk delete tb source two",
-      targetTerm: "bulk delete tb target two",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      termBaseName: bulkTbName
-    });
-    await refreshResources();
-    const bulkTmKey = `${bulkTmName}::${state.project.sourceLang}::${state.project.targetLang}`;
-    const bulkTbKey = `${bulkTbName}::${state.project.sourceLang}::${state.project.targetLang}`;
-    const originalResourceConfirm = window.confirm;
-    window.confirm = () => true;
-    try {
-      RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.add(`tm:${bulkTmKey}`);
-      const failedBulkTmDelete = await confirmDeleteResource("tm", bulkTmKey);
-      const failedBulkTmEntries = (await listTmEntries()).filter((entry) => entry.tmName === bulkTmName);
-      assert(
-        !failedBulkTmDelete &&
-          els.saveStatus.textContent.includes("Simulated TM resource delete failure") &&
-          failedBulkTmEntries.length === 2,
-        "TM whole resource delete failure reports visible status without partial deletion"
-      );
-      RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.delete(`tm:${bulkTmKey}`);
-      const successfulBulkTmDelete = await confirmDeleteResource("tm", bulkTmKey);
-      assert(
-        successfulBulkTmDelete &&
-          !(await listTmEntries()).some((entry) => entry.tmName === bulkTmName),
-        "TM whole resource delete removes all entries after recovered failure"
-      );
-
-      RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.add(`tb:${bulkTbKey}`);
-      const failedBulkTbDelete = await confirmDeleteResource("tb", bulkTbKey);
-      const failedBulkTbTerms = (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })).filter((term) => term.termBaseName === bulkTbName);
-      assert(
-        !failedBulkTbDelete &&
-          els.saveStatus.textContent.includes("Simulated termbase resource delete failure") &&
-          failedBulkTbTerms.length === 2,
-        "termbase whole resource delete failure reports visible status without partial deletion"
-      );
-      RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.delete(`tb:${bulkTbKey}`);
-      const successfulBulkTbDelete = await confirmDeleteResource("tb", bulkTbKey);
-      assert(
-        successfulBulkTbDelete &&
-          !(await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })).some((term) => term.termBaseName === bulkTbName),
-        "termbase whole resource delete removes all terms after recovered failure"
-      );
-    } finally {
-      RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.delete(`tm:${bulkTmKey}`);
-      RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.delete(`tb:${bulkTbKey}`);
-      window.confirm = originalResourceConfirm;
-    }
-
-    await importLocalization(new File([JSON.stringify({ title: "Package source JSON" })], "workflow-structure.json", { type: "application/json" }));
-    await importLocalization(new File(["key,source,target\nbutton,Package source CSV,CSV hedef"], "workflow-structure.csv", { type: "text/csv" }));
-    assert(
-      Boolean(state.project.documents.find((item) => item.name === "workflow-structure.json")) &&
-        Boolean(state.project.documents.find((item) => item.name === "workflow-structure.csv")),
-      "project package source-asset fixtures imported"
-    );
-
-    const packageDownloads = [];
-    const originalPackageCreateObjectUrl = URL.createObjectURL.bind(URL);
-    const originalPackageAnchorClick = HTMLAnchorElement.prototype.click;
-    URL.createObjectURL = (blob) => {
-      blob.text().then((text) => packageDownloads.push({ type: blob.type, text }));
-      return originalPackageCreateObjectUrl(blob);
-    };
-    HTMLAnchorElement.prototype.click = function noopPackageDownloadClick() {};
-    try {
-      const oldCreatedAt = new Date(Date.now() - 10 * 86400000).toISOString();
-      state.project = await updateProject({ ...state.project, createdAt: oldCreatedAt, exportHistory: [] });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      localStorage.removeItem(BACKUP_REMINDER_STORAGE);
-      renderBackupReminder();
-      assert(!els.backupReminderPanel.classList.contains("hidden") && els.backupReminderMessage.textContent.includes("no project package export"), "long-running project without package export shows backup reminder");
-      els.backupReminderDismissBtn.click();
-      assert(els.backupReminderPanel.classList.contains("hidden"), "backup reminder can be dismissed temporarily");
-      localStorage.removeItem(BACKUP_REMINDER_STORAGE);
-      renderBackupReminder();
-      assert(!els.backupReminderPanel.classList.contains("hidden"), "backup reminder returns after dismissal window is cleared");
-      const packageExportActivityCountBeforeFailure = state.activityEvents.filter((event) => event.type === "export" && event.summary === "Project package exported").length;
-      const packageFlushFailureText = `Paket dis aktarimi oncesi bekleyen hata ${Date.now()}`;
-      updateSegmentDraft(segmentIndex, packageFlushFailureText);
-      setHiddenSegmentField(state.segments[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
-      const packageDownloadCountBeforeFlushFailure = packageDownloads.length;
-      await exportProjectPackage();
-      assert(
-        els.saveStatus.textContent.includes("Simulated pending save flush failure") &&
-          state.saveTimers.has(state.segments[segmentIndex].id) &&
-          packageDownloads.length === packageDownloadCountBeforeFlushFailure &&
-          state.activityEvents.filter((event) => event.type === "export" && event.summary === "Project package exported").length === packageExportActivityCountBeforeFailure,
-        "project package export reports pending save flush failure without download or activity"
-      );
-      Reflect.deleteProperty(state.segments[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG);
-      await flushPendingSegmentSaves(project.id);
-      URL.createObjectURL = () => {
-        throw new Error("Simulated package download failure");
-      };
-      await exportProjectPackage();
-      assert(
-        els.saveStatus.textContent.includes("Simulated package download failure") &&
-          !(state.project.exportHistory || []).some((entry) => entry.type === "project-package") &&
-          state.activityEvents.filter((event) => event.type === "export" && event.summary === "Project package exported").length === packageExportActivityCountBeforeFailure,
-        "project package download failure does not record export success"
-      );
-      URL.createObjectURL = (blob) => {
-        blob.text().then((text) => packageDownloads.push({ type: blob.type, text }));
-        return originalPackageCreateObjectUrl(blob);
-      };
-      const packageExportTargetText = `Paket dis aktariminda saklanan hedef ${Date.now()}`;
-      updateSegmentDraft(segmentIndex, packageExportTargetText);
-      assert(state.saveTimers.has(state.segments[segmentIndex].id), "pending save exists before project package export");
-      await exportProjectPackage();
-      const packageDownload = await waitFor(() => packageDownloads.find((item) => item.type === "application/json" && item.text.includes('"type": "project-package"')), "project package download");
-      const exportedPackage = JSON.parse(packageDownload.text);
-      assert((exportedPackage.segments || []).some((segment) => segment.target === packageExportTargetText), "project package export flushes pending segment edits");
-      assert((exportedPackage.segments || []).some((segment) => segment.targetHistory?.some((entry) => entry.reason === "edit" && entry.toTarget === packageExportTargetText)), "project package export preserves pending segment revision history");
-      assert(exportedPackage.project.exportHistory?.some((entry) => entry.type === "project-package" && entry.filename?.endsWith(".loopcat.json")), "project package export includes export history entry");
-      assert(exportedPackage.activityEvents?.some((event) => event.type === "export" && event.summary === "Project package exported"), "project package export includes export activity event");
-      assert(
-        exportedPackage.sourceAssets?.some((asset) => asset.name === "workflow-structure.json" && asset.originalAvailable && asset.structurePreserved) &&
-          exportedPackage.sourceAssets?.some((asset) => asset.name === "workflow-structure.csv" && asset.originalAvailable && asset.structurePreserved),
-        "project package source assets report JSON and CSV reconstruction data"
-      );
-      assert(els.backupReminderPanel.classList.contains("hidden"), "project package export clears backup reminder");
-    } finally {
-      URL.createObjectURL = originalPackageCreateObjectUrl;
-      HTMLAnchorElement.prototype.click = originalPackageAnchorClick;
-    }
-
-    const switchText = `Proje gecisinde saklanan hedef ${Date.now()}`;
-    updateSegmentDraft(segmentIndex, switchText);
-    assert(state.saveTimers.size > 0, "pending save exists before project switch");
-    const secondProject = await createProject({
-      name: `Workflow Switch ${Date.now()}`,
-      sourceLang: "en",
-      targetLang: "tr",
-      tmName: "Workflow TM",
-      termBaseName: "Workflow TB"
-    });
-    await loadProjects(false);
-    await openProject(secondProject.id);
-    const firstProjectSegments = await getProjectSegments(project.id);
-    assert(firstProjectSegments.some((segment) => segment.target === switchText), "project switch flushes pending segment edits");
-
-    await openProject(project.id);
-    openProjectDialog("create");
-    document.querySelector("#projectNameInput").value = `Workflow Create Activity ${Date.now()}`;
-    document.querySelector("#projectDomainInput").value = "Creation warning";
-    document.querySelector("#sourceLangInput").value = "en";
-    document.querySelector("#targetLangInput").value = "tr";
-    els.newTmNameInput.value = "Workflow TM";
-    els.newTermBaseNameInput.value = "Workflow TB";
-    if (els.saveProjectToFolderInput) els.saveProjectToFolderInput.checked = false;
-    setHiddenSegmentField(els.projectForm, CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const createActivityProject = await saveProjectFromDialog();
-    assert(
-      createActivityProject?.id &&
-        state.project?.id === createActivityProject.id &&
-        els.saveStatus.textContent.includes("activity log failed") &&
-        state.workspaceDirtyProjectIds.has(createActivityProject.id),
-      "project creation activity log failure reports warning after successful project creation"
-    );
-    Reflect.deleteProperty(els.projectForm, CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG);
-    await deleteProject(createActivityProject.id);
-    clearWorkspaceDirty(createActivityProject.id);
-    await loadProjects(false);
-    await openProject(project.id);
-
-    const deleteProjectFixture = await createProject({
-      name: `Workflow Delete ${Date.now()}`,
-      sourceLang: "en",
-      targetLang: "tr",
-      tmName: "Workflow TM",
-      termBaseName: "Workflow TB"
-    });
-    await appendProjectSegments(deleteProjectFixture.id, [{ text: "Delete after typing.", target: "" }], {
-      documentId: "doc-delete-workflow",
-      documentName: "delete.txt",
-      documentType: "text"
-    });
-    await loadProjects(false);
-    await openProject(deleteProjectFixture.id);
-    const deleteText = `Silme oncesi hedef ${Date.now()}`;
-    updateSegmentDraft(0, deleteText);
-    assert(state.saveTimers.size > 0, "pending save exists before project delete");
-    const originalConfirm = window.confirm;
-    window.confirm = () => true;
-    try {
-      const deleteProjectListEntry = state.projects.find((item) => item.id === deleteProjectFixture.id);
-      setHiddenSegmentField(deleteProjectListEntry, PROJECT_DELETE_FAILURE_TEST_FLAG, true);
-      const failedProjectDelete = await confirmDeleteProject(deleteProjectFixture.id);
-      const failedProjectDeleteSegments = await getProjectSegments(deleteProjectFixture.id);
-      assert(
-        !failedProjectDelete &&
-          els.saveStatus.textContent.includes("Simulated project delete failure") &&
-          state.projects.some((item) => item.id === deleteProjectFixture.id) &&
-          failedProjectDeleteSegments.some((segment) => segment.target === deleteText),
-        "project delete failure reports visible status without deleting stored project"
-      );
-      Reflect.deleteProperty(deleteProjectListEntry, PROJECT_DELETE_FAILURE_TEST_FLAG);
-      const successfulProjectDelete = await confirmDeleteProject(deleteProjectFixture.id);
-      const projectTrashEntry = (await appRuntime.trashRepository.list()).find(
-        (entry) => entry.entityType === "project" && entry.projectId === deleteProjectFixture.id
-      );
-      assert(successfulProjectDelete && projectTrashEntry, "project delete moves records to persistent Trash after recovered failure");
-      await undoLastCommand();
-      assert(
-        Boolean(await getAllByIndex("segments", "projectId", deleteProjectFixture.id).then((segments) => segments.length)) &&
-          state.projects.some((item) => item.id === deleteProjectFixture.id),
-        "Undo restores a trashed project and its segments"
-      );
-      await redoLastCommand();
-      assert(
-        !state.projects.some((item) => item.id === deleteProjectFixture.id),
-        "Redo returns a restored project to Trash"
-      );
-    } finally {
-      window.confirm = originalConfirm;
-    }
-    const deletedSegments = await getProjectSegments(deleteProjectFixture.id);
-    assert(!deletedSegments.length && !pendingSaveRecords(deleteProjectFixture.id).length, "project delete clears pending saves without orphan segments");
-
-    const deleteFileFixture = await createProject({
-      name: `Workflow Delete File ${Date.now()}`,
-      sourceLang: "en",
-      targetLang: "tr",
-      tmName: "Workflow TM",
-      termBaseName: "Workflow TB"
-    });
-    await loadProjects(false);
-    await openProject(deleteFileFixture.id);
-    await importLocalization(new File(["<!doctype html><html><body><p>Delete file after typing.</p></body></html>"], "delete-file.html", { type: "text/html" }));
-    const deleteFileDocument = state.project.documents.find((item) => item.name === "delete-file.html");
-    const deleteFileText = `Silinen dosya hedefi ${Date.now()}`;
-    updateSegmentDraft(0, deleteFileText);
-    assert(state.saveTimers.size > 0, "pending save exists before file delete");
-    window.confirm = () => true;
-    try {
-      setHiddenSegmentField(deleteFileDocument, FILE_DELETE_FAILURE_TEST_FLAG, true);
-      const failedFileDelete = await confirmDeleteFile(deleteFileDocument);
-      const failedFileDeleteSegments = await getProjectSegments(deleteFileFixture.id);
-      assert(
-        !failedFileDelete &&
-          els.saveStatus.textContent.includes("Simulated file delete failure") &&
-          state.project.documents.some((item) => item.id === deleteFileDocument.id) &&
-          failedFileDeleteSegments.some((segment) => segment.documentId === deleteFileDocument.id && segment.target === deleteFileText),
-        "file delete failure reports visible status without deleting file segments"
-      );
-      Reflect.deleteProperty(deleteFileDocument, FILE_DELETE_FAILURE_TEST_FLAG);
-      setHiddenSegmentField(deleteFileDocument, FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG, true);
-      const successfulFileDelete = await confirmDeleteFile(deleteFileDocument);
-      const fileTrashEntry = (await appRuntime.trashRepository.list()).find(
-        (entry) => entry.entityType === "document" && entry.entityId === deleteFileDocument.id
-      );
-      assert(
-        successfulFileDelete &&
-          fileTrashEntry &&
-          !state.project.documents.some((item) => item.id === deleteFileDocument.id) &&
-          els.saveStatus.textContent.includes("activity log failed"),
-        "file delete activity log failure reports warning while preserving the file in Trash"
-      );
-      Reflect.deleteProperty(deleteFileDocument, FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG);
-      await undoLastCommand();
-      assert(
-        state.project.documents.some((item) => item.id === deleteFileDocument.id) &&
-          (await getProjectSegments(deleteFileFixture.id)).some((segment) => segment.documentId === deleteFileDocument.id),
-        "Undo restores a trashed file and its segments"
-      );
-      await redoLastCommand();
-      assert(
-        !state.project.documents.some((item) => item.id === deleteFileDocument.id),
-        "Redo returns a restored file to Trash"
-      );
-    } finally {
-      window.confirm = originalConfirm;
-    }
-    await delay(650);
-    const deletedFileSegments = await getProjectSegments(deleteFileFixture.id);
-    assert(!deletedFileSegments.length && !pendingSaveRecords(deleteFileFixture.id).length, "file delete clears pending saves without orphan segments");
-    await appRuntime.trashRepository.emptyAll();
-    await deleteProject(deleteFileFixture.id);
-    clearWorkspaceDirty(deleteFileFixture.id);
-    state.project = null;
-    state.segments = [];
-    state.view = "projects";
-    await loadProjects(false);
-
-    state.workspaceStatus = { supported: true, connected: false, mode: "browser-cache", name: "", lastSyncedAt: "", projectCount: 0, resourceCount: 0, backupCount: 0 };
-    clearWorkspaceDirtyMarkers();
-    markWorkspaceDirty(project.id);
-    renderWorkspaceStatus();
-    assert(!els.workspaceMenuSummary.textContent.includes("unsaved") && !shouldWarnBeforeUnload(), "browser-cache dirty recovery marker stays hidden until a workspace is connected");
-
-    const originalConnectChooseWorkspaceFolder = workspaceStorage.chooseWorkspaceFolder;
-    const originalConnectListWorkspacePackages = workspaceStorage.listProjectPackages;
-    try {
-      state.workspaceStatus = { supported: true, connected: false, mode: "browser-cache", name: "", lastSyncedAt: "", projectCount: 0, resourceCount: 0, backupCount: 0 };
-      clearWorkspaceDirtyMarkers();
-      workspaceStorage.chooseWorkspaceFolder = async () => ({ supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 1, resourceCount: 0, backupCount: 0 });
-      workspaceStorage.listProjectPackages = async () => [{ id: "other-project", name: "Other Project", packagePath: "projects/other/project.loopcat.json" }];
-      await chooseWorkspaceFolder();
-      assert(
-        state.workspaceDirtyProjectIds.has(project.id) &&
-          els.workspaceMenuSummary.textContent.includes("unsaved") &&
-          els.saveStatus.textContent.includes("local project package") &&
-          els.saveStatus.textContent.includes("to be saved"),
-        "workspace folder connection marks local projects missing from the folder dirty"
-      );
-      clearWorkspaceDirtyMarkers();
-      workspaceStorage.listProjectPackages = async () => [{ id: project.id, name: project.name, packagePath: `projects/${project.id}/project.loopcat.json` }];
-      await chooseWorkspaceFolder();
-      assert(
-        !state.workspaceDirtyProjectIds.has(project.id),
-        "workspace folder connection keeps local projects clean when the folder already has their package"
-      );
-    } finally {
-      workspaceStorage.chooseWorkspaceFolder = originalConnectChooseWorkspaceFolder;
-      workspaceStorage.listProjectPackages = originalConnectListWorkspacePackages;
-      clearWorkspaceDirtyMarkers();
-    }
-
-    state.workspaceStatus = { supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 0, resourceCount: 0, backupCount: 0 };
-    clearWorkspaceDirtyMarkers();
-    markWorkspaceDirty(project.id);
-    assert(readStoredWorkspaceDirtyIds().includes(project.id), "workspace dirty package marker persists for reload recovery");
-    clearWorkspaceDirtyMemoryOnly();
-    restoreWorkspaceDirtyIds();
-    assert(state.workspaceDirtyProjectIds.has(project.id), "workspace dirty package marker restores after reload");
-    localStorage.setItem(WORKSPACE_DIRTY_STORAGE, JSON.stringify([project.id, "missing-project"]));
-    restoreWorkspaceDirtyIds();
-    pruneWorkspaceDirtyProjectIds();
-    assert(state.workspaceDirtyProjectIds.has(project.id) && !state.workspaceDirtyProjectIds.has("missing-project"), "workspace dirty recovery prunes missing projects");
-    const beforeUnloadEvent = {
-      returnValue: undefined,
-      prevented: false,
-      preventDefault() {
-        this.prevented = true;
-      }
-    };
-    handleBeforeUnload(beforeUnloadEvent);
-    assert(beforeUnloadEvent.prevented && beforeUnloadEvent.returnValue === "", "workspace dirty packages warn before closing");
-
-    const originalSaveProjectPackage = workspaceStorage.saveProjectPackage;
-    const originalGetWorkspaceStatus = workspaceStorage.getStatus;
-    const savedWorkspacePackages = [];
-    workspaceStorage.saveProjectPackage = async (pkg) => {
-      savedWorkspacePackages.push(pkg);
-      return { manifest: {}, packagePath: `mock/${pkg.project.id}.loopcat.json`, savedAt: new Date().toISOString() };
-    };
-    workspaceStorage.getStatus = async () => ({ ...state.workspaceStatus, projectCount: savedWorkspacePackages.length });
-    try {
-      state.workspaceRecoveryProjectIds = new Set([project.id]);
-      state.workspaceRecoveryDismissed = false;
-      renderWorkspaceStatus();
-      assert(
-        !els.workspaceRecoveryPanel.classList.contains("hidden") &&
-          els.workspaceRecoveryMessage.textContent.includes("saved in LoopCAT") &&
-          els.workspaceRecoveryList.textContent.includes(project.name),
-        "startup workspace recovery panel names unsaved project packages"
-      );
-      els.workspaceRecoverySaveBtn.click();
-      await waitFor(() => !state.workspaceDirtyProjectIds.has(project.id), "workspace recovery panel save");
-      assert(els.workspaceRecoveryPanel.classList.contains("hidden"), "workspace recovery panel hides after saved packages are written");
-      markWorkspaceDirty(project.id);
-      await autosaveDirtyWorkspacePackages();
-    } finally {
-      workspaceStorage.saveProjectPackage = originalSaveProjectPackage;
-      workspaceStorage.getStatus = originalGetWorkspaceStatus;
-    }
-    assert(savedWorkspacePackages.some((pkg) => pkg.project.id === project.id && pkg.segments.some((segment) => segment.target === switchText)) && !state.workspaceDirtyProjectIds.has(project.id), "background workspace autosave saves dirty inactive project packages");
-    assert(!readStoredWorkspaceDirtyIds().includes(project.id), "workspace autosave clears persisted dirty marker");
-
-    await openProject(project.id);
-    state.workspaceStatus = { supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 0, resourceCount: 0, backupCount: 0 };
-    clearWorkspaceDirtyMarkers();
-    const pendingWorkspaceAutosavePackages = [];
-    const originalPendingWorkspaceAutosaveSave = workspaceStorage.saveProjectPackage;
-    const originalPendingWorkspaceAutosaveStatus = workspaceStorage.getStatus;
-    workspaceStorage.saveProjectPackage = async (pkg) => {
-      pendingWorkspaceAutosavePackages.push(pkg);
-      return { manifest: {}, packagePath: `mock/${pkg.project.id}.loopcat.json`, savedAt: new Date().toISOString() };
-    };
-    workspaceStorage.getStatus = async () => ({ ...state.workspaceStatus, projectCount: pendingWorkspaceAutosavePackages.length });
-    try {
-      const pendingWorkspaceAutosaveSegment = state.segments[0];
-      const pendingWorkspaceAutosaveIndex = state.segments.findIndex((segment) => segment.id === pendingWorkspaceAutosaveSegment.id);
-      const pendingWorkspaceAutosavePreviousTarget = pendingWorkspaceAutosaveSegment.target || "";
-      const pendingWorkspaceAutosavePreviousStatus = pendingWorkspaceAutosaveSegment.status || "empty";
-      const pendingWorkspaceAutosaveText = `workspace autosave pending target ${Date.now()}`;
-      updateSegmentDraft(pendingWorkspaceAutosaveIndex, pendingWorkspaceAutosaveText);
-      assert(state.saveTimers.has(pendingWorkspaceAutosaveSegment.id), "pending active workspace autosave save created");
-      await autosaveDirtyWorkspacePackages();
-      const storedPendingWorkspaceAutosaveSegment = (await getProjectSegments(project.id)).find((segment) => segment.id === pendingWorkspaceAutosaveSegment.id);
-      assert(
-        pendingWorkspaceAutosavePackages.some((pkg) =>
-          pkg.project.id === project.id &&
-            pkg.segments.some((segment) => segment.id === pendingWorkspaceAutosaveSegment.id && segment.target === pendingWorkspaceAutosaveText)
-        ) &&
-          storedPendingWorkspaceAutosaveSegment?.target === pendingWorkspaceAutosaveText &&
-          !state.saveTimers.has(pendingWorkspaceAutosaveSegment.id) &&
-          !state.workspaceDirtyProjectIds.has(project.id),
-        "background workspace autosave flushes pending active segment edits before saving package"
-      );
-      setSegmentTargetAndStatus(pendingWorkspaceAutosaveSegment, pendingWorkspaceAutosavePreviousTarget, pendingWorkspaceAutosavePreviousStatus, "test-restore");
-      touchSegment(pendingWorkspaceAutosaveSegment);
-      await saveSegment(pendingWorkspaceAutosaveSegment);
-    } finally {
-      workspaceStorage.saveProjectPackage = originalPendingWorkspaceAutosaveSave;
-      workspaceStorage.getStatus = originalPendingWorkspaceAutosaveStatus;
-      clearWorkspaceDirtyMarkers();
-    }
-
-    const cleanBeforeUnloadEvent = {
-      returnValue: undefined,
-      prevented: false,
-      preventDefault() {
-        this.prevented = true;
-      }
-    };
-    handleBeforeUnload(cleanBeforeUnloadEvent);
-    assert(!cleanBeforeUnloadEvent.prevented, "clean workspace does not warn before closing");
-
-    await openProject(project.id);
-    clearWorkspaceDirtyMarkers();
-    const workspaceSaveActivityPackages = [];
-    const originalWorkspaceSaveActivitySave = workspaceStorage.saveProjectPackage;
-    const originalWorkspaceSaveActivityStatus = workspaceStorage.getStatus;
-    workspaceStorage.saveProjectPackage = async (pkg) => {
-      workspaceSaveActivityPackages.push(pkg);
-      return { manifest: {}, packagePath: `mock/${pkg.project.id}.loopcat.json`, savedAt: new Date().toISOString() };
-    };
-    workspaceStorage.getStatus = async () => ({ ...state.workspaceStatus, projectCount: workspaceSaveActivityPackages.length });
-    try {
-      setHiddenSegmentField(state, WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG, true);
-      await saveCurrentProjectPackageToWorkspace();
-      assert(
-        workspaceSaveActivityPackages.some((pkg) => pkg.project.id === project.id) &&
-          els.saveStatus.textContent.includes("activity log failed") &&
-          state.workspaceDirtyProjectIds.has(project.id),
-        "workspace package save activity log failure still writes package and reports warning"
-      );
-    } finally {
-      Reflect.deleteProperty(state, WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG);
-      workspaceStorage.saveProjectPackage = originalWorkspaceSaveActivitySave;
-      workspaceStorage.getStatus = originalWorkspaceSaveActivityStatus;
-      clearWorkspaceDirtyMarkers();
-    }
-
-    await openProject(project.id);
-    clearWorkspaceDirtyMarkers();
-    const workspaceWriteFailureActivityCount = (await listActivityEvents(project.id))
-      .filter((event) => event.type === "workspace-save" && event.summary === "Project package saved to workspace folder").length;
-    const originalWorkspaceWriteFailureSave = workspaceStorage.saveProjectPackage;
-    workspaceStorage.saveProjectPackage = async () => {
-      throw new Error("Simulated workspace package write failure");
-    };
-    try {
-      let workspaceWriteFailureRejected = false;
-      try {
-        await saveCurrentProjectPackageToWorkspace();
-      } catch (error) {
-        workspaceWriteFailureRejected = error.message.includes("Simulated workspace package write failure");
-      }
-      const activityAfterFailedWorkspaceWrite = await listActivityEvents(project.id);
-      assert(
-        workspaceWriteFailureRejected &&
-          activityAfterFailedWorkspaceWrite.filter((event) => event.type === "workspace-save" && event.summary === "Project package saved to workspace folder").length === workspaceWriteFailureActivityCount &&
-          state.workspaceDirtyProjectIds.has(project.id),
-        "failed workspace package save keeps project dirty without recording successful workspace-save activity"
-      );
-    } finally {
-      workspaceStorage.saveProjectPackage = originalWorkspaceWriteFailureSave;
-      clearWorkspaceDirtyMarkers();
-    }
-    await logProjectActivity("qa-run", "Activity dirty regression", { source: "workflow-test" });
-    assert(state.workspaceDirtyProjectIds.has(project.id), "activity events mark linked project package dirty");
-
-    const invalidWorkspaceProject = await createProject({
-      name: `Workflow Invalid Package ${Date.now()}`,
-      sourceLang: "en",
-      targetLang: "tr",
-      tmName: "Workflow TM",
-      termBaseName: "Workflow TB"
-    });
-    await bulkPut("projects", [{ ...invalidWorkspaceProject, qaSettings: null }]);
-    await loadProjects(false);
-    clearWorkspaceDirtyMarkers();
-    markWorkspaceDirty(invalidWorkspaceProject.id);
-    const invalidPackageSaves = [];
-    const originalInvalidSaveProjectPackage = workspaceStorage.saveProjectPackage;
-    const originalInvalidGetWorkspaceStatus = workspaceStorage.getStatus;
-    workspaceStorage.saveProjectPackage = async (pkg) => {
-      invalidPackageSaves.push(pkg);
-      return { manifest: {}, packagePath: `mock/${pkg.project.id}.loopcat.json`, savedAt: new Date().toISOString() };
-    };
-    workspaceStorage.getStatus = async () => ({ ...state.workspaceStatus, connected: true });
-    try {
-      let invalidWorkspaceSaveRejected = false;
-      try {
-        await saveProjectPackageToWorkspaceById(invalidWorkspaceProject.id);
-      } catch (error) {
-        invalidWorkspaceSaveRejected = error.validation?.errors?.some((item) => item.includes("Project QA settings")) && error.message.includes("Cannot save project package");
-      }
-      assert(invalidWorkspaceSaveRejected, "workspace package save rejects invalid generated packages");
-      assert(!invalidPackageSaves.length && state.workspaceDirtyProjectIds.has(invalidWorkspaceProject.id), "invalid workspace package is not written or marked clean");
-      markWorkspaceDirty(project.id);
-      const expectedAutosaveWarnings = [];
-      const originalConsoleWarn = console.warn;
-      console.warn = (...args) => {
-        const text = args.map((arg) => arg?.message || String(arg)).join(" ");
-        if (text.includes("Cannot save project package to workspace")) {
-          expectedAutosaveWarnings.push(text);
-          return;
-        }
-        originalConsoleWarn(...args);
-      };
-      try {
-        await autosaveDirtyWorkspacePackages();
-      } finally {
-        console.warn = originalConsoleWarn;
-      }
-      assert(
-        invalidPackageSaves.some((pkg) => pkg.project.id === project.id) &&
-          state.workspaceDirtyProjectIds.has(invalidWorkspaceProject.id) &&
-          !state.workspaceDirtyProjectIds.has(project.id) &&
-          els.saveStatus.textContent.includes("background workspace save"),
-        "background workspace autosave continues after an invalid dirty package"
-      );
-      assert(expectedAutosaveWarnings.length === 1, "background workspace autosave records expected invalid package warning");
-    } finally {
-      workspaceStorage.saveProjectPackage = originalInvalidSaveProjectPackage;
-      workspaceStorage.getStatus = originalInvalidGetWorkspaceStatus;
-      await deleteProject(invalidWorkspaceProject.id);
-      clearWorkspaceDirty(invalidWorkspaceProject.id);
-      await loadProjects(false);
-    }
-
-    let invalidBackupWriteRejected = false;
-    try {
-      assertValidBackupForWrite({ app: "LoopCAT", schemaVersion: storageConstants.BACKUP_SCHEMA_VERSION, projects: {}, segments: [], tmEntries: [], terms: [], activityEvents: [], trashEntries: [] }, "export backup");
-    } catch (error) {
-      invalidBackupWriteRejected = error.validation?.errors?.some((item) => item.includes("Projects must be an array")) && error.message.includes("Cannot export backup");
-    }
-    assert(invalidBackupWriteRejected, "backup export write guard rejects invalid backup payloads");
-
-    const invalidWorkspaceBackupProject = await createProject({
-      name: `Workflow Invalid Backup ${Date.now()}`,
-      sourceLang: "en",
-      targetLang: "tr",
-      tmName: "Workflow TM",
-      termBaseName: "Workflow TB"
-    });
-    await bulkPut("projects", [{ ...invalidWorkspaceBackupProject, documents: {} }]);
-    await loadProjects(false);
-    const originalInvalidWorkspaceBackupExport = workspaceStorage.exportFullBackup;
-    const invalidWorkspaceBackupWrites = [];
-    workspaceStorage.exportFullBackup = async (backup) => {
-      invalidWorkspaceBackupWrites.push(backup);
-      return { path: "mock/invalid-backup.json", manifestSaved: true };
-    };
-    try {
-      let invalidWorkspaceBackupRejected = false;
-      try {
-        await exportWorkspaceBackupToFolder();
-      } catch (error) {
-        invalidWorkspaceBackupRejected = error.validation?.errors?.some((item) => item.includes("document manifest must be an array")) && error.message.includes("Cannot export backup");
-      }
-      assert(
-        invalidWorkspaceBackupRejected &&
-          !invalidWorkspaceBackupWrites.length &&
-          state.lastValidationReport?.errors?.some((item) => item.includes("document manifest must be an array")) &&
-          els.saveStatus.textContent.includes("Cannot export backup"),
-        "workspace backup export reports validation failure before writing folder backup"
-      );
-    } finally {
-      workspaceStorage.exportFullBackup = originalInvalidWorkspaceBackupExport;
-      await deleteProject(invalidWorkspaceBackupProject.id);
-      clearWorkspaceDirty(invalidWorkspaceBackupProject.id);
-      await loadProjects(false);
-    }
-
-    const restoreDirtyBackup = await exportAllData();
-    clearWorkspaceDirtyMarkers();
-    const restoreDirtyResult = await restoreBackupData(restoreDirtyBackup);
-    assert(restoreDirtyResult && restoreDirtyBackup.projects.every((item) => state.workspaceDirtyProjectIds.has(item.id)) && state.lastValidationReport?.risky?.some((item) => item.includes("must be saved to the workspace folder")), "manual backup restore marks connected workspace packages dirty");
-
-    clearWorkspaceDirtyMarkers();
-    els.tmResourceNameInput.value = "Workflow TM";
-    els.tmResourceSourceLangInput.value = languageOptionValue("en");
-    els.tmResourceTargetLangInput.value = languageOptionValue("tr");
-    const linkedResourceTmx = buildTmx([{ source: "Linked resource TM source", target: "Linked resource TM target", sourceLang: "en", targetLang: "tr", projectName: "Resource dirty regression" }], { sourceLang: "en", targetLang: "tr" });
-    await handleResourceTmxImport(new File([linkedResourceTmx], "linked-resource.tmx", { type: "application/xml" }));
-    assert(state.workspaceDirtyProjectIds.has(project.id), "TMX resource import marks linked project package dirty");
-
-    const linkedTmEntry = (await listTmEntries({ sourceLang: "en", targetLang: "tr", tmNames: ["Workflow TM"] }))
-      .find((entry) => entry.source === "Linked resource TM source");
-    assert(
-      Boolean(linkedTmEntry) &&
-        linkedTmEntry.sourceLang === "en" &&
-        linkedTmEntry.targetLang === "tr" &&
-        els.tmResourceSourceLangInput.value === languageOptionValue("en") &&
-        els.tmResourceTargetLangInput.value === languageOptionValue("tr"),
-      "linked TM resource import normalizes friendly language labels before memory lookup"
-    );
-    clearWorkspaceDirtyMarkers();
-    const linkedTmRow = renderTmEntryRow(linkedTmEntry);
-    linkedTmRow.querySelector('[data-field="target"]').value = "Linked resource TM target updated";
-    linkedTmRow.querySelector("button").click();
-    await waitFor(() => state.workspaceDirtyProjectIds.has(project.id), "linked TM row save dirty marker");
-    assert(state.workspaceDirtyProjectIds.has(project.id), "TM resource row save marks linked project package dirty");
-
-    clearWorkspaceDirtyMarkers();
-    els.tbResourceNameInput.value = "Workflow TB";
-    els.tbResourceSourceLangInput.value = languageOptionValue("en");
-    els.tbResourceTargetLangInput.value = languageOptionValue("tr");
-    const linkedResourceTbx = `<?xml version="1.0" encoding="UTF-8"?>
-<tbx>
-  <text>
-    <body>
-      <termEntry id="linked-resource-term">
-        <langSet xml:lang="en"><tig><term>linked resource term</term></tig></langSet>
-        <langSet xml:lang="tr"><tig><term>bagli kaynak terimi</term></tig></langSet>
-        <descrip type="context">Linked TBX context note</descrip>
-      </termEntry>
-      <termEntry id="linked-sensitive-resource-term">
-        <langSet xml:lang="en"><tig><term>linked sensitive resource term</term></tig></langSet>
-        <langSet xml:lang="tr"><tig><term>bagli gizli kaynak terimi</term></tig></langSet>
-        <descrip type="context">Bearer linked-tbx-note-token-that-must-not-import</descrip>
-      </termEntry>
-    </body>
-  </text>
-</tbx>`;
-    await handleResourceTbxImport(new File([linkedResourceTbx], "linked-resource.tbx", { type: "application/xml" }));
-    assert(state.workspaceDirtyProjectIds.has(project.id), "TBX resource import marks linked project package dirty");
-    clearWorkspaceDirtyMarkers();
-    const linkedResourceCsv = [
-      "source,target,notes,forbidden",
-      "linked csv term,bagli csv terimi,CSV resource import,no",
-      "linked forbidden csv term,yasak csv terimi,Forbidden CSV resource import,yes"
-    ].join("\n");
-    await handleResourceTermListImport(new File([linkedResourceCsv], "linked-resource.csv", { type: "text/csv" }));
-    assert(state.workspaceDirtyProjectIds.has(project.id), "CSV term resource import marks linked project package dirty");
-
-    const linkedTerm = (await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] }))
-      .find((term) => term.sourceTerm === "linked resource term");
-    assert(
-      Boolean(linkedTerm) &&
-        linkedTerm.sourceLang === "en" &&
-        linkedTerm.targetLang === "tr" &&
-        els.tbResourceSourceLangInput.value === languageOptionValue("en") &&
-        els.tbResourceTargetLangInput.value === languageOptionValue("tr"),
-      "linked TB resource imports normalize friendly language labels before terminology lookup"
-    );
-    assert(linkedTerm?.notes === "Linked TBX context note", "TBX resource import preserves termbase notes");
-    const linkedSensitiveTerm = (await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] }))
-      .find((term) => term.sourceTerm === "linked sensitive resource term");
-    assert(linkedSensitiveTerm?.notes === "[redacted secret]", "TBX resource import redacts credential-looking termbase notes");
-    const linkedCsvTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] });
-    assert(linkedCsvTerms.some((term) => term.sourceTerm === "linked csv term") && linkedCsvTerms.some((term) => term.sourceTerm === "linked forbidden csv term" && term.isForbidden), "CSV term resource import creates editable approved and forbidden terms");
-    clearWorkspaceDirtyMarkers();
-    const linkedTermRow = renderTermRow(linkedTerm);
-    linkedTermRow.querySelector('[data-field="targetTerm"]').value = "guncel bagli kaynak terimi";
-    linkedTermRow.querySelector("button").click();
-    await waitFor(() => state.workspaceDirtyProjectIds.has(project.id), "linked TB row save dirty marker");
-    assert(state.workspaceDirtyProjectIds.has(project.id), "TB resource row save marks linked project package dirty");
-
-    await openProject(project.id);
-    await openProjectFile(documentInfo.id);
-    const termSuggestionSegmentIndex = state.segments.findIndex((segment) => segment.documentId === documentInfo.id && (segment.source || segment.text || "").includes("Hello"));
-    assert(termSuggestionSegmentIndex >= 0, "term suggestion regression has source segment");
-    await setActiveSegment(termSuggestionSegmentIndex);
-    renderTermbaseSelect();
-    els.termBaseSelect.value = "Workflow TB";
-    els.sourceTermInput.value = "unsaved sidebar term";
-    els.targetTermInput.value = "kaydedilmeyen yan panel terimi";
-    els.termNotesInput.value = "This term must stay in the form when saving fails";
-    setHiddenSegmentField(els.termForm, TERM_FORM_SAVE_FAILURE_TEST_FLAG, true);
-    const failedTermFormSave = await saveTermFromForm();
-    const failedSidebarTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] });
-    assert(
-      !failedTermFormSave &&
-        els.saveStatus.textContent.includes("Simulated term form save failure") &&
-        els.sourceTermInput.value === "unsaved sidebar term" &&
-        !failedSidebarTerms.some((term) => term.sourceTerm === "unsaved sidebar term"),
-      "term form save failure reports visible status without changing stored terms"
-    );
-    Reflect.deleteProperty(els.termForm, TERM_FORM_SAVE_FAILURE_TEST_FLAG);
-    els.sourceTermInput.value = "Hello";
-    els.targetTermInput.value = "Merhaba";
-    els.termNotesInput.value = "Suggestion dirty regression";
-    clearWorkspaceDirtyMarkers();
-    const savedTermFromForm = await saveTermFromForm();
-    assert(savedTermFromForm && state.workspaceDirtyProjectIds.has(project.id), "term form save marks linked project package dirty");
-    await waitFor(() => Array.from(els.termSuggestions.querySelectorAll(".term-card")).some((card) => card.textContent.includes("Hello")), "term suggestion card");
-    const helloTermForDeleteFailure = (await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] })).find((term) => term.sourceTerm === "Hello");
-    assert(Boolean(helloTermForDeleteFailure), "term suggestion delete failure fixture exists");
-    setHiddenSegmentField(helloTermForDeleteFailure, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG, true);
-    const failedSuggestionDelete = await deleteTermResourceEntry(helloTermForDeleteFailure, { refreshResourceView: false, refreshSuggestions: true });
-    assert(
-      !failedSuggestionDelete &&
-        els.saveStatus.textContent.includes("Simulated term resource delete failure") &&
-        (await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] })).some((term) => term.id === helloTermForDeleteFailure.id),
-      "term suggestion delete failure reports visible status without deleting stored term"
-    );
-    clearWorkspaceDirtyMarkers();
-    const suggestionCard = Array.from(els.termSuggestions.querySelectorAll(".term-card")).find((card) => card.textContent.includes("Hello"));
-    const suggestionDeleteButton = suggestionCard?.querySelector("button");
-    assert(Boolean(suggestionDeleteButton), "term suggestion delete button renders");
-    suggestionDeleteButton.click();
-    await waitFor(() => state.workspaceDirtyProjectIds.has(project.id), "term suggestion delete dirty marker");
-    assert(state.workspaceDirtyProjectIds.has(project.id), "term suggestion delete marks linked project package dirty");
-    clearWorkspaceDirtyMarkers();
-
-    let malformedBackupRejected = false;
-    try {
-      await restoreBackupFile(new File(["{not valid json"], "broken-backup.json", { type: "application/json" }));
-    } catch (error) {
-      malformedBackupRejected = error.message === "Backup file is not valid JSON.";
-      renderValidationReport(portableFileErrorReport(error.message));
-      setSaveStatus(error.message, "dirty");
-    }
-    assert(malformedBackupRejected && state.lastValidationReport?.errors?.[0] === "Backup file is not valid JSON.", "malformed backup JSON fails with validation report");
-
-    const invalidBackupResult = await restoreBackupData({ app: "LoopCAT", schemaVersion: storageConstants.BACKUP_SCHEMA_VERSION, projects: {}, segments: [], tmEntries: [], terms: [], activityEvents: [], trashEntries: [] });
-    assert(!invalidBackupResult && state.lastValidationReport?.errors?.some((error) => error.includes("Projects must be an array")), "invalid backup shape is rejected without restore");
-
-    let oversizedBackupRejected = false;
-    try {
-      await restoreBackupFile(new File([new Blob([new Uint8Array(MAX_PORTABLE_JSON_BYTES + 1)])], "huge-backup.json", { type: "application/json" }));
-    } catch (error) {
-      oversizedBackupRejected = error.message.includes("too large");
-      renderValidationReport(portableFileErrorReport(error.message));
-      setSaveStatus(error.message, "dirty");
-    }
-    assert(oversizedBackupRejected && state.lastValidationReport?.errors?.[0]?.includes("too large"), "oversized backup JSON fails before restore");
-
-    let malformedPackageRejected = false;
-    try {
-      await importProjectPackage(new File(["{broken package"], "broken.loopcat.json", { type: "application/json" }));
-    } catch (error) {
-      malformedPackageRejected = error.message === "Project package is not valid JSON.";
-      renderValidationReport(portableFileErrorReport(error.message));
-      setSaveStatus(error.message, "dirty");
-    }
-    assert(malformedPackageRejected && state.lastValidationReport?.errors?.[0] === "Project package is not valid JSON.", "malformed project package JSON fails with validation report");
-
-    let oversizedPackageRejected = false;
-    try {
-      await importProjectPackage(new File([new Blob([new Uint8Array(MAX_PORTABLE_JSON_BYTES + 1)])], "huge.loopcat.json", { type: "application/json" }));
-    } catch (error) {
-      oversizedPackageRejected = error.message.includes("too large");
-      renderValidationReport(portableFileErrorReport(error.message));
-      setSaveStatus(error.message, "dirty");
-    }
-    assert(oversizedPackageRejected && state.lastValidationReport?.errors?.[0]?.includes("too large"), "oversized project package JSON fails before import");
-
-    const invalidPackageShapeResult = await importProjectPackageData({ app: "LoopCAT", type: "project-package", version: 1 }, {
-      sourceName: "invalid-shape.loopcat.json",
-      suppressAlert: true
-    });
-    assert(!invalidPackageShapeResult && els.saveStatus.textContent === "Project package import failed validation", "invalid project package shape reports failed import status");
-
-    const originalListWorkspacePackages = workspaceStorage.listProjectPackages;
-    const originalReadWorkspacePackage = workspaceStorage.readProjectPackage;
-    const originalGetWorkspaceStatusForUnreadablePackage = workspaceStorage.getStatus;
-    const originalWorkspaceStatus = state.workspaceStatus;
-    workspaceStorage.listProjectPackages = async () => [{ id: "bad-workspace-package", name: "Bad Workspace Package Bearer workspace-sync-label-token-that-must-not-appear", packagePath: "projects/bad/project.loopcat.json" }];
-    workspaceStorage.readProjectPackage = async () => ({ app: "LoopCAT", type: "project-package", version: 1 });
-    workspaceStorage.getStatus = async () => ({
-      ...state.workspaceStatus,
-      skippedProjectCount: 1,
-      warnings: ["Skipped unreadable workspace package in Damaged Bearer workspace-status-warning-token-that-must-not-appear: project.loopcat.json is too large to read from the workspace folder."]
-    });
-    state.workspaceStatus = { supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 1, resourceCount: 0, backupCount: 0 };
-    try {
-      await syncWorkspaceFromFolder();
-      assert(state.lastValidationReport?.warnings?.some((item) => item.includes("failed validation and was skipped")) && els.saveStatus.textContent === "Workspace sync completed with warnings", "workspace sync reports skipped invalid packages");
-      assert(state.lastValidationReport?.warnings?.some((item) => item.includes("Skipped unreadable workspace package in Damaged")), "workspace sync reports unreadable workspace packages");
-      const workspaceSyncWarningText = JSON.stringify(state.lastValidationReport?.warnings || []);
-      assert(
-        !workspaceSyncWarningText.includes("workspace-sync-label-token-that-must-not-appear") &&
-          !workspaceSyncWarningText.includes("workspace-status-warning-token-that-must-not-appear"),
-        "workspace sync warnings redact credential-looking external labels"
-      );
-    } finally {
-      workspaceStorage.listProjectPackages = originalListWorkspacePackages;
-      workspaceStorage.readProjectPackage = originalReadWorkspacePackage;
-      workspaceStorage.getStatus = originalGetWorkspaceStatusForUnreadablePackage;
-      state.workspaceStatus = originalWorkspaceStatus;
-    }
-
-    const originalErrorSyncListWorkspacePackages = workspaceStorage.listProjectPackages;
-    const originalErrorSyncReadWorkspacePackage = workspaceStorage.readProjectPackage;
-    const originalErrorSyncGetStatus = workspaceStorage.getStatus;
-    const originalErrorSyncWorkspaceStatus = state.workspaceStatus;
-    workspaceStorage.listProjectPackages = async () => [{
-      id: "error-workspace-package",
-      name: "Error Workspace Package Bearer workspace-sync-error-label-token-that-must-not-appear",
-      packagePath: "projects/error/project.loopcat.json"
-    }];
-    workspaceStorage.readProjectPackage = async () => {
-      throw new Error("Bearer workspace-sync-error-token-that-must-not-appear could not be read.");
-    };
-    workspaceStorage.getStatus = async () => ({
-      ...state.workspaceStatus,
-      warnings: []
-    });
-    state.workspaceStatus = { supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 1, resourceCount: 0, backupCount: 0 };
-    try {
-      await syncWorkspaceFromFolder();
-      const workspaceSyncErrorWarningText = JSON.stringify(state.lastValidationReport?.warnings || []);
-      assert(
-        workspaceSyncErrorWarningText.includes("[redacted secret]") &&
-          !workspaceSyncErrorWarningText.includes("workspace-sync-error-label-token-that-must-not-appear") &&
-          !workspaceSyncErrorWarningText.includes("workspace-sync-error-token-that-must-not-appear"),
-        "workspace sync warnings redact credential-looking external labels and errors"
-      );
-    } finally {
-      workspaceStorage.listProjectPackages = originalErrorSyncListWorkspacePackages;
-      workspaceStorage.readProjectPackage = originalErrorSyncReadWorkspacePackage;
-      workspaceStorage.getStatus = originalErrorSyncGetStatus;
-      state.workspaceStatus = originalErrorSyncWorkspaceStatus;
-    }
-
-    const originalWarningSyncListWorkspacePackages = workspaceStorage.listProjectPackages;
-    const originalWarningSyncReadWorkspacePackage = workspaceStorage.readProjectPackage;
-    const originalWarningSyncWorkspaceStatus = state.workspaceStatus;
-    const workspaceWarningPackage = await buildProjectPackage({
-      ...project,
-      id: `workspace-warning-${Date.now()}`,
-      name: `Workspace Warning ${Date.now()}`,
-      sourceFileName: "",
-      documents: [],
-      docxStructure: null,
-      docxStructures: {},
-      localizationStructures: {},
-      aiSettings: defaultAiSettings({
-        ...project.aiSettings,
-        enabled: true,
-        sendSourceToAi: true
-      })
-    }, []);
-    workspaceStorage.listProjectPackages = async () => [{
-      id: workspaceWarningPackage.project.id,
-      name: workspaceWarningPackage.project.name,
-      packagePath: `projects/${workspaceWarningPackage.project.id}/project.loopcat.json`
-    }];
-    workspaceStorage.readProjectPackage = async () => workspaceWarningPackage;
-    state.workspaceStatus = { supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 1, resourceCount: 0, backupCount: 0 };
-    try {
-      await syncWorkspaceFromFolder();
-      assert(
-        state.lastValidationReport?.warnings?.some((item) => item.includes("imported with") && item.includes("validation note")) &&
-          els.saveStatus.textContent === "Workspace sync completed with warnings",
-        "workspace sync reports validation notes from imported packages"
-      );
-    } finally {
-      workspaceStorage.listProjectPackages = originalWarningSyncListWorkspacePackages;
-      workspaceStorage.readProjectPackage = originalWarningSyncReadWorkspacePackage;
-      state.workspaceStatus = originalWarningSyncWorkspaceStatus;
-      await deleteProject(workspaceWarningPackage.project.id);
-      clearWorkspaceDirty(workspaceWarningPackage.project.id);
-      await loadProjects(false);
-    }
-
-    const originalDirtySyncListWorkspacePackages = workspaceStorage.listProjectPackages;
-    const originalDirtySyncReadWorkspacePackage = workspaceStorage.readProjectPackage;
-    const originalDirtySyncWorkspaceStatus = state.workspaceStatus;
-    let dirtySyncReadCount = 0;
-    workspaceStorage.listProjectPackages = async () => [{ id: project.id, name: project.name, packagePath: `projects/${project.id}/project.loopcat.json` }];
-    workspaceStorage.readProjectPackage = async () => {
-      dirtySyncReadCount += 1;
-      return { app: "LoopCAT", type: "project-package", version: 1 };
-    };
-    state.workspaceStatus = { supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 1, resourceCount: 0, backupCount: 0 };
-    clearWorkspaceDirtyMarkers();
-    markWorkspaceDirty(project.id);
-    try {
-      await syncWorkspaceFromFolder();
-      assert(
-        dirtySyncReadCount === 0 &&
-          state.workspaceDirtyProjectIds.has(project.id) &&
-          state.lastValidationReport?.warnings?.some((item) => item.includes("unsaved folder changes")),
-        "workspace sync skips dirty local packages instead of overwriting them"
-      );
-    } finally {
-      workspaceStorage.listProjectPackages = originalDirtySyncListWorkspacePackages;
-      workspaceStorage.readProjectPackage = originalDirtySyncReadWorkspacePackage;
-      state.workspaceStatus = originalDirtySyncWorkspaceStatus;
-    }
-
-    await loadProjects(false);
-    await openProject(project.id);
-    const packageSourceSegments = await getProjectSegments(project.id);
-    const originalSegmentIds = new Set(packageSourceSegments.map((segment) => segment.id));
-    const collisionTm = {
-      id: "workflow-collision-tm",
-      workspaceId: "local-workspace",
-      ownerId: "local-user",
-      source: "Collision source",
-      target: "Local TM target",
-      sourceLang: "en",
-      targetLang: "tr",
-      languagePair: "en::tr",
-      projectName: "Local resource",
-      tmName: "Workflow TM",
-      signature: "collision",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    const collisionTerm = {
-      id: "workflow-collision-term",
-      workspaceId: "local-workspace",
-      ownerId: "local-user",
-      sourceTerm: "collision",
-      targetTerm: "local term",
-      sourceLang: "en",
-      targetLang: "tr",
-      languagePair: "en::tr",
-      termBaseName: "Workflow TB",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    const collisionActivity = {
-      id: "workflow-collision-activity",
-      projectId: secondProject.id,
-      type: "local",
-      summary: "Local activity remains",
-      detail: {},
-      createdAt: new Date().toISOString()
-    };
-    await bulkPut("tmEntries", [collisionTm]);
-    await bulkPut("terms", [collisionTerm]);
-    await bulkPut("activityEvents", [collisionActivity]);
-    const collisionPackage = await buildProjectPackage(state.project, packageSourceSegments);
-    collisionPackage.resources.tmEntries = [{ ...collisionTm, target: "Incoming TM target" }];
-    collisionPackage.resources.terms = [{ ...collisionTerm, targetTerm: "incoming term" }];
-    collisionPackage.activityEvents = [{ ...collisionActivity, projectId: project.id, summary: "Incoming activity" }];
-    setHiddenSegmentField(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const copyImport = await importProjectPackageData(collisionPackage, {
-      sourceName: "collision-copy.loopcat.json",
-      replaceExisting: false,
-      importAsCopy: true,
-      open: false,
-      suppressAlert: true
-    });
-    assert(
-      copyImport?.pkg?.project?.id &&
-        copyImport.pkg.project.id !== project.id &&
-        copyImport.pkg.project.name.includes("(copy)") &&
-        els.saveStatus.textContent.includes("activity log failed"),
-      "project package import activity log failure reports warning after successful package import"
-    );
-    Reflect.deleteProperty(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG);
-    assert(state.workspaceDirtyProjectIds.has(copyImport.pkg.project.id), "manual project package import marks connected workspace package dirty");
-    const copiedSegments = await getProjectSegments(copyImport.pkg.project.id);
-    assert(copiedSegments.length === packageSourceSegments.length && copiedSegments.every((segment) => !originalSegmentIds.has(segment.id)) && copiedSegments.some((segment) => segment.target === switchText), "project package copy remaps project-scoped segment ids");
-    const tmAfterCopy = await getAll("tmEntries");
-    assert(tmAfterCopy.some((entry) => entry.id === collisionTm.id && entry.target === collisionTm.target) && tmAfterCopy.some((entry) => entry.id !== collisionTm.id && entry.target === "Incoming TM target"), "project package import remaps colliding TM resource ids");
-    const termsAfterCopy = await getAll("terms");
-    assert(termsAfterCopy.some((term) => term.id === collisionTerm.id && term.targetTerm === collisionTerm.targetTerm) && termsAfterCopy.some((term) => term.id !== collisionTerm.id && term.targetTerm === "incoming term"), "project package import remaps colliding termbase ids");
-    const activityAfterCopy = await getAll("activityEvents");
-    assert(activityAfterCopy.some((event) => event.id === collisionActivity.id && event.summary === collisionActivity.summary && event.projectId === secondProject.id) && activityAfterCopy.some((event) => event.id !== collisionActivity.id && event.summary === "Incoming activity" && event.projectId === copyImport.pkg.project.id), "project package import remaps colliding activity event ids");
-    const successfulCopyImport = await importProjectPackageData(collisionPackage, {
-      sourceName: "collision-copy-success.loopcat.json",
-      replaceExisting: false,
-      importAsCopy: true,
-      open: false,
-      suppressAlert: true
-    });
-    const activityAfterSuccessfulCopy = await getAll("activityEvents");
-    assert(
-      successfulCopyImport?.pkg?.project?.id &&
-        activityAfterSuccessfulCopy.some((event) => event.type === "import" && event.summary === "Project package imported" && event.projectId === successfulCopyImport.pkg.project.id) &&
-        !activityAfterSuccessfulCopy.some((event) => event.type === "import" && event.summary === "Project package imported" && event.detail?.fileName === "collision-copy-success.loopcat.json" && event.projectId === project.id),
-      "project package import activity belongs to the imported project"
-    );
-
-    await openProject(project.id);
-    const documentCountBeforeBadImport = state.project.documents.length;
-    const badProjectImportOk = await runFileImportTask("Project file import", () => importProjectDocument(new File(["{ broken json"], "broken.json", { type: "application/json" })));
-    assert(!badProjectImportOk && state.project.documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.startsWith("Project file import failed:"), "damaged project file import reports failure without changing project documents");
-    const oversizedProjectImportOk = await runFileImportTask("Project file import", () => importProjectDocument({ name: "huge.docx", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
-    assert(!oversizedProjectImportOk && state.project.documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "oversized project file import is rejected before parsing");
-    const oversizedDirectDocxImportOk = await runFileImportTask("Project file import", () => importDocx({ name: "huge-direct.docx", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
-    assert(!oversizedDirectDocxImportOk && state.project.documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct DOCX import helper rejects oversized files before parsing");
-    const oversizedDirectXliffImportOk = await runFileImportTask("Project file import", () => importXliff({ name: "huge-direct.xlf", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
-    assert(!oversizedDirectXliffImportOk && state.project.documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct XLIFF import helper rejects oversized files before parsing");
-    const oversizedDirectLocalizationImportOk = await runFileImportTask("Project file import", () => importLocalization({ name: "huge-direct.html", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
-    assert(!oversizedDirectLocalizationImportOk && state.project.documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct localization import helper rejects oversized files before parsing");
-
-    const badTmxImportOk = await runFileImportTask("TMX import", () => handleTmxImport(new File(["<tmx><body>"], "broken.tmx", { type: "application/xml" })));
-    assert(!badTmxImportOk && state.lastValidationReport?.errors?.[0]?.includes("TMX import failed"), "damaged TMX import reports failure through validation panel");
-    const oversizedTmxImportOk = await runFileImportTask("TMX import", () => handleTmxImport({ name: "huge.tmx", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
-    assert(!oversizedTmxImportOk && state.lastValidationReport?.errors?.[0]?.includes("TMX file is too large"), "oversized TMX import is rejected before parsing");
-    const oversizedTbxImportOk = await runFileImportTask("TBX import", () => handleTbxImport({ name: "huge.tbx", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
-    assert(!oversizedTbxImportOk && state.lastValidationReport?.errors?.[0]?.includes("TBX file is too large"), "oversized TBX import is rejected before parsing");
-    const badTermListImportOk = await runFileImportTask("Term list import", () => handleTermListImport(new File(["only-source"], "broken.csv", { type: "text/csv" })));
-    assert(!badTermListImportOk && state.lastValidationReport?.errors?.[0]?.includes("Term list import failed"), "damaged term list import reports failure through validation panel");
-    const oversizedTermListImportOk = await runFileImportTask("Term list import", () => handleTermListImport({ name: "huge.csv", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
-    assert(!oversizedTermListImportOk && state.lastValidationReport?.errors?.[0]?.includes("Term list file is too large"), "oversized term list import is rejected before parsing");
-
-    const structuralDocument = { id: makeId("document"), name: "workflow-structural.txt", type: "text" };
-    await appendProjectSegments(project.id, [
-      { text: "Split source first half. Split source second half.", target: "Split target first half. Split target second half." },
-      { text: "Merge first source.", target: "Merge first target." },
-      { text: "Merge second source.", target: "Merge second target." }
-    ], {
-      documentId: structuralDocument.id,
-      documentName: structuralDocument.name,
-      documentType: structuralDocument.type
-    });
-    state.project = await updateProject({ ...state.project, documents: [...(state.project.documents || []), structuralDocument] });
-    state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
-    await openProjectFile(structuralDocument.id);
-    const structuralSegmentsBefore = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
-    assert(structuralSegmentsBefore.length === 3, "plain structural edit fixture has three segments");
-    const structuralSplitOriginalSource = structuralSegmentsBefore[0].source;
-    const structuralSplitOriginalTarget = structuralSegmentsBefore[0].target;
-    const structuralSegmentIdsBeforeSplit = new Set(structuralSegmentsBefore.map((segment) => segment.id));
-    let splitIndex = state.segments.findIndex((segment) => segment.id === structuralSegmentsBefore[0].id);
-    await setActiveSegment(splitIndex);
-    let splitTextarea = els.segmentBody.querySelector(`tr[data-index="${splitIndex}"] textarea`);
-    splitTextarea?.setSelectionRange(24, 24);
-    setHiddenSegmentField(state.segments[splitIndex], SPLIT_SAVE_FAILURE_TEST_FLAG, true);
-    await splitCurrentSegment();
-    let splitFailureStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
-    assert(
-      els.saveStatus.textContent.includes("Simulated split save failure") &&
-        state.segments.filter((segment) => segment.documentId === structuralDocument.id).length === 3 &&
-        splitFailureStored.length === 3 &&
-        splitFailureStored[0].source === structuralSplitOriginalSource,
-      "split save failure restores visible and persisted segment list"
-    );
-    splitIndex = state.segments.findIndex((segment) => segment.documentId === structuralDocument.id);
-    await setActiveSegment(splitIndex);
-    splitTextarea = els.segmentBody.querySelector(`tr[data-index="${splitIndex}"] textarea`);
-    splitTextarea?.setSelectionRange(24, 24);
-    const splitCommandResult = await splitCurrentSegment();
-    const splitAppliedVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
-    const splitCreatedSegment = splitAppliedVisible.find((segment) => !structuralSegmentIdsBeforeSplit.has(segment.id));
-    const splitSuccessStored = (await getProjectSegments(project.id)).filter(
-      (segment) => segment.documentId === structuralDocument.id
-    );
-    const splitAppliedRevisionById = new Map(splitAppliedVisible.map((segment) => [segment.id, segment.revision]));
-    assert(
-      els.saveStatus.textContent === "Segment split; Undo is available" &&
-        splitCommandResult?.receipt?.commandId === "split-segment" &&
-        splitCommandResult.receipt.affectedIds.includes(structuralSegmentsBefore[0].id) &&
-        splitCommandResult.receipt.affectedIds.includes(splitCreatedSegment?.id) &&
-        !JSON.stringify(splitCommandResult.receipt).includes(structuralSplitOriginalSource) &&
-        !JSON.stringify(splitCommandResult.receipt).includes(structuralSplitOriginalTarget) &&
-        splitAppliedVisible.length === 4 &&
-        splitSuccessStored.length === 4 &&
-        splitAppliedVisible.every((segment, index) => segment.documentIndex === index) &&
-        currentSegment()?.id === splitCreatedSegment?.id,
-      "segment split saves one redacted structural command with contiguous order and stable focus"
-    );
-
-    await undoLastCommand();
-    const splitUndoVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
-    const splitUndoStored = (await getProjectSegments(project.id)).filter(
-      (segment) => segment.documentId === structuralDocument.id
-    );
-    const splitUndoOriginal = splitUndoVisible.find((segment) => segment.id === structuralSegmentsBefore[0].id);
-    const splitUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
-    assert(
-      splitUndoVisible.length === 3 &&
-        splitUndoStored.length === 3 &&
-        !splitUndoVisible.some((segment) => segment.id === splitCreatedSegment?.id) &&
-        !splitUndoStored.some((segment) => segment.id === splitCreatedSegment?.id) &&
-        splitUndoOriginal?.source === structuralSplitOriginalSource &&
-        splitUndoOriginal?.target === structuralSplitOriginalTarget &&
-        splitUndoVisible.every((segment, index) => segment.documentIndex === index) &&
-        currentSegment()?.id === structuralSegmentsBefore[0].id &&
-        document.activeElement === splitUndoTextarea,
-      "SplitSegment Undo atomically restores the original segment, order, persistence, and focus"
-    );
-    const splitUndoOriginalRevision = Number(splitUndoOriginal?.revision || 0);
-
-    await redoLastCommand();
-    const splitRedoVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
-    const splitRedoStored = (await getProjectSegments(project.id)).filter(
-      (segment) => segment.documentId === structuralDocument.id
-    );
-    const splitRedoCreated = splitRedoVisible.find((segment) => segment.id === splitCreatedSegment?.id);
-    const splitRedoOriginal = splitRedoVisible.find((segment) => segment.id === structuralSegmentsBefore[0].id);
-    const splitRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
-    assert(
-      splitRedoVisible.length === 4 &&
-        splitRedoStored.length === 4 &&
-        splitRedoCreated?.source === splitCreatedSegment?.source &&
-        splitRedoCreated?.target === splitCreatedSegment?.target &&
-        splitRedoOriginal?.source === splitAppliedVisible[0].source &&
-        splitRedoOriginal?.target === splitAppliedVisible[0].target &&
-        Number(splitRedoOriginal?.revision || 0) > splitUndoOriginalRevision &&
-        Number(splitRedoCreated?.revision || 0) > Number(splitAppliedRevisionById.get(splitCreatedSegment?.id) || 0) &&
-        splitRedoVisible.every((segment, index) => segment.documentIndex === index) &&
-        currentSegment()?.id === splitCreatedSegment?.id &&
-        document.activeElement === splitRedoTextarea,
-      "SplitSegment Redo recreates the stable segment, order, targets, monotonic revisions, persistence, and focus"
-    );
-
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
-    await openProjectFile(structuralDocument.id);
-    let mergeCandidates = state.segments
-      .map((segment, index) => ({ segment, index }))
-      .filter((item) => item.segment.documentId === structuralDocument.id)
-      .slice(-2);
-    const mergeFailureIds = mergeCandidates.map((item) => item.segment.id);
-    const mergeFailureSources = mergeCandidates.map((item) => item.segment.source);
-    const mergeFailureTargets = mergeCandidates.map((item) => item.segment.target);
-    await setActiveSegment(mergeCandidates[0].index);
-    setHiddenSegmentField(state.segments[mergeCandidates[0].index], MERGE_POST_DELETE_FAILURE_TEST_FLAG, true);
-    const failedMergeCommand = await mergeWithNextSegment();
-    const mergeFailureVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
-    const mergeFailureStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
-    assert(
-      failedMergeCommand === null &&
-        els.saveStatus.textContent.includes("Simulated merge transaction failure") &&
-        mergeFailureVisible.length === 4 &&
-        mergeFailureStored.length === 4 &&
-        mergeFailureIds.every((id, index) => {
-          const visible = mergeFailureVisible.find((segment) => segment.id === id);
-          const stored = mergeFailureStored.find((segment) => segment.id === id);
-          return (
-            visible?.source === mergeFailureSources[index] &&
-            visible?.target === mergeFailureTargets[index] &&
-            stored?.source === mergeFailureSources[index] &&
-            stored?.target === mergeFailureTargets[index]
-          );
-        }) &&
-        mergeFailureVisible.every((item, index) => item.documentIndex === index) &&
-        state.segments.every((item, index) => item.index === index),
-      "MergeSegment transaction failure leaves no missing, duplicate, reordered, or partially persisted segment"
-    );
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
-    await openProjectFile(structuralDocument.id);
-    mergeCandidates = state.segments
-      .map((segment, index) => ({ segment, index }))
-      .filter((item) => item.segment.documentId === structuralDocument.id)
-      .slice(-2);
-    const mergeFirstBefore = structuredClone(mergeCandidates[0].segment);
-    const mergeSecondBefore = structuredClone(mergeCandidates[1].segment);
-    const expectedMergedSource = `${mergeFirstBefore.source} ${mergeSecondBefore.source}`.trim();
-    const expectedMergedTarget = `${mergeFirstBefore.target || ""} ${mergeSecondBefore.target || ""}`.trim();
-    await setActiveSegment(mergeCandidates[0].index);
-    const mergeCommandResult = await mergeWithNextSegment();
-    const mergeAppliedVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
-    const mergeSuccessStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
-    const mergeAppliedSurvivor = mergeAppliedVisible.find((segment) => segment.id === mergeFirstBefore.id);
-    const mergeAppliedTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
-    const mergeAppliedRevision = Number(mergeAppliedSurvivor?.revision || 0);
-    const mergeAppliedHistory = structuredClone(mergeAppliedSurvivor?.targetHistory || []);
-    assert(
-      els.saveStatus.textContent === "Segments merged; Undo is available" &&
-        mergeCommandResult?.receipt?.commandId === "merge-segments" &&
-        mergeCommandResult.receipt.affectedIds.includes(mergeFirstBefore.id) &&
-        mergeCommandResult.receipt.affectedIds.includes(mergeSecondBefore.id) &&
-        !JSON.stringify(mergeCommandResult.receipt).includes(mergeFirstBefore.source) &&
-        !JSON.stringify(mergeCommandResult.receipt).includes(mergeFirstBefore.target) &&
-        mergeAppliedVisible.length === 3 &&
-        mergeSuccessStored.length === 3 &&
-        mergeAppliedSurvivor?.source === expectedMergedSource &&
-        mergeAppliedSurvivor?.target === expectedMergedTarget &&
-        mergeAppliedSurvivor?.targetHistory?.some((entry) => entry.reason === "merge") &&
-        !mergeAppliedVisible.some((segment) => segment.id === mergeSecondBefore.id) &&
-        !mergeSuccessStored.some((segment) => segment.id === mergeSecondBefore.id) &&
-        mergeAppliedVisible.every((item, index) => item.documentIndex === index) &&
-        state.segments.every((item, index) => item.index === index) &&
-        currentSegment()?.id === mergeFirstBefore.id &&
-        document.activeElement === mergeAppliedTextarea,
-      "MergeSegment persists one redacted atomic command with contiguous order, history, and focus"
-    );
-
-    const mergeUndoResult = await undoLastCommand();
-    const mergeUndoVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
-    const mergeUndoStored = (await getProjectSegments(project.id)).filter(
-      (segment) => segment.documentId === structuralDocument.id
-    );
-    const mergeUndoFirst = mergeUndoVisible.find((segment) => segment.id === mergeFirstBefore.id);
-    const mergeUndoSecond = mergeUndoVisible.find((segment) => segment.id === mergeSecondBefore.id);
-    const mergeUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
-    const mergeUndoFirstRevision = Number(mergeUndoFirst?.revision || 0);
-    assert(
-      mergeUndoResult?.receipt?.commandId === "merge-segments" &&
-        mergeUndoVisible.length === 4 &&
-        mergeUndoStored.length === 4 &&
-        mergeUndoFirst?.source === mergeFirstBefore.source &&
-        mergeUndoFirst?.target === mergeFirstBefore.target &&
-        JSON.stringify(mergeUndoFirst?.targetHistory || []) === JSON.stringify(mergeFirstBefore.targetHistory || []) &&
-        mergeUndoSecond?.source === mergeSecondBefore.source &&
-        mergeUndoSecond?.target === mergeSecondBefore.target &&
-        JSON.stringify(mergeUndoSecond?.targetHistory || []) === JSON.stringify(mergeSecondBefore.targetHistory || []) &&
-        Number(mergeUndoFirst?.revision || 0) > mergeAppliedRevision &&
-        Number(mergeUndoSecond?.revision || 0) > Number(mergeSecondBefore.revision || 0) &&
-        mergeUndoVisible.every((item, index) => item.documentIndex === index) &&
-        state.segments.every((item, index) => item.index === index) &&
-        currentSegment()?.id === mergeFirstBefore.id &&
-        document.activeElement === mergeUndoTextarea,
-      "MergeSegment Undo atomically restores both stable segment IDs, order, history, persistence, and focus"
-    );
-
-    const mergeRedoResult = await redoLastCommand();
-    const mergeRedoVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
-    const mergeRedoStored = (await getProjectSegments(project.id)).filter(
-      (segment) => segment.documentId === structuralDocument.id
-    );
-    const mergeRedoSurvivor = mergeRedoVisible.find((segment) => segment.id === mergeFirstBefore.id);
-    const mergeRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
-    assert(
-      mergeRedoResult?.receipt?.commandId === "merge-segments" &&
-        mergeRedoVisible.length === 3 &&
-        mergeRedoStored.length === 3 &&
-        mergeRedoSurvivor?.source === expectedMergedSource &&
-        mergeRedoSurvivor?.target === expectedMergedTarget &&
-        JSON.stringify(mergeRedoSurvivor?.targetHistory || []) === JSON.stringify(mergeAppliedHistory) &&
-        Number(mergeRedoSurvivor?.revision || 0) > mergeUndoFirstRevision &&
-        !mergeRedoVisible.some((segment) => segment.id === mergeSecondBefore.id) &&
-        !mergeRedoStored.some((segment) => segment.id === mergeSecondBefore.id) &&
-        mergeRedoVisible.every((item, index) => item.documentIndex === index) &&
-        state.segments.every((item, index) => item.index === index) &&
-        currentSegment()?.id === mergeFirstBefore.id &&
-        document.activeElement === mergeRedoTextarea,
-      "MergeSegment Redo recreates the merge with monotonic revisions and deletes only the merged-away segment"
-    );
-
-    const taggedFile = new File(["<!doctype html><html><body><p>Keep <strong>this</strong> tag.</p></body></html>"], "tagged.html", { type: "text/html" });
-    await importLocalization(taggedFile);
-    const taggedDocument = state.project.documents.find((item) => item.name === "tagged.html");
-    assert(Boolean(taggedDocument), "tagged HTML fixture imported");
-    state.documentFilter = taggedDocument.id;
-    const taggedIndex = state.segments.findIndex((segment) => segment.documentId === taggedDocument.id);
-    renderSegments();
-    const taggedRow = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"]`);
-    const sourceChipLabels = Array.from(taggedRow?.querySelectorAll(".source-cell .tag-chip") || []).map((chip) => chip.textContent);
-    assert(sourceChipLabels.includes("<b>") && sourceChipLabels.includes("</b>") && !sourceChipLabels.includes("<strong>"), "editor displays semantic inline tag labels for HTML formatting");
-    await setActiveSegment(taggedIndex);
-    let taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
-    taggedTextarea?.focus();
-    taggedTextarea?.setSelectionRange(0, 0);
-    const beforeProtectedTagInsert = targetCommandPatch(state.segments[taggedIndex]);
-    clearWorkspaceDirtyMarkers();
-    const protectedTagCommand = await insertTagIntoTarget("<strong>");
-    await flushPendingSegmentSaves(project.id);
-    const protectedTagApplied = targetCommandPatch(state.segments[taggedIndex]);
-    taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
-    assert(
-      protectedTagCommand?.receipt?.commandId === "insert-protected-tag" &&
-        protectedTagCommand.receipt.provenance?.producer === "protected-tag" &&
-        !JSON.stringify(protectedTagCommand.receipt).includes("<strong>") &&
-        state.segments[taggedIndex].target.startsWith("<strong>") &&
-        state.segments[taggedIndex].targetHistory?.some((entry) => entry.reason === "insert-tag") &&
-        taggedTextarea?.selectionStart === "<strong>".length &&
-        taggedTextarea?.selectionEnd === "<strong>".length &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "protected-tag insertion records one redacted command, history, caret placement, and workspace dirtiness"
-    );
-    const undoProtectedTag = await undoLastCommand();
-    const protectedTagUndoRevision = Number(state.segments[taggedIndex].revision || 0);
-    const storedAfterProtectedTagUndo = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[taggedIndex].id
-    );
-    taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
-    assert(
-      undoProtectedTag?.receipt?.commandId === "insert-protected-tag" &&
-        state.segments[taggedIndex].target === beforeProtectedTagInsert.target &&
-        JSON.stringify(state.segments[taggedIndex].targetHistory) ===
-          JSON.stringify(beforeProtectedTagInsert.targetHistory) &&
-        storedAfterProtectedTagUndo?.target === beforeProtectedTagInsert.target &&
-        taggedTextarea?.selectionStart === 0 &&
-        taggedTextarea?.selectionEnd === 0,
-      "protected-tag Undo restores target state, persistence, selection, and the original caret"
-    );
-    await redoLastCommand();
-    const storedAfterProtectedTagRedo = (await getProjectSegments(project.id)).find(
-      (segment) => segment.id === state.segments[taggedIndex].id
-    );
-    taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
-    assert(
-      state.segments[taggedIndex].target === protectedTagApplied.target &&
-        JSON.stringify(state.segments[taggedIndex].targetHistory) === JSON.stringify(protectedTagApplied.targetHistory) &&
-        Number(state.segments[taggedIndex].revision || 0) > protectedTagUndoRevision &&
-        storedAfterProtectedTagRedo?.target === protectedTagApplied.target &&
-        taggedTextarea?.selectionStart === "<strong>".length &&
-        taggedTextarea?.selectionEnd === "<strong>".length,
-      "protected-tag Redo restores the target patch and post-insert caret with a monotonic revision"
-    );
-    taggedTextarea?.setSelectionRange(4, 4);
-    const beforeBlockedSplitCount = state.segments.length;
-    await splitCurrentSegment();
-    assert(state.segments.length === beforeBlockedSplitCount && els.saveStatus.textContent.includes("Split is unavailable"), "split is blocked for structure-preserving localization segments");
-    state.segments[taggedIndex].target = "Etiketi eksik hedef.";
-    state.segments[taggedIndex].status = "draft";
-    touchSegment(state.segments[taggedIndex]);
-    await saveSegment(state.segments[taggedIndex]);
-    const deliveryDownloads = [];
-    const originalDeliveryCreateObjectUrl = URL.createObjectURL.bind(URL);
-    const originalDeliveryAnchorClick = HTMLAnchorElement.prototype.click;
-    const originalDeliveryConfirm = window.confirm;
-    URL.createObjectURL = (blob) => {
-      deliveryDownloads.push({ type: blob.type, blob });
-      return originalDeliveryCreateObjectUrl(blob);
-    };
-    HTMLAnchorElement.prototype.click = function noopDeliveryClick() {};
-    window.confirm = () => true;
-    try {
-      const wrongDocxSelectionDownloadCount = deliveryDownloads.length;
-      await exportTargetDocx();
-      assert(
-        deliveryDownloads.length === wrongDocxSelectionDownloadCount &&
-          els.saveStatus.textContent.includes("selected file is not a DOCX"),
-        "DOCX export blocks non-DOCX selected document instead of silently exporting another file"
-      );
-      await exportTargetText();
-      assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("protected placeholders")), "target TXT export blocks missing protected tags");
-      await exportLocalization();
-      assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("protected placeholders")), "delivery export blocks missing protected tags");
-      state.segments[taggedIndex].target = "Bu <strong>etiketi</strong></strong> koru.";
-      state.segments[taggedIndex].status = "draft";
-      touchSegment(state.segments[taggedIndex]);
-      await saveSegment(state.segments[taggedIndex]);
-      await exportLocalization();
-      assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("unbalanced inline markup")), "delivery export blocks unbalanced inline markup");
-      state.segments[taggedIndex].target = 'Bu <strong>etiketi</strong> koru. <img src="x" onerror="alert(1)">';
-      state.segments[taggedIndex].status = "draft";
-      touchSegment(state.segments[taggedIndex]);
-      await saveSegment(state.segments[taggedIndex]);
-      await exportLocalization();
-      assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("unsafe HTML markup")), "HTML delivery export blocks unsafe target markup");
-      state.segments[taggedIndex].target = 'Bu <strong>etiketi</strong> koru. <span style="background:url(javascript:alert(1))">stil</span>';
-      touchSegment(state.segments[taggedIndex]);
-      await saveSegment(state.segments[taggedIndex]);
-      await exportLocalization();
-      assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("unsafe HTML markup")), "HTML delivery export blocks scriptable style markup");
-      state.segments[taggedIndex].target = "Bu <strong>etiketi</strong> koru.";
-      state.segments[taggedIndex].status = "draft";
-      touchSegment(state.segments[taggedIndex]);
-      await saveSegment(state.segments[taggedIndex]);
-      await exportLocalization();
-      assert(deliveryDownloads.some((item) => item.type === "text/html"), "delivery export runs after protected tags are restored");
-      const beforeXmlInvalidDownloadCount = deliveryDownloads.length;
-      state.segments[taggedIndex].target = `Bu <strong>etiketi</strong> koru.${String.fromCharCode(0x0b)}`;
-      touchSegment(state.segments[taggedIndex]);
-      await saveSegment(state.segments[taggedIndex]);
-      await exportBilingualDocx();
-      assert(deliveryDownloads.length === beforeXmlInvalidDownloadCount && els.saveStatus.textContent.includes("Bilingual DOCX blocked"), "bilingual DOCX export blocks XML-invalid target characters");
-      await exportXliff();
-      assert(deliveryDownloads.length === beforeXmlInvalidDownloadCount && state.lastValidationReport?.risky?.some((item) => item.includes("XML-invalid characters")), "XLIFF export blocks XML-invalid target characters");
-      state.segments[taggedIndex].target = "Bu <strong>etiketi</strong> koru.";
-      touchSegment(state.segments[taggedIndex]);
-      await saveSegment(state.segments[taggedIndex]);
-    } finally {
-      URL.createObjectURL = originalDeliveryCreateObjectUrl;
-      HTMLAnchorElement.prototype.click = originalDeliveryAnchorClick;
-      window.confirm = originalDeliveryConfirm;
-    }
-
-    const structuredMergeFile = new File(["<!doctype html><html><body><p>First block.</p><p>Second block.</p></body></html>"], "structured-merge.html", { type: "text/html" });
-    await importLocalization(structuredMergeFile);
-    const structuredMergeDocument = state.project.documents.find((item) => item.name === "structured-merge.html");
-    assert(Boolean(structuredMergeDocument), "structured merge fixture imported");
-    state.documentFilter = structuredMergeDocument.id;
-    renderSegments();
-    const structuredMergeIndexes = state.segments
-      .map((segment, index) => ({ segment, index }))
-      .filter((item) => item.segment.documentId === structuredMergeDocument.id)
-      .map((item) => item.index);
-    assert(structuredMergeIndexes.length === 2, "structured merge fixture has two segments");
-    await setActiveSegment(structuredMergeIndexes[0]);
-    const beforeBlockedMergeCount = state.segments.length;
-    await mergeWithNextSegment();
-    const afterBlockedMergeSegments = state.segments.filter((segment) => segment.documentId === structuredMergeDocument.id);
-    assert(
-      state.segments.length === beforeBlockedMergeCount &&
-        afterBlockedMergeSegments.length === 2 &&
-        els.saveStatus.textContent.includes("Merge is available only"),
-      "merge is blocked across structure-preserving localization segments"
-    );
-
-    const duplicateTaggedFile = new File(["<!doctype html><html><body><p><strong>One</strong> and <strong>two</strong></p></body></html>"], "duplicate-tagged.html", { type: "text/html" });
-    await importLocalization(duplicateTaggedFile);
-    const duplicateTaggedDocument = state.project.documents.find((item) => item.name === "duplicate-tagged.html");
-    assert(Boolean(duplicateTaggedDocument), "duplicate tagged HTML fixture imported");
-    state.documentFilter = duplicateTaggedDocument.id;
-    const duplicateTaggedIndex = state.segments.findIndex((segment) => segment.documentId === duplicateTaggedDocument.id);
-    state.segments[duplicateTaggedIndex].target = "<strong>Bir</strong> ve iki";
-    state.segments[duplicateTaggedIndex].status = "draft";
-    touchSegment(state.segments[duplicateTaggedIndex]);
-    await saveSegment(state.segments[duplicateTaggedIndex]);
-    const duplicateDeliveryDownloads = [];
-    const originalDuplicateCreateObjectUrl = URL.createObjectURL.bind(URL);
-    const originalDuplicateAnchorClick = HTMLAnchorElement.prototype.click;
-    const originalDuplicateConfirm = window.confirm;
-    URL.createObjectURL = (blob) => {
-      duplicateDeliveryDownloads.push({ type: blob.type, blob });
-      return originalDuplicateCreateObjectUrl(blob);
-    };
-    HTMLAnchorElement.prototype.click = function noopDuplicateDeliveryClick() {};
-    window.confirm = () => true;
-    try {
-      await exportLocalization();
-      assert(!duplicateDeliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("protected placeholders")), "delivery export blocks incomplete duplicate protected tags");
-      state.segments[duplicateTaggedIndex].target = "<strong>Bir</strong> ve <strong>iki</strong>";
-      touchSegment(state.segments[duplicateTaggedIndex]);
-      await saveSegment(state.segments[duplicateTaggedIndex]);
-      await exportLocalization();
-      assert(duplicateDeliveryDownloads.some((item) => item.type === "text/html"), "delivery export runs after duplicate protected tags are restored");
-    } finally {
-      URL.createObjectURL = originalDuplicateCreateObjectUrl;
-      HTMLAnchorElement.prototype.click = originalDuplicateAnchorClick;
-      window.confirm = originalDuplicateConfirm;
-    }
-
-    const scopedCompleteFile = new File(["<!doctype html><html><body><p>Scoped completed segment.</p></body></html>"], "scoped-complete.html", { type: "text/html" });
-    await importLocalization(scopedCompleteFile);
-    const scopedCompleteDocument = state.project.documents.find((item) => item.name === "scoped-complete.html");
-    const scopedCompleteIndex = state.segments.findIndex((segment) => segment.documentId === scopedCompleteDocument?.id);
-    assert(Boolean(scopedCompleteDocument) && scopedCompleteIndex >= 0, "scoped export completed fixture imported");
-    state.segments[scopedCompleteIndex].target = "Yalnizca secili dosya hedefi.";
-    state.segments[scopedCompleteIndex].status = "draft";
-    touchSegment(state.segments[scopedCompleteIndex]);
-    await saveSegment(state.segments[scopedCompleteIndex]);
-    const scopedEmptyFile = new File(["<!doctype html><html><body><p>Unselected unfinished segment.</p></body></html>"], "scoped-empty.html", { type: "text/html" });
-    await importLocalization(scopedEmptyFile);
-    const scopedEmptyDocument = state.project.documents.find((item) => item.name === "scoped-empty.html");
-    assert(Boolean(scopedEmptyDocument) && state.segments.some((segment) => segment.documentId === scopedEmptyDocument.id && !String(segment.target || "").trim()), "scoped export unfinished fixture imported");
-    state.documentFilter = scopedCompleteDocument.id;
-    renderDocumentFilter();
-    renderSegments();
-    const scopedExportDownloads = [];
-    const originalScopedCreateObjectUrl = URL.createObjectURL.bind(URL);
-    const originalScopedAnchorClick = HTMLAnchorElement.prototype.click;
-    const originalScopedConfirm = window.confirm;
-    URL.createObjectURL = (blob) => {
-      scopedExportDownloads.push({ type: blob.type, blob, name: "" });
-      return originalScopedCreateObjectUrl(blob);
-    };
-    HTMLAnchorElement.prototype.click = function noopScopedExportClick() {
-      if (scopedExportDownloads.length) scopedExportDownloads[scopedExportDownloads.length - 1].name = this.download;
-    };
-    window.confirm = () => true;
-    try {
-      await exportTargetText();
-      await exportXliff();
-      const scopedTxtDownload = scopedExportDownloads.find((item) => item.type === "text/plain");
-      const scopedXliffDownload = scopedExportDownloads.find((item) => item.type === "application/x-xliff+xml");
-      const scopedTxt = await scopedTxtDownload?.blob.text();
-      const scopedXliff = await scopedXliffDownload?.blob.text();
-      assert(
-        scopedTxt === "Yalnizca secili dosya hedefi." &&
-          scopedTxtDownload.name.includes("scoped-complete_html") &&
-          !scopedTxt.includes("Unselected unfinished segment"),
-        "selected target TXT export ignores unfinished unselected files"
-      );
-      assert(
-        scopedXliff?.includes('original="scoped-complete.html"') &&
-          scopedXliff.includes("Yalnizca secili dosya hedefi.") &&
-          !scopedXliff.includes("Unselected unfinished segment") &&
-          scopedXliffDownload.name.includes("scoped-complete_html"),
-        "selected XLIFF export ignores unfinished unselected files"
-      );
-
-      state.documentFilter = scopedEmptyDocument.id;
-      renderDocumentFilter();
-      renderSegments();
-      const scopedEmptySegment = state.segments.find((segment) => segment.documentId === scopedEmptyDocument.id);
-      const emptyTargetBeforeExports = scopedEmptySegment.target;
-      const emptyStatusBeforeExports = scopedEmptySegment.status;
-      const emptyHistoryLengthBeforeExports = scopedEmptySegment.targetHistory?.length || 0;
-      const downloadsBeforeCancelledExport = scopedExportDownloads.length;
-      const activityBeforeCancelledExport = (await listActivityEvents(project.id)).length;
-      const partialExportPrompts = [];
-      window.confirm = (message) => {
-        partialExportPrompts.push(String(message || ""));
-        return false;
-      };
-      await exportLocalization();
-      assert(
-        scopedExportDownloads.length === downloadsBeforeCancelledExport &&
-          (await listActivityEvents(project.id)).length === activityBeforeCancelledExport &&
-          els.saveStatus.textContent.includes("Export cancelled") &&
-          partialExportPrompts.at(-1)?.includes("1 empty target segment(s) will export source text"),
-        "cancelled incomplete export creates no download or activity record"
-      );
-
-      window.confirm = (message) => {
-        partialExportPrompts.push(String(message || ""));
-        return true;
-      };
-      await exportLocalization();
-      const partialHtmlDownload = scopedExportDownloads.filter((item) => item.type === "text/html").at(-1);
-      const partialHtml = await partialHtmlDownload?.blob.text();
-      const activityAfterFallbackExport = await listActivityEvents(project.id);
-      const fallbackActivity = activityAfterFallbackExport.find((event) => event.type === "export" && event.detail?.documentId === scopedEmptyDocument.id && event.detail?.sourceFallbackCount === 1);
-      assert(
-        partialHtml?.includes("Unselected unfinished segment.") &&
-          scopedEmptySegment.target === emptyTargetBeforeExports &&
-          scopedEmptySegment.status === emptyStatusBeforeExports &&
-          (scopedEmptySegment.targetHistory?.length || 0) === emptyHistoryLengthBeforeExports &&
-          Boolean(fallbackActivity) &&
-          els.saveStatus.textContent.includes("1 source fallback"),
-        "incomplete localization export uses source fallback without mutating editor state"
-      );
-
-      await exportXliff();
-      const partialXliffDownload = scopedExportDownloads.filter((item) => item.type === "application/x-xliff+xml").at(-1);
-      const partialXliff = await partialXliffDownload?.blob.text();
-      const parsedPartialXliff = window.CatHan.xliff.parseXliffText(partialXliff, "partial.xlf");
-      assert(
-        parsedPartialXliff.segments[0].target === "" &&
-          parsedPartialXliff.segments[0].status === "empty" &&
-          partialExportPrompts.at(-1)?.includes("1 empty target segment(s) will remain empty") &&
-          scopedEmptySegment.target === emptyTargetBeforeExports,
-        "incomplete XLIFF export preserves an explicit empty target after confirmation"
-      );
-    } finally {
-      URL.createObjectURL = originalScopedCreateObjectUrl;
-      HTMLAnchorElement.prototype.click = originalScopedAnchorClick;
-      window.confirm = originalScopedConfirm;
-    }
-
-    const deliveryActivityDownloads = [];
-    const originalActivityCreateObjectUrl = URL.createObjectURL.bind(URL);
-    const originalActivityAnchorClick = HTMLAnchorElement.prototype.click;
-    const originalActivityConfirm = window.confirm;
-    URL.createObjectURL = (blob) => {
-      deliveryActivityDownloads.push({ type: blob.type, blob });
-      return originalActivityCreateObjectUrl(blob);
-    };
-    HTMLAnchorElement.prototype.click = function noopActivityDeliveryClick() {};
-    window.confirm = () => true;
-    try {
-      const activityCountBeforeDeliveryExport = (await listActivityEvents(project.id)).length;
-      const untranslatedForDelivery = state.segments.filter((segment) => !String(segment.target || "").trim());
-      untranslatedForDelivery.forEach((segment) => {
-        setSegmentTargetAndStatus(segment, segment.source || "Completed target", "draft", "delivery-test-complete");
-        touchSegment(segment);
-      });
-      if (untranslatedForDelivery.length) await saveSegments(state.segments);
-      state.documentFilter = "";
-      renderDocumentFilter();
-      clearWorkspaceDirtyMarkers();
-      await exportXliff();
-      const activityAfterDeliveryExport = await listActivityEvents(project.id);
-      assert(
-        deliveryActivityDownloads.some((item) => item.type === "application/x-xliff+xml") &&
-        activityAfterDeliveryExport.length > activityCountBeforeDeliveryExport &&
-        activityAfterDeliveryExport.some((event) => event.type === "export" && event.summary === "XLIFF exported") &&
-        state.workspaceDirtyProjectIds.has(project.id),
-        "delivery export awaits activity event and marks workspace package dirty"
-      );
-    } finally {
-      URL.createObjectURL = originalActivityCreateObjectUrl;
-      HTMLAnchorElement.prototype.click = originalActivityAnchorClick;
-      window.confirm = originalActivityConfirm;
-    }
-    publish(true);
-  } catch (error) {
-    publish(false, error);
-  }
-} : async function runAppWorkflowTestDisabled() {};
+/* LOOPCAT_TEST_WORKFLOW_DRIVER */
 
 (async () => {
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "loading active interface locale";
@@ -20039,7 +13827,6 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "rendering UI locale options";
   renderUiLocaleOptions();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "binding local AI drawer";
-  bindLocalAiOutputDrawer();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "wiring UI events";
   wireEvents();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "starting workspace autosave";
@@ -20058,7 +13845,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
   await loadProjects(false);
   if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: loading interface preferences";
   await Promise.all([
-    themeController?.initialize?.({ freshProfile: state.projects.length === 0 }),
+    themeController?.initialize?.({ freshProfile: currentProjects().length === 0 }),
     workspaceLayoutController?.initialize?.()
   ]);
   if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: starting workflow characterization";

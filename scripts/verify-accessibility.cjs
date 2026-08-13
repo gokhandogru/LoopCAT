@@ -166,6 +166,186 @@ app
       }
       await audit("Projects empty");
 
+      await windowRef.webContents.executeJavaScript("document.querySelector('#resourcesViewBtn').click()", true);
+      await waitFor("!document.querySelector('#resourcesView').classList.contains('hidden')", "Resources view");
+      await audit("Resources translation memories empty");
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const tab = document.querySelector("#tmResourceTab");
+          tab.focus();
+          tab.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+        })()`,
+        true
+      );
+      await waitFor(
+        "document.querySelector('#tbResourceTab').getAttribute('aria-selected') === 'true'",
+        "Resources keyboard tab navigation"
+      );
+      await audit("Resources termbases empty");
+      await windowRef.webContents.executeJavaScript(
+        `window.CatHan.storage.put("trashEntries", {
+          id: "a11y-resource-trash",
+          entityType: "term",
+          entityId: "a11y-term",
+          projectId: "",
+          resourceType: "tb",
+          resourceName: "Accessibility terms",
+          sourceLang: "en",
+          targetLang: "tr",
+          languagePair: "en::tr",
+          label: "Termbase entry · Accessibility terms",
+          deletedAt: new Date().toISOString(),
+          payload: { records: [{
+            id: "a11y-term",
+            termBaseName: "Accessibility terms",
+            sourceLang: "en",
+            targetLang: "tr",
+            languagePair: "en::tr",
+            sourceTerm: "source",
+            targetTerm: "target"
+          }] }
+        })`,
+        true
+      );
+      await windowRef.webContents.executeJavaScript("document.querySelector('#trashBtn').click()", true);
+      await waitFor("document.querySelector('#trashDialog').open", "Resource Trash dialog");
+      await waitFor("document.querySelector('#trashList .trash-item')", "Resource Trash item");
+      await audit("Resource Trash populated");
+      await windowRef.webContents.executeJavaScript("document.querySelector('#closeTrashBtn').click()", true);
+      await waitFor("!document.querySelector('#trashDialog').open", "Resource Trash dialog close");
+      await windowRef.webContents.executeJavaScript(
+        "window.CatHan.storage.deleteByKey('trashEntries', 'a11y-resource-trash')",
+        true
+      );
+      await windowRef.webContents.executeJavaScript("document.querySelector('#projectsViewBtn').click()", true);
+      await waitFor("!document.querySelector('#projectsView').classList.contains('hidden')", "Projects return");
+
+      const fixture = JSON.parse(
+        await fs.readFile(path.join(root, "tests", "fixtures", "modernization", "baseline-backup.json"), "utf8")
+      );
+      const recoveryProjectId = fixture.projects?.[0]?.id;
+      if (!recoveryProjectId) throw new Error("Accessibility fixture has no project for workspace recovery.");
+      await windowRef.webContents.executeJavaScript(
+        `(async () => {
+          await window.CatHan.storage.importAllData(${JSON.stringify(fixture)});
+          localStorage.setItem("loopcat.workspace.dirtyProjectIds", ${JSON.stringify(JSON.stringify([recoveryProjectId]))});
+        })()`,
+        true
+      );
+      await windowRef.reload();
+      await waitFor("document.querySelector('.project-tile button.primary')", "populated accessibility project");
+      await waitFor(
+        "!document.querySelector('#workspaceRecoveryPanel').classList.contains('hidden')",
+        "accessible workspace recovery panel"
+      );
+      await audit("Workspace recovery visible");
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const opener = document.querySelector("#workspaceRecoveryOpenBtn");
+          opener.focus();
+          opener.click();
+        })()`,
+        true
+      );
+      await waitFor(
+        "document.querySelector('.workspace-menu').open && document.activeElement === document.querySelector('#workspaceMenuSummary')",
+        "accessible workspace local status menu"
+      );
+      await audit("Workspace local status menu");
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const dismiss = document.querySelector("#workspaceRecoveryDismissBtn");
+          dismiss.focus();
+          dismiss.click();
+        })()`,
+        true
+      );
+      await waitFor(
+        "document.querySelector('#workspaceRecoveryPanel').classList.contains('hidden') && document.activeElement === document.querySelector('#workspaceMenuSummary')",
+        "accessible workspace recovery dismissal"
+      );
+      await windowRef.webContents.executeJavaScript(
+        "document.querySelector('.workspace-menu').removeAttribute('open')",
+        true
+      );
+      await windowRef.webContents.executeJavaScript(
+        "document.querySelector('.project-tile button.primary').click()",
+        true
+      );
+      await waitFor("document.querySelector('.file-card button.primary')", "accessibility project dashboard");
+      await windowRef.webContents.executeJavaScript(
+        "document.querySelector('.file-card button.primary').click()",
+        true
+      );
+      await waitFor("document.querySelector('#segmentBody textarea')", "accessibility translation editor");
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const returnTarget = document.querySelector("#focusModeBtn");
+          const input = document.querySelector("#projectPackageImportInput");
+          returnTarget.focus();
+          Object.defineProperty(input, "files", {
+            configurable: true,
+            value: [new File(["{"], "invalid-project.loopcat.json", { type: "application/json" })]
+          });
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        })()`,
+        true
+      );
+      await waitFor(
+        "!document.querySelector('#validationReportPanel').classList.contains('hidden') && document.querySelector('#validationReportList').textContent.includes('not valid JSON')",
+        "accessible import validation error"
+      );
+      await audit("Import validation error");
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const dismiss = document.querySelector("#validationReportMeta .validation-dismiss");
+          dismiss.focus();
+          dismiss.click();
+        })()`,
+        true
+      );
+      await waitFor(
+        "document.querySelector('#validationReportPanel').classList.contains('hidden') && document.activeElement === document.querySelector('#focusModeBtn')",
+        "accessible import validation focus return"
+      );
+      await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorTabReview').click()", true);
+      await waitFor(
+        "document.querySelector('#inspectorTabReview').getAttribute('aria-selected') === 'true'",
+        "populated review inspector"
+      );
+      await audit("Review comments populated");
+      await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorTabQuality').click()", true);
+      await waitFor(
+        "document.querySelector('#inspectorTabQuality').getAttribute('aria-selected') === 'true'",
+        "populated Quality Workbench"
+      );
+      await audit("Quality Workbench populated");
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          document.querySelector("#inspectorTabAi").click();
+          const opener = document.querySelector("#openProjectAiSettingsBtn");
+          opener.focus();
+          opener.click();
+        })()`,
+        true
+      );
+      await waitFor(
+        "document.querySelector('#projectDialog').open && document.querySelector('#projectAiOptions').open",
+        "AI provider administration dialog"
+      );
+      await audit("AI provider administration and command centre");
+      await windowRef.webContents.executeJavaScript("document.querySelector('#cancelProjectBtn').click()", true);
+      await waitFor("!document.querySelector('#projectDialog').open", "AI provider administration dialog close");
+      await waitFor(
+        "document.activeElement === document.querySelector('#openProjectAiSettingsBtn')",
+        "AI provider administration focus return"
+      );
+      await windowRef.webContents.executeJavaScript("document.querySelector('#projectsViewBtn').click()", true);
+      await waitFor(
+        "!document.querySelector('#projectsView').classList.contains('hidden')",
+        "Projects return after quality audit"
+      );
+
       await windowRef.webContents.executeJavaScript(
         `(() => {
           const opener = document.querySelector("#newProjectBtn");
@@ -198,6 +378,34 @@ app
       await windowRef.webContents.executeJavaScript("document.querySelector('#closeAboutBtn').click()", true);
       await waitFor("!document.querySelector('#aboutDialog').open", "About dialog close");
       await waitFor("document.activeElement === document.querySelector('#aboutBtn')", "About dialog focus return");
+
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const dialog = document.querySelector("#tmPretranslateDialog");
+          dialog.showModal();
+          document.querySelector("#tmPretranslateThresholdInput").focus();
+        })()`,
+        true
+      );
+      await waitFor("document.querySelector('#tmPretranslateDialog').open", "TM threshold dialog");
+      await audit("TM pretranslation threshold dialog");
+      windowRef.webContents.sendInputEvent({ type: "keyDown", keyCode: "ESC" });
+      windowRef.webContents.sendInputEvent({ type: "keyUp", keyCode: "ESC" });
+      await waitFor("!document.querySelector('#tmPretranslateDialog').open", "TM threshold dialog Escape close");
+
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const dialog = document.querySelector("#opusCatHelpDialog");
+          dialog.showModal();
+          document.querySelector("#closeOpusCatHelpBtn").focus();
+        })()`,
+        true
+      );
+      await waitFor("document.querySelector('#opusCatHelpDialog').open", "OPUS-CAT help dialog");
+      await audit("OPUS-CAT connection help dialog");
+      windowRef.webContents.sendInputEvent({ type: "keyDown", keyCode: "ESC" });
+      windowRef.webContents.sendInputEvent({ type: "keyUp", keyCode: "ESC" });
+      await waitFor("!document.querySelector('#opusCatHelpDialog').open", "OPUS-CAT help dialog Escape close");
 
       await windowRef.webContents.executeJavaScript(
         `(() => {
