@@ -164,6 +164,7 @@ const requiredReleaseFiles = [
   "src/features/editor/autosave-service.js",
   "src/features/editor/segment-confirmation-controller.js",
   "src/features/editor/target-edit-controller.js",
+  "src/features/editor/target-producer-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
   "src/ai/providers/gemini-provider-adapter.js",
@@ -198,6 +199,7 @@ const requiredReleaseFiles = [
   "tests/unit/autosave-service.test.cjs",
   "tests/unit/segment-confirmation-controller.test.cjs",
   "tests/unit/target-edit-controller.test.cjs",
+  "tests/unit/target-producer-controller.test.cjs",
   "tests/app-workflow/workflow-driver.inc.js",
   "tests/unit/gemini-provider-adapter.test.cjs",
   "tests/unit/groq-provider-adapter.test.cjs",
@@ -276,9 +278,11 @@ const segmentGridControllerJs = readText("src/features/editor/segment-grid-contr
 const autosaveServiceJs = readText("src/features/editor/autosave-service.js");
 const segmentConfirmationControllerJs = readText("src/features/editor/segment-confirmation-controller.js");
 const targetEditControllerJs = readText("src/features/editor/target-edit-controller.js");
+const targetProducerControllerJs = readText("src/features/editor/target-producer-controller.js");
 const autosaveServiceUnitTests = readText("tests/unit/autosave-service.test.cjs");
 const segmentConfirmationControllerUnitTests = readText("tests/unit/segment-confirmation-controller.test.cjs");
 const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
+const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
 const commandBusJs = readText("src/commands/command-bus.js");
 const editTargetSessionJs = readText("src/commands/edit-target-session.js");
 const segmentCommandsJs = readText("src/commands/segment-commands.js");
@@ -1843,6 +1847,51 @@ assertIncludes(
   segmentCommandsJs,
   "createInsertProtectedTagCommand",
   "Segment commands must expose a reversible protected-tag insertion boundary."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createTargetProducerController",
+  "The application runtime must expose the checked target-producer controller boundary."
+);
+for (const boundary of [
+  "editLifecycle.finalize(segment.id)",
+  "persistence.clearPending(segment, { finalizeEdit: false })",
+  "await commands.bus.execute(command)",
+  "persistence.debounce(segment)",
+  "mutation.restorePatch(segment, beforePatch)"
+]) {
+  assertIncludes(
+    targetProducerControllerJs,
+    boundary,
+    `TargetProducerController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "targetProducerController.mount()",
+  "app.js must delegate the Copy Source button lifecycle to TargetProducerController."
+);
+for (const delegation of [
+  "targetProducerController.insertTmTarget(target, options)",
+  "targetProducerController.copySourceToTarget()",
+  "targetProducerController.insertProtectedTag(tagText)"
+]) {
+  assertIncludes(appJs, delegation, `app.js must retain only the checked ${delegation} compatibility facade.`);
+}
+assert(
+  !appJs.includes("async function runTargetProducerCommand") &&
+    !appJs.includes('els.copySourceBtn.addEventListener("click"'),
+  "app.js must not regain discrete target-producer command or Copy Source event ownership."
+);
+assertIncludes(
+  targetProducerControllerUnitTests,
+  "target producer owns Copy Source button lifecycle and finalizes typing before a redacted command",
+  "focused target-producer tests must characterize EditTarget takeover and Copy Source event ownership."
+);
+assertIncludes(
+  targetProducerControllerUnitTests,
+  "filter membership changes preserve scroll while producer failure restores the exact target patch and caret",
+  "focused target-producer tests must characterize rendering and failure recovery."
 );
 assertIncludes(
   appJs,

@@ -1432,6 +1432,45 @@ targetEditController = appRuntime.featureFactories.createTargetEditController({
   undo: undoLastCommand,
   redo: redoLastCommand
 });
+const targetProducerController = appRuntime.featureFactories.createTargetProducerController({
+  copySourceElement: els.copySourceBtn,
+  editorSessionStore,
+  commands: {
+    bus: appRuntime.commands.bus,
+    createCopySource: appRuntime.commands.createCopySourceToTargetCommand,
+    createTmTarget: appRuntime.commands.createInsertTmTargetCommand,
+    createProtectedTag: appRuntime.commands.createInsertProtectedTagCommand,
+    changed: renderUndoControls
+  },
+  editLifecycle: { finalize: finalizePendingEditCommand },
+  persistence: {
+    clearPending: clearPendingSave,
+    debounce: debounceSave
+  },
+  selection: {
+    getActiveIndex: currentActiveIndex,
+    active: (segment) => targetEditController.activeSelection(segment),
+    normalize: (selection, targetLength) => targetEditController.normalizeSelection(selection, targetLength),
+    focus: focusActiveTextarea
+  },
+  filters: { matches: segmentPassesFilters },
+  mutation: {
+    capturePatch: targetCommandPatch,
+    applyTarget: setSegmentTargetAndStatus,
+    touch: touchSegment,
+    restorePatch: applyTargetCommandPatch,
+    invalidateFilters: invalidateSegmentFilterCache
+  },
+  restoration: { restorePatch: restoreSegmentEditCommandPatch },
+  view: {
+    renderSegments,
+    renderProgress,
+    renderHistory: renderRevisionHistory
+  },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus }
+});
+targetProducerController.mount();
 
 const editorContextController = appRuntime?.featureFactories?.createEditorContextController?.({
   getContext: () => ({
@@ -7892,120 +7931,16 @@ function normalizedTargetSelection(selection, targetLength) {
   return targetEditController.normalizeSelection(selection, targetLength);
 }
 
-function activeTargetSelection(segment) {
-  return targetEditController.activeSelection(segment);
-}
-
-async function runTargetProducerCommand({
-  createCommand,
-  target,
-  reason,
-  provenance,
-  selection,
-  successMessage
-}) {
-  const segment = currentSegment();
-  const projectId = currentProject()?.id || segment?.projectId || "";
-  if (!segment || !projectId || typeof createCommand !== "function") return null;
-
-  finalizePendingEditCommand(segment.id);
-  clearPendingSave(segment, { finalizeEdit: false });
-  const beforePatch = targetCommandPatch(segment);
-  const beforeSelection = activeTargetSelection(segment);
-  const nextTarget = String(target || "");
-  const nextSelection = normalizedTargetSelection(selection, nextTarget.length) || {
-    start: nextTarget.length,
-    end: nextTarget.length
-  };
-  const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
-  const passedFiltersBefore = segmentPassesFilters(segment);
-
-  try {
-    const command = createCommand({
-      projectId,
-      segmentId: segment.id,
-      beforePatch,
-      beforeSelection,
-      provenance,
-      restorePatch: (patch, context) =>
-        restoreSegmentEditCommandPatch(segment.id, patch, { ...context, focusTarget: true }),
-      applyFirst: () => {
-        setSegmentTargetAndStatus(segment, nextTarget, nextTarget.trim() ? "draft" : "empty", reason);
-        touchSegment(segment);
-        const passedFiltersAfter = segmentPassesFilters(segment);
-        if (passedFiltersBefore !== passedFiltersAfter) renderSegments({ preserveScroll: true });
-        else renderSegments();
-        renderProgress({ previousStatus, nextStatus: segment.status });
-        renderRevisionHistory();
-        markWorkspaceDirty();
-        debounceSave(segment);
-        focusActiveTextarea(nextSelection);
-        return {
-          patch: targetCommandPatch(segment),
-          activeSegmentId: segment.id,
-          focusTarget: true,
-          selection: nextSelection
-        };
-      }
-    });
-    const result = await appRuntime.commands.bus.execute(command);
-    renderUndoControls();
-    if (successMessage) setSaveStatus(`${successMessage}; Undo is available`, "dirty");
-    return result;
-  } catch (error) {
-    applyTargetCommandPatch(segment, beforePatch);
-    invalidateSegmentFilterCache();
-    renderSegments({ preserveScroll: true });
-    renderProgress();
-    renderRevisionHistory();
-    focusActiveTextarea(beforeSelection);
-    setSaveStatus(`${error.message || "Target change failed"}; existing work was preserved`, "dirty");
-    return null;
-  }
-}
-
 function insertTarget(target, options = {}) {
-  const channel = options.channel === "concordance" ? "concordance" : "match";
-  return runTargetProducerCommand({
-    createCommand: appRuntime?.commands?.createInsertTmTargetCommand,
-    target,
-    reason: "insert-target",
-    provenance: {
-      origin: "translation-memory",
-      channel,
-      ...(options.resourceId ? { resourceId: String(options.resourceId) } : {})
-    },
-    successMessage: channel === "concordance" ? "Concordance target inserted" : "TM target inserted"
-  });
+  return targetProducerController.insertTmTarget(target, options);
 }
 
 function copySourceToTarget() {
-  const segment = currentSegment();
-  if (!segment) return Promise.resolve(null);
-  return runTargetProducerCommand({
-    createCommand: appRuntime?.commands?.createCopySourceToTargetCommand,
-    target: segment.source,
-    reason: "copy-source",
-    provenance: { origin: "user", producer: "copy-source" },
-    successMessage: "Source copied to target"
-  });
+  return targetProducerController.copySourceToTarget();
 }
 
 function insertTagIntoTarget(tagText) {
-  const segment = currentSegment();
-  if (!segment) return Promise.resolve(null);
-  const current = segment.target || "";
-  const selected = activeTargetSelection(segment) || { start: current.length, end: current.length };
-  const nextTarget = `${current.slice(0, selected.start)}${tagText}${current.slice(selected.end)}`;
-  const nextPosition = selected.start + String(tagText || "").length;
-  return runTargetProducerCommand({
-    createCommand: appRuntime?.commands?.createInsertProtectedTagCommand,
-    target: nextTarget,
-    reason: "insert-tag",
-    provenance: { origin: "user", producer: "protected-tag" },
-    selection: { start: nextPosition, end: nextPosition },
-    successMessage: "Protected tag inserted"
-  });
+  return targetProducerController.insertProtectedTag(tagText);
 }
 
 async function saveProjectDomainFromForm() {
@@ -13587,7 +13522,6 @@ function wireEvents() {
 
   els.saveTmBtn.addEventListener("click", saveActiveSegmentToTm);
   els.pretranslateBtn.addEventListener("click", pretranslateFromTm);
-  els.copySourceBtn.addEventListener("click", copySourceToTarget);
   els.nextOpenBtn.addEventListener("click", goToNextOpenSegment);
   els.splitSegmentBtn.addEventListener("click", splitCurrentSegment);
   els.mergeNextBtn.addEventListener("click", mergeWithNextSegment);
