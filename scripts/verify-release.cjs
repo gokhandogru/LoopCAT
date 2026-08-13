@@ -185,6 +185,7 @@ const requiredReleaseFiles = [
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
   "src/features/quality/quality-review-controller.js",
+  "src/features/quality/review-state-controller.js",
   "src/features/resources/resources-controller.js",
   "src/features/resources/tm-pretranslation-dialog-controller.js",
   "src/features/import-export/import-export-controller.js",
@@ -212,6 +213,7 @@ const requiredReleaseFiles = [
   "tests/unit/perplexity-provider-adapter.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
+  "tests/unit/review-state-controller.test.cjs",
   "tests/unit/import-export-controller.test.cjs",
   "tests/unit/recovery-workspace-controller.test.cjs",
   "tests/unit/resource-trash.test.cjs",
@@ -283,6 +285,8 @@ const autosaveServiceUnitTests = readText("tests/unit/autosave-service.test.cjs"
 const segmentConfirmationControllerUnitTests = readText("tests/unit/segment-confirmation-controller.test.cjs");
 const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
+const reviewStateControllerJs = readText("src/features/quality/review-state-controller.js");
+const reviewStateControllerUnitTests = readText("tests/unit/review-state-controller.test.cjs");
 const commandBusJs = readText("src/commands/command-bus.js");
 const editTargetSessionJs = readText("src/commands/edit-target-session.js");
 const segmentCommandsJs = readText("src/commands/segment-commands.js");
@@ -1892,6 +1896,46 @@ assertIncludes(
   targetProducerControllerUnitTests,
   "filter membership changes preserve scroll while producer failure restores the exact target patch and caret",
   "focused target-producer tests must characterize rendering and failure recovery."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createReviewStateController",
+  "The application runtime must expose the checked quick review-state controller boundary."
+);
+for (const boundary of [
+  "mutation.toggle(segment, reviewState)",
+  "await persistence.save(segment)",
+  "await activity.log(segment, project, summary)",
+  "await commands.bus.execute(command)",
+  "mutation.restore(segment, snapshot)"
+]) {
+  assertIncludes(
+    reviewStateControllerJs,
+    boundary,
+    `ReviewStateController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return reviewStateController.setState(reviewState)",
+  "app.js must retain only the checked quick review-state compatibility facade."
+);
+assert(
+  !functionBody(appJs, "async function setActiveReviewState", "function qaSummary").includes(
+    "createChangeReviewStateCommand"
+  ) &&
+    !functionBody(appJs, "async function setActiveReviewState", "function qaSummary").includes("segment.reviewState ="),
+  "app.js must not regain quick review-state command or mutation orchestration."
+);
+assertIncludes(
+  reviewStateControllerUnitTests,
+  "primary quick review save failure restores the exact snapshot and failure presentation",
+  "focused quick review-state tests must characterize primary persistence rollback."
+);
+assertIncludes(
+  reviewStateControllerUnitTests,
+  "secondary quick review activity failure keeps the saved command durable",
+  "focused quick review-state tests must characterize non-transactional activity failure."
 );
 assertIncludes(
   appJs,

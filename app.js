@@ -1899,6 +1899,57 @@ const qualityReviewController = appRuntime?.featureFactories?.createQualityRevie
   onError: (error) => setSaveStatus(error?.message || "Quality or review action failed.", "dirty")
 });
 qualityReviewController?.mount?.();
+const reviewStateController = appRuntime.featureFactories.createReviewStateController({
+  editorSessionStore,
+  commands: {
+    bus: appRuntime.commands.bus,
+    create: appRuntime.commands.createChangeReviewStateCommand,
+    changed: renderUndoControls
+  },
+  selection: { getActiveIndex: currentActiveIndex },
+  mutation: {
+    toggle: (segment, reviewState) => {
+      segment.reviewState = segment.reviewState === reviewState ? "" : reviewState;
+    },
+    touch: touchSegment,
+    restore: (segment, snapshot) => {
+      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
+      Object.assign(segment, snapshot);
+    },
+    prepareHistory: prepareSegmentHistoryState
+  },
+  persistence: {
+    clearPending: clearPendingSave,
+    save: saveSegment
+  },
+  restoration: {
+    restoreCommand: (segmentId, snapshot) => restoreSegmentCommandSnapshot(segmentId, snapshot)
+  },
+  activity: {
+    log: (segment, _project, summary) =>
+      logProjectActivity("review", summary, {
+        segmentId: segment.id,
+        reviewState: segment.reviewState
+      })
+  },
+  presentation: {
+    syncState: (reviewState) => qualityReviewController?.syncReviewState?.(reviewState),
+    renderReview: () => renderReviewPanel(),
+    updateRow,
+    renderHistory: renderRevisionHistory
+  },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus },
+  describeState: (reviewState) => stableLower(reviewLabel(reviewState)),
+  testHooks: {
+    beforeSave: (segment) => {
+      if (LOOPCAT_TEST_BUILD && segment[REVIEW_STATE_SAVE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated review state save failure");
+      }
+    }
+  },
+  logger: console
+});
 dialogLifecycleController?.mount?.();
 
 function uiT(key, values = {}) {
@@ -7657,53 +7708,7 @@ async function saveActiveReviewMetadata(values = qualityReviewController?.readRe
 }
 
 async function setActiveReviewState(reviewState) {
-  const segment = currentSegment();
-  if (!currentProject() || !segment) return;
-  const snapshot = structuredClone(segment);
-  try {
-    const command = appRuntime.commands.createChangeReviewStateCommand({
-      projectId: currentProject().id,
-      segmentId: segment.id,
-      beforeSnapshot: snapshot,
-      restoreSnapshot: (nextSnapshot) => restoreSegmentCommandSnapshot(segment.id, nextSnapshot),
-      applyFirst: async () => {
-        segment.reviewState = segment.reviewState === reviewState ? "" : reviewState;
-        touchSegment(segment);
-        qualityReviewController?.syncReviewState?.(segment.reviewState);
-        clearPendingSave(segment);
-        if (LOOPCAT_TEST_BUILD && segment[REVIEW_STATE_SAVE_FAILURE_TEST_FLAG]) {
-          throw new Error("Simulated review state save failure");
-        }
-        await saveSegment(segment);
-        try {
-          await logProjectActivity(
-            "review",
-            segment.reviewState ? `Marked ${stableLower(reviewLabel(segment.reviewState))}` : "Review state cleared",
-            { segmentId: segment.id, reviewState: segment.reviewState }
-          );
-        } catch (activityError) {
-          console.warn("Review activity log failed.", activityError);
-        }
-        updateRow(currentActiveIndex());
-        markWorkspaceDirty();
-        return { snapshot: structuredClone(segment), activeSegmentId: segment.id };
-      }
-    });
-    await appRuntime.commands.bus.execute(command);
-    renderUndoControls();
-    setSaveStatus(
-      `${segment.reviewState ? `Marked ${stableLower(reviewLabel(segment.reviewState))}` : "Review state cleared"}; Undo is available`,
-      "saved"
-    );
-  } catch (error) {
-    Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-    Object.assign(segment, snapshot);
-    prepareSegmentHistoryState(segment);
-    renderReviewPanel();
-    updateRow(currentActiveIndex());
-    renderRevisionHistory();
-    setSaveStatus(error.message || "Review state save failed", "dirty");
-  }
+  return reviewStateController.setState(reviewState);
 }
 
 function qaSummary(checks) {
