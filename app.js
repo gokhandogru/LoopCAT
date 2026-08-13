@@ -1471,6 +1471,62 @@ const targetProducerController = appRuntime.featureFactories.createTargetProduce
   status: { set: setSaveStatus }
 });
 targetProducerController.mount();
+const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
+  elements: {
+    splitButton: els.splitSegmentBtn,
+    mergeButton: els.mergeNextBtn
+  },
+  editorSessionStore,
+  commands: {
+    bus: appRuntime.commands.bus,
+    createSplit: appRuntime.commands.createSplitSegmentCommand,
+    createMerge: appRuntime.commands.createMergeSegmentCommand,
+    setProjectId: (projectId) => {
+      state.commandProjectId = projectId;
+    },
+    changed: renderUndoControls
+  },
+  selection: {
+    getActiveIndex: currentActiveIndex,
+    findEditor: (index) => els.segmentBody.querySelector(`tr[data-index="${index}"] textarea`),
+    select: (index) => selectApplicationSegment(index),
+    focusTarget: focusActiveTextarea
+  },
+  mutation: {
+    applyTarget: setSegmentTargetAndStatus,
+    touch: touchSegment,
+    detectTags: detectProtectedTags,
+    prepareHistoryStates: prepareSegmentHistoryStates,
+    prepareRestoreSnapshot: prepareCommandRestoreSegmentSnapshot
+  },
+  persistence: {
+    flush: flushPendingSegmentSaves,
+    saveStructure: saveSegmentStructure,
+    discardPending: (segmentId) => autosaveService.discard(segmentId)
+  },
+  view: {
+    invalidateFilters: invalidateSegmentFilterCache,
+    renderAll
+  },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus },
+  ids: {
+    segment: () => `segment-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`
+  },
+  testHooks: {
+    beforeSplitSave: (segment) => {
+      if (LOOPCAT_TEST_BUILD && segment[SPLIT_SAVE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated split save failure");
+      }
+    },
+    beforeMergeSave: (segment) => {
+      if (LOOPCAT_TEST_BUILD && segment[MERGE_POST_DELETE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated merge transaction failure");
+      }
+    }
+  }
+});
+structuralSegmentController.mount();
 
 const editorContextController = appRuntime?.featureFactories?.createEditorContextController?.({
   getContext: () => ({
@@ -3891,70 +3947,24 @@ function tagDisplayText(tag) {
   return tag?.label || tag?.text || "";
 }
 
-function detectInlineCodeRanges(text) {
-  return Array.from(String(text || "").matchAll(/<(g|b|i|u)\b[^>]*>[\s\S]*?<\/\1>/gi)).map((match) => ({
-    start: match.index || 0,
-    end: (match.index || 0) + match[0].length
-  }));
-}
-
 function splitProtectedRanges(text) {
-  return [
-    ...detectProtectedTags(text).map((tag) => ({ start: tag.index, end: tag.index + tag.text.length })),
-    ...detectInlineCodeRanges(text)
-  ];
-}
-
-function safeSplitIndex(text, preferredIndex) {
-  const value = String(text || "");
-  const max = value.length - 1;
-  if (max <= 0) return 0;
-  const preferred = Math.min(Math.max(Math.round(preferredIndex), 1), max);
-  const ranges = splitProtectedRanges(value);
-  const safe = (index) => {
-    if (index <= 0 || index >= value.length) return false;
-    if (!/\s/u.test(value[index] || value[index - 1] || "")) return false;
-    return !ranges.some((range) => index > range.start && index < range.end);
-  };
-  for (let offset = 0; offset < value.length; offset += 1) {
-    const left = preferred - offset;
-    const right = preferred + offset;
-    if (safe(left)) return left;
-    if (safe(right)) return right;
-  }
-  return ranges.some((range) => preferred > range.start && preferred < range.end) ? 0 : preferred;
+  return structuralSegmentController.splitProtectedRanges(text);
 }
 
 function mappedSourceSplitIndex(source, target, targetCursor) {
-  const sourceText = String(source || "");
-  const targetText = String(target || "");
-  if (!targetText.trim()) return safeSplitIndex(sourceText, sourceText.length / 2);
-  const ratio = Math.min(Math.max(targetCursor / targetText.length, 0), 1);
-  return safeSplitIndex(sourceText, sourceText.length * ratio);
+  return structuralSegmentController.mappedSourceSplitIndex(source, target, targetCursor);
 }
 
 function canSplitSegmentStructure(segment) {
-  if (!segment?.structure) return true;
-  return segment.structure.type === "paragraph";
+  return structuralSegmentController.canSplit(segment);
 }
 
 function canMergeSegmentStructures(segment, next) {
-  if (!segment || !next || segment.documentId !== next.documentId) return false;
-  if (!segment.structure && !next.structure) return true;
-  if (segment.structure?.type !== "paragraph" || next.structure?.type !== "paragraph") return false;
-  return (
-    (segment.structure.partPath || "word/document.xml") === (next.structure.partPath || "word/document.xml") &&
-    segment.structure.paragraphIndex === next.structure.paragraphIndex
-  );
+  return structuralSegmentController.canMerge(segment, next);
 }
 
 function nextSegmentForMerge(segment = currentSegment()) {
-  if (!segment) return null;
-  return (
-    currentSegments().find(
-      (item) => item.index > segment.index && item.documentId === segment.documentId
-    ) || null
-  );
+  return structuralSegmentController.nextForMerge(segment);
 }
 
 function missingTags(segment) {
@@ -6766,117 +6776,12 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
   }
 }
 
-function normalizeStructuralSegmentOrder(segments) {
-  const ordered = segments
-    .map((segment, order) => ({ segment, order }))
-    .sort((left, right) => Number(left.segment.index || 0) - Number(right.segment.index || 0) || left.order - right.order)
-    .map(({ segment }) => segment);
-  const documentCounts = new Map();
-  ordered.forEach((segment, index) => {
-    segment.index = index;
-    const documentIndex = documentCounts.get(segment.documentId) || 0;
-    segment.documentIndex = documentIndex;
-    documentCounts.set(segment.documentId, documentIndex + 1);
-  });
-  return ordered;
-}
-
 async function restoreSplitSegmentCommandSegments(nextSnapshots, options = {}) {
-  if (!currentProject()?.id) throw new Error("The split segment project is no longer open.");
-  const snapshots = Array.isArray(nextSnapshots) ? nextSnapshots : [];
-  const snapshotIds = new Set();
-  snapshots.forEach((snapshot) => {
-    if (!snapshot?.id || snapshot.projectId !== currentProject().id || snapshotIds.has(snapshot.id)) {
-      throw new Error("The split segment snapshot is invalid for the current project.");
-    }
-    snapshotIds.add(snapshot.id);
-  });
-  if (!snapshots.length || !snapshotIds.has(options.originalSegmentId)) {
-    throw new Error("The split segment snapshot does not contain the original segment.");
-  }
-
-  const currentSegmentSnapshots = currentSegments().map((segment) => structuredClone(segment));
-  const currentById = new Map(currentSegmentSnapshots.map((segment) => [segment.id, segment]));
-  if (!currentById.has(options.originalSegmentId)) {
-    throw new Error("The original split segment is no longer available.");
-  }
-  const preservedCurrentSegments = currentSegmentSnapshots.filter(
-    (segment) => !snapshotIds.has(segment.id) && segment.id !== options.createdSegmentId
-  );
-  const restored = normalizeStructuralSegmentOrder(
-    [...snapshots, ...preservedCurrentSegments].map((snapshot) =>
-      prepareCommandRestoreSegmentSnapshot(snapshot, currentById.get(snapshot.id))
-    )
-  );
-  const deleteSegmentIds =
-    options.direction === "undo" && currentById.has(options.createdSegmentId) ? [options.createdSegmentId] : [];
-  const savedSegments = await saveSegmentStructure(restored, deleteSegmentIds);
-
-  deleteSegmentIds.forEach((segmentId) => {
-    autosaveService.discard(segmentId);
-  });
-  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
-  const requestedIndex = currentSegments().findIndex((segment) => segment.id === options.activeSegmentId);
-  selectApplicationSegment(requestedIndex >= 0 ? requestedIndex : Math.max(0, currentActiveIndex()));
-  invalidateSegmentFilterCache();
-  markWorkspaceDirty();
-  return {
-    segments: currentSegments().map((segment) => structuredClone(segment)),
-    activeSegmentId: currentSegment()?.id || options.activeSegmentId || options.originalSegmentId,
-    affectedCount: 2,
-    focusTarget: true
-  };
+  return structuralSegmentController.restoreSplit(nextSnapshots, options);
 }
 
 async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
-  if (!currentProject()?.id) throw new Error("The merged segment project is no longer open.");
-  const snapshots = Array.isArray(nextSnapshots) ? nextSnapshots : [];
-  const snapshotIds = new Set();
-  snapshots.forEach((snapshot) => {
-    if (!snapshot?.id || snapshot.projectId !== currentProject().id || snapshotIds.has(snapshot.id)) {
-      throw new Error("The merged segment snapshot is invalid for the current project.");
-    }
-    snapshotIds.add(snapshot.id);
-  });
-  if (!snapshots.length || !snapshotIds.has(options.segmentId)) {
-    throw new Error("The merged segment snapshot does not contain the surviving segment.");
-  }
-  const expectsMergedSegment = options.direction === "undo";
-  if (snapshotIds.has(options.mergedSegmentId) !== expectsMergedSegment) {
-    throw new Error("The merged segment snapshot does not match the requested restore direction.");
-  }
-
-  const currentSegmentSnapshots = currentSegments().map((segment) => structuredClone(segment));
-  const currentById = new Map(currentSegmentSnapshots.map((segment) => [segment.id, segment]));
-  if (!currentById.has(options.segmentId)) {
-    throw new Error("The surviving merged segment is no longer available.");
-  }
-  const preservedCurrentSegments = currentSegmentSnapshots.filter(
-    (segment) => !snapshotIds.has(segment.id) && segment.id !== options.mergedSegmentId
-  );
-  const restored = normalizeStructuralSegmentOrder(
-    [...snapshots, ...preservedCurrentSegments].map((snapshot) =>
-      prepareCommandRestoreSegmentSnapshot(snapshot, currentById.get(snapshot.id))
-    )
-  );
-  const deleteSegmentIds =
-    options.direction === "redo" && currentById.has(options.mergedSegmentId) ? [options.mergedSegmentId] : [];
-  const savedSegments = await saveSegmentStructure(restored, deleteSegmentIds);
-
-  deleteSegmentIds.forEach((segmentId) => {
-    autosaveService.discard(segmentId);
-  });
-  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
-  const requestedIndex = currentSegments().findIndex((segment) => segment.id === options.activeSegmentId);
-  selectApplicationSegment(requestedIndex >= 0 ? requestedIndex : Math.max(0, currentActiveIndex()));
-  invalidateSegmentFilterCache();
-  markWorkspaceDirty();
-  return {
-    segments: currentSegments().map((segment) => structuredClone(segment)),
-    activeSegmentId: currentSegment()?.id || options.activeSegmentId || options.segmentId,
-    affectedCount: 2,
-    focusTarget: true
-  };
+  return structuralSegmentController.restoreMerge(nextSnapshots, options);
 }
 
 async function replaceTargetText(scope = "visible") {
@@ -11400,188 +11305,11 @@ function confirmExternalAiPromptShare({ provider, includesSourceText, contextLab
 }
 
 async function splitCurrentSegment() {
-  const segment = currentSegment();
-  const textarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
-  if (!segment || !textarea) return null;
-  if (!canSplitSegmentStructure(segment)) {
-    setSaveStatus("Split is unavailable for structure-preserving localization files.", "dirty");
-    return null;
-  }
-  const source = segment.source || "";
-  const target = segment.target || "";
-  const targetCursor = textarea.selectionStart || 0;
-  const sourceCursor = mappedSourceSplitIndex(source, target, targetCursor);
-  if (sourceCursor <= 0 || sourceCursor >= source.length) {
-    setSaveStatus("Place the cursor in the target/source-equivalent position before splitting.", "dirty");
-    return null;
-  }
-  const firstSource = source.slice(0, sourceCursor).trim();
-  const secondSource = source.slice(sourceCursor).trim();
-  if (!firstSource || !secondSource) return null;
-  const targetSplit = target.trim() ? Math.min(targetCursor, target.length) : 0;
-  const firstTarget = target.slice(0, targetSplit).trim();
-  const secondTarget = target.slice(targetSplit).trim();
-  try {
-    await flushPendingSegmentSaves(currentProject().id);
-  } catch (error) {
-    setSaveStatus(error.message || "Save pending changes before splitting failed", "dirty");
-    return null;
-  }
-  const beforeSegments = currentSegments().map((item) => structuredClone(item));
-  const createdSegmentId = `segment-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  const createdAt = new Date().toISOString();
-  const command = appRuntime?.commands?.createSplitSegmentCommand?.({
-    projectId: currentProject().id,
-    segmentId: segment.id,
-    createdSegmentId,
-    beforeSegments,
-    restoreSegments: restoreSplitSegmentCommandSegments,
-    applyFirst: async () => {
-      const nextSegments = beforeSegments.map((item) => structuredClone(item));
-      const firstSegment = nextSegments.find((item) => item.id === segment.id);
-      if (!firstSegment) throw new Error("The segment to split is no longer available.");
-      const secondSegment = {
-        ...structuredClone(firstSegment),
-        id: createdSegmentId,
-        index: Number(firstSegment.index || 0) + 0.5,
-        documentIndex: Number(firstSegment.documentIndex || 0) + 0.5,
-        source: secondSource,
-        target: secondTarget,
-        status: secondTarget ? "draft" : "empty",
-        tags: detectProtectedTags(secondSource),
-        revision: 1,
-        createdAt,
-        updatedAt: createdAt
-      };
-      firstSegment.source = firstSource;
-      setSegmentTargetAndStatus(firstSegment, firstTarget, firstTarget ? "draft" : "empty", "split");
-      firstSegment.tags = detectProtectedTags(firstSource);
-      touchSegment(firstSegment);
-      const ordered = normalizeStructuralSegmentOrder([...nextSegments, secondSegment]);
-      if (LOOPCAT_TEST_BUILD && segment[SPLIT_SAVE_FAILURE_TEST_FLAG]) {
-        throw new Error("Simulated split save failure");
-      }
-      const savedSegments = await saveSegmentStructure(ordered);
-      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
-      selectApplicationSegment(currentSegments().findIndex((item) => item.id === createdSegmentId));
-      invalidateSegmentFilterCache();
-      markWorkspaceDirty();
-      return {
-        segments: currentSegments().map((item) => structuredClone(item)),
-        activeSegmentId: createdSegmentId,
-        affectedCount: 2,
-        focusTarget: true
-      };
-    }
-  });
-  if (!command) {
-    setSaveStatus("The reversible segment split service is unavailable.", "dirty");
-    return null;
-  }
-
-  let commandExecution;
-  try {
-    commandExecution = await appRuntime.commands.bus.execute(command);
-  } catch (error) {
-    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(beforeSegments));
-    selectApplicationSegment(Math.max(0, currentSegments().findIndex((item) => item.id === segment.id)));
-    invalidateSegmentFilterCache();
-    renderAll();
-    focusActiveTextarea();
-    setSaveStatus(error.message || "Segment split failed", "dirty");
-    return null;
-  }
-  state.commandProjectId = currentProject().id;
-  renderAll();
-  renderUndoControls();
-  setSaveStatus("Segment split; Undo is available", "saved");
-  focusActiveTextarea();
-  return commandExecution;
+  return structuralSegmentController.split();
 }
 
 async function mergeWithNextSegment() {
-  const segment = currentSegment();
-  if (!segment) return null;
-  const next = nextSegmentForMerge(segment);
-  if (!next) return null;
-  if (!canMergeSegmentStructures(segment, next)) {
-    setSaveStatus("Merge is available only for unstructured text or DOCX segments from the same paragraph.", "dirty");
-    return null;
-  }
-  try {
-    await flushPendingSegmentSaves(currentProject().id);
-  } catch (error) {
-    setSaveStatus(error.message || "Save pending changes before merging failed", "dirty");
-    return null;
-  }
-  const beforeSegments = currentSegments().map((item) => structuredClone(item));
-  const segmentId = segment.id;
-  const mergedSegmentId = next.id;
-  const command = appRuntime?.commands?.createMergeSegmentCommand?.({
-    projectId: currentProject().id,
-    segmentId,
-    mergedSegmentId,
-    beforeSegments,
-    restoreSegments: restoreMergeSegmentCommandSegments,
-    applyFirst: async () => {
-      const nextSegments = beforeSegments.map((item) => structuredClone(item));
-      const survivingSegment = nextSegments.find((item) => item.id === segmentId);
-      const mergedSegment = nextSegments.find((item) => item.id === mergedSegmentId);
-      if (!survivingSegment || !mergedSegment || !canMergeSegmentStructures(survivingSegment, mergedSegment)) {
-        throw new Error("The segments to merge are no longer available in a compatible structure.");
-      }
-      survivingSegment.source = `${survivingSegment.source} ${mergedSegment.source}`.trim();
-      const mergedTarget = `${survivingSegment.target || ""} ${mergedSegment.target || ""}`.trim();
-      setSegmentTargetAndStatus(
-        survivingSegment,
-        mergedTarget,
-        mergedTarget ? "draft" : "empty",
-        "merge"
-      );
-      survivingSegment.tags = detectProtectedTags(survivingSegment.source);
-      touchSegment(survivingSegment);
-      const ordered = normalizeStructuralSegmentOrder(
-        nextSegments.filter((item) => item.id !== mergedSegmentId)
-      );
-      if (LOOPCAT_TEST_BUILD && segment[MERGE_POST_DELETE_FAILURE_TEST_FLAG]) {
-        throw new Error("Simulated merge transaction failure");
-      }
-      const savedSegments = await saveSegmentStructure(ordered, [mergedSegmentId]);
-      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(savedSegments));
-      selectApplicationSegment(currentSegments().findIndex((item) => item.id === segmentId));
-      invalidateSegmentFilterCache();
-      markWorkspaceDirty();
-      return {
-        segments: currentSegments().map((item) => structuredClone(item)),
-        activeSegmentId: segmentId,
-        affectedCount: 2,
-        focusTarget: true
-      };
-    }
-  });
-  if (!command) {
-    setSaveStatus("The reversible segment merge service is unavailable.", "dirty");
-    return null;
-  }
-
-  let commandExecution;
-  try {
-    commandExecution = await appRuntime.commands.bus.execute(command);
-  } catch (error) {
-    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(beforeSegments));
-    selectApplicationSegment(Math.max(0, currentSegments().findIndex((item) => item.id === segmentId)));
-    invalidateSegmentFilterCache();
-    renderAll();
-    focusActiveTextarea();
-    setSaveStatus(error.message || "Segment merge failed", "dirty");
-    return null;
-  }
-  state.commandProjectId = currentProject().id;
-  renderAll();
-  renderUndoControls();
-  setSaveStatus("Segments merged; Undo is available", "saved");
-  focusActiveTextarea();
-  return commandExecution;
+  return structuralSegmentController.merge();
 }
 
 async function importDocx(file) {
@@ -13528,8 +13256,6 @@ function wireEvents() {
   els.saveTmBtn.addEventListener("click", saveActiveSegmentToTm);
   els.pretranslateBtn.addEventListener("click", pretranslateFromTm);
   els.nextOpenBtn.addEventListener("click", goToNextOpenSegment);
-  els.splitSegmentBtn.addEventListener("click", splitCurrentSegment);
-  els.mergeNextBtn.addEventListener("click", mergeWithNextSegment);
   els.runQaBtn.addEventListener("click", runProjectQa);
   document.querySelectorAll("[data-panel-toggle]").forEach((button) => {
     syncPanelToggleState(button);

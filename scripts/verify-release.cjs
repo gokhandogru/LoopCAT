@@ -165,6 +165,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-confirmation-controller.js",
   "src/features/editor/target-edit-controller.js",
   "src/features/editor/target-producer-controller.js",
+  "src/features/editor/structural-segment-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
   "src/ai/providers/gemini-provider-adapter.js",
@@ -201,6 +202,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-confirmation-controller.test.cjs",
   "tests/unit/target-edit-controller.test.cjs",
   "tests/unit/target-producer-controller.test.cjs",
+  "tests/unit/structural-segment-controller.test.cjs",
   "tests/app-workflow/workflow-driver.inc.js",
   "tests/unit/gemini-provider-adapter.test.cjs",
   "tests/unit/groq-provider-adapter.test.cjs",
@@ -281,10 +283,12 @@ const autosaveServiceJs = readText("src/features/editor/autosave-service.js");
 const segmentConfirmationControllerJs = readText("src/features/editor/segment-confirmation-controller.js");
 const targetEditControllerJs = readText("src/features/editor/target-edit-controller.js");
 const targetProducerControllerJs = readText("src/features/editor/target-producer-controller.js");
+const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
 const autosaveServiceUnitTests = readText("tests/unit/autosave-service.test.cjs");
 const segmentConfirmationControllerUnitTests = readText("tests/unit/segment-confirmation-controller.test.cjs");
 const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
+const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
 const reviewStateControllerJs = readText("src/features/quality/review-state-controller.js");
 const reviewStateControllerUnitTests = readText("tests/unit/review-state-controller.test.cjs");
 const commandBusJs = readText("src/commands/command-bus.js");
@@ -2003,6 +2007,25 @@ assertIncludes(
   "Segment commands must expose a reversible SplitSegment boundary."
 );
 assertIncludes(
+  appBootstrapJs,
+  "createStructuralSegmentController",
+  "The application runtime must expose the checked structural-segment controller boundary."
+);
+for (const boundary of [
+  "await persistence.flush(project.id)",
+  "await commands.bus.execute(command)",
+  "mutation.prepareRestoreSnapshot(snapshot, currentById.get(snapshot.id))",
+  "await persistence.saveStructure(restored, deleteSegmentIds)",
+  "deleteSegmentIds.forEach((segmentId) => persistence.discardPending(segmentId))",
+  "editorSessionStore.replaceSegments(mutation.prepareHistoryStates(savedSegments))"
+]) {
+  assertIncludes(
+    structuralSegmentControllerJs,
+    boundary,
+    `StructuralSegmentController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
   storageJs,
   "writeSegmentStructureAtomically",
   "structural segment writes and created-segment deletion must share one IndexedDB transaction."
@@ -2011,6 +2034,11 @@ assertIncludes(
   appJs,
   "restoreSplitSegmentCommandSegments",
   "SplitSegment Undo/Redo must share the atomic structural restoration boundary."
+);
+assertIncludes(
+  appJs,
+  "return structuralSegmentController.restoreSplit(nextSnapshots, options)",
+  "app.js must delegate SplitSegment restoration to StructuralSegmentController."
 );
 assertIncludes(
   appJs,
@@ -2034,6 +2062,11 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
+  "return structuralSegmentController.restoreMerge(nextSnapshots, options)",
+  "app.js must delegate MergeSegment restoration to StructuralSegmentController."
+);
+assertIncludes(
+  appJs,
   '{ id: "merge-segments", label: "Merge with next segment"',
   "the command palette and segment button must route through the same merge action."
 );
@@ -2042,6 +2075,46 @@ assertIncludes(
   "MergeSegment restores the deleted segment with stable IDs and retryable atomic Undo",
   "focused command tests must cover MergeSegment identity, initial failure, and failed-Undo recovery."
 );
+assertIncludes(
+  appJs,
+  "structuralSegmentController.mount()",
+  "app.js must delegate structural segment button lifecycle to StructuralSegmentController."
+);
+for (const delegation of [
+  "return structuralSegmentController.split()",
+  "return structuralSegmentController.merge()",
+  "return structuralSegmentController.mappedSourceSplitIndex(source, target, targetCursor)",
+  "return structuralSegmentController.canSplit(segment)",
+  "return structuralSegmentController.canMerge(segment, next)",
+  "return structuralSegmentController.nextForMerge(segment)"
+]) {
+  assertIncludes(appJs, delegation, `app.js must retain only the checked ${delegation} compatibility facade.`);
+}
+assert(
+  !appJs.includes("function normalizeStructuralSegmentOrder") &&
+    !appJs.includes("function safeSplitIndex") &&
+    !appJs.includes('els.splitSegmentBtn.addEventListener("click"') &&
+    !appJs.includes('els.mergeNextBtn.addEventListener("click"') &&
+    !functionBody(appJs, "async function splitCurrentSegment", "async function mergeWithNextSegment").includes(
+      "createSplitSegmentCommand"
+    ) &&
+    !functionBody(appJs, "async function mergeWithNextSegment", "async function importDocx").includes(
+      "createMergeSegmentCommand"
+    ),
+  "app.js must not regain structural mapping, command, restoration, or button lifecycle ownership."
+);
+for (const testName of [
+  "structural controller maps split cursors outside protected ranges and owns action listener lifecycle",
+  "split flushes pending saves, records stable IDs, normalizes order, selects the created segment, and restores Undo",
+  "merge atomically persists deletion, regenerates target history and tags, and restores the merged segment",
+  "initial structural persistence failures restore the exact visible list, selection, focus, and status"
+]) {
+  assertIncludes(
+    structuralSegmentControllerUnitTests,
+    testName,
+    `focused structural-segment tests must characterize ${testName}.`
+  );
+}
 assertIncludes(
   webSmokeScript,
   "const artifactName = `${productName} Web ${packageJson.version}.zip`;",

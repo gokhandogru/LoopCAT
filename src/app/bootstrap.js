@@ -45,6 +45,7 @@ import { createAutosaveService } from "../features/editor/autosave-service.js";
 import { createTargetEditController } from "../features/editor/target-edit-controller.js";
 import { createSegmentConfirmationController } from "../features/editor/segment-confirmation-controller.js";
 import { createTargetProducerController } from "../features/editor/target-producer-controller.js";
+import { createStructuralSegmentController } from "../features/editor/structural-segment-controller.js";
 import { createPaletteController } from "../features/palette/palette-controller.js";
 import { createWorkspaceLayoutController } from "../features/workspace/workspace-layout-controller.js";
 import { createUpdateController } from "../features/update/update-controller.js";
@@ -143,6 +144,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createRecoveryWorkspaceController,
       createResourcesController,
       createSegmentConfirmationController,
+      createStructuralSegmentController,
       createTargetProducerController,
       createPaletteController,
       createThemeController,
