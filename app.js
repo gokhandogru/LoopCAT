@@ -2295,6 +2295,63 @@ const aiTerminologyExtractionController =
     status: { set: setSaveStatus },
     logger: console
   });
+let aiProjectBriefOwnsPromptBusy = false;
+const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBriefController({
+  editorSessionStore,
+  settings: {
+    persist: () => persistLocalAiSettings({ silent: true }),
+    runtimeConfig: localAiRuntimeConfig,
+    assertReady: assertLocalAiRuntimeReady,
+    normalizeProjectAiSettings: defaultAiSettings
+  },
+  providers: {
+    get: currentLocalAiProvider,
+    sharesExternally: (settings) =>
+      localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
+  },
+  consent: { externalShare: confirmExternalAiPromptShare },
+  context: {
+    getSampleSegments: projectBriefSampleSegments,
+    getDocuments: projectDocuments,
+    getTerms: (project) =>
+      listTerms({
+        sourceLang: project.sourceLang,
+        targetLang: project.targetLang,
+        termBaseNames: projectTermBaseNames()
+      })
+  },
+  domain: {
+    generateProjectBrief: (options) => aiCommandService.generateProjectBrief(options)
+  },
+  lifecycle: {
+    isRunning: () => state.localAi.running,
+    isPromptBusy: () => state.localAi.promptBusy,
+    sync: ({ promptBusy }) => {
+      if (promptBusy) {
+        aiProjectBriefOwnsPromptBusy = true;
+        state.localAi.promptBusy = true;
+      } else if (aiProjectBriefOwnsPromptBusy) {
+        state.localAi.promptBusy = false;
+        aiProjectBriefOwnsPromptBusy = false;
+      }
+    }
+  },
+  persistence: { updateProject },
+  administration: {
+    setStyleGuide: (value) => aiAdministrationController?.setGlobalStyleGuide?.(value)
+  },
+  presentation: {
+    renderCommandCentre: renderLocalAiCommandCentre,
+    renderOutput: renderLocalAiOutput
+  },
+  activity: {
+    log: (details) =>
+      logProjectActivity("ai-project-brief", "AI project brief generated", details)
+  },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus },
+  logger: console
+});
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
     splitButton: els.splitSegmentBtn,
@@ -9295,100 +9352,7 @@ function projectBriefSampleSegments(limit = 6) {
 }
 
 async function generateProjectBriefWithLocalAi() {
-  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
-  const settings = await persistLocalAiSettings({ silent: true });
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-    assertLocalAiRuntimeReady(settings, config, "generating a project brief");
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const provider = currentLocalAiProvider(settings);
-  if (!provider?.completePrompt) {
-    const message = "AI project brief generation is not available for this provider.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const sampleSegments = projectBriefSampleSegments();
-  if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) {
-    const ok = confirmExternalAiPromptShare({
-      provider: provider.name || settings.providerId,
-      includesSourceText: sampleSegments.length > 0,
-      contextLabels: ["project metadata", "document names", "sample segments", "termbase hints", "configured provider URL"]
-    });
-    if (!ok) {
-      setSaveStatus("AI project brief canceled", "dirty");
-      return false;
-    }
-  }
-  const projectSnapshot = structuredClone(currentProject());
-  state.localAi.promptBusy = true;
-  renderLocalAiCommandCentre();
-  setSaveStatus("Generating AI project brief...");
-  try {
-    const documents = projectDocuments();
-    const terms = await listTerms({
-      sourceLang: currentProject().sourceLang,
-      targetLang: currentProject().targetLang,
-      termBaseNames: projectTermBaseNames()
-    });
-    const result = await aiCommandService.generateProjectBrief({
-      provider,
-      project: currentProject(),
-      settings,
-      config,
-      sourceLanguage: settings.sourceLanguage,
-      sourceCode: settings.sourceCode,
-      targetLanguage: settings.targetLanguage,
-      targetCode: settings.targetCode,
-      documents,
-      sampleSegments,
-      terms: terms.slice(0, 12)
-    });
-    const existingStyle = String(currentProject().aiSettings?.styleGuide || "").trim();
-    const generatedBlock = `AI project brief:\n${result.brief.trim()}`;
-    const nextStyleGuide = existingStyle
-      ? `${existingStyle}\n\n${generatedBlock}`
-      : generatedBlock;
-    const aiSettings = defaultAiSettings({
-      ...currentProject().aiSettings,
-      styleGuide: nextStyleGuide
-    });
-    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), aiSettings }));
-    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
-    markWorkspaceDirty();
-    let activityLogged = true;
-    try {
-      await logProjectActivity("ai-project-brief", "AI project brief generated", {
-        provider: result.provider || provider.name || settings.providerId,
-        model: result.model || settings.model,
-        sampleCount: sampleSegments.length,
-        termCount: Math.min(terms.length, 12)
-      });
-    } catch (activityError) {
-      activityLogged = false;
-      console.warn("AI project brief activity log failed.", activityError);
-      markWorkspaceDirty();
-    }
-    aiAdministrationController?.setGlobalStyleGuide?.(currentProject().aiSettings.styleGuide || "");
-    renderLocalAiOutput(result.brief);
-    setSaveStatus(activityLogged ? "AI project brief saved to style instructions" : "AI project brief saved; activity log failed", activityLogged ? "saved" : "dirty");
-    return true;
-  } catch (error) {
-    editorSessionStore.replaceProject(projectSnapshot);
-    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === projectSnapshot.id ? projectSnapshot : project)));
-    aiAdministrationController?.setGlobalStyleGuide?.(defaultAiSettings(projectSnapshot.aiSettings).styleGuide || "");
-    const message = error.message || "AI project brief failed.";
-    renderLocalAiOutput(message, { muted: false });
-    setSaveStatus(message, "dirty");
-    return false;
-  } finally {
-    state.localAi.promptBusy = false;
-    renderLocalAiCommandCentre();
-  }
+  return aiProjectBriefController.generate();
 }
 
 function localAiPretranslationSegments(settings) {

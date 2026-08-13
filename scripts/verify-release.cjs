@@ -185,6 +185,7 @@ const requiredReleaseFiles = [
   "src/features/ai/ai-administration-controller.js",
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
+  "src/features/ai/ai-project-brief-controller.js",
   "src/features/ai/ai-terminology-application-controller.js",
   "src/features/ai/ai-terminology-extraction-controller.js",
   "src/features/ai/ai-pretranslation-controller.js",
@@ -207,6 +208,7 @@ const requiredReleaseFiles = [
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/ai-alternatives-controller.test.cjs",
   "tests/unit/ai-draft-editing-controller.test.cjs",
+  "tests/unit/ai-project-brief-controller.test.cjs",
   "tests/unit/ai-terminology-application-controller.test.cjs",
   "tests/unit/ai-terminology-extraction-controller.test.cjs",
   "tests/unit/ai-pretranslation-controller.test.cjs",
@@ -348,6 +350,8 @@ const aiAlternativesControllerJs = readText("src/features/ai/ai-alternatives-con
 const aiAlternativesControllerUnitTests = readText("tests/unit/ai-alternatives-controller.test.cjs");
 const aiDraftEditingControllerJs = readText("src/features/ai/ai-draft-editing-controller.js");
 const aiDraftEditingControllerUnitTests = readText("tests/unit/ai-draft-editing-controller.test.cjs");
+const aiProjectBriefControllerJs = readText("src/features/ai/ai-project-brief-controller.js");
+const aiProjectBriefControllerUnitTests = readText("tests/unit/ai-project-brief-controller.test.cjs");
 const aiTerminologyApplicationControllerJs = readText("src/features/ai/ai-terminology-application-controller.js");
 const aiTerminologyApplicationControllerUnitTests = readText(
   "tests/unit/ai-terminology-application-controller.test.cjs"
@@ -2930,6 +2934,73 @@ for (const testName of [
     aiTerminologyExtractionControllerUnitTests,
     testName,
     `focused AI-terminology-extraction tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiProjectBriefController",
+  "The application runtime must expose the checked AI-project-brief controller boundary."
+);
+for (const boundary of [
+  "if (!project || lifecycle.isRunning() || promptBusy || lifecycle.isPromptBusy()) return false",
+  'settingsBoundary.assertReady(settings, config, "generating a project brief")',
+  "const sampleSegments = context.getSampleSegments()",
+  "providers.sharesExternally(settings)",
+  "const documents = context.getDocuments()",
+  "const terms = await context.getTerms(project)",
+  "const result = await domain.generateProjectBrief({",
+  "const generatedBlock = `AI project brief:\\n${result.brief.trim()}`",
+  "const savedProject = await persistence.updateProject({ ...project, aiSettings })",
+  "editorSessionStore.replaceProject(savedProject)",
+  "replaceProjectInList(savedProject)",
+  "await activity.log({",
+  'administration.setStyleGuide(savedProject.aiSettings.styleGuide || "")',
+  "editorSessionStore.replaceProject(projectSnapshot)",
+  "replaceProjectInList(projectSnapshot)",
+  "promptBusy = false"
+]) {
+  assertIncludes(
+    aiProjectBriefControllerJs,
+    boundary,
+    `AiProjectBriefController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return aiProjectBriefController.generate()",
+  "app.js must retain only the checked AI-project-brief compatibility facade."
+);
+const aiProjectBriefFacade = functionBody(
+  appJs,
+  "async function generateProjectBriefWithLocalAi",
+  "function localAiPretranslationSegments"
+);
+assert(
+  !aiProjectBriefFacade.includes("persistLocalAiSettings(") &&
+    !aiProjectBriefFacade.includes("localAiRuntimeConfig(") &&
+    !aiProjectBriefFacade.includes("confirmExternalAiPromptShare(") &&
+    !aiProjectBriefFacade.includes("projectBriefSampleSegments(") &&
+    !aiProjectBriefFacade.includes("projectDocuments(") &&
+    !aiProjectBriefFacade.includes("listTerms(") &&
+    !aiProjectBriefFacade.includes("aiCommandService.generateProjectBrief(") &&
+    !aiProjectBriefFacade.includes("updateProject(") &&
+    !aiProjectBriefFacade.includes("logProjectActivity(") &&
+    !aiProjectBriefFacade.includes("renderLocalAiOutput(") &&
+    !aiProjectBriefFacade.includes("state.localAi"),
+  "app.js must not regain AI-project-brief validation, consent, lifecycle, context, provider, mutation, persistence, activity, presentation, status, or recovery orchestration."
+);
+for (const testName of [
+  "AI project brief preserves project, busy, runtime, provider, and external-consent safeguards",
+  "AI project brief routes bounded context and appends normalized style instructions",
+  "AI project brief creates a first style block when no existing guide is present",
+  "primary AI project brief persistence failure restores exact project and project-list state",
+  "post-save AI administration failure restores in-memory project state and visible style input",
+  "secondary AI project brief activity failure keeps persisted guidance durable and reports dirty"
+]) {
+  assertIncludes(
+    aiProjectBriefControllerUnitTests,
+    testName,
+    `focused AI-project-brief tests must characterize ${testName}.`
   );
 }
 assertIncludes(
