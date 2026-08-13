@@ -1590,6 +1590,112 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
   logger: console
 });
 tmPretranslationController.mount();
+let aiPretranslationAbortController = null;
+const aiPretranslationController = appRuntime.featureFactories.createAiPretranslationController({
+  editorSessionStore,
+  settings: {
+    persist: () => persistLocalAiSettings({ silent: true }),
+    runtimeConfig: localAiRuntimeConfig,
+    assertReady: assertLocalAiRuntimeReady,
+    projectDefaults: (project) => defaultAiSettings(project.aiSettings)
+  },
+  providers: {
+    get: currentLocalAiProvider,
+    sharesExternally: (settings) =>
+      localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
+  },
+  consent: {
+    externalShare: confirmExternalAiPromptShare,
+    overwrite: () =>
+      uiConfirm(
+        "Overwrite existing target text in eligible draft segments? Confirmed and locked segments are always preserved."
+      )
+  },
+  scope: {
+    getSegments: localAiPretranslationSegments,
+    getOptions: localAiPretranslationOptions
+  },
+  domain: {
+    selectSegments: (segments, options) => preTranslationService.selectSegments(segments, options),
+    pretranslateSegments: (options) => preTranslationService.pretranslateSegments(options)
+  },
+  context: {
+    glossaryTermsForSegment: localAiGlossaryTermsForSegment,
+    tmMatchesForSegment: localAiTmMatchesForSegment,
+    surroundingSegmentsForSegment: localAiSurroundingSegmentsForSegment
+  },
+  lifecycle: {
+    isBusy: () => state.localAi.running,
+    sync: ({ running, abortController, progress }) => {
+      state.localAi.progress = progress;
+      if (running) {
+        aiPretranslationAbortController = abortController;
+        state.localAi.running = true;
+        state.localAi.abortController = abortController;
+      } else if (
+        aiPretranslationAbortController &&
+        state.localAi.abortController === aiPretranslationAbortController
+      ) {
+        state.localAi.running = false;
+        state.localAi.abortController = null;
+        aiPretranslationAbortController = null;
+      }
+    }
+  },
+  commands: {
+    bus: appRuntime.commands.bus,
+    create: appRuntime.commands.createAiPretranslationCommand,
+    changed: renderUndoControls
+  },
+  persistence: {
+    flush: flushPendingSegmentSaves,
+    save: saveSegments,
+    load: getProjectSegments
+  },
+  mutation: {
+    capturePatch: targetCommandPatch,
+    applyPatch: applyTargetCommandPatch,
+    clearPending: clearPendingSave,
+    recordHistory: (segment) =>
+      recordSegmentTargetHistory(segment, segment.target, segment.status, "ai-pretranslate"),
+    touch: touchSegment,
+    restore: (segment, snapshot) => {
+      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
+      Object.assign(segment, snapshot);
+    },
+    prepareHistory: prepareSegmentHistoryState,
+    prepareHistories: prepareSegmentHistoryStates
+  },
+  restoration: { restorePatches: restoreBatchTargetCommandPatches },
+  selection: { getActiveSegmentId: () => currentSegment()?.id || "" },
+  presentation: {
+    invalidateFilters: invalidateSegmentFilterCache,
+    renderAll,
+    renderSegments,
+    renderProjectProgress: renderProgress,
+    renderHistory: renderRevisionHistory,
+    renderAiProgress: renderLocalAiProgress,
+    renderCommandCentre: renderLocalAiCommandCentre,
+    refreshSidebar
+  },
+  activity: {
+    log: (details) =>
+      logProjectActivity("ai-pretranslate", "Local AI pretranslation applied", details)
+  },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus },
+  testHooks: {
+    beforeSave: (segments) => {
+      if (
+        LOOPCAT_TEST_BUILD &&
+        segments.some((segment) => segment[PRETRANSLATE_SAVE_FAILURE_TEST_FLAG])
+      ) {
+        throw new Error("Simulated pretranslation save failure");
+      }
+    }
+  },
+  logger: console
+});
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
     splitButton: els.splitSegmentBtn,
@@ -10950,203 +11056,11 @@ function localAiSurroundingSegmentsForSegment(segment, options = {}) {
 }
 
 async function pretranslateWithLocalAi() {
-  if (!currentProject() || state.localAi.running) return;
-  const settings = await persistLocalAiSettings({ silent: true });
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-    assertLocalAiRuntimeReady(settings, config, "pre-translating");
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setSaveStatus(message, "dirty");
-    return;
-  }
-  const provider = currentLocalAiProvider(settings);
-  if (!provider) {
-    const message = "Pre-translation is not available for this provider.";
-    setSaveStatus(message, "dirty");
-    return;
-  }
-  if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) {
-    const contextLabels = [
-      "configured provider URL",
-      "batch segment text",
-      settings.includeNearbyContext !== false ? "nearby segment context" : "",
-      defaultAiSettings(currentProject().aiSettings).useTmContext !== false ? "TM matches" : "",
-      defaultAiSettings(currentProject().aiSettings).useTermbaseContext !== false ? "termbase hints" : ""
-    ].filter(Boolean);
-    const ok = confirmExternalAiPromptShare({ provider: provider.name || settings.providerId, includesSourceText: true, contextLabels });
-    if (!ok) {
-      setSaveStatus("AI pre-translation canceled", "dirty");
-      return;
-    }
-  }
-  if (settings.overwriteExisting) {
-    const ok = uiConfirm("Overwrite existing target text in eligible draft segments? Confirmed and locked segments are always preserved.");
-    if (!ok) {
-      setSaveStatus("Local AI pre-translation canceled", "saved");
-      return;
-    }
-  }
-  try {
-    await flushPendingSegmentSaves(currentProject().id);
-  } catch (error) {
-    setSaveStatus(error.message || "Save pending changes before local AI pre-translation failed", "dirty");
-    return;
-  }
-  const segments = localAiPretranslationSegments(settings);
-  const pretranslationOptions = localAiPretranslationOptions(settings);
-  const selection = preTranslationService.selectSegments(segments, {
-    ...pretranslationOptions,
-    settings,
-    project: currentProject()
-  });
-  state.localAi.progress = {
-    total: selection.candidates.length,
-    completed: 0,
-    failed: 0,
-    skipped: selection.skipped.length
-  };
-  if (!selection.candidates.length) {
-    renderLocalAiProgress();
-    setSaveStatus(selection.skipped.length ? "No eligible segments for local AI pre-translation." : "No segments to pre-translate.", "saved");
-    return;
-  }
-  const beforePatches = new Map(selection.candidates.map((segment) => [segment.id, targetCommandPatch(segment)]));
-  const beforeSnapshots = new Map(selection.candidates.map((segment) => [segment.id, structuredClone(segment)]));
-  const activeSegmentId = currentSegment()?.id || selection.candidates[0].id;
-  state.localAi.running = true;
-  state.localAi.abortController = new AbortController();
-  renderLocalAiCommandCentre();
-  setSaveStatus(`Local AI pre-translating ${selection.candidates.length} segment${selection.candidates.length === 1 ? "" : "s"}...`);
-  try {
-    const summary = await preTranslationService.pretranslateSegments({
-      segments,
-      provider,
-      project: currentProject(),
-      settings,
-      config,
-      mode: settings.mode,
-      sourceLanguage: settings.sourceLanguage,
-      sourceCode: settings.sourceCode,
-      targetLanguage: settings.targetLanguage,
-      targetCode: settings.targetCode,
-      glossaryTermsForSegment: localAiGlossaryTermsForSegment,
-      tmMatchesForSegment: localAiTmMatchesForSegment,
-      surroundingSegmentsForSegment: settings.includeNearbyContext !== false
-        ? (segment) => localAiSurroundingSegmentsForSegment(segment, { settings, segments })
-        : null,
-      selectedSegmentIds: pretranslationOptions.selectedSegmentIds,
-      visibleSegmentIds: pretranslationOptions.visibleSegmentIds,
-      signal: state.localAi.abortController.signal,
-      onProgress(progress) {
-        state.localAi.progress = progress;
-        renderLocalAiProgress();
-      }
-    });
-    const updated = summary.updatedSegmentIds
-      .map((id) => currentSegments().find((segment) => segment.id === id))
-      .filter(Boolean);
-    if (summary.canceled) {
-      beforePatches.forEach((patch, segmentId) => {
-        const segment = currentSegments().find((item) => item.id === segmentId);
-        if (segment) applyTargetCommandPatch(segment, patch);
-      });
-      invalidateSegmentFilterCache();
-      renderAll();
-      setSaveStatus("Local AI pre-translation canceled; no target changes were applied", "saved");
-      return null;
-    }
-    updated.forEach((segment) => {
-      clearPendingSave(segment);
-      recordSegmentTargetHistory(segment, segment.target, segment.status, "ai-pretranslate");
-      touchSegment(segment);
-    });
-    if (!updated.length) {
-      const failureText = summary.failed ? `; ${summary.failed} failed` : "";
-      const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
-      setSaveStatus(`Local AI pre-translation: no segments updated${failureText}${skippedText}`, summary.failed ? "dirty" : "saved");
-      return null;
-    }
-    const command = appRuntime.commands.createAiPretranslationCommand({
-      projectId: currentProject().id,
-      segmentIds: updated.map((segment) => segment.id),
-      beforePatches: updated.map((segment) => beforePatches.get(segment.id)),
-      provenance: {
-        origin: "ai",
-        producer: "pretranslation",
-        provider: provider.name || settings.providerId,
-        providerId: settings.providerId,
-        model: settings.model,
-        failedCount: summary.failed,
-        skippedCount: summary.skipped
-      },
-      restorePatches: (patches, context) =>
-        restoreBatchTargetCommandPatches(patches, { ...context, activeSegmentId }),
-      applyFirst: async () => {
-        if (LOOPCAT_TEST_BUILD && updated.some((segment) => segment[PRETRANSLATE_SAVE_FAILURE_TEST_FLAG])) {
-          throw new Error("Simulated pretranslation save failure");
-        }
-        await saveSegments(updated);
-        return {
-          patches: updated.map((segment) => targetCommandPatch(segment)),
-          activeSegmentId,
-          affectedCount: updated.length
-        };
-      }
-    });
-    const commandExecution = await appRuntime.commands.bus.execute(command);
-    renderUndoControls();
-    try {
-      await logProjectActivity("ai-pretranslate", "Local AI pretranslation applied", {
-        provider: provider.name || settings.providerId,
-        model: settings.model,
-        updatedCount: updated.length,
-        failedCount: summary.failed,
-        skippedCount: summary.skipped,
-        canceled: summary.canceled
-      });
-    } catch (activityError) {
-      console.warn("Local AI pretranslation activity log failed.", activityError);
-    }
-    try {
-      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
-      renderAll();
-      await refreshSidebar();
-    } catch (refreshError) {
-      console.warn("Local AI pretranslation refresh failed.", refreshError);
-      renderAll();
-    }
-    markWorkspaceDirty();
-    const failureText = summary.failed ? `; ${summary.failed} failed` : "";
-    const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
-    setSaveStatus(
-      `Local AI pre-translation: ${updated.length} segment${updated.length === 1 ? "" : "s"} updated${failureText}${skippedText}; Undo is available`,
-      summary.failed ? "dirty" : "saved"
-    );
-    return { ...commandExecution, summary };
-  } catch (error) {
-    beforeSnapshots.forEach((snapshot, segmentId) => {
-      const segment = currentSegments().find((item) => item.id === segmentId);
-      if (!segment) return;
-      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-      Object.assign(segment, snapshot);
-      prepareSegmentHistoryState(segment);
-    });
-    invalidateSegmentFilterCache();
-    renderSegments();
-    renderProgress();
-    renderRevisionHistory();
-    setSaveStatus(error.message || "Local AI pre-translation failed", "dirty");
-    return null;
-  } finally {
-    state.localAi.running = false;
-    state.localAi.abortController = null;
-    renderLocalAiCommandCentre();
-  }
+  return aiPretranslationController.pretranslate();
 }
 
 function cancelLocalAiBatch() {
+  if (aiPretranslationController.cancel()) return;
   state.localAi.abortController?.abort();
   state.localAi.progress = {
     ...(state.localAi.progress || {}),

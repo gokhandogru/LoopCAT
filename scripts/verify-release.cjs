@@ -183,6 +183,7 @@ const requiredReleaseFiles = [
   "src/commands/edit-target-session.js",
   "src/ui/dialog-controller.js",
   "src/features/ai/ai-administration-controller.js",
+  "src/features/ai/ai-pretranslation-controller.js",
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
   "src/features/quality/quality-profile-controller.js",
@@ -198,6 +199,7 @@ const requiredReleaseFiles = [
   "src/features/workspace/recovery-workspace-controller.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
+  "tests/unit/ai-pretranslation-controller.test.cjs",
   "tests/unit/anthropic-provider-adapter.test.cjs",
   "tests/unit/cohere-provider-adapter.test.cjs",
   "tests/unit/compatibility-module-registry.test.cjs",
@@ -324,6 +326,8 @@ const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-p
 const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
 const aiAdministrationControllerJs = readText("src/features/ai/ai-administration-controller.js");
 const aiAdministrationControllerUnitTests = readText("tests/unit/ai-administration-controller.test.cjs");
+const aiPretranslationControllerJs = readText("src/features/ai/ai-pretranslation-controller.js");
+const aiPretranslationControllerUnitTests = readText("tests/unit/ai-pretranslation-controller.test.cjs");
 const anthropicProviderAdapterJs = readText("src/ai/providers/anthropic-provider-adapter.js");
 const cohereProviderAdapterJs = readText("src/ai/providers/cohere-provider-adapter.js");
 const geminiProviderAdapterJs = readText("src/ai/providers/gemini-provider-adapter.js");
@@ -2279,6 +2283,82 @@ assertIncludes(
   "createAiPretranslationCommand",
   "Segment commands must expose an atomic AI pretranslation boundary."
 );
+assertIncludes(
+  appBootstrapJs,
+  "createAiPretranslationController",
+  "The application runtime must expose the checked AI-pretranslation controller boundary."
+);
+for (const boundary of [
+  "if (!project || running || lifecycle.isBusy()) return undefined",
+  "const configuredSettings = await settingsBoundary.persist()",
+  'settingsBoundary.assertReady(configuredSettings, config, "pre-translating")',
+  "if (providers.sharesExternally(configuredSettings))",
+  "if (configuredSettings.overwriteExisting && !consent.overwrite())",
+  "await persistence.flush(project.id)",
+  "const candidateSelection = domain.selectSegments(scopedSegments",
+  "abortController = createAbortController()",
+  "const summary = await domain.pretranslateSegments({",
+  "if (summary.canceled)",
+  "mutation.applyPatch(segment, patch)",
+  "mutation.recordHistory(segment)",
+  "const command = commands.create({",
+  "await persistence.save(updated)",
+  "const commandExecution = await commands.bus.execute(command)",
+  "await activity.log({",
+  "editorSessionStore.replaceSegments(mutation.prepareHistories(await persistence.load(project.id)))",
+  "restoreSnapshots(beforeSnapshots)",
+  "abortController = null",
+  'status.set("Canceling local AI batch...", "dirty")'
+]) {
+  assertIncludes(
+    aiPretranslationControllerJs,
+    boundary,
+    `AiPretranslationController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return aiPretranslationController.pretranslate()",
+  "app.js must retain only the checked AI-pretranslation compatibility facade."
+);
+assertIncludes(
+  appJs,
+  "if (aiPretranslationController.cancel()) return;",
+  "the shared AI cancel facade must delegate owned pretranslation cancellation first."
+);
+const aiPretranslationFacade = functionBody(
+  appJs,
+  "async function pretranslateWithLocalAi",
+  "function cancelLocalAiBatch"
+);
+assert(
+  !aiPretranslationFacade.includes("persistLocalAiSettings(") &&
+    !aiPretranslationFacade.includes("localAiRuntimeConfig(") &&
+    !aiPretranslationFacade.includes("confirmExternalAiPromptShare(") &&
+    !aiPretranslationFacade.includes("flushPendingSegmentSaves(") &&
+    !aiPretranslationFacade.includes("preTranslationService.selectSegments(") &&
+    !aiPretranslationFacade.includes("preTranslationService.pretranslateSegments(") &&
+    !aiPretranslationFacade.includes("createAiPretranslationCommand(") &&
+    !aiPretranslationFacade.includes("saveSegments(") &&
+    !aiPretranslationFacade.includes("logProjectActivity(") &&
+    !aiPretranslationFacade.includes("renderAll(") &&
+    !aiPretranslationFacade.includes("Reflect.ownKeys") &&
+    !aiPretranslationFacade.includes("state.localAi"),
+  "app.js must not regain AI-pretranslation validation, consent, lifecycle, provider, mutation, command, persistence, activity, presentation, or rollback orchestration."
+);
+for (const testName of [
+  "AI pretranslation validates runtime/provider and preserves external and overwrite consent boundaries",
+  "AI pretranslation owns provider progress, context, history, and one redacted atomic command",
+  "mid-batch AI pretranslation cancellation restores every candidate patch and records no command",
+  "primary AI pretranslation persistence failure restores exact snapshots and always releases lifecycle state",
+  "secondary AI pretranslation activity and refresh failures preserve the durable command and success status"
+]) {
+  assertIncludes(
+    aiPretranslationControllerUnitTests,
+    testName,
+    `focused AI-pretranslation tests must characterize ${testName}.`
+  );
+}
 assertIncludes(
   segmentCommandsJs,
   "BATCH_RECEIPT_ID_LIMIT",
