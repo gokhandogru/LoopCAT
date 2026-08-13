@@ -1618,180 +1618,6 @@ async function fetchJsonWithTimeout(url, options = {}, config = {}) {
   return { response, data };
 }
 
-function opusCatLanguageCode(value, fallback = "und") {
-  const clean = String(value || fallback || "").trim().toLowerCase().replaceAll("_", "-");
-  const match = clean.match(/[a-z]{2,3}/);
-  return match?.[0] || String(fallback || "und").trim().toLowerCase() || "und";
-}
-
-function opusCatLanguagePairMatches(pair, sourceCode, targetCode) {
-  const tokens = String(pair || "").toLowerCase().match(/[a-z]{2,3}/g) || [];
-  return tokens.length >= 2 && tokens[0] === sourceCode && tokens[1] === targetCode;
-}
-
-function opusCatModelTag(model = "") {
-  const tag = String(model || "").trim();
-  return tag && !/^(?:default|auto)$/i.test(tag) ? tag : "";
-}
-
-function opusCatQuery(params = {}) {
-  const query = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value === undefined || value === null) return;
-    query.set(key, String(value));
-  });
-  return query.toString();
-}
-
-function opusCatTranslationText(data) {
-  if (typeof data === "string") return data;
-  return typeof data?.translation === "string"
-    ? data.translation
-    : typeof data?.Translation === "string"
-      ? data.Translation
-      : "";
-}
-
-function opusCatReachableError(baseUrl) {
-  return `OPUS-CAT MT Engine is not reachable at ${normalizeOpusCatBaseUrl(baseUrl || OPUS_CAT_DEFAULT_BASE_URL)}. Start OPUS-CAT MT Engine and try again.`;
-}
-
-function opusCatAutoConnectError() {
-  return "OPUS-CAT connection failed. Open Connection help for setup steps.";
-}
-
-function opusCatStatusError(data, status) {
-  const raw = redactSensitiveText(data?.error || data?.message || "").trim();
-  if (status === 401 || status === 403) return "OPUS-CAT rejected the request. Check that the local MT Engine is running and accepting local API requests.";
-  if (status === 404) return "OPUS-CAT did not expose the expected MTRestService endpoint. Check the OPUS-CAT MT Engine version and port.";
-  return raw || `OPUS-CAT request failed with status ${status}.`;
-}
-
-async function opusCatJson(action, params = {}, options = {}, config = {}) {
-  const baseUrl = normalizeOpusCatBaseUrl(config.baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
-  const query = opusCatQuery(params);
-  const url = `${opusCatApiUrl(baseUrl, action)}${query ? `?${query}` : ""}`;
-  let result = null;
-  try {
-    result = await fetchJsonWithTimeout(url, options, config);
-  } catch (error) {
-    if (String(error?.message || "").includes("canceled") || String(error?.message || "").includes("timed out")) throw error;
-    throw new Error(opusCatReachableError(baseUrl));
-  }
-  if (!result.response?.ok) {
-    throw new Error(opusCatStatusError(result.data, result.response?.status));
-  }
-  return result.data;
-}
-
-const OpusCatProvider = {
-  id: "opus-cat",
-  name: "OPUS-CAT",
-  defaultBaseUrl: OPUS_CAT_DEFAULT_BASE_URL,
-  defaultModel: OPUS_CAT_DEFAULT_MODEL,
-  async testConnection(config = {}) {
-    const configuredBaseUrl = normalizeOpusCatBaseUrl(config.baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
-    const candidates = opusCatConnectionCandidates(configuredBaseUrl);
-    let lastError = null;
-    for (const baseUrl of candidates) {
-      try {
-        const data = await opusCatJson(
-          "ListSupportedLanguagePairs",
-          { tokenCode: "0" },
-          { method: "GET" },
-          { ...config, baseUrl, timeoutMs: Math.min(Number(config.timeoutMs) || 5000, 5000) }
-        );
-        const supportedLanguagePairs = Array.isArray(data) ? data.map((item) => String(item || "").trim()).filter(Boolean) : [];
-        return {
-          ok: true,
-          provider: "OPUS-CAT",
-          version: supportedLanguagePairs.length ? `${supportedLanguagePairs.length} pair${supportedLanguagePairs.length === 1 ? "" : "s"}` : "",
-          baseUrl,
-          connectionMode: opusCatConnectionMode(baseUrl),
-          autoDiscovered: baseUrl !== configuredBaseUrl,
-          modelCount: supportedLanguagePairs.length
-        };
-      } catch (error) {
-        if (String(error?.message || "").toLowerCase().includes("canceled")) throw error;
-        lastError = error;
-      }
-    }
-    if (!isLoopbackBaseUrl(configuredBaseUrl, OPUS_CAT_DEFAULT_BASE_URL) && lastError) throw lastError;
-    throw new Error(opusCatAutoConnectError());
-  },
-  async listModels(config = {}) {
-    const settings = defaultLocalAiSettings({ ...config, providerId: "opus-cat" }, config.project);
-    const baseUrl = normalizeOpusCatBaseUrl(config.baseUrl || settings.baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
-    const sourceCode = opusCatLanguageCode(config.sourceCode || settings.sourceCode || config.sourceLanguage || settings.sourceLanguage || "en", "en");
-    const targetCode = opusCatLanguageCode(config.targetCode || settings.targetCode || config.targetLanguage || settings.targetLanguage || "tr", "tr");
-    const data = await opusCatJson("ListSupportedLanguagePairs", { tokenCode: "0" }, { method: "GET" }, { ...settings, ...config, baseUrl });
-    const supportedLanguagePairs = Array.isArray(data) ? data.map((item) => String(item || "").trim()).filter(Boolean) : [];
-    const pairSupported = supportedLanguagePairs.some((pair) => opusCatLanguagePairMatches(pair, sourceCode, targetCode));
-    let modelTags = [];
-    if (pairSupported) {
-      const tagData = await opusCatJson("GetLanguagePairModelTags", {
-        tokenCode: "0",
-        srcLangCode: sourceCode,
-        trgLangCode: targetCode
-      }, { method: "GET" }, { ...settings, ...config, baseUrl });
-      modelTags = Array.isArray(tagData) ? tagData.map((item) => String(item || "").trim()).filter(Boolean) : [];
-    }
-    const models = pairSupported
-      ? [
-        { name: OPUS_CAT_DEFAULT_MODEL, size: 0, modifiedAt: "" },
-        ...modelTags.filter((tag) => tag !== OPUS_CAT_DEFAULT_MODEL).map((tag) => ({ name: tag, size: 0, modifiedAt: "" }))
-      ]
-      : [];
-    return {
-      models,
-      raw: {
-        supportedLanguagePairs,
-        sourceCode,
-        targetCode,
-        modelTags
-      }
-    };
-  },
-  async translateSegment(config = {}, request = {}) {
-    const settings = defaultLocalAiSettings({ ...config, providerId: "opus-cat", model: config.model || request.model }, request.project);
-    const baseUrl = normalizeOpusCatBaseUrl(config.baseUrl || settings.baseUrl || OPUS_CAT_DEFAULT_BASE_URL);
-    const model = String(config.model || request.model || settings.model || OPUS_CAT_DEFAULT_MODEL).trim() || OPUS_CAT_DEFAULT_MODEL;
-    const modelTag = opusCatModelTag(model);
-    const sourceText = String(request.text ?? request.segment?.source ?? "");
-    if (!sourceText.trim()) throw new Error("The segment has no source text.");
-    const sourceCode = opusCatLanguageCode(request.sourceCode || settings.sourceCode || request.sourceLanguage || settings.sourceLanguage || "en", "en");
-    const targetCode = opusCatLanguageCode(request.targetCode || settings.targetCode || request.targetLanguage || settings.targetLanguage || "tr", "tr");
-    const startedAt = localAiStartedAt();
-    const data = await opusCatJson("TranslateJson", {
-      tokenCode: "0",
-      input: sourceText,
-      srcLangCode: sourceCode,
-      trgLangCode: targetCode,
-      modelTag,
-      inputIsSingleSentence: "true"
-    }, { method: "GET" }, { ...settings, ...config, baseUrl, model, signal: request.signal || config.signal });
-    const rawOutput = opusCatTranslationText(data);
-    if (typeof rawOutput !== "string") throw new Error("OPUS-CAT returned a malformed translation response.");
-    const translatedText = cleanModelTranslationOutput(rawOutput, sourceText);
-    if (!translatedText.trim()) throw new Error("OPUS-CAT returned an empty translation for this segment. Check that an OPUS-CAT model is installed for the selected language pair.");
-    return {
-      translatedText,
-      rawOutput,
-      provider: "OPUS-CAT",
-      providerId: "opus-cat",
-      model: modelTag || OPUS_CAT_DEFAULT_MODEL,
-      durationMs: requestDurationMs(startedAt),
-      prompt: sourceText,
-      metadata: {
-        sourceCode,
-        targetCode,
-        modelTag,
-        segmentedTranslationCount: Array.isArray(data?.SegmentedTranslation) ? data.SegmentedTranslation.length : 0
-      }
-    };
-  }
-};
-
 function genericPromptSystem() {
   return "You are a professional translation assistant inside LoopCAT. Follow the user's CAT-tool instruction exactly and keep the response concise.";
 }
@@ -1822,6 +1648,8 @@ const providerAdapterRuntime = Object.freeze({
   OLLAMA_DEFAULT_BASE_URL,
   DEFAULT_LOCAL_AI_MODEL,
   LM_STUDIO_DEFAULT_BASE_URL,
+  OPUS_CAT_DEFAULT_BASE_URL,
+  OPUS_CAT_DEFAULT_MODEL,
   OPENAI_DEFAULT_BASE_URL,
   OPENAI_DEFAULT_MODEL,
   GEMINI_DEFAULT_BASE_URL,
@@ -1886,6 +1714,11 @@ const providerAdapterRuntime = Object.freeze({
   ollamaApiUrl,
   normalizeOpenAiCompatibleBaseUrl,
   openAiCompatibleApiUrl,
+  normalizeOpusCatBaseUrl,
+  opusCatApiUrl,
+  opusCatConnectionCandidates,
+  opusCatConnectionMode,
+  isLoopbackBaseUrl,
   normalizeOpenAiBaseUrl,
   normalizeGeminiBaseUrl,
   normalizeAnthropicBaseUrl,
@@ -1945,7 +1778,7 @@ aiProviderRegistry.reserve("cohere");
 aiProviderRegistry.reserve("mistral");
 aiProviderRegistry.reserve("azure-openai");
 aiProviderRegistry.reserve("openai-compatible");
-aiProviderRegistry.register(OpusCatProvider);
+aiProviderRegistry.reserve("opus-cat");
 
 function isLockedSegment(segment = {}) {
   return Boolean(segment.locked || segment.isLocked || segment.readOnly || segment.readonly || segment.status === "locked");
@@ -2583,7 +2416,6 @@ window.CatHan.ai = {
   localAiProviderGuidance,
   defaultLocalAiSettings,
   localAISettingsStore,
-  OpusCatProvider,
   providerAdapterRuntime,
   aiProviderRegistry,
   preTranslationService,

@@ -5641,7 +5641,8 @@
           opusCatSetupError = error;
         }
         assert(
-          window.CatHan.ai.normalizeOpusCatBaseUrl("http://localhost:8500/MTRestService") === "http://localhost:8500" &&
+          window.CatHan.ai.OpusCatProvider === opusCatProvider &&
+            window.CatHan.ai.normalizeOpusCatBaseUrl("http://localhost:8500/MTRestService") === "http://localhost:8500" &&
             window.CatHan.ai.opusCatApiUrl("http://localhost:8500", "/TranslateJson") === "http://localhost:8500/MTRestService/TranslateJson" &&
             window.CatHan.ai.opusCatConnectionCandidates("http://localhost:8500").join("|") === "http://localhost:8500|http://127.0.0.1:8500|http://127.0.0.1:8502|http://localhost:8502" &&
             opusCatModels.models.some((model) => model.name === "default") &&

@@ -42,6 +42,7 @@ const standaloneTestDependencies = [
   "src/ai/providers/openai-compatible-hosted-provider-adapter.js",
   "src/ai/providers/openai-compatible-provider-adapter.js",
   "src/ai/providers/ollama-provider-adapter.js",
+  "src/ai/providers/opus-cat-provider-adapter.js",
   "src/ai/providers/perplexity-provider-adapter.js",
   "src/ai/providers/openai-responses-provider-adapter.js",
   "src/ai/providers/provider-contract.js",

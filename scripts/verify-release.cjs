@@ -164,6 +164,7 @@ const requiredReleaseFiles = [
   "src/ai/providers/openai-compatible-hosted-provider-adapter.js",
   "src/ai/providers/openai-compatible-provider-adapter.js",
   "src/ai/providers/ollama-provider-adapter.js",
+  "src/ai/providers/opus-cat-provider-adapter.js",
   "src/ai/providers/openai-responses-provider-adapter.js",
   "src/ai/providers/perplexity-provider-adapter.js",
   "src/commands/edit-target-session.js",
@@ -187,6 +188,7 @@ const requiredReleaseFiles = [
   "tests/unit/native-openai-provider-adapters.test.cjs",
   "tests/unit/ollama-provider-adapter.test.cjs",
   "tests/unit/openai-compatible-provider-adapter.test.cjs",
+  "tests/unit/opus-cat-provider-adapter.test.cjs",
   "tests/unit/perplexity-provider-adapter.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
@@ -269,6 +271,7 @@ const nativeChatProviderAdaptersJs = readText("src/ai/providers/native-chat-prov
 const nativeOpenAiProviderAdaptersJs = readText("src/ai/providers/native-openai-provider-adapters.js");
 const openAiResponsesProviderAdapterJs = readText("src/ai/providers/openai-responses-provider-adapter.js");
 const ollamaProviderAdapterJs = readText("src/ai/providers/ollama-provider-adapter.js");
+const opusCatProviderAdapterJs = readText("src/ai/providers/opus-cat-provider-adapter.js");
 const perplexityProviderAdapterJs = readText("src/ai/providers/perplexity-provider-adapter.js");
 const extractedProviderInstallerJs = readText("src/ai/providers/install-extracted-providers.js");
 const anthropicProviderAdapterUnitTests = readText("tests/unit/anthropic-provider-adapter.test.cjs");
@@ -280,6 +283,7 @@ const nativeChatProviderAdaptersUnitTests = readText("tests/unit/native-chat-pro
 const nativeOpenAiProviderAdaptersUnitTests = readText("tests/unit/native-openai-provider-adapters.test.cjs");
 const ollamaProviderAdapterUnitTests = readText("tests/unit/ollama-provider-adapter.test.cjs");
 const openAiCompatibleProviderAdapterUnitTests = readText("tests/unit/openai-compatible-provider-adapter.test.cjs");
+const opusCatProviderAdapterUnitTests = readText("tests/unit/opus-cat-provider-adapter.test.cjs");
 const perplexityProviderAdapterUnitTests = readText("tests/unit/perplexity-provider-adapter.test.cjs");
 const productionEntryJs = readText("src/entry/production.js");
 const qualityReviewControllerJs = readText("src/features/quality/quality-review-controller.js");
@@ -2421,7 +2425,6 @@ const defaultLocalAiSettingsFunction = functionBody(
   "function defaultLocalAiSettings",
   "function readLocalAiSettings"
 );
-const opusCatProviderFunction = functionBody(aiJs, "const OpusCatProvider = {", "function genericPromptSystem");
 assertIncludes(
   aiJs,
   `const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"`,
@@ -2950,7 +2953,7 @@ assertIncludes(
   "Azure OpenAI deployment ${model} was not found.",
   "The checked Azure OpenAI adapter must preserve deployment-specific failures."
 );
-assertIncludes(aiJs, "const OpusCatProvider = {", "ai.js must implement the OPUS-CAT MT Engine provider.");
+assertIncludes(opusCatProviderAdapterJs, 'id: "opus-cat"', "The checked adapter must implement OPUS-CAT MT Engine.");
 assertIncludes(aiJs, "opusCatApiUrl", "ai.js must normalize OPUS-CAT MTRestService endpoints.");
 assertIncludes(
   aiJs,
@@ -2958,14 +2961,14 @@ assertIncludes(
   "ai.js must discover standard direct and bridged OPUS-CAT endpoints."
 );
 assertIncludes(
-  aiJs,
+  opusCatProviderAdapterJs,
   "OPUS-CAT connection failed. Open Connection help for setup steps.",
-  "ai.js must keep OPUS-CAT inline failure status concise and actionable."
+  "The OPUS-CAT adapter must keep inline failure status concise and actionable."
 );
 assertIncludes(
-  opusCatProviderFunction,
-  "connectionMode: opusCatConnectionMode(baseUrl)",
-  "ai.js OPUS-CAT connection tests must report the discovered connection route."
+  opusCatProviderAdapterJs,
+  "connectionMode: runtime.opusCatConnectionMode(baseUrl)",
+  "The OPUS-CAT connection test must report the discovered connection route."
 );
 assertIncludes(
   defaultLocalAiSettingsFunction,
@@ -2973,21 +2976,46 @@ assertIncludes(
   "ai.js must default OPUS-CAT settings to the OPUS-CAT base URL/model, not Ollama."
 );
 assertIncludes(
-  opusCatProviderFunction,
+  opusCatProviderAdapterJs,
   "ListSupportedLanguagePairs",
-  "ai.js OPUS-CAT provider must test and list installed language pairs."
+  "The OPUS-CAT adapter must test and list installed language pairs."
 );
 assertIncludes(
-  opusCatProviderFunction,
+  opusCatProviderAdapterJs,
   "GetLanguagePairModelTags",
-  "ai.js OPUS-CAT provider must list language-pair model tags."
+  "The OPUS-CAT adapter must list language-pair model tags."
 );
 assertIncludes(
-  opusCatProviderFunction,
+  opusCatProviderAdapterJs,
   "TranslateJson",
-  "ai.js OPUS-CAT provider must pretranslate through the OPUS-CAT TranslateJson endpoint."
+  "The OPUS-CAT adapter must pretranslate through the OPUS-CAT TranslateJson endpoint."
 );
-assertIncludes(aiJs, "aiProviderRegistry.register(OpusCatProvider)", "ai.js must register the OPUS-CAT provider.");
+assertIncludes(
+  extractedProviderInstallerJs,
+  "installOpusCatProviderAdapter",
+  "The extracted-provider installer must register OPUS-CAT."
+);
+assertIncludes(
+  aiJs,
+  'aiProviderRegistry.reserve("opus-cat")',
+  "The legacy registry must preserve OPUS-CAT's provider order while its adapter installs."
+);
+assertIncludes(
+  opusCatProviderAdapterJs,
+  "ai.OpusCatProvider = provider",
+  "The OPUS-CAT adapter must retain the temporary compatibility export."
+);
+assertIncludes(
+  opusCatProviderAdapterUnitTests,
+  "preserves TranslateJson query encoding, default/custom model tags, abort, provenance, and segmented metadata",
+  "The OPUS-CAT adapter must retain focused query, model-tag, abort, provenance, and metadata characterization."
+);
+assert(
+  !aiJs.includes("const OpusCatProvider = {") &&
+    !aiJs.includes("async function opusCatJson") &&
+    !aiJs.includes("function opusCatStatusError"),
+  "ai.js must not retain the extracted OPUS-CAT provider implementation."
+);
 assertIncludes(
   aiJs,
   'if (providerId === "opus-cat") return false;',
