@@ -184,6 +184,7 @@ const requiredReleaseFiles = [
   "src/ui/dialog-controller.js",
   "src/features/ai/ai-administration-controller.js",
   "src/features/ai/ai-pretranslation-controller.js",
+  "src/features/ai/ai-review-controller.js",
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
   "src/features/quality/quality-profile-controller.js",
@@ -200,6 +201,7 @@ const requiredReleaseFiles = [
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/ai-pretranslation-controller.test.cjs",
+  "tests/unit/ai-review-controller.test.cjs",
   "tests/unit/anthropic-provider-adapter.test.cjs",
   "tests/unit/cohere-provider-adapter.test.cjs",
   "tests/unit/compatibility-module-registry.test.cjs",
@@ -328,6 +330,8 @@ const aiAdministrationControllerJs = readText("src/features/ai/ai-administration
 const aiAdministrationControllerUnitTests = readText("tests/unit/ai-administration-controller.test.cjs");
 const aiPretranslationControllerJs = readText("src/features/ai/ai-pretranslation-controller.js");
 const aiPretranslationControllerUnitTests = readText("tests/unit/ai-pretranslation-controller.test.cjs");
+const aiReviewControllerJs = readText("src/features/ai/ai-review-controller.js");
+const aiReviewControllerUnitTests = readText("tests/unit/ai-review-controller.test.cjs");
 const anthropicProviderAdapterJs = readText("src/ai/providers/anthropic-provider-adapter.js");
 const cohereProviderAdapterJs = readText("src/ai/providers/cohere-provider-adapter.js");
 const geminiProviderAdapterJs = readText("src/ai/providers/gemini-provider-adapter.js");
@@ -2357,6 +2361,101 @@ for (const testName of [
     aiPretranslationControllerUnitTests,
     testName,
     `focused AI-pretranslation tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiReviewController",
+  "The application runtime must expose the checked AI-review controller boundary."
+);
+for (const boundary of [
+  "if (!project || running || promptBusy || lifecycle.isRunning() || lifecycle.isPromptBusy()) return false",
+  'status.set("Select a segment before running AI review.", "dirty")',
+  'settingsBoundary.assertReady(settings, config, "reviewing the active segment")',
+  "if (!provider?.completePrompt)",
+  "providers.sharesExternally(settings)",
+  "const glossaryTerms = await context.findTerms(glossaryOptions(segment, project))",
+  "const result = await domain.reviewSegment(",
+  "appendComment(segment, result)",
+  "await persistence.saveOne(segment)",
+  "await activity.logActive({",
+  "restoreSnapshot(segment, snapshot)",
+  "function selectSegments(settings = {})",
+  'if (scope.isLocked(segment)) return "locked"',
+  "await persistence.flush(project.id)",
+  "const candidateSelection = selectSegments(settings)",
+  "abortController = createAbortController()",
+  "for (const segment of candidateSelection.candidates)",
+  "if (returnedNoIssues(result))",
+  "summary.highestRisk = highestRiskLevel(summary.highestRisk, reviewRisk.level)",
+  "message: redact(error?.message || \"AI QA failed for this segment.\")",
+  "if (updated.length) await persistence.saveMany(updated)",
+  "await activity.logBatch({",
+  "editorSessionStore.replaceSegments(mutation.prepareHistories(await persistence.load(project.id)))",
+  "snapshots.forEach((snapshot, id) =>",
+  "abortController = null",
+  'status.set("Canceling local AI batch...", "dirty")'
+]) {
+  assertIncludes(
+    aiReviewControllerJs,
+    boundary,
+    `AiReviewController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return aiReviewController.reviewActive()",
+  "app.js must retain only the checked active AI-review compatibility facade."
+);
+assertIncludes(
+  appJs,
+  "return aiReviewController.reviewBatch()",
+  "app.js must retain only the checked batch AI-review compatibility facade."
+);
+assertIncludes(
+  appJs,
+  "if (aiReviewController.cancel()) return;",
+  "the shared AI cancel facade must delegate owned AI-review cancellation."
+);
+const activeAiReviewFacade = functionBody(
+  appJs,
+  "async function reviewActiveSegmentWithLocalAi",
+  "function localAiReviewScopeSegments"
+);
+const batchAiReviewFacade = functionBody(
+  appJs,
+  "async function reviewBatchWithLocalAi",
+  "async function repairActiveSegmentTagsWithLocalAi"
+);
+for (const facade of [activeAiReviewFacade, batchAiReviewFacade]) {
+  assert(
+    !facade.includes("persistLocalAiSettings(") &&
+      !facade.includes("localAiRuntimeConfig(") &&
+      !facade.includes("confirmExternalAiPromptShare(") &&
+      !facade.includes("findTerms(") &&
+      !facade.includes("aiCommandService.reviewSegment(") &&
+      !facade.includes("saveSegment(") &&
+      !facade.includes("saveSegments(") &&
+      !facade.includes("logProjectActivity(") &&
+      !facade.includes("renderLocalAiOutput(") &&
+      !facade.includes("Reflect.ownKeys") &&
+      !facade.includes("state.localAi"),
+    "app.js must not regain AI-review validation, consent, lifecycle, selection, provider, mutation, persistence, activity, presentation, or recovery orchestration."
+  );
+}
+for (const testName of [
+  "AI review active validation preserves busy, source, target, provider, and external-consent safeguards",
+  "active AI review owns glossary routing, normalized risk comments, persistence, activity, and presentation",
+  "primary active AI review persistence failure restores the exact segment and releases prompt lifecycle",
+  "batch AI review saves risk-ranked comments, no-issue results, skips protected segments, and contains failures",
+  "mid-batch AI review cancellation preserves completed comments, stops new work, and saves the partial summary",
+  "primary batch AI review persistence failure restores every candidate snapshot and always cleans lifecycle state",
+  "secondary AI review activity failure keeps the saved review durable and visible"
+]) {
+  assertIncludes(
+    aiReviewControllerUnitTests,
+    testName,
+    `focused AI-review tests must characterize ${testName}.`
   );
 }
 assertIncludes(

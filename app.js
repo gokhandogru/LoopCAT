@@ -1696,6 +1696,106 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
   },
   logger: console
 });
+let aiReviewAbortController = null;
+let aiReviewOwnsPromptBusy = false;
+const aiReviewController = appRuntime.featureFactories.createAiReviewController({
+  editorSessionStore,
+  selection: {
+    getActiveSegment: currentSegment,
+    getActiveIndex: currentActiveIndex
+  },
+  scope: {
+    getVisibleSegments: () =>
+      filteredSegmentIndexes()
+        .map((index) => currentSegments()[index])
+        .filter(Boolean),
+    getDocumentSegments: currentDocumentSegments,
+    isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment))
+  },
+  settings: {
+    persist: () => persistLocalAiSettings({ silent: true }),
+    runtimeConfig: localAiRuntimeConfig,
+    assertReady: assertLocalAiRuntimeReady
+  },
+  providers: {
+    get: currentLocalAiProvider,
+    sharesExternally: (settings) =>
+      localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
+  },
+  consent: { externalShare: confirmExternalAiPromptShare },
+  context: {
+    findTerms,
+    getTermBaseNames: projectTermBaseNames
+  },
+  domain: {
+    reviewSegment: (options) => aiCommandService.reviewSegment(options),
+    parseRisk: parseAiReviewRisk
+  },
+  lifecycle: {
+    isRunning: () => state.localAi.running,
+    isPromptBusy: () => state.localAi.promptBusy,
+    sync: ({ running, promptBusy, abortController, progress }) => {
+      if (progress !== undefined) state.localAi.progress = progress;
+      if (promptBusy) {
+        aiReviewOwnsPromptBusy = true;
+        state.localAi.promptBusy = true;
+      } else if (aiReviewOwnsPromptBusy) {
+        state.localAi.promptBusy = false;
+        aiReviewOwnsPromptBusy = false;
+      }
+      if (running) {
+        aiReviewAbortController = abortController;
+        state.localAi.running = true;
+        state.localAi.abortController = abortController;
+      } else if (aiReviewAbortController && state.localAi.abortController === aiReviewAbortController) {
+        state.localAi.running = false;
+        state.localAi.abortController = null;
+        aiReviewAbortController = null;
+      }
+    }
+  },
+  persistence: {
+    flush: flushPendingSegmentSaves,
+    saveOne: saveSegment,
+    saveMany: saveSegments,
+    load: getProjectSegments
+  },
+  mutation: {
+    touch: touchSegment,
+    clearPending: clearPendingSave,
+    restore: (segment, snapshot) => {
+      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
+      Object.assign(segment, snapshot);
+    },
+    prepareHistory: prepareSegmentHistoryState,
+    prepareHistories: prepareSegmentHistoryStates
+  },
+  presentation: {
+    renderCommandCentre: renderLocalAiCommandCentre,
+    renderAiProgress: renderLocalAiProgress,
+    renderOutput: renderLocalAiOutput,
+    renderReview: renderReviewPanel,
+    updateRow,
+    renderAll,
+    refreshSidebar,
+    renderSegments,
+    renderProjectProgress: renderProgress,
+    renderHistory: renderRevisionHistory
+  },
+  activity: {
+    logActive: (details) =>
+      logProjectActivity("ai-review", "AI segment review created", details),
+    logBatch: (details) =>
+      logProjectActivity("ai-batch-review", "Batch AI QA completed", details)
+  },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus },
+  labels: { risk: aiReviewRiskLabel },
+  redact: redactSensitiveText,
+  ids: { next: () => (crypto.randomUUID ? crypto.randomUUID() : Date.now()) },
+  clock: { now: () => new Date().toISOString() },
+  logger: console
+});
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
     splitButton: els.splitSegmentBtn,
@@ -8542,10 +8642,6 @@ async function testLocalAiPrompt() {
   }
 }
 
-const AI_REVIEW_RISK_LEVELS = new Set(["none", "low", "medium", "high", "critical"]);
-const AI_REVIEW_RISK_SCORES = { none: 0, low: 25, medium: 50, high: 75, critical: 100 };
-const AI_REVIEW_RISK_ORDER = { none: 0, low: 1, medium: 2, high: 3, critical: 4 };
-
 function aiReviewRiskLabel(level) {
   return {
     none: uiLabel("noIssuesFound"),
@@ -8556,181 +8652,8 @@ function aiReviewRiskLabel(level) {
   }[level] || uiLabel("unrankedRisk");
 }
 
-function normalizeAiReviewRisk(reviewRisk = {}, reviewText = "") {
-  const fallback = parseAiReviewRisk(reviewText || "");
-  const source = reviewRisk && typeof reviewRisk === "object" ? reviewRisk : fallback;
-  const level = AI_REVIEW_RISK_LEVELS.has(String(source.level || "").trim())
-    ? String(source.level || "").trim()
-    : fallback.level;
-  const score = Number.isFinite(Number(source.score))
-    ? Math.min(100, Math.max(0, Math.round(Number(source.score))))
-    : (AI_REVIEW_RISK_SCORES[level] ?? AI_REVIEW_RISK_SCORES.low);
-  const issueCount = Number.isFinite(Number(source.issueCount))
-    ? Math.max(0, Math.round(Number(source.issueCount)))
-    : (level === "none" ? 0 : 1);
-  return {
-    level,
-    score,
-    issueCount,
-    label: aiReviewRiskLabel(level)
-  };
-}
-
-function aiReviewRiskFromResult(result = {}) {
-  return normalizeAiReviewRisk(result.reviewRisk, result.reviewText || result.text || result.rawOutput || "");
-}
-
-function aiReviewRiskLine(reviewRisk = {}) {
-  const risk = normalizeAiReviewRisk(reviewRisk);
-  if (risk.level === "none") return "Risk: none";
-  const issueText = risk.issueCount === 1 ? "1 issue" : `${risk.issueCount} issues`;
-  return `Risk: ${risk.label.replace(/ risk$/i, "")} (${risk.score}/100, ${issueText})`;
-}
-
-function aiReviewOutputText(result = {}) {
-  const text = String(result.reviewText || result.text || "").trim();
-  const risk = aiReviewRiskFromResult(result);
-  return `${aiReviewRiskLine(risk)}\n\n${text}`.trim();
-}
-
-function highestAiReviewRiskLevel(current = "none", next = "none") {
-  const currentLevel = AI_REVIEW_RISK_LEVELS.has(current) ? current : "none";
-  const nextLevel = AI_REVIEW_RISK_LEVELS.has(next) ? next : "none";
-  return AI_REVIEW_RISK_ORDER[nextLevel] > AI_REVIEW_RISK_ORDER[currentLevel] ? nextLevel : currentLevel;
-}
-
-function aiReviewCommentBody(result = {}) {
-  const provider = redactSensitiveText(result.provider || "AI").trim() || "AI";
-  const model = redactSensitiveText(result.model || "").trim();
-  const header = model ? `AI review by ${provider} (${model})` : `AI review by ${provider}`;
-  return `${header}\n${aiReviewRiskLine(aiReviewRiskFromResult(result))}\n\n${String(result.reviewText || result.text || "").trim()}`.trim();
-}
-
-function aiReviewReturnedNoIssues(result = {}) {
-  const text = String(result.reviewText || result.text || "").trim().replace(/[.!]+$/g, "").toLocaleLowerCase("en-US");
-  return text === "no issues found";
-}
-
-function appendAiReviewComment(segment, result = {}) {
-  const now = new Date().toISOString();
-  const reviewRisk = aiReviewRiskFromResult(result);
-  const body = aiReviewCommentBody(result);
-  segment.reviewState = "needs-review";
-  segment.aiReviewRisk = reviewRisk;
-  segment.comments = [
-    ...(segment.comments || []),
-    {
-      id: `comment-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`,
-      body,
-      aiReviewRisk: reviewRisk,
-      state: "open",
-      createdAt: now,
-      updatedAt: now
-    }
-  ];
-  return body;
-}
-
 async function reviewActiveSegmentWithLocalAi() {
-  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
-  const segment = currentSegment();
-  if (!segment) {
-    setSaveStatus("Select a segment before running AI review.", "dirty");
-    return false;
-  }
-  if (!String(segment.source || "").trim()) {
-    setSaveStatus("The active segment has no source text.", "dirty");
-    return false;
-  }
-  if (!String(segment.target || "").trim()) {
-    setSaveStatus("The active segment has no target text to review.", "dirty");
-    return false;
-  }
-  const settings = await persistLocalAiSettings({ silent: true });
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-    assertLocalAiRuntimeReady(settings, config, "reviewing the active segment");
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const provider = currentLocalAiProvider(settings);
-  if (!provider?.completePrompt) {
-    const message = "AI review is not available for this provider.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) {
-    const ok = confirmExternalAiPromptShare({
-      provider: provider.name || settings.providerId,
-      includesSourceText: true,
-      contextLabels: ["target text", "configured provider URL", "project glossary hints"]
-    });
-    if (!ok) {
-      setSaveStatus("AI review canceled", "dirty");
-      return false;
-    }
-  }
-  const snapshot = structuredClone(segment);
-  state.localAi.promptBusy = true;
-  renderLocalAiCommandCentre();
-  setSaveStatus("Sending segment for AI review...");
-  try {
-    const glossaryTerms = await findTerms({
-      source: segment.source,
-      sourceLang: currentProject().sourceLang,
-      targetLang: currentProject().targetLang,
-      termBaseNames: projectTermBaseNames()
-    });
-    const result = await aiCommandService.reviewSegment({
-      provider,
-      project: currentProject(),
-      segment,
-      settings,
-      config,
-      sourceLanguage: settings.sourceLanguage,
-      sourceCode: settings.sourceCode,
-      targetLanguage: settings.targetLanguage,
-      targetCode: settings.targetCode,
-      glossaryTerms
-    });
-    const body = appendAiReviewComment(segment, result);
-    touchSegment(segment);
-    clearPendingSave(segment);
-    await saveSegment(segment);
-    try {
-      await logProjectActivity("ai-review", "AI segment review created", {
-        segmentId: segment.id,
-        provider: result.provider || provider.name || settings.providerId,
-        model: result.model || settings.model,
-        reviewRisk: aiReviewRiskFromResult(result).level
-      });
-    } catch (activityError) {
-      console.warn("AI review activity log failed.", activityError);
-      markWorkspaceDirty();
-    }
-    renderLocalAiOutput(aiReviewOutputText(result));
-    renderReviewPanel();
-    updateRow(currentActiveIndex());
-    markWorkspaceDirty();
-    setSaveStatus("AI review added to the active segment", "saved");
-    return true;
-  } catch (error) {
-    Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-    Object.assign(segment, snapshot);
-    prepareSegmentHistoryState(segment);
-    renderReviewPanel();
-    updateRow(currentActiveIndex());
-    const message = error.message || "AI review failed.";
-    renderLocalAiOutput(message, { muted: false });
-    setSaveStatus(message, "dirty");
-    return false;
-  } finally {
-    state.localAi.promptBusy = false;
-    renderLocalAiCommandCentre();
-  }
+  return aiReviewController.reviewActive();
 }
 
 function localAiReviewScopeSegments(settings = {}) {
@@ -8764,206 +8687,7 @@ function selectLocalAiReviewSegments(settings = {}) {
 }
 
 async function reviewBatchWithLocalAi() {
-  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
-  const settings = await persistLocalAiSettings({ silent: true });
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-    assertLocalAiRuntimeReady(settings, config, "running batch AI QA");
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const provider = currentLocalAiProvider(settings);
-  if (!provider?.completePrompt) {
-    const message = "Batch AI QA is not available for this provider.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) {
-    const ok = confirmExternalAiPromptShare({
-      provider: provider.name || settings.providerId,
-      includesSourceText: true,
-      contextLabels: ["target text", "configured provider URL", "batch review text", "project glossary hints"]
-    });
-    if (!ok) {
-      setSaveStatus("Batch AI QA canceled", "dirty");
-      return false;
-    }
-  }
-  try {
-    await flushPendingSegmentSaves(currentProject().id);
-  } catch (error) {
-    setSaveStatus(error.message || "Save pending changes before batch AI QA failed", "dirty");
-    return false;
-  }
-  const selection = selectLocalAiReviewSegments(settings);
-  const progress = {
-    total: selection.candidates.length,
-    completed: 0,
-    failed: 0,
-    skipped: selection.skipped.length
-  };
-  state.localAi.progress = progress;
-  renderLocalAiProgress();
-  if (!selection.candidates.length) {
-    setSaveStatus(selection.skipped.length ? "No eligible translated draft segments for batch AI QA." : "No segments to review with local AI.", "saved");
-    return {
-      ...progress,
-      commented: 0,
-      noIssue: 0,
-      riskCounts: { critical: 0, high: 0, medium: 0, low: 0 },
-      highestRisk: "none",
-      failures: [],
-      skippedSegments: selection.skipped,
-      updatedSegmentIds: [],
-      canceled: false
-    };
-  }
-  const snapshots = new Map(selection.candidates.map((segment) => [segment.id, structuredClone(segment)]));
-  const summary = {
-    total: selection.candidates.length,
-    completed: 0,
-    commented: 0,
-    noIssue: 0,
-    failed: 0,
-    skipped: selection.skipped.length,
-    riskCounts: { critical: 0, high: 0, medium: 0, low: 0 },
-    highestRisk: "none",
-    failures: [],
-    skippedSegments: selection.skipped,
-    updatedSegmentIds: [],
-    canceled: false
-  };
-  const updated = [];
-  state.localAi.running = true;
-  state.localAi.promptBusy = true;
-  state.localAi.abortController = new AbortController();
-  renderLocalAiCommandCentre();
-  setSaveStatus(`Running batch AI QA on ${selection.candidates.length} segment${selection.candidates.length === 1 ? "" : "s"}...`);
-  try {
-    for (const segment of selection.candidates) {
-      if (state.localAi.abortController.signal.aborted) {
-        summary.canceled = true;
-        break;
-      }
-      try {
-        const glossaryTerms = await findTerms({
-          source: segment.source,
-          sourceLang: currentProject().sourceLang,
-          targetLang: currentProject().targetLang,
-          termBaseNames: projectTermBaseNames()
-        });
-        const result = await aiCommandService.reviewSegment({
-          provider,
-          project: currentProject(),
-          segment,
-          settings,
-          config,
-          sourceLanguage: settings.sourceLanguage,
-          sourceCode: settings.sourceCode,
-          targetLanguage: settings.targetLanguage,
-          targetCode: settings.targetCode,
-          glossaryTerms,
-          signal: state.localAi.abortController.signal
-        });
-        if (aiReviewReturnedNoIssues(result)) {
-          summary.noIssue += 1;
-        } else {
-          const reviewRisk = aiReviewRiskFromResult(result);
-          appendAiReviewComment(segment, { ...result, reviewRisk });
-          touchSegment(segment);
-          clearPendingSave(segment);
-          updated.push(segment);
-          summary.commented += 1;
-          if (reviewRisk.level !== "none" && summary.riskCounts[reviewRisk.level] !== undefined) {
-            summary.riskCounts[reviewRisk.level] += 1;
-          }
-          summary.highestRisk = highestAiReviewRiskLevel(summary.highestRisk, reviewRisk.level);
-          summary.updatedSegmentIds.push(segment.id || "");
-        }
-        summary.completed += 1;
-      } catch (error) {
-        if (state.localAi.abortController.signal.aborted || String(error?.message || "").includes("canceled")) {
-          summary.canceled = true;
-          break;
-        }
-        summary.failed += 1;
-        summary.failures.push({
-          segmentId: segment.id || "",
-          message: redactSensitiveText(error?.message || "AI QA failed for this segment.")
-        });
-      } finally {
-        state.localAi.progress = { ...summary };
-        renderLocalAiProgress();
-      }
-    }
-    if (updated.length) await saveSegments(updated);
-    try {
-      await logProjectActivity("ai-batch-review", "Batch AI QA completed", {
-        provider: provider.name || settings.providerId,
-        model: settings.model,
-        reviewedCount: summary.completed,
-        commentedCount: summary.commented,
-        noIssueCount: summary.noIssue,
-        failedCount: summary.failed,
-        skippedCount: summary.skipped,
-        riskCounts: summary.riskCounts,
-        highestRisk: summary.highestRisk,
-        canceled: summary.canceled
-      });
-    } catch (activityError) {
-      console.warn("Batch AI QA activity log failed.", activityError);
-      if (updated.length) markWorkspaceDirty();
-    }
-    if (updated.length) {
-      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
-      renderAll();
-      await refreshSidebar();
-      markWorkspaceDirty();
-    } else {
-      renderLocalAiProgress();
-    }
-    const failureText = summary.failed ? `; ${summary.failed} failed` : "";
-    const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
-    const noIssueText = summary.noIssue ? `; ${summary.noIssue} no issues found` : "";
-    const highestRiskText = summary.highestRisk && summary.highestRisk !== "none" ? `; highest risk ${summary.highestRisk}` : "";
-    const canceledText = summary.canceled ? " canceled" : "";
-    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-    const riskLines = ["critical", "high", "medium", "low"]
-      .filter((level) => summary.riskCounts[level])
-      .map((level) => `${aiReviewRiskLabel(level)}: ${summary.riskCounts[level]}`);
-    renderLocalAiOutput([
-      `${summary.commented} review comment${summary.commented === 1 ? "" : "s"} saved.`,
-      riskLines.join("\n"),
-      `${summary.noIssue} segment${summary.noIssue === 1 ? "" : "s"} returned no issues.`,
-      failureLines.join("\n")
-    ].filter(Boolean).join("\n"));
-    setSaveStatus(`Batch AI QA${canceledText}: ${summary.commented} review comment${summary.commented === 1 ? "" : "s"} saved${highestRiskText}${noIssueText}${failureText}${skippedText}`, summary.failed ? "dirty" : "saved");
-    return summary;
-  } catch (error) {
-    snapshots.forEach((snapshot, id) => {
-      const segment = currentSegments().find((item) => item.id === id);
-      if (!segment) return;
-      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-      Object.assign(segment, snapshot);
-      prepareSegmentHistoryState(segment);
-    });
-    renderSegments();
-    renderProgress();
-    renderRevisionHistory();
-    renderReviewPanel();
-    const message = error.message || "Batch AI QA failed.";
-    renderLocalAiOutput(message, { muted: false });
-    setSaveStatus(message, "dirty");
-    return false;
-  } finally {
-    state.localAi.running = false;
-    state.localAi.promptBusy = false;
-    state.localAi.abortController = null;
-    renderLocalAiCommandCentre();
-  }
+  return aiReviewController.reviewBatch();
 }
 
 async function repairActiveSegmentTagsWithLocalAi() {
@@ -11061,6 +10785,7 @@ async function pretranslateWithLocalAi() {
 
 function cancelLocalAiBatch() {
   if (aiPretranslationController.cancel()) return;
+  if (aiReviewController.cancel()) return;
   state.localAi.abortController?.abort();
   state.localAi.progress = {
     ...(state.localAi.progress || {}),
