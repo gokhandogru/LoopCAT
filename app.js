@@ -1955,6 +1955,47 @@ const qualityReviewController = appRuntime?.featureFactories?.createQualityRevie
   onError: (error) => setSaveStatus(error?.message || "Quality or review action failed.", "dirty")
 });
 qualityReviewController?.mount?.();
+const reviewMetadataController = appRuntime.featureFactories.createReviewMetadataController({
+  editorSessionStore,
+  selection: { getActiveIndex: currentActiveIndex },
+  mutation: {
+    touch: touchSegment,
+    restore: (segment, snapshot) => {
+      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
+      Object.assign(segment, snapshot);
+    },
+    prepareHistory: prepareSegmentHistoryState
+  },
+  persistence: {
+    clearPending: clearPendingSave,
+    save: saveSegment
+  },
+  activity: {
+    log: (segment) =>
+      logProjectActivity("review", "Review metadata saved", {
+        segmentId: segment.id,
+        reviewState: segment.reviewState
+      })
+  },
+  presentation: {
+    renderReview: renderReviewPanel,
+    updateRow,
+    renderHistory: renderRevisionHistory
+  },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus },
+  ids: {
+    comment: () => `comment-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`
+  },
+  testHooks: {
+    beforeSave: (segment) => {
+      if (LOOPCAT_TEST_BUILD && segment[REVIEW_METADATA_SAVE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated review metadata save failure");
+      }
+    }
+  },
+  logger: console
+});
 const reviewStateController = appRuntime.featureFactories.createReviewStateController({
   editorSessionStore,
   commands: {
@@ -7568,48 +7609,7 @@ function renderRevisionHistory() {
 }
 
 async function saveActiveReviewMetadata(values = qualityReviewController?.readReview?.()) {
-  const segment = currentSegment();
-  if (!segment) return;
-  const snapshot = structuredClone(segment);
-  try {
-    segment.reviewState = String(values?.reviewState || "");
-    segment.reviewNote = String(values?.reviewNote || "").trim();
-    const commentBody = String(values?.commentBody || "").trim();
-    if (commentBody) {
-      const now = new Date().toISOString();
-      segment.comments = [
-        ...(segment.comments || []),
-        {
-          id: `comment-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`,
-          body: commentBody,
-          state: "open",
-          createdAt: now,
-          updatedAt: now
-        }
-      ];
-    }
-    touchSegment(segment);
-    clearPendingSave(segment);
-    if (LOOPCAT_TEST_BUILD && segment[REVIEW_METADATA_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated review metadata save failure");
-    await saveSegment(segment);
-    try {
-      await logProjectActivity("review", "Review metadata saved", { segmentId: segment.id, reviewState: segment.reviewState });
-    } catch (activityError) {
-      console.warn("Review activity log failed.", activityError);
-    }
-    renderReviewPanel({ force: true });
-    updateRow(currentActiveIndex());
-    markWorkspaceDirty();
-    setSaveStatus("Review saved", "saved");
-  } catch (error) {
-    Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-    Object.assign(segment, snapshot);
-    prepareSegmentHistoryState(segment);
-    renderReviewPanel({ force: true });
-    updateRow(currentActiveIndex());
-    renderRevisionHistory();
-    setSaveStatus(error.message || "Review save failed", "dirty");
-  }
+  return reviewMetadataController.save(values);
 }
 
 async function setActiveReviewState(reviewState) {

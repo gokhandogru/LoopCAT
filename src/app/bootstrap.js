@@ -58,6 +58,7 @@ import { createTmPretranslationDialogController } from "../features/resources/tm
 import { createResourcesController } from "../features/resources/resources-controller.js";
 import { createQualityReviewController } from "../features/quality/quality-review-controller.js";
 import { createReviewStateController } from "../features/quality/review-state-controller.js";
+import { createReviewMetadataController } from "../features/quality/review-metadata-controller.js";
 import { createRecoveryWorkspaceController } from "../features/workspace/recovery-workspace-controller.js";
 import { createImportExportController } from "../features/import-export/import-export-controller.js";
 import {
@@ -140,6 +141,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createProjectDialogController,
       createProjectsController,
       createQualityReviewController,
+      createReviewMetadataController,
       createReviewStateController,
       createRecoveryWorkspaceController,
       createResourcesController,

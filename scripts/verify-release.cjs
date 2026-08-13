@@ -186,6 +186,7 @@ const requiredReleaseFiles = [
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
   "src/features/quality/quality-review-controller.js",
+  "src/features/quality/review-metadata-controller.js",
   "src/features/quality/review-state-controller.js",
   "src/features/resources/resources-controller.js",
   "src/features/resources/tm-pretranslation-dialog-controller.js",
@@ -215,6 +216,7 @@ const requiredReleaseFiles = [
   "tests/unit/perplexity-provider-adapter.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
+  "tests/unit/review-metadata-controller.test.cjs",
   "tests/unit/review-state-controller.test.cjs",
   "tests/unit/import-export-controller.test.cjs",
   "tests/unit/recovery-workspace-controller.test.cjs",
@@ -289,6 +291,8 @@ const segmentConfirmationControllerUnitTests = readText("tests/unit/segment-conf
 const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
+const reviewMetadataControllerJs = readText("src/features/quality/review-metadata-controller.js");
+const reviewMetadataControllerUnitTests = readText("tests/unit/review-metadata-controller.test.cjs");
 const reviewStateControllerJs = readText("src/features/quality/review-state-controller.js");
 const reviewStateControllerUnitTests = readText("tests/unit/review-state-controller.test.cjs");
 const commandBusJs = readText("src/commands/command-bus.js");
@@ -1901,6 +1905,57 @@ assertIncludes(
   "filter membership changes preserve scroll while producer failure restores the exact target patch and caret",
   "focused target-producer tests must characterize rendering and failure recovery."
 );
+assertIncludes(
+  appBootstrapJs,
+  "createReviewMetadataController",
+  "The application runtime must expose the checked full review-metadata controller boundary."
+);
+for (const boundary of [
+  'segment.reviewState = String(values?.reviewState || "")',
+  'segment.reviewNote = String(values?.reviewNote || "").trim()',
+  "id: createCommentId()",
+  "mutation.touch(segment)",
+  "persistence.clearPending(segment)",
+  "await persistence.save(segment)",
+  "await activity.log(segment)",
+  "presentation.renderReview({ force: true })",
+  "mutation.restore(segment, snapshot)"
+]) {
+  assertIncludes(
+    reviewMetadataControllerJs,
+    boundary,
+    `ReviewMetadataController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return reviewMetadataController.save(values)",
+  "app.js must retain only the checked full review-metadata compatibility facade."
+);
+const reviewMetadataFacade = functionBody(
+  appJs,
+  "async function saveActiveReviewMetadata",
+  "async function setActiveReviewState"
+);
+assert(
+  !reviewMetadataFacade.includes("segment.reviewState =") &&
+    !reviewMetadataFacade.includes("saveSegment(") &&
+    !reviewMetadataFacade.includes("logProjectActivity(") &&
+    !reviewMetadataFacade.includes("renderReviewPanel(") &&
+    !reviewMetadataFacade.includes("Reflect.ownKeys"),
+  "app.js must not regain full review-metadata mutation, persistence, activity, presentation, or rollback orchestration."
+);
+for (const testName of [
+  "full review metadata normalizes fields, appends one stable comment, persists, and refreshes presentation",
+  "primary review metadata persistence failure restores the exact snapshot and failure presentation",
+  "secondary review metadata activity failure keeps the saved review durable"
+]) {
+  assertIncludes(
+    reviewMetadataControllerUnitTests,
+    testName,
+    `focused review-metadata tests must characterize ${testName}.`
+  );
+}
 assertIncludes(
   appBootstrapJs,
   "createReviewStateController",
