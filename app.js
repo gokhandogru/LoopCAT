@@ -742,6 +742,14 @@ const state = {
 const editorSessionStore = appRuntime.editorSession;
 editorSessionStore.attachCompatibility(state);
 
+function currentProjects() {
+  return editorSessionStore.getProjects();
+}
+
+function currentProject() {
+  return editorSessionStore.getProject();
+}
+
 function currentProjectSummaries() {
   return editorSessionStore.getProjectSummaries();
 }
@@ -1307,7 +1315,7 @@ verticalFeatureState?.inspector?.mount?.();
 
 const editorContextController = appRuntime?.featureFactories?.createEditorContextController?.({
   getContext: () => ({
-    projectId: state.project?.id || "",
+    projectId: currentProject()?.id || "",
     segmentId: currentSegment()?.id || ""
   }),
   renderReview: () => renderReviewPanel(),
@@ -1321,7 +1329,7 @@ const editorContextController = appRuntime?.featureFactories?.createEditorContex
 const filterPresetController = appRuntime?.featureFactories?.createFilterPresetController?.({
   select: els.filterPresetSelect,
   preferencesRepository: appRuntime.preferencesRepository,
-  getProjectId: () => state.project?.id || "",
+  getProjectId: () => currentProject()?.id || "",
   applyFilters: async (preset) => {
     updateEditorFilters({ status: preset.status, reviewState: preset.reviewState, aiState: preset.aiState });
     els.segmentStatusFilter.value = preset.status;
@@ -1388,7 +1396,7 @@ const diagnosticsService = appRuntime?.featureFactories?.createDiagnosticsServic
     const counts = new Map();
     for (const segment of segments) counts.set(segment.projectId, (counts.get(segment.projectId) || 0) + 1);
     return {
-      projectCount: state.projects.length,
+      projectCount: currentProjects().length,
       segmentCount: segments.length,
       largestProjectSegmentCount: Math.max(0, ...counts.values())
     };
@@ -1542,7 +1550,7 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
     resourceTbxImportInput: els.resourceTbxImportInput,
     resourceTermListImportInput: els.resourceTermListImportInput
   },
-  hasProject: () => Boolean(state.project),
+  hasProject: () => Boolean(currentProject()),
   runImportTask: runFileImportTask,
   importProjectFile: importProjectDocument,
   importProjectPackage: async (file) => {
@@ -1611,7 +1619,7 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
     { element: els.editorProjectSettingsBtn, mode: "edit" },
     { element: els.openProjectAiSettingsBtn, mode: "edit", focusAi: true }
   ],
-  getProject: () => state.project,
+  getProject: () => currentProject(),
   refreshResources,
   suggestedCreatorName,
   cleanCreatorName,
@@ -1795,7 +1803,7 @@ function refreshLocalizedUi() {
   renderProjectStorageStatus();
   if (currentApplicationView() === "projects") renderProjectsView();
   if (currentApplicationView() === "resources") renderResourcesView();
-  if (state.project) {
+  if (currentProject()) {
     if (currentApplicationView() === "project") {
       renderProjectHome();
       void renderProjectAnalysis();
@@ -1842,7 +1850,7 @@ function setSaveStatus(text, mode = "") {
   appRuntime?.status?.controller?.fromLegacy?.({
     text: displayText,
     mode,
-    projectId: state.project?.id || null,
+    projectId: currentProject()?.id || null,
     segmentId: currentSegmentId()
   });
   els.saveStatus.textContent = uiSource(displayText);
@@ -1859,7 +1867,7 @@ function setSaveStatus(text, mode = "") {
 }
 
 function renderUndoControls() {
-  const projectId = state.commandProjectId || state.project?.id || null;
+  const projectId = state.commandProjectId || currentProject()?.id || null;
   if (els.undoBtn) els.undoBtn.disabled = !appRuntime?.commands?.bus?.canUndo?.(projectId);
   if (els.redoBtn) els.redoBtn.disabled = !appRuntime?.commands?.bus?.canRedo?.(projectId);
 }
@@ -1893,14 +1901,14 @@ async function synchronizeResourceTrashChange(entry, { refreshSuggestions = fals
 }
 
 async function undoLastCommand() {
-  const projectId = state.commandProjectId || state.project?.id || null;
+  const projectId = state.commandProjectId || currentProject()?.id || null;
   finalizePendingEditCommands(projectId || "");
   const result = await appRuntime?.commands?.bus?.undo?.(projectId);
   if (!result) return false;
   const requestedActiveSegmentId = result.result?.activeSegmentId || "";
   await loadProjects(false);
-  if (state.project?.id === projectId) {
-    state.project = state.projects.find((project) => project.id === projectId) || state.project;
+  if (currentProject()?.id === projectId) {
+    editorSessionStore.replaceProject(currentProjects().find((project) => project.id === projectId) || currentProject());
     state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
     const requestedIndex = requestedActiveSegmentId
       ? state.segments.findIndex((segment) => segment.id === requestedActiveSegmentId)
@@ -1912,7 +1920,7 @@ async function undoLastCommand() {
       : -1;
     selectApplicationSegment(nextIndex);
     renderAll();
-  } else if (!state.project && projectId && state.projects.some((project) => project.id === projectId)) {
+  } else if (!currentProject() && projectId && currentProjects().some((project) => project.id === projectId)) {
     await openProject(projectId);
   }
   await synchronizeResourceTrashChange(resourceTrashEntryFromCommandResult(result));
@@ -1925,27 +1933,27 @@ async function undoLastCommand() {
 }
 
 async function redoLastCommand() {
-  const projectId = state.commandProjectId || state.project?.id || null;
+  const projectId = state.commandProjectId || currentProject()?.id || null;
   finalizePendingEditCommands(projectId || "");
   const result = await appRuntime?.commands?.bus?.redo?.(projectId);
   if (!result) return false;
   const requestedActiveSegmentId = result.result?.activeSegmentId || "";
-  if (result.receipt.commandId === "delete-project" && state.project?.id === projectId) {
-    state.project = null;
+  if (result.receipt.commandId === "delete-project" && currentProject()?.id === projectId) {
+    editorSessionStore.replaceProject(null);
     state.segments = [];
     setView("projects");
     applicationNavigation.clearSelection();
   }
   await loadProjects(false);
-  if (result.receipt.commandId === "delete-document" && state.project?.id === projectId) {
-    state.project = state.projects.find((project) => project.id === projectId) || state.project;
+  if (result.receipt.commandId === "delete-document" && currentProject()?.id === projectId) {
+    editorSessionStore.replaceProject(currentProjects().find((project) => project.id === projectId) || currentProject());
     state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
     const nextIndex = state.segments.length
       ? Math.max(0, Math.min(currentActiveIndex(), state.segments.length - 1))
       : -1;
     selectApplicationSegment(nextIndex);
     renderAll();
-  } else if (state.project?.id === projectId && requestedActiveSegmentId) {
+  } else if (currentProject()?.id === projectId && requestedActiveSegmentId) {
     state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
     const requestedIndex = state.segments.findIndex((segment) => segment.id === requestedActiveSegmentId);
     if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
@@ -2059,7 +2067,7 @@ function syncAllPanelToggleStates() {
 }
 
 function renderFocusMode() {
-  const active = Boolean(currentFocusMode() && currentApplicationView() === "editor" && state.project);
+  const active = Boolean(currentFocusMode() && currentApplicationView() === "editor" && currentProject());
   document.body.classList.toggle("focus-mode", active);
   els.workspace.classList.toggle("focus-mode", active);
   if (els.focusModeBtn) {
@@ -2076,11 +2084,11 @@ function renderFocusMode() {
 function setFocusMode(enabled) {
   applicationStore?.dispatch?.({
     type: "interface/focus-mode-changed",
-    payload: { enabled: Boolean(enabled && state.project) }
+    payload: { enabled: Boolean(enabled && currentProject()) }
   });
   renderFocusMode();
   document.querySelectorAll(".menu[open]").forEach((menu) => menu.removeAttribute("open"));
-  if (!state.project) return;
+  if (!currentProject()) return;
   requestAnimationFrame(() => {
     renderSegments({ preserveScroll: true });
     if (currentFocusMode()) focusActiveTextarea();
@@ -2453,7 +2461,7 @@ function touchSegment(segment, options = {}) {
   return segment;
 }
 
-function languagePair(project = state.project) {
+function languagePair(project = currentProject()) {
   return project ? languagePairDisplay(project.sourceLang, project.targetLang) : "";
 }
 
@@ -2637,7 +2645,7 @@ function localAiStorage(kind) {
 
 function localAiKeyStorageKey(settings = localAiSettingsFromForm()) {
   const clean = localAISettingsStore?.defaults
-    ? localAISettingsStore.defaults(settings || {}, state.project)
+    ? localAISettingsStore.defaults(settings || {}, currentProject())
     : (settings || {});
   const providerId = String(clean.providerId || clean.provider || "ollama").trim() || "ollama";
   const fallbackBaseUrl = clean.baseUrl || (providerId === "ollama" ? OLLAMA_DEFAULT_BASE_URL : OPENAI_DEFAULT_BASE_URL);
@@ -2782,17 +2790,17 @@ function markOpenAiProjectRollbackDirty(projectId) {
 
 async function restoreProjectAfterOpenAiSetupFailure(previousProject, previousProjects, projectPersisted) {
   if (!projectPersisted) {
-    state.project = previousProject;
-    state.projects = previousProjects;
+    editorSessionStore.replaceProject(previousProject);
+    editorSessionStore.replaceProjects(previousProjects);
     return;
   }
   try {
-    state.project = await updateProject(previousProject);
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    editorSessionStore.replaceProject(await updateProject(previousProject));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   } catch (rollbackError) {
     console.warn("Project AI settings rollback failed.", rollbackError);
-    state.project = previousProject;
-    state.projects = previousProjects;
+    editorSessionStore.replaceProject(previousProject);
+    editorSessionStore.replaceProjects(previousProjects);
     markOpenAiProjectRollbackDirty(previousProject.id);
   }
 }
@@ -2952,7 +2960,7 @@ async function suggestedCreatorName() {
   return "This computer";
 }
 
-function projectDocumentManifest(project = state.project) {
+function projectDocumentManifest(project = currentProject()) {
   const seen = new Set();
   return (Array.isArray(project?.documents) ? project.documents : [])
     .map((documentInfo) => {
@@ -3016,23 +3024,23 @@ function projectResourceLinks(project) {
   return links;
 }
 
-function mainTmName(project = state.project) {
+function mainTmName(project = currentProject()) {
   return projectResourceLinks(project).find((link) => link.type === "tm" && link.role === "main")?.name || cleanProjectText(project?.mainTmName, cleanProjectText(project?.tmName, "Default TM"));
 }
 
-function projectTmNames(project = state.project) {
+function projectTmNames(project = currentProject()) {
   return uniqueNames([mainTmName(project), ...projectResourceLinks(project).filter((link) => link.type === "tm").map((link) => link.name)]);
 }
 
-function projectTermBaseNames(project = state.project) {
+function projectTermBaseNames(project = currentProject()) {
   return uniqueNames(projectResourceLinks(project).filter((link) => link.type === "termbase").map((link) => link.name));
 }
 
-function primaryTermBaseName(project = state.project) {
+function primaryTermBaseName(project = currentProject()) {
   return projectTermBaseNames(project)[0] || cleanProjectText(project?.termBaseName, "Default TB");
 }
 
-function projectResourceSummary(project = state.project) {
+function projectResourceSummary(project = currentProject()) {
   const tmNames = projectTmNames(project);
   const tbNames = projectTermBaseNames(project);
   return {
@@ -3235,12 +3243,12 @@ function firstVisibleSegmentIndex() {
 
 function projectDocuments() {
   const map = new Map();
-  projectDocumentManifest(state.project).forEach((documentInfo) => {
+  projectDocumentManifest(currentProject()).forEach((documentInfo) => {
     const id = documentInfo?.id || "";
     if (!id || map.has(id)) return;
     map.set(id, {
       id,
-      name: documentInfo.name || state.project?.sourceFileName || "Document",
+      name: documentInfo.name || currentProject()?.sourceFileName || "Document",
       type: stableLower(documentInfo.type || "docx") || "docx"
     });
   });
@@ -3249,7 +3257,7 @@ function projectDocuments() {
     if (!map.has(id)) {
       map.set(id, {
         id,
-        name: segment.documentName || state.project?.sourceFileName || "Document",
+        name: segment.documentName || currentProject()?.sourceFileName || "Document",
         type: stableLower(segment.documentType || "docx") || "docx"
       });
       return;
@@ -3257,7 +3265,7 @@ function projectDocuments() {
     const current = map.get(id);
     map.set(id, {
       ...current,
-      name: current.name || segment.documentName || state.project?.sourceFileName || "Document",
+      name: current.name || segment.documentName || currentProject()?.sourceFileName || "Document",
       type: stableLower(current.type || segment.documentType || "docx") || "docx"
     });
   });
@@ -3354,7 +3362,7 @@ function deliveryExportScope() {
 }
 
 function scopedExportBaseName(baseName, documentInfo) {
-  const base = fileSafeName(baseName || state.project?.name || "project");
+  const base = fileSafeName(baseName || currentProject()?.name || "project");
   return documentInfo ? `${base}_${fileSafeName(documentInfo.name || "current-file")}` : base;
 }
 
@@ -3513,11 +3521,11 @@ function shouldLiveSyncLanguageInput(input) {
   return Boolean(LANGUAGE_ALIAS_CODES[lookup]) || lookup === stableLanguageLookupKey(code);
 }
 
-function languagePairKey(project = state.project) {
+function languagePairKey(project = currentProject()) {
   return project ? `${normalizeLanguageInputValue(project.sourceLang)}::${normalizeLanguageInputValue(project.targetLang)}` : "";
 }
 
-function targetSpellcheckLanguage(project = state.project) {
+function targetSpellcheckLanguage(project = currentProject()) {
   return normalizeLanguageInputValue(project?.targetLang || "");
 }
 
@@ -3595,7 +3603,7 @@ function textDecodingOptions() {
 }
 
 function recentLanguagePairs(limit = 4) {
-  return [...state.projects]
+  return [...currentProjects()]
     .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
     .map((project) => [normalizeLanguageInputValue(project.sourceLang), normalizeLanguageInputValue(project.targetLang)])
     .filter(([source, target]) => source && target)
@@ -3618,11 +3626,11 @@ function renderFrequentLanguagePairs() {
 function syncLocalAiLanguageFields(changedField = "") {
   const form = aiAdministrationController?.readLocalForm?.() || {};
   const sourceCode = changedField === "sourceLanguage"
-    ? normalizeLanguageInputValue(form.sourceLanguage || state.project?.sourceLang || "")
-    : normalizeLanguageInputValue(form.sourceCode || form.sourceLanguage || state.project?.sourceLang || "");
+    ? normalizeLanguageInputValue(form.sourceLanguage || currentProject()?.sourceLang || "")
+    : normalizeLanguageInputValue(form.sourceCode || form.sourceLanguage || currentProject()?.sourceLang || "");
   const targetCode = changedField === "targetLanguage"
-    ? normalizeLanguageInputValue(form.targetLanguage || state.project?.targetLang || "")
-    : normalizeLanguageInputValue(form.targetCode || form.targetLanguage || state.project?.targetLang || "");
+    ? normalizeLanguageInputValue(form.targetLanguage || currentProject()?.targetLang || "")
+    : normalizeLanguageInputValue(form.targetCode || form.targetLanguage || currentProject()?.targetLang || "");
   const fields = {};
   if (sourceCode) {
     if (changedField !== "sourceLanguage") fields.sourceLanguage = languageNameForUi(sourceCode);
@@ -3889,46 +3897,46 @@ function segmentStatusLabel(status) {
 }
 
 function commandList() {
-  const commandProjectId = state.commandProjectId || state.project?.id || null;
+  const commandProjectId = state.commandProjectId || currentProject()?.id || null;
   const commands = [
     { id: "undo", label: "Undo last action", run: undoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canUndo?.(commandProjectId)) },
     { id: "redo", label: "Redo last action", run: redoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canRedo?.(commandProjectId)) },
     { id: "trash", label: "Open Trash", run: openTrash, enabled: Boolean(appRuntime?.trashRepository) },
     { id: "confirm", label: "Confirm segment", run: confirmCurrentSegment, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(state.segments.length) },
-    { id: "focus-mode", label: currentFocusMode() ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(currentApplicationView() === "editor" && state.project) },
+    { id: "focus-mode", label: currentFocusMode() ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(currentApplicationView() === "editor" && currentProject()) },
     { id: "copy-source", label: "Copy source", run: copySourceToTarget, enabled: Boolean(currentSegment()) },
     { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: splitCurrentSegment, enabled: Boolean(currentSegment() && canSplitSegmentStructure(currentSegment())) },
     { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: mergeWithNextSegment, enabled: Boolean(currentSegment() && canMergeSegmentStructures(currentSegment(), nextSegmentForMerge(currentSegment()))) },
     { id: "save-tm", label: "Save segment to TM", run: saveActiveSegmentToTm, enabled: Boolean(currentSegment()?.target?.trim()) },
-    { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(state.project) },
-    { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(state.project) },
-    { id: "quality-passport", label: "Export Quality Passport", run: exportQualityPassport, enabled: Boolean(state.project) },
-    { id: "next-quality-risk", label: "Next quality risk", run: goToNextQualityRisk, enabled: Boolean(state.project) },
-    { id: "concordance", label: "Open concordance", run: openConcordanceSearch, enabled: Boolean(state.project) },
-    { id: "replace-target", label: "Find and replace target text", run: openReplacePanel, enabled: Boolean(state.project) },
-    { id: "preset-translate", label: "Use Translate filter preset", group: "Filters", keywords: ["open", "segments", "matches"], run: () => filterPresetController?.applyPreset?.("translate"), enabled: Boolean(state.project) },
-    { id: "preset-review", label: "Use Review filter preset", group: "Filters", keywords: ["needs review", "comments"], run: () => filterPresetController?.applyPreset?.("review"), enabled: Boolean(state.project) },
-    { id: "preset-qa-fixes", label: "Use QA fixes filter preset", group: "Filters", keywords: ["quality", "blocked", "fixes"], run: () => filterPresetController?.applyPreset?.("qa-fixes"), enabled: Boolean(state.project) },
-    { id: "preset-ai-review", label: "Use AI review filter preset", group: "Filters", keywords: ["AI", "risk", "suggestions"], run: () => filterPresetController?.applyPreset?.("ai-review"), enabled: Boolean(state.project) },
-    { id: "project-report", label: "Export project report", run: exportProjectReport, enabled: Boolean(state.project) },
-    { id: "anonymized-report", label: "Export anonymized report", run: () => exportProjectReport({ anonymized: true }), enabled: Boolean(state.project) },
-    { id: "local-ai-pretranslate", label: "Local AI pre-translate", run: pretranslateWithLocalAi, enabled: Boolean(state.project && !state.localAi.running) },
+    { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(currentProject()) },
+    { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(currentProject()) },
+    { id: "quality-passport", label: "Export Quality Passport", run: exportQualityPassport, enabled: Boolean(currentProject()) },
+    { id: "next-quality-risk", label: "Next quality risk", run: goToNextQualityRisk, enabled: Boolean(currentProject()) },
+    { id: "concordance", label: "Open concordance", run: openConcordanceSearch, enabled: Boolean(currentProject()) },
+    { id: "replace-target", label: "Find and replace target text", run: openReplacePanel, enabled: Boolean(currentProject()) },
+    { id: "preset-translate", label: "Use Translate filter preset", group: "Filters", keywords: ["open", "segments", "matches"], run: () => filterPresetController?.applyPreset?.("translate"), enabled: Boolean(currentProject()) },
+    { id: "preset-review", label: "Use Review filter preset", group: "Filters", keywords: ["needs review", "comments"], run: () => filterPresetController?.applyPreset?.("review"), enabled: Boolean(currentProject()) },
+    { id: "preset-qa-fixes", label: "Use QA fixes filter preset", group: "Filters", keywords: ["quality", "blocked", "fixes"], run: () => filterPresetController?.applyPreset?.("qa-fixes"), enabled: Boolean(currentProject()) },
+    { id: "preset-ai-review", label: "Use AI review filter preset", group: "Filters", keywords: ["AI", "risk", "suggestions"], run: () => filterPresetController?.applyPreset?.("ai-review"), enabled: Boolean(currentProject()) },
+    { id: "project-report", label: "Export project report", run: exportProjectReport, enabled: Boolean(currentProject()) },
+    { id: "anonymized-report", label: "Export anonymized report", run: () => exportProjectReport({ anonymized: true }), enabled: Boolean(currentProject()) },
+    { id: "local-ai-pretranslate", label: "Local AI pre-translate", run: pretranslateWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running) },
     { id: "local-ai-review", label: "AI review active segment", run: reviewActiveSegmentWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-review-batch", label: "AI QA batch", run: reviewBatchWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-review-batch", label: "AI QA batch", run: reviewBatchWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-tag-repair", label: "Suggest AI tag repair", run: repairActiveSegmentTagsWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-tag-repair-batch", label: "Repair AI tags batch", run: repairBatchTagsWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-tag-repair-batch", label: "Repair AI tags batch", run: repairBatchTagsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-polish-draft", label: "Polish active draft with AI", run: polishActiveSegmentDraftWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-polish-batch", label: "Polish AI drafts batch", run: polishBatchDraftsWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-polish-batch", label: "Polish AI drafts batch", run: polishBatchDraftsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-adapt-draft", label: "Adapt active draft with AI", run: adaptActiveSegmentDraftWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-adapt-batch", label: "Adapt AI drafts batch", run: adaptBatchDraftsWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-adapt-batch", label: "Adapt AI drafts batch", run: adaptBatchDraftsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-variants", label: "Suggest AI alternatives", run: suggestActiveSegmentVariantsWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-variants-batch", label: "Suggest AI alternatives batch", run: suggestBatchSegmentVariantsWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-variants-batch", label: "Suggest AI alternatives batch", run: suggestBatchSegmentVariantsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-apply-terms", label: "Apply AI terminology", run: applyActiveSegmentTerminologyWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-apply-terms-batch", label: "Apply AI terminology batch", run: applyBatchTerminologyWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-apply-terms-batch", label: "Apply AI terminology batch", run: applyBatchTerminologyWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-terms", label: "Extract AI terms", run: extractActiveSegmentTermsWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-terms-batch", label: "Extract AI terms batch", run: extractBatchTermsWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-project-brief", label: "Generate AI project brief", run: generateProjectBriefWithLocalAi, enabled: Boolean(state.project && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-terms-batch", label: "Extract AI terms batch", run: extractBatchTermsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-project-brief", label: "Generate AI project brief", run: generateProjectBriefWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "openai-ai", label: "Create OpenAI suggestion", run: createOpenAiSuggestion, enabled: Boolean(currentSegment()) }
   ];
   const shortcuts = {
@@ -4082,7 +4090,7 @@ function restoreWorkspaceDirtyIds() {
 }
 
 function pruneWorkspaceDirtyProjectIds() {
-  const knownIds = new Set(state.projects.map((project) => project.id).filter(Boolean));
+  const knownIds = new Set(currentProjects().map((project) => project.id).filter(Boolean));
   const nextIds = workspaceDirtyIds().filter((id) => knownIds.has(id));
   const nextRecoveryIds = Array.from(state.workspaceRecoveryProjectIds).filter((id) => knownIds.has(id) && nextIds.includes(id));
   const dirtyChanged = nextIds.length !== state.workspaceDirtyProjectIds.size;
@@ -4112,7 +4120,7 @@ function handleBeforeUnload(event) {
   event.returnValue = "";
 }
 
-function markWorkspaceDirty(projectId = state.project?.id) {
+function markWorkspaceDirty(projectId = currentProject()?.id) {
   if (!projectId) return;
   const changed = !state.workspaceDirtyProjectIds.has(projectId);
   state.workspaceDirtyProjectIds.add(projectId);
@@ -4143,14 +4151,14 @@ function projectUsesResource(project, type, name, sourceLang = "", targetLang = 
 }
 
 function markProjectsUsingResourceDirty(type, name, sourceLang = "", targetLang = "") {
-  const projectIds = state.projects
+  const projectIds = currentProjects()
     .filter((project) => projectUsesResource(project, type, name, sourceLang, targetLang))
     .map((project) => project.id);
   markWorkspaceProjectsDirty(projectIds);
   return projectIds.length;
 }
 
-function clearWorkspaceDirty(projectId = state.project?.id) {
+function clearWorkspaceDirty(projectId = currentProject()?.id) {
   if (projectId) state.workspaceDirtyProjectIds.delete(projectId);
   if (projectId) state.workspaceRecoveryProjectIds.delete(projectId);
   persistWorkspaceDirtyIds();
@@ -4182,7 +4190,7 @@ function renderWorkspaceStatus() {
     storageLine: storageDurabilityLine(state.storageDurability),
     storageWarnings,
     importBusy: Boolean(state.importTask),
-    hasProject: Boolean(state.project)
+    hasProject: Boolean(currentProject())
   });
   renderWorkspaceRecoveryPanel();
 }
@@ -4224,7 +4232,7 @@ function isBackupReminderDismissed(projectId, now = new Date()) {
   return until ? new Date(until).getTime() > now.getTime() : false;
 }
 
-function dismissBackupReminder(projectId = state.project?.id, hours = BACKUP_REMINDER_DISMISS_HOURS) {
+function dismissBackupReminder(projectId = currentProject()?.id, hours = BACKUP_REMINDER_DISMISS_HOURS) {
   if (!projectId) return;
   const dismissed = backupReminderDismissals();
   dismissed[projectId] = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
@@ -4236,12 +4244,12 @@ function dismissBackupReminder(projectId = state.project?.id, hours = BACKUP_REM
   renderBackupReminder();
 }
 
-function latestProjectPackageExport(project = state.project) {
+function latestProjectPackageExport(project = currentProject()) {
   const history = (project?.exportHistory || []).filter((entry) => entry.type === "project-package" && entry.createdAt);
   return history.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0] || null;
 }
 
-function backupReminderInfo(project = state.project, activityEvents = currentActivityEvents(), now = new Date()) {
+function backupReminderInfo(project = currentProject(), activityEvents = currentActivityEvents(), now = new Date()) {
   if (!project || isBackupReminderDismissed(project.id, now)) return null;
   const latestExport = latestProjectPackageExport(project);
   const projectAgeDays = daysBetween(project.createdAt, now);
@@ -4268,9 +4276,9 @@ function renderBackupReminder() {
 }
 
 function knownProjectById(projectId) {
-  return state.project?.id === projectId
-    ? state.project
-    : state.projects.find((project) => project.id === projectId) || currentProjectSummaries().find((project) => project.id === projectId) || null;
+  return currentProject()?.id === projectId
+    ? currentProject()
+    : currentProjects().find((project) => project.id === projectId) || currentProjectSummaries().find((project) => project.id === projectId) || null;
 }
 
 async function refreshWorkspaceStatus() {
@@ -4335,7 +4343,7 @@ async function summarizeProject(project, segments = null, summaryRevision = proj
 
 async function refreshProjectSummaries() {
   const cachedById = new Map(currentProjectSummaries().map((summary) => [summary.id, summary]));
-  const projectSummaries = await Promise.all(state.projects.map((project) => {
+  const projectSummaries = await Promise.all(currentProjects().map((project) => {
     const revision = projectSummaryRevision(project.id);
     const cached = cachedById.get(project.id);
     if (cached && cached.updatedAt === project.updatedAt && cached.summaryRevision === revision) {
@@ -4349,7 +4357,7 @@ async function refreshProjectSummaries() {
         summaryRevision: revision
       };
     }
-    const inMemorySegments = state.project?.id === project.id ? state.segments : null;
+    const inMemorySegments = currentProject()?.id === project.id ? state.segments : null;
     return summarizeProject(project, inMemorySegments, revision);
   }));
   editorSessionStore.replaceProjectSummaries(projectSummaries);
@@ -4358,23 +4366,23 @@ async function refreshProjectSummaries() {
 }
 
 async function loadProjects(selectFirst = false) {
-  state.projects = await listProjects();
-  const knownProjectIds = new Set(state.projects.map((project) => project.id));
+  editorSessionStore.replaceProjects(await listProjects());
+  const knownProjectIds = new Set(currentProjects().map((project) => project.id));
   editorSessionStore.pruneProjectSummaryRevisions(knownProjectIds);
   pruneWorkspaceDirtyProjectIds();
   await refreshProjectSummaries();
   renderProjectList();
   renderEditor();
   void refreshTrashSummary();
-  if (selectFirst && !state.project && state.projects[0]) {
-    await openProject(state.projects[0].id);
+  if (selectFirst && !currentProject() && currentProjects()[0]) {
+    await openProject(currentProjects()[0].id);
   }
 }
 
 function setView(view) {
   if (view === "projects") applicationNavigation?.openProjects?.();
   else if (view === "resources") applicationNavigation?.openResources?.();
-  else if (view === "project") applicationNavigation?.openProject?.(state.project?.id || null, currentActiveIndex());
+  else if (view === "project") applicationNavigation?.openProject?.(currentProject()?.id || null, currentActiveIndex());
   else applicationNavigation?.openEditor?.(applicationNavigationPayload({ view: "editor" }));
   renderEditor();
   if (view === "projects") refreshProjectSummaries();
@@ -4382,9 +4390,9 @@ function setView(view) {
 }
 
 function showProjectHome() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   const activeIndex = state.segments.length ? 0 : -1;
-  applicationNavigation?.openProject?.(state.project.id, activeIndex);
+  applicationNavigation?.openProject?.(currentProject().id, activeIndex);
   renderAll();
 }
 
@@ -4471,7 +4479,7 @@ function resourceOptionHtml(resource, type, selected, main) {
   `;
 }
 
-function renderProjectResourcePickers(project = state.project) {
+function renderProjectResourcePickers(project = currentProject()) {
   const { sourceLang, targetLang } = projectDialogValues();
   if (!sourceLang || !targetLang) return;
   const editing = projectDialogController?.getMode?.() === "edit";
@@ -4546,13 +4554,13 @@ async function refreshResources() {
 }
 
 async function refreshProjectTerms({ rerender = false } = {}) {
-  if (!state.project) {
+  if (!currentProject()) {
     editorSessionStore.replaceProjectTerms([]);
     return;
   }
   editorSessionStore.replaceProjectTerms(await listTerms({
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     termBaseNames: projectTermBaseNames()
   }));
   invalidateSegmentFilterCache();
@@ -4561,18 +4569,18 @@ async function refreshProjectTerms({ rerender = false } = {}) {
 }
 
 async function projectTermsForValidation() {
-  if (!state.project) return [];
+  if (!currentProject()) return [];
   return listTerms({
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     termBaseNames: projectTermBaseNames()
   });
 }
 
-async function logProjectActivity(type, summary, detail = {}, project = state.project) {
+async function logProjectActivity(type, summary, detail = {}, project = currentProject()) {
   if (!project) return null;
   const event = await recordActivityEvent({ projectId: project.id, type, summary, detail });
-  if (event && state.project?.id === project.id) {
+  if (event && currentProject()?.id === project.id) {
     editorSessionStore.prependActivityEvent(event);
     renderBackupReminder();
   }
@@ -4598,28 +4606,28 @@ function draftProjectActivityEvent(project, type, summary, detail = {}) {
 
 async function logOptionalProjectActivity(type, summary, detail = {}, label = summary || type) {
   try {
-    if (LOOPCAT_TEST_BUILD && ["export", "resource-export"].includes(type) && state.project?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]) {
+    if (LOOPCAT_TEST_BUILD && ["export", "resource-export"].includes(type) && currentProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]) {
       throw new Error("Simulated export activity log failure");
     }
-    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || state.project?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
+    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || currentProject()?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
       throw new Error("Simulated import activity log failure");
     }
     await logProjectActivity(type, summary, detail);
     return true;
   } catch (activityError) {
     console.warn(`${label} activity log failed.`, activityError);
-    if (state.project?.id) markWorkspaceDirty(state.project.id);
+    if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
     return false;
   }
 }
 
 async function logOptionalActivityForProject(projectId, type, summary, detail = {}, label = summary || type) {
   try {
-    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || state.project?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
+    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || currentProject()?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
       throw new Error("Simulated import activity log failure");
     }
     const event = await recordActivityEvent({ projectId, type, summary, detail });
-    if (state.project?.id === projectId) {
+    if (currentProject()?.id === projectId) {
       editorSessionStore.replaceActivityEvents(await listActivityEvents(projectId));
       renderBackupReminder();
     }
@@ -4681,11 +4689,11 @@ function renderValidationReport(report) {
 
 async function renderProjectAnalysis() {
   const run = (state.projectAnalysisRun += 1);
-  const project = state.project;
+  const project = currentProject();
   if (!project || currentApplicationView() !== "project" || !els.projectAnalysis) return;
   const segments = state.segments;
   const tmEntries = await getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`);
-  if (run !== state.projectAnalysisRun || currentApplicationView() !== "project" || state.project?.id !== project.id) return;
+  if (run !== state.projectAnalysisRun || currentApplicationView() !== "project" || currentProject()?.id !== project.id) return;
   const tmNames = new Set(projectTmNames(project));
   const analysis = analyzeProject(project, segments, tmEntries.filter((entry) => tmNames.has(entry.tmName)));
   const ai = analysis.ai || {};
@@ -4706,14 +4714,14 @@ async function renderProjectAnalysis() {
 }
 
 function renderProjectList() {
-  if (!state.projects.length) {
+  if (!currentProjects().length) {
     replaceSafeHtml(els.projectList, `<div class="muted">${translatedSourceHtml("No projects yet.")}</div>`);
     return;
   }
   const fragment = document.createDocumentFragment();
-  state.projects.forEach((project) => {
+  currentProjects().forEach((project) => {
     const button = document.createElement("button");
-    button.className = `project-item ${state.project?.id === project.id ? "active" : ""}`;
+    button.className = `project-item ${currentProject()?.id === project.id ? "active" : ""}`;
     replaceSafeHtml(button, `<strong>${displaySafeHtml(project.name)}</strong><span>${escapeHtml(languagePair(project))}</span><span>${project.sourceFileName ? displaySafeHtml(project.sourceFileName) : uiLabelHtml("noSourceFile")}</span>`);
     button.addEventListener("click", () => openProject(project.id));
     fragment.append(button);
@@ -4723,24 +4731,24 @@ function renderProjectList() {
 
 async function openProject(projectId) {
   await flushPendingSegmentSaves();
-  state.project = state.projects.find((project) => project.id === projectId) || null;
-  state.commandProjectId = state.project?.id || projectId || "";
-  state.segments = prepareSegmentHistoryStates(state.project ? await getProjectSegments(projectId) : []);
-  editorSessionStore.replaceActivityEvents(state.project ? await listActivityEvents(projectId) : []);
+  editorSessionStore.replaceProject(currentProjects().find((project) => project.id === projectId) || null);
+  state.commandProjectId = currentProject()?.id || projectId || "";
+  state.segments = prepareSegmentHistoryStates(currentProject() ? await getProjectSegments(projectId) : []);
+  editorSessionStore.replaceActivityEvents(currentProject() ? await listActivityEvents(projectId) : []);
   await refreshProjectTerms();
   const activeIndex = state.segments.length ? 0 : -1;
   await filterPresetReady;
-  await filterPresetController?.restoreForProject?.(state.project?.id || projectId);
-  applicationNavigation?.openProject?.(state.project?.id || projectId, activeIndex);
+  await filterPresetController?.restoreForProject?.(currentProject()?.id || projectId);
+  applicationNavigation?.openProject?.(currentProject()?.id || projectId, activeIndex);
   renderAll();
   if (currentApplicationView() === "editor") await refreshSidebar();
 }
 
 async function openProjectFile(documentId) {
-  if (!state.project) return;
+  if (!currentProject()) return;
   const first = state.segments.findIndex((segment) => segment.documentId === documentId);
   applicationNavigation?.openEditor?.({
-    projectId: state.project.id,
+    projectId: currentProject().id,
     documentId,
     segmentId: state.segments[first]?.id || "",
     activeIndex: first
@@ -4762,11 +4770,11 @@ function renderAll() {
 
 function localAiSettingsFromForm() {
   const projectSettings = localAISettingsStore?.projectSettings
-    ? localAISettingsStore.projectSettings(state.project)
+    ? localAISettingsStore.projectSettings(currentProject())
     : {};
   const form = aiAdministrationController?.readLocalForm?.() || {};
-  const formSourceCode = normalizeLanguageInputValue(form.sourceCode || form.sourceLanguage || projectSettings.sourceCode || state.project?.sourceLang);
-  const formTargetCode = normalizeLanguageInputValue(form.targetCode || form.targetLanguage || projectSettings.targetCode || state.project?.targetLang);
+  const formSourceCode = normalizeLanguageInputValue(form.sourceCode || form.sourceLanguage || projectSettings.sourceCode || currentProject()?.sourceLang);
+  const formTargetCode = normalizeLanguageInputValue(form.targetCode || form.targetLanguage || projectSettings.targetCode || currentProject()?.targetLang);
   const formSourceLanguage = form.sourceLanguage
     ? languageNameForUi(normalizeLanguageInputValue(form.sourceLanguage))
     : projectSettings.sourceLanguage;
@@ -4779,9 +4787,9 @@ function localAiSettingsFromForm() {
     baseUrl: form.baseUrl || projectSettings.baseUrl || OLLAMA_DEFAULT_BASE_URL,
     model: form.model || projectSettings.model || DEFAULT_LOCAL_AI_MODEL,
     sourceLanguage: formSourceLanguage,
-    sourceCode: formSourceCode || projectSettings.sourceCode || state.project?.sourceLang,
+    sourceCode: formSourceCode || projectSettings.sourceCode || currentProject()?.sourceLang,
     targetLanguage: formTargetLanguage,
-    targetCode: formTargetCode || projectSettings.targetCode || state.project?.targetLang,
+    targetCode: formTargetCode || projectSettings.targetCode || currentProject()?.targetLang,
     mode: form.mode || projectSettings.mode,
     variantMode: form.variantMode || projectSettings.variantMode,
     adaptMode: form.adaptMode || projectSettings.adaptMode,
@@ -4790,7 +4798,7 @@ function localAiSettingsFromForm() {
     overwriteExisting: Boolean(form.overwriteExisting),
     includeNearbyContext: form.includeNearbyContext !== false,
     preserveConfirmedLocked: form.preserveConfirmedLocked !== false
-  }, state.project);
+  }, currentProject());
 }
 
 function assertLocalAiEndpointAllowed(settings) {
@@ -4917,7 +4925,7 @@ function localAiPromptPreviewRequest(settings = localAiSettingsFromForm(), mode 
   };
   const glossaryTerms = localAiPreviewTermsForSegment(previewSegment);
   const common = {
-    project: state.project,
+    project: currentProject(),
     segment: previewSegment,
     sourceLanguage: settings.sourceLanguage,
     sourceCode: settings.sourceCode,
@@ -4929,7 +4937,7 @@ function localAiPromptPreviewRequest(settings = localAiSettingsFromForm(), mode 
     glossaryTerms,
     terms: glossaryTerms,
     tmMatches: [],
-    styleGuide: state.project?.aiSettings?.styleGuide || "",
+    styleGuide: currentProject()?.aiSettings?.styleGuide || "",
     variantMode: settings.variantMode,
     adaptMode: settings.adaptMode,
     surroundingSegments: settings.includeNearbyContext && activeSegment
@@ -5294,7 +5302,7 @@ function handleLocalAiLanguageChanged(field, value, eventType) {
 }
 
 function renderLocalAiCommandCentre() {
-  const settings = localAISettingsStore.projectSettings(state.project);
+  const settings = localAISettingsStore.projectSettings(currentProject());
   const currentPreset = localAiProviderPresetForSettings(settings);
   const groups = new Map();
   LOCAL_AI_PROVIDER_PRESETS.forEach((preset) => {
@@ -5309,10 +5317,10 @@ function renderLocalAiCommandCentre() {
   aiAdministrationController?.render?.({
     settings: {
       ...settings,
-      sourceLanguage: settings.sourceLanguage || languageNameForUi(settings.sourceCode || state.project?.sourceLang),
-      sourceCode: normalizeLanguageInputValue(settings.sourceCode || state.project?.sourceLang),
-      targetLanguage: settings.targetLanguage || languageNameForUi(settings.targetCode || state.project?.targetLang),
-      targetCode: normalizeLanguageInputValue(settings.targetCode || state.project?.targetLang)
+      sourceLanguage: settings.sourceLanguage || languageNameForUi(settings.sourceCode || currentProject()?.sourceLang),
+      sourceCode: normalizeLanguageInputValue(settings.sourceCode || currentProject()?.sourceLang),
+      targetLanguage: settings.targetLanguage || languageNameForUi(settings.targetCode || currentProject()?.targetLang),
+      targetCode: normalizeLanguageInputValue(settings.targetCode || currentProject()?.targetLang)
     },
     presets: {
       groups: Array.from(groups, ([label, options]) => ({ label, options })),
@@ -5349,7 +5357,7 @@ function renderLocalAiCommandCentre() {
     },
     promptPreview: localAiPromptPreviewRequest(settings).prompt,
     availability: {
-      hasProject: Boolean(state.project),
+      hasProject: Boolean(currentProject()),
       hasSegment: Boolean(currentSegment()),
       running: state.localAi.running,
       promptBusy: state.localAi.promptBusy
@@ -5358,7 +5366,7 @@ function renderLocalAiCommandCentre() {
 }
 
 async function persistLocalAiSettings(options = {}) {
-  if (!state.project) return localAiSettingsFromForm();
+  if (!currentProject()) return localAiSettingsFromForm();
   const settings = localAiSettingsFromForm();
   try {
     assertLocalAiEndpointAllowed(settings);
@@ -5367,11 +5375,11 @@ async function persistLocalAiSettings(options = {}) {
   }
   localAISettingsStore.save(settings);
   const aiSettings = defaultAiSettings({
-    ...state.project.aiSettings,
-    ...localAISettingsStore.projectUpdateFields(settings, state.project)
+    ...currentProject().aiSettings,
+    ...localAISettingsStore.projectUpdateFields(settings, currentProject())
   });
-  state.project = await updateProject({ ...state.project, aiSettings });
-  state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+  editorSessionStore.replaceProject(await updateProject({ ...currentProject(), aiSettings }));
+  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   markWorkspaceDirty();
   if (!options.silent) setSaveStatus("Local AI settings saved", "saved");
   return settings;
@@ -5379,7 +5387,7 @@ async function persistLocalAiSettings(options = {}) {
 
 function renderEditor() {
   syncLegacyApplicationState();
-  const hasProject = Boolean(state.project);
+  const hasProject = Boolean(currentProject());
   void syncDesktopSpellcheckLanguage();
   renderWorkspaceStatus();
   renderBackupReminder();
@@ -5401,21 +5409,21 @@ function renderEditor() {
     els.inspectorToggleBtn.setAttribute("aria-expanded", String(state.inspectorOpen));
     els.inspectorToggleBtn.textContent = state.inspectorOpen ? uiSource("Hide inspector") : uiSource("Show inspector");
   }
-  if (!state.project) return;
+  if (!currentProject()) return;
 
   const resources = projectResourceSummary();
-  els.projectTitle.textContent = displaySafeText(state.project.name);
+  els.projectTitle.textContent = displaySafeText(currentProject().name);
   els.projectMeta.textContent = `${languagePair()} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
-  els.projectDomainEditInput.value = state.project.domain || "";
+  els.projectDomainEditInput.value = currentProject().domain || "";
   els.domainForm.classList.add("clean");
-  els.domainForm.classList.toggle("hidden", Boolean((state.project.domain || "").trim()));
+  els.domainForm.classList.toggle("hidden", Boolean((currentProject().domain || "").trim()));
   replaceSafeHtml(els.projectInfo, `
-    <dt>${uiLabelHtml("name")}</dt><dd>${displaySafeHtml(state.project.name)}</dd>
-    <dt>${translatedSourceHtml("Creator")}</dt><dd>${displaySafeHtml(state.project.creatorName || uiLabel("notSet"))}</dd>
-    <dt>${translatedSourceHtml("Domain")}</dt><dd>${displaySafeHtml(state.project.domain || uiLabel("notSet"))}</dd>
+    <dt>${uiLabelHtml("name")}</dt><dd>${displaySafeHtml(currentProject().name)}</dd>
+    <dt>${translatedSourceHtml("Creator")}</dt><dd>${displaySafeHtml(currentProject().creatorName || uiLabel("notSet"))}</dd>
+    <dt>${translatedSourceHtml("Domain")}</dt><dd>${displaySafeHtml(currentProject().domain || uiLabel("notSet"))}</dd>
     <dt>${uiLabelHtml("languages")}</dt><dd>${escapeHtml(languagePair())}</dd>
-    <dt>${translatedSourceHtml("Workspace")}</dt><dd>${escapeHtml(state.project.workspaceId || "local-workspace")}</dd>
-    <dt>${uiLabelHtml("sourceFile")}</dt><dd>${displaySafeHtml(state.project.sourceFileName || uiLabel("notImported"))}</dd>
+    <dt>${translatedSourceHtml("Workspace")}</dt><dd>${escapeHtml(currentProject().workspaceId || "local-workspace")}</dd>
+    <dt>${uiLabelHtml("sourceFile")}</dt><dd>${displaySafeHtml(currentProject().sourceFileName || uiLabel("notImported"))}</dd>
     <dt>${uiLabelHtml("mainTm")}</dt><dd>${displaySafeHtml(resources.mainTm)}</dd>
     <dt>${uiLabelHtml("linkedTms")}</dt><dd>${displaySafeHtml(resources.tmNames.join(", "))}</dd>
     <dt>${uiLabelHtml("linkedTbs")}</dt><dd>${displaySafeHtml(resources.tbNames.join(", "))}</dd>
@@ -5423,7 +5431,7 @@ function renderEditor() {
     <dt>${uiLabelHtml("segmentsTitle")}</dt><dd>${state.segments.length}</dd>
     <dt>${uiLabelHtml("activity")}</dt><dd>${uiLabelHtml("eventCount", { count: currentActivityEvents().length })}</dd>
   `);
-  const ai = defaultAiSettings(state.project.aiSettings);
+  const ai = defaultAiSettings(currentProject().aiSettings);
   aiAdministrationController?.renderGlobalSettings?.({
     settings: ai,
     storedKey: storedOpenAiKey(),
@@ -5451,14 +5459,14 @@ function renderTermbaseSelect() {
 }
 
 function renderProjectHome() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   const documents = projectDocuments();
   const documentStatsById = projectDocumentStats(documents);
   const total = aggregateDocumentStats(documentStatsById);
   const sourceWords = total.words;
   const resources = projectResourceSummary();
-  els.projectHomeTitle.textContent = displaySafeText(state.project.name);
-  els.projectHomeMeta.textContent = `${languagePair()} - ${displaySafeText(state.project.domain || uiLabel("noDomain"))} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
+  els.projectHomeTitle.textContent = displaySafeText(currentProject().name);
+  els.projectHomeMeta.textContent = `${languagePair()} - ${displaySafeText(currentProject().domain || uiLabel("noDomain"))} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
   replaceSafeHtml(els.projectHomeStats, `
     <div><strong>${total.percent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
     <div><strong>${documents.length}</strong><span>${uiLabelHtml("files")}</span></div>
@@ -5534,7 +5542,7 @@ function renderDocumentFilter() {
 
 function renderLanguagePairFilter() {
   const current = els.languagePairFilter.value;
-  const pairs = Array.from(new Set(state.projects.map((project) => languagePairKey(project)).filter((pair) => pair !== "::"))).sort();
+  const pairs = Array.from(new Set(currentProjects().map((project) => languagePairKey(project)).filter((pair) => pair !== "::"))).sort();
   const fragment = document.createDocumentFragment();
   const allOption = document.createElement("option");
   allOption.value = "";
@@ -5639,8 +5647,8 @@ function renderProjectsView() {
   els.projectDashboard.replaceChildren(...(visible.length ? visible.map(createProjectTile) : [projectEmptyState({ hasProjects: summaries.length > 0 })]));
 }
 
-async function confirmDeleteProject(projectId = state.project?.id) {
-  const project = state.projects.find((item) => item.id === projectId);
+async function confirmDeleteProject(projectId = currentProject()?.id) {
+  const project = currentProjects().find((item) => item.id === projectId);
   if (!project) return false;
   const ok = uiConfirm(`Move project "${displaySafeText(project.name)}" and all of its files to Trash?`);
   if (!ok) return false;
@@ -5652,8 +5660,8 @@ async function confirmDeleteProject(projectId = state.project?.id) {
     await appRuntime.commands.bus.execute(command);
     state.commandProjectId = project.id;
     clearWorkspaceDirty(project.id);
-    if (state.project?.id === project.id) {
-      state.project = null;
+    if (currentProject()?.id === project.id) {
+      editorSessionStore.replaceProject(null);
       state.segments = [];
       applicationNavigation.openProjects();
       applicationNavigation.clearSelection();
@@ -5669,22 +5677,22 @@ async function confirmDeleteProject(projectId = state.project?.id) {
 }
 
 async function confirmDeleteFile(documentInfo) {
-  if (!state.project || !documentInfo) return false;
+  if (!currentProject() || !documentInfo) return false;
   const ok = uiConfirm(`Move file "${displaySafeText(documentInfo.name)}" to Trash?`);
   if (!ok) return false;
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
     if (LOOPCAT_TEST_BUILD && documentInfo[FILE_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated file delete failure");
     const command = appRuntime?.commands?.createDeleteDocumentCommand?.({
-      project: state.project,
+      project: currentProject(),
       documentId: documentInfo.id
     });
     if (!command) throw new Error("The reversible file deletion service is unavailable.");
     const commandResult = await appRuntime.commands.bus.execute(command);
-    state.commandProjectId = state.project.id;
-    state.project = commandResult.result.project;
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
-    state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+    state.commandProjectId = currentProject().id;
+    editorSessionStore.replaceProject(commandResult.result.project);
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
+    state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
     selectApplicationDocument("");
     selectApplicationSegment(state.segments.length ? 0 : -1);
     markWorkspaceDirty();
@@ -5790,23 +5798,23 @@ function renderResourceDashboard(type, resourceState) {
 }
 
 function canAddResourceToCurrentProject(type, resource) {
-  if (!state.project) return false;
-  if (resource.sourceLang !== state.project.sourceLang || resource.targetLang !== state.project.targetLang) return false;
+  if (!currentProject()) return false;
+  if (resource.sourceLang !== currentProject().sourceLang || resource.targetLang !== currentProject().targetLang) return false;
   const names = type === "tm" ? projectTmNames() : projectTermBaseNames();
   return !names.includes(resource.name);
 }
 
 async function addResourceToCurrentProject(type, resource) {
-  if (!state.project || !canAddResourceToCurrentProject(type, resource)) return;
-  const links = projectResourceLinks(state.project);
+  if (!currentProject() || !canAddResourceToCurrentProject(type, resource)) return;
+  const links = projectResourceLinks(currentProject());
   links.push({
     id: makeId("resource-link"),
     type: type === "tm" ? "tm" : "termbase",
     name: resource.name,
     role: type === "tm" ? "reference" : undefined
   });
-  state.project = await updateProject({ ...state.project, resourceLinks: links });
-  state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+  editorSessionStore.replaceProject(await updateProject({ ...currentProject(), resourceLinks: links }));
+  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   await refreshProjectTerms({ rerender: true });
   await refreshProjectSummaries();
   renderAll();
@@ -5892,7 +5900,7 @@ async function deleteTmResourceEntry(entry) {
     const command = appRuntime?.commands?.createDeleteResourceEntryCommand?.({
       resourceType: "tm",
       entityId: entry.id,
-      projectId: state.project?.id || null
+      projectId: currentProject()?.id || null
     });
     const result = await executeResourceTrashCommand(command);
     setSaveStatus(
@@ -5915,7 +5923,7 @@ async function deleteTermResourceEntry(term, options = {}) {
     const command = appRuntime?.commands?.createDeleteResourceEntryCommand?.({
       resourceType: "tb",
       entityId: term.id,
-      projectId: state.project?.id || null
+      projectId: currentProject()?.id || null
     });
     const result = await executeResourceTrashCommand(command, { refreshSuggestions });
     setSaveStatus(
@@ -6048,7 +6056,7 @@ async function confirmDeleteResource(type, key) {
         languagePair: info.languagePair
       },
       affectedIds: items.map((item) => item.id),
-      projectId: state.project?.id || null
+      projectId: currentProject()?.id || null
     });
     const result = await executeResourceTrashCommand(command, { refreshSuggestions: type === "tb" });
     setSaveStatus(
@@ -6380,7 +6388,7 @@ function calculateProgressSummary() {
     if (segment.status === "confirmed") confirmed += 1;
     words += sourceWordCount(segment);
   }
-  return { projectId: state.project?.id || "", total, confirmed, words };
+  return { projectId: currentProject()?.id || "", total, confirmed, words };
 }
 
 function renderProgress(options = {}) {
@@ -6389,7 +6397,7 @@ function renderProgress(options = {}) {
   const cached = currentProgressSummary();
   const canApplyStatusDelta =
     cached &&
-    cached.projectId === (state.project?.id || "") &&
+    cached.projectId === (currentProject()?.id || "") &&
     cached.total === state.segments.length &&
     previousStatus !== undefined &&
     nextStatus !== undefined;
@@ -6452,7 +6460,7 @@ function updateSegmentDraft(index, target) {
   const editTargetSessions = appRuntime?.commands?.editTargetSessions;
   if (editTargetSessions && !editTargetSessions.has(segment.id)) {
     editTargetSessions.begin({
-      projectId: segment.projectId || state.project?.id,
+      projectId: segment.projectId || currentProject()?.id,
       segmentId: segment.id,
       beforePatch: targetCommandPatch(segment),
       restorePatch: (patch, context) => restoreSegmentEditCommandPatch(segment.id, patch, context)
@@ -6644,11 +6652,11 @@ function normalizeStructuralSegmentOrder(segments) {
 }
 
 async function restoreSplitSegmentCommandSegments(nextSnapshots, options = {}) {
-  if (!state.project?.id) throw new Error("The split segment project is no longer open.");
+  if (!currentProject()?.id) throw new Error("The split segment project is no longer open.");
   const snapshots = Array.isArray(nextSnapshots) ? nextSnapshots : [];
   const snapshotIds = new Set();
   snapshots.forEach((snapshot) => {
-    if (!snapshot?.id || snapshot.projectId !== state.project.id || snapshotIds.has(snapshot.id)) {
+    if (!snapshot?.id || snapshot.projectId !== currentProject().id || snapshotIds.has(snapshot.id)) {
       throw new Error("The split segment snapshot is invalid for the current project.");
     }
     snapshotIds.add(snapshot.id);
@@ -6693,11 +6701,11 @@ async function restoreSplitSegmentCommandSegments(nextSnapshots, options = {}) {
 }
 
 async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
-  if (!state.project?.id) throw new Error("The merged segment project is no longer open.");
+  if (!currentProject()?.id) throw new Error("The merged segment project is no longer open.");
   const snapshots = Array.isArray(nextSnapshots) ? nextSnapshots : [];
   const snapshotIds = new Set();
   snapshots.forEach((snapshot) => {
-    if (!snapshot?.id || snapshot.projectId !== state.project.id || snapshotIds.has(snapshot.id)) {
+    if (!snapshot?.id || snapshot.projectId !== currentProject().id || snapshotIds.has(snapshot.id)) {
       throw new Error("The merged segment snapshot is invalid for the current project.");
     }
     snapshotIds.add(snapshot.id);
@@ -6746,7 +6754,7 @@ async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
 }
 
 async function replaceTargetText(scope = "visible") {
-  if (!state.project) return { segmentCount: 0, replacementCount: 0 };
+  if (!currentProject()) return { segmentCount: 0, replacementCount: 0 };
   const findText = els.replaceFindInput.value;
   const replacement = els.replaceWithInput.value;
   if (!findText) {
@@ -6781,10 +6789,10 @@ async function replaceTargetText(scope = "visible") {
   const snapshots = new Map();
   const updated = [];
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
     proposals.forEach(({ segment }) => snapshots.set(segment.id, structuredClone(segment)));
     const command = appRuntime.commands.createReplaceTargetsCommand({
-      projectId: state.project.id,
+      projectId: currentProject().id,
       segmentIds: proposals.map(({ segment }) => segment.id),
       beforeSnapshots: proposals.map(({ segment }) => snapshots.get(segment.id)),
       restoreSnapshots: (nextSnapshots) =>
@@ -6897,7 +6905,7 @@ async function confirmCurrentSegment() {
     return;
   }
   const segmentIndex = currentActiveIndex();
-  const project = state.project;
+  const project = currentProject();
   const previousStatus = segment.status;
   const passedFiltersBefore = segmentPassesFilters(segment);
   const previous = structuredClone(segment);
@@ -7003,7 +7011,7 @@ async function confirmCurrentSegment() {
   }
 }
 
-async function saveSegmentToTm(segment, project = state.project) {
+async function saveSegmentToTm(segment, project = currentProject()) {
   if (!segment || !project || !segment.source.trim() || !segment.target.trim()) return null;
       if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG]) throw new Error("Simulated TM save failure");
   const entry = await saveTmEntry({
@@ -7021,9 +7029,9 @@ async function saveSegmentToTm(segment, project = state.project) {
 async function saveActiveSegmentToTm(options = {}) {
   const { reportStatus = true } = options || {};
   const segment = currentSegment();
-  if (!segment || !state.project || !segment.source.trim() || !segment.target.trim()) return null;
+  if (!segment || !currentProject() || !segment.source.trim() || !segment.target.trim()) return null;
   try {
-    const entry = await saveSegmentToTm(segment, state.project);
+    const entry = await saveSegmentToTm(segment, currentProject());
     await refreshTmMatches();
     if (reportStatus) setSaveStatus("Segment saved to TM", "saved");
     return entry;
@@ -7042,7 +7050,7 @@ function requestTmPretranslationThreshold() {
 }
 
 async function pretranslateFromTm() {
-  if (!state.project || state.tmPretranslating) return null;
+  if (!currentProject() || state.tmPretranslating) return null;
   const beforePatches = new Map();
   const beforeSnapshots = new Map();
   const updated = [];
@@ -7077,8 +7085,8 @@ async function pretranslateFromTm() {
       const sources = uniqueSources.slice(offset, offset + TM_PRETRANSLATE_BATCH_SIZE);
       const options = sources.map((source) => ({
         source,
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
         tmNames,
         limit: 1
       }));
@@ -7098,14 +7106,14 @@ async function pretranslateFromTm() {
       setSaveStatus(`No TM matches at ${threshold}% or higher.`, "saved");
       return null;
     }
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
     const activeSegmentId = currentSegment()?.id || proposals[0].segment.id;
     proposals.forEach(({ segment }) => {
       beforePatches.set(segment.id, targetCommandPatch(segment));
       beforeSnapshots.set(segment.id, structuredClone(segment));
     });
     const command = appRuntime.commands.createTmPretranslationCommand({
-      projectId: state.project.id,
+      projectId: currentProject().id,
       segmentIds: proposals.map(({ segment }) => segment.id),
       beforePatches: proposals.map(({ segment }) => beforePatches.get(segment.id)),
       provenance: {
@@ -7220,7 +7228,7 @@ function handleGlobalKeydown(event) {
   const key = stableLower(event.key);
   const editableTarget = event.target?.matches?.("input, textarea, [contenteditable='true']");
   if ((event.ctrlKey || event.metaKey) && key === "z" && !editableTarget) {
-    const projectId = state.commandProjectId || state.project?.id || null;
+    const projectId = state.commandProjectId || currentProject()?.id || null;
     const canRun = event.shiftKey
       ? appRuntime?.commands?.bus?.canRedo?.(projectId)
       : appRuntime?.commands?.bus?.canUndo?.(projectId);
@@ -7244,7 +7252,7 @@ function handleGlobalKeydown(event) {
     openCommandPalette();
     return;
   }
-  if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "f" && currentApplicationView() === "editor" && state.project) {
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "f" && currentApplicationView() === "editor" && currentProject()) {
     event.preventDefault();
     event.stopPropagation();
     toggleFocusMode();
@@ -7274,7 +7282,7 @@ function handleGlobalKeydown(event) {
 }
 
 async function openConcordanceSearch() {
-  if (currentApplicationView() !== "editor" || !state.project) return;
+  if (currentApplicationView() !== "editor" || !currentProject()) return;
   const keyword = selectedConcordanceKeyword();
   if (!keyword) {
     setSaveStatus("Select a source word, then press Ctrl+K or Alt+K.", "dirty");
@@ -7284,7 +7292,7 @@ async function openConcordanceSearch() {
   const entries = await listTmEntries();
   const tmNames = new Set(projectTmNames());
   const results = entries
-    .filter((entry) => entry.sourceLang === state.project.sourceLang && entry.targetLang === state.project.targetLang)
+    .filter((entry) => entry.sourceLang === currentProject().sourceLang && entry.targetLang === currentProject().targetLang)
     .filter((entry) => tmNames.has(entry.tmName))
     .filter((entry) => stableLower(entry.source).includes(query))
     .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
@@ -7338,7 +7346,7 @@ function handleEditorKeydown(event, index) {
   const key = stableLower(event.key);
   if ((event.ctrlKey || event.metaKey) && key === "z" && !event.altKey) {
     finalizePendingEditCommand(state.segments[index]?.id || "");
-    const projectId = state.commandProjectId || state.project?.id || null;
+    const projectId = state.commandProjectId || currentProject()?.id || null;
     const canRun = event.shiftKey
       ? appRuntime?.commands?.bus?.canRedo?.(projectId)
       : appRuntime?.commands?.bus?.canUndo?.(projectId);
@@ -7446,12 +7454,12 @@ function qualityQaBySegment(qaChecks = currentQaChecks()) {
 }
 
 function currentQualityRiskQueue(qaChecks = currentQaChecks()) {
-  if (!state.project) return null;
+  if (!currentProject()) return null;
   return buildRiskQueue({
-    project: state.project,
+    project: currentProject(),
     segments: currentDocumentSegments(),
     qaChecks,
-    profile: state.project.qualityProfile
+    profile: currentProject().qualityProfile
   });
 }
 
@@ -7468,41 +7476,41 @@ function qualityRiskLevelLabel(level) {
 
 function activeQualityEvidence(queue = null) {
   const segment = currentSegment();
-  if (!state.project || !segment) return null;
+  if (!currentProject() || !segment) return null;
   const queuedItem = (queue?.items || []).find((item) => item.segmentId === segment.id);
   if (queuedItem) return queuedItem;
   return scoreSegment(segment, currentActiveIndex(), {
-    profile: state.project.qualityProfile,
+    profile: currentProject().qualityProfile,
     qaBySegment: qualityQaBySegment()
   });
 }
 
 function renderQualityWorkbench() {
   const storedQueue = storedQualityRiskQueue();
-  const queue = state.project
-    ? storedQueue?.projectId === state.project.id
+  const queue = currentProject()
+    ? storedQueue?.projectId === currentProject().id
       ? storedQueue
       : currentQualityRiskQueue()
     : null;
-  if (state.project) editorSessionStore.replaceQualityRiskQueue(queue);
+  if (currentProject()) editorSessionStore.replaceQualityRiskQueue(queue);
   qualityReviewController?.renderQuality?.({
-    project: state.project,
+    project: currentProject(),
     segment: currentSegment(),
     activeIndex: currentActiveIndex(),
-    profile: state.project?.qualityProfile,
+    profile: currentProject()?.qualityProfile,
     queue,
     evidence: activeQualityEvidence(queue)
   });
 }
 
 async function saveQualityProfileFromForm(values = qualityReviewController?.readProfile?.()) {
-  if (!state.project) return false;
-  const previousProject = structuredClone(state.project);
-  const previousProjects = state.projects.map((project) => structuredClone(project));
+  if (!currentProject()) return false;
+  const previousProject = structuredClone(currentProject());
+  const previousProjects = currentProjects().map((project) => structuredClone(project));
   const qualityProfile = defaultQualityProfile(values);
   try {
-    state.project = await updateProject({ ...state.project, qualityProfile });
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), qualityProfile }));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
     editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
     await refreshProjectSummaries();
     markWorkspaceDirty();
@@ -7517,8 +7525,8 @@ async function saveQualityProfileFromForm(values = qualityReviewController?.read
     setSaveStatus(appendActivityWarning("Quality profile saved", activityLogged), exportStatusMode("saved", activityLogged));
     return true;
   } catch (error) {
-    state.project = previousProject;
-    state.projects = previousProjects;
+    editorSessionStore.replaceProject(previousProject);
+    editorSessionStore.replaceProjects(previousProjects);
     renderQualityWorkbench();
     setSaveStatus(error.message || "Quality profile save failed", "dirty");
     return false;
@@ -7526,7 +7534,7 @@ async function saveQualityProfileFromForm(values = qualityReviewController?.read
 }
 
 async function saveQualityDecisionFromForm(values = qualityReviewController?.readDecision?.()) {
-  if (!state.project) return false;
+  if (!currentProject()) return false;
   const segment = currentSegment();
   if (!segment) return false;
   const snapshot = structuredClone(segment);
@@ -7577,7 +7585,7 @@ async function saveQualityDecisionFromForm(values = qualityReviewController?.rea
 }
 
 async function refreshQualityRiskQueue() {
-  if (!state.project) return null;
+  if (!currentProject()) return null;
   const checks = await runProjectQa();
   if (!checks) return null;
   editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue(checks));
@@ -7607,9 +7615,9 @@ async function goToQualityRiskItem(item) {
 }
 
 async function goToNextQualityRisk() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   const storedQueue = storedQualityRiskQueue();
-  if (!storedQueue || storedQueue.projectId !== state.project.id) {
+  if (!storedQueue || storedQueue.projectId !== currentProject().id) {
     editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
   }
   const queue = storedQualityRiskQueue();
@@ -7718,11 +7726,11 @@ async function saveActiveReviewMetadata(values = qualityReviewController?.readRe
 
 async function setActiveReviewState(reviewState) {
   const segment = currentSegment();
-  if (!state.project || !segment) return;
+  if (!currentProject() || !segment) return;
   const snapshot = structuredClone(segment);
   try {
     const command = appRuntime.commands.createChangeReviewStateCommand({
-      projectId: state.project.id,
+      projectId: currentProject().id,
       segmentId: segment.id,
       beforeSnapshot: snapshot,
       restoreSnapshot: (nextSnapshot) => restoreSegmentCommandSnapshot(segment.id, nextSnapshot),
@@ -7840,20 +7848,20 @@ function renderQaResults() {
 
 async function refreshTmMatches() {
   const segment = currentSegment();
-  if (!segment || !state.project) {
+  if (!segment || !currentProject()) {
     els.tmMatches.textContent = uiSource("No active segment.");
     els.tmMatches.classList.add("muted");
     return;
   }
   const segmentId = segment.id;
-  const projectId = state.project.id;
+  const projectId = currentProject().id;
   const matches = await findProjectTmMatches({
     source: segment.source,
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     tmNames: projectTmNames()
   });
-  if (state.project?.id !== projectId || currentSegment()?.id !== segmentId) return;
+  if (currentProject()?.id !== projectId || currentSegment()?.id !== segmentId) return;
   els.tmMatches.classList.toggle("muted", !matches.length);
   if (!matches.length) {
     els.tmMatches.textContent = uiSource("No TM matches.");
@@ -7883,20 +7891,20 @@ async function refreshTmMatches() {
 
 async function refreshTerms() {
   const segment = currentSegment();
-  if (!segment || !state.project) {
+  if (!segment || !currentProject()) {
     els.termSuggestions.textContent = uiSource("No active segment.");
     els.termSuggestions.classList.add("muted");
     return;
   }
   const segmentId = segment.id;
-  const projectId = state.project.id;
+  const projectId = currentProject().id;
   const suggestions = await findTerms({
     source: segment.source,
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     termBaseNames: projectTermBaseNames()
   });
-  if (state.project?.id !== projectId || currentSegment()?.id !== segmentId) return;
+  if (currentProject()?.id !== projectId || currentSegment()?.id !== segmentId) return;
   els.termSuggestions.classList.toggle("muted", !suggestions.length);
   if (!suggestions.length) {
     els.termSuggestions.textContent = uiSource("No terms found in this segment.");
@@ -7920,7 +7928,7 @@ async function refreshTerms() {
 }
 
 async function saveTermFromForm() {
-  if (!state.project || !els.sourceTermInput.value.trim() || !els.targetTermInput.value.trim()) return null;
+  if (!currentProject() || !els.sourceTermInput.value.trim() || !els.targetTermInput.value.trim()) return null;
   const termBaseName = els.termBaseSelect.value || primaryTermBaseName();
   try {
     if (LOOPCAT_TEST_BUILD && els.termForm[TERM_FORM_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated term form save failure");
@@ -7928,12 +7936,12 @@ async function saveTermFromForm() {
       sourceTerm: els.sourceTermInput.value,
       targetTerm: els.targetTermInput.value,
       notes: els.termNotesInput.value,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseName,
       isForbidden: els.termForbiddenInput?.checked
     });
-    markProjectsUsingResourceDirty("termbase", termBaseName, state.project.sourceLang, state.project.targetLang);
+    markProjectsUsingResourceDirty("termbase", termBaseName, currentProject().sourceLang, currentProject().targetLang);
     els.termForm.reset();
     renderTermbaseSelect();
     try {
@@ -7951,12 +7959,12 @@ async function saveTermFromForm() {
 }
 
 async function runProjectQa() {
-  if (!state.project) return null;
+  if (!currentProject()) return null;
   try {
-    if (LOOPCAT_TEST_BUILD && state.project[QA_RUN_FAILURE_TEST_FLAG]) throw new Error("Simulated QA run failure");
+    if (LOOPCAT_TEST_BUILD && currentProject()[QA_RUN_FAILURE_TEST_FLAG]) throw new Error("Simulated QA run failure");
     const terms = await listTerms({
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
     const qaSegments = currentDocumentSegments().map((segment) => ({
@@ -7973,7 +7981,7 @@ async function runProjectQa() {
     editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue(checks));
     renderQualityWorkbench();
     try {
-    if (LOOPCAT_TEST_BUILD && state.project[QA_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated QA activity log failure");
+    if (LOOPCAT_TEST_BUILD && currentProject()[QA_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated QA activity log failure");
       await logProjectActivity("qa-run", "QA checks run", { issueCount: checks.length, documentId: currentDocumentId() });
     } catch (activityError) {
       console.warn("QA activity log failed.", activityError);
@@ -8015,7 +8023,7 @@ async function runTargetProducerCommand({
   successMessage
 }) {
   const segment = currentSegment();
-  const projectId = state.project?.id || segment?.projectId || "";
+  const projectId = currentProject()?.id || segment?.projectId || "";
   if (!segment || !projectId || typeof createCommand !== "function") return null;
 
   finalizePendingEditCommand(segment.id);
@@ -8119,33 +8127,33 @@ function insertTagIntoTarget(tagText) {
 }
 
 async function saveProjectDomainFromForm() {
-  if (!state.project) return false;
-  const previousProject = structuredClone(state.project);
-  const previousProjects = state.projects.map((project) => structuredClone(project));
+  if (!currentProject()) return false;
+  const previousProject = structuredClone(currentProject());
+  const previousProjects = currentProjects().map((project) => structuredClone(project));
   const domain = els.projectDomainEditInput.value.trim();
   try {
-    if (LOOPCAT_TEST_BUILD && state.project[PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated project domain save failure");
-    state.project = await updateProject({ ...state.project, domain });
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    if (LOOPCAT_TEST_BUILD && currentProject()[PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated project domain save failure");
+    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), domain }));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
     await refreshProjectSummaries();
     renderAll();
-    els.domainForm.classList.toggle("hidden", Boolean((state.project.domain || "").trim()));
+    els.domainForm.classList.toggle("hidden", Boolean((currentProject().domain || "").trim()));
     markWorkspaceDirty();
     setSaveStatus("Project domain saved", "saved");
     return true;
   } catch (error) {
-    state.project = previousProject;
-    state.projects = previousProjects;
-    els.domainForm.classList.toggle("clean", domain === (state.project.domain || ""));
+    editorSessionStore.replaceProject(previousProject);
+    editorSessionStore.replaceProjects(previousProjects);
+    els.domainForm.classList.toggle("clean", domain === (currentProject().domain || ""));
     setSaveStatus(error.message || "Project domain save failed", "dirty");
     return false;
   }
 }
 
 async function saveAiSettings() {
-  if (!state.project) return;
-  const previousProject = structuredClone(state.project);
-  const previousProjects = state.projects.map((project) => structuredClone(project));
+  if (!currentProject()) return;
+  const previousProject = structuredClone(currentProject());
+  const previousProjects = currentProjects().map((project) => structuredClone(project));
   const previousOpenAiKey = openAiKeySnapshot();
   const globalForm = aiAdministrationController?.readGlobalForm?.() || {};
   const secrets = aiAdministrationController?.readSecrets?.() || {};
@@ -8165,17 +8173,17 @@ async function saveAiSettings() {
     useTmContext: globalForm.useTmContext !== false,
     useTermbaseContext: globalForm.useTermbaseContext !== false,
     styleGuide: globalForm.styleGuide || "",
-    ...localAISettingsStore.projectUpdateFields(localAiSettings, state.project)
+    ...localAISettingsStore.projectUpdateFields(localAiSettings, currentProject())
   });
   const shouldUpdateOpenAiKey = Boolean(String(apiKeyInput || "").trim()) && isOpenAiProvider({ aiSettings });
   const shouldUpdateLocalAiKey = Boolean(String(localAiKeyInput || "").trim());
   try {
     assertLocalAiEndpointAllowed(localAiSettings);
-  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && state.project[AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG]);
-  if (LOOPCAT_TEST_BUILD && state.project[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
-    state.project = await updateProject({ ...state.project, aiSettings });
+  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && currentProject()[AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG]);
+  if (LOOPCAT_TEST_BUILD && currentProject()[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
+    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), aiSettings }));
     projectPersisted = true;
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
     if (shouldUpdateOpenAiKey) saveOpenAiKey(apiKeyInput, rememberApiKey);
     if (shouldUpdateLocalAiKey) saveLocalAiKey(localAiKeyInput, rememberLocalAiKey, localAiSettings);
     try {
@@ -8191,7 +8199,7 @@ async function saveAiSettings() {
     } catch (activityError) {
       activityLogged = false;
       console.warn("AI settings activity log failed.", activityError);
-      if (state.project?.id) markWorkspaceDirty(state.project.id);
+      if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
     }
     renderEditor();
     markWorkspaceDirty();
@@ -8283,14 +8291,14 @@ async function aiContextForSegment(segment, ai) {
   return Promise.all([
     ai.useTmContext ? findProjectTmMatches({
       source: segment.source,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       tmNames: projectTmNames()
     }) : [],
     ai.useTermbaseContext ? findTerms({
       source: segment.source,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     }) : []
   ]);
@@ -8341,7 +8349,7 @@ async function appendAiSuggestion(segment, suggestion, activityType, activityMes
     } catch (activityError) {
       activityLogged = false;
       console.warn("AI suggestion activity log failed.", activityError);
-      if (state.project?.id) markWorkspaceDirty(state.project.id);
+      if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
     }
     renderAiSuggestions();
     markWorkspaceDirty();
@@ -8367,7 +8375,7 @@ async function applyAiSuggestion(suggestionId, options = {}) {
     return false;
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before applying AI suggestion failed", "dirty");
     return false;
@@ -8401,7 +8409,7 @@ async function applyAiSuggestion(suggestionId, options = {}) {
   let activityLogged = true;
   try {
     const command = appRuntime.commands.createApplyAiSuggestionCommand({
-      projectId: state.project.id,
+      projectId: currentProject().id,
       segmentId,
       suggestion,
       beforeSnapshot: snapshot,
@@ -8432,7 +8440,7 @@ async function applyAiSuggestion(suggestionId, options = {}) {
         } catch (activityError) {
           activityLogged = false;
           console.warn("AI suggestion activity log failed.", activityError);
-          if (state.project?.id) markWorkspaceDirty(state.project.id);
+          if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
         }
         renderSegments();
         renderProgress();
@@ -8468,11 +8476,11 @@ async function applyAiSuggestion(suggestionId, options = {}) {
 
 async function createOpenAiSuggestion() {
   const segment = currentSegment();
-  if (!state.project || !segment) return;
+  if (!currentProject() || !segment) return;
   const globalForm = aiAdministrationController?.readGlobalForm?.() || {};
   const secrets = aiAdministrationController?.readSecrets?.() || {};
   const aiSettings = defaultAiSettings({
-    ...state.project.aiSettings,
+    ...currentProject().aiSettings,
     enabled: Boolean(globalForm.enabled),
     provider: globalForm.provider || "OpenAI",
     model: globalForm.model || OPENAI_DEFAULT_MODEL,
@@ -8515,15 +8523,15 @@ async function createOpenAiSuggestion() {
     setSaveStatus("OpenAI suggestion canceled", "dirty");
     return;
   }
-  const previousProject = structuredClone(state.project);
-  const previousProjects = state.projects.map((project) => structuredClone(project));
+  const previousProject = structuredClone(currentProject());
+  const previousProjects = currentProjects().map((project) => structuredClone(project));
   const previousOpenAiKey = openAiKeySnapshot();
   let projectPersisted = false;
   try {
-    if (LOOPCAT_TEST_BUILD && state.project[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
-    state.project = await updateProject({ ...state.project, aiSettings });
+    if (LOOPCAT_TEST_BUILD && currentProject()[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
+    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), aiSettings }));
     projectPersisted = true;
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
     saveOpenAiKey(apiKey, Boolean(secrets.rememberOpenAiKey));
     markWorkspaceDirty();
     renderEditor();
@@ -8537,7 +8545,7 @@ async function createOpenAiSuggestion() {
   }
   try {
     const [tmMatches, terms] = await aiContextForSegment(segment, aiSettings);
-    const suggestion = await openAiSuggestion({ apiKey, segment, tmMatches, terms, project: state.project });
+    const suggestion = await openAiSuggestion({ apiKey, segment, tmMatches, terms, project: currentProject() });
     const saved = await appendAiSuggestion(segment, suggestion, "ai-openai-suggestion", "OpenAI suggestion created");
     if (saved?.ok) {
       setSaveStatus(saved.activityLogged ? "OpenAI suggestion ready for review" : "OpenAI suggestion ready for review; activity log failed", saved.activityLogged ? "saved" : "dirty");
@@ -8619,7 +8627,7 @@ async function startLmStudioServerFromUi(settings = localAiSettingsFromForm()) {
 }
 
 async function startLmStudioServerAndTestConnection() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   const settings = await persistLocalAiSettings({ silent: true });
   try {
     await startLmStudioServerFromUi(settings);
@@ -8632,7 +8640,7 @@ async function startLmStudioServerAndTestConnection() {
 }
 
 async function testLocalAiConnection(options = {}) {
-  if (!state.project) return;
+  if (!currentProject()) return;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -8678,7 +8686,7 @@ async function testLocalAiConnection(options = {}) {
 }
 
 async function refreshLocalAiModels() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -8721,7 +8729,7 @@ async function refreshLocalAiModels() {
 }
 
 async function pullLocalAiModel() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -8755,7 +8763,7 @@ async function pullLocalAiModel() {
 }
 
 async function testLocalAiPrompt() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return;
   const mode = localAiPromptMode();
   const source = localAiSampleText();
   if (mode !== "project-brief" && !String(source || "").trim()) {
@@ -8801,7 +8809,7 @@ async function testLocalAiPrompt() {
   try {
     const result = mode === "pretranslate"
       ? await provider.translateSegment(config, {
-        project: state.project,
+        project: currentProject(),
         text: promptRequest.sourceText,
         sourceLanguage: settings.sourceLanguage,
         sourceCode: settings.sourceCode,
@@ -8812,7 +8820,7 @@ async function testLocalAiPrompt() {
         prompt: promptRequest.prompt
       })
       : await provider.completePrompt(config, {
-        project: state.project,
+        project: currentProject(),
         prompt: promptRequest.prompt,
         system: promptRequest.system,
         model: settings.model
@@ -8922,7 +8930,7 @@ function appendAiReviewComment(segment, result = {}) {
 }
 
 async function reviewActiveSegmentWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before running AI review.", "dirty");
@@ -8970,13 +8978,13 @@ async function reviewActiveSegmentWithLocalAi() {
   try {
     const glossaryTerms = await findTerms({
       source: segment.source,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
     const result = await aiCommandService.reviewSegment({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment,
       settings,
       config,
@@ -9054,7 +9062,7 @@ function selectLocalAiReviewSegments(settings = {}) {
 }
 
 async function reviewBatchWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -9083,7 +9091,7 @@ async function reviewBatchWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before batch AI QA failed", "dirty");
     return false;
@@ -9141,13 +9149,13 @@ async function reviewBatchWithLocalAi() {
       try {
         const glossaryTerms = await findTerms({
           source: segment.source,
-          sourceLang: state.project.sourceLang,
-          targetLang: state.project.targetLang,
+          sourceLang: currentProject().sourceLang,
+          targetLang: currentProject().targetLang,
           termBaseNames: projectTermBaseNames()
         });
         const result = await aiCommandService.reviewSegment({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment,
           settings,
           config,
@@ -9208,7 +9216,7 @@ async function reviewBatchWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -9257,7 +9265,7 @@ async function reviewBatchWithLocalAi() {
 }
 
 async function repairActiveSegmentTagsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before requesting AI tag repair.", "dirty");
@@ -9305,7 +9313,7 @@ async function repairActiveSegmentTagsWithLocalAi() {
     const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
     const result = await aiCommandService.repairSegmentTags({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment: { ...segment, tags: segmentTags(segment) },
       settings,
       config,
@@ -9376,7 +9384,7 @@ function selectLocalAiTagRepairSegments(settings = {}) {
 }
 
 async function repairBatchTagsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -9421,7 +9429,7 @@ async function repairBatchTagsWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before batch AI tag repair failed", "dirty");
     return false;
@@ -9463,7 +9471,7 @@ async function repairBatchTagsWithLocalAi() {
         const missingTokens = missingTags(segment).map(tagDisplayText).filter(Boolean);
         const result = await aiCommandService.repairSegmentTags({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment: { ...segment, tags: segmentTags(segment) },
           settings,
           config,
@@ -9535,7 +9543,7 @@ async function repairBatchTagsWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -9576,7 +9584,7 @@ async function repairBatchTagsWithLocalAi() {
 }
 
 async function suggestActiveSegmentVariantsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before requesting AI alternatives.", "dirty");
@@ -9620,14 +9628,14 @@ async function suggestActiveSegmentVariantsWithLocalAi() {
   try {
     const glossaryTerms = await findTerms({
       source: segment.source,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
     const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
     const result = await aiCommandService.suggestSegmentVariants({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment: { ...segment, tags: segmentTags(segment) },
       settings,
       config,
@@ -9705,7 +9713,7 @@ async function suggestActiveSegmentVariantsWithLocalAi() {
 }
 
 async function suggestBatchSegmentVariantsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -9750,7 +9758,7 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before batch AI alternatives failed", "dirty");
     return false;
@@ -9792,7 +9800,7 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
         const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
         const result = await aiCommandService.suggestSegmentVariants({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment: { ...segment, tags: segmentTags(segment) },
           settings,
           config,
@@ -9873,7 +9881,7 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -9914,7 +9922,7 @@ async function suggestBatchSegmentVariantsWithLocalAi() {
 }
 
 async function applyActiveSegmentTerminologyWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before applying AI terminology.", "dirty");
@@ -9974,7 +9982,7 @@ async function applyActiveSegmentTerminologyWithLocalAi() {
     const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
     const result = await aiCommandService.applyTerminology({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment: { ...segment, tags: segmentTags(segment) },
       settings,
       config,
@@ -10034,7 +10042,7 @@ function selectLocalAiTerminologyApplicationSegments(settings = {}) {
 }
 
 async function applyBatchTerminologyWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -10080,7 +10088,7 @@ async function applyBatchTerminologyWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before batch AI terminology application failed", "dirty");
     return false;
@@ -10128,7 +10136,7 @@ async function applyBatchTerminologyWithLocalAi() {
         const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
         const result = await aiCommandService.applyTerminology({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment: { ...segment, tags: segmentTags(segment) },
           settings,
           config,
@@ -10202,7 +10210,7 @@ async function applyBatchTerminologyWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -10245,7 +10253,7 @@ async function applyBatchTerminologyWithLocalAi() {
 }
 
 async function polishActiveSegmentDraftWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before polishing a draft.", "dirty");
@@ -10297,7 +10305,7 @@ async function polishActiveSegmentDraftWithLocalAi() {
     const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
     const result = await aiCommandService.polishSegmentStyle({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment: { ...segment, tags: segmentTags(segment) },
       settings,
       config,
@@ -10308,7 +10316,7 @@ async function polishActiveSegmentDraftWithLocalAi() {
       protectedTokens,
       glossaryTerms,
       tmMatches,
-      styleGuide: state.project.aiSettings?.styleGuide || ""
+      styleGuide: currentProject().aiSettings?.styleGuide || ""
     });
     if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
       renderLocalAiOutput("AI did not propose a different polished draft.", { muted: false });
@@ -10351,7 +10359,7 @@ async function polishActiveSegmentDraftWithLocalAi() {
 }
 
 async function adaptActiveSegmentDraftWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before adapting a draft.", "dirty");
@@ -10403,7 +10411,7 @@ async function adaptActiveSegmentDraftWithLocalAi() {
     const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
     const result = await aiCommandService.adaptSegmentDraft({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment: { ...segment, tags: segmentTags(segment) },
       settings,
       config,
@@ -10414,7 +10422,7 @@ async function adaptActiveSegmentDraftWithLocalAi() {
       protectedTokens,
       glossaryTerms,
       tmMatches,
-      styleGuide: state.project.aiSettings?.styleGuide || "",
+      styleGuide: currentProject().aiSettings?.styleGuide || "",
       adaptMode: settings.adaptMode
     });
     if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
@@ -10462,7 +10470,7 @@ function selectLocalAiDraftSegments(settings = {}) {
 }
 
 async function adaptBatchDraftsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -10507,7 +10515,7 @@ async function adaptBatchDraftsWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before batch AI adaptation failed", "dirty");
     return false;
@@ -10552,7 +10560,7 @@ async function adaptBatchDraftsWithLocalAi() {
         const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
         const result = await aiCommandService.adaptSegmentDraft({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment: { ...segment, tags: segmentTags(segment) },
           settings,
           config,
@@ -10563,7 +10571,7 @@ async function adaptBatchDraftsWithLocalAi() {
           protectedTokens,
           glossaryTerms,
           tmMatches,
-          styleGuide: state.project.aiSettings?.styleGuide || "",
+          styleGuide: currentProject().aiSettings?.styleGuide || "",
           adaptMode: settings.adaptMode,
           signal: state.localAi.abortController.signal
         });
@@ -10630,7 +10638,7 @@ async function adaptBatchDraftsWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -10671,7 +10679,7 @@ async function adaptBatchDraftsWithLocalAi() {
 }
 
 async function polishBatchDraftsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -10716,7 +10724,7 @@ async function polishBatchDraftsWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before batch AI polish failed", "dirty");
     return false;
@@ -10761,7 +10769,7 @@ async function polishBatchDraftsWithLocalAi() {
         const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
         const result = await aiCommandService.polishSegmentStyle({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment: { ...segment, tags: segmentTags(segment) },
           settings,
           config,
@@ -10772,7 +10780,7 @@ async function polishBatchDraftsWithLocalAi() {
           protectedTokens,
           glossaryTerms,
           tmMatches,
-          styleGuide: state.project.aiSettings?.styleGuide || "",
+          styleGuide: currentProject().aiSettings?.styleGuide || "",
           signal: state.localAi.abortController.signal
         });
         if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
@@ -10837,7 +10845,7 @@ async function polishBatchDraftsWithLocalAi() {
       if (updated.length) markWorkspaceDirty();
     }
     if (updated.length) {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
       renderAll();
       await refreshSidebar();
       markWorkspaceDirty();
@@ -10879,8 +10887,8 @@ async function polishBatchDraftsWithLocalAi() {
 
 async function saveAiTermCandidates(terms = [], termBaseName = primaryTermBaseName()) {
   const existingTerms = await listTerms({
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     termBaseNames: [termBaseName]
   });
   const existingKeys = new Set(existingTerms.map((term) => `${stableLower(term.sourceTerm)}::${stableLower(term.targetTerm)}`));
@@ -10896,14 +10904,14 @@ async function saveAiTermCandidates(terms = [], termBaseName = primaryTermBaseNa
       sourceTerm: term.sourceTerm,
       targetTerm: term.targetTerm,
       notes: ["AI extracted term candidate. Review before relying on it.", term.note].filter(Boolean).join(" "),
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseName,
       isForbidden: false
     });
     savedTerms.push(saved);
   }
-  if (savedTerms.length) markProjectsUsingResourceDirty("termbase", termBaseName, state.project.sourceLang, state.project.targetLang);
+  if (savedTerms.length) markProjectsUsingResourceDirty("termbase", termBaseName, currentProject().sourceLang, currentProject().targetLang);
   return {
     savedTerms,
     duplicateCount: Math.max(0, (terms || []).length - savedTerms.length)
@@ -10911,7 +10919,7 @@ async function saveAiTermCandidates(terms = [], termBaseName = primaryTermBaseNa
 }
 
 function localAiTerminologySegments(settings = localAiSettingsFromForm()) {
-  if (!state.project) return [];
+  if (!currentProject()) return [];
   if (settings.mode === "selected") return currentSegment() ? [currentSegment()] : [];
   if (settings.mode === "visible") return filteredSegmentIndexes().map((index) => state.segments[index]).filter(Boolean);
   if (settings.mode === "project") return state.segments;
@@ -10920,7 +10928,7 @@ function localAiTerminologySegments(settings = localAiSettingsFromForm()) {
 }
 
 async function extractActiveSegmentTermsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const segment = currentSegment();
   if (!segment) {
     setSaveStatus("Select a segment before extracting AI terms.", "dirty");
@@ -10964,7 +10972,7 @@ async function extractActiveSegmentTermsWithLocalAi() {
   try {
     const result = await aiCommandService.extractSegmentTerms({
       provider,
-      project: state.project,
+      project: currentProject(),
       segment,
       settings,
       config,
@@ -11021,7 +11029,7 @@ async function extractActiveSegmentTermsWithLocalAi() {
 }
 
 async function extractBatchTermsWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -11077,7 +11085,7 @@ async function extractBatchTermsWithLocalAi() {
       try {
         const result = await aiCommandService.extractSegmentTerms({
           provider,
-          project: state.project,
+          project: currentProject(),
           segment,
           settings,
           config,
@@ -11169,7 +11177,7 @@ function projectBriefSampleSegments(limit = 6) {
 }
 
 async function generateProjectBriefWithLocalAi() {
-  if (!state.project || state.localAi.running || state.localAi.promptBusy) return false;
+  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -11198,20 +11206,20 @@ async function generateProjectBriefWithLocalAi() {
       return false;
     }
   }
-  const projectSnapshot = structuredClone(state.project);
+  const projectSnapshot = structuredClone(currentProject());
   state.localAi.promptBusy = true;
   renderLocalAiCommandCentre();
   setSaveStatus("Generating AI project brief...");
   try {
     const documents = projectDocuments();
     const terms = await listTerms({
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
     const result = await aiCommandService.generateProjectBrief({
       provider,
-      project: state.project,
+      project: currentProject(),
       settings,
       config,
       sourceLanguage: settings.sourceLanguage,
@@ -11222,17 +11230,17 @@ async function generateProjectBriefWithLocalAi() {
       sampleSegments,
       terms: terms.slice(0, 12)
     });
-    const existingStyle = String(state.project.aiSettings?.styleGuide || "").trim();
+    const existingStyle = String(currentProject().aiSettings?.styleGuide || "").trim();
     const generatedBlock = `AI project brief:\n${result.brief.trim()}`;
     const nextStyleGuide = existingStyle
       ? `${existingStyle}\n\n${generatedBlock}`
       : generatedBlock;
     const aiSettings = defaultAiSettings({
-      ...state.project.aiSettings,
+      ...currentProject().aiSettings,
       styleGuide: nextStyleGuide
     });
-    state.project = await updateProject({ ...state.project, aiSettings });
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), aiSettings }));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
     markWorkspaceDirty();
     let activityLogged = true;
     try {
@@ -11247,13 +11255,13 @@ async function generateProjectBriefWithLocalAi() {
       console.warn("AI project brief activity log failed.", activityError);
       markWorkspaceDirty();
     }
-    aiAdministrationController?.setGlobalStyleGuide?.(state.project.aiSettings.styleGuide || "");
+    aiAdministrationController?.setGlobalStyleGuide?.(currentProject().aiSettings.styleGuide || "");
     renderLocalAiOutput(result.brief);
     setSaveStatus(activityLogged ? "AI project brief saved to style instructions" : "AI project brief saved; activity log failed", activityLogged ? "saved" : "dirty");
     return true;
   } catch (error) {
-    state.project = projectSnapshot;
-    state.projects = state.projects.map((project) => (project.id === projectSnapshot.id ? projectSnapshot : project));
+    editorSessionStore.replaceProject(projectSnapshot);
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === projectSnapshot.id ? projectSnapshot : project)));
     aiAdministrationController?.setGlobalStyleGuide?.(defaultAiSettings(projectSnapshot.aiSettings).styleGuide || "");
     const message = error.message || "AI project brief failed.";
     renderLocalAiOutput(message, { muted: false });
@@ -11279,13 +11287,13 @@ function localAiPretranslationOptions(settings) {
 }
 
 async function localAiGlossaryTermsForSegment(segment) {
-  if (!state.project || !segment) return [];
-  if (defaultAiSettings(state.project.aiSettings).useTermbaseContext === false) return [];
+  if (!currentProject() || !segment) return [];
+  if (defaultAiSettings(currentProject().aiSettings).useTermbaseContext === false) return [];
   try {
     return await findTerms({
       source: segment.source,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
   } catch (error) {
@@ -11295,13 +11303,13 @@ async function localAiGlossaryTermsForSegment(segment) {
 }
 
 async function localAiTmMatchesForSegment(segment) {
-  if (!state.project || !segment) return [];
-  if (defaultAiSettings(state.project.aiSettings).useTmContext === false) return [];
+  if (!currentProject() || !segment) return [];
+  if (defaultAiSettings(currentProject().aiSettings).useTmContext === false) return [];
   try {
     return await findProjectTmMatches({
       source: segment.source,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       tmNames: projectTmNames(),
       limit: 3
     });
@@ -11312,7 +11320,7 @@ async function localAiTmMatchesForSegment(segment) {
 }
 
 function localAiSurroundingSegmentsForSegment(segment, options = {}) {
-  if (!state.project || !segment) return [];
+  if (!currentProject() || !segment) return [];
   const settings = options.settings || localAiSettingsFromForm();
   if (settings.includeNearbyContext === false) return [];
   const segments = Array.isArray(options.segments) && options.segments.length ? options.segments : state.segments;
@@ -11346,7 +11354,7 @@ function localAiSurroundingSegmentsForSegment(segment, options = {}) {
 }
 
 async function pretranslateWithLocalAi() {
-  if (!state.project || state.localAi.running) return;
+  if (!currentProject() || state.localAi.running) return;
   const settings = await persistLocalAiSettings({ silent: true });
   let config = null;
   try {
@@ -11368,8 +11376,8 @@ async function pretranslateWithLocalAi() {
       "configured provider URL",
       "batch segment text",
       settings.includeNearbyContext !== false ? "nearby segment context" : "",
-      defaultAiSettings(state.project.aiSettings).useTmContext !== false ? "TM matches" : "",
-      defaultAiSettings(state.project.aiSettings).useTermbaseContext !== false ? "termbase hints" : ""
+      defaultAiSettings(currentProject().aiSettings).useTmContext !== false ? "TM matches" : "",
+      defaultAiSettings(currentProject().aiSettings).useTermbaseContext !== false ? "termbase hints" : ""
     ].filter(Boolean);
     const ok = confirmExternalAiPromptShare({ provider: provider.name || settings.providerId, includesSourceText: true, contextLabels });
     if (!ok) {
@@ -11385,7 +11393,7 @@ async function pretranslateWithLocalAi() {
     }
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before local AI pre-translation failed", "dirty");
     return;
@@ -11395,7 +11403,7 @@ async function pretranslateWithLocalAi() {
   const selection = preTranslationService.selectSegments(segments, {
     ...pretranslationOptions,
     settings,
-    project: state.project
+    project: currentProject()
   });
   state.localAi.progress = {
     total: selection.candidates.length,
@@ -11419,7 +11427,7 @@ async function pretranslateWithLocalAi() {
     const summary = await preTranslationService.pretranslateSegments({
       segments,
       provider,
-      project: state.project,
+      project: currentProject(),
       settings,
       config,
       mode: settings.mode,
@@ -11465,7 +11473,7 @@ async function pretranslateWithLocalAi() {
       return null;
     }
     const command = appRuntime.commands.createAiPretranslationCommand({
-      projectId: state.project.id,
+      projectId: currentProject().id,
       segmentIds: updated.map((segment) => segment.id),
       beforePatches: updated.map((segment) => beforePatches.get(segment.id)),
       provenance: {
@@ -11506,7 +11514,7 @@ async function pretranslateWithLocalAi() {
       console.warn("Local AI pretranslation activity log failed.", activityError);
     }
     try {
-      state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
+      state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
       renderAll();
       await refreshSidebar();
     } catch (refreshError) {
@@ -11592,7 +11600,7 @@ async function splitCurrentSegment() {
   const firstTarget = target.slice(0, targetSplit).trim();
   const secondTarget = target.slice(targetSplit).trim();
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before splitting failed", "dirty");
     return null;
@@ -11601,7 +11609,7 @@ async function splitCurrentSegment() {
   const createdSegmentId = `segment-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
   const createdAt = new Date().toISOString();
   const command = appRuntime?.commands?.createSplitSegmentCommand?.({
-    projectId: state.project.id,
+    projectId: currentProject().id,
     segmentId: segment.id,
     createdSegmentId,
     beforeSegments,
@@ -11661,7 +11669,7 @@ async function splitCurrentSegment() {
     setSaveStatus(error.message || "Segment split failed", "dirty");
     return null;
   }
-  state.commandProjectId = state.project.id;
+  state.commandProjectId = currentProject().id;
   renderAll();
   renderUndoControls();
   setSaveStatus("Segment split; Undo is available", "saved");
@@ -11679,7 +11687,7 @@ async function mergeWithNextSegment() {
     return null;
   }
   try {
-    await flushPendingSegmentSaves(state.project.id);
+    await flushPendingSegmentSaves(currentProject().id);
   } catch (error) {
     setSaveStatus(error.message || "Save pending changes before merging failed", "dirty");
     return null;
@@ -11688,7 +11696,7 @@ async function mergeWithNextSegment() {
   const segmentId = segment.id;
   const mergedSegmentId = next.id;
   const command = appRuntime?.commands?.createMergeSegmentCommand?.({
-    projectId: state.project.id,
+    projectId: currentProject().id,
     segmentId,
     mergedSegmentId,
     beforeSegments,
@@ -11746,7 +11754,7 @@ async function mergeWithNextSegment() {
     setSaveStatus(error.message || "Segment merge failed", "dirty");
     return null;
   }
-  state.commandProjectId = state.project.id;
+  state.commandProjectId = currentProject().id;
   renderAll();
   renderUndoControls();
   setSaveStatus("Segments merged; Undo is available", "saved");
@@ -11760,17 +11768,17 @@ async function importDocx(file) {
   const result = await extractDocxSegments(file);
   await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
   const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  const documents = [...projectDocumentManifest(state.project), { id: documentId, name: result.fileName, type: "docx" }];
-  const docxStructures = { ...(state.project.docxStructures || {}), [documentId]: result.structure };
+  const documents = [...projectDocumentManifest(currentProject()), { id: documentId, name: result.fileName, type: "docx" }];
+  const docxStructures = { ...(currentProject().docxStructures || {}), [documentId]: result.structure };
   const importResult = await appendProjectSegmentsAndUpdateProject(
-    { ...state.project, sourceFileName: result.fileName, docxStructure: result.structure, docxStructures, documents },
+    { ...currentProject(), sourceFileName: result.fileName, docxStructure: result.structure, docxStructures, documents },
     result.segments,
     { documentId, documentName: result.fileName, documentType: "docx" }
   );
   await reportImportProgress("Refreshing project view", file);
-  state.project = importResult.project;
-  state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
-  state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+  editorSessionStore.replaceProject(importResult.project);
+  state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   await refreshProjectSummaries();
   const activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
   selectApplicationDocument(documentId, {
@@ -11791,19 +11799,19 @@ async function importLocalization(file) {
   const result = await parseLocalizationFile(file, textDecodingOptions());
   await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
   const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  const documents = [...projectDocumentManifest(state.project), { id: documentId, name: result.fileName, type: result.documentType }];
+  const documents = [...projectDocumentManifest(currentProject()), { id: documentId, name: result.fileName, type: result.documentType }];
   const localizationStructures = result.structure
-    ? { ...(state.project.localizationStructures || {}), [documentId]: result.structure }
-    : state.project.localizationStructures;
+    ? { ...(currentProject().localizationStructures || {}), [documentId]: result.structure }
+    : currentProject().localizationStructures;
   const importResult = await appendProjectSegmentsAndUpdateProject(
-    { ...state.project, documents, localizationStructures },
+    { ...currentProject(), documents, localizationStructures },
     result.segments,
     { documentId, documentName: result.fileName, documentType: result.documentType }
   );
   await reportImportProgress("Refreshing project view", file);
-  state.project = importResult.project;
-  state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
-  state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+  editorSessionStore.replaceProject(importResult.project);
+  state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   await refreshProjectSummaries();
   const activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
   selectApplicationDocument(documentId, {
@@ -11823,20 +11831,20 @@ async function importXliff(file) {
   const result = await parseXliffFile(file, textDecodingOptions());
   await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
   const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  const documents = [...projectDocumentManifest(state.project), { id: documentId, name: result.fileName, type: result.documentType }];
+  const documents = [...projectDocumentManifest(currentProject()), { id: documentId, name: result.fileName, type: result.documentType }];
   const localizationStructures = {
-    ...(state.project.localizationStructures || {}),
+    ...(currentProject().localizationStructures || {}),
     [documentId]: result.structure
   };
   const importResult = await appendProjectSegmentsAndUpdateProject(
-    { ...state.project, documents, localizationStructures },
+    { ...currentProject(), documents, localizationStructures },
     result.segments,
     { documentId, documentName: result.fileName, documentType: result.documentType }
   );
   await reportImportProgress("Refreshing project view", file);
-  state.project = importResult.project;
-  state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
-  state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+  editorSessionStore.replaceProject(importResult.project);
+  state.segments = prepareSegmentHistoryStates(await getProjectSegments(currentProject().id));
+  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   await refreshProjectSummaries();
   const activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
   selectApplicationDocument(documentId, {
@@ -11862,7 +11870,7 @@ function confirmDuplicateImport(file) {
 }
 
 async function importProjectDocument(file) {
-  if (!state.project || !file) return;
+  if (!currentProject() || !file) return;
   assertFileSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);
   if (!confirmDuplicateImport(file)) {
     setSaveStatus("Import canceled", "saved");
@@ -11900,7 +11908,7 @@ function clonePortableRecord(record) {
 
 function importedCopyName(name) {
   const base = `${String(name || "Imported project").trim() || "Imported project"} (copy)`;
-  const usedNames = new Set(state.projects.map((project) => project.name).filter(Boolean));
+  const usedNames = new Set(currentProjects().map((project) => project.name).filter(Boolean));
   if (!usedNames.has(base)) return base;
   let counter = 2;
   while (usedNames.has(`${base} ${counter}`)) counter += 1;
@@ -12035,10 +12043,10 @@ async function runFileImportTask(label, action) {
   }
 }
 
-async function buildProjectPackage(project = state.project, segmentRecords = null, options = {}) {
+async function buildProjectPackage(project = currentProject(), segmentRecords = null, options = {}) {
   if (!project) return null;
   await flushPendingSegmentSaves(project.id);
-  const projectSegments = segmentRecords || (project.id === state.project?.id ? state.segments : await getProjectSegments(project.id));
+  const projectSegments = segmentRecords || (project.id === currentProject()?.id ? state.segments : await getProjectSegments(project.id));
   const [tmEntries, terms, activityEvents] = await Promise.all([
     getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`),
     listTerms({
@@ -12155,8 +12163,8 @@ function reportProjectPackageExportFailure(error, pkg = null) {
 }
 
 async function exportProjectPackage() {
-  if (!state.project) return;
-  const base = fileSafeName(state.project.name || "project");
+  if (!currentProject()) return;
+  const base = fileSafeName(currentProject().name || "project");
   const filename = `${base}.loopcat.json`;
   let previewPackage = null;
   try {
@@ -12169,17 +12177,17 @@ async function exportProjectPackage() {
   const warnings = reportCount(previewPackage.validation);
   const exportHistoryEntry = { id: `export-${Date.now()}`, type: "project-package", filename, warningCount: warnings, createdAt: new Date().toISOString() };
   const pendingProject = {
-    ...state.project,
+    ...currentProject(),
     exportHistory: [
-      ...(state.project.exportHistory || []),
+      ...(currentProject().exportHistory || []),
       exportHistoryEntry
     ].slice(-25)
   };
   const activityDetail = { filename, warningCount: warnings };
-  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && state.project?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]);
+  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && currentProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]);
   const pendingActivityEvent = shouldSimulateActivityFailure
     ? null
-    : draftProjectActivityEvent(state.project, "export", "Project package exported", activityDetail);
+    : draftProjectActivityEvent(currentProject(), "export", "Project package exported", activityDetail);
   let pkg = null;
   try {
     pkg = await buildProjectPackage(pendingProject, null, {
@@ -12198,11 +12206,11 @@ async function exportProjectPackage() {
     return;
   }
   try {
-    state.project = await updateProject(pendingProject);
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    editorSessionStore.replaceProject(await updateProject(pendingProject));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
   } catch (error) {
     console.warn("Project package export history update failed.", error);
-    markWorkspaceDirty(state.project?.id);
+    markWorkspaceDirty(currentProject()?.id);
     renderValidationReport(pkg.validation);
     renderEditor();
     setSaveStatus("Project package exported; local export history failed", "dirty");
@@ -12213,14 +12221,14 @@ async function exportProjectPackage() {
     if (shouldSimulateActivityFailure) throw new Error("Simulated export activity log failure");
     if (pendingActivityEvent) {
       await bulkPut("activityEvents", [pendingActivityEvent]);
-      editorSessionStore.replaceActivityEvents(await listActivityEvents(state.project.id));
+      editorSessionStore.replaceActivityEvents(await listActivityEvents(currentProject().id));
     }
-    markWorkspaceDirty(state.project.id);
+    markWorkspaceDirty(currentProject().id);
     renderBackupReminder();
   } catch (activityError) {
     activityLogged = false;
     console.warn("Project package export activity log failed.", activityError);
-    if (state.project?.id) markWorkspaceDirty(state.project.id);
+    if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
   }
   renderValidationReport(pkg.validation);
   renderEditor();
@@ -12238,7 +12246,7 @@ async function importProjectPackageData(pkg, options = {}) {
     setSaveStatus("Project package import failed validation", "dirty");
     return null;
   }
-  const existing = state.projects.find((project) => project.id === pkg.project.id);
+  const existing = currentProjects().find((project) => project.id === pkg.project.id);
   let importAsCopy = false;
   if (existing) {
     const replace = options.replaceExisting ?? uiConfirm(`A project named "${displaySafeText(existing.name)}" already exists. Replace it with this package?`);
@@ -12274,7 +12282,7 @@ async function importProjectPackageData(pkg, options = {}) {
   await reportImportProgress("Refreshing projects", { name: sourceName });
   const activityResult = await logOptionalActivityForProject(prepared.project.id, "import", "Project package imported", { fileName: sourceName, warningCount: reportCount(importReport), importAsCopy }, "Project package import");
   const activityLogged = activityResult.ok;
-  state.project = null;
+  editorSessionStore.replaceProject(null);
   state.segments = [];
   applicationNavigation.openProjects();
   applicationNavigation.clearSelection();
@@ -12310,12 +12318,12 @@ async function restoreBackupData(backup) {
   await rebuildAllTmIndexes();
   await rebuildAllTermIndexes();
   await reportImportProgress("Refreshing projects");
-  state.project = null;
+  editorSessionStore.replaceProject(null);
   state.segments = [];
   applicationNavigation.openProjects();
   applicationNavigation.clearSelection();
   await loadProjects(false);
-  const restoredProjectIds = state.projects.map((project) => project.id).filter(Boolean);
+  const restoredProjectIds = currentProjects().map((project) => project.id).filter(Boolean);
   if (state.workspaceStatus?.connected) {
     clearWorkspaceDirtyMarkers();
     markWorkspaceProjectsDirty(restoredProjectIds);
@@ -12367,17 +12375,17 @@ async function chooseWorkspaceFolder() {
 }
 
 async function saveCurrentProjectPackageToWorkspace() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   await flushPendingSegmentSaves();
   if (!state.workspaceStatus?.connected) await chooseWorkspaceFolder();
   if (!state.workspaceStatus?.connected) return;
-  const previewPackage = await buildProjectPackage(state.project);
+  const previewPackage = await buildProjectPackage(currentProject());
   assertValidProjectPackageForWrite(previewPackage, "save project package to workspace");
   const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && state[WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG]);
   const pendingActivityEvent = shouldSimulateActivityFailure
     ? null
-    : draftProjectActivityEvent(state.project, "workspace-save", "Project package saved to workspace folder");
-  const { pkg, result } = await saveProjectPackageToWorkspaceById(state.project.id, {
+    : draftProjectActivityEvent(currentProject(), "workspace-save", "Project package saved to workspace folder");
+  const { pkg, result } = await saveProjectPackageToWorkspaceById(currentProject().id, {
     activityEvents: pendingActivityEvent ? [pendingActivityEvent] : []
   });
   let activityLogged = true;
@@ -12385,14 +12393,14 @@ async function saveCurrentProjectPackageToWorkspace() {
     if (shouldSimulateActivityFailure) throw new Error("Simulated workspace save activity failure");
     if (pendingActivityEvent) {
       await bulkPut("activityEvents", [pendingActivityEvent]);
-      editorSessionStore.replaceActivityEvents(await listActivityEvents(state.project.id));
+      editorSessionStore.replaceActivityEvents(await listActivityEvents(currentProject().id));
     }
     renderBackupReminder();
   } catch (activityError) {
     activityLogged = false;
     console.warn("Workspace save activity log failed.", activityError);
   }
-  if (!activityLogged) markWorkspaceDirty(state.project.id);
+  if (!activityLogged) markWorkspaceDirty(currentProject().id);
   state.workspaceStatus = await workspaceStorage.getStatus();
   renderValidationReport(pkg.validation);
   const validationReportWarning = result.validationReportSaved === false ? "; validation report sidecar failed" : "";
@@ -12410,7 +12418,7 @@ async function saveProjectPackageToWorkspaceById(projectId, options = {}) {
     const pkg = await buildProjectPackage(project, null, options);
     assertValidProjectPackageForWrite(pkg, "save project package to workspace");
     const result = await workspaceStorage.saveProjectPackage(pkg);
-    if (state.project?.id === projectId) {
+    if (currentProject()?.id === projectId) {
       state.workspaceStatus = await workspaceStorage.getStatus();
     }
     clearWorkspaceDirty(projectId);
@@ -12463,7 +12471,7 @@ function startWorkspaceAutosave() {
 }
 
 async function maybeSaveProjectPackageFromSettings(shouldSaveToFolder = Boolean(els.saveProjectToFolderInput?.checked)) {
-  if (!shouldSaveToFolder || !state.project) return false;
+  if (!shouldSaveToFolder || !currentProject()) return false;
   if (!workspaceStorage?.isSupported()) return false;
   try {
     if (!state.workspaceStatus?.connected) await chooseWorkspaceFolder();
@@ -12485,8 +12493,8 @@ async function saveProjectFromDialog() {
     setSaveStatus("Complete required project fields.", "dirty");
     return false;
   }
-  const editing = projectDialogController?.getMode?.() === "edit" && Boolean(state.project);
-  const settings = collectProjectResourceSettings(editing ? state.project : null);
+  const editing = projectDialogController?.getMode?.() === "edit" && Boolean(currentProject());
+  const settings = collectProjectResourceSettings(editing ? currentProject() : null);
   const shouldSaveToFolder = Boolean(els.saveProjectToFolderInput?.checked);
   if (shouldSaveToFolder && workspaceStorage?.isSupported() && !state.workspaceStatus?.connected) {
     try {
@@ -12497,17 +12505,17 @@ async function saveProjectFromDialog() {
       renderProjectStorageStatus();
     }
   }
-  if (editing && state.project) {
+  if (editing && currentProject()) {
     const creatorName = rememberCreatorName(els.projectCreatorInput?.value || "");
-    state.project = await updateProject({
-      ...state.project,
+    editorSessionStore.replaceProject(await updateProject({
+      ...currentProject(),
       name: els.projectNameInput.value.trim(),
       creatorName,
-      creatorOrigin: state.project.creatorOrigin || "manual",
+      creatorOrigin: currentProject().creatorOrigin || "manual",
       domain: els.projectDomainInput.value.trim(),
       ...settings
-    });
-    state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
+    }));
+    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
     await refreshProjectTerms({ rerender: true });
     await refreshProjectSummaries();
     renderAll();
@@ -12535,7 +12543,7 @@ async function saveProjectFromDialog() {
         activityLogged ? "saved" : "dirty"
       );
     }
-    return state.project;
+    return currentProject();
   }
 
   const creatorName = rememberCreatorName(els.projectCreatorInput?.value || "");
@@ -12610,7 +12618,7 @@ async function syncWorkspaceFromFolder() {
       addWorkspaceSyncWarning(`${ref.name || ref.id}: ${error.message}`);
     }
   }
-  state.project = null;
+  editorSessionStore.replaceProject(null);
   state.segments = [];
   applicationNavigation.openProjects();
   applicationNavigation.clearSelection();
@@ -12654,7 +12662,7 @@ async function repairWorkspaceLinks() {
   state.workspaceStatus = await workspaceStorage.getStatus();
   const [tmEntries, terms] = await Promise.all([listTmEntries(), getAll("terms")]);
   const report = await workspaceStorage.buildHealthReport({
-    projects: state.projects,
+    projects: currentProjects(),
     tmEntries,
     terms,
     dirtyProjectIds: workspaceDirtyIds()
@@ -12731,18 +12739,18 @@ async function buildProjectReportData() {
   await flushPendingSegmentSaves();
   const tmNames = new Set(projectTmNames());
   const [tmEntries, terms, activityEvents] = await Promise.all([
-    getAllByIndex("tmEntries", "languagePair", `${state.project.sourceLang}::${state.project.targetLang}`),
+    getAllByIndex("tmEntries", "languagePair", `${currentProject().sourceLang}::${currentProject().targetLang}`),
     listTerms({
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     }),
-    listActivityEvents(state.project.id)
+    listActivityEvents(currentProject().id)
   ]);
   const scopedTm = tmEntries.filter((entry) => tmNames.has(entry.tmName));
   const reportActivityEvents = sanitizePortableValue(activityEvents, "activityEvents");
-  const validation = validateExportReadiness({ project: state.project, segments: state.segments, format: "project-report", terms });
-  const analysis = analyzeProject(state.project, state.segments, scopedTm);
+  const validation = validateExportReadiness({ project: currentProject(), segments: state.segments, format: "project-report", terms });
+  const analysis = analyzeProject(currentProject(), state.segments, scopedTm);
   const qaSegments = state.segments.map((segment) => ({
     ...segment,
     tags: segmentTags(segment)
@@ -12752,7 +12760,7 @@ async function buildProjectReportData() {
     ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
     : await fallback();
   const qualityPassport = buildQualityPassportData({
-    project: state.project,
+    project: currentProject(),
     segments: state.segments,
     qaChecks,
     validation,
@@ -12762,12 +12770,12 @@ async function buildProjectReportData() {
     tmEntries: scopedTm,
     tmEntryCount: scopedTm.length,
     termCount: terms.length,
-    profile: state.project.qualityProfile
+    profile: currentProject().qualityProfile
   });
   return {
     generatedAt: new Date().toISOString(),
-    project: state.project,
-    resources: projectResourceSummary(state.project),
+    project: currentProject(),
+    resources: projectResourceSummary(currentProject()),
     analysis,
     validation,
     qualityPassport,
@@ -13111,7 +13119,7 @@ function qualityPassportHtml(data) {
 }
 
 async function exportQualityPassport() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     const data = await buildProjectReportData();
     editorSessionStore.replaceQaChecks(data.qaChecks);
@@ -13120,7 +13128,7 @@ async function exportQualityPassport() {
     renderQaResults();
     renderQualityWorkbench();
     renderValidationReport(data.validation);
-    const base = fileSafeName(state.project.name || "project");
+    const base = fileSafeName(currentProject().name || "project");
     download(`${base}_quality-passport.html`, finalizeReportDocument(qualityPassportHtml(data)), "text/html");
     const activityLogged = await logOptionalProjectActivity("export", "Quality Passport exported", {
       segmentCount: data.analysis.totals.segments,
@@ -13138,7 +13146,7 @@ async function exportQualityPassport() {
 }
 
 async function exportProjectReport(options = {}) {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     const anonymized = Boolean(options.anonymized);
     const data = await buildProjectReportData();
@@ -13146,7 +13154,7 @@ async function exportProjectReport(options = {}) {
     state.qaFilter = "";
     renderQaResults();
     renderValidationReport(data.validation);
-    const base = fileSafeName(state.project.name || "project");
+    const base = fileSafeName(currentProject().name || "project");
     download(
       `${base}_${anonymized ? "anonymized-" : ""}project-report.html`,
       finalizeReportDocument(projectReportHtml(data, { anonymized })),
@@ -13168,24 +13176,24 @@ async function exportProjectReport(options = {}) {
 }
 
 async function exportTargetText() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     await flushPendingSegmentSaves();
     const { documentInfo, segments } = deliveryExportScope();
     const exportPlan = planDeliveryExport({ format: "txt", documentInfo, segments });
-    const report = validateExportReadiness({ project: state.project, segments, format: "txt", terms: await projectTermsForValidation(), exportPlan });
+    const report = validateExportReadiness({ project: currentProject(), segments, format: "txt", terms: await projectTermsForValidation(), exportPlan });
     addScopedExportReportNote(report, documentInfo, "Target TXT");
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, documentInfo, state.project.name || "project")) {
+    if (!confirmIncompleteExport(exportPlan, documentInfo, currentProject().name || "project")) {
       cancelIncompleteExport();
       return;
     }
     const content = exportPlan.segments
       .map((segment) => segment.target.trim())
       .join("\n\n");
-    const base = scopedExportBaseName(state.project.name || "project", documentInfo);
-    download(`${base}_${state.project.targetLang}.txt`, content, "text/plain");
+    const base = scopedExportBaseName(currentProject().name || "project", documentInfo);
+    download(`${base}_${currentProject().targetLang}.txt`, content, "text/plain");
     const activityLogged = await logOptionalProjectActivity("export", "Target TXT exported", {
       documentId: documentInfo?.id || "",
       fileName: documentInfo?.name || "",
@@ -13200,24 +13208,24 @@ async function exportTargetText() {
 }
 
 async function exportTargetDocx() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     await flushPendingSegmentSaves();
     const documentInfo = exportDocumentForTypes(new Set(["docx"]), "The selected file is not a DOCX document.", "Select a DOCX document to export.");
     if (!documentInfo) return;
     const segments = state.segments.filter((segment) => segment.documentId === documentInfo.id);
     const exportPlan = planDeliveryExport({ format: "docx", documentInfo, segments });
-    const report = validateExportReadiness({ project: state.project, segments, documentInfo, format: "docx", terms: await projectTermsForValidation(), exportPlan });
+    const report = validateExportReadiness({ project: currentProject(), segments, documentInfo, format: "docx", terms: await projectTermsForValidation(), exportPlan });
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, documentInfo, state.project.name || "project")) {
+    if (!confirmIncompleteExport(exportPlan, documentInfo, currentProject().name || "project")) {
       cancelIncompleteExport();
       return;
     }
-    const docxStructure = state.project.docxStructures?.[documentInfo.id] || state.project.docxStructure;
-    const base = fileSafeName(state.project.name || "project");
-    const bytes = await buildTargetDocx({ ...state.project, docxStructure }, exportPlan.segments);
-    download(`${base}_${fileSafeName(documentInfo.name)}_${state.project.targetLang}.docx`, bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    const docxStructure = currentProject().docxStructures?.[documentInfo.id] || currentProject().docxStructure;
+    const base = fileSafeName(currentProject().name || "project");
+    const bytes = await buildTargetDocx({ ...currentProject(), docxStructure }, exportPlan.segments);
+    download(`${base}_${fileSafeName(documentInfo.name)}_${currentProject().targetLang}.docx`, bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     const activityLogged = await logOptionalProjectActivity("export", "Target DOCX exported", {
       documentId: documentInfo.id,
       fileName: documentInfo.name,
@@ -13232,11 +13240,11 @@ async function exportTargetDocx() {
 }
 
 async function exportBilingualDocx() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     await flushPendingSegmentSaves();
     const terms = await projectTermsForValidation();
-    const report = validateExportReadiness({ project: state.project, segments: state.segments, format: "bilingual-docx", terms });
+    const report = validateExportReadiness({ project: currentProject(), segments: state.segments, format: "bilingual-docx", terms });
     renderValidationReport(report);
     if (!canRunBilingualDocxExport(report)) return;
     const qaSegments = state.segments.map((segment) => ({
@@ -13250,8 +13258,8 @@ async function exportBilingualDocx() {
     editorSessionStore.replaceQaChecks(qaChecks);
     state.qaFilter = "";
     renderQaResults();
-    const base = fileSafeName(state.project.name || "project");
-    const bytes = buildBilingualDocx(state.project, state.segments, { qaChecks });
+    const base = fileSafeName(currentProject().name || "project");
+    const bytes = buildBilingualDocx(currentProject(), state.segments, { qaChecks });
     download(`${base}_bilingual.docx`, bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     const activityLogged = await logOptionalProjectActivity("export", "Bilingual DOCX exported", { segmentCount: state.segments.length, qaIssueCount: qaChecks.length, validationNoteCount: reportCount(report) }, "Bilingual DOCX export");
     const message = reportCount(report) || qaChecks.length ? "Bilingual DOCX exported with notes" : "Bilingual DOCX exported";
@@ -13263,7 +13271,7 @@ async function exportBilingualDocx() {
 
 async function exportLocalization() {
   try {
-    if (!state.project) return;
+    if (!currentProject()) return;
     await flushPendingSegmentSaves();
     const documentInfo = exportDocumentForTypes(
       LOCALIZATION_EXPORT_TYPES,
@@ -13274,10 +13282,10 @@ async function exportLocalization() {
     const documentType = projectDocumentType(documentInfo);
     const exportDocumentInfo = { ...documentInfo, type: documentType };
     const segments = state.segments.filter((segment) => segment.documentId === documentInfo.id);
-    const structure = state.project.localizationStructures?.[documentInfo.id];
+    const structure = currentProject().localizationStructures?.[documentInfo.id];
     const exportPlan = planDeliveryExport({ format: documentType, documentInfo: exportDocumentInfo, structure, segments });
     const report = validateExportReadiness({
-      project: state.project,
+      project: currentProject(),
       segments,
       documentInfo: exportDocumentInfo,
       format: documentType,
@@ -13287,16 +13295,16 @@ async function exportLocalization() {
     });
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, exportDocumentInfo, state.project.name || "project")) {
+    if (!confirmIncompleteExport(exportPlan, exportDocumentInfo, currentProject().name || "project")) {
       cancelIncompleteExport();
       return;
     }
     const content = XLIFF_DOCUMENT_TYPES.has(documentType)
-      ? buildTargetXliff(state.project, exportPlan.segments, structure)
+      ? buildTargetXliff(currentProject(), exportPlan.segments, structure)
       : await buildLocalizationFile(documentType, exportPlan.segments, structure);
     const ext = documentType === "yml" ? "yaml" : documentType === "markdown" ? "md" : documentType;
     const type = localizationDownloadMimeType(ext, structure);
-    download(`${fileSafeName(documentInfo.name)}_${state.project.targetLang}.${ext}`, content, type);
+    download(`${fileSafeName(documentInfo.name)}_${currentProject().targetLang}.${ext}`, content, type);
     const activityLogged = await logOptionalProjectActivity("export", "Localization file exported", {
       documentId: documentInfo.id,
       documentType,
@@ -13311,26 +13319,26 @@ async function exportLocalization() {
 }
 
 async function exportXliff(version = "1.2") {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     await flushPendingSegmentSaves();
     const { documentInfo, segments } = deliveryExportScope();
     const exportPlan = planDeliveryExport({ format: "xliff", documentInfo, segments });
-    const report = validateExportReadiness({ project: state.project, segments, format: "xliff", terms: await projectTermsForValidation(), exportPlan });
+    const report = validateExportReadiness({ project: currentProject(), segments, format: "xliff", terms: await projectTermsForValidation(), exportPlan });
     addScopedExportReportNote(report, documentInfo, "XLIFF");
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, documentInfo, state.project.name || "project")) {
+    if (!confirmIncompleteExport(exportPlan, documentInfo, currentProject().name || "project")) {
       cancelIncompleteExport();
       return;
     }
-    const base = scopedExportBaseName(state.project.name || "project", documentInfo);
-    const exportProject = documentInfo ? { ...state.project, sourceFileName: documentInfo.name } : state.project;
+    const base = scopedExportBaseName(currentProject().name || "project", documentInfo);
+    const exportProject = documentInfo ? { ...currentProject(), sourceFileName: documentInfo.name } : currentProject();
     const isXliff22 = version === "2.2";
     const content = isXliff22 ? buildXliff22(exportProject, exportPlan.segments) : buildXliff(exportProject, exportPlan.segments);
     const label = isXliff22 ? "XLIFF 2.2" : "XLIFF";
     const exportedMessage = isXliff22 ? "XLIFF 2.2 exported" : "XLIFF exported";
-    download(`${base}_${state.project.sourceLang}-${state.project.targetLang}.xlf`, content, xliffMimeType(version));
+    download(`${base}_${currentProject().sourceLang}-${currentProject().targetLang}.xlf`, content, xliffMimeType(version));
     const activityLogged = await logOptionalProjectActivity("export", exportedMessage, {
       documentId: documentInfo?.id || "",
       fileName: documentInfo?.name || "",
@@ -13350,16 +13358,16 @@ async function exportXliff22() {
 }
 
 async function handleTmxImport(file) {
-  if (!state.project) return;
+  if (!currentProject()) return;
   assertFileSize(file, "TMX file", MAX_RESOURCE_IMPORT_BYTES);
   await reportImportProgress("Reading TMX", file);
   const text = await readImportTextFile(file);
   await reportImportProgress("Parsing TMX", file);
   const entries = await parseTmxAsync(text, {
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     tmName: mainTmName(),
-    projectName: `${state.project.name} TMX import`
+    projectName: `${currentProject().name} TMX import`
   }, {
     yieldFn: yieldToUi,
     onProgress: (progress) => reportImportProgress(
@@ -13381,7 +13389,7 @@ async function handleTmxImport(file) {
       importProgressDetail(progress.saved, progress.total, "index rows")
     )
   });
-  markProjectsUsingResourceDirty("tm", mainTmName(), state.project.sourceLang, state.project.targetLang);
+  markProjectsUsingResourceDirty("tm", mainTmName(), currentProject().sourceLang, currentProject().targetLang);
   await reportImportProgress("Refreshing TM matches", file);
   await refreshTmMatches();
   const activityLogged = await logOptionalProjectActivity("resource-import", "TMX imported", { fileName: file.name, entryCount: entries.length, tmName: mainTmName() }, "TMX import");
@@ -13389,12 +13397,12 @@ async function handleTmxImport(file) {
 }
 
 async function handleTmxExport() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     const tmNames = new Set(projectTmNames());
-    const entries = (await getAllByIndex("tmEntries", "languagePair", `${state.project.sourceLang}::${state.project.targetLang}`))
+    const entries = (await getAllByIndex("tmEntries", "languagePair", `${currentProject().sourceLang}::${currentProject().targetLang}`))
       .filter((entry) => tmNames.has(entry.tmName));
-    download(`${fileSafeName(state.project.name)}_project-tms.tmx`, buildTmx(entries, { ...state.project, tmName: mainTmName() }), "application/xml");
+    download(`${fileSafeName(currentProject().name)}_project-tms.tmx`, buildTmx(entries, { ...currentProject(), tmName: mainTmName() }), "application/xml");
     const activityLogged = await logOptionalProjectActivity("resource-export", "TMX exported", { entryCount: entries.length, tmNames: Array.from(tmNames) }, "TMX export");
     setSaveStatus(appendActivityWarning(`Exported ${entries.length} project TM entr${entries.length === 1 ? "y" : "ies"}`, activityLogged), exportStatusMode("saved", activityLogged));
   } catch (error) {
@@ -13403,14 +13411,14 @@ async function handleTmxExport() {
 }
 
 async function handleTbxImport(file) {
-  if (!state.project) return;
+  if (!currentProject()) return;
   assertFileSize(file, "TBX file", MAX_RESOURCE_IMPORT_BYTES);
   await reportImportProgress("Reading TBX", file);
   const text = await readImportTextFile(file);
   await reportImportProgress("Parsing TBX", file);
   const terms = await parseTbxAsync(text, {
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     termBaseName: els.termBaseSelect.value || primaryTermBaseName()
   }, {
     yieldFn: yieldToUi,
@@ -13433,7 +13441,7 @@ async function handleTbxImport(file) {
       importProgressDetail(progress.saved, progress.total, "index rows")
     )
   });
-  markProjectsUsingResourceDirty("termbase", els.termBaseSelect.value || primaryTermBaseName(), state.project.sourceLang, state.project.targetLang);
+  markProjectsUsingResourceDirty("termbase", els.termBaseSelect.value || primaryTermBaseName(), currentProject().sourceLang, currentProject().targetLang);
   await reportImportProgress("Refreshing terms", file);
   await refreshProjectTerms({ rerender: true });
   await refreshTerms();
@@ -13449,13 +13457,13 @@ async function parseTermListFile(file, options) {
 }
 
 async function handleTermListImport(file) {
-  if (!state.project) return;
+  if (!currentProject()) return;
   assertFileSize(file, "Term list file", MAX_RESOURCE_IMPORT_BYTES);
   const termBaseName = els.termBaseSelect.value || primaryTermBaseName();
   await reportImportProgress("Reading term list", file);
   const terms = await parseTermListFile(file, {
-    sourceLang: state.project.sourceLang,
-    targetLang: state.project.targetLang,
+    sourceLang: currentProject().sourceLang,
+    targetLang: currentProject().targetLang,
     termBaseName,
     fileName: file.name
   });
@@ -13472,7 +13480,7 @@ async function handleTermListImport(file) {
       importProgressDetail(progress.saved, progress.total, "index rows")
     )
   });
-  markProjectsUsingResourceDirty("termbase", termBaseName, state.project.sourceLang, state.project.targetLang);
+  markProjectsUsingResourceDirty("termbase", termBaseName, currentProject().sourceLang, currentProject().targetLang);
   await reportImportProgress("Refreshing terms", file);
   await refreshProjectTerms({ rerender: true });
   await refreshTerms();
@@ -13481,14 +13489,14 @@ async function handleTermListImport(file) {
 }
 
 async function handleTbxExport() {
-  if (!state.project) return;
+  if (!currentProject()) return;
   try {
     const terms = await listTerms({
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
-    download(`${fileSafeName(state.project.name)}_project-termbases.tbx`, buildTbx(terms, { ...state.project, termBaseName: primaryTermBaseName() }), "application/xml");
+    download(`${fileSafeName(currentProject().name)}_project-termbases.tbx`, buildTbx(terms, { ...currentProject(), termBaseName: primaryTermBaseName() }), "application/xml");
     const activityLogged = await logOptionalProjectActivity("resource-export", "TBX exported", { termCount: terms.length, termBaseNames: projectTermBaseNames() }, "TBX export");
     setSaveStatus(appendActivityWarning(`Exported ${terms.length} project term${terms.length === 1 ? "" : "s"}`, activityLogged), exportStatusMode("saved", activityLogged));
   } catch (error) {
@@ -13782,7 +13790,7 @@ function wireEvents() {
     await saveProjectDomainFromForm();
   });
   els.projectDomainEditInput.addEventListener("input", () => {
-    const current = state.project?.domain || "";
+    const current = currentProject()?.domain || "";
     els.domainForm.classList.toggle("clean", els.projectDomainEditInput.value.trim() === current);
   });
 
@@ -13834,7 +13842,7 @@ function wireEvents() {
   await loadProjects(false);
   if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: loading interface preferences";
   await Promise.all([
-    themeController?.initialize?.({ freshProfile: state.projects.length === 0 }),
+    themeController?.initialize?.({ freshProfile: currentProjects().length === 0 }),
     workspaceLayoutController?.initialize?.()
   ]);
   if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: starting workflow characterization";

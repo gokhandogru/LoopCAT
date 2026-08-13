@@ -427,6 +427,8 @@ assertIncludes(
   "EditorSessionStore must retain the temporary checked compatibility bridge while app.js is decomposed."
 );
 for (const field of [
+  "projects",
+  "project",
   "projectSummaries",
   "projectSummaryRevisions",
   "projectTerms",
@@ -436,11 +438,16 @@ for (const field of [
   "progressSummary"
 ]) {
   assert(
-    !appJs.includes(`state.${field}`) && !appWorkflowDriverJs.includes(`state.${field}`),
+    !new RegExp(`\\bstate\\.${field}\\b`).test(appJs) &&
+      !new RegExp(`\\bstate\\.${field}\\b`).test(appWorkflowDriverJs),
     `EditorSessionStore explicit APIs must remain the only ${field} owner.`
   );
 }
 for (const method of [
+  "getProjects",
+  "replaceProjects",
+  "getProject",
+  "replaceProject",
   "getProjectSummaries",
   "replaceProjectSummaries",
   "getProjectSummaryRevision",
@@ -5565,7 +5572,7 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "function projectDocuments()", "function projectDocumentType"),
-  "projectDocumentManifest(state.project)",
+  "projectDocumentManifest(currentProject())",
   "app.js document lists must include saved project document metadata even when a document has no segment rows."
 );
 assertIncludes(
@@ -5635,7 +5642,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  'draftProjectActivityEvent(state.project, "export", "Project package exported"',
+  'draftProjectActivityEvent(currentProject(), "export", "Project package exported"',
   "app.js must draft project-package export activity before download so success history can be committed only after download succeeds."
 );
 assertIncludes(
@@ -7343,7 +7350,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "buildProjectPackage(state.project, packageSourceSegments)",
+  "buildProjectPackage(currentProject(), packageSourceSegments)",
   "app workflow package-copy fixture must build from current project metadata so segment document IDs match the exported manifest."
 );
 assertIncludes(

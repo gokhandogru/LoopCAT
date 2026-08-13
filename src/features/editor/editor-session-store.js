@@ -24,6 +24,8 @@ function createDefaultSession() {
 
 export const EDITOR_SESSION_FIELDS = Object.freeze(Object.keys(createDefaultSession()));
 const EXPLICIT_SESSION_FIELDS = new Set([
+  "projects",
+  "project",
   "projectSummaries",
   "projectSummaryRevisions",
   "projectTerms",
@@ -77,6 +79,8 @@ export function createEditorSessionStore(initialState = {}) {
   return Object.freeze({
     getState: () => state,
     getActivityEvents: () => state.activityEvents,
+    getProject: () => state.project,
+    getProjects: () => state.projects,
     getProjectTerms: () => state.projectTerms,
     getProjectSummaries: () => state.projectSummaries,
     getProgressSummary: () => state.progressSummary,
@@ -107,6 +111,12 @@ export function createEditorSessionStore(initialState = {}) {
     },
     replaceActivityEvents(activityEvents) {
       return replace({ activityEvents }).activityEvents;
+    },
+    replaceProject(project) {
+      return replace({ project }).project;
+    },
+    replaceProjects(projects) {
+      return replace({ projects }).projects;
     },
     replaceProjectTerms(projectTerms) {
       return replace({ projectTerms }).projectTerms;

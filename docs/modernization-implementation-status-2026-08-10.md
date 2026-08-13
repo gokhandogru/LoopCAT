@@ -26,6 +26,7 @@ This document records what the current working tree implements from the 2026 mod
 - Project-term and activity-event contextual caches are also removed from the EditorSessionStore compatibility bridge. Project switching and terminology refresh use explicit checked replacement APIs, while activity logging uses a newest-first deduplicated prepend action; reports, backup reminders, workspace persistence, and workflow characterization read through checked selectors.
 - QA-check and quality-risk contextual caches are now removed from the EditorSessionStore compatibility bridge. Successful QA and report generation use explicit checked replacement actions, failed QA preserves the previous checks, and Quality Workbench rendering, risk navigation, profile/decision refreshes, reports, and workflow characterization read through checked selectors.
 - The derived project progress-summary cache is now removed from the EditorSessionStore compatibility bridge. Progress rendering reads and replaces the cache through checked APIs while preserving its project/segment-count validity guard, incremental confirmed-status delta, single-pass fallback, cached source word counts, and existing UI output.
+- The core project collection and current-project record are now removed from the EditorSessionStore compatibility bridge. Loading, creation, switching, settings edits and rollback, imports, project-package history, Trash/Undo, recovery, workspace sync, reports, AI context, and workflow fixtures use explicit checked selectors and replacement actions; only the segment collection remains on the narrowed bridge.
 - A checked SegmentGridController now owns the virtual window, coalesced scroll and row-update frames, active-segment dispatch, visibility scrolling, and focused target-editor lookup. A checked EditorContextController coordinates Matches, Terms, Review, History, AI suggestions, and Quality refreshes while their domain services and renderers remain injected.
 - The 6,367-line application workflow characterization driver now lives under `tests/app-workflow/` and is composed into `app.js` lexical scope only by the test renderer build. Source and artifact checks reject the driver from the production graph while the existing deep browser workflow remains unchanged.
 - Checked JavaScript/JSDoc, ESLint, Prettier, Stylelint/token enforcement, import-boundary checks, Node focused tests, axe checks, and visual regression checks. Prettier now follows the repository's `.gitattributes` LF contract, so the formatting gate is reproducible on a clean checkout.
@@ -47,10 +48,10 @@ This document records what the current working tree implements from the 2026 mod
 
 ## Measured results
 
-- Packaged production JavaScript graph: 2,393,594 bytes across five modules, including both mutually exclusive startup paths.
-- Hosted/desktop initial production `app.js`: 952,226 bytes minified and 262,726 bytes gzip. Its two locale chunks remain lazy.
-- Direct-file web fallback `app-file.js`: 1,196,775 bytes minified and 345,639 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
-- Initial synchronous JavaScript is more than 40% below the recorded approximately 2.62 MB baseline. Hosted gzip remains within the 250 KiB-class budget but is 12,726 bytes above a strict 250,000-byte interpretation; the hosted entry remains 202,226 bytes above the 750 KB minified stretch target.
+- Packaged production JavaScript graph: 2,388,682 bytes across five modules, including both mutually exclusive startup paths.
+- Hosted/desktop initial production `app.js`: 949,770 bytes minified and 262,691 bytes gzip. Its two locale chunks remain lazy.
+- Direct-file web fallback `app-file.js`: 1,194,319 bytes minified and 345,573 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
+- Initial synchronous JavaScript is more than 40% below the recorded approximately 2.62 MB baseline. Hosted gzip remains within the 250 KiB-class budget but is 12,691 bytes above a strict 250,000-byte interpretation; the hosted entry remains 199,770 bytes above the 750 KB minified stretch target.
 - Visual verification passes 81 deterministic screenshots covering 1440×900, 1366×768, and 1024×768, including an actionable import-validation failure, visible focus recovery, the local recovery panel and open workspace-status menu, populated Comments and Quality Workbench inspectors, Resources TM dashboard/detail, termbase dashboard, populated resource Trash, post-restore empty Trash, the TM threshold and OPUS-CAT help dialogs, provider administration/AI Command Centre, light/dark, inspector open/closed, Focus mode, AI, status, and compact-density states.
 - Automated accessibility checks pass the deterministic Projects, import-validation error and focus-return path, actionable local recovery panel, open workspace-status menu, Resources translation-memory/termbase empty states, populated resource Trash, populated Comments and Quality Workbench states, AI provider administration/Command Centre and focus-return path, New project dialog, About dialog, TM threshold dialog, OPUS-CAT help dialog, and command-palette states with zero blocking findings. This is not a WCAG conformance claim.
 - The full Electron browser suite passes security, offline shell, smoke, regression, application workflow, workspace storage, package round trip, and large-project coverage.
@@ -60,17 +61,17 @@ This document records what the current working tree implements from the 2026 mod
 
 ### P1-08 — Remaining `app.js` extraction
 
-The new checked boundaries are active, but `app.js` remains the compatibility coordinator and is still 13,847 source lines. The 6,367-line workflow driver is now external and composed only into the test graph, but the roadmap's source goal of a bootstrap under 300 lines is not met.
+The new checked boundaries are active, but `app.js` remains the compatibility coordinator and is still 13,855 source lines. The 6,367-line workflow driver is now external and composed only into the test graph, but the roadmap's source goal of a bootstrap under 300 lines is not met.
 
 The synchronous dialog-lifecycle, async project-dialog, TM-threshold, OPUS-CAT help, Resources, quality/review, recovery/workspace, import/export/report, and AI provider-administration/command-centre UI slices are complete. All 18 AI registry positions now install through checked adapters rather than provider implementations in `ai.js`. This includes the hosted OpenAI-compatible family (Groq, Together AI, OpenRouter, Hugging Face Inference Providers, DeepInfra, and Fireworks AI), the native Responses family (OpenAI, xAI, and Azure OpenAI), native chat-completion providers (DeepSeek and Mistral), Perplexity Sonar, Google Gemini Interactions, Anthropic Messages, Cohere Chat V2, local/hosted Ollama, loopback/allowlisted OpenAI-compatible servers, and OPUS-CAT direct/bridge MTRestService. Their original registry positions, endpoints, credentials, payloads, parsing, metadata, timeout/cancellation behavior, redacted errors, consent rules, and temporary compatibility exports are characterized independently. Release verification now rejects any provider object implementation or provider registration returning to `ai.js`. The explicit-consent direct OpenAI suggestion flow remains separate and unchanged in the AI façade. Still required before this package is complete:
 
-1. Continue removing temporary EditorSessionStore compatibility accessors one family at a time. All derived/contextual caches and AppStore navigation/selection ownership are complete; only the core project/segment records remain.
+1. Remove the final temporary EditorSessionStore compatibility accessor for the segment collection. All project and derived/contextual ownership is complete.
 2. Reduce the remaining `app.js` compatibility coordinator toward the roadmap's bootstrap-only goal, one characterized feature boundary at a time.
 3. Keep each extraction behavior-preserving and run the focused feature suite plus the full browser/release suite at each family boundary.
 
 ### P2-05 — Performance stretch target
 
-Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 202,226 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
+Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 199,770 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
 
 ## Manual and external release gates still required
 
@@ -97,20 +98,20 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 with the core project-record family: the `projects` collection and current `project` record. All derived/contextual fields and AppStore navigation/selection ownership are complete; `segments` should remain a separate final family.
+Continue P1-08 with the final EditorSessionStore compatibility family: the `segments` collection. All project, derived/contextual, navigation, selection, filter, and virtual-grid ownership is complete.
 
 Entry criteria:
 
-- Characterize project-list loading/replacement, current-project loading/replacement, creation, settings edits, deletion/Trash/Undo, switching, import conflict handling, workspace recovery, package round trips, and reload behavior.
+- Characterize segment loading/replacement, in-place editing, autosave/retry, commands and Undo/Redo, split/merge, imports, pretranslation, QA/review, document filtering, recovery, package round trips, reload, virtualization, typing latency, and large-project behavior.
 - Preserve the completed AppStore characterization across Projects → dashboard → editor, project/file switching, Focus mode, filters, Undo/Redo, and reload recovery while project/session ownership moves.
 - Preserve the extracted compatibility-module registry, provider installer, all registry positions, provider selection/administration, endpoint allowlists, key storage, consent/redaction, jobs, commands/Undo, persistence, status, and offline behavior.
-- Move `projects` and `project` behind explicit EditorSessionStore selectors/actions and injected project/repository/controller calls; retain no compatibility setter for either migrated field.
+- Move `segments` behind explicit EditorSessionStore selector/action APIs and injected editor/command/repository/controller calls; remove `attachCompatibility` after no fields remain.
 - Do not combine state ownership changes with visual redesign, storage migration, provider changes, or new features.
 
 Exit criteria:
 
-- EditorSessionStore is the only writer for the project collection and current project record, with checked selectors/actions and no new global mutable state.
-- Neither migrated project field relies on `attachCompatibility`; `segments` continues through the narrowed bridge until its separate characterized slice.
+- EditorSessionStore is the only top-level writer for the segment collection, with checked selector/action APIs and no new global mutable state; existing characterized record-level mutations remain command/persistence controlled.
+- The temporary `attachCompatibility` bridge is removed, and release verification prevents any migrated session field from returning to legacy `state`.
 - Focused controller/repository tests, provider adapter tests, security policy, AI UX, web/desktop smoke, app workflow, package/workspace round trips, and FULL-SUITE gates pass with no intended user-visible difference.
 
 Continue until `app.js` is a bootstrap-only compatibility entry and the façade can be removed without changing mature LoopCAT behavior.

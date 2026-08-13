@@ -174,11 +174,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     document.querySelector("#projectNameInput").value = "";
     document.querySelector("#sourceLangInput").value = languageOptionValue("en");
     document.querySelector("#targetLangInput").value = languageOptionValue("tr");
-    const invalidDialogProjectCount = state.projects.length;
+    const invalidDialogProjectCount = currentProjects().length;
     const invalidDialogProject = await saveProjectFromDialog();
     assert(
       !invalidDialogProject &&
-        state.projects.length === invalidDialogProjectCount &&
+        currentProjects().length === invalidDialogProjectCount &&
         els.saveStatus.textContent === "Complete required project fields.",
       "project dialog blocks missing required fields before creation"
     );
@@ -241,7 +241,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     });
     await loadProjects(false);
     await openProject(project.id);
-    assert(state.project?.id === project.id, "real app project creation");
+    assert(currentProject()?.id === project.id, "real app project creation");
     els.localAiSourceCodeInput.value = "en";
     els.localAiSourceLangInput.value = languageOptionValue("es");
     els.localAiSourceLangInput.dispatchEvent(new Event("change", { bubbles: true }));
@@ -258,7 +258,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "local AI language dropdowns keep language names and codes synchronized for prompts"
     );
     const malformedResourceSummary = projectResourceSummary({
-      ...state.project,
+      ...currentProject(),
       resourceLinks: [
         null,
         { id: "legacy-workflow-main-tm", type: "tm", name: "Workflow TM", role: "main" },
@@ -283,7 +283,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "resource keys preserve names containing double-colon delimiters"
     );
     const legacyDocumentManifest = projectDocumentManifest({
-      ...state.project,
+      ...currentProject(),
       sourceFileName: "legacy-source.html",
       documents: [
         null,
@@ -298,8 +298,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         legacyDocumentManifest[0].type === "html",
       "local project document manifests tolerate malformed legacy entries"
     );
-    const originalWorkflowProject = state.project;
-    state.project = { ...state.project, documents: { malformed: true } };
+    const originalWorkflowProject = currentProject();
+    editorSessionStore.replaceProject({ ...currentProject(), documents: { malformed: true } });
     renderProjectHome();
     renderDocumentFilter();
     assert(
@@ -307,22 +307,22 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         !els.projectFileList.textContent.includes("[object Object]"),
       "project file views tolerate malformed legacy document manifests"
     );
-    state.project = originalWorkflowProject;
-    const originalProjectDomain = state.project.domain;
+    editorSessionStore.replaceProject(originalWorkflowProject);
+    const originalProjectDomain = currentProject().domain;
     els.projectDomainEditInput.value = "Unstored workflow domain";
-    setHiddenSegmentField(state.project, PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG, true);
+    setHiddenSegmentField(currentProject(), PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG, true);
     const failedDomainSave = await saveProjectDomainFromForm();
     assert(
       !failedDomainSave &&
         els.saveStatus.textContent.includes("Simulated project domain save failure") &&
-        state.project.domain === originalProjectDomain &&
+        currentProject().domain === originalProjectDomain &&
         els.projectDomainEditInput.value === "Unstored workflow domain",
       "project domain save failure reports visible status without changing project metadata"
     );
-    Reflect.deleteProperty(state.project, PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG);
+    Reflect.deleteProperty(currentProject(), PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG);
     els.projectDomainEditInput.value = "Workflow saved domain";
     const successfulDomainSave = await saveProjectDomainFromForm();
-    assert(successfulDomainSave && state.project.domain === "Workflow saved domain", "project domain save persists metadata");
+    assert(successfulDomainSave && currentProject().domain === "Workflow saved domain", "project domain save persists metadata");
     await openProjectDialog("edit");
     assert(
       projectDialogController?.isEditing?.() &&
@@ -352,12 +352,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     setOpusCatConnectionHelpVisible(false);
     const legacyDialogSettings = collectProjectResourceSettings({
-      ...state.project,
+      ...currentProject(),
       resourceLinks: [
         null,
-        { id: "legacy-dialog-main-tm", type: "tm", name: mainTmName(state.project), role: "main" },
+        { id: "legacy-dialog-main-tm", type: "tm", name: mainTmName(currentProject()), role: "main" },
         { id: "legacy-dialog-invalid-link", type: "glossary", name: "Ignored glossary" },
-        { id: "legacy-dialog-tb", type: "termbase", name: primaryTermBaseName(state.project) }
+        { id: "legacy-dialog-tb", type: "termbase", name: primaryTermBaseName(currentProject()) }
       ]
     });
     assert(
@@ -372,7 +372,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const settingsActivityProject = await saveProjectFromDialog();
     assert(
       settingsActivityProject?.id === project.id &&
-        state.project.domain === "Settings activity warning" &&
+        currentProject().domain === "Settings activity warning" &&
         els.saveStatus.textContent.includes("activity log failed") &&
         state.workspaceDirtyProjectIds.has(project.id),
       "project settings activity log failure reports warning after successful settings save"
@@ -381,18 +381,18 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     const file = new File(["<!doctype html><html><body><p>Hello world.</p></body></html>"], "workflow.html", { type: "text/html" });
     await importLocalization(file);
-    const documentInfo = state.project.documents.find((item) => item.name === "workflow.html");
+    const documentInfo = currentProject().documents.find((item) => item.name === "workflow.html");
     assert(Boolean(documentInfo), "real app HTML file import");
     const workflowSegmentIndex = state.segments.findIndex((segment) => segment.documentId === documentInfo.id);
     state.segments[workflowSegmentIndex].target = "Merhaba dunya.";
     state.segments[workflowSegmentIndex].status = "draft";
     touchSegment(state.segments[workflowSegmentIndex]);
     await saveSegment(state.segments[workflowSegmentIndex]);
-    state.project = await updateProject({
-      ...state.project,
-      documents: state.project.documents.map((item) => (item.id === documentInfo.id ? { ...item, type: "HTML" } : item))
-    });
-    state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+    editorSessionStore.replaceProject(await updateProject({
+      ...currentProject(),
+      documents: currentProject().documents.map((item) => (item.id === documentInfo.id ? { ...item, type: "HTML" } : item))
+    }));
+    editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
     selectApplicationDocument(documentInfo.id);
     const caseInsensitiveTypeDownloads = [];
     const originalCaseCreateObjectUrl = URL.createObjectURL.bind(URL);
@@ -416,11 +416,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       HTMLAnchorElement.prototype.click = originalCaseAnchorClick;
       window.confirm = originalCaseConfirm;
     }
-    state.project = await updateProject({
-      ...state.project,
-      documents: state.project.documents.map((item) => (item.id === documentInfo.id ? { ...item, type: "html" } : item))
-    });
-    state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+    editorSessionStore.replaceProject(await updateProject({
+      ...currentProject(),
+      documents: currentProject().documents.map((item) => (item.id === documentInfo.id ? { ...item, type: "html" } : item))
+    }));
+    editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
     const roundTripLocalizationFixture = async (name, sourceText, targetTextValue, expectedText = targetTextValue) => {
       const parsed = await parseLocalizationFile(new File([sourceText], name, { type: "text/plain" }));
       const translated = parsed.segments.map((segment) => ({
@@ -435,7 +435,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const sdlxliffFixture = `<?xml version="1.0" encoding="UTF-8"?><xliff version="1.2"><file original="workflow.sdlxliff" source-language="en" target-language="tr"><body><trans-unit id="1"><source>Hello world</source><target></target></trans-unit></body></file></xliff>`;
     const sdlxliffParsed = await parseXliffFile(new File([sdlxliffFixture], "workflow.sdlxliff", { type: "application/x-xliff+xml" }));
     assert(sdlxliffParsed.documentType === "sdlxliff", "SDLXLIFF import preserves document type");
-    const sdlxliffOutput = buildTargetXliff(state.project, sdlxliffParsed.segments.map((segment) => ({ ...segment, target: "Merhaba dunya", status: "draft" })), sdlxliffParsed.structure);
+    const sdlxliffOutput = buildTargetXliff(currentProject(), sdlxliffParsed.segments.map((segment) => ({ ...segment, target: "Merhaba dunya", status: "draft" })), sdlxliffParsed.structure);
     assert(sdlxliffOutput.includes("Merhaba dunya"), "SDLXLIFF target export updates original XLIFF structure");
     await roundTripLocalizationFixture("workflow.xhtml", `<html xmlns="http://www.w3.org/1999/xhtml"><body><p>Hello world</p></body></html>`, "Merhaba dunya");
     await roundTripLocalizationFixture("workflow.txml", `<txml><segment><source>Hello world</source><target></target></segment></txml>`, "Merhaba dunya");
@@ -602,11 +602,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const docmRoundTrip = await parseLocalizationFile(new File([docmOutput], "workflow.docm", { type: "application/vnd.ms-word.document.macroEnabled.12" }));
     assert(docmRoundTrip.segments.some((segment) => segment.text.includes("Merhaba dunya")), "DOCM OpenXML package round-trips translated text");
     const metadataOnlyDocument = { id: `doc-empty-${Date.now()}`, name: "metadata-only.html", type: "html" };
-    state.project = await updateProject({
-      ...state.project,
-      documents: [...(state.project.documents || []), metadataOnlyDocument]
-    });
-    state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+    editorSessionStore.replaceProject(await updateProject({
+      ...currentProject(),
+      documents: [...(currentProject().documents || []), metadataOnlyDocument]
+    }));
+    editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
     renderProjectHome();
     renderDocumentFilter();
     assert(
@@ -628,33 +628,33 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } finally {
       window.confirm = originalMetadataOnlyConfirm;
     }
-    const atomicImportDocumentCount = state.project.documents.length;
-    state.project.__atomicImportFailureProbe = () => {};
+    const atomicImportDocumentCount = currentProject().documents.length;
+    currentProject().__atomicImportFailureProbe = () => {};
     let atomicImportError = "";
     try {
       await importLocalization(new File(["<!doctype html><html><body><p>Atomic import failure.</p></body></html>"], "workflow-atomic-import-failure.html", { type: "text/html" }));
     } catch (error) {
       atomicImportError = error.message || String(error);
     } finally {
-      delete state.project.__atomicImportFailureProbe;
+      delete currentProject().__atomicImportFailureProbe;
     }
     const storedProjectAfterAtomicImportFailure = (await listProjects()).find((item) => item.id === project.id);
     const storedSegmentsAfterAtomicImportFailure = await getProjectSegments(project.id);
     assert(
       atomicImportError &&
-        state.project.documents.length === atomicImportDocumentCount &&
+        currentProject().documents.length === atomicImportDocumentCount &&
         (storedProjectAfterAtomicImportFailure?.documents || []).length === atomicImportDocumentCount &&
         !storedSegmentsAfterAtomicImportFailure.some((segment) => segment.documentName === "workflow-atomic-import-failure.html"),
       "file import metadata failure leaves no orphan segments"
     );
     setHiddenSegmentField(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const importActivityFailureDocumentCount = state.project.documents.length;
+    const importActivityFailureDocumentCount = currentProject().documents.length;
     await importLocalization(new File(["<!doctype html><html><body><p>Import activity warning.</p></body></html>"], "workflow-import-activity-warning.html", { type: "text/html" }));
-    const importActivityFailureDocument = state.project.documents.find((item) => item.name === "workflow-import-activity-warning.html");
+    const importActivityFailureDocument = currentProject().documents.find((item) => item.name === "workflow-import-activity-warning.html");
     const importActivityFailureSegmentIndex = state.segments.findIndex((segment) => segment.documentId === importActivityFailureDocument?.id);
     assert(
       Boolean(importActivityFailureDocument) &&
-        state.project.documents.length === importActivityFailureDocumentCount + 1 &&
+        currentProject().documents.length === importActivityFailureDocumentCount + 1 &&
         importActivityFailureSegmentIndex >= 0 &&
         els.saveStatus.textContent.includes("activity log failed") &&
         state.workspaceDirtyProjectIds.has(project.id),
@@ -671,7 +671,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       [{ source: "DOCX import landing source.", target: "", status: "empty" }]
     );
     await importDocx(new File([docxLandingBytes], "workflow-docx-landing.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
-    const docxLandingDocument = state.project.documents.find((item) => item.name === "workflow-docx-landing.docx");
+    const docxLandingDocument = currentProject().documents.find((item) => item.name === "workflow-docx-landing.docx");
     assert(
       docxLandingDocument &&
         currentDocumentId() === docxLandingDocument.id &&
@@ -948,13 +948,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     }
     assert(
       restoreGuardError.includes("Simulated pending save flush failure") &&
-        state.project?.id === project.id &&
+        currentProject()?.id === project.id &&
         state.saveTimers.has(state.segments[segmentIndex].id),
       "backup restore stops before destructive restore when pending save flush fails"
     );
     Reflect.deleteProperty(state.segments[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG);
     await flushPendingSegmentSaves(project.id);
-    const replaceGuardPackage = await buildProjectPackage(state.project);
+    const replaceGuardPackage = await buildProjectPackage(currentProject());
     const replaceGuardText = `Paket degisimi oncesi bekleyen hedef ${Date.now()}`;
     updateSegmentDraft(segmentIndex, replaceGuardText);
     setHiddenSegmentField(state.segments[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
@@ -971,7 +971,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     }
     assert(
       replaceGuardError.includes("Simulated pending save flush failure") &&
-        state.project?.id === project.id &&
+        currentProject()?.id === project.id &&
         state.saveTimers.has(state.segments[segmentIndex].id),
       "project package replacement stops before destructive import when pending save flush fails"
     );
@@ -1494,7 +1494,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiVariantsProvider = aiProviderService.get("ollama");
     const originalAiVariantsCompletePrompt = aiVariantsProvider.completePrompt;
     const aiVariantsSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
-    const aiVariantsProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
+    const aiVariantsProjectSettingsSnapshot = structuredClone(currentProject().aiSettings || {});
     const originalAiVariantsMode = els.localAiVariantModeSelect?.value || "";
     const originalAiVariantsFilters = {
       documentFilter: currentDocumentId(),
@@ -1574,7 +1574,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "AI alternatives active segment saves selected-style review suggestions without overwriting target"
       );
       await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch variants alpha source.</p><p>Workflow batch variants beta source.</p><p>Workflow batch variants failure source.</p><p>Workflow batch variants locked source.</p></body></html>"], "workflow-ai-batch-variants.html", { type: "text/html" }));
-      const aiBatchVariantsDocument = state.project.documents.find((item) => item.name === "workflow-ai-batch-variants.html");
+      const aiBatchVariantsDocument = currentProject().documents.find((item) => item.name === "workflow-ai-batch-variants.html");
       await openProjectFile(aiBatchVariantsDocument.id);
       updateEditorFilters({
         query: "",
@@ -1654,11 +1654,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         status: originalAiVariantsFilters.segmentStatusFilter,
         reviewState: originalAiVariantsFilters.reviewStateFilter
       });
-      state.project = await updateProject({
-        ...state.project,
+      editorSessionStore.replaceProject(await updateProject({
+        ...currentProject(),
         aiSettings: defaultAiSettings(aiVariantsProjectSettingsSnapshot)
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+      }));
+      editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
       const aiVariantsRestoreRevision = Number(state.segments[segmentIndex]?.revision || 0);
       Reflect.ownKeys(state.segments[segmentIndex]).forEach((key) => delete state.segments[segmentIndex][key]);
       Object.assign(state.segments[segmentIndex], aiVariantsSegmentSnapshot);
@@ -1699,8 +1699,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         sourceTerm: applyTermsSourceTerm,
         targetTerm: applyTermsTargetTerm,
         notes: "Workflow AI terminology application fixture.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
         termBaseName: primaryTermBaseName()
       });
       aiApplyTermsProvider.completePrompt = async (_config, request) => {
@@ -1813,16 +1813,16 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         sourceTerm: batchApplySourceTerm,
         targetTerm: batchApplyTargetTerm,
         notes: "Workflow batch AI terminology application fixture.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
         termBaseName: primaryTermBaseName()
       }));
       aiBatchApplyTermsSavedTerms.push(await saveTerm({
         sourceTerm: batchApplyFailedTerm,
         targetTerm: "batch failed terminology",
         notes: "Workflow batch AI terminology application failure fixture.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
         termBaseName: primaryTermBaseName()
       }));
       aiApplyTermsProvider.completePrompt = async (_config, request) => {
@@ -1892,7 +1892,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiPolishProvider = aiProviderService.get("ollama");
     const originalAiPolishCompletePrompt = aiPolishProvider.completePrompt;
     const aiPolishSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
-    const aiPolishProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
+    const aiPolishProjectSettingsSnapshot = structuredClone(currentProject().aiSettings || {});
     const originalAiPolishFilters = {
       documentFilter: currentDocumentId(),
       segmentQuery: currentEditorFilters().query,
@@ -1910,14 +1910,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-polish-model";
-      state.project = await updateProject({
-        ...state.project,
+      editorSessionStore.replaceProject(await updateProject({
+        ...currentProject(),
         aiSettings: defaultAiSettings({
-          ...state.project.aiSettings,
+          ...currentProject().aiSettings,
           styleGuide: "Workflow polish style: use concise UI wording."
         })
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+      }));
+      editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
       const polishSourceTerm = `workflow polish term ${Date.now()}`;
       const polishTargetTerm = "workflow polish target term";
       state.segments[segmentIndex].source = `Open {name} with ${polishSourceTerm}.`;
@@ -1934,16 +1934,16 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         sourceTerm: polishSourceTerm,
         targetTerm: polishTargetTerm,
         notes: "Workflow AI polish fixture.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
         termBaseName: primaryTermBaseName()
       });
       aiPolishTmEntry = await saveTmEntry({
         source: state.segments[segmentIndex].source,
         target: "Open {name} using concise TM wording.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        projectName: state.project.name,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
+        projectName: currentProject().name,
         tmName: mainTmName()
       });
       aiPolishProvider.completePrompt = async (_config, request) => {
@@ -1996,7 +1996,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "AI polish active segment saves review suggestion without overwriting target"
       );
       await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch polish alpha source.</p><p>Workflow batch polish beta source.</p></body></html>"], "workflow-ai-batch-polish.html", { type: "text/html" }));
-      const aiBatchPolishDocument = state.project.documents.find((item) => item.name === "workflow-ai-batch-polish.html");
+      const aiBatchPolishDocument = currentProject().documents.find((item) => item.name === "workflow-ai-batch-polish.html");
       await openProjectFile(aiBatchPolishDocument.id);
       updateEditorFilters({
         query: "",
@@ -2049,11 +2049,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       });
       if (aiPolishTerm?.id) await deleteTerm(aiPolishTerm.id);
       if (aiPolishTmEntry?.id) await deleteTmEntry(aiPolishTmEntry.id);
-      state.project = await updateProject({
-        ...state.project,
+      editorSessionStore.replaceProject(await updateProject({
+        ...currentProject(),
         aiSettings: defaultAiSettings(aiPolishProjectSettingsSnapshot)
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+      }));
+      editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
       const aiPolishRestoreRevision = Number(state.segments[segmentIndex]?.revision || 0);
       Reflect.ownKeys(state.segments[segmentIndex]).forEach((key) => delete state.segments[segmentIndex][key]);
       Object.assign(state.segments[segmentIndex], aiPolishSegmentSnapshot);
@@ -2072,7 +2072,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiAdaptProvider = aiProviderService.get("ollama");
     const originalAiAdaptCompletePrompt = aiAdaptProvider.completePrompt;
     const aiAdaptSegmentSnapshot = structuredClone(state.segments[segmentIndex]);
-    const aiAdaptProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
+    const aiAdaptProjectSettingsSnapshot = structuredClone(currentProject().aiSettings || {});
     const originalAiAdaptMode = els.localAiAdaptModeSelect?.value || "";
     let aiAdaptTerm = null;
     let aiAdaptTmEntry = null;
@@ -2081,14 +2081,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-adapt-model";
       if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = "shorten";
-      state.project = await updateProject({
-        ...state.project,
+      editorSessionStore.replaceProject(await updateProject({
+        ...currentProject(),
         aiSettings: defaultAiSettings({
-          ...state.project.aiSettings,
+          ...currentProject().aiSettings,
           styleGuide: "Workflow adaptation style: keep target UI copy short."
         })
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+      }));
+      editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
       const adaptSourceTerm = `workflow adapt term ${Date.now()}`;
       const adaptTargetTerm = "workflow adapted term";
       state.segments[segmentIndex].source = `Open {name} with ${adaptSourceTerm} before deployment.`;
@@ -2105,16 +2105,16 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         sourceTerm: adaptSourceTerm,
         targetTerm: adaptTargetTerm,
         notes: "Workflow AI adaptation fixture.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
         termBaseName: primaryTermBaseName()
       });
       aiAdaptTmEntry = await saveTmEntry({
         source: state.segments[segmentIndex].source,
         target: "Open {name} with concise adaptation TM wording.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        projectName: state.project.name,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
+        projectName: currentProject().name,
         tmName: mainTmName()
       });
       aiAdaptProvider.completePrompt = async (_config, request) => {
@@ -2152,11 +2152,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = originalAiAdaptMode;
       if (aiAdaptTerm?.id) await deleteTerm(aiAdaptTerm.id);
       if (aiAdaptTmEntry?.id) await deleteTmEntry(aiAdaptTmEntry.id);
-      state.project = await updateProject({
-        ...state.project,
+      editorSessionStore.replaceProject(await updateProject({
+        ...currentProject(),
         aiSettings: defaultAiSettings(aiAdaptProjectSettingsSnapshot)
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+      }));
+      editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
       const aiAdaptRestoreRevision = Number(state.segments[segmentIndex]?.revision || 0);
       Reflect.ownKeys(state.segments[segmentIndex]).forEach((key) => delete state.segments[segmentIndex][key]);
       Object.assign(state.segments[segmentIndex], aiAdaptSegmentSnapshot);
@@ -2171,7 +2171,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     const aiBatchAdaptProvider = aiProviderService.get("ollama");
     const originalAiBatchAdaptCompletePrompt = aiBatchAdaptProvider.completePrompt;
-    const aiBatchAdaptProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
+    const aiBatchAdaptProjectSettingsSnapshot = structuredClone(currentProject().aiSettings || {});
     const originalAiBatchAdaptFilters = {
       documentFilter: currentDocumentId(),
       segmentQuery: currentEditorFilters().query,
@@ -2189,16 +2189,16 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-adapt-model";
       if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = "shorten";
-      state.project = await updateProject({
-        ...state.project,
+      editorSessionStore.replaceProject(await updateProject({
+        ...currentProject(),
         aiSettings: defaultAiSettings({
-          ...state.project.aiSettings,
+          ...currentProject().aiSettings,
           styleGuide: "Workflow batch adaptation style: keep UI drafts compact."
         })
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+      }));
+      editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
       await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch adapt alpha source.</p><p>Workflow batch adapt beta source.</p><p>Workflow batch adapt failure source.</p><p>Workflow batch adapt locked source.</p></body></html>"], "workflow-ai-batch-adapt.html", { type: "text/html" }));
-      const aiBatchAdaptDocument = state.project.documents.find((item) => item.name === "workflow-ai-batch-adapt.html");
+      const aiBatchAdaptDocument = currentProject().documents.find((item) => item.name === "workflow-ai-batch-adapt.html");
       await openProjectFile(aiBatchAdaptDocument.id);
       updateEditorFilters({
         query: "",
@@ -2310,11 +2310,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         status: originalAiBatchAdaptFilters.segmentStatusFilter,
         reviewState: originalAiBatchAdaptFilters.reviewStateFilter
       });
-      state.project = await updateProject({
-        ...state.project,
+      editorSessionStore.replaceProject(await updateProject({
+        ...currentProject(),
         aiSettings: defaultAiSettings(aiBatchAdaptProjectSettingsSnapshot)
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+      }));
+      editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
       state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
       renderDocumentFilter();
       renderSegments();
@@ -2365,7 +2365,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         };
       };
       const aiTermsSaved = await extractActiveSegmentTermsWithLocalAi();
-      const aiTermsStored = (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang, termBaseNames: ["Workflow TB"] }))
+      const aiTermsStored = (await listTerms({ sourceLang: currentProject().sourceLang, targetLang: currentProject().targetLang, termBaseNames: ["Workflow TB"] }))
         .filter((term) => term.sourceTerm.startsWith("workflow ai "));
       aiExtractedTermIds = aiTermsStored.map((term) => term.id);
       assert(
@@ -2377,11 +2377,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "AI term extraction active segment saves candidates to the project termbase"
       );
       await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch source alpha.</p><p>Workflow batch source beta.</p></body></html>"], "workflow-ai-batch-terms.html", { type: "text/html" }));
-      const aiBatchTermsDocument = state.project.documents.find((item) => item.name === "workflow-ai-batch-terms.html");
+      const aiBatchTermsDocument = currentProject().documents.find((item) => item.name === "workflow-ai-batch-terms.html");
       await openProjectFile(aiBatchTermsDocument.id);
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
       const batchTermsResult = await extractBatchTermsWithLocalAi();
-      const aiBatchTermsStored = (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang, termBaseNames: ["Workflow TB"] }))
+      const aiBatchTermsStored = (await listTerms({ sourceLang: currentProject().sourceLang, targetLang: currentProject().targetLang, termBaseNames: ["Workflow TB"] }))
         .filter((term) => term.sourceTerm.startsWith("workflow ai batch source term"));
       aiExtractedTermIds.push(...aiBatchTermsStored.map((term) => term.id));
       assert(
@@ -2400,7 +2400,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (Number.isInteger(originalAiTermsActiveIndex) && originalAiTermsActiveIndex >= 0) await setActiveSegment(originalAiTermsActiveIndex);
       if (aiExtractedTermIds.length) {
         await deleteTerms(aiExtractedTermIds);
-        markProjectsUsingResourceDirty("termbase", "Workflow TB", state.project.sourceLang, state.project.targetLang);
+        markProjectsUsingResourceDirty("termbase", "Workflow TB", currentProject().sourceLang, currentProject().targetLang);
         await refreshProjectTerms({ rerender: true });
         await refreshTerms();
       }
@@ -2408,20 +2408,20 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     const aiBriefProvider = aiProviderService.get("ollama");
     const originalAiBriefCompletePrompt = aiBriefProvider.completePrompt;
-    const originalAiBriefSettings = structuredClone(state.project.aiSettings || {});
+    const originalAiBriefSettings = structuredClone(currentProject().aiSettings || {});
     try {
       if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-brief-model";
       els.aiStyleGuideInput.value = "Existing workflow style instruction.";
-      state.project = await updateProject({
-        ...state.project,
+      editorSessionStore.replaceProject(await updateProject({
+        ...currentProject(),
         aiSettings: defaultAiSettings({
-          ...state.project.aiSettings,
+          ...currentProject().aiSettings,
           styleGuide: els.aiStyleGuideInput.value
         })
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+      }));
+      editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
       aiBriefProvider.completePrompt = async (_config, request) => {
         assert(
           request.prompt.includes("Create a concise translation project brief") &&
@@ -2438,25 +2438,25 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         };
       };
       const aiBriefSaved = await generateProjectBriefWithLocalAi();
-      const storedBriefProject = (await listProjects()).find((item) => item.id === state.project.id);
+      const storedBriefProject = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         aiBriefSaved &&
-          state.project.aiSettings?.styleGuide.includes("Existing workflow style instruction.") &&
-          state.project.aiSettings?.styleGuide.includes("AI project brief:") &&
-          state.project.aiSettings?.styleGuide.includes("Workflow localization") &&
-          storedBriefProject?.aiSettings?.styleGuide === state.project.aiSettings?.styleGuide &&
+          currentProject().aiSettings?.styleGuide.includes("Existing workflow style instruction.") &&
+          currentProject().aiSettings?.styleGuide.includes("AI project brief:") &&
+          currentProject().aiSettings?.styleGuide.includes("Workflow localization") &&
+          storedBriefProject?.aiSettings?.styleGuide === currentProject().aiSettings?.styleGuide &&
           els.aiStyleGuideInput.value.includes("AI project brief:") &&
           els.localAiPromptOutput.textContent.includes("Preserve UI labels"),
         "AI project brief saves generated instructions without replacing existing style guide"
       );
     } finally {
       aiBriefProvider.completePrompt = originalAiBriefCompletePrompt;
-      state.project = await updateProject({
-        ...state.project,
+      editorSessionStore.replaceProject(await updateProject({
+        ...currentProject(),
         aiSettings: defaultAiSettings(originalAiBriefSettings)
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      if (els.aiStyleGuideInput) els.aiStyleGuideInput.value = state.project.aiSettings?.styleGuide || "";
+      }));
+      editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
+      if (els.aiStyleGuideInput) els.aiStyleGuideInput.value = currentProject().aiSettings?.styleGuide || "";
     }
 
     const aiSuggestionBaseline = structuredClone(state.segments[segmentIndex]);
@@ -2586,7 +2586,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     editorSessionStore.replaceQaChecks([{ id: "existing-qa-fixture", type: "existing", severity: "info", segmentId: state.segments[segmentIndex].id, label: "fixture", message: "Existing QA fixture." }]);
     renderQaResults();
-    setHiddenSegmentField(state.project, QA_RUN_FAILURE_TEST_FLAG, true);
+    setHiddenSegmentField(currentProject(), QA_RUN_FAILURE_TEST_FLAG, true);
     const failedQaRun = await runProjectQa();
     assert(
       failedQaRun === null &&
@@ -2594,8 +2594,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         currentQaChecks().some((check) => check.id === "existing-qa-fixture"),
       "QA run failure reports visible status and preserves previous QA results"
     );
-    Reflect.deleteProperty(state.project, QA_RUN_FAILURE_TEST_FLAG);
-    setHiddenSegmentField(state.project, QA_ACTIVITY_FAILURE_TEST_FLAG, true);
+    Reflect.deleteProperty(currentProject(), QA_RUN_FAILURE_TEST_FLAG);
+    setHiddenSegmentField(currentProject(), QA_ACTIVITY_FAILURE_TEST_FLAG, true);
     const qaWithActivityFailure = await runProjectQa();
     assert(
       Array.isArray(qaWithActivityFailure) &&
@@ -2603,7 +2603,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         !currentQaChecks().some((check) => check.id === "existing-qa-fixture"),
       "QA activity log failure still renders fresh QA results"
     );
-    Reflect.deleteProperty(state.project, QA_ACTIVITY_FAILURE_TEST_FLAG);
+    Reflect.deleteProperty(currentProject(), QA_ACTIVITY_FAILURE_TEST_FLAG);
     const successfulQaRun = await runProjectQa();
     assert(Array.isArray(successfulQaRun) && els.saveStatus.textContent.startsWith("QA found"), "QA run reports visible result status");
 
@@ -2612,7 +2612,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const originalWindowConfirm = window.confirm;
     const originalFetch = window.fetch;
     const originalStorageSetItem = Storage.prototype.setItem;
-    const originalAiSettings = state.project.aiSettings;
+    const originalAiSettings = currentProject().aiSettings;
     const originalLocalOpenAiKey = localStorage.getItem(OPENAI_KEY_STORAGE);
     const originalSessionOpenAiKey = sessionStorage.getItem(OPENAI_KEY_STORAGE);
     const openAiConfirms = [];
@@ -2632,25 +2632,25 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.aiStyleGuideInput.value = "";
       els.aiEnabledInput.checked = true;
       els.aiSendSourceInput.checked = true;
-      setHiddenSegmentField(state.project, AI_SETTINGS_SAVE_FAILURE_TEST_FLAG, true);
+      setHiddenSegmentField(currentProject(), AI_SETTINGS_SAVE_FAILURE_TEST_FLAG, true);
       const failedAiSettingsSave = await saveAiSettings();
       assert(
         !failedAiSettingsSave &&
           els.saveStatus.textContent.includes("Simulated AI settings save failure") &&
           !storedOpenAiKey() &&
-          JSON.stringify(state.project.aiSettings || {}) === JSON.stringify(originalAiSettings || {}),
+          JSON.stringify(currentProject().aiSettings || {}) === JSON.stringify(originalAiSettings || {}),
         "AI settings save failure reports visible status without storing API key"
       );
-      Reflect.deleteProperty(state.project, AI_SETTINGS_SAVE_FAILURE_TEST_FLAG);
+      Reflect.deleteProperty(currentProject(), AI_SETTINGS_SAVE_FAILURE_TEST_FLAG);
       localStorage.setItem(OPENAI_KEY_STORAGE, "sk-existing-openai-key");
       setHiddenSegmentField(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG, true);
       const failedOpenAiKeyStorageSave = await saveAiSettings();
-      const storedProjectAfterKeyStorageFailure = (await listProjects()).find((item) => item.id === state.project.id);
+      const storedProjectAfterKeyStorageFailure = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         !failedOpenAiKeyStorageSave &&
           els.saveStatus.textContent.includes("Simulated OpenAI key storage failure") &&
           storedOpenAiKey() === "sk-existing-openai-key" &&
-          JSON.stringify(state.project.aiSettings || {}) === JSON.stringify(originalAiSettings || {}) &&
+          JSON.stringify(currentProject().aiSettings || {}) === JSON.stringify(originalAiSettings || {}) &&
           JSON.stringify(storedProjectAfterKeyStorageFailure?.aiSettings || {}) === JSON.stringify(originalAiSettings || {}),
         "OpenAI key storage failure restores previous key and project settings"
       );
@@ -2663,12 +2663,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       };
       els.openAiApiKeyInput.value = "sk-browser-storage-failure";
       const failedBrowserOpenAiKeyStorageSave = await saveAiSettings();
-      const storedProjectAfterBrowserKeyFailure = (await listProjects()).find((item) => item.id === state.project.id);
+      const storedProjectAfterBrowserKeyFailure = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         !failedBrowserOpenAiKeyStorageSave &&
           els.saveStatus.textContent.includes("OpenAI key could not be saved") &&
           storedOpenAiKey() === "sk-existing-openai-key" &&
-          JSON.stringify(state.project.aiSettings || {}) === JSON.stringify(originalAiSettings || {}) &&
+          JSON.stringify(currentProject().aiSettings || {}) === JSON.stringify(originalAiSettings || {}) &&
           JSON.stringify(storedProjectAfterBrowserKeyFailure?.aiSettings || {}) === JSON.stringify(originalAiSettings || {}),
         "browser OpenAI key storage method failure restores previous key and project settings"
       );
@@ -2678,7 +2678,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(
         successfulAiSettingsSave &&
           storedOpenAiKey() === "sk-blocked-openai-key" &&
-          state.project.aiSettings?.enabled === true,
+          currentProject().aiSettings?.enabled === true,
         "AI settings save persists project settings after storing API key"
       );
       els.openAiApiKeyInput.value = "";
@@ -2687,7 +2687,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(
         preservedKeySettingsSave &&
           storedOpenAiKey() === "sk-blocked-openai-key" &&
-          state.project.aiSettings?.model === "test-model-key-preserved",
+          currentProject().aiSettings?.model === "test-model-key-preserved",
         "AI settings save with blank key field preserves existing browser key"
       );
       els.aiProviderInput.value = "Bearer workflow-ai-provider-token-that-must-redact";
@@ -2700,14 +2700,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           String(event.detail?.provider || "").includes("[redacted secret]") &&
           String(event.detail?.model || "").includes("[redacted secret]")
       );
-      const storedProjectAfterAiSettingsMetadataRedaction = (await listProjects()).find((item) => item.id === state.project.id);
+      const storedProjectAfterAiSettingsMetadataRedaction = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         redactedAiSettingsMetadataSave &&
           storedOpenAiKey() === "sk-blocked-openai-key" &&
-          !JSON.stringify(state.project.aiSettings || {}).includes("workflow-ai-provider-token-that-must-redact") &&
-          !JSON.stringify(state.project.aiSettings || {}).includes("workflow-ai-model-token-that-must-redact") &&
-          JSON.stringify(state.project.aiSettings || {}).includes("[redacted secret]") &&
-          JSON.stringify(storedProjectAfterAiSettingsMetadataRedaction?.aiSettings || {}) === JSON.stringify(state.project.aiSettings || {}) &&
+          !JSON.stringify(currentProject().aiSettings || {}).includes("workflow-ai-provider-token-that-must-redact") &&
+          !JSON.stringify(currentProject().aiSettings || {}).includes("workflow-ai-model-token-that-must-redact") &&
+          JSON.stringify(currentProject().aiSettings || {}).includes("[redacted secret]") &&
+          JSON.stringify(storedProjectAfterAiSettingsMetadataRedaction?.aiSettings || {}) === JSON.stringify(currentProject().aiSettings || {}) &&
           redactedAiSettingsMetadataActivity &&
           !JSON.stringify(redactedAiSettingsMetadataActivity).includes("workflow-ai-provider-token-that-must-redact") &&
           !JSON.stringify(redactedAiSettingsMetadataActivity).includes("workflow-ai-model-token-that-must-redact") &&
@@ -2727,48 +2727,48 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(
         nonOpenAiProviderSettingsSave &&
           storedOpenAiKey() === "sk-blocked-openai-key" &&
-          state.project.aiSettings?.provider === "Anthropic" &&
-          state.project.aiSettings?.model === "test-model-non-openai-provider" &&
+          currentProject().aiSettings?.provider === "Anthropic" &&
+          currentProject().aiSettings?.model === "test-model-non-openai-provider" &&
           nonOpenAiProviderSettingsActivity?.detail?.keyStorage === "Not applicable",
         "AI settings save does not store typed OpenAI key or report OpenAI key storage when provider is not OpenAI"
       );
       els.aiProviderInput.value = "OpenAI";
-      state.project = await updateProject({
-        ...state.project,
+      editorSessionStore.replaceProject(await updateProject({
+        ...currentProject(),
         aiSettings: {
-          ...state.project.aiSettings,
+          ...currentProject().aiSettings,
           apiKey: "sk-local-ai-metadata-that-must-strip",
           bearerToken: "bearer-local-ai-metadata-that-must-strip",
           apiKeyMode: "sk-abused-api-key-mode-that-must-normalize",
           styleGuide: "Use Bearer ai-style-token-that-must-redact"
         }
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
-      const storedProjectAfterAiMetadataNormalization = (await listProjects()).find((item) => item.id === state.project.id);
+      }));
+      editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
+      const storedProjectAfterAiMetadataNormalization = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
-        !JSON.stringify(state.project.aiSettings || {}).includes("sk-local-ai-metadata") &&
-          !JSON.stringify(state.project.aiSettings || {}).includes("bearer-local-ai-metadata") &&
-          !JSON.stringify(state.project.aiSettings || {}).includes("ai-style-token-that-must-redact") &&
-          JSON.stringify(state.project.aiSettings || {}).includes("[redacted secret]") &&
-          state.project.aiSettings?.apiKeyMode === "bring-your-own" &&
-          JSON.stringify(storedProjectAfterAiMetadataNormalization?.aiSettings || {}) === JSON.stringify(state.project.aiSettings || {}),
+        !JSON.stringify(currentProject().aiSettings || {}).includes("sk-local-ai-metadata") &&
+          !JSON.stringify(currentProject().aiSettings || {}).includes("bearer-local-ai-metadata") &&
+          !JSON.stringify(currentProject().aiSettings || {}).includes("ai-style-token-that-must-redact") &&
+          JSON.stringify(currentProject().aiSettings || {}).includes("[redacted secret]") &&
+          currentProject().aiSettings?.apiKeyMode === "bring-your-own" &&
+          JSON.stringify(storedProjectAfterAiMetadataNormalization?.aiSettings || {}) === JSON.stringify(currentProject().aiSettings || {}),
         "project updates normalize AI settings and strip secret-shaped metadata and style instructions"
       );
       els.aiModelInput.value = "test-model-activity-warning";
       els.openAiApiKeyInput.value = "sk-ai-settings-activity-warning-key";
-      setHiddenSegmentField(state.project, AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG, true);
+      setHiddenSegmentField(currentProject(), AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG, true);
       const aiSettingsActivityWarning = await saveAiSettings();
-      const storedProjectAfterAiSettingsActivityWarning = (await listProjects()).find((item) => item.id === state.project.id);
+      const storedProjectAfterAiSettingsActivityWarning = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         aiSettingsActivityWarning &&
           storedOpenAiKey() === "sk-ai-settings-activity-warning-key" &&
-          state.project.aiSettings?.model === "test-model-activity-warning" &&
+          currentProject().aiSettings?.model === "test-model-activity-warning" &&
           storedProjectAfterAiSettingsActivityWarning?.aiSettings?.model === "test-model-activity-warning" &&
           els.saveStatus.textContent.includes("activity log failed") &&
           state.workspaceDirtyProjectIds.has(project.id),
         "AI settings activity log failure reports warning after successful settings save"
       );
-      Reflect.deleteProperty(state.project, AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG);
+      Reflect.deleteProperty(currentProject(), AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG);
       sessionStorage.removeItem(OPENAI_KEY_STORAGE);
       localStorage.removeItem(OPENAI_KEY_STORAGE);
       els.aiEnabledInput.checked = false;
@@ -2787,7 +2787,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.aiModelInput.value = "model-empty-source-must-not-save";
       els.openAiApiKeyInput.value = "sk-openai-empty-source-key";
       els.rememberOpenAiKeyInput.checked = true;
-      const aiSettingsBeforeEmptySourceOpenAi = structuredClone(state.project.aiSettings || {});
+      const aiSettingsBeforeEmptySourceOpenAi = structuredClone(currentProject().aiSettings || {});
       const openAiConfirmCountBeforeEmptySource = openAiConfirms.length;
       const sourceBeforeEmptySourceOpenAi = state.segments[segmentIndex].source;
       state.segments[segmentIndex].source = "";
@@ -2796,19 +2796,19 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       } finally {
         state.segments[segmentIndex].source = sourceBeforeEmptySourceOpenAi;
       }
-      const storedProjectAfterEmptySourceOpenAi = (await listProjects()).find((item) => item.id === state.project.id);
+      const storedProjectAfterEmptySourceOpenAi = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         !storedOpenAiKey() &&
           els.saveStatus.textContent.includes("no source text") &&
           openAiConfirms.length === openAiConfirmCountBeforeEmptySource &&
-          state.project.aiSettings?.model !== "model-empty-source-must-not-save" &&
+          currentProject().aiSettings?.model !== "model-empty-source-must-not-save" &&
           JSON.stringify(storedProjectAfterEmptySourceOpenAi?.aiSettings || {}) === JSON.stringify(aiSettingsBeforeEmptySourceOpenAi),
         "blocked OpenAI suggestion does not save typed key or changed project settings when source text is empty"
       );
       els.aiModelInput.value = "model-offline-no-key-must-not-save";
       els.openAiApiKeyInput.value = "";
       els.rememberOpenAiKeyInput.checked = true;
-      const aiSettingsBeforeOfflineNoKeyOpenAi = structuredClone(state.project.aiSettings || {});
+      const aiSettingsBeforeOfflineNoKeyOpenAi = structuredClone(currentProject().aiSettings || {});
       const openAiConfirmCountBeforeOfflineNoKey = openAiConfirms.length;
       const navigatorOnlineDescriptorForNoKey = Object.getOwnPropertyDescriptor(navigator, "onLine");
       try {
@@ -2818,12 +2818,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         if (navigatorOnlineDescriptorForNoKey) Object.defineProperty(navigator, "onLine", navigatorOnlineDescriptorForNoKey);
         else Reflect.deleteProperty(navigator, "onLine");
       }
-      const storedProjectAfterOfflineNoKeyOpenAi = (await listProjects()).find((item) => item.id === state.project.id);
+      const storedProjectAfterOfflineNoKeyOpenAi = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         !storedOpenAiKey() &&
           els.saveStatus.textContent.includes("appears to be offline") &&
           !els.saveStatus.textContent.includes("Add your OpenAI API key") &&
-          state.project.aiSettings?.model !== "model-offline-no-key-must-not-save" &&
+          currentProject().aiSettings?.model !== "model-offline-no-key-must-not-save" &&
           JSON.stringify(storedProjectAfterOfflineNoKeyOpenAi?.aiSettings || {}) === JSON.stringify(aiSettingsBeforeOfflineNoKeyOpenAi) &&
           openAiConfirms.length === openAiConfirmCountBeforeOfflineNoKey,
         "offline OpenAI suggestion reports offline before API key requirement or settings save"
@@ -2831,7 +2831,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.aiModelInput.value = "model-offline-must-not-save";
       els.openAiApiKeyInput.value = "sk-openai-offline-key";
       els.rememberOpenAiKeyInput.checked = true;
-      const aiSettingsBeforeOfflineOpenAi = structuredClone(state.project.aiSettings || {});
+      const aiSettingsBeforeOfflineOpenAi = structuredClone(currentProject().aiSettings || {});
       const openAiConfirmCountBeforeOffline = openAiConfirms.length;
       const navigatorOnlineDescriptor = Object.getOwnPropertyDescriptor(navigator, "onLine");
       try {
@@ -2841,11 +2841,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         if (navigatorOnlineDescriptor) Object.defineProperty(navigator, "onLine", navigatorOnlineDescriptor);
         else Reflect.deleteProperty(navigator, "onLine");
       }
-      const storedProjectAfterOfflineOpenAi = (await listProjects()).find((item) => item.id === state.project.id);
+      const storedProjectAfterOfflineOpenAi = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         !storedOpenAiKey() &&
           els.saveStatus.textContent.includes("appears to be offline") &&
-          state.project.aiSettings?.model !== "model-offline-must-not-save" &&
+          currentProject().aiSettings?.model !== "model-offline-must-not-save" &&
           JSON.stringify(storedProjectAfterOfflineOpenAi?.aiSettings || {}) === JSON.stringify(aiSettingsBeforeOfflineOpenAi) &&
           openAiConfirms.length === openAiConfirmCountBeforeOffline,
         "offline OpenAI suggestion fails before source sharing confirmation or key/settings save"
@@ -2861,7 +2861,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         return false;
       };
       await createOpenAiSuggestion();
-      const storedProjectAfterOpenAiCancel = (await listProjects()).find((item) => item.id === state.project.id);
+      const storedProjectAfterOpenAiCancel = (await listProjects()).find((item) => item.id === currentProject().id);
       const canceledOpenAiConfirm = openAiConfirms.find((message) => message.includes("OpenAI") && message.includes("outside LoopCAT"));
       assert(
         canceledOpenAiConfirm &&
@@ -2870,8 +2870,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           canceledOpenAiConfirm.includes("style instructions") &&
           !storedOpenAiKey() &&
           els.saveStatus.textContent.includes("OpenAI suggestion canceled") &&
-          state.project.aiSettings?.model !== "model-canceled-before-save" &&
-          JSON.stringify(storedProjectAfterOpenAiCancel?.aiSettings || {}) === JSON.stringify(state.project.aiSettings || {}),
+          currentProject().aiSettings?.model !== "model-canceled-before-save" &&
+          JSON.stringify(storedProjectAfterOpenAiCancel?.aiSettings || {}) === JSON.stringify(currentProject().aiSettings || {}),
         "OpenAI suggestion confirmation names optional local context before key or project settings are saved"
       );
       window.confirm = (message) => {
@@ -2881,27 +2881,27 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.aiModelInput.value = "model-that-must-not-save";
       els.openAiApiKeyInput.value = "sk-openai-setup-failure-key";
       els.rememberOpenAiKeyInput.checked = true;
-      setHiddenSegmentField(state.project, AI_SETTINGS_SAVE_FAILURE_TEST_FLAG, true);
+      setHiddenSegmentField(currentProject(), AI_SETTINGS_SAVE_FAILURE_TEST_FLAG, true);
       await createOpenAiSuggestion();
       assert(
         !storedOpenAiKey() &&
           els.saveStatus.textContent.includes("Simulated AI settings save failure") &&
-          state.project.aiSettings?.model !== "model-that-must-not-save",
+          currentProject().aiSettings?.model !== "model-that-must-not-save",
         "OpenAI suggestion setup failure does not store typed key or changed project settings"
       );
-      Reflect.deleteProperty(state.project, AI_SETTINGS_SAVE_FAILURE_TEST_FLAG);
-      const aiSettingsBeforeOpenAiKeyFailure = structuredClone(state.project.aiSettings || {});
+      Reflect.deleteProperty(currentProject(), AI_SETTINGS_SAVE_FAILURE_TEST_FLAG);
+      const aiSettingsBeforeOpenAiKeyFailure = structuredClone(currentProject().aiSettings || {});
       localStorage.setItem(OPENAI_KEY_STORAGE, "sk-existing-openai-key");
       els.aiModelInput.value = "model-key-storage-failure";
       els.openAiApiKeyInput.value = "sk-openai-key-storage-failure";
       els.rememberOpenAiKeyInput.checked = true;
       setHiddenSegmentField(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG, true);
       await createOpenAiSuggestion();
-      const storedProjectAfterOpenAiKeyFailure = (await listProjects()).find((item) => item.id === state.project.id);
+      const storedProjectAfterOpenAiKeyFailure = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         storedOpenAiKey() === "sk-existing-openai-key" &&
           els.saveStatus.textContent.includes("Simulated OpenAI key storage failure") &&
-          JSON.stringify(state.project.aiSettings || {}) === JSON.stringify(aiSettingsBeforeOpenAiKeyFailure) &&
+          JSON.stringify(currentProject().aiSettings || {}) === JSON.stringify(aiSettingsBeforeOpenAiKeyFailure) &&
           JSON.stringify(storedProjectAfterOpenAiKeyFailure?.aiSettings || {}) === JSON.stringify(aiSettingsBeforeOpenAiKeyFailure),
         "OpenAI suggestion key storage failure restores previous key and project settings"
       );
@@ -2925,11 +2925,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       };
       await createOpenAiSuggestion();
       window.fetch = originalFetch;
-      const storedProjectAfterOpenAiConnectionFailure = (await listProjects()).find((item) => item.id === state.project.id);
+      const storedProjectAfterOpenAiConnectionFailure = (await listProjects()).find((item) => item.id === currentProject().id);
       const storedSegmentAfterOpenAiConnectionFailure = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
       assert(
         storedOpenAiKey() === "sk-openai-provider-connection-failure" &&
-          state.project.aiSettings?.model === "model-provider-connection-failure" &&
+          currentProject().aiSettings?.model === "model-provider-connection-failure" &&
           storedProjectAfterOpenAiConnectionFailure?.aiSettings?.model === "model-provider-connection-failure" &&
           (state.segments[segmentIndex].aiSuggestions || []).length === suggestionCountBeforeOpenAiConnectionFailure &&
           (storedSegmentAfterOpenAiConnectionFailure?.aiSuggestions || []).length === suggestionCountBeforeOpenAiConnectionFailure &&
@@ -2945,8 +2945,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       localStorage.removeItem(OPENAI_KEY_STORAGE);
       if (originalLocalOpenAiKey !== null) localStorage.setItem(OPENAI_KEY_STORAGE, originalLocalOpenAiKey);
       if (originalSessionOpenAiKey !== null) sessionStorage.setItem(OPENAI_KEY_STORAGE, originalSessionOpenAiKey);
-      state.project = await updateProject({ ...state.project, aiSettings: originalAiSettings });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+      editorSessionStore.replaceProject(await updateProject({ ...currentProject(), aiSettings: originalAiSettings }));
+      editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
       renderEditor();
     }
     await setActiveSegment(segmentIndex);
@@ -3054,21 +3054,21 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await saveTerm({
       sourceTerm: "Hello",
       targetTerm: "forbidden-report-term",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       notes: "Report terminology fixture Bearer report-term-note-token-that-must-not-appear",
       termBaseName: "Workflow TB",
       isForbidden: true
     });
     const forbiddenDeliveryReport = validateExportReadiness({
-      project: state.project,
+      project: currentProject(),
       segments: [{ ...state.segments[segmentIndex], target: "forbidden-report-term" }],
       format: "txt",
       terms: [{ sourceTerm: "Hello", targetTerm: "forbidden-report-term", isForbidden: true }]
     });
     assert(!canRunDeliveryExport(forbiddenDeliveryReport) && forbiddenDeliveryReport.risky.some((item) => item.includes("forbidden terminology")), "delivery export gate blocks forbidden terminology");
     const emptyTargetDeliveryReport = validateExportReadiness({
-      project: state.project,
+      project: currentProject(),
       segments: [{ ...state.segments[segmentIndex], target: "" }],
       format: "txt",
       terms: []
@@ -3099,21 +3099,21 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         { type: "text/html" }
       )
     );
-    const pretranslateDocument = state.project.documents.find((item) => item.name === "workflow-pretranslate.html");
+    const pretranslateDocument = currentProject().documents.find((item) => item.name === "workflow-pretranslate.html");
     await saveTmEntry({
       source: pretranslateSource,
       target: pretranslateTarget,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      projectName: state.project.name,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
+      projectName: currentProject().name,
       tmName: mainTmName()
     });
     await saveTmEntry({
       source: secondPretranslateSource,
       target: secondPretranslateTarget,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      projectName: state.project.name,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
+      projectName: currentProject().name,
       tmName: mainTmName()
     });
     await openProjectFile(pretranslateDocument.id);
@@ -3236,21 +3236,21 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const localAiContextAfterSource = "Save the profile changes.";
       const localAiTmTarget = "Workflow TM context target";
       await importLocalization(new File([`<!doctype html><html><body><p>${localAiContextBeforeSource}</p><p>${localAiGlossarySource}</p><p>${localAiContextAfterSource}</p></body></html>`], "workflow-local-ai-glossary.html", { type: "text/html" }));
-      const localAiGlossaryDocument = state.project.documents.find((item) => item.name === "workflow-local-ai-glossary.html");
+      const localAiGlossaryDocument = currentProject().documents.find((item) => item.name === "workflow-local-ai-glossary.html");
       localAiGlossaryTerm = await saveTerm({
         sourceTerm: localAiGlossarySourceTerm,
         targetTerm: localAiGlossaryTargetTerm,
         notes: "Workflow Local AI glossary hint fixture.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
         termBaseName: primaryTermBaseName()
       });
       localAiTmEntry = await saveTmEntry({
         source: localAiGlossarySource,
         target: localAiTmTarget,
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        projectName: state.project.name,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
+        projectName: currentProject().name,
         tmName: mainTmName()
       });
       await openProjectFile(localAiGlossaryDocument.id);
@@ -3477,7 +3477,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         providerId: "ollama",
         baseUrl: OLLAMA_CLOUD_BASE_URL,
         model: "gpt-oss:120b"
-      }, state.project);
+      }, currentProject());
       const hostedOllamaKeySnapshot = localAiKeySnapshot(hostedOllamaKeySettings);
       const previousHostedOllamaKeyFieldValue = els.localAiApiKeyInput?.value || "";
       const previousHostedOllamaRememberValue = Boolean(els.rememberLocalAiKeyInput?.checked);
@@ -3645,12 +3645,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       providerId: "deepseek",
       baseUrl: "https://api.deepseek.com",
       model: "deepseek-v4-pro"
-    }, state.project);
+    }, currentProject());
     const geminiKeySettings = localAISettingsStore.defaults({
       providerId: "gemini",
       baseUrl: "https://generativelanguage.googleapis.com/v1beta",
       model: "gemini-3.5-flash"
-    }, state.project);
+    }, currentProject());
     const deepSeekKeySnapshot = localAiKeySnapshot(deepSeekKeySettings);
     const geminiKeySnapshot = localAiKeySnapshot(geminiKeySettings);
     const previousLocalAiKeyFieldValue = els.localAiApiKeyInput?.value || "";
@@ -3678,10 +3678,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       providerId: "openai-compatible",
       baseUrl: "https://example.com/v1",
       model: "unsupported-compatible-model"
-    }, state.project);
+    }, currentProject());
     const unsupportedCompatibleKeySnapshot = localAiKeySnapshot(unsupportedCompatibleSettings);
     const unsupportedCompatiblePreviousKey = unsupportedCompatibleKeySnapshot.session || unsupportedCompatibleKeySnapshot.local || "";
-    const unsupportedCompatibleProjectAiSettings = structuredClone(state.project.aiSettings || {});
+    const unsupportedCompatibleProjectAiSettings = structuredClone(currentProject().aiSettings || {});
     const previousLocalProviderValue = els.localAiProviderSelect?.value || "";
     const previousLocalBaseUrlValue = els.localAiBaseUrlInput?.value || "";
     const previousLocalModelValue = els.localAiModelInput?.value || "";
@@ -3698,7 +3698,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         els.saveStatus.textContent.includes("explicit provider allowlist") &&
           els.localAiStatusText.textContent.includes("explicit provider allowlist") &&
           storedLocalAiKey(unsupportedCompatibleSettings) === unsupportedCompatiblePreviousKey &&
-          JSON.stringify(state.project.aiSettings || {}) === JSON.stringify(unsupportedCompatibleProjectAiSettings),
+          JSON.stringify(currentProject().aiSettings || {}) === JSON.stringify(unsupportedCompatibleProjectAiSettings),
         "AI Command Centre blocks unsupported hosted OpenAI-compatible endpoints before saving keys or settings"
       );
     } finally {
@@ -3863,15 +3863,15 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const qualityProfileSubmitEvent = new Event("submit", { bubbles: true, cancelable: true });
     const qualityProfileSubmitResult = els.qualityForm.dispatchEvent(qualityProfileSubmitEvent);
     await waitFor(
-      () => state.project.qualityProfile?.standard === "agency-delivery" && state.project.qualityProfile?.reviewDepth === "lqa",
+      () => currentProject().qualityProfile?.standard === "agency-delivery" && currentProject().qualityProfile?.reviewDepth === "lqa",
       "checked quality profile form submit"
     );
     assert(
       !qualityProfileSubmitResult &&
         qualityProfileSubmitEvent.defaultPrevented &&
-        state.project.qualityProfile.standard === "agency-delivery" &&
-        state.project.qualityProfile.reviewDepth === "lqa" &&
-        state.project.qualityProfile.terminologyStrictness === "strict",
+        currentProject().qualityProfile.standard === "agency-delivery" &&
+        currentProject().qualityProfile.reviewDepth === "lqa" &&
+        currentProject().qualityProfile.terminologyStrictness === "strict",
       "checked quality/review controller owns profile submit while domain persistence keeps the review contract"
     );
     editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
@@ -3879,7 +3879,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(
       els.qualitySummary.textContent.includes("risk items") &&
         els.qualityRiskList.textContent.length > 0 &&
-        qualityReviewController.getState().projectId === state.project.id &&
+        qualityReviewController.getState().projectId === currentProject().id &&
         qualityReviewController.getState().segmentId === currentSegment()?.id &&
         qualityReviewController.getState().riskCount === storedQualityRiskQueue().totalRiskItems,
       "checked quality/review controller owns workbench rendering and redacted view state"
@@ -3919,10 +3919,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     assert(
       buildRiskQueue({
-        project: state.project,
+        project: currentProject(),
         segments: state.segments,
         qaChecks: currentQaChecks(),
-        profile: state.project.qualityProfile
+        profile: currentProject().qualityProfile
       })?.byCategory?.accuracy >= 1,
       "quality decision contributes to category risk aggregation"
     );
@@ -3954,16 +3954,16 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await logProjectActivity("Bearer report-activity-type-token-that-must-not-appear", "Activity type privacy fixture", {
         issueCount: 0
       });
-      state.project = await updateProject({
-        ...state.project,
+      editorSessionStore.replaceProject(await updateProject({
+        ...currentProject(),
         domain: "Bearer external-domain-token-that-must-redact"
-      });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+      }));
+      editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
       const reportTargetText = state.segments[segmentIndex].target;
       els.exportProjectReportBtn.click();
       const reportDownload = await waitFor(() => reportDownloads.find((item) => item.type === "text/html"), "project report download");
       assert(
-        reportDownload.text.includes("LoopCAT Project Report") && reportDownload.text.includes(state.project.name),
+        reportDownload.text.includes("LoopCAT Project Report") && reportDownload.text.includes(currentProject().name),
         "checked import/export controller delegates project report export"
       );
       assert(reportDownload.text.includes(`Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`), "project report export includes restrictive CSP");
@@ -4076,7 +4076,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
       els.exportAnonymizedProjectReportBtn.click();
       const anonymizedReportDownload = await waitFor(() => reportDownloads.find((item) => item.text.includes("LoopCAT Anonymized Project Report")), "anonymized project report download");
-      assert(anonymizedReportDownload.text.includes("Anonymized project") && !anonymizedReportDownload.text.includes(state.project.name), "anonymized project report redacts project name");
+      assert(anonymizedReportDownload.text.includes("Anonymized project") && !anonymizedReportDownload.text.includes(currentProject().name), "anonymized project report redacts project name");
       assert(anonymizedReportDownload.text.includes(`Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`), "anonymized project report includes restrictive CSP");
       assert(!anonymizedReportDownload.text.includes("external-domain-token-that-must-redact"), "anonymized project report redacts credential-looking project domain metadata");
       assert(
@@ -4182,11 +4182,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const validationAlerts = [];
       try {
         window.alert = (message) => validationAlerts.push(String(message || ""));
-        const alertLeakPackage = await buildProjectPackage(state.project);
+        const alertLeakPackage = await buildProjectPackage(currentProject());
         alertLeakPackage.activityEvents = [
           {
             id: "Bearer validation-alert-activity-token-that-must-not-appear",
-            projectId: state.project.id,
+            projectId: currentProject().id,
             type: "import",
             summary: "Alert duplicate fixture",
             detail: {},
@@ -4194,7 +4194,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           },
           {
             id: "Bearer validation-alert-activity-token-that-must-not-appear",
-            projectId: state.project.id,
+            projectId: currentProject().id,
             type: "import",
             summary: "Alert duplicate fixture",
             detail: {},
@@ -4215,23 +4215,23 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       } finally {
         window.alert = originalValidationAlert;
       }
-      const originalLabelProject = state.project;
-      const originalLabelProjects = state.projects;
+      const originalLabelProject = currentProject();
+      const originalLabelProjects = currentProjects();
       const originalLabelProjectSummaries = currentProjectSummaries();
       const originalLabelResourceState = resourcesController.getState();
       const originalLabelConfirm = window.confirm;
-      const originalDocuments = projectDocumentManifest(state.project);
+      const originalDocuments = projectDocumentManifest(currentProject());
       const labelDocumentName = "Bearer ui-document-label-token-that-must-not-appear";
       const labelProject = {
-        ...state.project,
+        ...currentProject(),
         name: "Bearer ui-project-label-token-that-must-not-appear",
         sourceFileName: "Bearer ui-source-file-label-token-that-must-not-appear",
         documents: originalDocuments.map((documentInfo, index) => index === 0 ? { ...documentInfo, name: labelDocumentName } : documentInfo)
       };
       const capturedLabelPrompts = [];
       try {
-        state.project = labelProject;
-        state.projects = state.projects.map((item) => item.id === labelProject.id ? labelProject : item);
+        editorSessionStore.replaceProject(labelProject);
+        editorSessionStore.replaceProjects(currentProjects().map((item) => item.id === labelProject.id ? labelProject : item));
         editorSessionStore.replaceProjectSummaries(
           currentProjectSummaries().map((item) =>
             item.id === labelProject.id ? { ...item, ...labelProject } : item
@@ -4267,9 +4267,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           tmName: "Bearer ui-resource-label-token-that-must-not-appear",
           source: "Resource source",
           target: "Resource target",
-          sourceLang: state.project.sourceLang,
-          targetLang: state.project.targetLang,
-          languagePair: `${state.project.sourceLang}::${state.project.targetLang}`,
+          sourceLang: currentProject().sourceLang,
+          targetLang: currentProject().targetLang,
+          languagePair: `${currentProject().sourceLang}::${currentProject().targetLang}`,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }], terms: originalLabelResourceState.terms }, false);
@@ -4281,8 +4281,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         );
       } finally {
         window.confirm = originalLabelConfirm;
-        state.project = originalLabelProject;
-        state.projects = originalLabelProjects;
+        editorSessionStore.replaceProject(originalLabelProject);
+        editorSessionStore.replaceProjects(originalLabelProjects);
         editorSessionStore.replaceProjectSummaries(originalLabelProjectSummaries);
         resourcesController.selectType(originalLabelResourceState.type, { render: false });
         resourcesController.setResources({
@@ -4316,8 +4316,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await saveTmEntry({
         source: "TMX origin privacy source.",
         target: "TMX origin privacy target.",
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
         projectName: "Bearer project-tmx-origin-token-that-must-not-appear",
         tmName: mainTmName()
       });
@@ -4335,7 +4335,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       await refreshResources();
       const xmlDownloadsBeforeResourceTmx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      exportResource("tm", `${mainTmName()}::${state.project.sourceLang}::${state.project.targetLang}`);
+      exportResource("tm", `${mainTmName()}::${currentProject().sourceLang}::${currentProject().targetLang}`);
       const resourceTmxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
       const resourceTmxDownload = resourceTmxDownloads[resourceTmxDownloads.length - 1];
       const resourceTmxText = await resourceTmxDownload.blob.text();
@@ -4359,7 +4359,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       await refreshResources();
       const xmlDownloadsBeforeResourceTbx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      exportResource("tb", `${primaryTermBaseName()}::${state.project.sourceLang}::${state.project.targetLang}`);
+      exportResource("tb", `${primaryTermBaseName()}::${currentProject().sourceLang}::${currentProject().targetLang}`);
       const resourceTbxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
       const resourceTbxDownload = resourceTbxDownloads[resourceTbxDownloads.length - 1];
       const resourceTbxText = await resourceTbxDownload.blob.text();
@@ -4370,7 +4370,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "standalone TBX resource export redacts credential-looking termbase notes"
       );
       const targetTxtDownloadCountBeforeActivityFailure = statusDownloads.filter((item) => item.type === "text/plain").length;
-      setHiddenSegmentField(state.project, EXPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
+      setHiddenSegmentField(currentProject(), EXPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
       await exportTargetText();
       assert(
         els.saveStatus.textContent.includes("Target TXT exported") &&
@@ -4379,7 +4379,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           state.workspaceDirtyProjectIds.has(project.id),
         "target TXT export activity log failure reports warning after successful download"
       );
-      Reflect.deleteProperty(state.project, EXPORT_ACTIVITY_FAILURE_TEST_FLAG);
+      Reflect.deleteProperty(currentProject(), EXPORT_ACTIVITY_FAILURE_TEST_FLAG);
       const revokedUrlCountBeforeClickFailure = statusRevokedUrls.length;
       const temporaryDownloadLinksBeforeClickFailure = document.querySelectorAll("a[download]").length;
       HTMLAnchorElement.prototype.click = function failingStatusDownloadClick() {
@@ -4406,7 +4406,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "project TMX export failure reports visible status");
       await handleTbxExport();
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "project TBX export failure reports visible status");
-      exportResource("tm", `${mainTmName()}::${state.project.sourceLang}::${state.project.targetLang}`);
+      exportResource("tm", `${mainTmName()}::${currentProject().sourceLang}::${currentProject().targetLang}`);
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "resource export failure reports visible status");
     } finally {
       URL.createObjectURL = originalStatusCreateObjectUrl;
@@ -4418,16 +4418,16 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const resourceTmEntry = await saveTmEntry({
       source: "Resource row TM source",
       target: "Resource row TM target",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      projectName: state.project.name,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
+      projectName: currentProject().name,
       tmName: mainTmName()
     });
     const resourceTerm = await saveTerm({
       sourceTerm: "resource-row-term",
       targetTerm: "resource-row-target",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       notes: "Resource row note",
       termBaseName: primaryTermBaseName(),
       isForbidden: false
@@ -4539,8 +4539,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await undoLastCommand();
     const restoredTmCandidates = await getTmMatchCandidates({
       source: resourceTmEntry.source,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       tmName: mainTmName()
     });
     assert(
@@ -4566,7 +4566,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       notes: "Unsaved resource term note",
       isForbidden: true
     });
-    const failedStoredTerm = (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
+    const failedStoredTerm = (await listTerms({ sourceLang: currentProject().sourceLang, targetLang: currentProject().targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
     assert(
       !failedResourceTermSave &&
         els.saveStatus.textContent.includes("Simulated term resource save failure") &&
@@ -4582,7 +4582,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       notes: "Saved resource term note",
       isForbidden: true
     });
-    const savedStoredTerm = (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
+    const savedStoredTerm = (await listTerms({ sourceLang: currentProject().sourceLang, targetLang: currentProject().targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
     assert(
       successfulResourceTermSave &&
         savedStoredTerm?.targetTerm === "saved-resource-term-target" &&
@@ -4592,7 +4592,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     setHiddenSegmentField(editableTerm, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG, true);
     const failedResourceTermDelete = await deleteTermResourceEntry(editableTerm);
-    const failedDeletedTerm = (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
+    const failedDeletedTerm = (await listTerms({ sourceLang: currentProject().sourceLang, targetLang: currentProject().targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
     assert(
       !failedResourceTermDelete &&
         els.saveStatus.textContent.includes("Simulated term resource delete failure") &&
@@ -4607,7 +4607,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     assert(
       successfulResourceTermDelete &&
-        !(await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang, termBaseNames: [primaryTermBaseName()] })).some((term) => term.id === resourceTerm.id) &&
+        !(await listTerms({ sourceLang: currentProject().sourceLang, targetLang: currentProject().targetLang, termBaseNames: [primaryTermBaseName()] })).some((term) => term.id === resourceTerm.id) &&
         state.workspaceDirtyProjectIds.has(project.id) &&
         termEntryTrash?.payload?.records?.[0]?.notes === "Saved resource term note" &&
         els.saveStatus.textContent.includes("Undo is available"),
@@ -4616,15 +4616,15 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await undoLastCommand();
     const restoredResourceTerm = (
       await listTerms({
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
         termBaseNames: [primaryTermBaseName()]
       })
     ).find((term) => term.id === resourceTerm.id);
     const restoredTermSuggestions = await findTerms({
       source: resourceTerm.sourceTerm,
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseNames: [primaryTermBaseName()]
     });
     assert(
@@ -4636,7 +4636,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     await redoLastCommand();
     assert(
-      !(await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })).some(
+      !(await listTerms({ sourceLang: currentProject().sourceLang, targetLang: currentProject().targetLang })).some(
         (term) => term.id === resourceTerm.id
       ) &&
         (await appRuntime.trashRepository.list()).some(
@@ -4650,36 +4650,36 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await saveTmEntry({
       source: "bulk delete tm source one",
       target: "bulk delete tm target one",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      projectName: state.project.name,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
+      projectName: currentProject().name,
       tmName: bulkTmName
     });
     await saveTmEntry({
       source: "bulk delete tm source two",
       target: "bulk delete tm target two",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      projectName: state.project.name,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
+      projectName: currentProject().name,
       tmName: bulkTmName
     });
     await saveTerm({
       sourceTerm: "bulk delete tb source one",
       targetTerm: "bulk delete tb target one",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseName: bulkTbName
     });
     await saveTerm({
       sourceTerm: "bulk delete tb source two",
       targetTerm: "bulk delete tb target two",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
       termBaseName: bulkTbName
     });
     await refreshResources();
-    const bulkTmKey = `${bulkTmName}::${state.project.sourceLang}::${state.project.targetLang}`;
-    const bulkTbKey = `${bulkTbName}::${state.project.sourceLang}::${state.project.targetLang}`;
+    const bulkTmKey = `${bulkTmName}::${currentProject().sourceLang}::${currentProject().targetLang}`;
+    const bulkTbKey = `${bulkTbName}::${currentProject().sourceLang}::${currentProject().targetLang}`;
     const atomicConflictTrashId = `workflow-resource-trash-conflict-${Date.now()}`;
     await storageApi.put("trashEntries", {
       id: atomicConflictTrashId,
@@ -4699,9 +4699,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         projectId: "",
         resourceType: "tm",
         resourceName: bulkTmName,
-        sourceLang: state.project.sourceLang,
-        targetLang: state.project.targetLang,
-        languagePair: `${state.project.sourceLang}::${state.project.targetLang}`,
+        sourceLang: currentProject().sourceLang,
+        targetLang: currentProject().targetLang,
+        languagePair: `${currentProject().sourceLang}::${currentProject().targetLang}`,
         label: bulkTmName,
         deletedAt: new Date().toISOString(),
         payload: { records: resourceItems("tm", bulkTmKey) }
@@ -4750,9 +4750,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const conflictingBulkTmEntry = await saveTmEntry({
       source: "conflicting live TM source",
       target: "conflicting live TM target",
-      sourceLang: state.project.sourceLang,
-      targetLang: state.project.targetLang,
-      projectName: state.project.name,
+      sourceLang: currentProject().sourceLang,
+      targetLang: currentProject().targetLang,
+      projectName: currentProject().name,
       tmName: bulkTmName
     });
     let bulkTmRestoreConflict = null;
@@ -4772,7 +4772,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.add(`tb:${bulkTbKey}`);
     const failedBulkTbDelete = await confirmDeleteResource("tb", bulkTbKey);
     const failedBulkTbTerms = (
-      await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })
+      await listTerms({ sourceLang: currentProject().sourceLang, targetLang: currentProject().targetLang })
     ).filter((term) => term.termBaseName === bulkTbName);
     assert(
       !failedBulkTbDelete &&
@@ -4788,7 +4788,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     assert(
       successfulBulkTbDelete &&
-        !(await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })).some(
+        !(await listTerms({ sourceLang: currentProject().sourceLang, targetLang: currentProject().targetLang })).some(
           (term) => term.termBaseName === bulkTbName
         ) &&
         bulkTbTrash?.payload?.records?.length === 2,
@@ -4796,14 +4796,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     await undoLastCommand();
     assert(
-      (await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })).filter(
+      (await listTerms({ sourceLang: currentProject().sourceLang, targetLang: currentProject().targetLang })).filter(
         (term) => term.termBaseName === bulkTbName
       ).length === 2 && !(await appRuntime.trashRepository.list()).some((entry) => entry.id === bulkTbTrash.id),
       "termbase whole resource Undo atomically restores every term"
     );
     await redoLastCommand();
     assert(
-      !(await listTerms({ sourceLang: state.project.sourceLang, targetLang: state.project.targetLang })).some(
+      !(await listTerms({ sourceLang: currentProject().sourceLang, targetLang: currentProject().targetLang })).some(
         (term) => term.termBaseName === bulkTbName
       ) &&
         (await appRuntime.trashRepository.list()).some(
@@ -4828,8 +4828,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await importLocalization(new File([JSON.stringify({ title: "Package source JSON" })], "workflow-structure.json", { type: "application/json" }));
     await importLocalization(new File(["key,source,target\nbutton,Package source CSV,CSV hedef"], "workflow-structure.csv", { type: "text/csv" }));
     assert(
-      Boolean(state.project.documents.find((item) => item.name === "workflow-structure.json")) &&
-        Boolean(state.project.documents.find((item) => item.name === "workflow-structure.csv")),
+      Boolean(currentProject().documents.find((item) => item.name === "workflow-structure.json")) &&
+        Boolean(currentProject().documents.find((item) => item.name === "workflow-structure.csv")),
       "project package source-asset fixtures imported"
     );
 
@@ -4843,8 +4843,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     HTMLAnchorElement.prototype.click = function noopPackageDownloadClick() {};
     try {
       const oldCreatedAt = new Date(Date.now() - 10 * 86400000).toISOString();
-      state.project = await updateProject({ ...state.project, createdAt: oldCreatedAt, exportHistory: [] });
-      state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+      editorSessionStore.replaceProject(await updateProject({ ...currentProject(), createdAt: oldCreatedAt, exportHistory: [] }));
+      editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
       localStorage.removeItem(BACKUP_REMINDER_STORAGE);
       renderBackupReminder();
       assert(!els.backupReminderPanel.classList.contains("hidden") && els.backupReminderMessage.textContent.includes("no project package export"), "long-running project without package export shows backup reminder");
@@ -4874,7 +4874,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await exportProjectPackage();
       assert(
         els.saveStatus.textContent.includes("Simulated package download failure") &&
-          !(state.project.exportHistory || []).some((entry) => entry.type === "project-package") &&
+          !(currentProject().exportHistory || []).some((entry) => entry.type === "project-package") &&
           currentActivityEvents().filter((event) => event.type === "export" && event.summary === "Project package exported").length === packageExportActivityCountBeforeFailure,
         "project package download failure does not record export success"
       );
@@ -4931,7 +4931,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const createActivityProject = await saveProjectFromDialog();
     assert(
       createActivityProject?.id &&
-        state.project?.id === createActivityProject.id &&
+        currentProject()?.id === createActivityProject.id &&
         els.saveStatus.textContent.includes("activity log failed") &&
         state.workspaceDirtyProjectIds.has(createActivityProject.id),
       "project creation activity log failure reports warning after successful project creation"
@@ -4962,14 +4962,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const originalConfirm = window.confirm;
     window.confirm = () => true;
     try {
-      const deleteProjectListEntry = state.projects.find((item) => item.id === deleteProjectFixture.id);
+      const deleteProjectListEntry = currentProjects().find((item) => item.id === deleteProjectFixture.id);
       setHiddenSegmentField(deleteProjectListEntry, PROJECT_DELETE_FAILURE_TEST_FLAG, true);
       const failedProjectDelete = await confirmDeleteProject(deleteProjectFixture.id);
       const failedProjectDeleteSegments = await getProjectSegments(deleteProjectFixture.id);
       assert(
         !failedProjectDelete &&
           els.saveStatus.textContent.includes("Simulated project delete failure") &&
-          state.projects.some((item) => item.id === deleteProjectFixture.id) &&
+          currentProjects().some((item) => item.id === deleteProjectFixture.id) &&
           failedProjectDeleteSegments.some((segment) => segment.target === deleteText),
         "project delete failure reports visible status without deleting stored project"
       );
@@ -4982,12 +4982,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await undoLastCommand();
       assert(
         Boolean(await getAllByIndex("segments", "projectId", deleteProjectFixture.id).then((segments) => segments.length)) &&
-          state.projects.some((item) => item.id === deleteProjectFixture.id),
+          currentProjects().some((item) => item.id === deleteProjectFixture.id),
         "Undo restores a trashed project and its segments"
       );
       await redoLastCommand();
       assert(
-        !state.projects.some((item) => item.id === deleteProjectFixture.id),
+        !currentProjects().some((item) => item.id === deleteProjectFixture.id),
         "Redo returns a restored project to Trash"
       );
     } finally {
@@ -5006,7 +5006,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await loadProjects(false);
     await openProject(deleteFileFixture.id);
     await importLocalization(new File(["<!doctype html><html><body><p>Delete file after typing.</p></body></html>"], "delete-file.html", { type: "text/html" }));
-    const deleteFileDocument = state.project.documents.find((item) => item.name === "delete-file.html");
+    const deleteFileDocument = currentProject().documents.find((item) => item.name === "delete-file.html");
     const deleteFileText = `Silinen dosya hedefi ${Date.now()}`;
     updateSegmentDraft(0, deleteFileText);
     assert(state.saveTimers.size > 0, "pending save exists before file delete");
@@ -5018,7 +5018,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(
         !failedFileDelete &&
           els.saveStatus.textContent.includes("Simulated file delete failure") &&
-          state.project.documents.some((item) => item.id === deleteFileDocument.id) &&
+          currentProject().documents.some((item) => item.id === deleteFileDocument.id) &&
           failedFileDeleteSegments.some((segment) => segment.documentId === deleteFileDocument.id && segment.target === deleteFileText),
         "file delete failure reports visible status without deleting file segments"
       );
@@ -5031,20 +5031,20 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(
         successfulFileDelete &&
           fileTrashEntry &&
-          !state.project.documents.some((item) => item.id === deleteFileDocument.id) &&
+          !currentProject().documents.some((item) => item.id === deleteFileDocument.id) &&
           els.saveStatus.textContent.includes("activity log failed"),
         "file delete activity log failure reports warning while preserving the file in Trash"
       );
       Reflect.deleteProperty(deleteFileDocument, FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG);
       await undoLastCommand();
       assert(
-        state.project.documents.some((item) => item.id === deleteFileDocument.id) &&
+        currentProject().documents.some((item) => item.id === deleteFileDocument.id) &&
           (await getProjectSegments(deleteFileFixture.id)).some((segment) => segment.documentId === deleteFileDocument.id),
         "Undo restores a trashed file and its segments"
       );
       await redoLastCommand();
       assert(
-        !state.project.documents.some((item) => item.id === deleteFileDocument.id),
+        !currentProject().documents.some((item) => item.id === deleteFileDocument.id),
         "Redo returns a restored file to Trash"
       );
     } finally {
@@ -5056,7 +5056,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await appRuntime.trashRepository.emptyAll();
     await deleteProject(deleteFileFixture.id);
     clearWorkspaceDirty(deleteFileFixture.id);
-    state.project = null;
+    editorSessionStore.replaceProject(null);
     state.segments = [];
     applicationNavigation.openProjects();
     applicationNavigation.clearSelection();
@@ -5740,7 +5740,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await bulkPut("tmEntries", [collisionTm]);
     await bulkPut("terms", [collisionTerm]);
     await bulkPut("activityEvents", [collisionActivity]);
-    const collisionPackage = await buildProjectPackage(state.project, packageSourceSegments);
+    const collisionPackage = await buildProjectPackage(currentProject(), packageSourceSegments);
     collisionPackage.resources.tmEntries = [{ ...collisionTm, target: "Incoming TM target" }];
     collisionPackage.resources.terms = [{ ...collisionTerm, targetTerm: "incoming term" }];
     collisionPackage.activityEvents = [{ ...collisionActivity, projectId: project.id, summary: "Incoming activity" }];
@@ -5785,17 +5785,17 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
 
     await openProject(project.id);
-    const documentCountBeforeBadImport = state.project.documents.length;
+    const documentCountBeforeBadImport = currentProject().documents.length;
     const badProjectImportOk = await runFileImportTask("Project file import", () => importProjectDocument(new File(["{ broken json"], "broken.json", { type: "application/json" })));
-    assert(!badProjectImportOk && state.project.documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.startsWith("Project file import failed:"), "damaged project file import reports failure without changing project documents");
+    assert(!badProjectImportOk && currentProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.startsWith("Project file import failed:"), "damaged project file import reports failure without changing project documents");
     const oversizedProjectImportOk = await runFileImportTask("Project file import", () => importProjectDocument({ name: "huge.docx", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
-    assert(!oversizedProjectImportOk && state.project.documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "oversized project file import is rejected before parsing");
+    assert(!oversizedProjectImportOk && currentProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "oversized project file import is rejected before parsing");
     const oversizedDirectDocxImportOk = await runFileImportTask("Project file import", () => importDocx({ name: "huge-direct.docx", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
-    assert(!oversizedDirectDocxImportOk && state.project.documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct DOCX import helper rejects oversized files before parsing");
+    assert(!oversizedDirectDocxImportOk && currentProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct DOCX import helper rejects oversized files before parsing");
     const oversizedDirectXliffImportOk = await runFileImportTask("Project file import", () => importXliff({ name: "huge-direct.xlf", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
-    assert(!oversizedDirectXliffImportOk && state.project.documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct XLIFF import helper rejects oversized files before parsing");
+    assert(!oversizedDirectXliffImportOk && currentProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct XLIFF import helper rejects oversized files before parsing");
     const oversizedDirectLocalizationImportOk = await runFileImportTask("Project file import", () => importLocalization({ name: "huge-direct.html", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
-    assert(!oversizedDirectLocalizationImportOk && state.project.documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct localization import helper rejects oversized files before parsing");
+    assert(!oversizedDirectLocalizationImportOk && currentProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct localization import helper rejects oversized files before parsing");
 
     const badTmxImportOk = await runFileImportTask("TMX import", () => handleTmxImport(new File(["<tmx><body>"], "broken.tmx", { type: "application/xml" })));
     assert(!badTmxImportOk && state.lastValidationReport?.errors?.[0]?.includes("TMX import failed"), "damaged TMX import reports failure through validation panel");
@@ -5818,8 +5818,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       documentName: structuralDocument.name,
       documentType: structuralDocument.type
     });
-    state.project = await updateProject({ ...state.project, documents: [...(state.project.documents || []), structuralDocument] });
-    state.projects = state.projects.map((item) => (item.id === state.project.id ? state.project : item));
+    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), documents: [...(currentProject().documents || []), structuralDocument] }));
+    editorSessionStore.replaceProjects(currentProjects().map((item) => (item.id === currentProject().id ? currentProject() : item)));
     state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
     await openProjectFile(structuralDocument.id);
     const structuralSegmentsBefore = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
@@ -6036,7 +6036,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     const taggedFile = new File(["<!doctype html><html><body><p>Keep <strong>this</strong> tag.</p></body></html>"], "tagged.html", { type: "text/html" });
     await importLocalization(taggedFile);
-    const taggedDocument = state.project.documents.find((item) => item.name === "tagged.html");
+    const taggedDocument = currentProject().documents.find((item) => item.name === "tagged.html");
     assert(Boolean(taggedDocument), "tagged HTML fixture imported");
     selectApplicationDocument(taggedDocument.id);
     const taggedIndex = state.segments.findIndex((segment) => segment.documentId === taggedDocument.id);
@@ -6167,7 +6167,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     const structuredMergeFile = new File(["<!doctype html><html><body><p>First block.</p><p>Second block.</p></body></html>"], "structured-merge.html", { type: "text/html" });
     await importLocalization(structuredMergeFile);
-    const structuredMergeDocument = state.project.documents.find((item) => item.name === "structured-merge.html");
+    const structuredMergeDocument = currentProject().documents.find((item) => item.name === "structured-merge.html");
     assert(Boolean(structuredMergeDocument), "structured merge fixture imported");
     selectApplicationDocument(structuredMergeDocument.id);
     renderSegments();
@@ -6189,7 +6189,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     const duplicateTaggedFile = new File(["<!doctype html><html><body><p><strong>One</strong> and <strong>two</strong></p></body></html>"], "duplicate-tagged.html", { type: "text/html" });
     await importLocalization(duplicateTaggedFile);
-    const duplicateTaggedDocument = state.project.documents.find((item) => item.name === "duplicate-tagged.html");
+    const duplicateTaggedDocument = currentProject().documents.find((item) => item.name === "duplicate-tagged.html");
     assert(Boolean(duplicateTaggedDocument), "duplicate tagged HTML fixture imported");
     selectApplicationDocument(duplicateTaggedDocument.id);
     const duplicateTaggedIndex = state.segments.findIndex((segment) => segment.documentId === duplicateTaggedDocument.id);
@@ -6223,7 +6223,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     const scopedCompleteFile = new File(["<!doctype html><html><body><p>Scoped completed segment.</p></body></html>"], "scoped-complete.html", { type: "text/html" });
     await importLocalization(scopedCompleteFile);
-    const scopedCompleteDocument = state.project.documents.find((item) => item.name === "scoped-complete.html");
+    const scopedCompleteDocument = currentProject().documents.find((item) => item.name === "scoped-complete.html");
     const scopedCompleteIndex = state.segments.findIndex((segment) => segment.documentId === scopedCompleteDocument?.id);
     assert(Boolean(scopedCompleteDocument) && scopedCompleteIndex >= 0, "scoped export completed fixture imported");
     state.segments[scopedCompleteIndex].target = "Yalnizca secili dosya hedefi.";
@@ -6232,7 +6232,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await saveSegment(state.segments[scopedCompleteIndex]);
     const scopedEmptyFile = new File(["<!doctype html><html><body><p>Unselected unfinished segment.</p></body></html>"], "scoped-empty.html", { type: "text/html" });
     await importLocalization(scopedEmptyFile);
-    const scopedEmptyDocument = state.project.documents.find((item) => item.name === "scoped-empty.html");
+    const scopedEmptyDocument = currentProject().documents.find((item) => item.name === "scoped-empty.html");
     assert(Boolean(scopedEmptyDocument) && state.segments.some((segment) => segment.documentId === scopedEmptyDocument.id && !String(segment.target || "").trim()), "scoped export unfinished fixture imported");
     selectApplicationDocument(scopedCompleteDocument.id);
     renderDocumentFilter();

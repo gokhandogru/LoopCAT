@@ -34,10 +34,12 @@ test("EditorSessionStore compatibility bridge delegates only unmigrated replacem
   const store = createEditorSessionStore();
   const compatibility = store.attachCompatibility({ transient: true });
 
-  compatibility.projects = [{ id: "project-1" }];
+  compatibility.segments = [{ id: "segment-1" }];
 
-  assert.deepEqual(store.getState().projects, [{ id: "project-1" }]);
-  assert.equal(compatibility.projects, store.getState().projects);
+  assert.deepEqual(store.getState().segments, [{ id: "segment-1" }]);
+  assert.equal(compatibility.segments, store.getState().segments);
+  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "projects"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "project"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "projectSummaries"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "projectSummaryRevisions"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(compatibility, "projectTerms"), false);
@@ -50,7 +52,7 @@ test("EditorSessionStore compatibility bridge delegates only unmigrated replacem
     EDITOR_SESSION_COMPATIBILITY_FIELDS.filter((name) => Object.prototype.hasOwnProperty.call(compatibility, name)),
     [...EDITOR_SESSION_COMPATIBILITY_FIELDS]
   );
-  assert.throws(() => store.attachCompatibility({ project: null }), /cannot attach over existing state\.project/);
+  assert.throws(() => store.attachCompatibility({ segments: [] }), /cannot attach over existing state\.segments/);
   assert.throws(() => {
     compatibility.segments = null;
   }, /segments must be an array/);
@@ -141,4 +143,23 @@ test("EditorSessionStore explicitly owns the derived progress summary", async ()
   assert.equal(store.replaceProgressSummary(progressSummary), progressSummary);
   assert.equal(store.getProgressSummary(), progressSummary);
   assert.equal(store.replaceProgressSummary(null), null);
+});
+
+test("EditorSessionStore explicitly owns the project collection and current project record", async () => {
+  const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
+  const originalProject = { id: "project-1", name: "Original" };
+  const store = createEditorSessionStore({ projects: [originalProject], project: originalProject });
+
+  assert.deepEqual(store.getProjects(), [originalProject]);
+  assert.equal(store.getProject(), originalProject);
+
+  const updatedProject = { ...originalProject, name: "Updated" };
+  const projects = [updatedProject, { id: "project-2", name: "Second" }];
+  assert.equal(store.replaceProject(updatedProject), updatedProject);
+  assert.equal(store.replaceProjects(projects), projects);
+  assert.equal(store.getProject(), updatedProject);
+  assert.equal(store.getProjects(), projects);
+
+  assert.equal(store.replaceProject(null), null);
+  assert.throws(() => store.replaceProjects(null), /projects must be an array/);
 });
