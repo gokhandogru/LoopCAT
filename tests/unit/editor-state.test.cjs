@@ -7,14 +7,19 @@ const root = path.resolve(__dirname, "../..");
 const moduleAt = (relativePath) => import(pathToFileURL(path.join(root, relativePath)).href);
 
 test("editor selection state exposes stable segment identity", async () => {
-  const [{ createSelectionStore }, { createSegmentGridController }] = await Promise.all([
-    moduleAt("src/features/editor/selection-store.js"),
-    moduleAt("src/features/editor/segment-grid-controller.js")
-  ]);
-  const selectionStore = createSelectionStore();
-  const grid = createSegmentGridController({ selectionStore });
-  grid.selectSegment(4, "segment-5");
-  assert.deepEqual(selectionStore.getState(), { activeIndex: 4, segmentId: "segment-5" });
+  const { createSegmentGridController } = await moduleAt("src/features/editor/segment-grid-controller.js");
+  const selections = [];
+  const grid = createSegmentGridController({
+    navigation: {
+      selectSegment(selection) {
+        selections.push(selection);
+        return selection;
+      }
+    }
+  });
+
+  assert.deepEqual(grid.selectSegment(4, "segment-5"), { activeIndex: 4, segmentId: "segment-5" });
+  assert.deepEqual(selections, [{ activeIndex: 4, segmentId: "segment-5" }]);
 });
 
 test("filter state updates atomically and resets to deterministic defaults", async () => {

@@ -156,6 +156,7 @@ const requiredReleaseFiles = [
   "src/app/bootstrap.js",
   "src/app/compatibility-module-registry.js",
   "src/app/install-runtime.js",
+  "src/features/editor/segment-grid-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
   "src/ai/providers/gemini-provider-adapter.js",
@@ -255,6 +256,7 @@ const appBootstrapJs = readText("src/app/bootstrap.js");
 const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-registry.js");
 const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-module-registry.test.cjs");
 const installRuntimeJs = readText("src/app/install-runtime.js");
+const segmentGridControllerJs = readText("src/features/editor/segment-grid-controller.js");
 const commandBusJs = readText("src/commands/command-bus.js");
 const editTargetSessionJs = readText("src/commands/edit-target-session.js");
 const segmentCommandsJs = readText("src/commands/segment-commands.js");
@@ -377,6 +379,15 @@ assert(
 assert(
   !appJs.includes("state.documentFilter"),
   "AppStore must remain the only selected-document owner; app.js cannot restore a legacy state.documentFilter field."
+);
+assert(
+  !appJs.includes("state.activeIndex"),
+  "AppStore must remain the only active-segment owner; app.js cannot restore a legacy state.activeIndex field."
+);
+assertIncludes(
+  segmentGridControllerJs,
+  "navigation.selectSegment",
+  "The segment grid must dispatch active-segment identity through application navigation."
 );
 assert(
   productionAssets.appVersion === packageJson.version,

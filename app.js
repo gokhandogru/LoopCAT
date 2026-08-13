@@ -712,7 +712,6 @@ const state = {
   project: null,
   segments: [],
   progressSummary: null,
-  activeIndex: -1,
   saveTimers: new Map(),
   focusMode: false,
   inspectorOpen: true,
@@ -774,19 +773,30 @@ function currentDocumentId() {
   return applicationStore.getState().navigation.documentId;
 }
 
+function currentActiveIndex() {
+  return applicationStore.getState().navigation.activeIndex;
+}
+
+function currentSegmentId() {
+  return applicationStore.getState().navigation.segmentId;
+}
+
+function selectApplicationSegment(activeIndex, segmentId = state.segments[activeIndex]?.id || "") {
+  return applicationNavigation.selectSegment({ activeIndex, segmentId });
+}
+
 function selectApplicationDocument(documentId, selection = {}) {
   return applicationNavigation.selectDocument({ documentId, ...selection });
 }
 
 function applicationNavigationPayload(overrides = {}) {
   const navigation = applicationStore.getState().navigation;
-  const activeSegment = state.segments[state.activeIndex] || null;
   return {
     view: navigation.view,
     projectId: currentProjectId(),
     documentId: navigation.documentId,
-    segmentId: activeSegment?.id || "",
-    activeIndex: state.activeIndex,
+    segmentId: navigation.segmentId,
+    activeIndex: navigation.activeIndex,
     ...overrides
   };
 }
@@ -802,11 +812,6 @@ function syncLegacyApplicationState(overrides = {}) {
     payload: { locale: uiI18n?.getLocale?.() || "" }
   });
   return navigation;
-}
-
-function applyApplicationNavigation(navigation) {
-  if (!navigation) return;
-  state.activeIndex = Number.isInteger(navigation.activeIndex) ? navigation.activeIndex : state.activeIndex;
 }
 
 const els = {
@@ -1259,10 +1264,6 @@ const verticalFeatureState = (() => {
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "creating vertical feature controllers";
   const factories = appRuntime?.featureFactories;
   if (!factories) return null;
-  const selectionStore = factories.createSelectionStore({
-    activeIndex: state.activeIndex,
-    segmentId: ""
-  });
   const filterStore = factories.createFilterStore();
   return Object.freeze({
     dashboard: factories.createDashboardController({ root: els.projectHomeView }),
@@ -1281,8 +1282,7 @@ const verticalFeatureState = (() => {
       preferencesRepository: appRuntime.preferencesRepository
     }),
     projects: factories.createProjectsController({ root: els.projectDashboard }),
-    segmentGrid: factories.createSegmentGridController({ selectionStore }),
-    selection: selectionStore
+    segmentGrid: factories.createSegmentGridController({ navigation: applicationNavigation })
   });
 })();
 verticalFeatureState?.inspector?.mount?.();
@@ -1814,7 +1814,7 @@ function setSaveStatus(text, mode = "") {
     text: displayText,
     mode,
     projectId: state.project?.id || null,
-    segmentId: state.segments[state.activeIndex]?.id || ""
+    segmentId: currentSegmentId()
   });
   els.saveStatus.textContent = uiSource(displayText);
   els.saveStatus.className = `save-status ${mode}`;
@@ -1876,11 +1876,12 @@ async function undoLastCommand() {
     const requestedIndex = requestedActiveSegmentId
       ? state.segments.findIndex((segment) => segment.id === requestedActiveSegmentId)
       : -1;
-    state.activeIndex = state.segments.length
+    const nextIndex = state.segments.length
       ? requestedIndex >= 0
         ? requestedIndex
-        : Math.max(0, Math.min(state.activeIndex, state.segments.length - 1))
+        : Math.max(0, Math.min(currentActiveIndex(), state.segments.length - 1))
       : -1;
+    selectApplicationSegment(nextIndex);
     renderAll();
   } else if (!state.project && projectId && state.projects.some((project) => project.id === projectId)) {
     await openProject(projectId);
@@ -1910,12 +1911,15 @@ async function redoLastCommand() {
   if (result.receipt.commandId === "delete-document" && state.project?.id === projectId) {
     state.project = state.projects.find((project) => project.id === projectId) || state.project;
     state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
-    state.activeIndex = state.segments.length ? Math.max(0, Math.min(state.activeIndex, state.segments.length - 1)) : -1;
+    const nextIndex = state.segments.length
+      ? Math.max(0, Math.min(currentActiveIndex(), state.segments.length - 1))
+      : -1;
+    selectApplicationSegment(nextIndex);
     renderAll();
   } else if (state.project?.id === projectId && requestedActiveSegmentId) {
     state.segments = prepareSegmentHistoryStates(await getProjectSegments(projectId));
     const requestedIndex = state.segments.findIndex((segment) => segment.id === requestedActiveSegmentId);
-    if (requestedIndex >= 0) state.activeIndex = requestedIndex;
+    if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
     renderAll();
   }
   await synchronizeResourceTrashChange(resourceTrashEntryFromCommandResult(result));
@@ -2294,7 +2298,7 @@ function sourceWordCount(segment) {
 }
 
 function currentSegment() {
-  return state.segments[state.activeIndex] || null;
+  return state.segments[currentActiveIndex()] || null;
 }
 
 function setHiddenSegmentField(segment, field, value) {
@@ -4339,14 +4343,10 @@ async function loadProjects(selectFirst = false) {
 }
 
 function setView(view) {
-  const navigation = view === "projects"
-    ? applicationNavigation?.openProjects?.()
-    : view === "resources"
-      ? applicationNavigation?.openResources?.()
-      : view === "project"
-        ? applicationNavigation?.openProject?.(state.project?.id || null, state.activeIndex)
-        : applicationNavigation?.openEditor?.(applicationNavigationPayload({ view: "editor" }));
-  if (navigation) applyApplicationNavigation(navigation);
+  if (view === "projects") applicationNavigation?.openProjects?.();
+  else if (view === "resources") applicationNavigation?.openResources?.();
+  else if (view === "project") applicationNavigation?.openProject?.(state.project?.id || null, currentActiveIndex());
+  else applicationNavigation?.openEditor?.(applicationNavigationPayload({ view: "editor" }));
   if (view !== "editor") state.focusMode = false;
   renderEditor();
   if (view === "projects") refreshProjectSummaries();
@@ -4356,9 +4356,8 @@ function setView(view) {
 function showProjectHome() {
   if (!state.project) return;
   state.focusMode = false;
-  state.activeIndex = state.segments.length ? 0 : -1;
-  const navigation = applicationNavigation?.openProject?.(state.project.id, state.activeIndex);
-  if (navigation) applyApplicationNavigation(navigation);
+  const activeIndex = state.segments.length ? 0 : -1;
+  applicationNavigation?.openProject?.(state.project.id, activeIndex);
   renderAll();
 }
 
@@ -4702,11 +4701,10 @@ async function openProject(projectId) {
   state.segments = prepareSegmentHistoryStates(state.project ? await getProjectSegments(projectId) : []);
   state.activityEvents = state.project ? await listActivityEvents(projectId) : [];
   await refreshProjectTerms();
-  state.activeIndex = state.segments.length ? 0 : -1;
+  const activeIndex = state.segments.length ? 0 : -1;
   await filterPresetReady;
   await filterPresetController?.restoreForProject?.(state.project?.id || projectId);
-  const navigation = applicationNavigation?.openProject?.(state.project?.id || projectId, state.activeIndex);
-  if (navigation) applyApplicationNavigation(navigation);
+  applicationNavigation?.openProject?.(state.project?.id || projectId, activeIndex);
   renderAll();
   if (currentApplicationView() === "editor") await refreshSidebar();
 }
@@ -4714,14 +4712,12 @@ async function openProject(projectId) {
 async function openProjectFile(documentId) {
   if (!state.project) return;
   const first = state.segments.findIndex((segment) => segment.documentId === documentId);
-  state.activeIndex = first;
-  const navigation = applicationNavigation?.openEditor?.({
+  applicationNavigation?.openEditor?.({
     projectId: state.project.id,
     documentId,
     segmentId: state.segments[first]?.id || "",
     activeIndex: first
   });
-  if (navigation) applyApplicationNavigation(navigation);
   renderAll();
   await refreshSidebar();
 }
@@ -5641,7 +5637,6 @@ async function confirmDeleteProject(projectId = state.project?.id) {
     if (state.project?.id === project.id) {
       state.project = null;
       state.segments = [];
-      state.activeIndex = -1;
       applicationNavigation.openProjects();
       applicationNavigation.clearSelection();
     }
@@ -5673,7 +5668,7 @@ async function confirmDeleteFile(documentInfo) {
     state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
     state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
     selectApplicationDocument("");
-    state.activeIndex = state.segments.length ? 0 : -1;
+    selectApplicationSegment(state.segments.length ? 0 : -1);
     markWorkspaceDirty();
     let fileDeleteActivityFailed = false;
     try {
@@ -6202,7 +6197,7 @@ function renderSegmentRow(index) {
   const segment = state.segments[index];
   const row = els.rowTemplate.content.firstElementChild.cloneNode(true);
   row.dataset.index = String(index);
-  row.classList.toggle("active", index === state.activeIndex);
+  row.classList.toggle("active", index === currentActiveIndex());
   row.classList.toggle("tag-warning-row", hasTagIssue(segment));
   row.querySelector(".num-col").textContent = String(index + 1);
   const sourceCell = row.querySelector(".source-cell");
@@ -6325,7 +6320,7 @@ function renderSegments(options = {}) {
     return;
   }
   const activeElement = document.activeElement;
-  if (options.fromScroll && els.segmentGridWrap.contains(activeElement) && !win.indexes.includes(state.activeIndex)) {
+  if (options.fromScroll && els.segmentGridWrap.contains(activeElement) && !win.indexes.includes(currentActiveIndex())) {
     activeElement.blur();
   }
   state.segmentWindow = win;
@@ -6345,7 +6340,7 @@ function updateRow(index) {
   const row = els.segmentBody.querySelector(`tr[data-index="${index}"]`);
   const segment = state.segments[index];
   if (!row || !segment) return;
-  row.classList.toggle("active", index === state.activeIndex);
+  row.classList.toggle("active", index === currentActiveIndex());
   row.classList.toggle("tag-warning-row", hasTagIssue(segment));
   renderTargetTagPreview(row, segment);
   renderStatusCell(row, segment);
@@ -6422,16 +6417,10 @@ function ensureSegmentVisible(index) {
 
 async function setActiveSegment(index) {
   if (index < 0 || index >= state.segments.length) return;
-  if (index === state.activeIndex) return;
-  const oldIndex = state.activeIndex;
-  state.activeIndex = index;
+  if (index === currentActiveIndex()) return;
+  const oldIndex = currentActiveIndex();
   verticalFeatureState?.segmentGrid?.selectSegment(index, state.segments[index]?.id || "");
   verticalFeatureState?.inspector?.setContext({ segmentId: state.segments[index]?.id || "" });
-  const navigation = applicationNavigation?.selectSegment?.({
-    segmentId: state.segments[index]?.id || "",
-    activeIndex: index
-  });
-  if (navigation) applyApplicationNavigation(navigation);
   renderConfirmBusyState();
   ensureSegmentVisible(index);
   updateRow(oldIndex);
@@ -6442,7 +6431,7 @@ async function setActiveSegment(index) {
 
 async function goToNextOpenSegment() {
   if (!state.segments.length) return;
-  const start = Math.max(state.activeIndex + 1, 0);
+  const start = Math.max(currentActiveIndex() + 1, 0);
   const afterCurrent = state.segments.findIndex((segment, index) => index >= start && isOpenSegment(segment));
   const beforeCurrent = state.segments.findIndex((segment, index) => index < start && isOpenSegment(segment));
   const next = afterCurrent !== -1 ? afterCurrent : beforeCurrent;
@@ -6518,7 +6507,6 @@ async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}
     applyTargetCommandPatch(segment, restoredPatch);
     clearPendingSave(segment);
     await saveSegment(segment);
-    state.activeIndex = index;
     verticalFeatureState?.segmentGrid?.selectSegment(index, segment.id);
     verticalFeatureState?.inspector?.setContext({ segmentId: segment.id });
     invalidateSegmentFilterCache();
@@ -6576,7 +6564,7 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
     await saveSegments(restored);
     const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
     const requestedIndex = state.segments.findIndex((segment) => segment.id === requestedActiveId);
-    if (requestedIndex >= 0) state.activeIndex = requestedIndex;
+    if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
     invalidateSegmentFilterCache();
     markWorkspaceDirty();
     renderAll();
@@ -6620,7 +6608,7 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
     await saveSegments(restored);
     const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
     const requestedIndex = state.segments.findIndex((segment) => segment.id === requestedActiveId);
-    if (requestedIndex >= 0) state.activeIndex = requestedIndex;
+    if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
     markWorkspaceDirty();
     renderAll();
     await refreshSidebar();
@@ -6692,7 +6680,7 @@ async function restoreSplitSegmentCommandSegments(nextSnapshots, options = {}) {
   });
   state.segments = prepareSegmentHistoryStates(savedSegments);
   const requestedIndex = state.segments.findIndex((segment) => segment.id === options.activeSegmentId);
-  state.activeIndex = requestedIndex >= 0 ? requestedIndex : Math.max(0, state.activeIndex);
+  selectApplicationSegment(requestedIndex >= 0 ? requestedIndex : Math.max(0, currentActiveIndex()));
   invalidateSegmentFilterCache();
   markWorkspaceDirty();
   return {
@@ -6745,7 +6733,7 @@ async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
   });
   state.segments = prepareSegmentHistoryStates(savedSegments);
   const requestedIndex = state.segments.findIndex((segment) => segment.id === options.activeSegmentId);
-  state.activeIndex = requestedIndex >= 0 ? requestedIndex : Math.max(0, state.activeIndex);
+  selectApplicationSegment(requestedIndex >= 0 ? requestedIndex : Math.max(0, currentActiveIndex()));
   invalidateSegmentFilterCache();
   markWorkspaceDirty();
   return {
@@ -6878,11 +6866,8 @@ async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = 
     state.segments[index] = restored;
     clearPendingSave(restored);
     await saveSegment(restored);
-    state.activeIndex = index;
     verticalFeatureState?.segmentGrid?.selectSegment(index, restored.id);
     verticalFeatureState?.inspector?.setContext({ segmentId: restored.id });
-    const navigation = applicationNavigation?.selectSegment?.({ segmentId: restored.id, activeIndex: index });
-    if (navigation) applyApplicationNavigation(navigation);
     markWorkspaceDirty();
     renderAll();
     await refreshSidebar();
@@ -6906,11 +6891,11 @@ async function confirmCurrentSegment() {
   const missing = missingTags(segment);
   if (missing.length) {
     setSaveStatus(`Cannot confirm: missing ${missing.map(tagDisplayText).join(", ")}`, "dirty");
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     focusActiveTextarea();
     return;
   }
-  const segmentIndex = state.activeIndex;
+  const segmentIndex = currentActiveIndex();
   const project = state.project;
   const previousStatus = segment.status;
   const passedFiltersBefore = segmentPassesFilters(segment);
@@ -7339,8 +7324,8 @@ async function openConcordanceSearch() {
 }
 
 function focusActiveTextarea(selection = null) {
-  ensureSegmentVisible(state.activeIndex);
-  const textarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+  ensureSegmentVisible(currentActiveIndex());
+  const textarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
   textarea?.focus();
   if (textarea && selection) {
     const normalized = normalizedTargetSelection(selection, textarea.value.length);
@@ -7489,7 +7474,7 @@ function activeQualityEvidence(queue = null) {
   if (!state.project || !segment) return null;
   const queuedItem = (queue?.items || []).find((item) => item.segmentId === segment.id);
   if (queuedItem) return queuedItem;
-  return scoreSegment(segment, state.activeIndex, {
+  return scoreSegment(segment, currentActiveIndex(), {
     profile: state.project.qualityProfile,
     qaBySegment: qualityQaBySegment()
   });
@@ -7505,7 +7490,7 @@ function renderQualityWorkbench() {
   qualityReviewController?.renderQuality?.({
     project: state.project,
     segment: currentSegment(),
-    activeIndex: state.activeIndex,
+    activeIndex: currentActiveIndex(),
     profile: state.project?.qualityProfile,
     queue,
     evidence: activeQualityEvidence(queue)
@@ -7572,7 +7557,7 @@ async function saveQualityDecisionFromForm(values = qualityReviewController?.rea
     state.qualityRiskQueue = currentQualityRiskQueue();
     renderReviewPanel({ force: true });
     renderQualityWorkbench();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     markWorkspaceDirty();
     const activityLogged = await logOptionalProjectActivity("quality-decision", "Quality decision saved", {
       segmentId: segment.id,
@@ -7587,7 +7572,7 @@ async function saveQualityDecisionFromForm(values = qualityReviewController?.rea
     prepareSegmentHistoryState(segment);
     renderReviewPanel({ force: true });
     renderQualityWorkbench();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     setSaveStatus(error.message || "Quality decision save failed", "dirty");
     return false;
   }
@@ -7643,7 +7628,7 @@ async function goToNextQualityRisk() {
     }))
     .filter((item) => item.globalIndex !== -1)
     .sort((a, b) => a.globalIndex - b.globalIndex);
-  const afterActive = indexedItems.find((item) => item.globalIndex > state.activeIndex);
+  const afterActive = indexedItems.find((item) => item.globalIndex > currentActiveIndex());
   await goToQualityRiskItem(afterActive || indexedItems[0] || queue.items[0]);
 }
 
@@ -7721,7 +7706,7 @@ async function saveActiveReviewMetadata(values = qualityReviewController?.readRe
       console.warn("Review activity log failed.", activityError);
     }
     renderReviewPanel({ force: true });
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     markWorkspaceDirty();
     setSaveStatus("Review saved", "saved");
   } catch (error) {
@@ -7729,7 +7714,7 @@ async function saveActiveReviewMetadata(values = qualityReviewController?.readRe
     Object.assign(segment, snapshot);
     prepareSegmentHistoryState(segment);
     renderReviewPanel({ force: true });
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     renderRevisionHistory();
     setSaveStatus(error.message || "Review save failed", "dirty");
   }
@@ -7763,7 +7748,7 @@ async function setActiveReviewState(reviewState) {
         } catch (activityError) {
           console.warn("Review activity log failed.", activityError);
         }
-        updateRow(state.activeIndex);
+        updateRow(currentActiveIndex());
         markWorkspaceDirty();
         return { snapshot: structuredClone(segment), activeSegmentId: segment.id };
       }
@@ -7779,7 +7764,7 @@ async function setActiveReviewState(reviewState) {
     Object.assign(segment, snapshot);
     prepareSegmentHistoryState(segment);
     renderReviewPanel();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     renderRevisionHistory();
     setSaveStatus(error.message || "Review state save failed", "dirty");
   }
@@ -8014,7 +7999,7 @@ function normalizedTargetSelection(selection, targetLength) {
 }
 
 function activeTargetSelection(segment) {
-  const textarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+  const textarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
   const length = String(segment?.target || "").length;
   return normalizedTargetSelection(
     textarea
@@ -9021,7 +9006,7 @@ async function reviewActiveSegmentWithLocalAi() {
     }
     renderLocalAiOutput(aiReviewOutputText(result));
     renderReviewPanel();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     markWorkspaceDirty();
     setSaveStatus("AI review added to the active segment", "saved");
     return true;
@@ -9030,7 +9015,7 @@ async function reviewActiveSegmentWithLocalAi() {
     Object.assign(segment, snapshot);
     prepareSegmentHistoryState(segment);
     renderReviewPanel();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     const message = error.message || "AI review failed.";
     renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
@@ -9702,7 +9687,7 @@ async function suggestActiveSegmentVariantsWithLocalAi() {
     }
     renderLocalAiOutput(variants.map((variant) => `${variant.label || "Alternative"}: ${variant.suggestedTarget}`).join("\n"));
     renderAiSuggestions();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     markWorkspaceDirty();
     setSaveStatus(activityLogged ? "AI alternatives ready for review" : "AI alternatives ready; activity log failed", activityLogged ? "saved" : "dirty");
     return true;
@@ -9711,7 +9696,7 @@ async function suggestActiveSegmentVariantsWithLocalAi() {
     Object.assign(segment, snapshot);
     prepareSegmentHistoryState(segment);
     renderAiSuggestions();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     const message = error.message || "AI alternatives failed.";
     renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
@@ -10036,7 +10021,7 @@ async function applyActiveSegmentTerminologyWithLocalAi() {
     Object.assign(segment, snapshot);
     prepareSegmentHistoryState(segment);
     renderAiSuggestions();
-    updateRow(state.activeIndex);
+    updateRow(currentActiveIndex());
     const message = error.message || "AI terminology application failed.";
     renderLocalAiOutput(message, { muted: false });
     setSaveStatus(message, "dirty");
@@ -11589,7 +11574,7 @@ function confirmExternalAiPromptShare({ provider, includesSourceText, contextLab
 
 async function splitCurrentSegment() {
   const segment = currentSegment();
-  const textarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+  const textarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
   if (!segment || !textarea) return null;
   if (!canSplitSegmentStructure(segment)) {
     setSaveStatus("Split is unavailable for structure-preserving localization files.", "dirty");
@@ -11651,7 +11636,7 @@ async function splitCurrentSegment() {
       }
       const savedSegments = await saveSegmentStructure(ordered);
       state.segments = prepareSegmentHistoryStates(savedSegments);
-      state.activeIndex = state.segments.findIndex((item) => item.id === createdSegmentId);
+      selectApplicationSegment(state.segments.findIndex((item) => item.id === createdSegmentId));
       invalidateSegmentFilterCache();
       markWorkspaceDirty();
       return {
@@ -11672,7 +11657,7 @@ async function splitCurrentSegment() {
     commandExecution = await appRuntime.commands.bus.execute(command);
   } catch (error) {
     state.segments = prepareSegmentHistoryStates(beforeSegments);
-    state.activeIndex = Math.max(0, state.segments.findIndex((item) => item.id === segment.id));
+    selectApplicationSegment(Math.max(0, state.segments.findIndex((item) => item.id === segment.id)));
     invalidateSegmentFilterCache();
     renderAll();
     focusActiveTextarea();
@@ -11736,7 +11721,7 @@ async function mergeWithNextSegment() {
       }
       const savedSegments = await saveSegmentStructure(ordered, [mergedSegmentId]);
       state.segments = prepareSegmentHistoryStates(savedSegments);
-      state.activeIndex = state.segments.findIndex((item) => item.id === segmentId);
+      selectApplicationSegment(state.segments.findIndex((item) => item.id === segmentId));
       invalidateSegmentFilterCache();
       markWorkspaceDirty();
       return {
@@ -11757,7 +11742,7 @@ async function mergeWithNextSegment() {
     commandExecution = await appRuntime.commands.bus.execute(command);
   } catch (error) {
     state.segments = prepareSegmentHistoryStates(beforeSegments);
-    state.activeIndex = Math.max(0, state.segments.findIndex((item) => item.id === segmentId));
+    selectApplicationSegment(Math.max(0, state.segments.findIndex((item) => item.id === segmentId)));
     invalidateSegmentFilterCache();
     renderAll();
     focusActiveTextarea();
@@ -11790,10 +11775,10 @@ async function importDocx(file) {
   state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
   state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
   await refreshProjectSummaries();
-  state.activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
+  const activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
   selectApplicationDocument(documentId, {
-    segmentId: state.segments[state.activeIndex]?.id || "",
-    activeIndex: state.activeIndex
+    segmentId: state.segments[activeIndex]?.id || "",
+    activeIndex
   });
   const extractedParts = result.structure?.textPartSummary?.filter((part) => part.segments > 0).length || 1;
   const activityLogged = await logOptionalProjectActivity("import", "DOCX imported", { fileName: file.name, segmentCount: result.segments.length, documentId }, "DOCX import");
@@ -11823,10 +11808,10 @@ async function importLocalization(file) {
   state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
   state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
   await refreshProjectSummaries();
-  state.activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
+  const activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
   selectApplicationDocument(documentId, {
-    segmentId: state.segments[state.activeIndex]?.id || "",
-    activeIndex: state.activeIndex
+    segmentId: state.segments[activeIndex]?.id || "",
+    activeIndex
   });
   const activityLogged = await logOptionalProjectActivity("import", "Localization file imported", { fileName: file.name, documentType: result.documentType, segmentCount: result.segments.length, documentId }, "Localization import");
   markWorkspaceDirty();
@@ -11856,10 +11841,10 @@ async function importXliff(file) {
   state.segments = prepareSegmentHistoryStates(await getProjectSegments(state.project.id));
   state.projects = state.projects.map((project) => (project.id === state.project.id ? state.project : project));
   await refreshProjectSummaries();
-  state.activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
+  const activeIndex = state.segments.findIndex((segment) => segment.documentId === documentId);
   selectApplicationDocument(documentId, {
-    segmentId: state.segments[state.activeIndex]?.id || "",
-    activeIndex: state.activeIndex
+    segmentId: state.segments[activeIndex]?.id || "",
+    activeIndex
   });
   const activityLogged = await logOptionalProjectActivity("import", "XLIFF imported", { fileName: file.name, segmentCount: result.segments.length, documentId }, "XLIFF import");
   markWorkspaceDirty();
@@ -14504,8 +14489,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       docxLandingDocument &&
         currentDocumentId() === docxLandingDocument.id &&
         els.documentFilter.value === docxLandingDocument.id &&
-        state.activeIndex >= 0 &&
-        state.segments[state.activeIndex]?.documentId === docxLandingDocument.id,
+        currentActiveIndex() >= 0 &&
+        state.segments[currentActiveIndex()]?.documentId === docxLandingDocument.id,
       "DOCX import selects newly imported document"
     );
     const completedDocxLandingSegments = state.segments
@@ -14677,7 +14662,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         JSON.stringify(targetCommandPatch(state.segments[segmentIndex]).aiApplication) ===
           JSON.stringify(editTargetBefore.aiApplication) &&
         editTargetStoredAfterUndo?.target === editTargetBefore.target &&
-        state.activeIndex === segmentIndex,
+        currentActiveIndex() === segmentIndex,
       "one coalesced EditTarget Undo restores target state, history, provenance, persistence, and selection"
     );
     const editTargetUndoRevision = Number(state.segments[segmentIndex].revision || 0);
@@ -14691,7 +14676,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         JSON.stringify(state.segments[segmentIndex].targetHistory) === JSON.stringify(editTargetApplied.targetHistory) &&
         Number(state.segments[segmentIndex].revision || 0) > editTargetUndoRevision &&
         editTargetStoredAfterRedo?.target === editTargetApplied.target &&
-        state.activeIndex === segmentIndex,
+        currentActiveIndex() === segmentIndex,
       "EditTarget Redo reapplies the coalesced patch with a monotonic revision"
     );
     const keyboardEditBefore = targetCommandPatch(state.segments[segmentIndex]);
@@ -14844,12 +14829,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(
       state.segments[segmentIndex].target === targetBeforeReplaceCommand &&
         undoReplaceStored?.target === targetBeforeReplaceCommand &&
-        state.activeIndex === segmentIndex,
+        currentActiveIndex() === segmentIndex,
       `Undo restores target replacement atomically and preserves selection (${JSON.stringify({
         visible: state.segments[segmentIndex].target,
         stored: undoReplaceStored?.target,
         expected: targetBeforeReplaceCommand,
-        activeIndex: state.activeIndex,
+        activeIndex: currentActiveIndex(),
         segmentIndex,
         commandId: undoReplaceCommand?.receipt?.commandId || "none"
       })})`
@@ -14940,7 +14925,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       (segment) => segment.id === state.segments[segmentIndex].id
     );
     assert(
-      state.activeIndex === segmentIndex &&
+      currentActiveIndex() === segmentIndex &&
         state.segments[segmentIndex].reviewState === "needs-review" &&
         undoneReviewStateStored?.reviewState === "needs-review",
       "Undo restores quick review state and active segment"
@@ -14950,7 +14935,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       (segment) => segment.id === state.segments[segmentIndex].id
     );
     assert(
-      state.activeIndex === segmentIndex &&
+      currentActiveIndex() === segmentIndex &&
         state.segments[segmentIndex].reviewState === "reviewed" &&
         redoneReviewStateStored?.reviewState === "reviewed",
       "Redo reapplies quick review state and active segment"
@@ -15127,7 +15112,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       });
       if (restoredBatchReviewSegments.length) await saveSegments(restoredBatchReviewSegments);
       state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
-      state.activeIndex = Math.max(0, state.segments.findIndex((segment) => segment.id === state.segments[segmentIndex]?.id));
+      selectApplicationSegment(
+        Math.max(0, state.segments.findIndex((segment) => segment.id === state.segments[segmentIndex]?.id))
+      );
       renderAll();
     }
 
@@ -15303,7 +15290,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       });
       if (restoredBatchRepairSegments.length) await saveSegments(restoredBatchRepairSegments);
       state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
-      state.activeIndex = Math.max(0, state.segments.findIndex((segment) => segment.id === state.segments[segmentIndex]?.id));
+      selectApplicationSegment(
+        Math.max(0, state.segments.findIndex((segment) => segment.id === state.segments[segmentIndex]?.id))
+      );
       renderAll();
     }
 
@@ -15691,7 +15680,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       });
       if (restoredBatchApplyTermsSegments.length) await saveSegments(restoredBatchApplyTermsSegments);
       state.segments = prepareSegmentHistoryStates(await getProjectSegments(project.id));
-      state.activeIndex = Math.max(0, state.segments.findIndex((segment) => segment.id === state.segments[segmentIndex]?.id));
+      selectApplicationSegment(
+        Math.max(0, state.segments.findIndex((segment) => segment.id === state.segments[segmentIndex]?.id))
+      );
       renderAll();
     }
 
@@ -15708,7 +15699,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       segmentStatusFilter: state.segmentStatusFilter,
       reviewStateFilter: state.reviewStateFilter,
       localAiMode: els.localAiModeSelect?.value || "",
-      activeIndex: state.activeIndex
+      activeIndex: currentActiveIndex()
     };
     let aiPolishTerm = null;
     let aiPolishTmEntry = null;
@@ -16124,7 +16115,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const originalAiTermsCompletePrompt = aiTermsProvider.completePrompt;
     const originalAiTermsMode = els.localAiModeSelect?.value || "";
     const originalAiTermsDocumentFilter = currentDocumentId();
-    const originalAiTermsActiveIndex = state.activeIndex;
+    const originalAiTermsActiveIndex = currentActiveIndex();
     let aiExtractedTermIds = [];
     let aiTermsPromptCount = 0;
     try {
@@ -17559,7 +17550,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         state.segments[segmentIndex].reviewState === "needs-review" &&
         undoneConfirmedSegment?.status === "draft" &&
         undoneConfirmedSegment?.reviewState === "needs-review" &&
-        state.activeIndex === segmentIndex,
+        currentActiveIndex() === segmentIndex,
       "Undo restores confirmed segment status, review state, persistence, and selection"
     );
     await redoLastCommand();
@@ -19666,7 +19657,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       (segment) => segment.documentId === structuralDocument.id
     );
     const splitUndoOriginal = splitUndoVisible.find((segment) => segment.id === structuralSegmentsBefore[0].id);
-    const splitUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+    const splitUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
     assert(
       splitUndoVisible.length === 3 &&
         splitUndoStored.length === 3 &&
@@ -19688,7 +19679,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     const splitRedoCreated = splitRedoVisible.find((segment) => segment.id === splitCreatedSegment?.id);
     const splitRedoOriginal = splitRedoVisible.find((segment) => segment.id === structuralSegmentsBefore[0].id);
-    const splitRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+    const splitRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
     assert(
       splitRedoVisible.length === 4 &&
         splitRedoStored.length === 4 &&
@@ -19752,7 +19743,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const mergeAppliedVisible = state.segments.filter((segment) => segment.documentId === structuralDocument.id);
     const mergeSuccessStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
     const mergeAppliedSurvivor = mergeAppliedVisible.find((segment) => segment.id === mergeFirstBefore.id);
-    const mergeAppliedTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+    const mergeAppliedTextarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
     const mergeAppliedRevision = Number(mergeAppliedSurvivor?.revision || 0);
     const mergeAppliedHistory = structuredClone(mergeAppliedSurvivor?.targetHistory || []);
     assert(
@@ -19783,7 +19774,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     const mergeUndoFirst = mergeUndoVisible.find((segment) => segment.id === mergeFirstBefore.id);
     const mergeUndoSecond = mergeUndoVisible.find((segment) => segment.id === mergeSecondBefore.id);
-    const mergeUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+    const mergeUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
     const mergeUndoFirstRevision = Number(mergeUndoFirst?.revision || 0);
     assert(
       mergeUndoResult?.receipt?.commandId === "merge-segments" &&
@@ -19810,7 +19801,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       (segment) => segment.documentId === structuralDocument.id
     );
     const mergeRedoSurvivor = mergeRedoVisible.find((segment) => segment.id === mergeFirstBefore.id);
-    const mergeRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${state.activeIndex}"] textarea`);
+    const mergeRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
     assert(
       mergeRedoResult?.receipt?.commandId === "merge-segments" &&
         mergeRedoVisible.length === 3 &&

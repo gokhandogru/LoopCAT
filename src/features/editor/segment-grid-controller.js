@@ -1,8 +1,8 @@
-export function createSegmentGridController({ selectionStore }) {
-  if (!selectionStore?.select) throw new TypeError("SegmentGridController requires a SelectionStore.");
+export function createSegmentGridController({ navigation }) {
+  if (!navigation?.selectSegment) throw new TypeError("SegmentGridController requires application navigation.");
   return Object.freeze({
     selectSegment(index, segmentId) {
-      return selectionStore.select(index, segmentId);
+      return navigation.selectSegment({ activeIndex: index, segmentId });
     }
   });
 }
