@@ -183,6 +183,7 @@ const requiredReleaseFiles = [
   "src/commands/edit-target-session.js",
   "src/ui/dialog-controller.js",
   "src/features/ai/ai-administration-controller.js",
+  "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-pretranslation-controller.js",
   "src/features/ai/ai-review-controller.js",
   "src/features/ai/ai-tag-repair-controller.js",
@@ -201,6 +202,7 @@ const requiredReleaseFiles = [
   "src/features/workspace/recovery-workspace-controller.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
+  "tests/unit/ai-alternatives-controller.test.cjs",
   "tests/unit/ai-pretranslation-controller.test.cjs",
   "tests/unit/ai-review-controller.test.cjs",
   "tests/unit/ai-tag-repair-controller.test.cjs",
@@ -336,6 +338,8 @@ const aiReviewControllerJs = readText("src/features/ai/ai-review-controller.js")
 const aiReviewControllerUnitTests = readText("tests/unit/ai-review-controller.test.cjs");
 const aiTagRepairControllerJs = readText("src/features/ai/ai-tag-repair-controller.js");
 const aiTagRepairControllerUnitTests = readText("tests/unit/ai-tag-repair-controller.test.cjs");
+const aiAlternativesControllerJs = readText("src/features/ai/ai-alternatives-controller.js");
+const aiAlternativesControllerUnitTests = readText("tests/unit/ai-alternatives-controller.test.cjs");
 const anthropicProviderAdapterJs = readText("src/ai/providers/anthropic-provider-adapter.js");
 const cohereProviderAdapterJs = readText("src/ai/providers/cohere-provider-adapter.js");
 const geminiProviderAdapterJs = readText("src/ai/providers/gemini-provider-adapter.js");
@@ -2392,7 +2396,7 @@ for (const boundary of [
   "for (const segment of candidateSelection.candidates)",
   "if (returnedNoIssues(result))",
   "summary.highestRisk = highestRiskLevel(summary.highestRisk, reviewRisk.level)",
-  "message: redact(error?.message || \"AI QA failed for this segment.\")",
+  'message: redact(error?.message || "AI QA failed for this segment.")',
   "if (updated.length) await persistence.saveMany(updated)",
   "await activity.logBatch({",
   "editorSessionStore.replaceSegments(mutation.prepareHistories(await persistence.load(project.id)))",
@@ -2400,11 +2404,7 @@ for (const boundary of [
   "abortController = null",
   'status.set("Canceling local AI batch...", "dirty")'
 ]) {
-  assertIncludes(
-    aiReviewControllerJs,
-    boundary,
-    `AiReviewController must retain checked ${boundary} orchestration.`
-  );
+  assertIncludes(aiReviewControllerJs, boundary, `AiReviewController must retain checked ${boundary} orchestration.`);
 }
 assertIncludes(
   appJs,
@@ -2456,11 +2456,7 @@ for (const testName of [
   "primary batch AI review persistence failure restores every candidate snapshot and always cleans lifecycle state",
   "secondary AI review activity failure keeps the saved review durable and visible"
 ]) {
-  assertIncludes(
-    aiReviewControllerUnitTests,
-    testName,
-    `focused AI-review tests must characterize ${testName}.`
-  );
+  assertIncludes(aiReviewControllerUnitTests, testName, `focused AI-review tests must characterize ${testName}.`);
 }
 assertIncludes(
   appBootstrapJs,
@@ -2551,6 +2547,97 @@ for (const testName of [
     aiTagRepairControllerUnitTests,
     testName,
     `focused AI-tag-repair tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiAlternativesController",
+  "The application runtime must expose the checked AI-alternatives controller boundary."
+);
+for (const boundary of [
+  "if (!project || running || promptBusy || lifecycle.isRunning() || lifecycle.isPromptBusy()) return false",
+  'status.set("Select a segment before requesting AI alternatives.", "dirty")',
+  'settingsBoundary.assertReady(settings, config, "suggesting translation alternatives")',
+  "providers.sharesExternally(settings)",
+  "const result = await domain.suggestSegmentVariants(",
+  "const variants = distinctVariants(result, segment)",
+  "const glossaryTerms = await context.activeTerms(project, segment)",
+  "const candidateSelection = selectSegments(settings)",
+  "await persistence.flush(project.id)",
+  "abortController = createAbortController()",
+  "for (const segment of candidateSelection.candidates)",
+  "const glossaryTerms = await context.batchTerms(segment)",
+  "segment.aiSuggestions = [...(segment.aiSuggestions || []), ...savedSuggestions]",
+  "if (updated.length) await persistence.saveMany(updated)",
+  "await activity.logBatch({",
+  "editorSessionStore.replaceSegments(mutation.prepareHistories(await persistence.load(project.id)))",
+  "mutation.restore(segment, snapshot)",
+  "abortController = null",
+  'status.set("Canceling local AI batch...", "dirty")'
+]) {
+  assertIncludes(
+    aiAlternativesControllerJs,
+    boundary,
+    `AiAlternativesController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return aiAlternativesController.suggestActive()",
+  "app.js must retain only the checked active AI-alternatives compatibility facade."
+);
+assertIncludes(
+  appJs,
+  "return aiAlternativesController.suggestBatch()",
+  "app.js must retain only the checked batch AI-alternatives compatibility facade."
+);
+assertIncludes(
+  appJs,
+  "if (aiAlternativesController.cancel()) return;",
+  "the shared AI cancel facade must delegate owned alternatives cancellation."
+);
+const activeAiAlternativesFacade = functionBody(
+  appJs,
+  "async function suggestActiveSegmentVariantsWithLocalAi",
+  "async function suggestBatchSegmentVariantsWithLocalAi"
+);
+const batchAiAlternativesFacade = functionBody(
+  appJs,
+  "async function suggestBatchSegmentVariantsWithLocalAi",
+  "async function applyActiveSegmentTerminologyWithLocalAi"
+);
+for (const facade of [activeAiAlternativesFacade, batchAiAlternativesFacade]) {
+  assert(
+    !facade.includes("persistLocalAiSettings(") &&
+      !facade.includes("localAiRuntimeConfig(") &&
+      !facade.includes("confirmExternalAiPromptShare(") &&
+      !facade.includes("localAiGlossaryTermsForSegment(") &&
+      !facade.includes("segmentTags(") &&
+      !facade.includes("aiCommandService.suggestSegmentVariants(") &&
+      !facade.includes("savedAiSuggestionRecord(") &&
+      !facade.includes("saveSegment(") &&
+      !facade.includes("saveSegments(") &&
+      !facade.includes("logProjectActivity(") &&
+      !facade.includes("renderLocalAiOutput(") &&
+      !facade.includes("Reflect.ownKeys") &&
+      !facade.includes("state.localAi"),
+    "app.js must not regain AI-alternatives validation, consent, lifecycle, selection, context, provider, suggestion, persistence, activity, presentation, or recovery orchestration."
+  );
+}
+for (const testName of [
+  "active AI alternatives preserve busy, source, provider, and external-consent safeguards",
+  "active AI alternatives route glossary and protected tokens, filter current duplicates, and save multiple review suggestions",
+  "active AI alternatives report unchanged output and restore exact state after primary persistence failure",
+  "batch AI alternatives select only translated unlocked drafts and return deterministic empty summaries",
+  "batch AI alternatives save normalized variants, contain failures, skip protected segments, and never overwrite targets",
+  "mid-batch AI alternatives cancellation preserves completed suggestions and saves the partial result",
+  "primary batch AI alternatives persistence failure restores every candidate and always cleans lifecycle state",
+  "secondary batch AI alternatives activity failure keeps saved suggestions durable and reports a dirty warning"
+]) {
+  assertIncludes(
+    aiAlternativesControllerUnitTests,
+    testName,
+    `focused AI-alternatives tests must characterize ${testName}.`
   );
 }
 assertIncludes(

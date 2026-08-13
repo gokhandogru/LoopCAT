@@ -1896,6 +1896,117 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
   redact: redactSensitiveText,
   logger: console
 });
+let aiAlternativesAbortController = null;
+let aiAlternativesOwnsPromptBusy = false;
+const aiAlternativesController = appRuntime.featureFactories.createAiAlternativesController({
+  editorSessionStore,
+  selection: {
+    getActiveSegment: currentSegment,
+    getActiveIndex: currentActiveIndex
+  },
+  scope: {
+    getVisibleSegments: () =>
+      filteredSegmentIndexes()
+        .map((index) => currentSegments()[index])
+        .filter(Boolean),
+    getDocumentSegments: currentDocumentSegments,
+    isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
+    getTags: segmentTags
+  },
+  settings: {
+    persist: () => persistLocalAiSettings({ silent: true }),
+    runtimeConfig: localAiRuntimeConfig,
+    assertReady: assertLocalAiRuntimeReady
+  },
+  providers: {
+    get: currentLocalAiProvider,
+    sharesExternally: (settings) =>
+      localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
+  },
+  consent: { externalShare: confirmExternalAiPromptShare },
+  context: {
+    activeTerms: (project, segment) =>
+      findTerms({
+        source: segment.source,
+        sourceLang: project.sourceLang,
+        targetLang: project.targetLang,
+        termBaseNames: projectTermBaseNames()
+      }),
+    batchTerms: localAiGlossaryTermsForSegment
+  },
+  domain: {
+    suggestSegmentVariants: (options) => aiCommandService.suggestSegmentVariants(options)
+  },
+  lifecycle: {
+    isRunning: () => state.localAi.running,
+    isPromptBusy: () => state.localAi.promptBusy,
+    sync: ({ running, promptBusy, abortController, progress }) => {
+      if (progress !== undefined) state.localAi.progress = progress;
+      if (promptBusy) {
+        aiAlternativesOwnsPromptBusy = true;
+        state.localAi.promptBusy = true;
+      } else if (aiAlternativesOwnsPromptBusy) {
+        state.localAi.promptBusy = false;
+        aiAlternativesOwnsPromptBusy = false;
+      }
+      if (running) {
+        aiAlternativesAbortController = abortController;
+        state.localAi.running = true;
+        state.localAi.abortController = abortController;
+      } else if (
+        aiAlternativesAbortController &&
+        state.localAi.abortController === aiAlternativesAbortController
+      ) {
+        state.localAi.running = false;
+        state.localAi.abortController = null;
+        aiAlternativesAbortController = null;
+      }
+    }
+  },
+  suggestions: {
+    normalize: savedAiSuggestionRecord,
+    nextId: () => makeId("ai-suggestion")
+  },
+  persistence: {
+    flush: flushPendingSegmentSaves,
+    saveOne: saveSegment,
+    saveMany: saveSegments,
+    load: getProjectSegments
+  },
+  mutation: {
+    touch: touchSegment,
+    clearPending: clearPendingSave,
+    restore: (segment, snapshot) => {
+      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
+      Object.assign(segment, snapshot);
+    },
+    prepareHistory: prepareSegmentHistoryState,
+    prepareHistories: prepareSegmentHistoryStates
+  },
+  presentation: {
+    renderCommandCentre: renderLocalAiCommandCentre,
+    renderAiProgress: renderLocalAiProgress,
+    renderOutput: renderLocalAiOutput,
+    renderSuggestions: renderAiSuggestions,
+    updateRow,
+    renderAll,
+    refreshSidebar
+  },
+  activity: {
+    logActive: (details) =>
+      logProjectActivity("ai-target-variants", "AI target alternatives created", details),
+    logBatch: (details) =>
+      logProjectActivity(
+        "ai-target-variants-batch",
+        "Batch AI target alternatives created",
+        details
+      )
+  },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus },
+  redact: redactSensitiveText,
+  logger: console
+});
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
     splitButton: els.splitSegmentBtn,
@@ -8799,341 +8910,11 @@ async function repairBatchTagsWithLocalAi() {
 }
 
 async function suggestActiveSegmentVariantsWithLocalAi() {
-  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
-  const segment = currentSegment();
-  if (!segment) {
-    setSaveStatus("Select a segment before requesting AI alternatives.", "dirty");
-    return false;
-  }
-  if (!String(segment.source || "").trim()) {
-    setSaveStatus("The active segment has no source text.", "dirty");
-    return false;
-  }
-  const settings = await persistLocalAiSettings({ silent: true });
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-    assertLocalAiRuntimeReady(settings, config, "suggesting translation alternatives");
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const provider = currentLocalAiProvider(settings);
-  if (!provider?.completePrompt) {
-    const message = "AI alternatives are not available for this provider.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) {
-    const ok = confirmExternalAiPromptShare({
-      provider: provider.name || settings.providerId,
-      includesSourceText: true,
-      contextLabels: ["current target draft", "configured provider URL", "project glossary hints"]
-    });
-    if (!ok) {
-      setSaveStatus("AI alternatives canceled", "dirty");
-      return false;
-    }
-  }
-  const snapshot = structuredClone(segment);
-  state.localAi.promptBusy = true;
-  renderLocalAiCommandCentre();
-  setSaveStatus("Requesting AI translation alternatives...");
-  try {
-    const glossaryTerms = await findTerms({
-      source: segment.source,
-      sourceLang: currentProject().sourceLang,
-      targetLang: currentProject().targetLang,
-      termBaseNames: projectTermBaseNames()
-    });
-    const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
-    const result = await aiCommandService.suggestSegmentVariants({
-      provider,
-      project: currentProject(),
-      segment: { ...segment, tags: segmentTags(segment) },
-      settings,
-      config,
-      sourceLanguage: settings.sourceLanguage,
-      sourceCode: settings.sourceCode,
-      targetLanguage: settings.targetLanguage,
-      targetCode: settings.targetCode,
-      protectedTokens,
-      glossaryTerms,
-      variantMode: settings.variantMode
-    });
-    const currentTarget = String(segment.target || "").trim();
-    const variants = (result.variants || []).filter((variant) => {
-      const suggestedTarget = String(variant.suggestedTarget || "").trim();
-      return suggestedTarget && (!currentTarget || suggestedTarget !== currentTarget);
-    });
-    if (!variants.length) {
-      renderLocalAiOutput("AI did not propose alternatives different from the current target.", { muted: false });
-      setSaveStatus("AI did not propose different alternatives.", "saved");
-      return true;
-    }
-    const suggestions = variants.map((variant) => ({
-      id: makeId("ai-suggestion"),
-      provider: result.provider || provider.name || "AI",
-      model: result.model || settings.model,
-      segmentId: segment.id,
-      suggestedTarget: variant.suggestedTarget,
-      confidence: variant.warnings?.length ? 65 : 75,
-      explanation: [
-        `AI ${variant.label || "alternative"} suggestion. Review before applying.`,
-        ...(result.protectedTokens?.length ? [`Protected tokens considered: ${result.protectedTokens.join(", ")}`] : []),
-        ...(variant.warnings || [])
-      ],
-      status: "review"
-    }));
-    const safeSuggestions = suggestions.map(savedAiSuggestionRecord);
-    segment.aiSuggestions = [...(segment.aiSuggestions || []), ...safeSuggestions];
-    touchSegment(segment);
-    clearPendingSave(segment);
-    await saveSegment(segment);
-    let activityLogged = true;
-    try {
-      await logProjectActivity("ai-target-variants", "AI target alternatives created", {
-        segmentId: segment.id,
-        provider: result.provider || provider.name || settings.providerId,
-        model: result.model || settings.model,
-        suggestionCount: safeSuggestions.length,
-        variantMode: settings.variantMode
-      });
-    } catch (activityError) {
-      activityLogged = false;
-      console.warn("AI alternatives activity log failed.", activityError);
-      markWorkspaceDirty();
-    }
-    renderLocalAiOutput(variants.map((variant) => `${variant.label || "Alternative"}: ${variant.suggestedTarget}`).join("\n"));
-    renderAiSuggestions();
-    updateRow(currentActiveIndex());
-    markWorkspaceDirty();
-    setSaveStatus(activityLogged ? "AI alternatives ready for review" : "AI alternatives ready; activity log failed", activityLogged ? "saved" : "dirty");
-    return true;
-  } catch (error) {
-    Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-    Object.assign(segment, snapshot);
-    prepareSegmentHistoryState(segment);
-    renderAiSuggestions();
-    updateRow(currentActiveIndex());
-    const message = error.message || "AI alternatives failed.";
-    renderLocalAiOutput(message, { muted: false });
-    setSaveStatus(message, "dirty");
-    return false;
-  } finally {
-    state.localAi.promptBusy = false;
-    renderLocalAiCommandCentre();
-  }
+  return aiAlternativesController.suggestActive();
 }
 
 async function suggestBatchSegmentVariantsWithLocalAi() {
-  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return false;
-  const settings = await persistLocalAiSettings({ silent: true });
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-    assertLocalAiRuntimeReady(settings, config, "suggesting batch translation alternatives");
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const provider = currentLocalAiProvider(settings);
-  if (!provider?.completePrompt) {
-    const message = "Batch AI alternatives are not available for this provider.";
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-  const selection = selectLocalAiDraftSegments(settings);
-  if (!selection.candidates.length) {
-    setSaveStatus(selection.skipped.length ? "No eligible translated draft segments for batch AI alternatives." : "No draft segments to suggest alternatives for with local AI.", "saved");
-    return {
-      total: 0,
-      completed: 0,
-      suggested: 0,
-      unchanged: 0,
-      failed: 0,
-      skipped: selection.skipped.length,
-      failures: [],
-      skippedSegments: selection.skipped,
-      updatedSegmentIds: [],
-      canceled: false
-    };
-  }
-  if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) {
-    const ok = confirmExternalAiPromptShare({
-      provider: provider.name || settings.providerId,
-      includesSourceText: true,
-      contextLabels: [`${selection.candidates.length} source/target draft segments`, "alternative style", "project glossary hints", "protected tags and placeholders", "configured provider URL"]
-    });
-    if (!ok) {
-      setSaveStatus("Batch AI alternatives canceled", "dirty");
-      return false;
-    }
-  }
-  try {
-    await flushPendingSegmentSaves(currentProject().id);
-  } catch (error) {
-    setSaveStatus(error.message || "Save pending changes before batch AI alternatives failed", "dirty");
-    return false;
-  }
-  const snapshots = new Map(selection.candidates.map((segment) => [segment.id, structuredClone(segment)]));
-  const summary = {
-    total: selection.candidates.length,
-    completed: 0,
-    suggested: 0,
-    unchanged: 0,
-    failed: 0,
-    skipped: selection.skipped.length,
-    failures: [],
-    skippedSegments: selection.skipped,
-    updatedSegmentIds: [],
-    canceled: false
-  };
-  const updated = [];
-  state.localAi.running = true;
-  state.localAi.promptBusy = true;
-  state.localAi.abortController = new AbortController();
-  state.localAi.progress = {
-    total: summary.total,
-    completed: 0,
-    failed: 0,
-    skipped: summary.skipped,
-    canceled: false
-  };
-  renderLocalAiCommandCentre();
-  setSaveStatus(`Suggesting alternatives for ${summary.total} draft segment${summary.total === 1 ? "" : "s"} with AI...`);
-  try {
-    for (const segment of selection.candidates) {
-      if (state.localAi.abortController.signal.aborted) {
-        summary.canceled = true;
-        break;
-      }
-      try {
-        const glossaryTerms = await localAiGlossaryTermsForSegment(segment);
-        const protectedTokens = segmentTags(segment).map((tag) => tag.text || tag.label || "").filter(Boolean);
-        const result = await aiCommandService.suggestSegmentVariants({
-          provider,
-          project: currentProject(),
-          segment: { ...segment, tags: segmentTags(segment) },
-          settings,
-          config,
-          sourceLanguage: settings.sourceLanguage,
-          sourceCode: settings.sourceCode,
-          targetLanguage: settings.targetLanguage,
-          targetCode: settings.targetCode,
-          protectedTokens,
-          glossaryTerms,
-          variantMode: settings.variantMode,
-          signal: state.localAi.abortController.signal
-        });
-        const currentTarget = String(segment.target || "").trim();
-        const variants = (result.variants || []).filter((variant) => {
-          const suggestedTarget = String(variant.suggestedTarget || "").trim();
-          return suggestedTarget && (!currentTarget || suggestedTarget !== currentTarget);
-        });
-        if (!variants.length) {
-          summary.unchanged += 1;
-        } else {
-          const suggestions = variants.map((variant) => savedAiSuggestionRecord({
-            id: makeId("ai-suggestion"),
-            provider: result.provider || provider.name || "AI",
-            model: result.model || settings.model,
-            segmentId: segment.id,
-            suggestedTarget: variant.suggestedTarget,
-            confidence: variant.warnings?.length ? 65 : 75,
-            explanation: [
-              `Batch AI ${variant.label || "alternative"} suggestion. Review before applying.`,
-              `Alternative style: ${settings.variantMode || "standard"}.`,
-              ...(glossaryTerms.length ? [`Termbase hints considered: ${Math.min(glossaryTerms.length, 12)}`] : []),
-              ...(result.protectedTokens?.length ? [`Protected tokens considered: ${result.protectedTokens.join(", ")}`] : []),
-              ...(variant.warnings || [])
-            ],
-            status: "review"
-          }));
-          segment.aiSuggestions = [...(segment.aiSuggestions || []), ...suggestions];
-          touchSegment(segment);
-          clearPendingSave(segment);
-          updated.push(segment);
-          summary.suggested += suggestions.length;
-          summary.updatedSegmentIds.push(segment.id || "");
-        }
-        summary.completed += 1;
-      } catch (error) {
-        if (state.localAi.abortController.signal.aborted || String(error?.message || "").includes("canceled")) {
-          summary.canceled = true;
-          break;
-        }
-        summary.failed += 1;
-        summary.failures.push({
-          segmentId: segment.id || "",
-          message: redactSensitiveText(error?.message || "AI alternatives failed for this segment.")
-        });
-      } finally {
-        state.localAi.progress = { ...summary };
-        renderLocalAiProgress();
-      }
-    }
-    if (updated.length) await saveSegments(updated);
-    let activityLogged = true;
-    try {
-      await logProjectActivity("ai-target-variants-batch", "Batch AI target alternatives created", {
-        provider: provider.name || settings.providerId,
-        model: settings.model,
-        mode: settings.mode,
-        variantMode: settings.variantMode,
-        processedCount: summary.completed,
-        suggestionCount: summary.suggested,
-        unchangedCount: summary.unchanged,
-        failedCount: summary.failed,
-        skippedCount: summary.skipped,
-        canceled: summary.canceled
-      });
-    } catch (activityError) {
-      activityLogged = false;
-      console.warn("Batch AI alternatives activity log failed.", activityError);
-      if (updated.length) markWorkspaceDirty();
-    }
-    if (updated.length) {
-      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
-      renderAll();
-      await refreshSidebar();
-      markWorkspaceDirty();
-    } else {
-      renderLocalAiProgress();
-    }
-    const failureText = summary.failed ? `; ${summary.failed} failed` : "";
-    const skippedText = summary.skipped ? `; ${summary.skipped} skipped` : "";
-    const unchangedText = summary.unchanged ? `; ${summary.unchanged} unchanged` : "";
-    const canceledText = summary.canceled ? " canceled" : "";
-    const failureLines = summary.failures.slice(0, 4).map((failure) => `Segment ${failure.segmentId}: ${failure.message}`);
-    renderLocalAiOutput([
-      `${summary.suggested} alternative suggestion${summary.suggested === 1 ? "" : "s"} saved.`,
-      `${summary.unchanged} segment${summary.unchanged === 1 ? "" : "s"} unchanged.`,
-      failureLines.join("\n")
-    ].filter(Boolean).join("\n"));
-    setSaveStatus(`Batch AI alternatives${canceledText}: ${summary.suggested} suggestion${summary.suggested === 1 ? "" : "s"} saved${unchangedText}${failureText}${skippedText}${activityLogged ? "" : "; activity log failed"}`, summary.failed || !activityLogged || summary.canceled ? "dirty" : "saved");
-    return summary;
-  } catch (error) {
-    snapshots.forEach((snapshot, id) => {
-      const segment = currentSegments().find((item) => item.id === id);
-      if (!segment) return;
-      Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-      Object.assign(segment, snapshot);
-      prepareSegmentHistoryState(segment);
-    });
-    renderAll();
-    const message = error.message || "Batch AI alternatives failed.";
-    renderLocalAiOutput(message, { muted: false });
-    setSaveStatus(message, "dirty");
-    return false;
-  } finally {
-    state.localAi.running = false;
-    state.localAi.promptBusy = false;
-    state.localAi.abortController = null;
-    renderLocalAiCommandCentre();
-  }
+  return aiAlternativesController.suggestBatch();
 }
 
 async function applyActiveSegmentTerminologyWithLocalAi() {
@@ -10576,6 +10357,7 @@ function cancelLocalAiBatch() {
   if (aiPretranslationController.cancel()) return;
   if (aiReviewController.cancel()) return;
   if (aiTagRepairController.cancel()) return;
+  if (aiAlternativesController.cancel()) return;
   state.localAi.abortController?.abort();
   state.localAi.progress = {
     ...(state.localAi.progress || {}),
