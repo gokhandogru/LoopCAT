@@ -426,6 +426,21 @@ assertIncludes(
   "attachCompatibility(target)",
   "EditorSessionStore must retain the temporary checked compatibility bridge while app.js is decomposed."
 );
+for (const field of ["projectSummaries", "projectSummaryRevisions"]) {
+  assert(
+    !appJs.includes(`state.${field}`) && !appWorkflowDriverJs.includes(`state.${field}`),
+    `EditorSessionStore explicit APIs must remain the only ${field} owner.`
+  );
+}
+for (const method of [
+  "getProjectSummaries",
+  "replaceProjectSummaries",
+  "getProjectSummaryRevision",
+  "markProjectSummaryDirty",
+  "pruneProjectSummaryRevisions"
+]) {
+  assertIncludes(editorSessionStoreJs, method, `EditorSessionStore must retain explicit ${method} ownership.`);
+}
 const appStateStart = appJs.indexOf("const state = {");
 const appStateEnd = appJs.indexOf("\n};", appStateStart);
 const appStateBlock = appJs.slice(appStateStart, appStateEnd);

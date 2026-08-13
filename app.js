@@ -739,7 +739,12 @@ const state = {
     promptBusy: false
   }
 };
-appRuntime.editorSession.attachCompatibility(state);
+const editorSessionStore = appRuntime.editorSession;
+editorSessionStore.attachCompatibility(state);
+
+function currentProjectSummaries() {
+  return editorSessionStore.getProjectSummaries();
+}
 
 function currentApplicationView() {
   return applicationStore.getState().navigation.view;
@@ -4245,7 +4250,7 @@ function renderBackupReminder() {
 function knownProjectById(projectId) {
   return state.project?.id === projectId
     ? state.project
-    : state.projects.find((project) => project.id === projectId) || state.projectSummaries.find((project) => project.id === projectId) || null;
+    : state.projects.find((project) => project.id === projectId) || currentProjectSummaries().find((project) => project.id === projectId) || null;
 }
 
 async function refreshWorkspaceStatus() {
@@ -4283,12 +4288,11 @@ function projectProgress(segments) {
 }
 
 function projectSummaryRevision(projectId) {
-  return Number(state.projectSummaryRevisions.get(projectId) || 0);
+  return editorSessionStore.getProjectSummaryRevision(projectId);
 }
 
 function markProjectSummaryDirty(projectId) {
-  if (!projectId) return;
-  state.projectSummaryRevisions.set(projectId, projectSummaryRevision(projectId) + 1);
+  editorSessionStore.markProjectSummaryDirty(projectId);
 }
 
 function projectSummaryRecord(project, segments, summaryRevision = projectSummaryRevision(project.id)) {
@@ -4310,8 +4314,8 @@ async function summarizeProject(project, segments = null, summaryRevision = proj
 }
 
 async function refreshProjectSummaries() {
-  const cachedById = new Map(state.projectSummaries.map((summary) => [summary.id, summary]));
-  state.projectSummaries = await Promise.all(state.projects.map((project) => {
+  const cachedById = new Map(currentProjectSummaries().map((summary) => [summary.id, summary]));
+  const projectSummaries = await Promise.all(state.projects.map((project) => {
     const revision = projectSummaryRevision(project.id);
     const cached = cachedById.get(project.id);
     if (cached && cached.updatedAt === project.updatedAt && cached.summaryRevision === revision) {
@@ -4328,6 +4332,7 @@ async function refreshProjectSummaries() {
     const inMemorySegments = state.project?.id === project.id ? state.segments : null;
     return summarizeProject(project, inMemorySegments, revision);
   }));
+  editorSessionStore.replaceProjectSummaries(projectSummaries);
   renderLanguagePairFilter();
   renderProjectsView();
 }
@@ -4335,9 +4340,7 @@ async function refreshProjectSummaries() {
 async function loadProjects(selectFirst = false) {
   state.projects = await listProjects();
   const knownProjectIds = new Set(state.projects.map((project) => project.id));
-  for (const projectId of state.projectSummaryRevisions.keys()) {
-    if (!knownProjectIds.has(projectId)) state.projectSummaryRevisions.delete(projectId);
-  }
+  editorSessionStore.pruneProjectSummaryRevisions(knownProjectIds);
   pruneWorkspaceDirtyProjectIds();
   await refreshProjectSummaries();
   renderProjectList();
@@ -5596,7 +5599,7 @@ function projectEmptyState({ hasProjects }) {
 function renderProjectsView() {
   const query = stableLower(els.projectSearchInput.value.trim());
   const pair = els.languagePairFilter.value;
-  const summaries = state.projectSummaries.map((project) => ({
+  const summaries = currentProjectSummaries().map((project) => ({
     ...project,
     searchText: project.searchText || stableLower(`${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`),
     languagePairKey: project.languagePairKey || languagePairKey(project)

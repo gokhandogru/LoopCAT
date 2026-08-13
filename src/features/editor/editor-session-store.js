@@ -23,6 +23,10 @@ function createDefaultSession() {
 }
 
 export const EDITOR_SESSION_FIELDS = Object.freeze(Object.keys(createDefaultSession()));
+const EXPLICIT_SESSION_FIELDS = new Set(["projectSummaries", "projectSummaryRevisions"]);
+export const EDITOR_SESSION_COMPATIBILITY_FIELDS = Object.freeze(
+  EDITOR_SESSION_FIELDS.filter((name) => !EXPLICIT_SESSION_FIELDS.has(name))
+);
 
 function normalizeField(name, value) {
   if (ARRAY_FIELDS.has(name) && !Array.isArray(value)) {
@@ -31,6 +35,7 @@ function normalizeField(name, value) {
   if (name === "projectSummaryRevisions" && !(value instanceof Map)) {
     throw new TypeError("EditorSessionStore projectSummaryRevisions must be a Map.");
   }
+  if (name === "projectSummaryRevisions") return new Map(value);
   return value;
 }
 
@@ -63,7 +68,29 @@ export function createEditorSessionStore(initialState = {}) {
 
   return Object.freeze({
     getState: () => state,
+    getProjectSummaries: () => state.projectSummaries,
+    getProjectSummaryRevision(projectId) {
+      return Number(state.projectSummaryRevisions.get(String(projectId || "")) || 0);
+    },
+    markProjectSummaryDirty(projectId) {
+      const normalizedProjectId = String(projectId || "");
+      if (!normalizedProjectId) return state.projectSummaryRevisions;
+      const revisions = new Map(state.projectSummaryRevisions);
+      revisions.set(normalizedProjectId, Number(revisions.get(normalizedProjectId) || 0) + 1);
+      return replace({ projectSummaryRevisions: revisions }).projectSummaryRevisions;
+    },
+    pruneProjectSummaryRevisions(projectIds) {
+      const retainedProjectIds = new Set(Array.from(projectIds || [], (projectId) => String(projectId || "")));
+      const revisions = new Map(
+        Array.from(state.projectSummaryRevisions).filter(([projectId]) => retainedProjectIds.has(projectId))
+      );
+      if (revisions.size === state.projectSummaryRevisions.size) return state.projectSummaryRevisions;
+      return replace({ projectSummaryRevisions: revisions }).projectSummaryRevisions;
+    },
     replace,
+    replaceProjectSummaries(projectSummaries) {
+      return replace({ projectSummaries }).projectSummaries;
+    },
     subscribe(listener) {
       if (typeof listener !== "function") throw new TypeError("EditorSessionStore listener must be a function.");
       listeners.add(listener);
@@ -73,7 +100,7 @@ export function createEditorSessionStore(initialState = {}) {
       if (!target || typeof target !== "object") {
         throw new TypeError("EditorSessionStore compatibility target must be an object.");
       }
-      for (const name of EDITOR_SESSION_FIELDS) {
+      for (const name of EDITOR_SESSION_COMPATIBILITY_FIELDS) {
         if (Object.prototype.hasOwnProperty.call(target, name)) {
           throw new Error(`EditorSessionStore cannot attach over existing state.${name}.`);
         }

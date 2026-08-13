@@ -4217,7 +4217,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       }
       const originalLabelProject = state.project;
       const originalLabelProjects = state.projects;
-      const originalLabelProjectSummaries = state.projectSummaries;
+      const originalLabelProjectSummaries = currentProjectSummaries();
       const originalLabelResourceState = resourcesController.getState();
       const originalLabelConfirm = window.confirm;
       const originalDocuments = projectDocumentManifest(state.project);
@@ -4232,7 +4232,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       try {
         state.project = labelProject;
         state.projects = state.projects.map((item) => item.id === labelProject.id ? labelProject : item);
-        state.projectSummaries = state.projectSummaries.map((item) => item.id === labelProject.id ? { ...item, ...labelProject } : item);
+        editorSessionStore.replaceProjectSummaries(
+          currentProjectSummaries().map((item) =>
+            item.id === labelProject.id ? { ...item, ...labelProject } : item
+          )
+        );
         window.confirm = (message) => {
           capturedLabelPrompts.push(message);
           return false;
@@ -4279,7 +4283,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         window.confirm = originalLabelConfirm;
         state.project = originalLabelProject;
         state.projects = originalLabelProjects;
-        state.projectSummaries = originalLabelProjectSummaries;
+        editorSessionStore.replaceProjectSummaries(originalLabelProjectSummaries);
         resourcesController.selectType(originalLabelResourceState.type, { render: false });
         resourcesController.setResources({
           tmEntries: originalLabelResourceState.tmEntries,
