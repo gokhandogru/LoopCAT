@@ -259,6 +259,7 @@ const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-reg
 const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-module-registry.test.cjs");
 const installRuntimeJs = readText("src/app/install-runtime.js");
 const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
+const editorContextControllerJs = readText("src/features/editor/editor-context-controller.js");
 const segmentGridControllerJs = readText("src/features/editor/segment-grid-controller.js");
 const commandBusJs = readText("src/commands/command-bus.js");
 const editTargetSessionJs = readText("src/commands/edit-target-session.js");
@@ -458,6 +459,21 @@ for (const method of ["calculateWindow", "scheduleScroll", "scheduleRowUpdate", 
     `The segment grid must retain checked ${method} ownership.`
   );
 }
+assertIncludes(
+  appBootstrapJs,
+  "createEditorContextController",
+  "The application runtime must expose the checked editor-context orchestration boundary."
+);
+assertIncludes(
+  editorContextControllerJs,
+  "await Promise.all",
+  "EditorContextController must coordinate asynchronous contextual services."
+);
+assertIncludes(
+  appJs,
+  "return editorContextController.refresh();",
+  "The legacy sidebar facade must delegate refresh ownership to EditorContextController."
+);
 assert(
   productionAssets.appVersion === packageJson.version,
   "Canonical production asset manifest appVersion must match package.json."

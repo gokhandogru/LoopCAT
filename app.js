@@ -1280,6 +1280,19 @@ const verticalFeatureState = (() => {
 })();
 verticalFeatureState?.inspector?.mount?.();
 
+const editorContextController = appRuntime?.featureFactories?.createEditorContextController?.({
+  getContext: () => ({
+    projectId: state.project?.id || "",
+    segmentId: currentSegment()?.id || ""
+  }),
+  renderReview: () => renderReviewPanel(),
+  renderHistory: () => renderRevisionHistory(),
+  renderAi: () => renderAiSuggestions(),
+  renderQuality: () => renderQualityWorkbench(),
+  refreshMatches: () => refreshTmMatches(),
+  refreshTerms: () => refreshTerms()
+});
+
 const filterPresetController = appRuntime?.featureFactories?.createFilterPresetController?.({
   select: els.filterPresetSelect,
   preferencesRepository: appRuntime.preferencesRepository,
@@ -7334,11 +7347,7 @@ function handleEditorKeydown(event, index) {
 }
 
 async function refreshSidebar() {
-  renderReviewPanel();
-  renderRevisionHistory();
-  renderAiSuggestions();
-  renderQualityWorkbench();
-  await Promise.all([refreshTmMatches(), refreshTerms()]);
+  return editorContextController.refresh();
 }
 
 function renderReviewPanel(options = {}) {
