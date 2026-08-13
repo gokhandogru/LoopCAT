@@ -30,7 +30,6 @@ test("filter state updates atomically and resets to deterministic defaults", asy
   assert.equal(filters.getState().query, "term");
   filters.reset();
   assert.deepEqual(filters.getState(), {
-    documentId: "",
     query: "",
     scope: "both",
     regex: false,

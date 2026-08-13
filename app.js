@@ -704,6 +704,7 @@ const CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG = Symbol("create-project-activit
 const WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG = Symbol("workspace-save-activity-failure-test");
 const RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS = new Set();
 const segmentSourceWordCounts = new WeakMap();
+const editorFilterStore = appRuntime.featureFactories.createFilterStore();
 
 const state = {
   projects: [],
@@ -714,13 +715,6 @@ const state = {
   progressSummary: null,
   saveTimers: new Map(),
   inspectorOpen: true,
-  segmentQuery: "",
-  segmentSearchScope: "both",
-  segmentRegex: false,
-  segmentCaseSensitive: false,
-  segmentStatusFilter: "all",
-  reviewStateFilter: "",
-  aiSegmentFilter: "",
   projectTerms: [],
   segmentFilterRevision: 0,
   segmentFilterCache: { key: "", indexes: [], positions: new Map() },
@@ -782,6 +776,14 @@ function currentSegmentId() {
 
 function currentFocusMode() {
   return applicationStore.getState().interface.focusMode;
+}
+
+function currentEditorFilters() {
+  return editorFilterStore.getState();
+}
+
+function updateEditorFilters(patch) {
+  return editorFilterStore.update(patch);
 }
 
 function selectApplicationSegment(activeIndex, segmentId = state.segments[activeIndex]?.id || "") {
@@ -1263,7 +1265,6 @@ const verticalFeatureState = (() => {
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "creating vertical feature controllers";
   const factories = appRuntime?.featureFactories;
   if (!factories) return null;
-  const filterStore = factories.createFilterStore();
   return Object.freeze({
     dashboard: factories.createDashboardController({ root: els.projectHomeView }),
     editor: factories.createEditorController({
@@ -1275,7 +1276,7 @@ const verticalFeatureState = (() => {
       emptyView: els.emptyState,
       editorView: els.editorView
     }),
-    filters: filterStore,
+    filters: editorFilterStore,
     inspector: factories.createInspectorController({
       root: els.sidebar,
       preferencesRepository: appRuntime.preferencesRepository
@@ -1291,9 +1292,7 @@ const filterPresetController = appRuntime?.featureFactories?.createFilterPresetC
   preferencesRepository: appRuntime.preferencesRepository,
   getProjectId: () => state.project?.id || "",
   applyFilters: async (preset) => {
-    state.segmentStatusFilter = preset.status;
-    state.reviewStateFilter = preset.reviewState;
-    state.aiSegmentFilter = preset.aiState;
+    updateEditorFilters({ status: preset.status, reviewState: preset.reviewState, aiState: preset.aiState });
     els.segmentStatusFilter.value = preset.status;
     if (els.reviewStateFilter) els.reviewStateFilter.value = preset.reviewState;
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = preset.aiState;
@@ -3096,7 +3095,7 @@ function segmentHasAiSuggestions(segment = {}) {
 }
 
 function segmentPassesAiFilter(segment = {}) {
-  const filter = state.aiSegmentFilter;
+  const filter = currentEditorFilters().aiState;
   if (!filter) return true;
   if (filter === "ai-draft") return segmentHasAiDraft(segment);
   if (filter === "ai-suggestions") return segmentHasAiSuggestions(segment);
@@ -3106,12 +3105,13 @@ function segmentPassesAiFilter(segment = {}) {
 }
 
 function segmentQueryMatcher() {
-  const query = state.segmentQuery;
+  const filters = currentEditorFilters();
+  const query = filters.query;
   if (!query) return () => true;
-  const scope = state.segmentSearchScope;
-  if (state.segmentRegex) {
+  const scope = filters.scope;
+  if (filters.regex) {
     try {
-      const pattern = new RegExp(query, state.segmentCaseSensitive ? "" : "i");
+      const pattern = new RegExp(query, filters.caseSensitive ? "" : "i");
       return (segment) => {
         const source = segment.source || "";
         const target = segment.target || "";
@@ -3122,7 +3122,7 @@ function segmentQueryMatcher() {
       return () => false;
     }
   }
-  if (state.segmentCaseSensitive) {
+  if (filters.caseSensitive) {
     return (segment) => {
       const source = segment.source || "";
       const target = segment.target || "";
@@ -3140,13 +3140,14 @@ function segmentQueryMatcher() {
 }
 
 function segmentPassesFilters(segment, queryMatches = segmentQueryMatcher()) {
-  const status = state.segmentStatusFilter;
+  const filters = currentEditorFilters();
+  const status = filters.status;
   if (currentDocumentId() && segment.documentId !== currentDocumentId()) return false;
-  if (state.reviewStateFilter) {
+  if (filters.reviewState) {
     const comments = (segment.comments || []).length + ((segment.reviewNote || "").trim() ? 1 : 0);
-    if (state.reviewStateFilter === "comments") {
+    if (filters.reviewState === "comments") {
       if (!comments) return false;
-    } else if (segment.reviewState !== state.reviewStateFilter) {
+    } else if (segment.reviewState !== filters.reviewState) {
       return false;
     }
   }
@@ -3164,16 +3165,17 @@ function projectSegmentIndexes() {
 }
 
 function segmentFilterCacheKey() {
+  const filters = currentEditorFilters();
   return [
     state.segmentFilterRevision,
     currentDocumentId(),
-    state.segmentQuery,
-    state.segmentSearchScope,
-    state.segmentRegex ? "regex" : "plain",
-    state.segmentCaseSensitive ? "case" : "fold",
-    state.segmentStatusFilter,
-    state.reviewStateFilter,
-    state.aiSegmentFilter
+    filters.query,
+    filters.scope,
+    filters.regex ? "regex" : "plain",
+    filters.caseSensitive ? "case" : "fold",
+    filters.status,
+    filters.reviewState,
+    filters.aiState
   ].join("\u001f");
 }
 
@@ -5355,16 +5357,6 @@ function renderEditor() {
     verticalFeatureState.editor.renderShell({ view: currentApplicationView(), hasProject, inspectorOpen: state.inspectorOpen });
     verticalFeatureState.inspector.setVisible(currentApplicationView() === "editor" && state.inspectorOpen);
     verticalFeatureState.dashboard.setVisible(currentApplicationView() === "project" && hasProject);
-    verticalFeatureState.filters.update({
-      documentId: currentDocumentId(),
-      query: state.segmentQuery,
-      scope: state.segmentSearchScope,
-      regex: state.segmentRegex,
-      caseSensitive: state.segmentCaseSensitive,
-      status: state.segmentStatusFilter,
-      reviewState: state.reviewStateFilter,
-      aiState: state.aiSegmentFilter
-    });
   } else {
     els.workspace.classList.toggle("projects-mode", currentApplicationView() !== "editor");
     els.sidebar.classList.toggle("hidden", currentApplicationView() !== "editor");
@@ -6434,7 +6426,7 @@ async function goToNextOpenSegment() {
   if (next === -1) return;
   await setActiveSegment(next);
   if (!segmentPassesFilters(state.segments[next])) {
-    state.segmentStatusFilter = "all";
+    updateEditorFilters({ status: "all" });
     els.segmentStatusFilter.value = "all";
     renderSegments();
   }
@@ -6750,8 +6742,8 @@ async function replaceTargetText(scope = "visible") {
     return { segmentCount: 0, replacementCount: 0 };
   }
   const options = {
-    regex: state.segmentRegex,
-    caseSensitive: state.segmentCaseSensitive
+    regex: currentEditorFilters().regex,
+    caseSensitive: currentEditorFilters().caseSensitive
   };
   const indexes = scope === "all" ? projectSegmentIndexes() : filteredSegmentIndexes();
   let replacementCount = 0;
@@ -7592,13 +7584,10 @@ async function goToQualityRiskItem(item) {
       selectApplicationDocument("");
       els.documentFilter.value = currentDocumentId();
     }
-    state.segmentQuery = "";
+    updateEditorFilters({ query: "", status: "all", reviewState: "", aiState: "" });
     els.segmentSearchInput.value = "";
-    state.segmentStatusFilter = "all";
     els.segmentStatusFilter.value = "all";
-    state.reviewStateFilter = "";
     if (els.reviewStateFilter) els.reviewStateFilter.value = "";
-    state.aiSegmentFilter = "";
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
     renderSegments();
   }
@@ -13726,25 +13715,25 @@ function wireEvents() {
     if (first !== -1) await setActiveSegment(first);
   });
   els.segmentSearchInput.addEventListener("input", async () => {
-    state.segmentQuery = els.segmentSearchInput.value.trim();
+    updateEditorFilters({ query: els.segmentSearchInput.value.trim() });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
   els.segmentSearchScope.addEventListener("change", async () => {
-    state.segmentSearchScope = els.segmentSearchScope.value;
+    updateEditorFilters({ scope: els.segmentSearchScope.value });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
   els.segmentRegexInput.addEventListener("change", async () => {
-    state.segmentRegex = els.segmentRegexInput.checked;
+    updateEditorFilters({ regex: els.segmentRegexInput.checked });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
   els.segmentCaseInput.addEventListener("change", async () => {
-    state.segmentCaseSensitive = els.segmentCaseInput.checked;
+    updateEditorFilters({ caseSensitive: els.segmentCaseInput.checked });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
@@ -13753,21 +13742,21 @@ function wireEvents() {
   els.replaceAllBtn.addEventListener("click", () => replaceTargetText("all"));
   els.segmentStatusFilter.addEventListener("change", async () => {
     filterPresetController?.markCustom?.();
-    state.segmentStatusFilter = els.segmentStatusFilter.value;
+    updateEditorFilters({ status: els.segmentStatusFilter.value });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
   els.reviewStateFilter?.addEventListener("change", async () => {
     filterPresetController?.markCustom?.();
-    state.reviewStateFilter = els.reviewStateFilter.value;
+    updateEditorFilters({ reviewState: els.reviewStateFilter.value });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
   });
   els.aiSegmentFilter?.addEventListener("change", async () => {
     filterPresetController?.markCustom?.();
-    state.aiSegmentFilter = els.aiSegmentFilter.value;
+    updateEditorFilters({ aiState: els.aiSegmentFilter.value });
     renderSegments();
     const first = firstVisibleSegmentIndex();
     if (first !== -1) await setActiveSegment(first);
@@ -14939,7 +14928,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     const aiReviewProvider = aiProviderService.get("ollama");
     const originalAiReviewCompletePrompt = aiReviewProvider.completePrompt;
-    const originalAiReviewSegmentFilter = state.aiSegmentFilter;
+    const originalAiReviewSegmentFilter = currentEditorFilters().aiState;
     try {
       if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
@@ -14966,7 +14955,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const aiReviewSaved = await reviewActiveSegmentWithLocalAi();
       const aiReviewStored = (await getProjectSegments(project.id)).find((segment) => segment.id === state.segments[segmentIndex].id);
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = "ai-review-risk";
-      state.aiSegmentFilter = "ai-review-risk";
+      updateEditorFilters({ aiState: "ai-review-risk" });
       renderSegments();
       assert(
         aiReviewSaved &&
@@ -14986,7 +14975,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
     } finally {
       aiReviewProvider.completePrompt = originalAiReviewCompletePrompt;
-      state.aiSegmentFilter = originalAiReviewSegmentFilter;
+      updateEditorFilters({ aiState: originalAiReviewSegmentFilter });
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalAiReviewSegmentFilter;
       renderSegments();
     }
@@ -14996,13 +14985,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiBatchReviewSnapshots = new Map(aiBatchReviewIndexes.map((index) => [state.segments[index].id, structuredClone(state.segments[index])]));
     const originalBatchReviewFilters = {
       documentFilter: currentDocumentId(),
-      segmentQuery: state.segmentQuery,
-      segmentSearchScope: state.segmentSearchScope,
-      segmentRegex: state.segmentRegex,
-      segmentCaseSensitive: state.segmentCaseSensitive,
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
-      aiSegmentFilter: state.aiSegmentFilter,
+      segmentQuery: currentEditorFilters().query,
+      segmentSearchScope: currentEditorFilters().scope,
+      segmentRegex: currentEditorFilters().regex,
+      segmentCaseSensitive: currentEditorFilters().caseSensitive,
+      segmentStatusFilter: currentEditorFilters().status,
+      reviewStateFilter: currentEditorFilters().reviewState,
+      aiSegmentFilter: currentEditorFilters().aiState,
       localAiMode: els.localAiModeSelect?.value || ""
     };
     try {
@@ -15012,13 +15001,15 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-review-model";
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
       selectApplicationDocument("");
-      state.segmentQuery = "workflow batch qa";
-      state.segmentSearchScope = "both";
-      state.segmentRegex = false;
-      state.segmentCaseSensitive = false;
-      state.segmentStatusFilter = "all";
-      state.reviewStateFilter = "";
-      state.aiSegmentFilter = "";
+      updateEditorFilters({
+        query: "workflow batch qa",
+        scope: "both",
+        regex: false,
+        caseSensitive: false,
+        status: "all",
+        reviewState: "",
+        aiState: ""
+      });
       const issueSegment = state.segments[aiBatchReviewIndexes[0]];
       const failedSegment = state.segments[aiBatchReviewIndexes[1]];
       const lockedSegment = state.segments[aiBatchReviewIndexes[2]];
@@ -15061,7 +15052,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const storedFailedSegment = batchReviewStored.find((segment) => segment.id === failedSegment.id);
       const storedLockedSegment = batchReviewStored.find((segment) => segment.id === lockedSegment.id);
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = "high-ai-risk";
-      state.aiSegmentFilter = "high-ai-risk";
+      updateEditorFilters({ aiState: "high-ai-risk" });
       renderSegments();
       assert(
         batchReviewSummary?.commented === 1 &&
@@ -15089,13 +15080,15 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } finally {
       aiReviewProvider.completePrompt = originalAiBatchReviewCompletePrompt;
       selectApplicationDocument(originalBatchReviewFilters.documentFilter);
-      state.segmentQuery = originalBatchReviewFilters.segmentQuery;
-      state.segmentSearchScope = originalBatchReviewFilters.segmentSearchScope;
-      state.segmentRegex = originalBatchReviewFilters.segmentRegex;
-      state.segmentCaseSensitive = originalBatchReviewFilters.segmentCaseSensitive;
-      state.segmentStatusFilter = originalBatchReviewFilters.segmentStatusFilter;
-      state.reviewStateFilter = originalBatchReviewFilters.reviewStateFilter;
-      state.aiSegmentFilter = originalBatchReviewFilters.aiSegmentFilter;
+      updateEditorFilters({
+        query: originalBatchReviewFilters.segmentQuery,
+        scope: originalBatchReviewFilters.segmentSearchScope,
+        regex: originalBatchReviewFilters.segmentRegex,
+        caseSensitive: originalBatchReviewFilters.segmentCaseSensitive,
+        status: originalBatchReviewFilters.segmentStatusFilter,
+        reviewState: originalBatchReviewFilters.reviewStateFilter,
+        aiState: originalBatchReviewFilters.aiSegmentFilter
+      });
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalBatchReviewFilters.aiSegmentFilter;
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalBatchReviewFilters.localAiMode;
       const restoredBatchReviewSegments = Array.from(aiBatchReviewSnapshots.values()).map((snapshot) => {
@@ -15171,12 +15164,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiBatchRepairSnapshots = new Map(aiBatchRepairIndexes.map((index) => [state.segments[index].id, structuredClone(state.segments[index])]));
     const originalBatchRepairFilters = {
       documentFilter: currentDocumentId(),
-      segmentQuery: state.segmentQuery,
-      segmentSearchScope: state.segmentSearchScope,
-      segmentRegex: state.segmentRegex,
-      segmentCaseSensitive: state.segmentCaseSensitive,
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
+      segmentQuery: currentEditorFilters().query,
+      segmentSearchScope: currentEditorFilters().scope,
+      segmentRegex: currentEditorFilters().regex,
+      segmentCaseSensitive: currentEditorFilters().caseSensitive,
+      segmentStatusFilter: currentEditorFilters().status,
+      reviewStateFilter: currentEditorFilters().reviewState,
       localAiMode: els.localAiModeSelect?.value || ""
     };
     try {
@@ -15186,12 +15179,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-repair-model";
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
       selectApplicationDocument("");
-      state.segmentQuery = "workflow batch tag repair";
-      state.segmentSearchScope = "both";
-      state.segmentRegex = false;
-      state.segmentCaseSensitive = false;
-      state.segmentStatusFilter = "all";
-      state.reviewStateFilter = "";
+      updateEditorFilters({
+        query: "workflow batch tag repair",
+        scope: "both",
+        regex: false,
+        caseSensitive: false,
+        status: "all",
+        reviewState: ""
+      });
       const repairedSegment = state.segments[aiBatchRepairIndexes[0]];
       const failedSegment = state.segments[aiBatchRepairIndexes[1]];
       const lockedSegment = state.segments[aiBatchRepairIndexes[2]];
@@ -15269,12 +15264,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } finally {
       aiRepairProvider.completePrompt = originalAiBatchRepairCompletePrompt;
       selectApplicationDocument(originalBatchRepairFilters.documentFilter);
-      state.segmentQuery = originalBatchRepairFilters.segmentQuery;
-      state.segmentSearchScope = originalBatchRepairFilters.segmentSearchScope;
-      state.segmentRegex = originalBatchRepairFilters.segmentRegex;
-      state.segmentCaseSensitive = originalBatchRepairFilters.segmentCaseSensitive;
-      state.segmentStatusFilter = originalBatchRepairFilters.segmentStatusFilter;
-      state.reviewStateFilter = originalBatchRepairFilters.reviewStateFilter;
+      updateEditorFilters({
+        query: originalBatchRepairFilters.segmentQuery,
+        scope: originalBatchRepairFilters.segmentSearchScope,
+        regex: originalBatchRepairFilters.segmentRegex,
+        caseSensitive: originalBatchRepairFilters.segmentCaseSensitive,
+        status: originalBatchRepairFilters.segmentStatusFilter,
+        reviewState: originalBatchRepairFilters.reviewStateFilter
+      });
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalBatchRepairFilters.localAiMode;
       const restoredBatchRepairSegments = Array.from(aiBatchRepairSnapshots.values()).map((snapshot) => {
         const current = state.segments.find((segment) => segment.id === snapshot.id);
@@ -15299,12 +15296,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const originalAiVariantsMode = els.localAiVariantModeSelect?.value || "";
     const originalAiVariantsFilters = {
       documentFilter: currentDocumentId(),
-      segmentQuery: state.segmentQuery,
-      segmentSearchScope: state.segmentSearchScope,
-      segmentRegex: state.segmentRegex,
-      segmentCaseSensitive: state.segmentCaseSensitive,
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
+      segmentQuery: currentEditorFilters().query,
+      segmentSearchScope: currentEditorFilters().scope,
+      segmentRegex: currentEditorFilters().regex,
+      segmentCaseSensitive: currentEditorFilters().caseSensitive,
+      segmentStatusFilter: currentEditorFilters().status,
+      reviewStateFilter: currentEditorFilters().reviewState,
       localAiMode: els.localAiModeSelect?.value || "",
       activeSegmentId: state.segments[segmentIndex]?.id || ""
     };
@@ -15377,12 +15374,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch variants alpha source.</p><p>Workflow batch variants beta source.</p><p>Workflow batch variants failure source.</p><p>Workflow batch variants locked source.</p></body></html>"], "workflow-ai-batch-variants.html", { type: "text/html" }));
       const aiBatchVariantsDocument = state.project.documents.find((item) => item.name === "workflow-ai-batch-variants.html");
       await openProjectFile(aiBatchVariantsDocument.id);
-      state.segmentQuery = "";
-      state.segmentSearchScope = "both";
-      state.segmentRegex = false;
-      state.segmentCaseSensitive = false;
-      state.segmentStatusFilter = "all";
-      state.reviewStateFilter = "";
+      updateEditorFilters({
+        query: "",
+        scope: "both",
+        regex: false,
+        caseSensitive: false,
+        status: "all",
+        reviewState: ""
+      });
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
       if (els.localAiVariantModeSelect) els.localAiVariantModeSelect.value = "concise";
       const aiBatchVariantsIndexes = state.segments
@@ -15445,12 +15444,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiVariantModeSelect) els.localAiVariantModeSelect.value = originalAiVariantsMode;
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiVariantsFilters.localAiMode;
       selectApplicationDocument(originalAiVariantsFilters.documentFilter);
-      state.segmentQuery = originalAiVariantsFilters.segmentQuery;
-      state.segmentSearchScope = originalAiVariantsFilters.segmentSearchScope;
-      state.segmentRegex = originalAiVariantsFilters.segmentRegex;
-      state.segmentCaseSensitive = originalAiVariantsFilters.segmentCaseSensitive;
-      state.segmentStatusFilter = originalAiVariantsFilters.segmentStatusFilter;
-      state.reviewStateFilter = originalAiVariantsFilters.reviewStateFilter;
+      updateEditorFilters({
+        query: originalAiVariantsFilters.segmentQuery,
+        scope: originalAiVariantsFilters.segmentSearchScope,
+        regex: originalAiVariantsFilters.segmentRegex,
+        caseSensitive: originalAiVariantsFilters.segmentCaseSensitive,
+        status: originalAiVariantsFilters.segmentStatusFilter,
+        reviewState: originalAiVariantsFilters.reviewStateFilter
+      });
       state.project = await updateProject({
         ...state.project,
         aiSettings: defaultAiSettings(aiVariantsProjectSettingsSnapshot)
@@ -15546,12 +15547,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiBatchApplyTermsSnapshots = new Map(aiBatchApplyTermsIndexes.map((index) => [state.segments[index].id, structuredClone(state.segments[index])]));
     const originalBatchApplyTermsFilters = {
       documentFilter: currentDocumentId(),
-      segmentQuery: state.segmentQuery,
-      segmentSearchScope: state.segmentSearchScope,
-      segmentRegex: state.segmentRegex,
-      segmentCaseSensitive: state.segmentCaseSensitive,
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
+      segmentQuery: currentEditorFilters().query,
+      segmentSearchScope: currentEditorFilters().scope,
+      segmentRegex: currentEditorFilters().regex,
+      segmentCaseSensitive: currentEditorFilters().caseSensitive,
+      segmentStatusFilter: currentEditorFilters().status,
+      reviewStateFilter: currentEditorFilters().reviewState,
       localAiMode: els.localAiModeSelect?.value || ""
     };
     const aiBatchApplyTermsSavedTerms = [];
@@ -15562,12 +15563,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-apply-terms-model";
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
       selectApplicationDocument("");
-      state.segmentQuery = "workflow batch apply terminology";
-      state.segmentSearchScope = "both";
-      state.segmentRegex = false;
-      state.segmentCaseSensitive = false;
-      state.segmentStatusFilter = "all";
-      state.reviewStateFilter = "";
+      updateEditorFilters({
+        query: "workflow batch apply terminology",
+        scope: "both",
+        regex: false,
+        caseSensitive: false,
+        status: "all",
+        reviewState: ""
+      });
       const suggestedSegment = state.segments[aiBatchApplyTermsIndexes[0]];
       const failedSegment = state.segments[aiBatchApplyTermsIndexes[1]];
       const lockedSegment = state.segments[aiBatchApplyTermsIndexes[2]];
@@ -15659,12 +15662,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       aiApplyTermsProvider.completePrompt = originalAiBatchApplyTermsCompletePrompt;
       await Promise.all(aiBatchApplyTermsSavedTerms.filter((term) => term?.id).map((term) => deleteTerm(term.id)));
       selectApplicationDocument(originalBatchApplyTermsFilters.documentFilter);
-      state.segmentQuery = originalBatchApplyTermsFilters.segmentQuery;
-      state.segmentSearchScope = originalBatchApplyTermsFilters.segmentSearchScope;
-      state.segmentRegex = originalBatchApplyTermsFilters.segmentRegex;
-      state.segmentCaseSensitive = originalBatchApplyTermsFilters.segmentCaseSensitive;
-      state.segmentStatusFilter = originalBatchApplyTermsFilters.segmentStatusFilter;
-      state.reviewStateFilter = originalBatchApplyTermsFilters.reviewStateFilter;
+      updateEditorFilters({
+        query: originalBatchApplyTermsFilters.segmentQuery,
+        scope: originalBatchApplyTermsFilters.segmentSearchScope,
+        regex: originalBatchApplyTermsFilters.segmentRegex,
+        caseSensitive: originalBatchApplyTermsFilters.segmentCaseSensitive,
+        status: originalBatchApplyTermsFilters.segmentStatusFilter,
+        reviewState: originalBatchApplyTermsFilters.reviewStateFilter
+      });
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalBatchApplyTermsFilters.localAiMode;
       const restoredBatchApplyTermsSegments = Array.from(aiBatchApplyTermsSnapshots.values()).map((snapshot) => {
         const current = state.segments.find((segment) => segment.id === snapshot.id);
@@ -15688,12 +15693,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiPolishProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
     const originalAiPolishFilters = {
       documentFilter: currentDocumentId(),
-      segmentQuery: state.segmentQuery,
-      segmentSearchScope: state.segmentSearchScope,
-      segmentRegex: state.segmentRegex,
-      segmentCaseSensitive: state.segmentCaseSensitive,
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
+      segmentQuery: currentEditorFilters().query,
+      segmentSearchScope: currentEditorFilters().scope,
+      segmentRegex: currentEditorFilters().regex,
+      segmentCaseSensitive: currentEditorFilters().caseSensitive,
+      segmentStatusFilter: currentEditorFilters().status,
+      reviewStateFilter: currentEditorFilters().reviewState,
       localAiMode: els.localAiModeSelect?.value || "",
       activeIndex: currentActiveIndex()
     };
@@ -15791,12 +15796,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch polish alpha source.</p><p>Workflow batch polish beta source.</p></body></html>"], "workflow-ai-batch-polish.html", { type: "text/html" }));
       const aiBatchPolishDocument = state.project.documents.find((item) => item.name === "workflow-ai-batch-polish.html");
       await openProjectFile(aiBatchPolishDocument.id);
-      state.segmentQuery = "";
-      state.segmentSearchScope = "both";
-      state.segmentRegex = false;
-      state.segmentCaseSensitive = false;
-      state.segmentStatusFilter = "all";
-      state.reviewStateFilter = "";
+      updateEditorFilters({
+        query: "",
+        scope: "both",
+        regex: false,
+        caseSensitive: false,
+        status: "all",
+        reviewState: ""
+      });
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
       if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = "shorten";
       const aiBatchPolishIndexes = state.segments
@@ -15830,12 +15837,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       aiPolishProvider.completePrompt = originalAiPolishCompletePrompt;
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiPolishFilters.localAiMode;
       selectApplicationDocument(originalAiPolishFilters.documentFilter);
-      state.segmentQuery = originalAiPolishFilters.segmentQuery;
-      state.segmentSearchScope = originalAiPolishFilters.segmentSearchScope;
-      state.segmentRegex = originalAiPolishFilters.segmentRegex;
-      state.segmentCaseSensitive = originalAiPolishFilters.segmentCaseSensitive;
-      state.segmentStatusFilter = originalAiPolishFilters.segmentStatusFilter;
-      state.reviewStateFilter = originalAiPolishFilters.reviewStateFilter;
+      updateEditorFilters({
+        query: originalAiPolishFilters.segmentQuery,
+        scope: originalAiPolishFilters.segmentSearchScope,
+        regex: originalAiPolishFilters.segmentRegex,
+        caseSensitive: originalAiPolishFilters.segmentCaseSensitive,
+        status: originalAiPolishFilters.segmentStatusFilter,
+        reviewState: originalAiPolishFilters.reviewStateFilter
+      });
       if (aiPolishTerm?.id) await deleteTerm(aiPolishTerm.id);
       if (aiPolishTmEntry?.id) await deleteTmEntry(aiPolishTmEntry.id);
       state.project = await updateProject({
@@ -15963,12 +15972,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiBatchAdaptProjectSettingsSnapshot = structuredClone(state.project.aiSettings || {});
     const originalAiBatchAdaptFilters = {
       documentFilter: currentDocumentId(),
-      segmentQuery: state.segmentQuery,
-      segmentSearchScope: state.segmentSearchScope,
-      segmentRegex: state.segmentRegex,
-      segmentCaseSensitive: state.segmentCaseSensitive,
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
+      segmentQuery: currentEditorFilters().query,
+      segmentSearchScope: currentEditorFilters().scope,
+      segmentRegex: currentEditorFilters().regex,
+      segmentCaseSensitive: currentEditorFilters().caseSensitive,
+      segmentStatusFilter: currentEditorFilters().status,
+      reviewStateFilter: currentEditorFilters().reviewState,
       localAiMode: els.localAiModeSelect?.value || "",
       localAiAdaptMode: els.localAiAdaptModeSelect?.value || "",
       activeSegmentId: state.segments[segmentIndex]?.id || ""
@@ -15989,12 +15998,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch adapt alpha source.</p><p>Workflow batch adapt beta source.</p><p>Workflow batch adapt failure source.</p><p>Workflow batch adapt locked source.</p></body></html>"], "workflow-ai-batch-adapt.html", { type: "text/html" }));
       const aiBatchAdaptDocument = state.project.documents.find((item) => item.name === "workflow-ai-batch-adapt.html");
       await openProjectFile(aiBatchAdaptDocument.id);
-      state.segmentQuery = "";
-      state.segmentSearchScope = "both";
-      state.segmentRegex = false;
-      state.segmentCaseSensitive = false;
-      state.segmentStatusFilter = "all";
-      state.reviewStateFilter = "";
+      updateEditorFilters({
+        query: "",
+        scope: "both",
+        regex: false,
+        caseSensitive: false,
+        status: "all",
+        reviewState: ""
+      });
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
       const aiBatchAdaptIndexes = state.segments
         .map((segment, index) => ({ segment, index }))
@@ -16089,12 +16100,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiBatchAdaptFilters.localAiMode;
       if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = originalAiBatchAdaptFilters.localAiAdaptMode;
       selectApplicationDocument(originalAiBatchAdaptFilters.documentFilter);
-      state.segmentQuery = originalAiBatchAdaptFilters.segmentQuery;
-      state.segmentSearchScope = originalAiBatchAdaptFilters.segmentSearchScope;
-      state.segmentRegex = originalAiBatchAdaptFilters.segmentRegex;
-      state.segmentCaseSensitive = originalAiBatchAdaptFilters.segmentCaseSensitive;
-      state.segmentStatusFilter = originalAiBatchAdaptFilters.segmentStatusFilter;
-      state.reviewStateFilter = originalAiBatchAdaptFilters.reviewStateFilter;
+      updateEditorFilters({
+        query: originalAiBatchAdaptFilters.segmentQuery,
+        scope: originalAiBatchAdaptFilters.segmentSearchScope,
+        regex: originalAiBatchAdaptFilters.segmentRegex,
+        caseSensitive: originalAiBatchAdaptFilters.segmentCaseSensitive,
+        status: originalAiBatchAdaptFilters.segmentStatusFilter,
+        reviewState: originalAiBatchAdaptFilters.reviewStateFilter
+      });
       state.project = await updateProject({
         ...state.project,
         aiSettings: defaultAiSettings(aiBatchAdaptProjectSettingsSnapshot)
@@ -17009,7 +17022,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const originalLocalAiGlossaryTranslateSegment = localAiGlossaryProvider.translateSegment;
     const originalLocalAiGlossaryCompletePrompt = localAiGlossaryProvider.completePrompt;
     const originalLocalAiGlossaryMode = els.localAiModeSelect?.value || "";
-    const originalLocalAiGlossaryAiFilter = state.aiSegmentFilter;
+    const originalLocalAiGlossaryAiFilter = currentEditorFilters().aiState;
     let localAiGlossaryTerm = null;
     let localAiTmEntry = null;
     let localAiGlossaryRequest = null;
@@ -17188,7 +17201,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "Local AI pretranslation Redo restores review/provenance patches with a monotonic revision"
       );
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = "ai-draft";
-      state.aiSegmentFilter = "ai-draft";
+      updateEditorFilters({ aiState: "ai-draft" });
       renderSegments();
       assert(
         localAiGlossaryRequest?.segment?.id === localAiGlossarySegment?.id &&
@@ -17217,7 +17230,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       localAiGlossarySegment.status = localAiConfirmedPreviousStatus;
       localAiGlossarySegment.reviewState = localAiConfirmedPreviousReviewState;
-      state.aiSegmentFilter = originalLocalAiGlossaryAiFilter;
+      updateEditorFilters({ aiState: originalLocalAiGlossaryAiFilter });
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalLocalAiGlossaryAiFilter;
       renderSegments();
       setSegmentTargetAndStatus(localAiGlossarySegment, "", "draft", "ai-cancel-fixture");
@@ -17421,7 +17434,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       localAiGlossaryProvider.translateSegment = originalLocalAiGlossaryTranslateSegment;
       localAiGlossaryProvider.completePrompt = originalLocalAiGlossaryCompletePrompt;
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalLocalAiGlossaryMode;
-      state.aiSegmentFilter = originalLocalAiGlossaryAiFilter;
+      updateEditorFilters({ aiState: originalLocalAiGlossaryAiFilter });
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalLocalAiGlossaryAiFilter;
       if (localAiTmEntry?.id) await deleteTmEntry(localAiTmEntry.id);
       if (localAiGlossaryTerm?.id) await deleteTerm(localAiGlossaryTerm.id);
@@ -17511,13 +17524,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     touchSegment(confirmRollbackSegment);
     await saveSegment(confirmRollbackSegment);
     const originalConfirmReviewedFilters = {
-      segmentStatusFilter: state.segmentStatusFilter,
-      reviewStateFilter: state.reviewStateFilter,
-      aiSegmentFilter: state.aiSegmentFilter
+      segmentStatusFilter: currentEditorFilters().status,
+      reviewStateFilter: currentEditorFilters().reviewState,
+      aiSegmentFilter: currentEditorFilters().aiState
     };
-    state.segmentStatusFilter = "all";
-    state.reviewStateFilter = "";
-    state.aiSegmentFilter = "";
+    updateEditorFilters({ status: "all", reviewState: "", aiState: "" });
     if (els.segmentStatusFilter) els.segmentStatusFilter.value = "all";
     if (els.reviewStateFilter) els.reviewStateFilter.value = "";
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
@@ -17558,9 +17569,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         (redoneConfirmedSegment?.reviewState || "") === "",
       "Redo reapplies confirmed segment state"
     );
-    state.segmentStatusFilter = originalConfirmReviewedFilters.segmentStatusFilter;
-    state.reviewStateFilter = originalConfirmReviewedFilters.reviewStateFilter;
-    state.aiSegmentFilter = originalConfirmReviewedFilters.aiSegmentFilter;
+    updateEditorFilters({
+      status: originalConfirmReviewedFilters.segmentStatusFilter,
+      reviewState: originalConfirmReviewedFilters.reviewStateFilter,
+      aiState: originalConfirmReviewedFilters.aiSegmentFilter
+    });
     if (els.segmentStatusFilter) els.segmentStatusFilter.value = originalConfirmReviewedFilters.segmentStatusFilter;
     if (els.reviewStateFilter) els.reviewStateFilter.value = originalConfirmReviewedFilters.reviewStateFilter;
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalConfirmReviewedFilters.aiSegmentFilter;

@@ -1,5 +1,4 @@
 const DEFAULT_FILTERS = Object.freeze({
-  documentId: "",
   query: "",
   scope: "both",
   regex: false,

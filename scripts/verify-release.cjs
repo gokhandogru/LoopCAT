@@ -388,6 +388,25 @@ assert(
   !appJs.includes("state.focusMode"),
   "AppStore must remain the only Focus-mode owner; app.js cannot restore a legacy state.focusMode field."
 );
+for (const field of [
+  "segmentQuery",
+  "segmentSearchScope",
+  "segmentRegex",
+  "segmentCaseSensitive",
+  "segmentStatusFilter",
+  "reviewStateFilter",
+  "aiSegmentFilter"
+]) {
+  assert(
+    !appJs.includes(`state.${field}`),
+    `FilterStore must remain the only editor-filter owner; app.js cannot restore legacy state.${field}.`
+  );
+}
+assertIncludes(
+  appJs,
+  "const editorFilterStore = appRuntime.featureFactories.createFilterStore();",
+  "app.js must install one authoritative checked editor FilterStore."
+);
 assertIncludes(
   segmentGridControllerJs,
   "navigation.selectSegment",
