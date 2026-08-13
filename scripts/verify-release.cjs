@@ -184,6 +184,7 @@ const requiredReleaseFiles = [
   "src/ui/dialog-controller.js",
   "src/features/ai/ai-administration-controller.js",
   "src/features/ai/ai-alternatives-controller.js",
+  "src/features/ai/ai-terminology-application-controller.js",
   "src/features/ai/ai-pretranslation-controller.js",
   "src/features/ai/ai-review-controller.js",
   "src/features/ai/ai-tag-repair-controller.js",
@@ -203,6 +204,7 @@ const requiredReleaseFiles = [
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/ai-alternatives-controller.test.cjs",
+  "tests/unit/ai-terminology-application-controller.test.cjs",
   "tests/unit/ai-pretranslation-controller.test.cjs",
   "tests/unit/ai-review-controller.test.cjs",
   "tests/unit/ai-tag-repair-controller.test.cjs",
@@ -340,6 +342,10 @@ const aiTagRepairControllerJs = readText("src/features/ai/ai-tag-repair-controll
 const aiTagRepairControllerUnitTests = readText("tests/unit/ai-tag-repair-controller.test.cjs");
 const aiAlternativesControllerJs = readText("src/features/ai/ai-alternatives-controller.js");
 const aiAlternativesControllerUnitTests = readText("tests/unit/ai-alternatives-controller.test.cjs");
+const aiTerminologyApplicationControllerJs = readText("src/features/ai/ai-terminology-application-controller.js");
+const aiTerminologyApplicationControllerUnitTests = readText(
+  "tests/unit/ai-terminology-application-controller.test.cjs"
+);
 const anthropicProviderAdapterJs = readText("src/ai/providers/anthropic-provider-adapter.js");
 const cohereProviderAdapterJs = readText("src/ai/providers/cohere-provider-adapter.js");
 const geminiProviderAdapterJs = readText("src/ai/providers/gemini-provider-adapter.js");
@@ -2638,6 +2644,98 @@ for (const testName of [
     aiAlternativesControllerUnitTests,
     testName,
     `focused AI-alternatives tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiTerminologyApplicationController",
+  "The application runtime must expose the checked AI-terminology-application controller boundary."
+);
+for (const boundary of [
+  "if (!project || running || promptBusy || lifecycle.isRunning() || lifecycle.isPromptBusy()) return false",
+  'status.set("Select a segment before applying AI terminology.", "dirty")',
+  'settingsBoundary.assertReady(settings, config, "applying terminology")',
+  "glossaryTerms = await context.termsForSegment(segment)",
+  'status.set("No matching project terminology found for the active segment.", "saved")',
+  "providers.sharesExternally(settings)",
+  "const result = await domain.applyTerminology(",
+  "const saved = await suggestions.append(",
+  "const candidateSelection = selectSegments(settings)",
+  "await persistence.flush(project.id)",
+  "abortController = createAbortController()",
+  "for (const segment of candidateSelection.candidates)",
+  "summary.noTerms += 1",
+  "segment.aiSuggestions = [...(segment.aiSuggestions || []), suggestion]",
+  "if (updated.length) await persistence.saveMany(updated)",
+  "await activity.logBatch({",
+  "editorSessionStore.replaceSegments(",
+  "mutation.restore(segment, snapshot)",
+  "abortController = null",
+  'status.set("Canceling local AI batch...", "dirty")'
+]) {
+  assertIncludes(
+    aiTerminologyApplicationControllerJs,
+    boundary,
+    `AiTerminologyApplicationController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return aiTerminologyApplicationController.applyActive()",
+  "app.js must retain only the checked active AI-terminology compatibility facade."
+);
+assertIncludes(
+  appJs,
+  "return aiTerminologyApplicationController.applyBatch()",
+  "app.js must retain only the checked batch AI-terminology compatibility facade."
+);
+assertIncludes(
+  appJs,
+  "if (aiTerminologyApplicationController.cancel()) return;",
+  "the shared AI cancel facade must delegate owned terminology-application cancellation."
+);
+const activeAiTerminologyApplicationFacade = functionBody(
+  appJs,
+  "async function applyActiveSegmentTerminologyWithLocalAi",
+  "async function applyBatchTerminologyWithLocalAi"
+);
+const batchAiTerminologyApplicationFacade = functionBody(
+  appJs,
+  "async function applyBatchTerminologyWithLocalAi",
+  "async function polishActiveSegmentDraftWithLocalAi"
+);
+for (const facade of [activeAiTerminologyApplicationFacade, batchAiTerminologyApplicationFacade]) {
+  assert(
+    !facade.includes("persistLocalAiSettings(") &&
+      !facade.includes("localAiRuntimeConfig(") &&
+      !facade.includes("confirmExternalAiPromptShare(") &&
+      !facade.includes("localAiGlossaryTermsForSegment(") &&
+      !facade.includes("segmentTags(") &&
+      !facade.includes("aiCommandService.applyTerminology(") &&
+      !facade.includes("appendAiSuggestion(") &&
+      !facade.includes("savedAiSuggestionRecord(") &&
+      !facade.includes("saveSegments(") &&
+      !facade.includes("logProjectActivity(") &&
+      !facade.includes("renderLocalAiOutput(") &&
+      !facade.includes("Reflect.ownKeys") &&
+      !facade.includes("state.localAi"),
+    "app.js must not regain AI-terminology validation, consent, lifecycle, selection, context, provider, suggestion, persistence, activity, presentation, or recovery orchestration."
+  );
+}
+for (const testName of [
+  "active AI terminology application preserves busy, source, target, provider, and consent safeguards",
+  "active AI terminology application stops cleanly when no matching termbase hints exist",
+  "active AI terminology application routes glossary and protected tokens and saves a non-overwriting suggestion",
+  "active AI terminology application restores exact state after suggestion persistence failure",
+  "batch AI terminology application selects translated unlocked drafts and reports no-term candidates",
+  "mid-batch AI terminology cancellation preserves completed suggestions and saves the partial result",
+  "primary batch AI terminology persistence failure restores every candidate and cleans lifecycle state",
+  "secondary batch AI terminology activity failure keeps saved suggestions durable and reports a dirty warning"
+]) {
+  assertIncludes(
+    aiTerminologyApplicationControllerUnitTests,
+    testName,
+    `focused AI-terminology-application tests must characterize ${testName}.`
   );
 }
 assertIncludes(
