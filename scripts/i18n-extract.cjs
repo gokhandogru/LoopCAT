@@ -42,13 +42,7 @@ const resourcesPresentationServicePath = path.join(
   "resources",
   "resources-presentation-service.js"
 );
-const resourceCatalogServicePath = path.join(
-  root,
-  "src",
-  "features",
-  "resources",
-  "resource-catalog-service.js"
-);
+const resourceCatalogServicePath = path.join(root, "src", "features", "resources", "resource-catalog-service.js");
 const projectResourceSelectionControllerPath = path.join(
   root,
   "src",
@@ -83,6 +77,13 @@ const projectDocumentCatalogServicePath = path.join(
   "features",
   "projects",
   "project-document-catalog-service.js"
+);
+const textEncodingInputServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "import-export",
+  "text-encoding-input-service.js"
 );
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const resourceMutationControllerPath = path.join(
@@ -253,11 +254,7 @@ function main() {
     resourcesPresentationServicePath,
     "src/features/resources/resources-presentation-service.js"
   );
-  extractScript(
-    messagesByText,
-    resourceCatalogServicePath,
-    "src/features/resources/resource-catalog-service.js"
-  );
+  extractScript(messagesByText, resourceCatalogServicePath, "src/features/resources/resource-catalog-service.js");
   extractScript(
     messagesByText,
     projectResourceSelectionControllerPath,
@@ -282,6 +279,11 @@ function main() {
     messagesByText,
     projectDocumentCatalogServicePath,
     "src/features/projects/project-document-catalog-service.js"
+  );
+  extractScript(
+    messagesByText,
+    textEncodingInputServicePath,
+    "src/features/import-export/text-encoding-input-service.js"
   );
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(

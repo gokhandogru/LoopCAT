@@ -106,6 +106,7 @@ import { createRecoveryWorkspaceController } from "../features/workspace/recover
 import { createDeliveryExportController } from "../features/import-export/delivery-export-controller.js";
 import { createProjectResourceTransferController } from "../features/import-export/project-resource-transfer-controller.js";
 import { createImportExportController } from "../features/import-export/import-export-controller.js";
+import { createTextEncodingInputService } from "../features/import-export/text-encoding-input-service.js";
 import {
   asTrustedHtml,
   asTrustedScriptUrl,
@@ -218,6 +219,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createDeliveryExportController,
       createProjectResourceTransferController,
       createImportExportController,
+      createTextEncodingInputService,
       createReportDataService,
       createReportDocumentCompositionService,
       createReportExportController,

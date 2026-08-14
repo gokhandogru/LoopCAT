@@ -1098,6 +1098,13 @@ const languageInputService = appRuntime.featureFactories.createLanguageInputServ
   replaceSafeHtml
 });
 
+const textEncodingInputService = appRuntime.featureFactories.createTextEncodingInputService({
+  select: els.fileEncodingSelect,
+  getOptions: () => encodingApi.TEXT_ENCODING_OPTIONS,
+  escapeHtml,
+  replaceSafeHtml
+});
+
 const projectLanguageContextController = appRuntime.featureFactories.createProjectLanguageContextController({
   getProject: () => editorSessionStore.getProject(),
   languageInput: languageInputService,
@@ -4834,24 +4841,6 @@ function firstVisibleSegmentIndex() {
   return filteredSegmentIndexes()[0] ?? -1;
 }
 
-function renderTextEncodingOptions() {
-  if (!els.fileEncodingSelect) return;
-  const options = encodingApi.TEXT_ENCODING_OPTIONS || [["auto", "Auto"], ["utf-8", "UTF-8"]];
-  replaceSafeHtml(
-    els.fileEncodingSelect,
-    options.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("")
-  );
-  els.fileEncodingSelect.value = "auto";
-}
-
-function selectedTextEncoding() {
-  return els.fileEncodingSelect?.value || "auto";
-}
-
-function textDecodingOptions() {
-  return { encoding: selectedTextEncoding() };
-}
-
 function selectedEditorText() {
   const active = document.activeElement;
   if (active?.tagName === "TEXTAREA" || active?.tagName === "INPUT") {
@@ -7222,7 +7211,7 @@ async function importDocx(file) {
 async function importLocalization(file) {
   assertFileSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);
   await reportImportProgress("Parsing project file", file);
-  const result = await parseLocalizationFile(file, textDecodingOptions());
+  const result = await parseLocalizationFile(file, textEncodingInputService.decodingOptions());
   await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
   const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
   const documents = [...projectDocumentManifest(editorSessionStore.getProject()), { id: documentId, name: result.fileName, type: result.documentType }];
@@ -7255,7 +7244,7 @@ async function importLocalization(file) {
 async function importXliff(file) {
   assertFileSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);
   await reportImportProgress("Parsing XLIFF", file);
-  const result = await parseXliffFile(file, textDecodingOptions());
+  const result = await parseXliffFile(file, textEncodingInputService.decodingOptions());
   await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
   const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
   const documents = [...projectDocumentManifest(editorSessionStore.getProject()), { id: documentId, name: result.fileName, type: result.documentType }];
@@ -7423,7 +7412,7 @@ async function parseJsonFile(file, label) {
   }
   try {
     const decoded = encodingApi
-      ? await encodingApi.decodeTextFile(file, textDecodingOptions())
+      ? await encodingApi.decodeTextFile(file, textEncodingInputService.decodingOptions())
       : { text: await file.text() };
     return JSON.parse(decoded.text);
   } catch {
@@ -7431,7 +7420,7 @@ async function parseJsonFile(file, label) {
   }
 }
 
-async function readImportTextFile(file, options = textDecodingOptions()) {
+async function readImportTextFile(file, options = textEncodingInputService.decodingOptions()) {
   if (encodingApi) return (await encodingApi.decodeTextFile(file, options)).text;
   return file.text();
 }
@@ -8105,7 +8094,7 @@ function wireEvents() {
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "rendering language datalists";
   languageInputService.renderDatalists();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "rendering text encodings";
-  renderTextEncodingOptions();
+  textEncodingInputService.renderOptions();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "attaching event listeners";
   document.querySelectorAll(".menu").forEach((menu) => {
     menu.addEventListener("toggle", () => {

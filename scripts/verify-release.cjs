@@ -209,6 +209,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-language-context-controller.js",
   "src/features/projects/project-document-statistics-service.js",
   "src/features/projects/project-document-catalog-service.js",
+  "src/features/import-export/text-encoding-input-service.js",
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-decision-controller.js",
   "src/features/quality/quality-review-controller.js",
@@ -272,6 +273,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-language-context-controller.test.cjs",
   "tests/unit/project-document-statistics-service.test.cjs",
   "tests/unit/project-document-catalog-service.test.cjs",
+  "tests/unit/text-encoding-input-service.test.cjs",
   "tests/unit/quality-profile-controller.test.cjs",
   "tests/unit/quality-decision-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
@@ -397,9 +399,7 @@ const dialogControllerJs = readText("src/ui/dialog-controller.js");
 const dialogControllerUnitTests = readText("tests/unit/dialog-controller.test.cjs");
 const projectDialogControllerJs = readText("src/features/projects/project-dialog-controller.js");
 const projectDialogControllerUnitTests = readText("tests/unit/project-dialog-controller.test.cjs");
-const projectResourceSelectionControllerJs = readText(
-  "src/features/projects/project-resource-selection-controller.js"
-);
+const projectResourceSelectionControllerJs = readText("src/features/projects/project-resource-selection-controller.js");
 const projectResourceSelectionControllerUnitTests = readText(
   "tests/unit/project-resource-selection-controller.test.cjs"
 );
@@ -409,22 +409,14 @@ const projectLanguagePairShortcutsControllerJs = readText(
 const projectLanguagePairShortcutsControllerUnitTests = readText(
   "tests/unit/project-language-pair-shortcuts-controller.test.cjs"
 );
-const projectLanguageContextControllerJs = readText(
-  "src/features/projects/project-language-context-controller.js"
-);
-const projectLanguageContextControllerUnitTests = readText(
-  "tests/unit/project-language-context-controller.test.cjs"
-);
-const projectDocumentStatisticsServiceJs = readText(
-  "src/features/projects/project-document-statistics-service.js"
-);
-const projectDocumentStatisticsServiceUnitTests = readText(
-  "tests/unit/project-document-statistics-service.test.cjs"
-);
+const projectLanguageContextControllerJs = readText("src/features/projects/project-language-context-controller.js");
+const projectLanguageContextControllerUnitTests = readText("tests/unit/project-language-context-controller.test.cjs");
+const projectDocumentStatisticsServiceJs = readText("src/features/projects/project-document-statistics-service.js");
+const projectDocumentStatisticsServiceUnitTests = readText("tests/unit/project-document-statistics-service.test.cjs");
 const projectDocumentCatalogServiceJs = readText("src/features/projects/project-document-catalog-service.js");
-const projectDocumentCatalogServiceUnitTests = readText(
-  "tests/unit/project-document-catalog-service.test.cjs"
-);
+const projectDocumentCatalogServiceUnitTests = readText("tests/unit/project-document-catalog-service.test.cjs");
+const textEncodingInputServiceJs = readText("src/features/import-export/text-encoding-input-service.js");
+const textEncodingInputServiceUnitTests = readText("tests/unit/text-encoding-input-service.test.cjs");
 const opusCatHelpControllerJs = readText("src/features/ai/opus-cat-help-controller.js");
 const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-pretranslation-dialog-controller.js");
 const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
@@ -722,6 +714,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createTextEncodingInputService } from "../features/import-export/text-encoding-input-service.js";',
+  "The application runtime must install the checked text-encoding input service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createTextEncodingInputService,",
+  "The application runtime must expose the checked text-encoding input factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createResourcesPresentationService } from "../features/resources/resources-presentation-service.js";',
   "The application runtime must install the checked Resources presentation service."
 );
@@ -831,7 +833,7 @@ for (const snippet of [
   "if (part.length === 2 || /^\\d{3}$/.test(part)) return part.toUpperCase()",
   'new intl.DisplayNames([getLocale() || getNavigatorLanguage() || "en"], { type: "language" })',
   '.normalize("NFKD")',
-  ".replace(/[^a-z0-9]+/g, \"\")",
+  '.replace(/[^a-z0-9]+/g, "")',
   "if (catalogCache) return catalogCache",
   "if (entryNameCache) return entryNameCache",
   "const parentheticalCode = clean.match",
@@ -848,11 +850,7 @@ for (const snippet of [
     `LanguageInputService must retain characterized language-input policy: ${snippet}`
   );
 }
-assertIncludes(
-  appJs,
-  "createLanguageInputService({",
-  "app.js must compose the checked language-input service."
-);
+assertIncludes(appJs, "createLanguageInputService({", "app.js must compose the checked language-input service.");
 for (const boundary of [
   "entries: LANGUAGE_ENTRIES",
   "aliases: LANGUAGE_ALIAS_CODES",
@@ -1476,7 +1474,8 @@ assertIncludes(
   "resource-catalog composition must inject current Resources state with the original empty fallback."
 );
 for (const method of ["key", "labelFromKey", "summarize", "matching"]) {
-  const consumerSnippet = method === "matching" ? "catalog: resourceCatalogService" : `resourceCatalogService.${method}`;
+  const consumerSnippet =
+    method === "matching" ? "catalog: resourceCatalogService" : `resourceCatalogService.${method}`;
   assertIncludes(
     `${appJs}\n${appWorkflowDriverJs}`,
     consumerSnippet,
@@ -1518,7 +1517,7 @@ for (const snippet of [
   'const editing = getMode() === "edit"',
   "const selectedTmNames = editing ? projectResources.tmNames(project) : []",
   "const selectedTbNames = editing ? projectResources.termBaseNames(project) : []",
-  "const main = editing ? projectResources.mainTmName(project) : \"\"",
+  'const main = editing ? projectResources.mainTmName(project) : ""',
   'catalog.matching("tm", sourceLang, targetLang, selectedTmNames)',
   'catalog.matching("tb", sourceLang, targetLang, selectedTbNames)',
   'localization.label(type === "tm" ? "unitCount" : "termCount", { count: resource.count })',
@@ -1629,7 +1628,7 @@ for (const snippet of [
   "const pairs = [...recent(), ...defaultPairs]",
   ".slice(0, 6)",
   "const current = getCurrentValues()",
-  'const active = source === current.sourceLang && target === current.targetLang',
+  "const active = source === current.sourceLang && target === current.targetLang",
   'data-source-lang="${escapeHtml(source)}"',
   'data-target-lang="${escapeHtml(target)}"',
   "escapeHtml(languagePairDisplay(source, target))",
@@ -1689,7 +1688,7 @@ assertIncludes(
 );
 for (const snippet of [
   "let desktopSpellcheckTargetLang = null",
-  "return project ? languageInput.pairDisplay(project.sourceLang, project.targetLang) : \"\"",
+  'return project ? languageInput.pairDisplay(project.sourceLang, project.targetLang) : ""',
   "`${languageInput.normalizeInput(project.sourceLang)}::${languageInput.normalizeInput(project.targetLang)}`",
   'return languageInput.normalizeInput(project?.targetLang || "")',
   "if (desktopSpellcheckTargetLang === targetLang) return null",
@@ -1918,6 +1917,71 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/projects/project-document-catalog-service.js"',
   "source-catalog extraction must scan the checked project document-catalog service."
+);
+for (const snippet of [
+  "const FALLBACK_OPTIONS = [",
+  '["auto", "Auto"]',
+  '["utf-8", "UTF-8"]',
+  "if (!select) return",
+  "const encodingOptions = getOptions() || FALLBACK_OPTIONS",
+  '.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`)',
+  'select.value = "auto"',
+  'return select?.value || "auto"',
+  "return { encoding: selectedEncoding() }",
+  "return Object.freeze({ renderOptions, selectedEncoding, decodingOptions })"
+]) {
+  assertIncludes(
+    textEncodingInputServiceJs,
+    snippet,
+    `TextEncodingInputService must retain characterized option/selection policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createTextEncodingInputService({",
+  "app.js must compose the checked text-encoding input service."
+);
+for (const boundary of [
+  "select: els.fileEncodingSelect",
+  "getOptions: () => encodingApi.TEXT_ENCODING_OPTIONS",
+  "escapeHtml",
+  "replaceSafeHtml"
+]) {
+  assertIncludes(appJs, boundary, `text-encoding input composition must inject the ${boundary} boundary.`);
+}
+for (const consumer of [
+  "parseLocalizationFile(file, textEncodingInputService.decodingOptions())",
+  "parseXliffFile(file, textEncodingInputService.decodingOptions())",
+  "encodingApi.decodeTextFile(file, textEncodingInputService.decodingOptions())",
+  "options = textEncodingInputService.decodingOptions()",
+  "textEncodingInputService.renderOptions()"
+]) {
+  assertIncludes(appJs, consumer, `text-encoding input consumers must call the checked service directly: ${consumer}`);
+}
+for (const removedHelper of ["renderTextEncodingOptions", "selectedTextEncoding", "textDecodingOptions"]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} text-encoding input helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "TextEncodingInputService preserves configured option order, safe escaping, and the auto reset",
+  "TextEncodingInputService preserves the Auto and UTF-8 fallback only for absent configured options",
+  "TextEncodingInputService contains absent selectors without reading configured options",
+  "TextEncodingInputService preserves selected values, empty fallback, and fresh decoding option objects",
+  "TextEncodingInputService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    textEncodingInputServiceUnitTests,
+    testName,
+    `focused text-encoding input tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/import-export/text-encoding-input-service.js"',
+  "source-catalog extraction must scan the checked text-encoding input service."
 );
 for (const snippet of [
   'renderDashboard("tm", resourceState)',
