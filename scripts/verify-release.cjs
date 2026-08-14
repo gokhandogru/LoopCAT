@@ -184,6 +184,7 @@ const requiredReleaseFiles = [
   "src/ui/dialog-controller.js",
   "src/features/ai/ai-administration-controller.js",
   "src/features/ai/ai-provider-administration-operations-controller.js",
+  "src/features/ai/ai-prompt-test-controller.js",
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
   "src/features/ai/ai-project-brief-controller.js",
@@ -208,6 +209,7 @@ const requiredReleaseFiles = [
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/ai-provider-administration-operations-controller.test.cjs",
+  "tests/unit/ai-prompt-test-controller.test.cjs",
   "tests/unit/ai-alternatives-controller.test.cjs",
   "tests/unit/ai-draft-editing-controller.test.cjs",
   "tests/unit/ai-project-brief-controller.test.cjs",
@@ -348,6 +350,8 @@ const aiProviderAdministrationOperationsControllerJs = readText(
 const aiProviderAdministrationOperationsControllerUnitTests = readText(
   "tests/unit/ai-provider-administration-operations-controller.test.cjs"
 );
+const aiPromptTestControllerJs = readText("src/features/ai/ai-prompt-test-controller.js");
+const aiPromptTestControllerUnitTests = readText("tests/unit/ai-prompt-test-controller.test.cjs");
 const aiPretranslationControllerJs = readText("src/features/ai/ai-pretranslation-controller.js");
 const aiPretranslationControllerUnitTests = readText("tests/unit/ai-pretranslation-controller.test.cjs");
 const aiReviewControllerJs = readText("src/features/ai/ai-review-controller.js");
@@ -2406,6 +2410,69 @@ for (const testName of [
     aiProviderAdministrationOperationsControllerUnitTests,
     testName,
     `focused AI-provider-administration tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiPromptTestController",
+  "The application runtime must expose the checked AI-prompt-test controller boundary."
+);
+for (const boundary of [
+  "if (!project.get() || lifecycle.isRunning() || promptBusy || lifecycle.isPromptBusy()) return undefined",
+  'if (mode !== "project-brief" && !String(source || "").trim())',
+  "const settings = await settingsBoundary.persist()",
+  "const promptRequest = prompt.createRequest(settings, mode)",
+  "settingsBoundary.assertReady(settings, config, `testing a ${promptRequest.label} prompt`)",
+  "if (providers.sharesExternally(settings))",
+  'includesSourceText: mode !== "project-brief" || prompt.hasProjectBriefSamples()',
+  "contextLabels: prompt.getContextLabels(mode)",
+  'if (mode !== "pretranslate" && !provider.completePrompt)',
+  "promptBusy = true",
+  "await provider.translateSegment(config, {",
+  "await provider.completePrompt(config, {",
+  'const normalizedOutput = result.rawOutput || result.translatedText || result.text || ""',
+  "output.set(normalizedOutput)",
+  "promptBusy = false"
+]) {
+  assertIncludes(
+    aiPromptTestControllerJs,
+    boundary,
+    `AiPromptTestController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return aiPromptTestController.testPrompt()",
+  "app.js must retain only the checked AI-prompt-test compatibility facade."
+);
+const aiPromptTestFacade = functionBody(appJs, "async function testLocalAiPrompt", "function aiReviewRiskLabel");
+assert(
+  !aiPromptTestFacade.includes("localAiPromptMode(") &&
+    !aiPromptTestFacade.includes("localAiSampleText(") &&
+    !aiPromptTestFacade.includes("persistLocalAiSettings(") &&
+    !aiPromptTestFacade.includes("localAiRuntimeConfig(") &&
+    !aiPromptTestFacade.includes("confirmExternalAiPromptShare(") &&
+    !aiPromptTestFacade.includes("currentLocalAiProvider(") &&
+    !aiPromptTestFacade.includes("translateSegment(") &&
+    !aiPromptTestFacade.includes("completePrompt(") &&
+    !aiPromptTestFacade.includes("renderLocalAiOutput(") &&
+    !aiPromptTestFacade.includes("renderLocalAiCommandCentre(") &&
+    !aiPromptTestFacade.includes("state.localAi") &&
+    !aiPromptTestFacade.includes("setSaveStatus("),
+  "app.js must not regain AI-prompt-test validation, consent, provider routing, output, lifecycle, presentation, or status orchestration."
+);
+for (const testName of [
+  "AI prompt testing preserves project, shared-running, busy, and sample-source safeguards",
+  "AI prompt testing preserves runtime, provider, and mode-capability validation",
+  "AI prompt testing discloses mode-aware external context and cancels before provider invocation",
+  "pre-translation prompt testing routes the exact translation request and normalizes output",
+  "generic prompt testing routes project, prompt, system, and selected model",
+  "AI prompt provider failure remains visible and always releases prompt-busy presentation"
+]) {
+  assertIncludes(
+    aiPromptTestControllerUnitTests,
+    testName,
+    `focused AI-prompt-test tests must characterize ${testName}.`
   );
 }
 assertIncludes(

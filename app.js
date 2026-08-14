@@ -2607,6 +2607,52 @@ const aiProviderAdministrationOperationsController =
     },
     defaults: { model: DEFAULT_LOCAL_AI_MODEL }
   });
+let aiPromptTestOwnsPromptBusy = false;
+const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestController({
+  project: { get: currentProject },
+  settings: {
+    persist: () => persistLocalAiSettings({ silent: true }),
+    runtimeConfig: localAiRuntimeConfig,
+    assertReady: assertLocalAiRuntimeReady
+  },
+  prompt: {
+    getMode: localAiPromptMode,
+    getSampleText: localAiSampleText,
+    createRequest: localAiPromptPreviewRequest,
+    getModeLabel: localAiPromptModeLabel,
+    getContextLabels: localAiPromptTestContextLabels,
+    hasProjectBriefSamples: () => projectBriefSampleSegments(1).length > 0
+  },
+  providers: {
+    get: currentLocalAiProvider,
+    sharesExternally: (settings) =>
+      localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
+  },
+  consent: { externalShare: confirmExternalAiPromptShare },
+  lifecycle: {
+    isRunning: () => state.localAi.running,
+    isPromptBusy: () => state.localAi.promptBusy,
+    sync: ({ promptBusy }) => {
+      if (promptBusy) {
+        aiPromptTestOwnsPromptBusy = true;
+        state.localAi.promptBusy = true;
+      } else if (aiPromptTestOwnsPromptBusy) {
+        state.localAi.promptBusy = false;
+        aiPromptTestOwnsPromptBusy = false;
+      }
+    }
+  },
+  output: {
+    set: (value) => {
+      state.localAi.promptOutput = value;
+    }
+  },
+  presentation: {
+    renderCommandCentre: renderLocalAiCommandCentre,
+    renderOutput: renderLocalAiOutput
+  },
+  status: { set: setSaveStatus }
+});
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
     splitButton: els.splitSegmentBtn,
@@ -8894,81 +8940,7 @@ async function pullLocalAiModel() {
 }
 
 async function testLocalAiPrompt() {
-  if (!currentProject() || state.localAi.running || state.localAi.promptBusy) return;
-  const mode = localAiPromptMode();
-  const source = localAiSampleText();
-  if (mode !== "project-brief" && !String(source || "").trim()) {
-    setSaveStatus("Enter sample source text or select a segment first.", "dirty");
-    return;
-  }
-  const settings = await persistLocalAiSettings({ silent: true });
-  const promptRequest = localAiPromptPreviewRequest(settings, mode);
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-    assertLocalAiRuntimeReady(settings, config, `testing a ${promptRequest.label} prompt`);
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setSaveStatus(message, "dirty");
-    return;
-  }
-  if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) {
-    const ok = confirmExternalAiPromptShare({
-      provider: currentLocalAiProvider(settings)?.name || settings.providerId,
-      includesSourceText: mode !== "project-brief" || projectBriefSampleSegments(1).length > 0,
-      contextLabels: localAiPromptTestContextLabels(mode)
-    });
-    if (!ok) {
-      setSaveStatus("AI prompt test canceled", "dirty");
-      return;
-    }
-  }
-  const provider = currentLocalAiProvider(settings);
-  if (!provider) {
-    const message = "Prompt testing is not available for this provider.";
-    setSaveStatus(message, "dirty");
-    return;
-  }
-  if (mode !== "pretranslate" && !provider.completePrompt) {
-    const message = `${localAiPromptModeLabel(mode)} prompt testing is not available for this provider.`;
-    setSaveStatus(message, "dirty");
-    return;
-  }
-  state.localAi.promptBusy = true;
-  renderLocalAiCommandCentre();
-  setSaveStatus(`Sending ${promptRequest.label} prompt...`);
-  try {
-    const result = mode === "pretranslate"
-      ? await provider.translateSegment(config, {
-        project: currentProject(),
-        text: promptRequest.sourceText,
-        sourceLanguage: settings.sourceLanguage,
-        sourceCode: settings.sourceCode,
-        targetLanguage: settings.targetLanguage,
-        targetCode: settings.targetCode,
-        segment: promptRequest.segment,
-        glossaryTerms: promptRequest.glossaryTerms,
-        prompt: promptRequest.prompt
-      })
-      : await provider.completePrompt(config, {
-        project: currentProject(),
-        prompt: promptRequest.prompt,
-        system: promptRequest.system,
-        model: settings.model
-      });
-    state.localAi.promptOutput = result.rawOutput || result.translatedText || result.text || "";
-    renderLocalAiOutput(state.localAi.promptOutput);
-    setSaveStatus(`${promptRequest.label} prompt returned output`, "saved");
-    return true;
-  } catch (error) {
-    const message = error.message || "Local AI prompt test failed.";
-    renderLocalAiOutput(message, { muted: false });
-    setSaveStatus(message, "dirty");
-    return false;
-  } finally {
-    state.localAi.promptBusy = false;
-    renderLocalAiCommandCentre();
-  }
+  return aiPromptTestController.testPrompt();
 }
 
 function aiReviewRiskLabel(level) {
