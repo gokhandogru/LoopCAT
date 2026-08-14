@@ -94,6 +94,7 @@ import { createReviewStateController } from "../features/quality/review-state-co
 import { createReviewMetadataController } from "../features/quality/review-metadata-controller.js";
 import { createRecoveryWorkspaceController } from "../features/workspace/recovery-workspace-controller.js";
 import { createDeliveryExportController } from "../features/import-export/delivery-export-controller.js";
+import { createProjectResourceTransferController } from "../features/import-export/project-resource-transfer-controller.js";
 import { createImportExportController } from "../features/import-export/import-export-controller.js";
 import {
   asTrustedHtml,
@@ -204,6 +205,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createFilterPresetController,
       createInspectorController,
       createDeliveryExportController,
+      createProjectResourceTransferController,
       createImportExportController,
       createReportDataService,
       createReportDocumentCompositionService,

@@ -1373,6 +1373,46 @@ const deliveryExportController = appRuntime.featureFactories.createDeliveryExpor
     set: setSaveStatus
   }
 });
+const projectResourceTransferController =
+  appRuntime.featureFactories.createProjectResourceTransferController({
+    session: { getProject: editorSessionStore.getProject },
+    files: {
+      assertSize: (file, label) => assertFileSize(file, label, MAX_RESOURCE_IMPORT_BYTES),
+      readText: readImportTextFile,
+      reportProgress: reportImportProgress,
+      progressDetail: importProgressDetail,
+      yieldToUi
+    },
+    parsers: {
+      parseTmx: parseTmxAsync,
+      parseTbx: parseTbxAsync,
+      parseTermList,
+      parseTermWorkbook
+    },
+    repositories: { importTmEntries, importTerms, getAllByIndex, listTerms },
+    resources: {
+      mainTmName,
+      projectTmNames,
+      selectedTermBaseName: () => els.termBaseSelect.value || primaryTermBaseName(),
+      primaryTermBaseName,
+      projectTermBaseNames,
+      markProjectsUsingDirty: markProjectsUsingResourceDirty
+    },
+    refresh: {
+      tmMatches: refreshTmMatches,
+      projectTerms: refreshProjectTerms,
+      terms: refreshTerms
+    },
+    builders: { buildTmx, buildTbx },
+    fileSafeName,
+    download,
+    activity: { logOptionalProject: logOptionalProjectActivity },
+    status: {
+      appendActivityWarning,
+      exportMode: exportStatusMode,
+      set: setSaveStatus
+    }
+  });
 const segmentConfirmationController = appRuntime.featureFactories.createSegmentConfirmationController({
   element: els.confirmBtn,
   editorSessionStore,
@@ -3088,9 +3128,9 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
     await autosaveService.flush();
     return restoreBackupFile(file);
   },
-  importTmx: handleTmxImport,
-  importTbx: handleTbxImport,
-  importTermList: handleTermListImport,
+  importTmx: projectResourceTransferController.importTmx,
+  importTbx: projectResourceTransferController.importTbx,
+  importTermList: projectResourceTransferController.importTermList,
   exportProjectPackage,
   exportTargetDocx: deliveryExportController.exportTargetDocx,
   exportBilingualDocx: deliveryExportController.exportBilingualDocx,
@@ -3101,8 +3141,8 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
   exportProjectReport: reportExportController.exportProjectReport,
   exportQualityPassport: reportExportController.exportQualityPassport,
   exportAnonymizedReport: reportExportController.exportAnonymizedReport,
-  exportTmx: handleTmxExport,
-  exportTbx: handleTbxExport,
+  exportTmx: projectResourceTransferController.exportTmx,
+  exportTbx: projectResourceTransferController.exportTbx,
   exportBackup: exportBrowserBackup,
   onValidationDismiss: () => {
     state.lastValidationReport = null;
@@ -8687,153 +8727,6 @@ async function repairWorkspaceLinks() {
   setSaveStatus(report.ok ? "Workspace health checked" : "Workspace needs attention", report.ok ? "saved" : "dirty");
 }
 
-async function handleTmxImport(file) {
-  if (!editorSessionStore.getProject()) return;
-  assertFileSize(file, "TMX file", MAX_RESOURCE_IMPORT_BYTES);
-  await reportImportProgress("Reading TMX", file);
-  const text = await readImportTextFile(file);
-  await reportImportProgress("Parsing TMX", file);
-  const entries = await parseTmxAsync(text, {
-    sourceLang: editorSessionStore.getProject().sourceLang,
-    targetLang: editorSessionStore.getProject().targetLang,
-    tmName: mainTmName(),
-    projectName: `${editorSessionStore.getProject().name} TMX import`
-  }, {
-    yieldFn: yieldToUi,
-    onProgress: (progress) => reportImportProgress(
-      "Parsing TMX",
-      file,
-      `${progress.percent}% - ${progress.entries} entr${progress.entries === 1 ? "y" : "ies"}`
-    )
-  });
-  await reportImportProgress("Saving TM entries", file, `${entries.length} entr${entries.length === 1 ? "y" : "ies"}`);
-  await importTmEntries(entries, {
-    onProgress: (progress) => reportImportProgress(
-      "Saving TM entries",
-      file,
-      importProgressDetail(progress.saved, progress.total, `entr${progress.saved === 1 ? "y" : "ies"}`)
-    ),
-    onIndexProgress: (progress) => reportImportProgress(
-      "Indexing TM entries",
-      file,
-      importProgressDetail(progress.saved, progress.total, "index rows")
-    )
-  });
-  markProjectsUsingResourceDirty("tm", mainTmName(), editorSessionStore.getProject().sourceLang, editorSessionStore.getProject().targetLang);
-  await reportImportProgress("Refreshing TM matches", file);
-  await refreshTmMatches();
-  const activityLogged = await logOptionalProjectActivity("resource-import", "TMX imported", { fileName: file.name, entryCount: entries.length, tmName: mainTmName() }, "TMX import");
-  setSaveStatus(appendActivityWarning(`Imported ${entries.length} TM entries`, activityLogged), exportStatusMode("saved", activityLogged));
-}
-
-async function handleTmxExport() {
-  if (!editorSessionStore.getProject()) return;
-  try {
-    const tmNames = new Set(projectTmNames());
-    const entries = (await getAllByIndex("tmEntries", "languagePair", `${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`))
-      .filter((entry) => tmNames.has(entry.tmName));
-    download(`${fileSafeName(editorSessionStore.getProject().name)}_project-tms.tmx`, buildTmx(entries, { ...editorSessionStore.getProject(), tmName: mainTmName() }), "application/xml");
-    const activityLogged = await logOptionalProjectActivity("resource-export", "TMX exported", { entryCount: entries.length, tmNames: Array.from(tmNames) }, "TMX export");
-    setSaveStatus(appendActivityWarning(`Exported ${entries.length} project TM entr${entries.length === 1 ? "y" : "ies"}`, activityLogged), exportStatusMode("saved", activityLogged));
-  } catch (error) {
-    setSaveStatus(error.message || "TMX export failed", "dirty");
-  }
-}
-
-async function handleTbxImport(file) {
-  if (!editorSessionStore.getProject()) return;
-  assertFileSize(file, "TBX file", MAX_RESOURCE_IMPORT_BYTES);
-  await reportImportProgress("Reading TBX", file);
-  const text = await readImportTextFile(file);
-  await reportImportProgress("Parsing TBX", file);
-  const terms = await parseTbxAsync(text, {
-    sourceLang: editorSessionStore.getProject().sourceLang,
-    targetLang: editorSessionStore.getProject().targetLang,
-    termBaseName: els.termBaseSelect.value || primaryTermBaseName()
-  }, {
-    yieldFn: yieldToUi,
-    onProgress: (progress) => reportImportProgress(
-      "Parsing TBX",
-      file,
-      `${progress.percent}% - ${progress.terms} term${progress.terms === 1 ? "" : "s"}`
-    )
-  });
-  await reportImportProgress("Saving terms", file, `${terms.length} term${terms.length === 1 ? "" : "s"}`);
-  await importTerms(terms, {
-    onProgress: (progress) => reportImportProgress(
-      "Saving terms",
-      file,
-      importProgressDetail(progress.saved, progress.total, `term${progress.saved === 1 ? "" : "s"}`)
-    ),
-    onIndexProgress: (progress) => reportImportProgress(
-      "Indexing terms",
-      file,
-      importProgressDetail(progress.saved, progress.total, "index rows")
-    )
-  });
-  markProjectsUsingResourceDirty("termbase", els.termBaseSelect.value || primaryTermBaseName(), editorSessionStore.getProject().sourceLang, editorSessionStore.getProject().targetLang);
-  await reportImportProgress("Refreshing terms", file);
-  await refreshProjectTerms({ rerender: true });
-  await refreshTerms();
-  const activityLogged = await logOptionalProjectActivity("resource-import", "TBX imported", { fileName: file.name, termCount: terms.length, termBaseName: els.termBaseSelect.value || primaryTermBaseName() }, "TBX import");
-  setSaveStatus(appendActivityWarning(`Imported ${terms.length} terms`, activityLogged), exportStatusMode("saved", activityLogged));
-}
-
-async function parseTermListFile(file, options) {
-  const isWorkbook = /\.xlsx$/i.test(file?.name || "") || file?.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  return isWorkbook
-    ? parseTermWorkbook(await file.arrayBuffer(), options)
-    : parseTermList(await readImportTextFile(file), options);
-}
-
-async function handleTermListImport(file) {
-  if (!editorSessionStore.getProject()) return;
-  assertFileSize(file, "Term list file", MAX_RESOURCE_IMPORT_BYTES);
-  const termBaseName = els.termBaseSelect.value || primaryTermBaseName();
-  await reportImportProgress("Reading term list", file);
-  const terms = await parseTermListFile(file, {
-    sourceLang: editorSessionStore.getProject().sourceLang,
-    targetLang: editorSessionStore.getProject().targetLang,
-    termBaseName,
-    fileName: file.name
-  });
-  await reportImportProgress("Saving terms", file, `${terms.length} term${terms.length === 1 ? "" : "s"}`);
-  await importTerms(terms, {
-    onProgress: (progress) => reportImportProgress(
-      "Saving terms",
-      file,
-      importProgressDetail(progress.saved, progress.total, `term${progress.saved === 1 ? "" : "s"}`)
-    ),
-    onIndexProgress: (progress) => reportImportProgress(
-      "Indexing terms",
-      file,
-      importProgressDetail(progress.saved, progress.total, "index rows")
-    )
-  });
-  markProjectsUsingResourceDirty("termbase", termBaseName, editorSessionStore.getProject().sourceLang, editorSessionStore.getProject().targetLang);
-  await reportImportProgress("Refreshing terms", file);
-  await refreshProjectTerms({ rerender: true });
-  await refreshTerms();
-  const activityLogged = await logOptionalProjectActivity("resource-import", "Term list imported", { fileName: file.name, termCount: terms.length, termBaseName }, "Term list import");
-  setSaveStatus(appendActivityWarning(`Imported ${terms.length} term${terms.length === 1 ? "" : "s"}`, activityLogged), exportStatusMode("saved", activityLogged));
-}
-
-async function handleTbxExport() {
-  if (!editorSessionStore.getProject()) return;
-  try {
-    const terms = await listTerms({
-      sourceLang: editorSessionStore.getProject().sourceLang,
-      targetLang: editorSessionStore.getProject().targetLang,
-      termBaseNames: projectTermBaseNames()
-    });
-    download(`${fileSafeName(editorSessionStore.getProject().name)}_project-termbases.tbx`, buildTbx(terms, { ...editorSessionStore.getProject(), termBaseName: primaryTermBaseName() }), "application/xml");
-    const activityLogged = await logOptionalProjectActivity("resource-export", "TBX exported", { termCount: terms.length, termBaseNames: projectTermBaseNames() }, "TBX export");
-    setSaveStatus(appendActivityWarning(`Exported ${terms.length} project term${terms.length === 1 ? "" : "s"}`, activityLogged), exportStatusMode("saved", activityLogged));
-  } catch (error) {
-    setSaveStatus(error.message || "TBX export failed", "dirty");
-  }
-}
-
 async function handleResourceTmxImport(file) {
   assertFileSize(file, "TMX resource file", MAX_RESOURCE_IMPORT_BYTES);
   const tmName = els.tmResourceNameInput.value.trim();
@@ -8940,12 +8833,18 @@ async function handleResourceTermListImport(file) {
     return;
   }
   await reportImportProgress("Reading term list resource", file);
-  const terms = await parseTermListFile(file, {
+  const parseOptions = {
     sourceLang,
     targetLang,
     termBaseName,
     fileName: file.name
-  });
+  };
+  const isWorkbook =
+    /\.xlsx$/i.test(file?.name || "") ||
+    file?.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  const terms = isWorkbook
+    ? await parseTermWorkbook(await file.arrayBuffer(), parseOptions)
+    : await parseTermList(await readImportTextFile(file), parseOptions);
   await reportImportProgress("Saving termbase resource terms", file, `${terms.length} term${terms.length === 1 ? "" : "s"}`);
   await importTerms(terms, {
     onProgress: (progress) => reportImportProgress(

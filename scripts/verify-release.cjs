@@ -480,6 +480,10 @@ const importExportControllerJs = readText("src/features/import-export/import-exp
 const importExportControllerUnitTests = readText("tests/unit/import-export-controller.test.cjs");
 const deliveryExportControllerJs = readText("src/features/import-export/delivery-export-controller.js");
 const deliveryExportControllerUnitTests = readText("tests/unit/delivery-export-controller.test.cjs");
+const projectResourceTransferControllerJs = readText(
+  "src/features/import-export/project-resource-transfer-controller.js"
+);
+const projectResourceTransferControllerUnitTests = readText("tests/unit/project-resource-transfer-controller.test.cjs");
 const resourcesControllerJs = readText("src/features/resources/resources-controller.js");
 const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
 const resourceTrashUnitTests = readText("tests/unit/resource-trash.test.cjs");
@@ -589,6 +593,16 @@ assertIncludes(
   appBootstrapJs,
   "createDeliveryExportController,",
   "The application runtime must expose the checked delivery-export factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectResourceTransferController } from "../features/import-export/project-resource-transfer-controller.js";',
+  "The application runtime must install the checked project-resource transfer controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectResourceTransferController,",
+  "The application runtime must expose the checked project-resource transfer factory."
 );
 for (const snippet of [
   "const translate = (key, values = {})",
@@ -1056,6 +1070,103 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/import-export/delivery-export-controller.js"',
   "source-catalog extraction must scan the checked delivery-export controller."
+);
+for (const snippet of [
+  'files.assertSize(file, "TMX file")',
+  'files.reportProgress("Reading TMX", file)',
+  "parsers.parseTmx",
+  "repositories.importTmEntries",
+  "resources.markProjectsUsingDirty",
+  "refresh.tmMatches",
+  "repositories.getAllByIndex",
+  "builders.buildTmx",
+  'files.assertSize(file, "TBX file")',
+  "parsers.parseTbx",
+  "repositories.importTerms",
+  "refresh.projectTerms({ rerender: true })",
+  "refresh.terms()",
+  "async function parseTermListFile",
+  "parsers.parseTermWorkbook",
+  "parsers.parseTermList",
+  "repositories.listTerms",
+  "builders.buildTbx",
+  "activity.logOptionalProject",
+  "status.appendActivityWarning",
+  "status.exportMode",
+  "return Object.freeze({ importTmx, exportTmx, importTbx, importTermList, exportTbx })"
+]) {
+  assertIncludes(
+    projectResourceTransferControllerJs,
+    snippet,
+    `ProjectResourceTransferController must retain characterized transfer policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createProjectResourceTransferController({",
+  "app.js must compose the checked project-resource transfer controller."
+);
+for (const boundary of [
+  "assertSize: (file, label) => assertFileSize(file, label, MAX_RESOURCE_IMPORT_BYTES)",
+  "readText: readImportTextFile",
+  "reportProgress: reportImportProgress",
+  "progressDetail: importProgressDetail",
+  "yieldToUi",
+  "parseTmx: parseTmxAsync",
+  "parseTbx: parseTbxAsync",
+  "parseTermList",
+  "parseTermWorkbook",
+  "repositories: { importTmEntries, importTerms, getAllByIndex, listTerms }",
+  "selectedTermBaseName: () => els.termBaseSelect.value || primaryTermBaseName()",
+  "markProjectsUsingDirty: markProjectsUsingResourceDirty",
+  "tmMatches: refreshTmMatches",
+  "projectTerms: refreshProjectTerms",
+  "terms: refreshTerms",
+  "builders: { buildTmx, buildTbx }",
+  "logOptionalProject: logOptionalProjectActivity",
+  "set: setSaveStatus"
+]) {
+  assertIncludes(appJs, boundary, `project-resource transfer composition must inject the ${boundary} boundary.`);
+}
+for (const method of ["importTmx", "exportTmx", "importTbx", "importTermList", "exportTbx"]) {
+  assertIncludes(
+    `${appJs}\n${appWorkflowDriverJs}`,
+    `projectResourceTransferController.${method}`,
+    `project-resource transfer consumers must call ProjectResourceTransferController.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "handleTmxImport",
+  "handleTmxExport",
+  "handleTbxImport",
+  "handleTbxExport",
+  "handleTermListImport",
+  "parseTermListFile"
+]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} project-resource transfer orchestration must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "ProjectResourceTransferController preserves TMX read, parse, progress, persistence, dirtiness, refresh, activity, and status",
+  "ProjectResourceTransferController preserves TBX call-time termbase selection, indexed persistence, refresh order, and activity",
+  "ProjectResourceTransferController preserves text/workbook term-list parsing and captures one selected termbase",
+  "ProjectResourceTransferController preserves linked TMX filtering, metadata, download-before-activity, and warning status",
+  "ProjectResourceTransferController preserves project TBX query, primary metadata, filename, activity, and status",
+  "ProjectResourceTransferController preserves no-project, size/parser failure propagation, export containment, and immutability"
+]) {
+  assertIncludes(
+    projectResourceTransferControllerUnitTests,
+    testName,
+    `focused project-resource transfer tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/import-export/project-resource-transfer-controller.js"',
+  "source-catalog extraction must scan the checked project-resource transfer controller."
 );
 assertIncludes(
   appJs,

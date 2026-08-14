@@ -547,7 +547,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     </tu>
   </body>
 </tmx>`;
-    const regionalLocaleTmxOk = await runFileImportTask("TMX import", () => handleTmxImport(new File([regionalLocaleTmx], "workflow-regional.tmx", { type: "application/xml" })));
+    const regionalLocaleTmxOk = await runFileImportTask("TMX import", () => projectResourceTransferController.importTmx(new File([regionalLocaleTmx], "workflow-regional.tmx", { type: "application/xml" })));
     const importedRegionalTmEntries = await listTmEntries({ sourceLang: "en", targetLang: "tr", tmNames: [mainTmName()] });
     assert(
       regionalLocaleTmxOk &&
@@ -574,7 +574,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     </body>
   </text>
 </tbx>`;
-    const regionalLocaleTbxOk = await runFileImportTask("TBX import", () => handleTbxImport(new File([regionalLocaleTbx], "workflow-regional.tbx", { type: "application/xml" })));
+    const regionalLocaleTbxOk = await runFileImportTask("TBX import", () => projectResourceTransferController.importTbx(new File([regionalLocaleTbx], "workflow-regional.tbx", { type: "application/xml" })));
     const importedRegionalTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: projectTermBaseNames() });
     assert(
       regionalLocaleTbxOk &&
@@ -590,10 +590,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.fileEncodingSelect.value = "windows-1254";
     try {
       const windows1254TermCsvText = "source,target,notes\nlight,\u0131\u015f\u0131k,\u00c7al\u0131\u015fma notu";
-      const windows1254CsvTerms = await parseTermListFile(
-        new File([encodingApi.encodeText(windows1254TermCsvText, "windows-1254").content], "workflow-windows-1254.csv", { type: "text/csv" }),
-        { sourceLang: "en", targetLang: "tr", termBaseName: "Encoding TB", fileName: "workflow-windows-1254.csv" }
+      await projectResourceTransferController.importTermList(
+        new File([encodingApi.encodeText(windows1254TermCsvText, "windows-1254").content], "workflow-windows-1254.csv", { type: "text/csv" })
       );
+      const windows1254CsvTerms = await listTerms({
+        sourceLang: "en",
+        targetLang: "tr",
+        termBaseNames: projectTermBaseNames()
+      });
       assert(
         windows1254CsvTerms[0]?.targetTerm === "\u0131\u015f\u0131k" &&
           windows1254CsvTerms[0]?.notes === "\u00c7al\u0131\u015fma notu",
@@ -4386,7 +4390,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         tmName: mainTmName()
       });
       const xmlDownloadsBeforeProjectTmx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      await handleTmxExport();
+      await projectResourceTransferController.exportTmx();
       const projectTmxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
       const projectTmxDownload = projectTmxDownloads[projectTmxDownloads.length - 1];
       const projectTmxText = await projectTmxDownload.blob.text();
@@ -4411,7 +4415,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "standalone TMX resource export redacts credential-looking origin metadata"
       );
       const xmlDownloadsBeforeProjectTbx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      await handleTbxExport();
+      await projectResourceTransferController.exportTbx();
       const projectTbxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
       const projectTbxDownload = projectTbxDownloads[projectTbxDownloads.length - 1];
       const projectTbxText = await projectTbxDownload.blob.text();
@@ -4466,9 +4470,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "target TXT export failure reports visible status");
       await deliveryExportController.exportXliff12();
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "XLIFF export failure reports visible status");
-      await handleTmxExport();
+      await projectResourceTransferController.exportTmx();
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "project TMX export failure reports visible status");
-      await handleTbxExport();
+      await projectResourceTransferController.exportTbx();
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "project TBX export failure reports visible status");
       exportResource("tm", `${mainTmName()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "resource export failure reports visible status");
@@ -5861,15 +5865,15 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const oversizedDirectLocalizationImportOk = await runFileImportTask("Project file import", () => importLocalization({ name: "huge-direct.html", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
     assert(!oversizedDirectLocalizationImportOk && editorSessionStore.getProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct localization import helper rejects oversized files before parsing");
 
-    const badTmxImportOk = await runFileImportTask("TMX import", () => handleTmxImport(new File(["<tmx><body>"], "broken.tmx", { type: "application/xml" })));
+    const badTmxImportOk = await runFileImportTask("TMX import", () => projectResourceTransferController.importTmx(new File(["<tmx><body>"], "broken.tmx", { type: "application/xml" })));
     assert(!badTmxImportOk && state.lastValidationReport?.errors?.[0]?.includes("TMX import failed"), "damaged TMX import reports failure through validation panel");
-    const oversizedTmxImportOk = await runFileImportTask("TMX import", () => handleTmxImport({ name: "huge.tmx", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
+    const oversizedTmxImportOk = await runFileImportTask("TMX import", () => projectResourceTransferController.importTmx({ name: "huge.tmx", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
     assert(!oversizedTmxImportOk && state.lastValidationReport?.errors?.[0]?.includes("TMX file is too large"), "oversized TMX import is rejected before parsing");
-    const oversizedTbxImportOk = await runFileImportTask("TBX import", () => handleTbxImport({ name: "huge.tbx", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
+    const oversizedTbxImportOk = await runFileImportTask("TBX import", () => projectResourceTransferController.importTbx({ name: "huge.tbx", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
     assert(!oversizedTbxImportOk && state.lastValidationReport?.errors?.[0]?.includes("TBX file is too large"), "oversized TBX import is rejected before parsing");
-    const badTermListImportOk = await runFileImportTask("Term list import", () => handleTermListImport(new File(["only-source"], "broken.csv", { type: "text/csv" })));
+    const badTermListImportOk = await runFileImportTask("Term list import", () => projectResourceTransferController.importTermList(new File(["only-source"], "broken.csv", { type: "text/csv" })));
     assert(!badTermListImportOk && state.lastValidationReport?.errors?.[0]?.includes("Term list import failed"), "damaged term list import reports failure through validation panel");
-    const oversizedTermListImportOk = await runFileImportTask("Term list import", () => handleTermListImport({ name: "huge.csv", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
+    const oversizedTermListImportOk = await runFileImportTask("Term list import", () => projectResourceTransferController.importTermList({ name: "huge.csv", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
     assert(!oversizedTermListImportOk && state.lastValidationReport?.errors?.[0]?.includes("Term list file is too large"), "oversized term list import is rejected before parsing");
 
     const structuralDocument = { id: makeId("document"), name: "workflow-structural.txt", type: "text" };
