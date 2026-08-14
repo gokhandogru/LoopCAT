@@ -1101,7 +1101,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.reviewNoteInput.value = "This review note must roll back.";
     els.reviewCommentInput.value = "This review comment must roll back.";
     setHiddenSegmentField(currentSegments()[segmentIndex], REVIEW_METADATA_SAVE_FAILURE_TEST_FLAG, true);
-    await saveActiveReviewMetadata();
+    await reviewMetadataController.save(qualityReviewController?.readReview?.());
     const failedReviewStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
     assert(
       els.saveStatus.textContent.includes("Simulated review metadata save failure") &&
@@ -1129,7 +1129,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "checked quality/review controller owns review submit, persistence delegation, and form refresh"
     );
     setHiddenSegmentField(currentSegments()[segmentIndex], REVIEW_STATE_SAVE_FAILURE_TEST_FLAG, true);
-    await setActiveReviewState("reviewed");
+    await reviewStateController.setState("reviewed");
     const failedReviewStateStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
     assert(
       els.saveStatus.textContent.includes("Simulated review state save failure") &&
@@ -1137,7 +1137,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         failedReviewStateStored?.reviewState === "needs-review",
       "quick review state failure restores visible and persisted review state"
     );
-    await setActiveReviewState("reviewed");
+    await reviewStateController.setState("reviewed");
     const savedReviewStateStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
     assert(
       els.saveStatus.textContent.includes("Marked reviewed") &&

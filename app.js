@@ -1516,7 +1516,7 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
   presentation: {
     renderSegments,
     renderProgress,
-    refreshSidebar,
+    refreshSidebar: () => editorContextController.refresh(),
     renderHistory: renderRevisionHistory
   },
   activity: {
@@ -1583,7 +1583,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
     renderSegments,
     renderProgress,
     renderHistory: renderRevisionHistory,
-    refreshSidebar
+    refreshSidebar: () => editorContextController.refresh()
   },
   activity: {
     log: (details) => logProjectActivity("pretranslate", "TM pretranslation applied", details)
@@ -1885,7 +1885,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
     renderHistory: renderRevisionHistory,
     renderAiProgress: aiProviderFormController.renderProgress,
     renderCommandCentre: aiProviderFormController.renderCommandCentre,
-    refreshSidebar
+    refreshSidebar: () => editorContextController.refresh()
   },
   activity: {
     log: (details) =>
@@ -1962,10 +1962,11 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
     renderCommandCentre: aiProviderFormController.renderCommandCentre,
     renderAiProgress: aiProviderFormController.renderProgress,
     renderOutput: aiProviderFormController.renderOutput,
-    renderReview: renderReviewPanel,
+    renderReview: (options = {}) =>
+      qualityReviewController?.renderReview?.({ segment: currentSegment(), force: Boolean(options.force) }),
     updateRow,
     renderAll,
-    refreshSidebar,
+    refreshSidebar: () => editorContextController.refresh(),
     renderSegments,
     renderProjectProgress: renderProgress,
     renderHistory: renderRevisionHistory
@@ -2045,7 +2046,7 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
     renderAiProgress: aiProviderFormController.renderProgress,
     renderOutput: aiProviderFormController.renderOutput,
     renderAll,
-    refreshSidebar
+    refreshSidebar: () => editorContextController.refresh()
   },
   activity: {
     logBatch: (details) =>
@@ -2130,7 +2131,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
     renderSuggestions: aiSuggestionListController.render,
     updateRow,
     renderAll,
-    refreshSidebar
+    refreshSidebar: () => editorContextController.refresh()
   },
   activity: {
     logActive: (details) =>
@@ -2213,7 +2214,7 @@ const aiTerminologyApplicationController =
       renderSuggestions: aiSuggestionListController.render,
       updateRow,
       renderAll,
-      refreshSidebar
+      refreshSidebar: () => editorContextController.refresh()
     },
     activity: {
       logBatch: (details) =>
@@ -2296,7 +2297,7 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
     renderAiProgress: aiProviderFormController.renderProgress,
     renderOutput: aiProviderFormController.renderOutput,
     renderAll,
-    refreshSidebar
+    refreshSidebar: () => editorContextController.refresh()
   },
   activity: {
     logBatch: (operation, details) =>
@@ -2462,7 +2463,7 @@ const aiSuggestionApplicationController =
       renderProgress,
       renderHistory: renderRevisionHistory,
       renderSuggestions: aiSuggestionListController.render,
-      refreshSidebar,
+      refreshSidebar: () => editorContextController.refresh(),
       renderAll,
       focusTarget: targetEditController.focusActive
     },
@@ -2808,7 +2809,8 @@ const editorContextController = appRuntime?.featureFactories?.createEditorContex
     projectId: currentProject()?.id || "",
     segmentId: currentSegment()?.id || ""
   }),
-  renderReview: () => renderReviewPanel(),
+  renderReview: () =>
+    qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false }),
   renderHistory: () => renderRevisionHistory(),
   renderAi: aiSuggestionListController.render,
   renderQuality: () => renderQualityWorkbench(),
@@ -3219,9 +3221,9 @@ const qualityReviewController = appRuntime?.featureFactories?.createQualityRevie
   categoryLabel: qualityCategoryName,
   riskLevelLabel: qualityRiskLevelLabel,
   formatDate,
-  saveReview: saveActiveReviewMetadata,
-  saveProfile: saveQualityProfileFromForm,
-  saveDecision: saveQualityDecisionFromForm,
+  saveReview: (values) => reviewMetadataController.save(values),
+  saveProfile: (values) => qualityProfileController.save(values),
+  saveDecision: (values) => qualityDecisionController.save(values),
   refreshRisks: refreshQualityRiskQueue,
   nextRisk: goToNextQualityRisk,
   exportPassport: exportQualityPassport,
@@ -3282,7 +3284,8 @@ const reviewMetadataController = appRuntime.featureFactories.createReviewMetadat
       })
   },
   presentation: {
-    renderReview: renderReviewPanel,
+    renderReview: (options = {}) =>
+      qualityReviewController?.renderReview?.({ segment: currentSegment(), force: Boolean(options.force) }),
     updateRow,
     renderHistory: renderRevisionHistory
   },
@@ -3327,7 +3330,8 @@ const qualityDecisionController = appRuntime.featureFactories.createQualityDecis
   },
   presentation: {
     clearNote: () => qualityReviewController?.clearDecisionNote?.(),
-    renderReview: renderReviewPanel,
+    renderReview: (options = {}) =>
+      qualityReviewController?.renderReview?.({ segment: currentSegment(), force: Boolean(options.force) }),
     renderWorkbench: renderQualityWorkbench,
     updateRow
   },
@@ -3374,7 +3378,8 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   },
   presentation: {
     syncState: (reviewState) => qualityReviewController?.syncReviewState?.(reviewState),
-    renderReview: () => renderReviewPanel(),
+    renderReview: () =>
+      qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false }),
     updateRow,
     renderHistory: renderRevisionHistory
   },
@@ -3460,11 +3465,11 @@ function refreshLocalizedUi() {
     }
     renderEditor();
     renderProgress();
-    renderReviewPanel();
+    qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false });
     renderQualityWorkbench();
     renderRevisionHistory();
     renderQaResults();
-    refreshSidebar();
+    editorContextController.refresh();
   }
 }
 
@@ -3543,7 +3548,7 @@ async function synchronizeResourceTrashChange(entry, { refreshSuggestions = fals
     await refreshProjectTerms({ rerender: currentApplicationView() === "editor" });
     if (refreshSuggestions || currentApplicationView() === "editor") await refreshTerms();
   } else if (currentApplicationView() === "editor") {
-    await refreshSidebar();
+    await editorContextController.refresh();
   }
   if (els.trashDialog?.open) await renderTrashList();
   else await refreshTrashSummary();
@@ -5915,7 +5920,7 @@ async function openProject(projectId) {
   await filterPresetController?.restoreForProject?.(currentProject()?.id || projectId);
   applicationNavigation?.openProject?.(currentProject()?.id || projectId, activeIndex);
   renderAll();
-  if (currentApplicationView() === "editor") await refreshSidebar();
+  if (currentApplicationView() === "editor") await editorContextController.refresh();
 }
 
 async function openProjectFile(documentId) {
@@ -5928,7 +5933,7 @@ async function openProjectFile(documentId) {
     activeIndex: first
   });
   renderAll();
-  await refreshSidebar();
+  await editorContextController.refresh();
 }
 
 function renderAll() {
@@ -6375,7 +6380,7 @@ async function addResourceToCurrentProject(type, resource) {
   await refreshProjectTerms({ rerender: true });
   await refreshProjectSummaries();
   renderAll();
-  await refreshSidebar();
+  await editorContextController.refresh();
   renderResourcesView();
   markWorkspaceDirty();
   setSaveStatus(`${type === "tm" ? "TM" : "TB"} added to project`, "saved");
@@ -6988,7 +6993,7 @@ async function setActiveSegment(index) {
   updateRow(oldIndex);
   updateRow(index);
   aiPromptPreviewController.render();
-  await refreshSidebar();
+  await editorContextController.refresh();
 }
 
 async function goToNextOpenSegment() {
@@ -7063,7 +7068,7 @@ async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}
     renderSegments({ preserveScroll: true });
     renderProgress({ previousStatus, nextStatus: segment.status });
     renderRevisionHistory();
-    await refreshSidebar();
+    await editorContextController.refresh();
     markWorkspaceDirty();
     const selection = options.selection
       ? targetEditController.normalizeSelection(options.selection, segment.target.length)
@@ -7120,7 +7125,7 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
     invalidateSegmentFilterCache();
     markWorkspaceDirty();
     renderAll();
-    await refreshSidebar();
+    await editorContextController.refresh();
     targetEditController.focusActive();
     return {
       patches: restored.map((segment) => targetCommandPatch(segment)),
@@ -7163,7 +7168,7 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
     if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
     markWorkspaceDirty();
     renderAll();
-    await refreshSidebar();
+    await editorContextController.refresh();
     targetEditController.focusActive();
     return {
       snapshots: restored.map((segment) => structuredClone(segment)),
@@ -7209,7 +7214,7 @@ async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = 
     verticalFeatureState?.inspector?.setContext({ segmentId: restored.id });
     markWorkspaceDirty();
     renderAll();
-    await refreshSidebar();
+    await editorContextController.refresh();
     if (options.navigateNext) await goToNextOpenSegment();
     else targetEditController.focusActive();
     return {
@@ -7397,14 +7402,6 @@ async function openConcordanceSearch() {
   els.concordanceOverlay.classList.remove("hidden");
 }
 
-async function refreshSidebar() {
-  return editorContextController.refresh();
-}
-
-function renderReviewPanel(options = {}) {
-  qualityReviewController?.renderReview?.({ segment: currentSegment(), force: Boolean(options.force) });
-}
-
 function qualityLabel(value) {
   const label = {
     "student-review": "Student review",
@@ -7510,14 +7507,6 @@ function renderQualityWorkbench() {
   });
 }
 
-async function saveQualityProfileFromForm(values = qualityReviewController?.readProfile?.()) {
-  return qualityProfileController.save(values);
-}
-
-async function saveQualityDecisionFromForm(values = qualityReviewController?.readDecision?.()) {
-  return qualityDecisionController.save(values);
-}
-
 async function refreshQualityRiskQueue() {
   if (!currentProject()) return null;
   const checks = await runProjectQa();
@@ -7611,14 +7600,6 @@ function renderRevisionHistory() {
       </div>
     </article>
   `).join(""));
-}
-
-async function saveActiveReviewMetadata(values = qualityReviewController?.readReview?.()) {
-  return reviewMetadataController.save(values);
-}
-
-async function setActiveReviewState(reviewState) {
-  return reviewStateController.setState(reviewState);
 }
 
 function qaSummary(checks) {
@@ -7904,7 +7885,7 @@ async function importDocx(file) {
   markWorkspaceDirty();
   setSaveStatus(appendActivityWarning(`Imported ${result.segments.length} segments from ${extractedParts} DOCX part${extractedParts === 1 ? "" : "s"}`, activityLogged), exportStatusMode("saved", activityLogged));
   renderAll();
-  await refreshSidebar();
+  await editorContextController.refresh();
 }
 
 async function importLocalization(file) {
@@ -7936,7 +7917,7 @@ async function importLocalization(file) {
   markWorkspaceDirty();
   setSaveStatus(appendActivityWarning("Saved", activityLogged), exportStatusMode("saved", activityLogged));
   renderAll();
-  await refreshSidebar();
+  await editorContextController.refresh();
 }
 
 async function importXliff(file) {
@@ -7969,7 +7950,7 @@ async function importXliff(file) {
   markWorkspaceDirty();
   setSaveStatus(appendActivityWarning(`Imported ${result.segments.length} XLIFF segment${result.segments.length === 1 ? "" : "s"}`, activityLogged), exportStatusMode("saved", activityLogged));
   renderAll();
-  await refreshSidebar();
+  await editorContextController.refresh();
 }
 
 function projectHasDocumentNamed(fileName) {
@@ -8633,7 +8614,7 @@ async function saveProjectFromDialog() {
     await refreshProjectTerms({ rerender: true });
     await refreshProjectSummaries();
     renderAll();
-    await refreshSidebar();
+    await editorContextController.refresh();
     els.projectDialog.close();
     markWorkspaceDirty();
     let activityLogged = true;

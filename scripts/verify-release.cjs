@@ -320,6 +320,7 @@ const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-
 const installRuntimeJs = readText("src/app/install-runtime.js");
 const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
 const editorContextControllerJs = readText("src/features/editor/editor-context-controller.js");
+const editorContextControllerUnitTests = readText("tests/unit/editor-context-controller.test.cjs");
 const segmentGridControllerJs = readText("src/features/editor/segment-grid-controller.js");
 const autosaveServiceJs = readText("src/features/editor/autosave-service.js");
 const segmentConfirmationControllerJs = readText("src/features/editor/segment-confirmation-controller.js");
@@ -654,9 +655,31 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "return editorContextController.refresh();",
-  "The legacy sidebar facade must delegate refresh ownership to EditorContextController."
+  "refreshSidebar: () => editorContextController.refresh()",
+  "controllers composed before EditorContextController must retain exact call-time refresh adapters."
 );
+assert(
+  appJs.split("refreshSidebar: () => editorContextController.refresh()").length - 1 === 9,
+  "only the nine construction-order-sensitive controller dependencies may retain sidebar refresh adapters."
+);
+assertIncludes(
+  appJs,
+  "await editorContextController.refresh();",
+  "application consumers composed after EditorContextController must refresh context directly."
+);
+assert(!appJs.includes("async function refreshSidebar"), "the editor-context refresh consumer facade must not return.");
+for (const testName of [
+  "editor context controller coordinates contextual panels before asynchronous services",
+  "editor context controller identifies a superseded asynchronous refresh",
+  "editor context controller normalizes empty context with optional handlers omitted",
+  "editor context controller starts contextual services together and propagates rejection"
+]) {
+  assertIncludes(
+    editorContextControllerUnitTests,
+    testName,
+    `focused editor-context tests must characterize ${testName}.`
+  );
+}
 assert(
   productionAssets.appVersion === packageJson.version,
   "Canonical production asset manifest appVersion must match package.json."
@@ -1590,20 +1613,50 @@ assert(
   "the migrated quality/review family must not retain superseded static listeners in app.js."
 );
 assert(
-  !functionBody(appJs, "function renderReviewPanel", "function qualityLabel").includes("replaceSafeHtml") &&
-    !functionBody(appJs, "function renderQualityWorkbench", "async function saveQualityProfileFromForm").includes(
-      "createElement"
-    ),
+  !functionBody(appJs, "function renderQualityWorkbench", "async function refreshQualityRiskQueue").includes(
+    "createElement"
+  ),
   "quality/review DOM construction must live in the checked controller rather than app.js."
 );
-assert(
-  !functionBody(appJs, "async function saveQualityProfileFromForm", "async function refreshQualityRiskQueue").includes(
-    ".value"
-  ) &&
-    !functionBody(appJs, "async function saveActiveReviewMetadata", "async function setActiveReviewState").includes(
-      ".value"
-    ),
-  "quality/review domain saves must consume controller values instead of reading form DOM directly."
+for (const directSaveAdapter of [
+  "saveReview: (values) => reviewMetadataController.save(values)",
+  "saveProfile: (values) => qualityProfileController.save(values)",
+  "saveDecision: (values) => qualityDecisionController.save(values)"
+]) {
+  assertIncludes(
+    appJs,
+    directSaveAdapter,
+    `QualityReviewController must call its checked mutation owner through ${directSaveAdapter}.`
+  );
+}
+for (const renderAdapter of [
+  "qualityReviewController?.renderReview?.({ segment: currentSegment(), force: Boolean(options.force) })",
+  "qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false })"
+]) {
+  assertIncludes(
+    appJs,
+    renderAdapter,
+    `review consumers must preserve current-segment and force behavior through ${renderAdapter}.`
+  );
+}
+for (const removedFacade of [
+  "function renderReviewPanel",
+  "async function saveQualityProfileFromForm",
+  "async function saveQualityDecisionFromForm",
+  "async function saveActiveReviewMetadata",
+  "async function setActiveReviewState"
+]) {
+  assert(!appJs.includes(removedFacade), `${removedFacade} consumer facade must not return.`);
+}
+assertIncludes(
+  appWorkflowDriverJs,
+  "reviewMetadataController.save(qualityReviewController?.readReview?.())",
+  "workflow characterization must preserve the default full-review form read while calling its owner directly."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  'reviewStateController.setState("reviewed")',
+  "workflow characterization must call the quick review-state owner directly."
 );
 assertIncludes(
   qualityReviewControllerUnitTests,
@@ -2291,26 +2344,8 @@ for (const boundary of [
 }
 assertIncludes(
   appJs,
-  "return qualityProfileController.save(values)",
-  "app.js must retain only the checked quality-profile compatibility facade."
-);
-const qualityProfileFacade = functionBody(
-  appJs,
-  "async function saveQualityProfileFromForm",
-  "async function saveQualityDecisionFromForm"
-);
-assert(
-  !qualityProfileFacade.includes("structuredClone(") &&
-    !qualityProfileFacade.includes("defaultQualityProfile(") &&
-    !qualityProfileFacade.includes("updateProject(") &&
-    !qualityProfileFacade.includes("replaceProject(") &&
-    !qualityProfileFacade.includes("replaceProjects(") &&
-    !qualityProfileFacade.includes("replaceQualityRiskQueue(") &&
-    !qualityProfileFacade.includes("refreshProjectSummaries(") &&
-    !qualityProfileFacade.includes("logOptionalProjectActivity(") &&
-    !qualityProfileFacade.includes("renderQualityWorkbench(") &&
-    !qualityProfileFacade.includes("setSaveStatus("),
-  "app.js must not regain quality-profile normalization, snapshot, persistence, risk, summary, activity, presentation, status, or rollback orchestration."
+  "saveProfile: (values) => qualityProfileController.save(values)",
+  "the quality/review form must route normalized profile values directly to QualityProfileController at call time."
 );
 for (const testName of [
   "quality profile normalizes, persists, synchronizes the selected project, and refreshes derived state",
@@ -2349,23 +2384,13 @@ for (const boundary of [
 }
 assertIncludes(
   appJs,
-  "return qualityDecisionController.save(values)",
-  "app.js must retain only the checked quality-decision compatibility facade."
-);
-const qualityDecisionFacade = functionBody(
-  appJs,
-  "async function saveQualityDecisionFromForm",
-  "async function refreshQualityRiskQueue"
+  "saveDecision: (values) => qualityDecisionController.save(values)",
+  "the quality/review form must route decision values directly to QualityDecisionController at call time."
 );
 assert(
-  !qualityDecisionFacade.includes("segment.reviewState =") &&
-    !qualityDecisionFacade.includes("saveSegment(") &&
-    !qualityDecisionFacade.includes("logOptionalProjectActivity(") &&
-    !qualityDecisionFacade.includes("renderQualityWorkbench(") &&
-    !qualityDecisionFacade.includes("Reflect.ownKeys") &&
-    !appJs.includes("function qualityDecisionCategory(value)") &&
+  !appJs.includes("function qualityDecisionCategory(value)") &&
     !appJs.includes("function qualityDecisionSeverity(value)"),
-  "app.js must not regain quality-decision normalization, mutation, persistence, risk, activity, presentation, or rollback orchestration."
+  "app.js must not regain quality-decision normalization helpers."
 );
 for (const testName of [
   "quality decision normalizes metadata, persists one stable comment, refreshes risk, and clears the note",
@@ -2402,21 +2427,8 @@ for (const boundary of [
 }
 assertIncludes(
   appJs,
-  "return reviewMetadataController.save(values)",
-  "app.js must retain only the checked full review-metadata compatibility facade."
-);
-const reviewMetadataFacade = functionBody(
-  appJs,
-  "async function saveActiveReviewMetadata",
-  "async function setActiveReviewState"
-);
-assert(
-  !reviewMetadataFacade.includes("segment.reviewState =") &&
-    !reviewMetadataFacade.includes("saveSegment(") &&
-    !reviewMetadataFacade.includes("logProjectActivity(") &&
-    !reviewMetadataFacade.includes("renderReviewPanel(") &&
-    !reviewMetadataFacade.includes("Reflect.ownKeys"),
-  "app.js must not regain full review-metadata mutation, persistence, activity, presentation, or rollback orchestration."
+  "saveReview: (values) => reviewMetadataController.save(values)",
+  "the review form must route metadata values directly to ReviewMetadataController at call time."
 );
 for (const testName of [
   "full review metadata normalizes fields, appends one stable comment, persists, and refreshes presentation",
@@ -2448,16 +2460,9 @@ for (const boundary of [
   );
 }
 assertIncludes(
-  appJs,
-  "return reviewStateController.setState(reviewState)",
-  "app.js must retain only the checked quick review-state compatibility facade."
-);
-assert(
-  !functionBody(appJs, "async function setActiveReviewState", "function qaSummary").includes(
-    "createChangeReviewStateCommand"
-  ) &&
-    !functionBody(appJs, "async function setActiveReviewState", "function qaSummary").includes("segment.reviewState ="),
-  "app.js must not regain quick review-state command or mutation orchestration."
+  appWorkflowDriverJs,
+  'reviewStateController.setState("reviewed")',
+  "workflow characterization must route quick review state directly to ReviewStateController."
 );
 assertIncludes(
   reviewStateControllerUnitTests,
@@ -6824,7 +6829,11 @@ assertIncludes(
 );
 assertIncludes(qualityJs, "function qualityCategoryLabel", "quality.js must label quality decision categories.");
 assertIncludes(appJs, "function exportQualityPassport", "app.js must wire Quality Passport export.");
-assertIncludes(appJs, "function saveQualityDecisionFromForm", "app.js must save active quality decisions.");
+assertIncludes(
+  appJs,
+  "saveDecision: (values) => qualityDecisionController.save(values)",
+  "app.js must route active quality decisions through the checked controller."
+);
 assertIncludes(indexHtml, "qualityForm", "index.html must expose Quality Workbench controls.");
 assertIncludes(indexHtml, "qualityActiveEvidence", "index.html must expose active segment quality evidence.");
 assertIncludes(indexHtml, "<h2>Comments</h2>", "index.html must label the review panel as Comments.");
