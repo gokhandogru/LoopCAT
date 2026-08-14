@@ -212,6 +212,7 @@ const requiredReleaseFiles = [
   "src/features/editor/target-replacement-controller.js",
   "src/features/editor/tm-pretranslation-controller.js",
   "src/features/resources/resources-controller.js",
+  "src/features/resources/resources-presentation-service.js",
   "src/features/resources/tm-pretranslation-dialog-controller.js",
   "src/features/import-export/import-export-controller.js",
   "src/features/workspace/recovery-workspace-controller.js",
@@ -269,6 +270,7 @@ const requiredReleaseFiles = [
   "tests/unit/ui-localization-service.test.cjs",
   "tests/unit/resource-trash.test.cjs",
   "tests/unit/resources-controller.test.cjs",
+  "tests/unit/resources-presentation-service.test.cjs",
   "scripts/generate-brand-icons.cjs",
   "scripts/publish-repository-downloads.cjs",
   "scripts/verify-web-artifact.cjs",
@@ -486,6 +488,8 @@ const projectResourceTransferControllerJs = readText(
 const projectResourceTransferControllerUnitTests = readText("tests/unit/project-resource-transfer-controller.test.cjs");
 const resourcesControllerJs = readText("src/features/resources/resources-controller.js");
 const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
+const resourcesPresentationServiceJs = readText("src/features/resources/resources-presentation-service.js");
+const resourcesPresentationServiceUnitTests = readText("tests/unit/resources-presentation-service.test.cjs");
 const resourceLibraryExportControllerJs = readText("src/features/resources/resource-library-export-controller.js");
 const resourceLibraryExportControllerUnitTests = readText("tests/unit/resource-library-export-controller.test.cjs");
 const resourceLibraryImportControllerJs = readText("src/features/resources/resource-library-import-controller.js");
@@ -609,6 +613,16 @@ assertIncludes(
   appBootstrapJs,
   "createProjectResourceTransferController,",
   "The application runtime must expose the checked project-resource transfer factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createResourcesPresentationService } from "../features/resources/resources-presentation-service.js";',
+  "The application runtime must install the checked Resources presentation service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createResourcesPresentationService,",
+  "The application runtime must expose the checked Resources presentation factory."
 );
 assertIncludes(
   appBootstrapJs,
@@ -1203,6 +1217,98 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/import-export/project-resource-transfer-controller.js"',
   "source-catalog extraction must scan the checked project-resource transfer controller."
+);
+for (const snippet of [
+  'renderDashboard("tm", resourceState)',
+  'renderDashboard("tb", resourceState)',
+  'isTm ? "noTranslationMemories" : "noTermbases"',
+  'action.dataset.resourceAction = "import"',
+  'card.className = "resource-card"',
+  'localization.labelHtml("updatedAt", { date: formatDate(resource.updatedAt) })',
+  'deleteButton.dataset.resourceAction = "delete-resource"',
+  'exportButton.dataset.resourceAction = "export"',
+  'openButton.dataset.resourceAction = "open"',
+  'tmDetail.classList.add("hidden")',
+  'tbDetail.classList.add("hidden")',
+  'localization.labelHtml("entryCount", { count: entries.length })',
+  'localization.labelHtml("termCount", { count: terms.length })',
+  'row.dataset.resourceRow = "tm"',
+  'row.dataset.resourceRow = "tb"',
+  'term.isForbidden ? "checked" : ""',
+  "table.replaceChildren(fragment)",
+  "return Object.freeze({ render })"
+]) {
+  assertIncludes(
+    resourcesPresentationServiceJs,
+    snippet,
+    `ResourcesPresentationService must retain characterized presentation policy: ${snippet}`
+  );
+}
+assert(
+  !resourcesPresentationServiceJs.includes("addEventListener"),
+  "ResourcesPresentationService must not take Resources event-listener ownership from ResourcesController."
+);
+assertIncludes(
+  appJs,
+  "createResourcesPresentationService?.({",
+  "app.js must compose the checked Resources presentation service."
+);
+for (const boundary of [
+  "tmDashboard: els.tmResourceDashboard",
+  "tbDashboard: els.tbResourceDashboard",
+  "tmDetail: els.tmResourceDetail",
+  "tbDetail: els.tbResourceDetail",
+  "document",
+  "summarizeResources",
+  "labelFromKey: resourceLabelFromKey",
+  "items: resourceItems",
+  "localization: uiLocalizationService",
+  "languagePairDisplay",
+  "formatDate",
+  "displaySafeHtml",
+  "displaySafeText",
+  "escapeHtml",
+  "replaceSafeHtml"
+]) {
+  assertIncludes(appJs, boundary, `Resources presentation composition must inject the ${boundary} boundary.`);
+}
+assertIncludes(
+  appJs,
+  "render: resourcesPresentationService.render",
+  "ResourcesController must call ResourcesPresentationService.render directly."
+);
+for (const removedHelper of [
+  "renderResourcesContent",
+  "renderResourceDashboard",
+  "renderResourceDetail",
+  "replaceResourceTableRows",
+  "renderTmResourceDetail",
+  "renderTbResourceDetail",
+  "renderTmEntryRow",
+  "renderTermRow"
+]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} Resources presentation helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "ResourcesPresentationService preserves localized TM and termbase empty states",
+  "ResourcesPresentationService preserves safe resource cards, metadata, and delegated action attributes",
+  "ResourcesPresentationService preserves TM detail visibility, counts, rows, escaping, and batched replacement",
+  "ResourcesPresentationService preserves term rows, notes, forbidden state, and immutable checked API"
+]) {
+  assertIncludes(
+    resourcesPresentationServiceUnitTests,
+    testName,
+    `focused Resources presentation tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/resources/resources-presentation-service.js"',
+  "source-catalog extraction must scan the checked Resources presentation service."
 );
 for (const snippet of [
   "function exportResource(type, key)",
@@ -2702,11 +2808,9 @@ assert(
   "the migrated Resources family must not retain view-local state or superseded static listeners in app.js."
 );
 assert(
-  !functionBody(appJs, "function renderResourceDashboard", "function canAddResourceToCurrentProject").includes(
-    "addEventListener"
-  ) &&
-    !functionBody(appJs, "function renderTmEntryRow", "function renderTermRow").includes("addEventListener") &&
-    !functionBody(appJs, "function renderTermRow", "function appendTextWithTags").includes("addEventListener"),
+  !resourcesPresentationServiceJs.includes("addEventListener") &&
+    resourcesControllerJs.includes('listen(tmDashboard, "click"') &&
+    resourcesControllerJs.includes('listen(tmDetail, "click"'),
   "Resources dashboards and rows must use controller-owned event delegation rather than per-render listeners."
 );
 assertIncludes(
@@ -8603,24 +8707,24 @@ assertIncludes(
   "ProjectsController must render project dashboard tiles in one DOM replacement."
 );
 assertIncludes(
-  appJs,
+  resourcesPresentationServiceJs,
   "dashboard.replaceChildren(fragment)",
-  "app.js resource dashboards must render cards in one DOM replacement."
+  "ResourcesPresentationService dashboards must render cards in one DOM replacement."
 );
 assertIncludes(
-  appJs,
-  "function replaceResourceTableRows",
-  "app.js resource detail tables must batch rows off-screen before replacing the table contents."
+  resourcesPresentationServiceJs,
+  "function replaceRows",
+  "ResourcesPresentationService detail tables must batch rows off-screen before replacing the table contents."
 );
 assertIncludes(
-  appJs,
-  "replaceResourceTableRows(table, entries, renderTmEntryRow)",
-  "app.js TM resource detail rows must render in one DOM replacement."
+  resourcesPresentationServiceJs,
+  'replaceRows(tmDetail.querySelector(".resource-table"), entries, renderTmEntryRow)',
+  "ResourcesPresentationService TM detail rows must render in one DOM replacement."
 );
 assertIncludes(
-  appJs,
-  "replaceResourceTableRows(table, terms, renderTermRow)",
-  "app.js termbase resource detail rows must render in one DOM replacement."
+  resourcesPresentationServiceJs,
+  'replaceRows(tbDetail.querySelector(".resource-table"), terms, renderTermRow)',
+  "ResourcesPresentationService termbase detail rows must render in one DOM replacement."
 );
 assertIncludes(
   paletteControllerJs,

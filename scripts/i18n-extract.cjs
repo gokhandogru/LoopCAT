@@ -35,6 +35,13 @@ const resourceLibraryExportControllerPath = path.join(
   "resources",
   "resource-library-export-controller.js"
 );
+const resourcesPresentationServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "resources",
+  "resources-presentation-service.js"
+);
 const resourceMutationControllerPath = path.join(
   root,
   "src",
@@ -197,6 +204,11 @@ function main() {
     messagesByText,
     resourceLibraryExportControllerPath,
     "src/features/resources/resource-library-export-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    resourcesPresentationServicePath,
+    "src/features/resources/resources-presentation-service.js"
   );
   extractScript(
     messagesByText,

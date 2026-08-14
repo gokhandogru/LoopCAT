@@ -87,6 +87,7 @@ import { createExternalAiConsentService } from "../features/ai/external-ai-conse
 import { createOpusCatHelpController } from "../features/ai/opus-cat-help-controller.js";
 import { createTmPretranslationDialogController } from "../features/resources/tm-pretranslation-dialog-controller.js";
 import { createResourcesController } from "../features/resources/resources-controller.js";
+import { createResourcesPresentationService } from "../features/resources/resources-presentation-service.js";
 import { createResourceLibraryImportController } from "../features/resources/resource-library-import-controller.js";
 import { createResourceLibraryExportController } from "../features/resources/resource-library-export-controller.js";
 import { createResourceMutationController } from "../features/resources/resource-mutation-controller.js";
@@ -227,6 +228,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createReviewStateController,
       createRecoveryWorkspaceController,
       createResourcesController,
+      createResourcesPresentationService,
       createSegmentConfirmationController,
       createStructuralSegmentController,
       createTargetProducerController,

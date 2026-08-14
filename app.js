@@ -3320,6 +3320,25 @@ const resourceMutationController = appRuntime.featureFactories.createResourceMut
   },
   logger: console
 });
+const resourcesPresentationService = appRuntime?.featureFactories?.createResourcesPresentationService?.({
+  elements: {
+    tmDashboard: els.tmResourceDashboard,
+    tbDashboard: els.tbResourceDashboard,
+    tmDetail: els.tmResourceDetail,
+    tbDetail: els.tbResourceDetail
+  },
+  document,
+  summarizeResources,
+  labelFromKey: resourceLabelFromKey,
+  items: resourceItems,
+  localization: uiLocalizationService,
+  languagePairDisplay,
+  formatDate,
+  displaySafeHtml,
+  displaySafeText,
+  escapeHtml,
+  replaceSafeHtml
+});
 const resourcesController = appRuntime?.featureFactories?.createResourcesController?.({
   elements: {
     viewButton: els.resourcesViewBtn,
@@ -3340,7 +3359,7 @@ const resourcesController = appRuntime?.featureFactories?.createResourcesControl
     termListImportInput: els.resourceTermListImportInput
   },
   navigate: () => setView("resources"),
-  render: renderResourcesContent,
+  render: resourcesPresentationService.render,
   keyForItem: (item, type) => resourceKey(item, type === "tm" ? "tmName" : "termBaseName"),
   normalizeLanguageInput: normalizeLanguageInputElement,
   runImportTask: runFileImportTask,
@@ -6333,83 +6352,6 @@ function renderResourcesView() {
   resourcesController?.render?.();
 }
 
-function renderResourcesContent(resourceState) {
-  renderResourceDashboard("tm", resourceState);
-  renderResourceDashboard("tb", resourceState);
-  renderResourceDetail(resourceState);
-}
-
-function renderResourceDashboard(type, resourceState) {
-  const isTm = type === "tm";
-  const dashboard = isTm ? els.tmResourceDashboard : els.tbResourceDashboard;
-  const summaries = summarizeResources(isTm ? resourceState.tmEntries : resourceState.terms, isTm ? "tmName" : "termBaseName");
-  if (!summaries.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-file-state actionable-empty-state";
-    const message = document.createElement("p");
-    message.textContent = uiLocalizationService.label(isTm ? "noTranslationMemories" : "noTermbases");
-    const action = document.createElement("button");
-    action.type = "button";
-    action.className = "primary";
-    action.textContent = uiLocalizationService.source(isTm ? "Import a TMX file" : "Import a TBX or term-list file");
-    action.dataset.resourceAction = "import";
-    action.dataset.resourceType = type;
-    empty.append(message, action);
-    dashboard.replaceChildren(empty);
-    return;
-  }
-  const fragment = document.createDocumentFragment();
-  summaries.forEach((resource) => {
-    const card = document.createElement("article");
-    card.className = "resource-card";
-    replaceSafeHtml(card, `
-      <header>
-        <div>
-          <h3>${displaySafeHtml(resource.name)}</h3>
-          <p>${escapeHtml(languagePairDisplay(resource.sourceLang, resource.targetLang))}</p>
-        </div>
-        <span class="language-badge">${resource.count}</span>
-      </header>
-      <div class="project-stats">
-        <div><strong>${resource.count}</strong><span>${uiLocalizationService.labelHtml(isTm ? "entries" : "terms")}</span></div>
-        <div><strong>${escapeHtml(resource.sourceLang || "-")}</strong><span>${uiLocalizationService.labelHtml("source")}</span></div>
-        <div><strong>${escapeHtml(resource.targetLang || "-")}</strong><span>${uiLocalizationService.labelHtml("target")}</span></div>
-      </div>
-      <footer>
-        <span>${uiLocalizationService.labelHtml("updatedAt", { date: formatDate(resource.updatedAt) })}</span>
-        <div class="resource-card-actions"></div>
-      </footer>
-    `);
-    const deleteButton = document.createElement("button");
-    const resourceLabel = displaySafeText(resource.name, uiLocalizationService.source("resource"));
-    deleteButton.className = "danger-small";
-    deleteButton.type = "button";
-    deleteButton.textContent = uiLocalizationService.source("Delete");
-    deleteButton.setAttribute("aria-label", uiLocalizationService.source("Delete resource {value1}", { value1: resourceLabel }));
-    deleteButton.dataset.resourceAction = "delete-resource";
-    deleteButton.dataset.resourceType = type;
-    deleteButton.dataset.resourceKey = resource.key;
-    const exportButton = document.createElement("button");
-    exportButton.type = "button";
-    exportButton.textContent = uiLocalizationService.source("Export");
-    exportButton.setAttribute("aria-label", uiLocalizationService.source("Export resource {value1}", { value1: resourceLabel }));
-    exportButton.dataset.resourceAction = "export";
-    exportButton.dataset.resourceType = type;
-    exportButton.dataset.resourceKey = resource.key;
-    const openButton = document.createElement("button");
-    openButton.className = "primary";
-    openButton.type = "button";
-    openButton.textContent = uiLocalizationService.source("Open");
-    openButton.setAttribute("aria-label", uiLocalizationService.source("Open resource {value1}", { value1: resourceLabel }));
-    openButton.dataset.resourceAction = "open";
-    openButton.dataset.resourceType = type;
-    openButton.dataset.resourceKey = resource.key;
-    card.querySelector(".resource-card-actions").append(deleteButton, exportButton, openButton);
-    fragment.append(card);
-  });
-  dashboard.replaceChildren(fragment);
-}
-
 function canAddResourceToCurrentProject(type, resource) {
   if (!editorSessionStore.getProject()) return false;
   if (resource.sourceLang !== editorSessionStore.getProject().sourceLang || resource.targetLang !== editorSessionStore.getProject().targetLang) return false;
@@ -6439,119 +6381,6 @@ async function addResourceToCurrentProject(type, resource) {
 
 function resourceItems(type, key) {
   return resourcesController?.getItems?.(type, key) || [];
-}
-
-function renderResourceDetail(resourceState) {
-  renderTmResourceDetail(resourceState);
-  renderTbResourceDetail(resourceState);
-}
-
-function replaceResourceTableRows(table, items, renderRow) {
-  const fragment = document.createDocumentFragment();
-  items.forEach((item) => fragment.append(renderRow(item)));
-  table.replaceChildren(fragment);
-}
-
-function renderTmResourceDetail(resourceState) {
-  if (resourceState.type !== "tm" || !resourceState.openKey) {
-    els.tmResourceDetail.classList.add("hidden");
-    return;
-  }
-  const info = resourceLabelFromKey(resourceState.openKey);
-  const entries = resourceItems("tm", resourceState.openKey);
-  els.tmResourceDetail.classList.remove("hidden");
-  replaceSafeHtml(els.tmResourceDetail, `
-    <div class="resource-detail-header">
-      <div>
-        <h3>${displaySafeHtml(info.name)}</h3>
-        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${uiLocalizationService.labelHtml("entryCount", { count: entries.length })}</p>
-      </div>
-      <button id="closeTmResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tm">${uiLocalizationService.sourceHtml("Close")}</button>
-    </div>
-    <div class="resource-table"></div>
-  `);
-  const table = els.tmResourceDetail.querySelector(".resource-table");
-  replaceResourceTableRows(table, entries, renderTmEntryRow);
-}
-
-function renderTbResourceDetail(resourceState) {
-  if (resourceState.type !== "tb" || !resourceState.openKey) {
-    els.tbResourceDetail.classList.add("hidden");
-    return;
-  }
-  const info = resourceLabelFromKey(resourceState.openKey);
-  const terms = resourceItems("tb", resourceState.openKey);
-  els.tbResourceDetail.classList.remove("hidden");
-  replaceSafeHtml(els.tbResourceDetail, `
-    <div class="resource-detail-header">
-      <div>
-        <h3>${displaySafeHtml(info.name)}</h3>
-        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${uiLocalizationService.labelHtml("termCount", { count: terms.length })}</p>
-      </div>
-      <button id="closeTbResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tb">${uiLocalizationService.sourceHtml("Close")}</button>
-    </div>
-    <div class="resource-table"></div>
-  `);
-  const table = els.tbResourceDetail.querySelector(".resource-table");
-  replaceResourceTableRows(table, terms, renderTermRow);
-}
-
-function renderTmEntryRow(entry) {
-  const row = document.createElement("article");
-  row.className = "resource-row";
-  row.dataset.resourceRow = "tm";
-  row.dataset.resourceId = entry.id;
-  replaceSafeHtml(row, `
-    <textarea data-field="source" aria-label="${uiLocalizationService.sourceHtml("Source")}">${escapeHtml(entry.source)}</textarea>
-    <textarea data-field="target" aria-label="${uiLocalizationService.sourceHtml("Target")}">${escapeHtml(entry.target)}</textarea>
-    <div class="resource-row-actions"></div>
-  `);
-  const actions = row.querySelector(".resource-row-actions");
-  const saveButton = document.createElement("button");
-  saveButton.type = "button";
-  saveButton.textContent = uiLocalizationService.source("Save");
-  saveButton.dataset.resourceAction = "save-entry";
-  saveButton.dataset.resourceType = "tm";
-  saveButton.dataset.resourceId = entry.id;
-  const deleteButton = document.createElement("button");
-  deleteButton.className = "danger-small";
-  deleteButton.type = "button";
-  deleteButton.textContent = uiLocalizationService.source("Delete");
-  deleteButton.dataset.resourceAction = "delete-entry";
-  deleteButton.dataset.resourceType = "tm";
-  deleteButton.dataset.resourceId = entry.id;
-  actions.append(saveButton, deleteButton);
-  return row;
-}
-
-function renderTermRow(term) {
-  const row = document.createElement("article");
-  row.className = "resource-row term-resource-row";
-  row.dataset.resourceRow = "tb";
-  row.dataset.resourceId = term.id;
-  replaceSafeHtml(row, `
-    <input data-field="sourceTerm" aria-label="${uiLocalizationService.sourceHtml("Source term")}" value="${escapeHtml(term.sourceTerm)}">
-    <input data-field="targetTerm" aria-label="${uiLocalizationService.sourceHtml("Target term")}" value="${escapeHtml(term.targetTerm)}">
-    <input data-field="notes" aria-label="${uiLocalizationService.sourceHtml("Notes")}" value="${escapeHtml(term.notes || "")}">
-    <label class="checkbox-row resource-checkbox"><input data-field="isForbidden" type="checkbox" ${term.isForbidden ? "checked" : ""}>${uiLocalizationService.labelHtml("forbidden")}</label>
-    <div class="resource-row-actions"></div>
-  `);
-  const actions = row.querySelector(".resource-row-actions");
-  const saveButton = document.createElement("button");
-  saveButton.type = "button";
-  saveButton.textContent = uiLocalizationService.source("Save");
-  saveButton.dataset.resourceAction = "save-entry";
-  saveButton.dataset.resourceType = "tb";
-  saveButton.dataset.resourceId = term.id;
-  const deleteButton = document.createElement("button");
-  deleteButton.className = "danger-small";
-  deleteButton.type = "button";
-  deleteButton.textContent = uiLocalizationService.source("Delete");
-  deleteButton.dataset.resourceAction = "delete-entry";
-  deleteButton.dataset.resourceType = "tb";
-  deleteButton.dataset.resourceId = term.id;
-  actions.append(saveButton, deleteButton);
-  return row;
 }
 
 function appendTextWithTags(container, text, tags, options = {}) {
