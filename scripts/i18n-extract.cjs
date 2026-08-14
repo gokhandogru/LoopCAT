@@ -77,6 +77,13 @@ const projectDocumentStatisticsServicePath = path.join(
   "projects",
   "project-document-statistics-service.js"
 );
+const projectDocumentCatalogServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "projects",
+  "project-document-catalog-service.js"
+);
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const resourceMutationControllerPath = path.join(
   root,
@@ -270,6 +277,11 @@ function main() {
     messagesByText,
     projectDocumentStatisticsServicePath,
     "src/features/projects/project-document-statistics-service.js"
+  );
+  extractScript(
+    messagesByText,
+    projectDocumentCatalogServicePath,
+    "src/features/projects/project-document-catalog-service.js"
   );
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(

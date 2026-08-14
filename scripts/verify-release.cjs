@@ -208,6 +208,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-language-pair-shortcuts-controller.js",
   "src/features/projects/project-language-context-controller.js",
   "src/features/projects/project-document-statistics-service.js",
+  "src/features/projects/project-document-catalog-service.js",
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-decision-controller.js",
   "src/features/quality/quality-review-controller.js",
@@ -270,6 +271,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-language-pair-shortcuts-controller.test.cjs",
   "tests/unit/project-language-context-controller.test.cjs",
   "tests/unit/project-document-statistics-service.test.cjs",
+  "tests/unit/project-document-catalog-service.test.cjs",
   "tests/unit/quality-profile-controller.test.cjs",
   "tests/unit/quality-decision-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
@@ -418,6 +420,10 @@ const projectDocumentStatisticsServiceJs = readText(
 );
 const projectDocumentStatisticsServiceUnitTests = readText(
   "tests/unit/project-document-statistics-service.test.cjs"
+);
+const projectDocumentCatalogServiceJs = readText("src/features/projects/project-document-catalog-service.js");
+const projectDocumentCatalogServiceUnitTests = readText(
+  "tests/unit/project-document-catalog-service.test.cjs"
 );
 const opusCatHelpControllerJs = readText("src/features/ai/opus-cat-help-controller.js");
 const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-pretranslation-dialog-controller.js");
@@ -703,6 +709,16 @@ assertIncludes(
   appBootstrapJs,
   "createProjectDocumentStatisticsService,",
   "The application runtime must expose the checked project document-statistics factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectDocumentCatalogService } from "../features/projects/project-document-catalog-service.js";',
+  "The application runtime must install the checked project document-catalog service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectDocumentCatalogService,",
+  "The application runtime must expose the checked project document-catalog factory."
 );
 assertIncludes(
   appBootstrapJs,
@@ -1250,7 +1266,7 @@ assertIncludes(
 for (const boundary of [
   "getDocumentId: () => applicationStore.getState().navigation.documentId",
   "autosave: autosaveService",
-  "documents: { list: projectDocuments, type: projectDocumentType }",
+  "documents: { list: projectDocumentCatalogService.list, type: projectDocumentCatalogService.type }",
   "listForValidation: projectTermsForValidation",
   "plan: planDeliveryExport",
   "validate: validateExportReadiness",
@@ -1778,7 +1794,7 @@ assertIncludes(
   "app.js must compose the checked project document-statistics service."
 );
 for (const boundary of [
-  "getDocuments: projectDocuments",
+  "getDocuments: projectDocumentCatalogService.list",
   "getSegments: () => editorSessionStore.getSegments()",
   "sourceWordCount"
 ]) {
@@ -1824,6 +1840,84 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/projects/project-document-statistics-service.js"',
   "source-catalog extraction must scan the checked project document-statistics service."
+);
+for (const snippet of [
+  "const map = new Map()",
+  "getManifest(getProject()).forEach((documentInfo) =>",
+  'const id = documentInfo?.id || ""',
+  "if (!id || map.has(id)) return",
+  'documentInfo.name || getProject()?.sourceFileName || "Document"',
+  'normalizeType(documentInfo.type || "docx") || "docx"',
+  'const id = segment.documentId || "default-document"',
+  'segment.documentName || getProject()?.sourceFileName || "Document"',
+  'normalizeType(segment.documentType || "docx") || "docx"',
+  "const current = map.get(id)",
+  "return Array.from(map.values())",
+  'return normalizeType(documentInfo?.type || "")',
+  "segment.documentId === documentId",
+  "return documentId ? getSegments().filter",
+  "if (!documentId) return null",
+  "list().find((documentInfo) => documentInfo.id === documentId) || null",
+  "return Object.freeze({ list, type, segments, currentSegments, selected })"
+]) {
+  assertIncludes(
+    projectDocumentCatalogServiceJs,
+    snippet,
+    `ProjectDocumentCatalogService must retain characterized catalog/selection policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createProjectDocumentCatalogService({",
+  "app.js must compose the checked project document-catalog service."
+);
+for (const boundary of [
+  "getProject: () => editorSessionStore.getProject()",
+  "getManifest: projectDocumentManifest",
+  "getSegments: () => editorSessionStore.getSegments()",
+  "getSelectedDocumentId: () => applicationStore.getState().navigation.documentId",
+  "normalizeType: stableLower"
+]) {
+  assertIncludes(appJs, boundary, `project document-catalog composition must inject the ${boundary} boundary.`);
+}
+for (const method of ["list", "type", "currentSegments"]) {
+  assertIncludes(
+    `${appJs}\n${appWorkflowDriverJs}`,
+    `projectDocumentCatalogService.${method}`,
+    `project document consumers must call ProjectDocumentCatalogService.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "projectDocuments",
+  "projectDocumentType",
+  "documentSegments",
+  "currentDocumentSegments",
+  "currentSelectedDocument"
+]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} project document-catalog helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "ProjectDocumentCatalogService preserves manifest-first reconciliation, invalid and duplicate rejection, fallbacks, and order",
+  "ProjectDocumentCatalogService preserves Document/docx fallbacks without a project source filename",
+  "ProjectDocumentCatalogService preserves standalone type normalization and exact document segment filtering",
+  "ProjectDocumentCatalogService preserves selected-document and all-segment current scopes",
+  "ProjectDocumentCatalogService preserves selected document null, found, and missing fallbacks",
+  "ProjectDocumentCatalogService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectDocumentCatalogServiceUnitTests,
+    testName,
+    `focused project document-catalog tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/project-document-catalog-service.js"',
+  "source-catalog extraction must scan the checked project document-catalog service."
 );
 for (const snippet of [
   'renderDashboard("tm", resourceState)',
@@ -10060,9 +10154,9 @@ assertIncludes(
   "README.md must document the platform signature artifact rule self-test."
 );
 assertIncludes(
-  functionBody(appJs, "function projectDocuments()", "function projectDocumentType"),
-  "projectDocumentManifest(editorSessionStore.getProject())",
-  "app.js document lists must include saved project document metadata even when a document has no segment rows."
+  functionBody(projectDocumentCatalogServiceJs, "function list()", "function type"),
+  "getManifest(getProject())",
+  "ProjectDocumentCatalogService document lists must include saved project document metadata even when a document has no segment rows."
 );
 assertIncludes(
   functionBody(appJs, "function projectDocumentManifest", "function cleanProjectResourceLinks"),

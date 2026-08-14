@@ -1105,8 +1105,16 @@ const projectLanguageContextController = appRuntime.featureFactories.createProje
   warn: (...args) => console.warn(...args)
 });
 
+const projectDocumentCatalogService = appRuntime.featureFactories.createProjectDocumentCatalogService({
+  getProject: () => editorSessionStore.getProject(),
+  getManifest: projectDocumentManifest,
+  getSegments: () => editorSessionStore.getSegments(),
+  getSelectedDocumentId: () => applicationStore.getState().navigation.documentId,
+  normalizeType: stableLower
+});
+
 const projectDocumentStatisticsService = appRuntime.featureFactories.createProjectDocumentStatisticsService({
-  getDocuments: projectDocuments,
+  getDocuments: projectDocumentCatalogService.list,
   getSegments: () => editorSessionStore.getSegments(),
   sourceWordCount
 });
@@ -1363,7 +1371,7 @@ const deliveryExportController = appRuntime.featureFactories.createDeliveryExpor
     }
   },
   autosave: autosaveService,
-  documents: { list: projectDocuments, type: projectDocumentType },
+  documents: { list: projectDocumentCatalogService.list, type: projectDocumentCatalogService.type },
   terms: { listForValidation: projectTermsForValidation },
   delivery: {
     plan: planDeliveryExport,
@@ -1637,7 +1645,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
   pretranslateButton: els.pretranslateBtn,
   editorSessionStore,
   segments: {
-    getDocumentSegments: currentDocumentSegments,
+    getDocumentSegments: projectDocumentCatalogService.currentSegments,
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment))
   },
   threshold: {
@@ -1795,7 +1803,7 @@ const aiScopeSelectionService = appRuntime.featureFactories.createAiScopeSelecti
   settings: { read: () => aiRuntimeSettingsService.localSettingsFromForm() },
   segments: {
     getAll: editorSessionStore.getSegments,
-    getDocument: currentDocumentSegments,
+    getDocument: projectDocumentCatalogService.currentSegments,
     getActive: currentSegment
   },
   filters: { getVisibleIndexes: filteredSegmentIndexes }
@@ -2016,7 +2024,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
       filteredSegmentIndexes()
         .map((index) => editorSessionStore.getSegments()[index])
         .filter(Boolean),
-    getDocumentSegments: currentDocumentSegments,
+    getDocumentSegments: projectDocumentCatalogService.currentSegments,
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment))
   },
   settings: {
@@ -2093,7 +2101,7 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
       filteredSegmentIndexes()
         .map((index) => editorSessionStore.getSegments()[index])
         .filter(Boolean),
-    getDocumentSegments: currentDocumentSegments,
+    getDocumentSegments: projectDocumentCatalogService.currentSegments,
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
     getTags: segmentTags,
     getMissingTags: missingTags,
@@ -2172,7 +2180,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
       filteredSegmentIndexes()
         .map((index) => editorSessionStore.getSegments()[index])
         .filter(Boolean),
-    getDocumentSegments: currentDocumentSegments,
+    getDocumentSegments: projectDocumentCatalogService.currentSegments,
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
     getTags: segmentTags
   },
@@ -2260,7 +2268,7 @@ const aiTerminologyApplicationController =
         filteredSegmentIndexes()
           .map((index) => editorSessionStore.getSegments()[index])
           .filter(Boolean),
-      getDocumentSegments: currentDocumentSegments,
+      getDocumentSegments: projectDocumentCatalogService.currentSegments,
       isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
       getTags: segmentTags
     },
@@ -2337,7 +2345,7 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
       filteredSegmentIndexes()
         .map((index) => editorSessionStore.getSegments()[index])
         .filter(Boolean),
-    getDocumentSegments: currentDocumentSegments,
+    getDocumentSegments: projectDocumentCatalogService.currentSegments,
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
     getTags: segmentTags
   },
@@ -2497,7 +2505,7 @@ const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBrie
   consent: { externalShare: externalAiConsentService.confirmShare },
   context: {
     getSampleSegments: aiScopeSelectionService.projectBriefSampleSegments,
-    getDocuments: projectDocuments,
+    getDocuments: projectDocumentCatalogService.list,
     getTerms: (project) =>
       listTerms({
         sourceLang: project.sourceLang,
@@ -2793,7 +2801,7 @@ const aiPromptPreviewController = appRuntime.featureFactories.createAiPromptPrev
     get: editorSessionStore.getProject,
     getActiveSegment: currentSegment,
     getTerms: editorSessionStore.getProjectTerms,
-    getDocuments: projectDocuments,
+    getDocuments: projectDocumentCatalogService.list,
     getSampleSegments: aiScopeSelectionService.projectBriefSampleSegments,
     getSurroundingSegments: aiSegmentContextService.surroundingSegmentsForSegment,
     getTags: segmentTags
@@ -4826,56 +4834,6 @@ function firstVisibleSegmentIndex() {
   return filteredSegmentIndexes()[0] ?? -1;
 }
 
-function projectDocuments() {
-  const map = new Map();
-  projectDocumentManifest(editorSessionStore.getProject()).forEach((documentInfo) => {
-    const id = documentInfo?.id || "";
-    if (!id || map.has(id)) return;
-    map.set(id, {
-      id,
-      name: documentInfo.name || editorSessionStore.getProject()?.sourceFileName || "Document",
-      type: stableLower(documentInfo.type || "docx") || "docx"
-    });
-  });
-  editorSessionStore.getSegments().forEach((segment) => {
-    const id = segment.documentId || "default-document";
-    if (!map.has(id)) {
-      map.set(id, {
-        id,
-        name: segment.documentName || editorSessionStore.getProject()?.sourceFileName || "Document",
-        type: stableLower(segment.documentType || "docx") || "docx"
-      });
-      return;
-    }
-    const current = map.get(id);
-    map.set(id, {
-      ...current,
-      name: current.name || segment.documentName || editorSessionStore.getProject()?.sourceFileName || "Document",
-      type: stableLower(current.type || segment.documentType || "docx") || "docx"
-    });
-  });
-  return Array.from(map.values());
-}
-
-function projectDocumentType(documentInfo) {
-  return stableLower(documentInfo?.type || "");
-}
-
-function documentSegments(documentId) {
-  return editorSessionStore.getSegments().filter((segment) => segment.documentId === documentId);
-}
-
-function currentDocumentSegments() {
-  return applicationStore.getState().navigation.documentId
-    ? editorSessionStore.getSegments().filter((segment) => segment.documentId === applicationStore.getState().navigation.documentId)
-    : editorSessionStore.getSegments();
-}
-
-function currentSelectedDocument() {
-  if (!applicationStore.getState().navigation.documentId) return null;
-  return projectDocuments().find((documentInfo) => documentInfo.id === applicationStore.getState().navigation.documentId) || null;
-}
-
 function renderTextEncodingOptions() {
   if (!els.fileEncodingSelect) return;
   const options = encodingApi.TEXT_ENCODING_OPTIONS || [["auto", "Auto"], ["utf-8", "UTF-8"]];
@@ -5694,7 +5652,7 @@ function renderEditor() {
     <dt>${uiLocalizationService.labelHtml("mainTm")}</dt><dd>${displaySafeHtml(resources.mainTm)}</dd>
     <dt>${uiLocalizationService.labelHtml("linkedTms")}</dt><dd>${displaySafeHtml(resources.tmNames.join(", "))}</dd>
     <dt>${uiLocalizationService.labelHtml("linkedTbs")}</dt><dd>${displaySafeHtml(resources.tbNames.join(", "))}</dd>
-    <dt>${uiLocalizationService.sourceHtml("Documents")}</dt><dd>${projectDocuments().length || 0}</dd>
+    <dt>${uiLocalizationService.sourceHtml("Documents")}</dt><dd>${projectDocumentCatalogService.list().length || 0}</dd>
     <dt>${uiLocalizationService.labelHtml("segmentsTitle")}</dt><dd>${editorSessionStore.getSegments().length}</dd>
     <dt>${uiLocalizationService.labelHtml("activity")}</dt><dd>${uiLocalizationService.labelHtml("eventCount", { count: editorSessionStore.getActivityEvents().length })}</dd>
   `);
@@ -5727,7 +5685,7 @@ function renderTermbaseSelect() {
 
 function renderProjectHome() {
   if (!editorSessionStore.getProject()) return;
-  const documents = projectDocuments();
+  const documents = projectDocumentCatalogService.list();
   const documentStatsById = projectDocumentStatisticsService.byDocument(documents);
   const total = projectDocumentStatisticsService.aggregate(documentStatsById);
   const sourceWords = total.words;
@@ -5790,7 +5748,7 @@ function renderProjectHome() {
 
 function renderDocumentFilter() {
   const current = applicationStore.getState().navigation.documentId;
-  const documents = projectDocuments();
+  const documents = projectDocumentCatalogService.list();
   const fragment = document.createDocumentFragment();
   const allOption = document.createElement("option");
   allOption.value = "";
@@ -6830,7 +6788,7 @@ function currentQualityRiskQueue(qaChecks = editorSessionStore.getQaChecks()) {
   if (!editorSessionStore.getProject()) return null;
   return buildRiskQueue({
     project: editorSessionStore.getProject(),
-    segments: currentDocumentSegments(),
+    segments: projectDocumentCatalogService.currentSegments(),
     qaChecks,
     profile: editorSessionStore.getProject().qualityProfile
   });
@@ -7167,11 +7125,11 @@ async function runProjectQa() {
       targetLang: editorSessionStore.getProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
-    const qaSegments = currentDocumentSegments().map((segment) => ({
+    const qaSegments = projectDocumentCatalogService.currentSegments().map((segment) => ({
       ...segment,
       tags: segmentTags(segment)
     }));
-    const fallback = () => Promise.resolve(runQaChecks(currentDocumentSegments(), terms, { missingTags }));
+    const fallback = () => Promise.resolve(runQaChecks(projectDocumentCatalogService.currentSegments(), terms, { missingTags }));
     const checks = workerClient?.runQaChecks
       ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
       : await fallback();
@@ -7331,7 +7289,7 @@ async function importXliff(file) {
 function projectHasDocumentNamed(fileName) {
   const normalized = stableLower(String(fileName || "").trim());
   if (!normalized) return false;
-  return projectDocuments().some((documentInfo) => stableLower(documentInfo.name.trim()) === normalized);
+  return projectDocumentCatalogService.list().some((documentInfo) => stableLower(documentInfo.name.trim()) === normalized);
 }
 
 function confirmDuplicateImport(file) {

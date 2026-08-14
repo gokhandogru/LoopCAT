@@ -320,7 +320,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     renderProjectHome();
     renderDocumentFilter();
     assert(
-      projectDocuments().every((documentInfo) => documentInfo.id) &&
+      projectDocumentCatalogService.list().every((documentInfo) => documentInfo.id) &&
         !els.projectFileList.textContent.includes("[object Object]"),
       "project file views tolerate malformed legacy document manifests"
     );
@@ -425,7 +425,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await deliveryExportController.exportLocalization();
       assert(
         caseInsensitiveTypeDownloads.some((item) => item.type === "text/html") &&
-          projectDocuments().find((item) => item.id === documentInfo.id)?.type === "html",
+          projectDocumentCatalogService.list().find((item) => item.id === documentInfo.id)?.type === "html",
         "localization export normalizes stored document type casing"
       );
     } finally {
@@ -632,7 +632,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     renderProjectHome();
     renderDocumentFilter();
     assert(
-      projectDocuments().some((item) => item.id === metadataOnlyDocument.id) &&
+      projectDocumentCatalogService.list().some((item) => item.id === metadataOnlyDocument.id) &&
         els.projectFileList.textContent.includes("metadata-only.html") &&
         Array.from(els.documentFilter.options).some((option) => option.value === metadataOnlyDocument.id),
       "metadata-only project documents remain visible without segment rows"
@@ -643,7 +643,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const deletedMetadataOnlyDocument = await confirmDeleteFile(metadataOnlyDocument);
       assert(
         deletedMetadataOnlyDocument &&
-          !projectDocuments().some((item) => item.id === metadataOnlyDocument.id) &&
+          !projectDocumentCatalogService.list().some((item) => item.id === metadataOnlyDocument.id) &&
           !Array.from(els.documentFilter.options).some((option) => option.value === metadataOnlyDocument.id),
         "metadata-only project documents can be deleted without orphan segments"
       );
@@ -4316,7 +4316,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         renderAll();
         renderProjectsView();
         await confirmDeleteProject(labelProject.id);
-        await confirmDeleteFile(projectDocuments()[0]);
+        await confirmDeleteFile(projectDocumentCatalogService.list()[0]);
         confirmDuplicateImport(new File(["duplicate"], labelDocumentName, { type: "text/plain" }));
         const labelUiText = [
           els.projectList.textContent,
