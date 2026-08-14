@@ -1244,31 +1244,31 @@ const aiAdministrationController = appRuntime?.featureFactories?.createAiAdminis
     promptOutput: els.localAiPromptOutput
   },
   actions: {
-    saveSettings: saveAiSettings,
-    contextualTranslate: pretranslateWithLocalAi,
-    reviewSegment: reviewActiveSegmentWithLocalAi,
-    repairSegment: repairActiveSegmentTagsWithLocalAi,
-    polishSegment: polishActiveSegmentDraftWithLocalAi,
-    variantsSegment: suggestActiveSegmentVariantsWithLocalAi,
-    applyTermsSegment: applyActiveSegmentTerminologyWithLocalAi,
-    openAiSuggestion: createOpenAiSuggestion,
+    saveSettings: (...args) => aiSettingsPersistenceController.save(...args),
+    contextualTranslate: (...args) => aiPretranslationController.pretranslate(...args),
+    reviewSegment: (...args) => aiReviewController.reviewActive(...args),
+    repairSegment: (...args) => aiTagRepairController.repairActive(...args),
+    polishSegment: (...args) => aiDraftEditingController.polishActive(...args),
+    variantsSegment: (...args) => aiAlternativesController.suggestActive(...args),
+    applyTermsSegment: (...args) => aiTerminologyApplicationController.applyActive(...args),
+    openAiSuggestion: (...args) => aiOpenAiSuggestionController.create(...args),
     cancel: (...args) => aiCommandLifecycleCoordinator.cancel(...args),
-    testConnection: testLocalAiConnection,
-    startLmStudio: startLmStudioServerAndTestConnection,
-    refreshModels: refreshLocalAiModels,
-    pullModel: pullLocalAiModel,
-    promptTest: testLocalAiPrompt,
-    reviewBatch: reviewBatchWithLocalAi,
-    repairBatch: repairBatchTagsWithLocalAi,
-    polishBatch: polishBatchDraftsWithLocalAi,
-    adaptSegment: adaptActiveSegmentDraftWithLocalAi,
-    adaptBatch: adaptBatchDraftsWithLocalAi,
-    variantsBatch: suggestBatchSegmentVariantsWithLocalAi,
-    applyTermsBatch: applyBatchTerminologyWithLocalAi,
-    extractTermsSegment: extractActiveSegmentTermsWithLocalAi,
-    extractTermsBatch: extractBatchTermsWithLocalAi,
-    pretranslate: pretranslateWithLocalAi,
-    projectBrief: generateProjectBriefWithLocalAi,
+    testConnection: (...args) => aiProviderAdministrationOperationsController.testConnection(...args),
+    startLmStudio: (...args) => aiProviderAdministrationOperationsController.startServerAndTest(...args),
+    refreshModels: (...args) => aiProviderAdministrationOperationsController.refreshModels(...args),
+    pullModel: (...args) => aiProviderAdministrationOperationsController.pullModel(...args),
+    promptTest: (...args) => aiPromptTestController.testPrompt(...args),
+    reviewBatch: (...args) => aiReviewController.reviewBatch(...args),
+    repairBatch: (...args) => aiTagRepairController.repairBatch(...args),
+    polishBatch: (...args) => aiDraftEditingController.polishBatch(...args),
+    adaptSegment: (...args) => aiDraftEditingController.adaptActive(...args),
+    adaptBatch: (...args) => aiDraftEditingController.adaptBatch(...args),
+    variantsBatch: (...args) => aiAlternativesController.suggestBatch(...args),
+    applyTermsBatch: (...args) => aiTerminologyApplicationController.applyBatch(...args),
+    extractTermsSegment: (...args) => aiTerminologyExtractionController.extractActive(...args),
+    extractTermsBatch: (...args) => aiTerminologyExtractionController.extractBatch(...args),
+    pretranslate: (...args) => aiPretranslationController.pretranslate(...args),
+    projectBrief: (...args) => aiProjectBriefController.generate(...args),
     presetChange: (...args) => aiProviderFormController.handlePresetChange(...args),
     providerChange: (...args) => aiProviderFormController.handleProviderChange(...args),
     baseUrlInput: (...args) => aiProviderFormController.handleBaseUrlInput(...args),
@@ -3122,7 +3122,7 @@ const opusCatHelpController = appRuntime?.featureFactories?.createOpusCatHelpCon
     closer: els.closeOpusCatHelpBtn,
     retryButton: els.retryOpusCatConnectionBtn
   },
-  retryConnection: testLocalAiConnection,
+  retryConnection: aiProviderAdministrationOperationsController.testConnection,
   onError: (error) => setSaveStatus(error?.message || "OPUS-CAT connection help could not complete the action.", "dirty")
 });
 opusCatHelpController?.mount?.();
@@ -5187,23 +5187,23 @@ function commandList() {
     { id: "preset-ai-review", label: "Use AI review filter preset", group: "Filters", keywords: ["AI", "risk", "suggestions"], run: () => filterPresetController?.applyPreset?.("ai-review"), enabled: Boolean(currentProject()) },
     { id: "project-report", label: "Export project report", run: exportProjectReport, enabled: Boolean(currentProject()) },
     { id: "anonymized-report", label: "Export anonymized report", run: () => exportProjectReport({ anonymized: true }), enabled: Boolean(currentProject()) },
-    { id: "local-ai-pretranslate", label: "Local AI pre-translate", run: pretranslateWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running) },
-    { id: "local-ai-review", label: "AI review active segment", run: reviewActiveSegmentWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-review-batch", label: "AI QA batch", run: reviewBatchWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-tag-repair", label: "Suggest AI tag repair", run: repairActiveSegmentTagsWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-tag-repair-batch", label: "Repair AI tags batch", run: repairBatchTagsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-polish-draft", label: "Polish active draft with AI", run: polishActiveSegmentDraftWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-polish-batch", label: "Polish AI drafts batch", run: polishBatchDraftsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-adapt-draft", label: "Adapt active draft with AI", run: adaptActiveSegmentDraftWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-adapt-batch", label: "Adapt AI drafts batch", run: adaptBatchDraftsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-variants", label: "Suggest AI alternatives", run: suggestActiveSegmentVariantsWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-variants-batch", label: "Suggest AI alternatives batch", run: suggestBatchSegmentVariantsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-apply-terms", label: "Apply AI terminology", run: applyActiveSegmentTerminologyWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-apply-terms-batch", label: "Apply AI terminology batch", run: applyBatchTerminologyWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-terms", label: "Extract AI terms", run: extractActiveSegmentTermsWithLocalAi, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-terms-batch", label: "Extract AI terms batch", run: extractBatchTermsWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-project-brief", label: "Generate AI project brief", run: generateProjectBriefWithLocalAi, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "openai-ai", label: "Create OpenAI suggestion", run: createOpenAiSuggestion, enabled: Boolean(currentSegment()) }
+    { id: "local-ai-pretranslate", label: "Local AI pre-translate", run: aiPretranslationController.pretranslate, enabled: Boolean(currentProject() && !state.localAi.running) },
+    { id: "local-ai-review", label: "AI review active segment", run: aiReviewController.reviewActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-review-batch", label: "AI QA batch", run: aiReviewController.reviewBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-tag-repair", label: "Suggest AI tag repair", run: aiTagRepairController.repairActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-tag-repair-batch", label: "Repair AI tags batch", run: aiTagRepairController.repairBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-polish-draft", label: "Polish active draft with AI", run: aiDraftEditingController.polishActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-polish-batch", label: "Polish AI drafts batch", run: aiDraftEditingController.polishBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-adapt-draft", label: "Adapt active draft with AI", run: aiDraftEditingController.adaptActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-adapt-batch", label: "Adapt AI drafts batch", run: aiDraftEditingController.adaptBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-variants", label: "Suggest AI alternatives", run: aiAlternativesController.suggestActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-variants-batch", label: "Suggest AI alternatives batch", run: aiAlternativesController.suggestBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-apply-terms", label: "Apply AI terminology", run: aiTerminologyApplicationController.applyActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-apply-terms-batch", label: "Apply AI terminology batch", run: aiTerminologyApplicationController.applyBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-terms", label: "Extract AI terms", run: aiTerminologyExtractionController.extractActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-terms-batch", label: "Extract AI terms batch", run: aiTerminologyExtractionController.extractBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-project-brief", label: "Generate AI project brief", run: aiProjectBriefController.generate, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "openai-ai", label: "Create OpenAI suggestion", run: aiOpenAiSuggestionController.create, enabled: Boolean(currentSegment()) }
   ];
   const shortcuts = {
     undo: "Ctrl/Cmd+Z",
@@ -7947,10 +7947,6 @@ async function saveProjectDomainFromForm() {
   }
 }
 
-async function saveAiSettings() {
-  return aiSettingsPersistenceController.save();
-}
-
 async function aiContextForSegment(segment, ai) {
   return Promise.all([
     ai.useTmContext ? findProjectTmMatches({
@@ -7985,10 +7981,6 @@ async function applyAiSuggestion(suggestionId, options = {}) {
   return aiSuggestionApplicationController.apply(suggestionId, options);
 }
 
-async function createOpenAiSuggestion() {
-  return aiOpenAiSuggestionController.create();
-}
-
 function currentLocalAiProvider(settings = aiRuntimeSettingsService.localSettingsFromForm()) {
   return aiProviderService.get(settings.providerId);
 }
@@ -8005,26 +7997,6 @@ function showOpusCatConnectionHelp() {
   return opusCatHelpController?.open?.();
 }
 
-async function startLmStudioServerAndTestConnection() {
-  return aiProviderAdministrationOperationsController.startServerAndTest();
-}
-
-async function testLocalAiConnection(options = {}) {
-  return aiProviderAdministrationOperationsController.testConnection(options);
-}
-
-async function refreshLocalAiModels() {
-  return aiProviderAdministrationOperationsController.refreshModels();
-}
-
-async function pullLocalAiModel() {
-  return aiProviderAdministrationOperationsController.pullModel();
-}
-
-async function testLocalAiPrompt() {
-  return aiPromptTestController.testPrompt();
-}
-
 function aiReviewRiskLabel(level) {
   return {
     none: uiLabel("noIssuesFound"),
@@ -8033,96 +8005,6 @@ function aiReviewRiskLabel(level) {
     high: uiLabel("highRisk"),
     critical: uiLabel("criticalRisk")
   }[level] || uiLabel("unrankedRisk");
-}
-
-async function reviewActiveSegmentWithLocalAi() {
-  return aiReviewController.reviewActive();
-}
-
-function localAiReviewScopeSegments(settings = {}) {
-  const mode = settings.mode || "untranslated";
-  if (mode === "selected") return currentSegment() ? [currentSegment()] : [];
-  if (mode === "visible") return filteredSegmentIndexes().map((index) => currentSegments()[index]).filter(Boolean);
-  if (mode === "project") return currentSegments();
-  return currentDocumentSegments();
-}
-
-function localAiReviewSkipReason(segment = {}) {
-  if (!String(segment.source || "").trim()) return "empty-source";
-  if (!String(segment.target || "").trim()) return "empty-target";
-  if (preTranslationService.isLockedSegment?.(segment)) return "locked";
-  if (segment.status === "confirmed") return "confirmed";
-  return "";
-}
-
-function selectLocalAiReviewSegments(settings = {}) {
-  const skipped = [];
-  const candidates = [];
-  localAiReviewScopeSegments(settings).forEach((segment) => {
-    const reason = localAiReviewSkipReason(segment);
-    if (reason) {
-      skipped.push({ segmentId: segment.id || "", reason });
-      return;
-    }
-    candidates.push(segment);
-  });
-  return { candidates, skipped, mode: settings.mode || "untranslated" };
-}
-
-async function reviewBatchWithLocalAi() {
-  return aiReviewController.reviewBatch();
-}
-
-async function repairActiveSegmentTagsWithLocalAi() {
-  return aiTagRepairController.repairActive();
-}
-
-async function repairBatchTagsWithLocalAi() {
-  return aiTagRepairController.repairBatch();
-}
-
-async function suggestActiveSegmentVariantsWithLocalAi() {
-  return aiAlternativesController.suggestActive();
-}
-
-async function suggestBatchSegmentVariantsWithLocalAi() {
-  return aiAlternativesController.suggestBatch();
-}
-
-async function applyActiveSegmentTerminologyWithLocalAi() {
-  return aiTerminologyApplicationController.applyActive();
-}
-
-async function applyBatchTerminologyWithLocalAi() {
-  return aiTerminologyApplicationController.applyBatch();
-}
-
-async function polishActiveSegmentDraftWithLocalAi() {
-  return aiDraftEditingController.polishActive();
-}
-
-async function adaptActiveSegmentDraftWithLocalAi() {
-  return aiDraftEditingController.adaptActive();
-}
-
-async function adaptBatchDraftsWithLocalAi() {
-  return aiDraftEditingController.adaptBatch();
-}
-
-async function polishBatchDraftsWithLocalAi() {
-  return aiDraftEditingController.polishBatch();
-}
-
-async function extractActiveSegmentTermsWithLocalAi() {
-  return aiTerminologyExtractionController.extractActive();
-}
-
-async function extractBatchTermsWithLocalAi() {
-  return aiTerminologyExtractionController.extractBatch();
-}
-
-async function generateProjectBriefWithLocalAi() {
-  return aiProjectBriefController.generate();
 }
 
 async function localAiGlossaryTermsForSegment(segment) {
@@ -8135,10 +8017,6 @@ async function localAiTmMatchesForSegment(segment) {
 
 function localAiSurroundingSegmentsForSegment(segment, options = {}) {
   return aiSegmentContextService.surroundingSegmentsForSegment(segment, options);
-}
-
-async function pretranslateWithLocalAi() {
-  return aiPretranslationController.pretranslate();
 }
 
 async function splitCurrentSegment() {

@@ -2486,49 +2486,16 @@ for (const boundary of [
     `AiProviderAdministrationOperationsController must retain checked ${boundary} orchestration.`
   );
 }
-for (const [start, end, delegation] of [
-  [
-    "function canStartLmStudioServer",
-    "function setOpusCatConnectionHelpVisible",
-    "return aiProviderAdministrationOperationsController.canStartServer(settings)"
-  ],
-  [
-    "async function startLmStudioServerAndTestConnection",
-    "async function testLocalAiConnection",
-    "return aiProviderAdministrationOperationsController.startServerAndTest()"
-  ],
-  [
-    "async function testLocalAiConnection",
-    "async function refreshLocalAiModels",
-    "return aiProviderAdministrationOperationsController.testConnection(options)"
-  ],
-  [
-    "async function refreshLocalAiModels",
-    "async function pullLocalAiModel",
-    "return aiProviderAdministrationOperationsController.refreshModels()"
-  ],
-  [
-    "async function pullLocalAiModel",
-    "async function testLocalAiPrompt",
-    "return aiProviderAdministrationOperationsController.pullModel()"
-  ]
-]) {
-  const facade = functionBody(appJs, start, end);
-  assertIncludes(facade, delegation, `${start} must delegate to the checked provider-administration controller.`);
-  assert(
-    !facade.includes("persistLocalAiSettings(") &&
-      !facade.includes("localAiRuntimeConfig(") &&
-      !facade.includes("assertLocalAiRuntimeReady(") &&
-      !facade.includes("currentLocalAiProvider(") &&
-      !facade.includes("startLmStudioServer(") &&
-      !facade.includes("listModels(") &&
-      !facade.includes("provider.pullModel(") &&
-      !facade.includes("setLocalAiStatus(") &&
-      !facade.includes("setSaveStatus(") &&
-      !facade.includes("state.localAi.models"),
-    "app.js must not regain provider connection, desktop retry, model-state, progress, or status orchestration."
-  );
-}
+const canStartLmStudioFacade = functionBody(
+  appJs,
+  "function canStartLmStudioServer",
+  "function setOpusCatConnectionHelpVisible"
+);
+assertIncludes(
+  canStartLmStudioFacade,
+  "return aiProviderAdministrationOperationsController.canStartServer(settings)",
+  "canStartLmStudioServer must delegate to the checked provider-administration controller."
+);
 for (const testName of [
   "provider administration exposes LM Studio start only for local OpenAI-compatible desktop settings",
   "provider connection validation and missing-provider outcomes stop before invocation",
@@ -2573,27 +2540,6 @@ for (const boundary of [
     `AiPromptTestController must retain checked ${boundary} orchestration.`
   );
 }
-assertIncludes(
-  appJs,
-  "return aiPromptTestController.testPrompt()",
-  "app.js must retain only the checked AI-prompt-test compatibility facade."
-);
-const aiPromptTestFacade = functionBody(appJs, "async function testLocalAiPrompt", "function aiReviewRiskLabel");
-assert(
-  !aiPromptTestFacade.includes("localAiPromptMode(") &&
-    !aiPromptTestFacade.includes("localAiSampleText(") &&
-    !aiPromptTestFacade.includes("persistLocalAiSettings(") &&
-    !aiPromptTestFacade.includes("localAiRuntimeConfig(") &&
-    !aiPromptTestFacade.includes("confirmExternalAiPromptShare(") &&
-    !aiPromptTestFacade.includes("currentLocalAiProvider(") &&
-    !aiPromptTestFacade.includes("translateSegment(") &&
-    !aiPromptTestFacade.includes("completePrompt(") &&
-    !aiPromptTestFacade.includes("renderLocalAiOutput(") &&
-    !aiPromptTestFacade.includes("renderLocalAiCommandCentre(") &&
-    !aiPromptTestFacade.includes("state.localAi") &&
-    !aiPromptTestFacade.includes("setSaveStatus("),
-  "app.js must not regain AI-prompt-test validation, consent, provider routing, output, lifecycle, presentation, or status orchestration."
-);
 for (const testName of [
   "AI prompt testing preserves project, shared-running, busy, and sample-source safeguards",
   "AI prompt testing preserves runtime, provider, and mode-capability validation",
@@ -2607,6 +2553,124 @@ for (const testName of [
     testName,
     `focused AI-prompt-test tests must characterize ${testName}.`
   );
+}
+const aiAdministrationActionRoutes = [
+  ["saveSettings", "aiSettingsPersistenceController.save"],
+  ["contextualTranslate", "aiPretranslationController.pretranslate"],
+  ["reviewSegment", "aiReviewController.reviewActive"],
+  ["repairSegment", "aiTagRepairController.repairActive"],
+  ["polishSegment", "aiDraftEditingController.polishActive"],
+  ["variantsSegment", "aiAlternativesController.suggestActive"],
+  ["applyTermsSegment", "aiTerminologyApplicationController.applyActive"],
+  ["openAiSuggestion", "aiOpenAiSuggestionController.create"],
+  ["testConnection", "aiProviderAdministrationOperationsController.testConnection"],
+  ["startLmStudio", "aiProviderAdministrationOperationsController.startServerAndTest"],
+  ["refreshModels", "aiProviderAdministrationOperationsController.refreshModels"],
+  ["pullModel", "aiProviderAdministrationOperationsController.pullModel"],
+  ["promptTest", "aiPromptTestController.testPrompt"],
+  ["reviewBatch", "aiReviewController.reviewBatch"],
+  ["repairBatch", "aiTagRepairController.repairBatch"],
+  ["polishBatch", "aiDraftEditingController.polishBatch"],
+  ["adaptSegment", "aiDraftEditingController.adaptActive"],
+  ["adaptBatch", "aiDraftEditingController.adaptBatch"],
+  ["variantsBatch", "aiAlternativesController.suggestBatch"],
+  ["applyTermsBatch", "aiTerminologyApplicationController.applyBatch"],
+  ["extractTermsSegment", "aiTerminologyExtractionController.extractActive"],
+  ["extractTermsBatch", "aiTerminologyExtractionController.extractBatch"],
+  ["pretranslate", "aiPretranslationController.pretranslate"],
+  ["projectBrief", "aiProjectBriefController.generate"]
+];
+for (const [action, delegation] of aiAdministrationActionRoutes) {
+  assertIncludes(
+    appJs,
+    `${action}: (...args) => ${delegation}(...args)`,
+    `AI administration action ${action} must late-bind directly to ${delegation}.`
+  );
+}
+assertIncludes(
+  appJs,
+  'onError: (error) => setSaveStatus(error?.message || "AI action failed.", "dirty")',
+  "AI administration must retain its single action-error boundary."
+);
+assertIncludes(
+  appJs,
+  "retryConnection: aiProviderAdministrationOperationsController.testConnection",
+  "OPUS-CAT retry must route directly to checked provider administration."
+);
+for (const delegation of [
+  "aiPretranslationController.pretranslate",
+  "aiReviewController.reviewActive",
+  "aiReviewController.reviewBatch",
+  "aiTagRepairController.repairActive",
+  "aiTagRepairController.repairBatch",
+  "aiDraftEditingController.polishActive",
+  "aiDraftEditingController.polishBatch",
+  "aiDraftEditingController.adaptActive",
+  "aiDraftEditingController.adaptBatch",
+  "aiAlternativesController.suggestActive",
+  "aiAlternativesController.suggestBatch",
+  "aiTerminologyApplicationController.applyActive",
+  "aiTerminologyApplicationController.applyBatch",
+  "aiTerminologyExtractionController.extractActive",
+  "aiTerminologyExtractionController.extractBatch",
+  "aiProjectBriefController.generate",
+  "aiOpenAiSuggestionController.create"
+]) {
+  assertIncludes(appJs, `run: ${delegation}`, `the command palette must route directly to ${delegation}.`);
+}
+for (const delegation of [
+  "aiSettingsPersistenceController.save",
+  "aiOpenAiSuggestionController.create",
+  "aiProviderAdministrationOperationsController.testConnection",
+  "aiPromptTestController.testPrompt",
+  "aiReviewController.reviewActive",
+  "aiReviewController.reviewBatch",
+  "aiTagRepairController.repairActive",
+  "aiTagRepairController.repairBatch",
+  "aiAlternativesController.suggestActive",
+  "aiAlternativesController.suggestBatch",
+  "aiTerminologyApplicationController.applyActive",
+  "aiTerminologyApplicationController.applyBatch",
+  "aiDraftEditingController.polishActive",
+  "aiDraftEditingController.polishBatch",
+  "aiDraftEditingController.adaptActive",
+  "aiDraftEditingController.adaptBatch",
+  "aiTerminologyExtractionController.extractActive",
+  "aiTerminologyExtractionController.extractBatch",
+  "aiProjectBriefController.generate",
+  "aiPretranslationController.pretranslate"
+]) {
+  assertIncludes(appWorkflowDriverJs, `${delegation}(`, `workflow characterization must call ${delegation} directly.`);
+}
+for (const removedFacade of [
+  "async function saveAiSettings",
+  "async function createOpenAiSuggestion",
+  "async function startLmStudioServerAndTestConnection",
+  "async function testLocalAiConnection",
+  "async function refreshLocalAiModels",
+  "async function pullLocalAiModel",
+  "async function testLocalAiPrompt",
+  "async function reviewActiveSegmentWithLocalAi",
+  "async function reviewBatchWithLocalAi",
+  "async function repairActiveSegmentTagsWithLocalAi",
+  "async function repairBatchTagsWithLocalAi",
+  "async function suggestActiveSegmentVariantsWithLocalAi",
+  "async function suggestBatchSegmentVariantsWithLocalAi",
+  "async function applyActiveSegmentTerminologyWithLocalAi",
+  "async function applyBatchTerminologyWithLocalAi",
+  "async function polishActiveSegmentDraftWithLocalAi",
+  "async function polishBatchDraftsWithLocalAi",
+  "async function adaptActiveSegmentDraftWithLocalAi",
+  "async function adaptBatchDraftsWithLocalAi",
+  "async function extractActiveSegmentTermsWithLocalAi",
+  "async function extractBatchTermsWithLocalAi",
+  "async function generateProjectBriefWithLocalAi",
+  "async function pretranslateWithLocalAi",
+  "function localAiReviewScopeSegments",
+  "function localAiReviewSkipReason",
+  "function selectLocalAiReviewSegments"
+]) {
+  assert(!appJs.includes(removedFacade), `${removedFacade} must not return after direct AI dispatch wiring.`);
 }
 assertIncludes(
   appBootstrapJs,
@@ -2816,7 +2880,7 @@ for (const [start, end, delegation] of [
   ],
   [
     "function localAiSurroundingSegmentsForSegment",
-    "async function pretranslateWithLocalAi",
+    "async function splitCurrentSegment",
     "return aiSegmentContextService.surroundingSegmentsForSegment(segment, options)"
   ]
 ]) {
@@ -3442,33 +3506,8 @@ for (const boundary of [
 }
 assertIncludes(
   appJs,
-  "return aiPretranslationController.pretranslate()",
-  "app.js must retain only the checked AI-pretranslation compatibility facade."
-);
-assertIncludes(
-  appJs,
   "  aiPretranslationController,",
   "the shared AI cancel order must register pretranslation first."
-);
-const aiPretranslationFacade = functionBody(
-  appJs,
-  "async function pretranslateWithLocalAi",
-  "async function splitCurrentSegment"
-);
-assert(
-  !aiPretranslationFacade.includes("persistLocalAiSettings(") &&
-    !aiPretranslationFacade.includes("localAiRuntimeConfig(") &&
-    !aiPretranslationFacade.includes("confirmExternalAiPromptShare(") &&
-    !aiPretranslationFacade.includes("flushPendingSegmentSaves(") &&
-    !aiPretranslationFacade.includes("preTranslationService.selectSegments(") &&
-    !aiPretranslationFacade.includes("preTranslationService.pretranslateSegments(") &&
-    !aiPretranslationFacade.includes("createAiPretranslationCommand(") &&
-    !aiPretranslationFacade.includes("saveSegments(") &&
-    !aiPretranslationFacade.includes("logProjectActivity(") &&
-    !aiPretranslationFacade.includes("renderAll(") &&
-    !aiPretranslationFacade.includes("Reflect.ownKeys") &&
-    !aiPretranslationFacade.includes("state.localAi"),
-  "app.js must not regain AI-pretranslation validation, consent, lifecycle, provider, mutation, command, persistence, activity, presentation, or rollback orchestration."
 );
 for (const testName of [
   "AI pretranslation validates runtime/provider and preserves external and overwrite consent boundaries",
@@ -3518,43 +3557,7 @@ for (const boundary of [
 ]) {
   assertIncludes(aiReviewControllerJs, boundary, `AiReviewController must retain checked ${boundary} orchestration.`);
 }
-assertIncludes(
-  appJs,
-  "return aiReviewController.reviewActive()",
-  "app.js must retain only the checked active AI-review compatibility facade."
-);
-assertIncludes(
-  appJs,
-  "return aiReviewController.reviewBatch()",
-  "app.js must retain only the checked batch AI-review compatibility facade."
-);
 assertIncludes(appJs, "  aiReviewController,", "the shared AI cancel order must register AI review.");
-const activeAiReviewFacade = functionBody(
-  appJs,
-  "async function reviewActiveSegmentWithLocalAi",
-  "function localAiReviewScopeSegments"
-);
-const batchAiReviewFacade = functionBody(
-  appJs,
-  "async function reviewBatchWithLocalAi",
-  "async function repairActiveSegmentTagsWithLocalAi"
-);
-for (const facade of [activeAiReviewFacade, batchAiReviewFacade]) {
-  assert(
-    !facade.includes("persistLocalAiSettings(") &&
-      !facade.includes("localAiRuntimeConfig(") &&
-      !facade.includes("confirmExternalAiPromptShare(") &&
-      !facade.includes("findTerms(") &&
-      !facade.includes("aiCommandService.reviewSegment(") &&
-      !facade.includes("saveSegment(") &&
-      !facade.includes("saveSegments(") &&
-      !facade.includes("logProjectActivity(") &&
-      !facade.includes("renderLocalAiOutput(") &&
-      !facade.includes("Reflect.ownKeys") &&
-      !facade.includes("state.localAi"),
-    "app.js must not regain AI-review validation, consent, lifecycle, selection, provider, mutation, persistence, activity, presentation, or recovery orchestration."
-  );
-}
 for (const testName of [
   "AI review active validation preserves busy, source, target, provider, and external-consent safeguards",
   "active AI review owns glossary routing, normalized risk comments, persistence, activity, and presentation",
@@ -3600,44 +3603,7 @@ for (const boundary of [
     `AiTagRepairController must retain checked ${boundary} orchestration.`
   );
 }
-assertIncludes(
-  appJs,
-  "return aiTagRepairController.repairActive()",
-  "app.js must retain only the checked active AI-tag-repair compatibility facade."
-);
-assertIncludes(
-  appJs,
-  "return aiTagRepairController.repairBatch()",
-  "app.js must retain only the checked batch AI-tag-repair compatibility facade."
-);
 assertIncludes(appJs, "  aiTagRepairController,", "the shared AI cancel order must register tag repair.");
-const activeAiTagRepairFacade = functionBody(
-  appJs,
-  "async function repairActiveSegmentTagsWithLocalAi",
-  "async function repairBatchTagsWithLocalAi"
-);
-const batchAiTagRepairFacade = functionBody(
-  appJs,
-  "async function repairBatchTagsWithLocalAi",
-  "async function suggestActiveSegmentVariantsWithLocalAi"
-);
-for (const facade of [activeAiTagRepairFacade, batchAiTagRepairFacade]) {
-  assert(
-    !facade.includes("persistLocalAiSettings(") &&
-      !facade.includes("localAiRuntimeConfig(") &&
-      !facade.includes("confirmExternalAiPromptShare(") &&
-      !facade.includes("segmentTags(") &&
-      !facade.includes("missingTags(") &&
-      !facade.includes("aiCommandService.repairSegmentTags(") &&
-      !facade.includes("appendAiSuggestion(") &&
-      !facade.includes("saveSegments(") &&
-      !facade.includes("logProjectActivity(") &&
-      !facade.includes("renderLocalAiOutput(") &&
-      !facade.includes("Reflect.ownKeys") &&
-      !facade.includes("state.localAi"),
-    "app.js must not regain AI-tag-repair validation, consent, lifecycle, selection, provider, suggestion, persistence, activity, presentation, or recovery orchestration."
-  );
-}
 for (const testName of [
   "active AI tag repair preserves busy, source, target, provider, and external-consent safeguards",
   "active AI tag repair routes protected tokens and saves a non-overwriting review suggestion",
@@ -3685,45 +3651,7 @@ for (const boundary of [
     `AiAlternativesController must retain checked ${boundary} orchestration.`
   );
 }
-assertIncludes(
-  appJs,
-  "return aiAlternativesController.suggestActive()",
-  "app.js must retain only the checked active AI-alternatives compatibility facade."
-);
-assertIncludes(
-  appJs,
-  "return aiAlternativesController.suggestBatch()",
-  "app.js must retain only the checked batch AI-alternatives compatibility facade."
-);
 assertIncludes(appJs, "  aiAlternativesController,", "the shared AI cancel order must register alternatives.");
-const activeAiAlternativesFacade = functionBody(
-  appJs,
-  "async function suggestActiveSegmentVariantsWithLocalAi",
-  "async function suggestBatchSegmentVariantsWithLocalAi"
-);
-const batchAiAlternativesFacade = functionBody(
-  appJs,
-  "async function suggestBatchSegmentVariantsWithLocalAi",
-  "async function applyActiveSegmentTerminologyWithLocalAi"
-);
-for (const facade of [activeAiAlternativesFacade, batchAiAlternativesFacade]) {
-  assert(
-    !facade.includes("persistLocalAiSettings(") &&
-      !facade.includes("localAiRuntimeConfig(") &&
-      !facade.includes("confirmExternalAiPromptShare(") &&
-      !facade.includes("localAiGlossaryTermsForSegment(") &&
-      !facade.includes("segmentTags(") &&
-      !facade.includes("aiCommandService.suggestSegmentVariants(") &&
-      !facade.includes("savedAiSuggestionRecord(") &&
-      !facade.includes("saveSegment(") &&
-      !facade.includes("saveSegments(") &&
-      !facade.includes("logProjectActivity(") &&
-      !facade.includes("renderLocalAiOutput(") &&
-      !facade.includes("Reflect.ownKeys") &&
-      !facade.includes("state.localAi"),
-    "app.js must not regain AI-alternatives validation, consent, lifecycle, selection, context, provider, suggestion, persistence, activity, presentation, or recovery orchestration."
-  );
-}
 for (const testName of [
   "active AI alternatives preserve busy, source, provider, and external-consent safeguards",
   "active AI alternatives route glossary and protected tokens, filter current duplicates, and save multiple review suggestions",
@@ -3775,47 +3703,9 @@ for (const boundary of [
 }
 assertIncludes(
   appJs,
-  "return aiTerminologyApplicationController.applyActive()",
-  "app.js must retain only the checked active AI-terminology compatibility facade."
-);
-assertIncludes(
-  appJs,
-  "return aiTerminologyApplicationController.applyBatch()",
-  "app.js must retain only the checked batch AI-terminology compatibility facade."
-);
-assertIncludes(
-  appJs,
   "  aiTerminologyApplicationController,",
   "the shared AI cancel order must register terminology application."
 );
-const activeAiTerminologyApplicationFacade = functionBody(
-  appJs,
-  "async function applyActiveSegmentTerminologyWithLocalAi",
-  "async function applyBatchTerminologyWithLocalAi"
-);
-const batchAiTerminologyApplicationFacade = functionBody(
-  appJs,
-  "async function applyBatchTerminologyWithLocalAi",
-  "async function polishActiveSegmentDraftWithLocalAi"
-);
-for (const facade of [activeAiTerminologyApplicationFacade, batchAiTerminologyApplicationFacade]) {
-  assert(
-    !facade.includes("persistLocalAiSettings(") &&
-      !facade.includes("localAiRuntimeConfig(") &&
-      !facade.includes("confirmExternalAiPromptShare(") &&
-      !facade.includes("localAiGlossaryTermsForSegment(") &&
-      !facade.includes("segmentTags(") &&
-      !facade.includes("aiCommandService.applyTerminology(") &&
-      !facade.includes("appendAiSuggestion(") &&
-      !facade.includes("savedAiSuggestionRecord(") &&
-      !facade.includes("saveSegments(") &&
-      !facade.includes("logProjectActivity(") &&
-      !facade.includes("renderLocalAiOutput(") &&
-      !facade.includes("Reflect.ownKeys") &&
-      !facade.includes("state.localAi"),
-    "app.js must not regain AI-terminology validation, consent, lifecycle, selection, context, provider, suggestion, persistence, activity, presentation, or recovery orchestration."
-  );
-}
 for (const testName of [
   "active AI terminology application preserves busy, source, target, provider, and consent safeguards",
   "active AI terminology application stops cleanly when no matching termbase hints exist",
@@ -3862,48 +3752,6 @@ for (const boundary of [
     aiDraftEditingControllerJs,
     boundary,
     `AiDraftEditingController must retain checked ${boundary} orchestration.`
-  );
-}
-for (const facade of [
-  [
-    "async function polishActiveSegmentDraftWithLocalAi",
-    "async function adaptActiveSegmentDraftWithLocalAi",
-    "return aiDraftEditingController.polishActive()"
-  ],
-  [
-    "async function adaptActiveSegmentDraftWithLocalAi",
-    "async function adaptBatchDraftsWithLocalAi",
-    "return aiDraftEditingController.adaptActive()"
-  ],
-  [
-    "async function adaptBatchDraftsWithLocalAi",
-    "async function polishBatchDraftsWithLocalAi",
-    "return aiDraftEditingController.adaptBatch()"
-  ],
-  [
-    "async function polishBatchDraftsWithLocalAi",
-    "async function extractActiveSegmentTermsWithLocalAi",
-    "return aiDraftEditingController.polishBatch()"
-  ]
-]) {
-  const body = functionBody(appJs, facade[0], facade[1]);
-  assertIncludes(body, facade[2], `${facade[0]} must delegate to the checked draft-editing controller.`);
-  assert(
-    !body.includes("persistLocalAiSettings(") &&
-      !body.includes("localAiRuntimeConfig(") &&
-      !body.includes("confirmExternalAiPromptShare(") &&
-      !body.includes("localAiGlossaryTermsForSegment(") &&
-      !body.includes("localAiTmMatchesForSegment(") &&
-      !body.includes("segmentTags(") &&
-      !body.includes("aiCommandService.polishSegmentStyle(") &&
-      !body.includes("aiCommandService.adaptSegmentDraft(") &&
-      !body.includes("appendAiSuggestion(") &&
-      !body.includes("saveSegments(") &&
-      !body.includes("logProjectActivity(") &&
-      !body.includes("renderLocalAiOutput(") &&
-      !body.includes("Reflect.ownKeys") &&
-      !body.includes("state.localAi"),
-    "app.js must not regain AI-draft-editing validation, consent, lifecycle, selection, context, provider, suggestion, persistence, activity, presentation, or recovery orchestration."
   );
 }
 assertIncludes(appJs, "  aiDraftEditingController,", "the shared AI cancel order must register draft editing.");
@@ -4006,45 +3854,9 @@ for (const boundary of [
 }
 assertIncludes(
   appJs,
-  "return aiTerminologyExtractionController.extractActive()",
-  "app.js must retain only the checked active AI-terminology-extraction compatibility facade."
-);
-assertIncludes(
-  appJs,
-  "return aiTerminologyExtractionController.extractBatch()",
-  "app.js must retain only the checked batch AI-terminology-extraction compatibility facade."
-);
-assertIncludes(
-  appJs,
   "  aiTerminologyExtractionController",
   "the shared AI cancel order must register terminology extraction last."
 );
-const activeAiTerminologyExtractionFacade = functionBody(
-  appJs,
-  "async function extractActiveSegmentTermsWithLocalAi",
-  "async function extractBatchTermsWithLocalAi"
-);
-const batchAiTerminologyExtractionFacade = functionBody(
-  appJs,
-  "async function extractBatchTermsWithLocalAi",
-  "async function generateProjectBriefWithLocalAi"
-);
-for (const facade of [activeAiTerminologyExtractionFacade, batchAiTerminologyExtractionFacade]) {
-  assert(
-    !facade.includes("persistLocalAiSettings(") &&
-      !facade.includes("localAiRuntimeConfig(") &&
-      !facade.includes("confirmExternalAiPromptShare(") &&
-      !facade.includes("localAiTerminologySegments(") &&
-      !facade.includes("saveAiTermCandidates(") &&
-      !facade.includes("aiCommandService.extractSegmentTerms(") &&
-      !facade.includes("logProjectActivity(") &&
-      !facade.includes("refreshProjectTerms(") &&
-      !facade.includes("refreshTerms(") &&
-      !facade.includes("renderLocalAiOutput(") &&
-      !facade.includes("state.localAi"),
-    "app.js must not regain AI-terminology-extraction validation, consent, lifecycle, selection, provider, term persistence, activity, presentation, status, or recovery orchestration."
-  );
-}
 for (const testName of [
   "active AI terminology extraction preserves busy, source, provider, and external-consent safeguards",
   "active AI terminology extraction routes provider output through injected deduplication and storage",
@@ -4091,30 +3903,6 @@ for (const boundary of [
     `AiProjectBriefController must retain checked ${boundary} orchestration.`
   );
 }
-assertIncludes(
-  appJs,
-  "return aiProjectBriefController.generate()",
-  "app.js must retain only the checked AI-project-brief compatibility facade."
-);
-const aiProjectBriefFacade = functionBody(
-  appJs,
-  "async function generateProjectBriefWithLocalAi",
-  "async function localAiGlossaryTermsForSegment"
-);
-assert(
-  !aiProjectBriefFacade.includes("persistLocalAiSettings(") &&
-    !aiProjectBriefFacade.includes("localAiRuntimeConfig(") &&
-    !aiProjectBriefFacade.includes("confirmExternalAiPromptShare(") &&
-    !aiProjectBriefFacade.includes("projectBriefSampleSegments(") &&
-    !aiProjectBriefFacade.includes("projectDocuments(") &&
-    !aiProjectBriefFacade.includes("listTerms(") &&
-    !aiProjectBriefFacade.includes("aiCommandService.generateProjectBrief(") &&
-    !aiProjectBriefFacade.includes("updateProject(") &&
-    !aiProjectBriefFacade.includes("logProjectActivity(") &&
-    !aiProjectBriefFacade.includes("renderLocalAiOutput(") &&
-    !aiProjectBriefFacade.includes("state.localAi"),
-  "app.js must not regain AI-project-brief validation, consent, lifecycle, context, provider, mutation, persistence, activity, presentation, status, or recovery orchestration."
-);
 for (const testName of [
   "AI project brief preserves project, busy, runtime, provider, and external-consent safeguards",
   "AI project brief routes bounded context and appends normalized style instructions",
@@ -4166,7 +3954,7 @@ assertIncludes(
 const aiSuggestionApplicationFacade = functionBody(
   appJs,
   "async function applyAiSuggestion",
-  "async function createOpenAiSuggestion"
+  "function currentLocalAiProvider"
 );
 assert(
   !aiSuggestionApplicationFacade.includes("flushPendingSegmentSaves(") &&
@@ -4229,33 +4017,6 @@ for (const boundary of [
     `AiOpenAiSuggestionController must retain checked ${boundary} orchestration.`
   );
 }
-assertIncludes(
-  appJs,
-  "return aiOpenAiSuggestionController.create()",
-  "app.js must retain only the checked direct-OpenAI-suggestion compatibility facade."
-);
-const aiOpenAiSuggestionFacade = functionBody(
-  appJs,
-  "async function createOpenAiSuggestion",
-  "function currentLocalAiProvider"
-);
-assert(
-  !aiOpenAiSuggestionFacade.includes("readGlobalForm(") &&
-    !aiOpenAiSuggestionFacade.includes("readSecrets(") &&
-    !aiOpenAiSuggestionFacade.includes("defaultAiSettings(") &&
-    !aiOpenAiSuggestionFacade.includes("isOpenAiProvider(") &&
-    !aiOpenAiSuggestionFacade.includes("browserAppearsOffline(") &&
-    !aiOpenAiSuggestionFacade.includes("storedOpenAiKey(") &&
-    !aiOpenAiSuggestionFacade.includes("confirmExternalAiPromptShare(") &&
-    !aiOpenAiSuggestionFacade.includes("updateProject(") &&
-    !aiOpenAiSuggestionFacade.includes("saveOpenAiKey(") &&
-    !aiOpenAiSuggestionFacade.includes("aiContextForSegment(") &&
-    !aiOpenAiSuggestionFacade.includes("openAiSuggestion(") &&
-    !aiOpenAiSuggestionFacade.includes("appendAiSuggestion(") &&
-    !aiOpenAiSuggestionFacade.includes("renderEditor(") &&
-    !aiOpenAiSuggestionFacade.includes("setSaveStatus("),
-  "app.js must not regain direct-OpenAI-suggestion validation, consent, setup, key, context, provider, suggestion-storage-result, presentation, workspace, status, or recovery orchestration."
-);
 for (const testName of [
   "direct OpenAI suggestion preserves project, segment, enabled, sharing, provider, source, offline, and key safeguards",
   "direct OpenAI suggestion discloses optional local context and cancels before setup",
@@ -4381,31 +4142,6 @@ for (const boundary of [
     `AiSettingsPersistenceController must retain checked ${boundary} orchestration.`
   );
 }
-assertIncludes(
-  appJs,
-  "return aiSettingsPersistenceController.save()",
-  "app.js must retain only the checked AI-settings-persistence compatibility facade."
-);
-const aiSettingsPersistenceFacade = functionBody(
-  appJs,
-  "async function saveAiSettings",
-  "async function aiContextForSegment"
-);
-assert(
-  !aiSettingsPersistenceFacade.includes("readGlobalForm(") &&
-    !aiSettingsPersistenceFacade.includes("readSecrets(") &&
-    !aiSettingsPersistenceFacade.includes("localAiSettingsFromForm(") &&
-    !aiSettingsPersistenceFacade.includes("defaultAiSettings(") &&
-    !aiSettingsPersistenceFacade.includes("assertLocalAiEndpointAllowed(") &&
-    !aiSettingsPersistenceFacade.includes("updateProject(") &&
-    !aiSettingsPersistenceFacade.includes("saveOpenAiKey(") &&
-    !aiSettingsPersistenceFacade.includes("saveLocalAiKey(") &&
-    !aiSettingsPersistenceFacade.includes("logProjectActivity(") &&
-    !aiSettingsPersistenceFacade.includes("renderEditor(") &&
-    !aiSettingsPersistenceFacade.includes("markWorkspaceDirty(") &&
-    !aiSettingsPersistenceFacade.includes("setSaveStatus("),
-  "app.js must not regain AI-settings form, normalization, endpoint, snapshot, project/list/key persistence, activity, presentation, workspace, status, or recovery orchestration."
-);
 for (const testName of [
   "AI settings persistence is inert without a selected project",
   "AI settings persistence normalizes forms, saves project and credentials, and logs storage labels",
@@ -6297,59 +6033,59 @@ assertIncludes(
   "localAiLocalCloudPresetBtn",
   "app.js must wire the Ollama local cloud-model quick preset button."
 );
-assertIncludes(appJs, "reviewActiveSegmentWithLocalAi", "app.js must wire the active-segment AI review command.");
+assertIncludes(appJs, "aiReviewController.reviewActive", "app.js must wire the active-segment AI review command.");
 assertIncludes(appJs, "localAiReviewSegmentBtn", "app.js must bind the active-segment AI review button.");
-assertIncludes(appJs, "reviewBatchWithLocalAi", "app.js must wire the batch AI QA command.");
+assertIncludes(appJs, "aiReviewController.reviewBatch", "app.js must wire the batch AI QA command.");
 assertIncludes(appJs, "localAiReviewBatchBtn", "app.js must bind the batch AI QA button.");
 assertIncludes(
   appJs,
-  "repairActiveSegmentTagsWithLocalAi",
+  "aiTagRepairController.repairActive",
   "app.js must wire the active-segment AI tag repair command."
 );
 assertIncludes(appJs, "localAiRepairTagsBtn", "app.js must bind the active-segment AI tag repair button.");
-assertIncludes(appJs, "repairBatchTagsWithLocalAi", "app.js must wire the batch AI tag repair command.");
+assertIncludes(appJs, "aiTagRepairController.repairBatch", "app.js must wire the batch AI tag repair command.");
 assertIncludes(appJs, "localAiRepairTagsBatchBtn", "app.js must bind the batch AI tag repair button.");
 assertIncludes(
   appJs,
-  "polishActiveSegmentDraftWithLocalAi",
+  "aiDraftEditingController.polishActive",
   "app.js must wire the active-segment AI draft polish command."
 );
 assertIncludes(appJs, "localAiPolishDraftBtn", "app.js must bind the active-segment AI draft polish button.");
-assertIncludes(appJs, "polishBatchDraftsWithLocalAi", "app.js must wire the batch AI draft polish command.");
+assertIncludes(appJs, "aiDraftEditingController.polishBatch", "app.js must wire the batch AI draft polish command.");
 assertIncludes(appJs, "localAiPolishBatchBtn", "app.js must bind the batch AI draft polish button.");
 assertIncludes(
   appJs,
-  "adaptActiveSegmentDraftWithLocalAi",
+  "aiDraftEditingController.adaptActive",
   "app.js must wire the active-segment AI draft adaptation command."
 );
 assertIncludes(appJs, "localAiAdaptDraftBtn", "app.js must bind the active-segment AI draft adaptation button.");
-assertIncludes(appJs, "adaptBatchDraftsWithLocalAi", "app.js must wire the batch AI draft adaptation command.");
+assertIncludes(appJs, "aiDraftEditingController.adaptBatch", "app.js must wire the batch AI draft adaptation command.");
 assertIncludes(appJs, "localAiAdaptBatchBtn", "app.js must bind the batch AI draft adaptation button.");
 assertIncludes(appJs, "localAiAdaptModeSelect", "app.js must bind the AI draft adaptation mode selector.");
 assertIncludes(
   appJs,
-  "suggestActiveSegmentVariantsWithLocalAi",
+  "aiAlternativesController.suggestActive",
   "app.js must wire the active-segment AI alternatives command."
 );
 assertIncludes(appJs, "localAiSuggestVariantsBtn", "app.js must bind the active-segment AI alternatives button.");
-assertIncludes(appJs, "suggestBatchSegmentVariantsWithLocalAi", "app.js must wire the batch AI alternatives command.");
+assertIncludes(appJs, "aiAlternativesController.suggestBatch", "app.js must wire the batch AI alternatives command.");
 assertIncludes(appJs, "localAiSuggestVariantsBatchBtn", "app.js must bind the batch AI alternatives button.");
 assertIncludes(appJs, "localAiVariantModeSelect", "app.js must bind the AI alternatives style selector.");
 assertIncludes(
   appJs,
-  "applyActiveSegmentTerminologyWithLocalAi",
+  "aiTerminologyApplicationController.applyActive",
   "app.js must wire the active-segment AI terminology application command."
 );
 assertIncludes(appJs, "localAiApplyTermsBtn", "app.js must bind the active-segment AI terminology application button.");
 assertIncludes(
   appJs,
-  "applyBatchTerminologyWithLocalAi",
+  "aiTerminologyApplicationController.applyBatch",
   "app.js must wire the batch AI terminology application command."
 );
 assertIncludes(appJs, "localAiApplyTermsBatchBtn", "app.js must bind the batch AI terminology application button.");
 assertIncludes(
   appJs,
-  "extractActiveSegmentTermsWithLocalAi",
+  "aiTerminologyExtractionController.extractActive",
   "app.js must wire the active-segment AI terminology extraction command."
 );
 assertIncludes(
@@ -6357,9 +6093,13 @@ assertIncludes(
   "localAiExtractTermsBtn",
   "app.js must bind the active-segment AI terminology extraction button."
 );
-assertIncludes(appJs, "extractBatchTermsWithLocalAi", "app.js must wire the batch AI terminology extraction command.");
+assertIncludes(
+  appJs,
+  "aiTerminologyExtractionController.extractBatch",
+  "app.js must wire the batch AI terminology extraction command."
+);
 assertIncludes(appJs, "localAiExtractTermsBatchBtn", "app.js must bind the batch AI terminology extraction button.");
-assertIncludes(appJs, "generateProjectBriefWithLocalAi", "app.js must wire the AI project brief command.");
+assertIncludes(appJs, "aiProjectBriefController.generate", "app.js must wire the AI project brief command.");
 assertIncludes(appJs, "localAiProjectBriefBtn", "app.js must bind the AI project brief button.");
 assertIncludes(
   appJs,

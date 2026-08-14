@@ -1191,7 +1191,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           model: "workflow-review-model"
         };
       };
-      const aiReviewSaved = await reviewActiveSegmentWithLocalAi();
+      const aiReviewSaved = await aiReviewController.reviewActive();
       const aiReviewStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = "ai-review-risk";
       updateEditorFilters({ aiState: "ai-review-risk" });
@@ -1285,7 +1285,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           model: "workflow-batch-review-model"
         };
       };
-      const batchReviewSummary = await reviewBatchWithLocalAi();
+      const batchReviewSummary = await aiReviewController.reviewBatch();
       const batchReviewStored = await getProjectSegments(project.id);
       const storedIssueSegment = batchReviewStored.find((segment) => segment.id === issueSegment.id);
       const storedFailedSegment = batchReviewStored.find((segment) => segment.id === failedSegment.id);
@@ -1375,7 +1375,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           model: "workflow-repair-model"
         };
       };
-      const aiRepairSaved = await repairActiveSegmentTagsWithLocalAi();
+      const aiRepairSaved = await aiTagRepairController.repairActive();
       const aiRepairStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
       assert(
         aiRepairSaved &&
@@ -1471,7 +1471,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           model: "workflow-batch-repair-model"
         };
       };
-      const aiBatchRepairSummary = await repairBatchTagsWithLocalAi();
+      const aiBatchRepairSummary = await aiTagRepairController.repairBatch();
       const aiBatchRepairStored = await getProjectSegments(project.id);
       const storedRepairedSegment = aiBatchRepairStored.find((segment) => segment.id === repairedSegment.id);
       const storedFailedRepairSegment = aiBatchRepairStored.find((segment) => segment.id === failedSegment.id);
@@ -1600,7 +1600,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           model: "workflow-variants-model"
         };
       };
-      const aiVariantsSaved = await suggestActiveSegmentVariantsWithLocalAi();
+      const aiVariantsSaved = await aiAlternativesController.suggestActive();
       const aiVariantsStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
       assert(
           aiVariantsSaved &&
@@ -1648,7 +1648,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         prepareSegmentHistoryState(currentSegments()[index]);
       });
       if (els.localAiVariantModeSelect) els.localAiVariantModeSelect.value = "concise";
-      const aiBatchVariantsSummary = await suggestBatchSegmentVariantsWithLocalAi();
+      const aiBatchVariantsSummary = await aiAlternativesController.suggestBatch();
       const aiBatchVariantsStored = await getProjectSegments(project.id);
       const aiBatchVariantsSegments = aiBatchVariantsStored.filter((segment) => segment.documentId === aiBatchVariantsDocument.id);
       const failedBatchVariantsSegment = aiBatchVariantsSegments.find((segment) => String(segment.source || "").includes("failure"));
@@ -1756,7 +1756,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           model: "workflow-apply-terms-model"
         };
       };
-      const aiApplyTermsSaved = await applyActiveSegmentTerminologyWithLocalAi();
+      const aiApplyTermsSaved = await aiTerminologyApplicationController.applyActive();
       const aiApplyTermsStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
       assert(
         aiApplyTermsSaved &&
@@ -1878,7 +1878,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           model: "workflow-batch-apply-terms-model"
         };
       };
-      const aiBatchApplyTermsSummary = await applyBatchTerminologyWithLocalAi();
+      const aiBatchApplyTermsSummary = await aiTerminologyApplicationController.applyBatch();
       const aiBatchApplyTermsStored = await getProjectSegments(project.id);
       const storedSuggestedSegment = aiBatchApplyTermsStored.find((segment) => segment.id === suggestedSegment.id);
       const storedFailedSegment = aiBatchApplyTermsStored.find((segment) => segment.id === failedSegment.id);
@@ -2022,7 +2022,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           model: "workflow-polish-model"
         };
       };
-      const aiPolishSaved = await polishActiveSegmentDraftWithLocalAi();
+      const aiPolishSaved = await aiDraftEditingController.polishActive();
       const aiPolishStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
       assert(
         aiPolishSaved &&
@@ -2061,7 +2061,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         Object.assign(currentSegments()[index], savedSegment);
         prepareSegmentHistoryState(currentSegments()[index]);
       });
-      const aiBatchPolishSummary = await polishBatchDraftsWithLocalAi();
+      const aiBatchPolishSummary = await aiDraftEditingController.polishBatch();
       const aiBatchPolishStored = await getProjectSegments(project.id);
       const aiBatchPolishSegments = aiBatchPolishStored.filter((segment) => segment.documentId === aiBatchPolishDocument.id);
       assert(
@@ -2172,7 +2172,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           model: "workflow-adapt-model"
         };
       };
-      const aiAdaptSaved = await adaptActiveSegmentDraftWithLocalAi();
+      const aiAdaptSaved = await aiDraftEditingController.adaptActive();
       const aiAdaptStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
       const aiAdaptStoredProject = (await listProjects()).find((item) => item.id === project.id);
       assert(
@@ -2302,7 +2302,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         };
       };
       if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = "shorten";
-      const aiBatchAdaptSummary = await adaptBatchDraftsWithLocalAi();
+      const aiBatchAdaptSummary = await aiDraftEditingController.adaptBatch();
       const aiBatchAdaptStored = await getProjectSegments(project.id);
       const aiBatchAdaptSegments = aiBatchAdaptStored.filter((segment) => segment.documentId === aiBatchAdaptDocument.id);
       const failedBatchAdaptSegment = aiBatchAdaptSegments.find((segment) => String(segment.source || "").includes("failure"));
@@ -2401,7 +2401,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           model: "workflow-terms-model"
         };
       };
-      const aiTermsSaved = await extractActiveSegmentTermsWithLocalAi();
+      const aiTermsSaved = await aiTerminologyExtractionController.extractActive();
       const aiTermsStored = (await listTerms({ sourceLang: currentProject().sourceLang, targetLang: currentProject().targetLang, termBaseNames: ["Workflow TB"] }))
         .filter((term) => term.sourceTerm.startsWith("workflow ai "));
       aiExtractedTermIds = aiTermsStored.map((term) => term.id);
@@ -2417,7 +2417,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const aiBatchTermsDocument = currentProject().documents.find((item) => item.name === "workflow-ai-batch-terms.html");
       await openProjectFile(aiBatchTermsDocument.id);
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
-      const batchTermsResult = await extractBatchTermsWithLocalAi();
+      const batchTermsResult = await aiTerminologyExtractionController.extractBatch();
       const aiBatchTermsStored = (await listTerms({ sourceLang: currentProject().sourceLang, targetLang: currentProject().targetLang, termBaseNames: ["Workflow TB"] }))
         .filter((term) => term.sourceTerm.startsWith("workflow ai batch source term"));
       aiExtractedTermIds.push(...aiBatchTermsStored.map((term) => term.id));
@@ -2474,7 +2474,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           model: "workflow-brief-model"
         };
       };
-      const aiBriefSaved = await generateProjectBriefWithLocalAi();
+      const aiBriefSaved = await aiProjectBriefController.generate();
       const storedBriefProject = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         aiBriefSaved &&
@@ -2670,7 +2670,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.aiEnabledInput.checked = true;
       els.aiSendSourceInput.checked = true;
       setHiddenSegmentField(currentProject(), AI_SETTINGS_SAVE_FAILURE_TEST_FLAG, true);
-      const failedAiSettingsSave = await saveAiSettings();
+      const failedAiSettingsSave = await aiSettingsPersistenceController.save();
       assert(
         !failedAiSettingsSave &&
           els.saveStatus.textContent.includes("Simulated AI settings save failure") &&
@@ -2681,7 +2681,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       Reflect.deleteProperty(currentProject(), AI_SETTINGS_SAVE_FAILURE_TEST_FLAG);
       localStorage.setItem(OPENAI_KEY_STORAGE, "sk-existing-openai-key");
       setHiddenSegmentField(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG, true);
-      const failedOpenAiKeyStorageSave = await saveAiSettings();
+      const failedOpenAiKeyStorageSave = await aiSettingsPersistenceController.save();
       const storedProjectAfterKeyStorageFailure = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         !failedOpenAiKeyStorageSave &&
@@ -2699,7 +2699,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         return originalStorageSetItem.call(this, key, value);
       };
       els.openAiApiKeyInput.value = "sk-browser-storage-failure";
-      const failedBrowserOpenAiKeyStorageSave = await saveAiSettings();
+      const failedBrowserOpenAiKeyStorageSave = await aiSettingsPersistenceController.save();
       const storedProjectAfterBrowserKeyFailure = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         !failedBrowserOpenAiKeyStorageSave &&
@@ -2711,7 +2711,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       Storage.prototype.setItem = originalStorageSetItem;
       els.openAiApiKeyInput.value = "sk-blocked-openai-key";
-      const successfulAiSettingsSave = await saveAiSettings();
+      const successfulAiSettingsSave = await aiSettingsPersistenceController.save();
       assert(
         successfulAiSettingsSave &&
           storedOpenAiKey() === "sk-blocked-openai-key" &&
@@ -2720,7 +2720,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       els.openAiApiKeyInput.value = "";
       els.aiModelInput.value = "test-model-key-preserved";
-      const preservedKeySettingsSave = await saveAiSettings();
+      const preservedKeySettingsSave = await aiSettingsPersistenceController.save();
       assert(
         preservedKeySettingsSave &&
           storedOpenAiKey() === "sk-blocked-openai-key" &&
@@ -2730,7 +2730,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.aiProviderInput.value = "Bearer workflow-ai-provider-token-that-must-redact";
       els.aiModelInput.value = "Bearer workflow-ai-model-token-that-must-redact";
       els.openAiApiKeyInput.value = "sk-ai-provider-model-redaction-key-that-must-not-store";
-      const redactedAiSettingsMetadataSave = await saveAiSettings();
+      const redactedAiSettingsMetadataSave = await aiSettingsPersistenceController.save();
       const redactedAiSettingsMetadataActivity = currentActivityEvents().find(
         (event) =>
           event.type === "ai-settings" &&
@@ -2754,7 +2754,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.aiProviderInput.value = "Anthropic";
       els.aiModelInput.value = "test-model-non-openai-provider";
       els.openAiApiKeyInput.value = "sk-non-openai-provider-should-not-store";
-      const nonOpenAiProviderSettingsSave = await saveAiSettings();
+      const nonOpenAiProviderSettingsSave = await aiSettingsPersistenceController.save();
       const nonOpenAiProviderSettingsActivity = currentActivityEvents().find(
         (event) =>
           event.type === "ai-settings" &&
@@ -2794,7 +2794,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.aiModelInput.value = "test-model-activity-warning";
       els.openAiApiKeyInput.value = "sk-ai-settings-activity-warning-key";
       setHiddenSegmentField(currentProject(), AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG, true);
-      const aiSettingsActivityWarning = await saveAiSettings();
+      const aiSettingsActivityWarning = await aiSettingsPersistenceController.save();
       const storedProjectAfterAiSettingsActivityWarning = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         aiSettingsActivityWarning &&
@@ -2810,15 +2810,15 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       localStorage.removeItem(OPENAI_KEY_STORAGE);
       els.aiEnabledInput.checked = false;
       els.aiSendSourceInput.checked = true;
-      await createOpenAiSuggestion();
+      await aiOpenAiSuggestionController.create();
       assert(!storedOpenAiKey() && els.saveStatus.textContent.includes("Enable AI helpers"), "blocked OpenAI suggestion does not save typed key when AI helpers are disabled");
       els.aiEnabledInput.checked = true;
       els.aiSendSourceInput.checked = false;
-      await createOpenAiSuggestion();
+      await aiOpenAiSuggestionController.create();
       assert(!storedOpenAiKey() && els.saveStatus.textContent.includes("source sharing"), "blocked OpenAI suggestion does not save typed key when source sharing is disabled");
       els.aiSendSourceInput.checked = true;
       els.aiProviderInput.value = "Anthropic";
-      await createOpenAiSuggestion();
+      await aiOpenAiSuggestionController.create();
       assert(!storedOpenAiKey() && els.saveStatus.textContent.includes("Choose OpenAI"), "blocked OpenAI suggestion does not save typed key when a different provider is selected");
       els.aiProviderInput.value = "OpenAI";
       els.aiModelInput.value = "model-empty-source-must-not-save";
@@ -2829,7 +2829,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const sourceBeforeEmptySourceOpenAi = currentSegments()[segmentIndex].source;
       currentSegments()[segmentIndex].source = "";
       try {
-        await createOpenAiSuggestion();
+        await aiOpenAiSuggestionController.create();
       } finally {
         currentSegments()[segmentIndex].source = sourceBeforeEmptySourceOpenAi;
       }
@@ -2850,7 +2850,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const navigatorOnlineDescriptorForNoKey = Object.getOwnPropertyDescriptor(navigator, "onLine");
       try {
         Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
-        await createOpenAiSuggestion();
+        await aiOpenAiSuggestionController.create();
       } finally {
         if (navigatorOnlineDescriptorForNoKey) Object.defineProperty(navigator, "onLine", navigatorOnlineDescriptorForNoKey);
         else Reflect.deleteProperty(navigator, "onLine");
@@ -2873,7 +2873,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const navigatorOnlineDescriptor = Object.getOwnPropertyDescriptor(navigator, "onLine");
       try {
         Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
-        await createOpenAiSuggestion();
+        await aiOpenAiSuggestionController.create();
       } finally {
         if (navigatorOnlineDescriptor) Object.defineProperty(navigator, "onLine", navigatorOnlineDescriptor);
         else Reflect.deleteProperty(navigator, "onLine");
@@ -2897,7 +2897,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         openAiConfirms.push(message);
         return false;
       };
-      await createOpenAiSuggestion();
+      await aiOpenAiSuggestionController.create();
       const storedProjectAfterOpenAiCancel = (await listProjects()).find((item) => item.id === currentProject().id);
       const canceledOpenAiConfirm = openAiConfirms.find((message) => message.includes("OpenAI") && message.includes("outside LoopCAT"));
       assert(
@@ -2919,7 +2919,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.openAiApiKeyInput.value = "sk-openai-setup-failure-key";
       els.rememberOpenAiKeyInput.checked = true;
       setHiddenSegmentField(currentProject(), AI_SETTINGS_SAVE_FAILURE_TEST_FLAG, true);
-      await createOpenAiSuggestion();
+      await aiOpenAiSuggestionController.create();
       assert(
         !storedOpenAiKey() &&
           els.saveStatus.textContent.includes("Simulated AI settings save failure") &&
@@ -2933,7 +2933,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.openAiApiKeyInput.value = "sk-openai-key-storage-failure";
       els.rememberOpenAiKeyInput.checked = true;
       setHiddenSegmentField(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG, true);
-      await createOpenAiSuggestion();
+      await aiOpenAiSuggestionController.create();
       const storedProjectAfterOpenAiKeyFailure = (await listProjects()).find((item) => item.id === currentProject().id);
       assert(
         storedOpenAiKey() === "sk-existing-openai-key" &&
@@ -2960,7 +2960,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       window.fetch = async () => {
         throw new TypeError("Simulated OpenAI provider connection failure");
       };
-      await createOpenAiSuggestion();
+      await aiOpenAiSuggestionController.create();
       window.fetch = originalFetch;
       const storedProjectAfterOpenAiConnectionFailure = (await listProjects()).find((item) => item.id === currentProject().id);
       const storedSegmentAfterOpenAiConnectionFailure = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
@@ -3356,7 +3356,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       };
       if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "review";
       aiPromptPreviewController.render();
-      const promptModeTested = await testLocalAiPrompt();
+      const promptModeTested = await aiPromptTestController.testPrompt();
       await Promise.resolve();
       assert(
         els.localAiPromptModeSelect?.querySelector('option[value="project-brief"]') &&
@@ -3395,7 +3395,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         };
       };
       const localAiPretranslationBefore = targetCommandPatch(currentSegments()[localAiGlossarySegmentIndex]);
-      const localAiPretranslationCommand = await pretranslateWithLocalAi();
+      const localAiPretranslationCommand = await aiPretranslationController.pretranslate();
       let localAiGlossarySegment = currentSegments().find(
         (segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource
       );
@@ -3486,7 +3486,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           model: config.model || "workflow-glossary-pretranslate-model"
         };
       };
-      const canceledLocalAiPretranslation = await pretranslateWithLocalAi();
+      const canceledLocalAiPretranslation = await aiPretranslationController.pretranslate();
       const storedAfterMidBatchCancellation = (await getProjectSegments(project.id)).find(
         (segment) => segment.id === localAiGlossarySegment.id
       );
@@ -3562,7 +3562,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           localAiCloudConfirmMessages.push(message);
           return false;
         };
-        await pretranslateWithLocalAi();
+        await aiPretranslationController.pretranslate();
         const storedAfterLocalAiCloudCancel = (await getProjectSegments(project.id)).find((segment) => segment.id === localAiGlossarySegment.id);
         assert(
           localAiCloudConfirmMessages.some((message) => message.includes("Ollama") && message.includes("outside LoopCAT")) &&
@@ -3576,7 +3576,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           localAiCloudConfirmMessages.push(message);
           return true;
         };
-        await pretranslateWithLocalAi();
+        await aiPretranslationController.pretranslate();
         const storedAfterLocalAiCloudAccept = (await getProjectSegments(project.id)).find((segment) => segment.id === localAiGlossarySegment.id);
         assert(
           localAiCloudProviderCalls === 1 &&
@@ -3628,7 +3628,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           localAiHostedConfirmMessages.push(message);
           return false;
         };
-        await pretranslateWithLocalAi();
+        await aiPretranslationController.pretranslate();
         const storedAfterHostedOllamaCancel = (await getProjectSegments(project.id)).find((segment) => segment.id === hostedOllamaSegment.id);
         assert(
           localAiHostedConfirmMessages.some((message) => message.includes("Ollama") && message.includes("outside LoopCAT")) &&
@@ -3642,7 +3642,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           localAiHostedConfirmMessages.push(message);
           return true;
         };
-        await pretranslateWithLocalAi();
+        await aiPretranslationController.pretranslate();
         const storedAfterHostedOllamaAccept = (await getProjectSegments(project.id)).find((segment) => segment.id === hostedOllamaSegment.id);
         assert(localAiHostedProviderCalls === 1, "Direct hosted Ollama pretranslation calls the provider once after confirmation");
         assert(localAiHostedConfig?.apiKey === "workflow-hosted-ollama-key", "Direct hosted Ollama pretranslation passes the hosted API key");
@@ -3730,7 +3730,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiModelInput) els.localAiModelInput.value = "unsupported-compatible-model";
       if (els.localAiApiKeyInput) els.localAiApiKeyInput.value = "unsupported-compatible-key-that-must-not-save";
       if (els.rememberLocalAiKeyInput) els.rememberLocalAiKeyInput.checked = true;
-      await testLocalAiConnection();
+      await aiProviderAdministrationOperationsController.testConnection();
       assert(
         els.saveStatus.textContent.includes("explicit provider allowlist") &&
           els.localAiStatusText.textContent.includes("explicit provider allowlist") &&
