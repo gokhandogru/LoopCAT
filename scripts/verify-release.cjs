@@ -205,6 +205,7 @@ const requiredReleaseFiles = [
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
   "src/features/projects/project-resource-selection-controller.js",
+  "src/features/projects/project-language-pair-shortcuts-controller.js",
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-decision-controller.js",
   "src/features/quality/quality-review-controller.js",
@@ -263,6 +264,7 @@ const requiredReleaseFiles = [
   "tests/unit/perplexity-provider-adapter.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/project-resource-selection-controller.test.cjs",
+  "tests/unit/project-language-pair-shortcuts-controller.test.cjs",
   "tests/unit/quality-profile-controller.test.cjs",
   "tests/unit/quality-decision-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
@@ -390,6 +392,12 @@ const projectResourceSelectionControllerJs = readText(
 );
 const projectResourceSelectionControllerUnitTests = readText(
   "tests/unit/project-resource-selection-controller.test.cjs"
+);
+const projectLanguagePairShortcutsControllerJs = readText(
+  "src/features/projects/project-language-pair-shortcuts-controller.js"
+);
+const projectLanguagePairShortcutsControllerUnitTests = readText(
+  "tests/unit/project-language-pair-shortcuts-controller.test.cjs"
 );
 const opusCatHelpControllerJs = readText("src/features/ai/opus-cat-help-controller.js");
 const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-pretranslation-dialog-controller.js");
@@ -635,6 +643,16 @@ assertIncludes(
   appBootstrapJs,
   "createProjectResourceSelectionController,",
   "The application runtime must expose the checked project resource-selection factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectLanguagePairShortcutsController } from "../features/projects/project-language-pair-shortcuts-controller.js";',
+  "The application runtime must install the checked project language-pair shortcuts controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectLanguagePairShortcutsController,",
+  "The application runtime must expose the checked project language-pair shortcuts factory."
 );
 assertIncludes(
   appBootstrapJs,
@@ -1421,6 +1439,76 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/projects/project-resource-selection-controller.js"',
   "source-catalog extraction must scan the checked project resource-selection controller."
+);
+for (const snippet of [
+  "function recent(limit = 4)",
+  "return [...getProjects()]",
+  ".sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime())",
+  ".map((project) => [normalizeLanguage(project.sourceLang), normalizeLanguage(project.targetLang)])",
+  ".filter(([source, target]) => source && target)",
+  "candidateSource === source && candidateTarget === target",
+  ".slice(0, limit)",
+  "if (!root) return",
+  "const pairs = [...recent(), ...defaultPairs]",
+  ".slice(0, 6)",
+  "const current = getCurrentValues()",
+  'const active = source === current.sourceLang && target === current.targetLang',
+  'data-source-lang="${escapeHtml(source)}"',
+  'data-target-lang="${escapeHtml(target)}"',
+  "escapeHtml(languagePairDisplay(source, target))",
+  "return Object.freeze({ recent, render })"
+]) {
+  assertIncludes(
+    projectLanguagePairShortcutsControllerJs,
+    snippet,
+    `ProjectLanguagePairShortcutsController must retain characterized shortcut policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createProjectLanguagePairShortcutsController({",
+  "app.js must compose the checked project language-pair shortcuts controller."
+);
+for (const boundary of [
+  "root: els.frequentLanguagePairs",
+  "getProjects: () => editorSessionStore.getProjects()",
+  "getCurrentValues: projectResourceSelectionController.values",
+  "normalizeLanguage: normalizeLanguageInputValue",
+  "defaultPairs: DEFAULT_LANGUAGE_PAIRS",
+  "languagePairDisplay",
+  "escapeHtml",
+  "replaceSafeHtml"
+]) {
+  assertIncludes(appJs, boundary, `project language-pair shortcut composition must inject the ${boundary} boundary.`);
+}
+assertIncludes(
+  appJs,
+  "renderFrequentPairs: projectLanguagePairShortcutsController.render",
+  "ProjectDialogController must call the checked language-pair shortcut renderer directly."
+);
+for (const removedHelper of ["recentLanguagePairs", "renderFrequentLanguagePairs"]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} project language-pair shortcut helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "ProjectLanguagePairShortcutsController preserves recent ordering, normalization, deduplication, and bounds",
+  "ProjectLanguagePairShortcutsController preserves recent-first defaults, six-pair bound, active state, and safe markup",
+  "ProjectLanguagePairShortcutsController preserves absent-root behavior without reading project or selection state",
+  "ProjectLanguagePairShortcutsController validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectLanguagePairShortcutsControllerUnitTests,
+    testName,
+    `focused project language-pair shortcut tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/project-language-pair-shortcuts-controller.js"',
+  "source-catalog extraction must scan the checked project language-pair shortcuts controller."
 );
 for (const snippet of [
   'renderDashboard("tm", resourceState)',
@@ -11334,9 +11422,9 @@ assertIncludes(
   "app.js must normalize friendly language labels back to stored resource/project codes."
 );
 assertIncludes(
-  appJs,
-  "function renderFrequentLanguagePairs",
-  "app.js must render recent and common project language-pair shortcuts."
+  projectLanguagePairShortcutsControllerJs,
+  "function render()",
+  "ProjectLanguagePairShortcutsController must render recent and common project language-pair shortcuts."
 );
 assertIncludes(
   appJs,

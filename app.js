@@ -3189,6 +3189,17 @@ const projectResourceSelectionController =
     names: { unique: uniqueNames, clean: cleanProjectText },
     makeId
   });
+const projectLanguagePairShortcutsController =
+  appRuntime.featureFactories.createProjectLanguagePairShortcutsController({
+    root: els.frequentLanguagePairs,
+    getProjects: () => editorSessionStore.getProjects(),
+    getCurrentValues: projectResourceSelectionController.values,
+    normalizeLanguage: normalizeLanguageInputValue,
+    defaultPairs: DEFAULT_LANGUAGE_PAIRS,
+    languagePairDisplay,
+    escapeHtml,
+    replaceSafeHtml
+  });
 const projectDialogController = appRuntime?.featureFactories?.createProjectDialogController?.({
   dialogLifecycle: dialogLifecycleController,
   elements: {
@@ -3229,7 +3240,7 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
   normalizeLanguageValue: normalizeLanguageInputElement,
   renderStorageStatus: renderProjectStorageStatus,
   renderResourcePickers: projectResourceSelectionController.render,
-  renderFrequentPairs: renderFrequentLanguagePairs,
+  renderFrequentPairs: projectLanguagePairShortcutsController.render,
   save: saveProjectFromDialog,
   chooseWorkspace: chooseWorkspaceFolder,
   workspaceSupported: () => Boolean(workspaceStorage?.isSupported()),
@@ -5119,27 +5130,6 @@ function selectedTextEncoding() {
 
 function textDecodingOptions() {
   return { encoding: selectedTextEncoding() };
-}
-
-function recentLanguagePairs(limit = 4) {
-  return [...editorSessionStore.getProjects()]
-    .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
-    .map((project) => [normalizeLanguageInputValue(project.sourceLang), normalizeLanguageInputValue(project.targetLang)])
-    .filter(([source, target]) => source && target)
-    .filter(([source, target], index, pairs) => pairs.findIndex(([a, b]) => a === source && b === target) === index)
-    .slice(0, limit);
-}
-
-function renderFrequentLanguagePairs() {
-  if (!els.frequentLanguagePairs) return;
-  const pairs = [...recentLanguagePairs(), ...DEFAULT_LANGUAGE_PAIRS]
-    .filter(([source, target], index, values) => source && target && values.findIndex(([a, b]) => a === source && b === target) === index)
-    .slice(0, 6);
-  const current = projectResourceSelectionController.values();
-  replaceSafeHtml(els.frequentLanguagePairs, pairs.map(([source, target]) => {
-    const active = source === current.sourceLang && target === current.targetLang;
-    return `<button type="button" class="${active ? "active" : ""}" data-source-lang="${escapeHtml(source)}" data-target-lang="${escapeHtml(target)}">${escapeHtml(languagePairDisplay(source, target))}</button>`;
-  }).join(""));
 }
 
 function selectedEditorText() {

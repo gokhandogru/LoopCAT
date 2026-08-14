@@ -56,6 +56,13 @@ const projectResourceSelectionControllerPath = path.join(
   "projects",
   "project-resource-selection-controller.js"
 );
+const projectLanguagePairShortcutsControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "projects",
+  "project-language-pair-shortcuts-controller.js"
+);
 const resourceMutationControllerPath = path.join(
   root,
   "src",
@@ -233,6 +240,11 @@ function main() {
     messagesByText,
     projectResourceSelectionControllerPath,
     "src/features/projects/project-resource-selection-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    projectLanguagePairShortcutsControllerPath,
+    "src/features/projects/project-language-pair-shortcuts-controller.js"
   );
   extractScript(
     messagesByText,
