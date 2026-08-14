@@ -366,6 +366,8 @@ const aiProviderPresentationServiceJs = readText("src/features/ai/ai-provider-pr
 const aiProviderPresentationServiceUnitTests = readText("tests/unit/ai-provider-presentation-service.test.cjs");
 const aiCredentialStorageServiceJs = readText("src/features/ai/ai-credential-storage-service.js");
 const aiCredentialStorageServiceUnitTests = readText("tests/unit/ai-credential-storage-service.test.cjs");
+const aiRuntimeSettingsServiceJs = readText("src/features/ai/ai-runtime-settings-service.js");
+const aiRuntimeSettingsServiceUnitTests = readText("tests/unit/ai-runtime-settings-service.test.cjs");
 const aiPromptTestControllerJs = readText("src/features/ai/ai-prompt-test-controller.js");
 const aiPromptTestControllerUnitTests = readText("tests/unit/ai-prompt-test-controller.test.cjs");
 const aiPromptPreviewControllerJs = readText("src/features/ai/ai-prompt-preview-controller.js");
@@ -1437,9 +1439,7 @@ assert(
   "the migrated AI administration and command-centre surfaces must not retain superseded static listeners in app.js."
 );
 assert(
-  !functionBody(appJs, "function localAiSettingsFromForm", "function assertLocalAiEndpointAllowed").includes(
-    "els.localAi"
-  ) &&
+  !aiRuntimeSettingsServiceJs.includes("els.localAi") &&
     !functionBody(appJs, "function renderLocalAiCommandCentre", "async function persistLocalAiSettings").includes(
       "els.localAi"
     ) &&
@@ -2961,6 +2961,83 @@ for (const testName of [
     aiCredentialStorageServiceUnitTests,
     testName,
     `focused AI-credential-storage tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiRuntimeSettingsService",
+  "The application runtime must expose the checked AI runtime-settings service boundary."
+);
+for (const boundary of [
+  'const LOCAL_PRETRANSLATION_MODES = new Set(["selected", "untranslated", "visible", "project"])',
+  'const LOCAL_VARIANT_MODES = new Set(["standard", "formal", "concise", "locale", "plain"])',
+  'const LOCAL_ADAPT_MODES = new Set(["simplify", "formalize", "localize", "shorten"])',
+  "function normalizeProjectSettings(settings = {})",
+  'apiKeyMode: "bring-your-own"',
+  "Math.min(2, Math.max(1, Math.round(localConcurrency)))",
+  "Math.min(600000, Math.max(5000, Math.round(localTimeoutMs)))",
+  "function localSettingsFromForm()",
+  "localSettings.projectSettings(project)",
+  "languages.nameForUi(languages.normalizeInput(form.sourceLanguage))",
+  "function assertEndpointAllowed(settings)",
+  'settings?.providerId === "openai-compatible"',
+  "HOSTED_COMPATIBLE_ENDPOINT_ERROR",
+  "function runtimeConfig(settings = localSettingsFromForm())",
+  "credentials.saveLocal(typedKey, Boolean(secrets.rememberLocalAiKey), settings)",
+  'settings.providerId === "openai" ? credentials.readOpenAi() : ""',
+  'function assertRuntimeReady(settings, config, actionLabel = "using this provider")',
+  "providers.needsApiKey(settings.providerId, settings.baseUrl)",
+  "Add a provider API key before ${actionLabel}."
+]) {
+  assertIncludes(
+    aiRuntimeSettingsServiceJs,
+    boundary,
+    `AiRuntimeSettingsService must retain checked ${boundary} normalization and readiness policy.`
+  );
+}
+for (const consumer of [
+  "appRuntime.featureFactories.createAiRuntimeSettingsService({",
+  "normalizeAiSettings: aiRuntimeSettingsService.normalizeProjectSettings",
+  "runtimeConfig: aiRuntimeSettingsService.runtimeConfig",
+  "assertReady: aiRuntimeSettingsService.assertRuntimeReady",
+  "normalizeProjectAiSettings: aiRuntimeSettingsService.normalizeProjectSettings",
+  "readLocalSettings: aiRuntimeSettingsService.localSettingsFromForm",
+  "endpoint: { assertAllowed: aiRuntimeSettingsService.assertEndpointAllowed }",
+  "settings: { read: aiRuntimeSettingsService.localSettingsFromForm }"
+]) {
+  assertIncludes(appJs, consumer, `AI runtime-settings consumer must use the checked service: ${consumer}.`);
+}
+assert(
+  appJs.indexOf("const aiRuntimeSettingsService =") >= 0 &&
+    appJs.indexOf("const aiRuntimeSettingsService =") <
+      appJs.indexOf("const aiSegmentContextService ="),
+  "AI credential/runtime settings services must initialize before eager segment-context consumers."
+);
+for (const removedFacade of [
+  "function defaultAiSettings",
+  "function localAiSettingsFromForm",
+  "function assertLocalAiEndpointAllowed",
+  "function localAiRuntimeConfig",
+  "function assertLocalAiRuntimeReady"
+]) {
+  assert(
+    !appJs.includes(removedFacade),
+    `app.js must not regain coordinator-private AI runtime-settings policy: ${removedFacade}.`
+  );
+}
+for (const testName of [
+  "AI runtime settings preserve every global and local project default",
+  "AI runtime settings preserve redaction, enum allowlists, numeric bounds, and booleans",
+  "local AI settings composition preserves form, project, language, and boolean precedence",
+  "AI runtime settings preserve exact hosted-compatible endpoint policy and error copy",
+  "AI runtime config preserves typed credential trimming, remember routing, and save failure",
+  "AI runtime config preserves provider-scoped then OpenAI-global credential fallback",
+  "AI runtime readiness preserves endpoint-first validation and action-specific key copy"
+]) {
+  assertIncludes(
+    aiRuntimeSettingsServiceUnitTests,
+    testName,
+    `focused AI-runtime-settings tests must characterize ${testName}.`
   );
 }
 assertIncludes(
@@ -5844,9 +5921,9 @@ assertIncludes(
   "ai.js must block unsupported hosted OpenAI-compatible endpoints before fetch."
 );
 assertIncludes(
-  appJs,
-  "assertLocalAiEndpointAllowed",
-  "app.js must preflight unsupported hosted OpenAI-compatible endpoints before saving keys or settings."
+  aiRuntimeSettingsServiceJs,
+  "function assertEndpointAllowed(settings)",
+  "the checked AI runtime-settings service must preflight unsupported hosted OpenAI-compatible endpoints before saving keys or settings."
 );
 assertIncludes(
   appJs,

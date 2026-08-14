@@ -1592,10 +1592,67 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
   logger: console
 });
 tmPretranslationController.mount();
+const aiCredentialStorageService =
+  appRuntime.featureFactories.createAiCredentialStorageService({
+    storage: {
+      get: (kind) => (kind === "local" ? globalThis.localStorage : globalThis.sessionStorage)
+    },
+    settings: {
+      readLocal: () => aiRuntimeSettingsService.localSettingsFromForm(),
+      normalizeLocal: (settings) =>
+        localAISettingsStore?.defaults
+          ? localAISettingsStore.defaults(settings || {}, currentProject())
+          : (settings || {}),
+      normalizeProviderBaseUrl: normalizedProviderBaseUrl
+    },
+    defaults: {
+      ollamaBaseUrl: OLLAMA_DEFAULT_BASE_URL,
+      openAiBaseUrl: OPENAI_DEFAULT_BASE_URL
+    },
+    failures: {
+      beforeOpenAiSave: () =>
+        LOOPCAT_TEST_BUILD && state[OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG]
+    },
+    logger: console
+  });
+const aiRuntimeSettingsService =
+  appRuntime.featureFactories.createAiRuntimeSettingsService({
+    project: { get: currentProject },
+    administration: {
+      readLocalForm: () => aiAdministrationController?.readLocalForm?.() || {},
+      readSecrets: () => aiAdministrationController?.readSecrets?.() || {}
+    },
+    localSettings: {
+      projectSettings: (project) => localAISettingsStore.projectSettings(project),
+      defaults: (settings, project) => localAISettingsStore.defaults(settings, project)
+    },
+    languages: {
+      normalizeInput: normalizeLanguageInputValue,
+      nameForUi: languageNameForUi
+    },
+    endpoints: {
+      isAllowedHostedCompatible: isAllowedOpenAiCompatibleHostedBaseUrl
+    },
+    providers: { needsApiKey: localAiProviderNeedsApiKey },
+    credentials: {
+      saveLocal: aiCredentialStorageService.saveLocalAiKey,
+      readLocal: aiCredentialStorageService.storedLocalAiKey,
+      readOpenAi: aiCredentialStorageService.storedOpenAiKey
+    },
+    redact: redactSensitiveText,
+    defaults: {
+      openAiModel: OPENAI_DEFAULT_MODEL,
+      projectLocalProviderId: "ollama",
+      projectLocalBaseUrl: "http://localhost:11434",
+      projectLocalModel: "translategemma",
+      localBaseUrl: OLLAMA_DEFAULT_BASE_URL,
+      localModel: DEFAULT_LOCAL_AI_MODEL
+    }
+  });
 const aiSegmentContextService = appRuntime.featureFactories.createAiSegmentContextService({
   project: {
     get: currentProject,
-    normalizeAiSettings: defaultAiSettings
+    normalizeAiSettings: aiRuntimeSettingsService.normalizeProjectSettings
   },
   resources: {
     getTermBaseNames: projectTermBaseNames,
@@ -1605,13 +1662,13 @@ const aiSegmentContextService = appRuntime.featureFactories.createAiSegmentConte
     findTerms,
     findTmMatches: findProjectTmMatches
   },
-  settings: { read: localAiSettingsFromForm },
+  settings: { read: () => aiRuntimeSettingsService.localSettingsFromForm() },
   segments: { getAll: currentSegments },
   logger: console
 });
 const aiScopeSelectionService = appRuntime.featureFactories.createAiScopeSelectionService({
   project: { get: currentProject },
-  settings: { read: localAiSettingsFromForm },
+  settings: { read: () => aiRuntimeSettingsService.localSettingsFromForm() },
   segments: {
     getAll: currentSegments,
     getDocument: currentDocumentSegments,
@@ -1659,37 +1716,15 @@ const aiProviderPresentationService =
       model: DEFAULT_LOCAL_AI_MODEL
     }
   });
-const aiCredentialStorageService =
-  appRuntime.featureFactories.createAiCredentialStorageService({
-    storage: {
-      get: (kind) => (kind === "local" ? globalThis.localStorage : globalThis.sessionStorage)
-    },
-    settings: {
-      readLocal: localAiSettingsFromForm,
-      normalizeLocal: (settings) =>
-        localAISettingsStore?.defaults
-          ? localAISettingsStore.defaults(settings || {}, currentProject())
-          : (settings || {}),
-      normalizeProviderBaseUrl: normalizedProviderBaseUrl
-    },
-    defaults: {
-      ollamaBaseUrl: OLLAMA_DEFAULT_BASE_URL,
-      openAiBaseUrl: OPENAI_DEFAULT_BASE_URL
-    },
-    failures: {
-      beforeOpenAiSave: () =>
-        LOOPCAT_TEST_BUILD && state[OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG]
-    },
-    logger: console
-  });
 let aiPretranslationAbortController = null;
 const aiPretranslationController = appRuntime.featureFactories.createAiPretranslationController({
   editorSessionStore,
   settings: {
     persist: () => persistLocalAiSettings({ silent: true }),
-    runtimeConfig: localAiRuntimeConfig,
-    assertReady: assertLocalAiRuntimeReady,
-    projectDefaults: (project) => defaultAiSettings(project.aiSettings)
+    runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
+    assertReady: aiRuntimeSettingsService.assertRuntimeReady,
+    projectDefaults: (project) =>
+      aiRuntimeSettingsService.normalizeProjectSettings(project.aiSettings)
   },
   providers: {
     get: currentLocalAiProvider,
@@ -1806,8 +1841,8 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
   },
   settings: {
     persist: () => persistLocalAiSettings({ silent: true }),
-    runtimeConfig: localAiRuntimeConfig,
-    assertReady: assertLocalAiRuntimeReady
+    runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
+    assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
   providers: {
     get: currentLocalAiProvider,
@@ -1906,8 +1941,8 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
   },
   settings: {
     persist: () => persistLocalAiSettings({ silent: true }),
-    runtimeConfig: localAiRuntimeConfig,
-    assertReady: assertLocalAiRuntimeReady
+    runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
+    assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
   providers: {
     get: currentLocalAiProvider,
@@ -2007,8 +2042,8 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
   },
   settings: {
     persist: () => persistLocalAiSettings({ silent: true }),
-    runtimeConfig: localAiRuntimeConfig,
-    assertReady: assertLocalAiRuntimeReady
+    runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
+    assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
   providers: {
     get: currentLocalAiProvider,
@@ -2119,8 +2154,8 @@ const aiTerminologyApplicationController =
     },
     settings: {
       persist: () => persistLocalAiSettings({ silent: true }),
-      runtimeConfig: localAiRuntimeConfig,
-      assertReady: assertLocalAiRuntimeReady
+      runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
+      assertReady: aiRuntimeSettingsService.assertRuntimeReady
     },
     providers: {
       get: currentLocalAiProvider,
@@ -2220,8 +2255,8 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
   },
   settings: {
     persist: () => persistLocalAiSettings({ silent: true }),
-    runtimeConfig: localAiRuntimeConfig,
-    assertReady: assertLocalAiRuntimeReady
+    runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
+    assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
   providers: {
     get: currentLocalAiProvider,
@@ -2335,8 +2370,8 @@ const aiTerminologyExtractionController =
     },
     settings: {
       persist: () => persistLocalAiSettings({ silent: true }),
-      runtimeConfig: localAiRuntimeConfig,
-      assertReady: assertLocalAiRuntimeReady
+      runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
+      assertReady: aiRuntimeSettingsService.assertRuntimeReady
     },
     providers: {
       get: currentLocalAiProvider,
@@ -2399,9 +2434,9 @@ const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBrie
   editorSessionStore,
   settings: {
     persist: () => persistLocalAiSettings({ silent: true }),
-    runtimeConfig: localAiRuntimeConfig,
-    assertReady: assertLocalAiRuntimeReady,
-    normalizeProjectAiSettings: defaultAiSettings
+    runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
+    assertReady: aiRuntimeSettingsService.assertRuntimeReady,
+    normalizeProjectAiSettings: aiRuntimeSettingsService.normalizeProjectSettings
   },
   providers: {
     get: currentLocalAiProvider,
@@ -2561,7 +2596,7 @@ const aiOpenAiSuggestionController = appRuntime.featureFactories.createAiOpenAiS
     readGlobalForm: () => aiAdministrationController?.readGlobalForm?.() || {},
     readSecrets: () => aiAdministrationController?.readSecrets?.() || {}
   },
-  settings: { normalize: defaultAiSettings },
+  settings: { normalize: aiRuntimeSettingsService.normalizeProjectSettings },
   provider: {
     isOpenAi: (aiSettings) => isOpenAiProvider({ aiSettings }),
     appearsOffline: browserAppearsOffline,
@@ -2607,14 +2642,14 @@ const aiSettingsPersistenceController =
     forms: {
       readGlobal: () => aiAdministrationController?.readGlobalForm?.() || {},
       readSecrets: () => aiAdministrationController?.readSecrets?.() || {},
-      readLocalSettings: localAiSettingsFromForm
+      readLocalSettings: aiRuntimeSettingsService.localSettingsFromForm
     },
     settings: {
-      normalize: defaultAiSettings,
+      normalize: aiRuntimeSettingsService.normalizeProjectSettings,
       projectUpdateFields: (localSettings, project) =>
         localAISettingsStore.projectUpdateFields(localSettings, project)
     },
-    endpoint: { assertAllowed: assertLocalAiEndpointAllowed },
+    endpoint: { assertAllowed: aiRuntimeSettingsService.assertEndpointAllowed },
     provider: { isOpenAi: (aiSettings) => isOpenAiProvider({ aiSettings }) },
     keys: {
       openAi: {
@@ -2663,8 +2698,8 @@ const aiProviderAdministrationOperationsController =
     project: { exists: () => Boolean(currentProject()) },
     settings: {
       persist: () => persistLocalAiSettings({ silent: true }),
-      runtimeConfig: localAiRuntimeConfig,
-      assertReady: assertLocalAiRuntimeReady,
+      runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
+      assertReady: aiRuntimeSettingsService.assertRuntimeReady,
       normalizeBaseUrl: normalizedProviderBaseUrl
     },
     providers: {
@@ -2711,7 +2746,7 @@ const aiPromptPreviewController = appRuntime.featureFactories.createAiPromptPrev
     readPromptState: () => aiAdministrationController?.readPromptState?.() || {},
     renderPromptPreview: (prompt) => aiAdministrationController?.renderPromptPreview?.(prompt)
   },
-  settings: { read: localAiSettingsFromForm },
+  settings: { read: aiRuntimeSettingsService.localSettingsFromForm },
   project: {
     get: currentProject,
     getActiveSegment: currentSegment,
@@ -2739,8 +2774,8 @@ const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestCon
   project: { get: currentProject },
   settings: {
     persist: () => persistLocalAiSettings({ silent: true }),
-    runtimeConfig: localAiRuntimeConfig,
-    assertReady: assertLocalAiRuntimeReady
+    runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
+    assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
   prompt: {
     getMode: localAiPromptMode,
@@ -4153,51 +4188,6 @@ function fileSafeName(value) {
   return (redactSensitiveText(value || "export").trim() || "export").replace(/[^\p{L}\p{N}-]+/gu, "_");
 }
 
-function defaultAiSettings(settings = {}) {
-  const source = settings && typeof settings === "object" ? settings : {};
-  const localProvider = redactSensitiveText(source.localProvider || source.localProviderId || "ollama").trim() || "ollama";
-  const localBaseUrl = redactSensitiveText(source.localBaseUrl || "http://localhost:11434").trim() || "http://localhost:11434";
-  const localModel = redactSensitiveText(source.localModel || "translategemma").trim() || "translategemma";
-  const localSourceCode = redactSensitiveText(source.localSourceCode || "").trim();
-  const localTargetCode = redactSensitiveText(source.localTargetCode || "").trim();
-  const localConcurrency = Number(source.localConcurrency);
-  const localTimeoutMs = Number(source.localTimeoutMs);
-  const localPretranslateMode = ["selected", "untranslated", "visible", "project"].includes(String(source.localPretranslateMode || "").trim())
-    ? String(source.localPretranslateMode).trim()
-    : "untranslated";
-  const localVariantMode = ["standard", "formal", "concise", "locale", "plain"].includes(String(source.localVariantMode || "").trim())
-    ? String(source.localVariantMode).trim()
-    : "standard";
-  const localAdaptMode = ["simplify", "formalize", "localize", "shorten"].includes(String(source.localAdaptMode || "").trim())
-    ? String(source.localAdaptMode).trim()
-    : "simplify";
-  return {
-    enabled: Boolean(source.enabled),
-    provider: redactSensitiveText(source.provider || "OpenAI").trim() || "OpenAI",
-    model: redactSensitiveText(source.model || OPENAI_DEFAULT_MODEL).trim() || OPENAI_DEFAULT_MODEL,
-    apiKeyMode: "bring-your-own",
-    sendSourceToAi: Boolean(source.sendSourceToAi),
-    useTmContext: source.useTmContext !== false,
-    useTermbaseContext: source.useTermbaseContext !== false,
-    styleGuide: redactSensitiveText(source.styleGuide || "").trim(),
-    localProvider,
-    localBaseUrl,
-    localModel,
-    localSourceLang: redactSensitiveText(source.localSourceLang || "").trim(),
-    localSourceCode,
-    localTargetLang: redactSensitiveText(source.localTargetLang || "").trim(),
-    localTargetCode,
-    localPretranslateMode,
-    localVariantMode,
-    localAdaptMode,
-    localConcurrency: Number.isFinite(localConcurrency) ? Math.min(2, Math.max(1, Math.round(localConcurrency))) : 1,
-    localTimeoutMs: Number.isFinite(localTimeoutMs) ? Math.min(600000, Math.max(5000, Math.round(localTimeoutMs))) : 120000,
-    localOverwrite: Boolean(source.localOverwrite),
-    localPreserveConfirmedLocked: source.localPreserveConfirmedLocked !== false,
-    localIncludeNearbyContext: source.localIncludeNearbyContext !== false
-  };
-}
-
 function redactSensitiveText(value) {
   return String(value || "").replace(new RegExp(SENSITIVE_TEXT_VALUE_PATTERN.source, "gi"), "[redacted secret]");
 }
@@ -4219,7 +4209,7 @@ function clearOpenAiKey() {
 }
 
 function clearLocalAiKey() {
-  const settings = localAiSettingsFromForm();
+  const settings = aiRuntimeSettingsService.localSettingsFromForm();
   try {
     aiCredentialStorageService.saveLocalAiKey("", false, settings);
   } catch (error) {
@@ -6084,80 +6074,6 @@ function renderAll() {
   renderProgress();
 }
 
-function localAiSettingsFromForm() {
-  const projectSettings = localAISettingsStore?.projectSettings
-    ? localAISettingsStore.projectSettings(currentProject())
-    : {};
-  const form = aiAdministrationController?.readLocalForm?.() || {};
-  const formSourceCode = normalizeLanguageInputValue(form.sourceCode || form.sourceLanguage || projectSettings.sourceCode || currentProject()?.sourceLang);
-  const formTargetCode = normalizeLanguageInputValue(form.targetCode || form.targetLanguage || projectSettings.targetCode || currentProject()?.targetLang);
-  const formSourceLanguage = form.sourceLanguage
-    ? languageNameForUi(normalizeLanguageInputValue(form.sourceLanguage))
-    : projectSettings.sourceLanguage;
-  const formTargetLanguage = form.targetLanguage
-    ? languageNameForUi(normalizeLanguageInputValue(form.targetLanguage))
-    : projectSettings.targetLanguage;
-  return localAISettingsStore.defaults({
-    ...projectSettings,
-    providerId: form.providerId || projectSettings.providerId,
-    baseUrl: form.baseUrl || projectSettings.baseUrl || OLLAMA_DEFAULT_BASE_URL,
-    model: form.model || projectSettings.model || DEFAULT_LOCAL_AI_MODEL,
-    sourceLanguage: formSourceLanguage,
-    sourceCode: formSourceCode || projectSettings.sourceCode || currentProject()?.sourceLang,
-    targetLanguage: formTargetLanguage,
-    targetCode: formTargetCode || projectSettings.targetCode || currentProject()?.targetLang,
-    mode: form.mode || projectSettings.mode,
-    variantMode: form.variantMode || projectSettings.variantMode,
-    adaptMode: form.adaptMode || projectSettings.adaptMode,
-    concurrency: form.concurrency || projectSettings.concurrency,
-    timeoutMs: form.timeoutMs || projectSettings.timeoutMs,
-    overwriteExisting: Boolean(form.overwriteExisting),
-    includeNearbyContext: form.includeNearbyContext !== false,
-    preserveConfirmedLocked: form.preserveConfirmedLocked !== false
-  }, currentProject());
-}
-
-function assertLocalAiEndpointAllowed(settings) {
-  if (
-    settings?.providerId === "openai-compatible" &&
-    !isAllowedOpenAiCompatibleHostedBaseUrl(settings.baseUrl)
-  ) {
-    throw new Error("This hosted OpenAI-compatible endpoint is not in LoopCAT's explicit provider allowlist. Choose a named hosted provider preset or use a loopback server such as LM Studio.");
-  }
-  return true;
-}
-
-function localAiRuntimeConfig(settings = localAiSettingsFromForm()) {
-  assertLocalAiEndpointAllowed(settings);
-  const secrets = aiAdministrationController?.readSecrets?.() || {};
-  const typedKey = String(secrets.localAiKey || "").trim();
-  if (typedKey) {
-    aiCredentialStorageService.saveLocalAiKey(
-      typedKey,
-      Boolean(secrets.rememberLocalAiKey),
-      settings
-    );
-  }
-  const apiKey =
-    typedKey ||
-    aiCredentialStorageService.storedLocalAiKey(settings) ||
-    (settings.providerId === "openai"
-      ? aiCredentialStorageService.storedOpenAiKey()
-      : "");
-  return {
-    ...settings,
-    apiKey
-  };
-}
-
-function assertLocalAiRuntimeReady(settings, config, actionLabel = "using this provider") {
-  assertLocalAiEndpointAllowed(settings);
-  if (localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl) && !String(config.apiKey || "").trim()) {
-    throw new Error(`Add a provider API key before ${actionLabel}.`);
-  }
-  return true;
-}
-
 function setLocalAiStatus(status, text) {
   state.localAi.connectionStatus = status || "disconnected";
   state.localAi.statusText = redactSensitiveText(text || "");
@@ -6202,7 +6118,10 @@ function localAiPreviewTermsForSegment(segment = currentSegment()) {
   return aiPromptPreviewController.termsForSegment(segment);
 }
 
-function localAiPromptPreviewRequest(settings = localAiSettingsFromForm(), mode = localAiPromptMode()) {
+function localAiPromptPreviewRequest(
+  settings = aiRuntimeSettingsService.localSettingsFromForm(),
+  mode = localAiPromptMode()
+) {
   return aiPromptPreviewController.createRequest(settings, mode);
 }
 
@@ -6278,7 +6197,7 @@ function applyLocalAiProviderPreset(presetId) {
   state.localAi.models = [];
   setOpusCatConnectionHelpVisible(false);
   setLocalAiStatus("disconnected", `${preset.label} selected`);
-  const settings = localAiSettingsFromForm();
+  const settings = aiRuntimeSettingsService.localSettingsFromForm();
   renderLocalAiPresetOptions(settings);
   renderLocalAiProviderControls(settings);
   renderLocalAiModelOptions(settings);
@@ -6290,7 +6209,7 @@ function handleLocalAiPresetChange(presetId) {
     applyLocalAiProviderPreset(presetId);
     return;
   }
-  renderLocalAiProviderControls(localAiSettingsFromForm());
+  renderLocalAiProviderControls(aiRuntimeSettingsService.localSettingsFromForm());
   renderLocalAiPromptPreview();
 }
 
@@ -6310,7 +6229,7 @@ function handleLocalAiProviderChange(providerId) {
   state.localAi.models = [];
   setOpusCatConnectionHelpVisible(false);
   setLocalAiStatus("disconnected", "Disconnected");
-  const settings = localAiSettingsFromForm();
+  const settings = aiRuntimeSettingsService.localSettingsFromForm();
   renderLocalAiPresetOptions(settings);
   renderLocalAiProviderControls(settings);
   renderLocalAiModelOptions(settings);
@@ -6320,7 +6239,7 @@ function handleLocalAiProviderChange(providerId) {
 function handleLocalAiBaseUrlInput() {
   setOpusCatConnectionHelpVisible(false);
   setLocalAiStatus("disconnected", "Disconnected");
-  const settings = localAiSettingsFromForm();
+  const settings = aiRuntimeSettingsService.localSettingsFromForm();
   renderLocalAiPresetOptions(settings);
   renderLocalAiProviderControls(settings);
 }
@@ -6334,7 +6253,9 @@ function handleClearOpenAiKey() {
 }
 
 function handleLocalAiFormChanged({ providerChanged = false } = {}) {
-  if (providerChanged) renderLocalAiProviderControls(localAiSettingsFromForm());
+  if (providerChanged) {
+    renderLocalAiProviderControls(aiRuntimeSettingsService.localSettingsFromForm());
+  }
   renderLocalAiPromptPreview();
 }
 
@@ -6408,15 +6329,15 @@ function renderLocalAiCommandCentre() {
 }
 
 async function persistLocalAiSettings(options = {}) {
-  if (!currentProject()) return localAiSettingsFromForm();
-  const settings = localAiSettingsFromForm();
+  if (!currentProject()) return aiRuntimeSettingsService.localSettingsFromForm();
+  const settings = aiRuntimeSettingsService.localSettingsFromForm();
   try {
-    assertLocalAiEndpointAllowed(settings);
+    aiRuntimeSettingsService.assertEndpointAllowed(settings);
   } catch {
     return settings;
   }
   localAISettingsStore.save(settings);
-  const aiSettings = defaultAiSettings({
+  const aiSettings = aiRuntimeSettingsService.normalizeProjectSettings({
     ...currentProject().aiSettings,
     ...localAISettingsStore.projectUpdateFields(settings, currentProject())
   });
@@ -6473,7 +6394,7 @@ function renderEditor() {
     <dt>${uiLabelHtml("segmentsTitle")}</dt><dd>${currentSegments().length}</dd>
     <dt>${uiLabelHtml("activity")}</dt><dd>${uiLabelHtml("eventCount", { count: currentActivityEvents().length })}</dd>
   `);
-  const ai = defaultAiSettings(currentProject().aiSettings);
+  const ai = aiRuntimeSettingsService.normalizeProjectSettings(currentProject().aiSettings);
   aiAdministrationController?.renderGlobalSettings?.({
     settings: ai,
     storedKey: aiCredentialStorageService.storedOpenAiKey(),
@@ -8523,11 +8444,11 @@ async function createOpenAiSuggestion() {
   return aiOpenAiSuggestionController.create();
 }
 
-function currentLocalAiProvider(settings = localAiSettingsFromForm()) {
+function currentLocalAiProvider(settings = aiRuntimeSettingsService.localSettingsFromForm()) {
   return aiProviderService.get(settings.providerId);
 }
 
-function canStartLmStudioServer(settings = localAiSettingsFromForm()) {
+function canStartLmStudioServer(settings = aiRuntimeSettingsService.localSettingsFromForm()) {
   return aiProviderAdministrationOperationsController.canStartServer(settings);
 }
 
@@ -9013,7 +8934,7 @@ async function buildProjectPackage(project = currentProject(), segmentRecords = 
     project: sanitizePortableValue({
       ...project,
       resourceLinks: projectResourceLinks(project),
-      aiSettings: defaultAiSettings(project.aiSettings)
+      aiSettings: aiRuntimeSettingsService.normalizeProjectSettings(project.aiSettings)
     }, "", [], portableContext),
     segments: sanitizePortableValue(projectSegments, "", [], portableContext),
     resources: sanitizePortableValue({

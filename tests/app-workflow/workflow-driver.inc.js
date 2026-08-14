@@ -8,6 +8,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     storedLocalAiKey,
     storedOpenAiKey
   } = aiCredentialStorageService;
+  const {
+    localSettingsFromForm: localAiSettingsFromForm,
+    normalizeProjectSettings: defaultAiSettings,
+    runtimeConfig: localAiRuntimeConfig
+  } = aiRuntimeSettingsService;
   const out = [];
   const publishProgress = () => {
     let output = document.querySelector("#appWorkflowTestResults");
