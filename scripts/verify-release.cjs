@@ -157,6 +157,7 @@ const requiredReleaseFiles = [
   "src/entry/test.js",
   "src/app/bootstrap.js",
   "src/app/app-store.js",
+  "src/app/navigation-controller.js",
   "src/app/compatibility-module-registry.js",
   "src/app/install-runtime.js",
   "src/features/editor/filter-store.js",
@@ -321,6 +322,7 @@ const appWorkflowDriverJs = readText("tests/app-workflow/workflow-driver.inc.js"
 const appBootstrapJs = readText("src/app/bootstrap.js");
 const appStoreJs = readText("src/app/app-store.js");
 const appStoreUnitTests = readText("tests/unit/app-store.test.cjs");
+const navigationControllerJs = readText("src/app/navigation-controller.js");
 const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-registry.js");
 const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-module-registry.test.cjs");
 const installRuntimeJs = readText("src/app/install-runtime.js");
@@ -569,7 +571,7 @@ assertIncludes(editorFilterStoreJs, "getState: () => state", "FilterStore must r
 assertIncludes(editorFilterStoreJs, "update(patch = {})", "FilterStore must retain its atomic update API.");
 for (const [removedFacade, directAccess] of [
   ["currentApplicationView", "applicationStore.getState().navigation.view"],
-  ["currentProjectId", "applicationStore.getState().navigation.projectId"],
+  ["currentProjectId", "projectId: navigation.projectId"],
   ["currentDocumentId", "applicationStore.getState().navigation.documentId"],
   ["currentActiveIndex", "applicationStore.getState().navigation.activeIndex"],
   ["currentSegmentId", "applicationStore.getState().navigation.segmentId"],
@@ -608,6 +610,67 @@ assertIncludes(
   editorStateUnitTests,
   "assert.equal(updated, getState())",
   "focused FilterStore tests must characterize direct getter identity and update return values."
+);
+for (const method of ["openEditor", "selectSegment", "selectDocument", "syncLegacy"]) {
+  assertIncludes(
+    navigationControllerJs,
+    `${method}(`,
+    `NavigationController must retain its checked ${method} public method.`
+  );
+}
+for (const removedFacade of [
+  "selectApplicationSegment",
+  "selectApplicationDocument",
+  "applicationNavigationPayload",
+  "syncLegacyApplicationState"
+]) {
+  assert(
+    !new RegExp(`\\b${removedFacade}\\b`).test(appJs) &&
+      !new RegExp(`\\b${removedFacade}\\b`).test(appWorkflowDriverJs),
+    `${removedFacade} ApplicationNavigation consumer facade must not return.`
+  );
+}
+assertIncludes(
+  appJs,
+  "applicationNavigation.selectSegment({",
+  "application consumers must select segments through NavigationController directly."
+);
+assertIncludes(
+  appJs,
+  'segmentId: editorSessionStore.getSegments()[index]?.id || ""',
+  "derived segment-selection callbacks must preserve the call-time EditorSessionStore fallback."
+);
+assertIncludes(
+  appJs,
+  "applicationNavigation.selectDocument({",
+  "application consumers must select documents through NavigationController directly."
+);
+assertIncludes(
+  appJs,
+  'applicationNavigation?.openEditor?.({ ...applicationStore.getState().navigation, view: "editor" })',
+  "view routing must pass the current navigation snapshot directly to NavigationController."
+);
+const renderEditorBody = functionBody(appJs, "function renderEditor()", "function renderTermbaseSelect()");
+assert(
+  renderEditorBody.indexOf("applicationNavigation?.syncLegacy?.({") !== -1 &&
+    renderEditorBody.indexOf("applicationNavigation?.syncLegacy?.({") <
+      renderEditorBody.indexOf('type: "interface/locale-changed"'),
+  "render-time legacy navigation synchronization must remain before the locale dispatch."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  "applicationNavigation.selectDocument({",
+  "workflow characterization must select documents through NavigationController directly."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  "applicationNavigation.selectSegment({",
+  "workflow characterization must select segments through NavigationController directly."
+);
+assertIncludes(
+  appStoreUnitTests,
+  "NavigationController preserves selection defaults, returns, and segment events",
+  "focused navigation tests must characterize selection defaults, stable returns, and events."
 );
 assertIncludes(
   appBootstrapJs,
@@ -8115,7 +8178,7 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "async function importDocx(file)", "async function importLocalization(file)"),
-  "selectApplicationDocument(documentId",
+  "applicationNavigation.selectDocument({",
   "app.js DOCX import must select the newly imported document through AppStore like other file imports."
 );
 assertIncludes(

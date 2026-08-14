@@ -218,6 +218,66 @@ test("NavigationController owns document and project selection identity", async 
   });
 });
 
+test("NavigationController preserves selection defaults, returns, and segment events", async () => {
+  const [{ createAppStore }, { createApplicationEvents, APPLICATION_EVENTS }, { createNavigationController }] =
+    await Promise.all([
+      moduleAt("src/app/app-store.js"),
+      moduleAt("src/app/events.js"),
+      moduleAt("src/app/navigation-controller.js")
+    ]);
+  const store = createAppStore();
+  const events = createApplicationEvents();
+  const navigation = createNavigationController({ store, events });
+  const selected = [];
+  events.on(APPLICATION_EVENTS.SEGMENT_SELECTED, (value) => selected.push(value));
+
+  navigation.openEditor({
+    projectId: "project-1",
+    documentId: "document-1",
+    segmentId: "segment-1",
+    activeIndex: 2
+  });
+  const segmentSelection = navigation.selectSegment({ activeIndex: 4 });
+  assert.equal(segmentSelection, store.getState().navigation);
+  assert.deepEqual(segmentSelection, {
+    view: "editor",
+    projectId: "project-1",
+    documentId: "document-1",
+    segmentId: "",
+    activeIndex: 4
+  });
+  assert.deepEqual(selected, [segmentSelection]);
+
+  navigation.openEditor({
+    projectId: "project-1",
+    documentId: "document-1",
+    segmentId: "segment-2",
+    activeIndex: 3
+  });
+  const documentSelection = navigation.selectDocument({ documentId: "document-2" });
+  assert.equal(documentSelection, store.getState().navigation);
+  assert.equal(documentSelection.segmentId, "segment-2");
+  assert.equal(documentSelection.activeIndex, 3);
+
+  const clearedDocument = navigation.selectDocument({ documentId: "", segmentId: "", activeIndex: -1 });
+  assert.deepEqual(clearedDocument, {
+    view: "editor",
+    projectId: "project-1",
+    documentId: "",
+    segmentId: "",
+    activeIndex: -1
+  });
+  const synchronized = navigation.syncLegacy({
+    view: "project",
+    projectId: "project-2",
+    documentId: "document-3",
+    segmentId: "segment-3",
+    activeIndex: 7
+  });
+  assert.equal(synchronized, store.getState().navigation);
+  assert.equal(synchronized.view, "project");
+});
+
 test("PreferencesRepository ignores unknown versions and stores only its scoped record", async () => {
   const { createPreferencesRepository } = await moduleAt("src/data/preferences-repository.js");
   const records = new Map([["modernization.preferences", { key: "modernization.preferences", version: 99 }]]);

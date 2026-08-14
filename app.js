@@ -739,35 +739,6 @@ const state = {
 };
 const editorSessionStore = appRuntime.editorSession;
 
-function selectApplicationSegment(activeIndex, segmentId = editorSessionStore.getSegments()[activeIndex]?.id || "") {
-  return applicationNavigation.selectSegment({ activeIndex, segmentId });
-}
-
-function selectApplicationDocument(documentId, selection = {}) {
-  return applicationNavigation.selectDocument({ documentId, ...selection });
-}
-
-function applicationNavigationPayload(overrides = {}) {
-  const navigation = applicationStore.getState().navigation;
-  return {
-    view: navigation.view,
-    projectId: applicationStore.getState().navigation.projectId,
-    documentId: navigation.documentId,
-    segmentId: navigation.segmentId,
-    activeIndex: navigation.activeIndex,
-    ...overrides
-  };
-}
-
-function syncLegacyApplicationState(overrides = {}) {
-  const navigation = applicationNavigation?.syncLegacy?.(applicationNavigationPayload(overrides));
-  applicationStore?.dispatch?.({
-    type: "interface/locale-changed",
-    payload: { locale: uiI18n?.getLocale?.() || "" }
-  });
-  return navigation;
-}
-
 const els = {
   saveStatus: document.querySelector("#saveStatus"),
   updateReadyBanner: document.querySelector("#updateReadyBanner"),
@@ -2697,7 +2668,11 @@ const structuralSegmentController = appRuntime.featureFactories.createStructural
   selection: {
     getActiveIndex: () => applicationStore.getState().navigation.activeIndex,
     findEditor: (index) => els.segmentBody.querySelector(`tr[data-index="${index}"] textarea`),
-    select: (index) => selectApplicationSegment(index),
+    select: (index) =>
+      applicationNavigation.selectSegment({
+        activeIndex: index,
+        segmentId: editorSessionStore.getSegments()[index]?.id || ""
+      }),
     focusTarget: targetEditController.focusActive
   },
   mutation: {
@@ -3506,7 +3481,7 @@ async function undoLastCommand() {
         ? requestedIndex
         : Math.max(0, Math.min(applicationStore.getState().navigation.activeIndex, editorSessionStore.getSegments().length - 1))
       : -1;
-    selectApplicationSegment(nextIndex);
+    applicationNavigation.selectSegment({ activeIndex: nextIndex, segmentId: editorSessionStore.getSegments()[nextIndex]?.id || "" });
     renderAll();
   } else if (!editorSessionStore.getProject() && projectId && editorSessionStore.getProjects().some((project) => project.id === projectId)) {
     await openProject(projectId);
@@ -3540,12 +3515,12 @@ async function redoLastCommand() {
     const nextIndex = editorSessionStore.getSegments().length
       ? Math.max(0, Math.min(applicationStore.getState().navigation.activeIndex, editorSessionStore.getSegments().length - 1))
       : -1;
-    selectApplicationSegment(nextIndex);
+    applicationNavigation.selectSegment({ activeIndex: nextIndex, segmentId: editorSessionStore.getSegments()[nextIndex]?.id || "" });
     renderAll();
   } else if (editorSessionStore.getProject()?.id === projectId && requestedActiveSegmentId) {
     editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(projectId)));
     const requestedIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveSegmentId);
-    if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
+    if (requestedIndex >= 0) applicationNavigation.selectSegment({ activeIndex: requestedIndex, segmentId: editorSessionStore.getSegments()[requestedIndex]?.id || "" });
     renderAll();
   }
   await synchronizeResourceTrashChange(resourceTrashEntryFromCommandResult(result));
@@ -5494,7 +5469,7 @@ function setView(view) {
   if (view === "projects") applicationNavigation?.openProjects?.();
   else if (view === "resources") applicationNavigation?.openResources?.();
   else if (view === "project") applicationNavigation?.openProject?.(editorSessionStore.getProject()?.id || null, applicationStore.getState().navigation.activeIndex);
-  else applicationNavigation?.openEditor?.(applicationNavigationPayload({ view: "editor" }));
+  else applicationNavigation?.openEditor?.({ ...applicationStore.getState().navigation, view: "editor" });
   renderEditor();
   if (view === "projects") refreshProjectSummaries();
   if (view === "resources") refreshResources();
@@ -5880,7 +5855,18 @@ function renderAll() {
 }
 
 function renderEditor() {
-  syncLegacyApplicationState();
+  const navigation = applicationStore.getState().navigation;
+  applicationNavigation?.syncLegacy?.({
+    view: navigation.view,
+    projectId: navigation.projectId,
+    documentId: navigation.documentId,
+    segmentId: navigation.segmentId,
+    activeIndex: navigation.activeIndex
+  });
+  applicationStore?.dispatch?.({
+    type: "interface/locale-changed",
+    payload: { locale: uiI18n?.getLocale?.() || "" }
+  });
   const hasProject = Boolean(editorSessionStore.getProject());
   void syncDesktopSpellcheckLanguage();
   renderWorkspaceStatus();
@@ -6031,7 +6017,7 @@ function renderDocumentFilter() {
   });
   els.documentFilter.replaceChildren(fragment);
   els.documentFilter.value = documents.some((documentInfo) => documentInfo.id === current) ? current : "";
-  if (els.documentFilter.value !== current) selectApplicationDocument(els.documentFilter.value);
+  if (els.documentFilter.value !== current) applicationNavigation.selectDocument({ documentId: els.documentFilter.value });
 }
 
 function renderLanguagePairFilter() {
@@ -6187,8 +6173,12 @@ async function confirmDeleteFile(documentInfo) {
     editorSessionStore.replaceProject(commandResult.result.project);
     editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
     editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(editorSessionStore.getProject().id)));
-    selectApplicationDocument("");
-    selectApplicationSegment(editorSessionStore.getSegments().length ? 0 : -1);
+    applicationNavigation.selectDocument({ documentId: "" });
+    const activeIndex = editorSessionStore.getSegments().length ? 0 : -1;
+    applicationNavigation.selectSegment({
+      activeIndex,
+      segmentId: editorSessionStore.getSegments()[activeIndex]?.id || ""
+    });
     markWorkspaceDirty();
     let fileDeleteActivityFailed = false;
     try {
@@ -7053,7 +7043,7 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
     await saveSegments(restored);
     const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
     const requestedIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveId);
-    if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
+    if (requestedIndex >= 0) applicationNavigation.selectSegment({ activeIndex: requestedIndex, segmentId: editorSessionStore.getSegments()[requestedIndex]?.id || "" });
     invalidateSegmentFilterCache();
     markWorkspaceDirty();
     renderAll();
@@ -7097,7 +7087,7 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
     await saveSegments(restored);
     const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
     const requestedIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveId);
-    if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
+    if (requestedIndex >= 0) applicationNavigation.selectSegment({ activeIndex: requestedIndex, segmentId: editorSessionStore.getSegments()[requestedIndex]?.id || "" });
     markWorkspaceDirty();
     renderAll();
     await editorContextController.refresh();
@@ -7454,7 +7444,7 @@ async function goToQualityRiskItem(item) {
   const segment = editorSessionStore.getSegments()[index];
   if (!segmentPassesFilters(segment)) {
     if (applicationStore.getState().navigation.documentId && segment.documentId !== applicationStore.getState().navigation.documentId) {
-      selectApplicationDocument("");
+      applicationNavigation.selectDocument({ documentId: "" });
       els.documentFilter.value = applicationStore.getState().navigation.documentId;
     }
     editorFilterStore.update({ query: "", status: "all", reviewState: "", aiState: "" });
@@ -7808,7 +7798,8 @@ async function importDocx(file) {
   editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
   await refreshProjectSummaries();
   const activeIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
-  selectApplicationDocument(documentId, {
+  applicationNavigation.selectDocument({
+    documentId,
     segmentId: editorSessionStore.getSegments()[activeIndex]?.id || "",
     activeIndex
   });
@@ -7841,7 +7832,8 @@ async function importLocalization(file) {
   editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
   await refreshProjectSummaries();
   const activeIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
-  selectApplicationDocument(documentId, {
+  applicationNavigation.selectDocument({
+    documentId,
     segmentId: editorSessionStore.getSegments()[activeIndex]?.id || "",
     activeIndex
   });
@@ -7874,7 +7866,8 @@ async function importXliff(file) {
   editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
   await refreshProjectSummaries();
   const activeIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
-  selectApplicationDocument(documentId, {
+  applicationNavigation.selectDocument({
+    documentId,
     segmentId: editorSessionStore.getSegments()[activeIndex]?.id || "",
     activeIndex
   });
@@ -9748,7 +9741,7 @@ function wireEvents() {
     });
   });
   els.documentFilter.addEventListener("change", async () => {
-    selectApplicationDocument(els.documentFilter.value);
+    applicationNavigation.selectDocument({ documentId: els.documentFilter.value });
     renderSegments();
     renderProgress();
     const first = firstVisibleSegmentIndex();
