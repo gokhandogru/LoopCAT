@@ -184,6 +184,7 @@ const requiredReleaseFiles = [
   "src/ui/dialog-controller.js",
   "src/features/ai/ai-administration-controller.js",
   "src/features/ai/ai-provider-administration-operations-controller.js",
+  "src/features/ai/ai-provider-presentation-service.js",
   "src/features/ai/ai-prompt-test-controller.js",
   "src/features/ai/ai-prompt-preview-controller.js",
   "src/features/ai/ai-term-candidate-persistence-service.js",
@@ -214,6 +215,7 @@ const requiredReleaseFiles = [
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/ai-provider-administration-operations-controller.test.cjs",
+  "tests/unit/ai-provider-presentation-service.test.cjs",
   "tests/unit/ai-prompt-test-controller.test.cjs",
   "tests/unit/ai-prompt-preview-controller.test.cjs",
   "tests/unit/ai-term-candidate-persistence-service.test.cjs",
@@ -360,6 +362,8 @@ const aiProviderAdministrationOperationsControllerJs = readText(
 const aiProviderAdministrationOperationsControllerUnitTests = readText(
   "tests/unit/ai-provider-administration-operations-controller.test.cjs"
 );
+const aiProviderPresentationServiceJs = readText("src/features/ai/ai-provider-presentation-service.js");
+const aiProviderPresentationServiceUnitTests = readText("tests/unit/ai-provider-presentation-service.test.cjs");
 const aiPromptTestControllerJs = readText("src/features/ai/ai-prompt-test-controller.js");
 const aiPromptTestControllerUnitTests = readText("tests/unit/ai-prompt-test-controller.test.cjs");
 const aiPromptPreviewControllerJs = readText("src/features/ai/ai-prompt-preview-controller.js");
@@ -2745,9 +2749,9 @@ assertIncludes(
 );
 for (const boundary of [
   "function humanReadableList(items)",
-  "...new Set((items || []).map((item) => String(item || \"\").trim()).filter(Boolean))",
+  '...new Set((items || []).map((item) => String(item || "").trim()).filter(Boolean))',
   'if (clean.length <= 1) return clean[0] || ""',
-  'if (clean.length === 2) return `${clean[0]} and ${clean[1]}`',
+  "if (clean.length === 2) return `${clean[0]} and ${clean[1]}`",
   'return `${clean.slice(0, -1).join(", ")}, and ${clean[clean.length - 1]}`',
   "function confirmShare({ provider, includesSourceText, contextLabels = [] })",
   'includesSourceText ? "selected/source text" : ""',
@@ -2783,6 +2787,84 @@ for (const testName of [
     externalAiConsentServiceUnitTests,
     testName,
     `focused external-AI-consent tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiProviderPresentationService",
+  "The application runtime must expose the checked AI-provider-presentation service boundary."
+);
+for (const boundary of [
+  "const PROVIDER_ENDPOINTS = Object.freeze({",
+  '"opus-cat": Object.freeze({',
+  'models: ["GET", "/v1/models"]',
+  'translate: ["POST", "/v2/chat"]',
+  'translate: ["POST", "/sonar"]',
+  '"azure-openai": Object.freeze({',
+  '"openai-compatible": Object.freeze({',
+  "function privacyText(settings)",
+  "Ollama cloud model mode: requests are sent to local Ollama first",
+  "Hosted AI mode: source text is sent to the configured provider URL after confirmation",
+  "Network AI mode: source text is sent to the configured provider URL after confirmation",
+  "Local AI mode: requests are sent to the loopback provider URL below",
+  "function endpointPathLabel(url)",
+  "const parsed = new URL(url)",
+  "function endpointSummary(settings = {})",
+  "Model list endpoint depends on provider",
+  "Translation endpoint depends on provider",
+  "function canPullModel(settings, provider)",
+  'settings.providerId === "ollama" && network.isOllamaCloudBaseUrl(settings.baseUrl)',
+  "function capabilityLabels(settings, provider)",
+  'labels.push("Connection test")',
+  'labels.push("Review/edit tools")',
+  'labels.push("Confirmation before send")',
+  '["No AI commands available"]',
+  "function summaryView(settings)",
+  'localization.label("hostedNetwork")',
+  'localization.label("apiKeyRequired")',
+  'localization.label("pullSupported")',
+  'localization.label("nearbyContextOn")',
+  'name: preset?.label || provider?.name || settings.providerId || "AI provider"',
+  'capabilities.map((item) => localization.source(item)).join(" - ")'
+]) {
+  assertIncludes(
+    aiProviderPresentationServiceJs,
+    boundary,
+    `AiProviderPresentationService must retain checked ${boundary} view-model policy.`
+  );
+}
+for (const consumer of [
+  "canPullModel: aiProviderPresentationService.canPullModel",
+  "aiProviderPresentationService.canPullModel(settings, provider)",
+  "aiProviderPresentationService.privacyText(settings)",
+  "aiProviderPresentationService.summaryView(settings)"
+]) {
+  assertIncludes(appJs, consumer, `AI provider presentation consumer must use the checked service: ${consumer}.`);
+}
+for (const removedFacade of [
+  "function localAiPrivacyText",
+  "function endpointPathLabel",
+  "function localAiEndpointSummary",
+  "function localAiCanPullModel",
+  "function localAiProviderCapabilityLabels",
+  "function localAiProviderSummaryView"
+]) {
+  assert(
+    !appJs.includes(removedFacade),
+    `app.js must not regain coordinator-private AI provider presentation policy: ${removedFacade}.`
+  );
+}
+for (const testName of [
+  "AI provider presentation preserves local, Ollama-cloud, hosted-key, and network privacy copy",
+  "AI provider presentation preserves safe paths and every registry endpoint summary",
+  "AI provider presentation preserves pull eligibility and ordered capability labels",
+  "AI provider presentation builds localized badges and the complete summary view",
+  "AI provider presentation preserves provider and default summary fallbacks with nearby context on"
+]) {
+  assertIncludes(
+    aiProviderPresentationServiceUnitTests,
+    testName,
+    `focused AI-provider-presentation tests must characterize ${testName}.`
   );
 }
 assertIncludes(
@@ -5676,9 +5758,9 @@ assertIncludes(
   "app.js must render OPUS-CAT endpoint summaries through the OPUS-CAT URL helper."
 );
 assertIncludes(
-  appJs,
-  'providerId === "opus-cat"',
-  "app.js must treat OPUS-CAT as a local runtime workflow in the AI Command Centre."
+  aiProviderPresentationServiceJs,
+  '"opus-cat": Object.freeze({',
+  "the checked provider presentation service must treat OPUS-CAT as a local runtime workflow in the AI Command Centre."
 );
 assertIncludes(
   aiProviderAdministrationOperationsControllerJs,
@@ -5782,8 +5864,8 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "function localAiProviderSummaryView",
-  "app.js must render AI provider locality, key, and endpoint details."
+  "aiProviderPresentationService.summaryView(settings)",
+  "app.js must render checked AI provider locality, key, and endpoint details."
 );
 assertIncludes(
   aiJs,
@@ -5801,14 +5883,14 @@ assertIncludes(
   "the checked AI administration controller must render provider best-fit guidance in the AI Command Centre summary."
 );
 assertIncludes(
-  appJs,
-  "function localAiProviderCapabilityLabels",
-  "app.js must derive AI Command Centre capabilities from the active provider object."
+  aiProviderPresentationServiceJs,
+  "function capabilityLabels(settings, provider)",
+  "the checked provider presentation service must derive AI Command Centre capabilities from the active provider object."
 );
 assertIncludes(
-  appJs,
+  aiProviderPresentationServiceJs,
   "Review/edit tools",
-  "app.js must render AI-native review/edit command availability in the provider summary."
+  "the checked provider presentation service must render AI-native review/edit command availability in the provider summary."
 );
 assertIncludes(
   appJs,

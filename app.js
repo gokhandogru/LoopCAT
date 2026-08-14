@@ -1620,6 +1620,43 @@ const aiScopeSelectionService = appRuntime.featureFactories.createAiScopeSelecti
 const externalAiConsentService = appRuntime.featureFactories.createExternalAiConsentService({
   confirm: uiConfirm
 });
+const aiProviderPresentationService =
+  appRuntime.featureFactories.createAiProviderPresentationService({
+    providers: {
+      get: (providerId) => aiProviderService.get(providerId),
+      getPreset: localAiProviderPresetForSettings,
+      needsApiKey: localAiProviderNeedsApiKey,
+      sharesExternally: localAiProviderSharesExternally,
+      getGuidance: localAiProviderGuidance
+    },
+    urls: {
+      ollama: ollamaApiUrl,
+      "opus-cat": opusCatApiUrl,
+      openai: openAiApiUrl,
+      deepseek: deepSeekApiUrl,
+      gemini: geminiApiUrl,
+      anthropic: anthropicApiUrl,
+      cohere: cohereApiUrl,
+      mistral: mistralApiUrl,
+      xai: xAiApiUrl,
+      perplexity: perplexityApiUrl,
+      groq: groqApiUrl,
+      together: togetherApiUrl,
+      openrouter: openRouterApiUrl,
+      huggingface: huggingFaceApiUrl,
+      deepinfra: deepInfraApiUrl,
+      fireworks: fireworksApiUrl,
+      "azure-openai": azureOpenAiApiUrl,
+      "openai-compatible": openAiCompatibleApiUrl
+    },
+    network: { isOllamaCloudBaseUrl },
+    localization: { label: uiLabel, source: uiSource },
+    defaults: {
+      providerId: "ollama",
+      baseUrl: OLLAMA_DEFAULT_BASE_URL,
+      model: DEFAULT_LOCAL_AI_MODEL
+    }
+  });
 let aiPretranslationAbortController = null;
 const aiPretranslationController = appRuntime.featureFactories.createAiPretranslationController({
   editorSessionStore,
@@ -2609,7 +2646,7 @@ const aiProviderAdministrationOperationsController =
       get: currentLocalAiProvider,
       sharesExternally: (settings) =>
         localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model),
-      canPullModel: localAiCanPullModel
+      canPullModel: aiProviderPresentationService.canPullModel
     },
     desktop: {
       getBridge: () =>
@@ -6387,203 +6424,13 @@ function renderLocalAiOutput(value, options) {
   aiAdministrationController?.renderOutput?.(value, options);
 }
 
-function localAiPrivacyText(settings) {
-  const sharesExternally = localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model);
-  const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
-  if (sharesExternally) {
-    if (settings.providerId === "ollama" && !needsKey) {
-      return "Ollama cloud model mode: requests are sent to local Ollama first, and cloud-suffixed models may be processed through Ollama Cloud after confirmation.";
-    }
-    return needsKey
-      ? "Hosted AI mode: source text is sent to the configured provider URL after confirmation. API keys stay in this browser and are never exported with project packages."
-      : "Network AI mode: source text is sent to the configured provider URL after confirmation.";
-  }
-  return settings.providerId === "ollama"
-    ? "Local AI mode: requests are sent to the loopback provider URL below. Ollama is the default local provider."
-    : "Local AI mode: requests are sent only to the loopback provider URL below.";
-}
-
-function endpointPathLabel(url) {
-  try {
-    const parsed = new URL(url);
-    return parsed.pathname || "/";
-  } catch {
-    return String(url || "");
-  }
-}
-
-function localAiEndpointSummary(settings = {}) {
-  const providerId = settings.providerId || "ollama";
-  const baseUrl = settings.baseUrl || OLLAMA_DEFAULT_BASE_URL;
-  if (providerId === "ollama") {
-    return {
-      models: `GET ${endpointPathLabel(ollamaApiUrl(baseUrl, "/tags"))}`,
-      translate: `POST ${endpointPathLabel(ollamaApiUrl(baseUrl, "/chat"))}`
-    };
-  }
-  if (providerId === "opus-cat") {
-    return {
-      models: `GET ${endpointPathLabel(opusCatApiUrl(baseUrl, "/ListSupportedLanguagePairs"))}`,
-      translate: `GET ${endpointPathLabel(opusCatApiUrl(baseUrl, "/TranslateJson"))}`
-    };
-  }
-  if (providerId === "openai") {
-    return {
-      models: `GET ${endpointPathLabel(openAiApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(openAiApiUrl(baseUrl, "/responses"))}`
-    };
-  }
-  if (providerId === "deepseek") {
-    return {
-      models: `GET ${endpointPathLabel(deepSeekApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(deepSeekApiUrl(baseUrl, "/chat/completions"))}`
-    };
-  }
-  if (providerId === "gemini") {
-    return {
-      models: `GET ${endpointPathLabel(geminiApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(geminiApiUrl(baseUrl, "/interactions"))}`
-    };
-  }
-  if (providerId === "anthropic") {
-    return {
-      models: `GET ${endpointPathLabel(anthropicApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(anthropicApiUrl(baseUrl, "/messages"))}`
-    };
-  }
-  if (providerId === "cohere") {
-    return {
-      models: `GET ${endpointPathLabel(cohereApiUrl(baseUrl, "/v1/models"))}`,
-      translate: `POST ${endpointPathLabel(cohereApiUrl(baseUrl, "/v2/chat"))}`
-    };
-  }
-  if (providerId === "mistral") {
-    return {
-      models: `GET ${endpointPathLabel(mistralApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(mistralApiUrl(baseUrl, "/chat/completions"))}`
-    };
-  }
-  if (providerId === "xai") {
-    return {
-      models: `GET ${endpointPathLabel(xAiApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(xAiApiUrl(baseUrl, "/responses"))}`
-    };
-  }
-  if (providerId === "perplexity") {
-    return {
-      models: `GET ${endpointPathLabel(perplexityApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(perplexityApiUrl(baseUrl, "/sonar"))}`
-    };
-  }
-  if (providerId === "groq") {
-    return {
-      models: `GET ${endpointPathLabel(groqApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(groqApiUrl(baseUrl, "/chat/completions"))}`
-    };
-  }
-  if (providerId === "together") {
-    return {
-      models: `GET ${endpointPathLabel(togetherApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(togetherApiUrl(baseUrl, "/chat/completions"))}`
-    };
-  }
-  if (providerId === "openrouter") {
-    return {
-      models: `GET ${endpointPathLabel(openRouterApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(openRouterApiUrl(baseUrl, "/chat/completions"))}`
-    };
-  }
-  if (providerId === "huggingface") {
-    return {
-      models: `GET ${endpointPathLabel(huggingFaceApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(huggingFaceApiUrl(baseUrl, "/chat/completions"))}`
-    };
-  }
-  if (providerId === "deepinfra") {
-    return {
-      models: `GET ${endpointPathLabel(deepInfraApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(deepInfraApiUrl(baseUrl, "/chat/completions"))}`
-    };
-  }
-  if (providerId === "fireworks") {
-    return {
-      models: `GET ${endpointPathLabel(fireworksApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(fireworksApiUrl(baseUrl, "/chat/completions"))}`
-    };
-  }
-  if (providerId === "azure-openai") {
-    return {
-      models: `GET ${endpointPathLabel(azureOpenAiApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(azureOpenAiApiUrl(baseUrl, "/responses"))}`
-    };
-  }
-  if (providerId === "openai-compatible") {
-    return {
-      models: `GET ${endpointPathLabel(openAiCompatibleApiUrl(baseUrl, "/models"))}`,
-      translate: `POST ${endpointPathLabel(openAiCompatibleApiUrl(baseUrl, "/chat/completions"))}`
-    };
-  }
-  return { models: "Model list endpoint depends on provider", translate: "Translation endpoint depends on provider" };
-}
-
-function localAiCanPullModel(settings, provider) {
-  if (!provider?.pullModel) return false;
-  if (settings.providerId === "ollama" && isOllamaCloudBaseUrl(settings.baseUrl)) return false;
-  return true;
-}
-
-function localAiProviderCapabilityLabels(settings, provider) {
-  const labels = [];
-  if (provider?.testConnection) labels.push("Connection test");
-  if (provider?.listModels) labels.push("Model refresh");
-  if (provider?.translateSegment) labels.push("Pre-translate");
-  if (provider?.completePrompt) {
-    labels.push("Prompt test");
-    labels.push("Review/edit tools");
-  }
-  if (localAiCanPullModel(settings, provider)) labels.push("Pull model");
-  if (localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)) labels.push("Confirmation before send");
-  return labels.length ? labels : ["No AI commands available"];
-}
-
-function localAiProviderSummaryView(settings) {
-  const provider = aiProviderService.get(settings.providerId);
-  const preset = localAiProviderPresetForSettings(settings);
-  const sharesExternally = localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model);
-  const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
-  const endpoints = localAiEndpointSummary(settings);
-  const canPull = localAiCanPullModel(settings, provider);
-  const guidance = localAiProviderGuidance(settings);
-  const capabilities = localAiProviderCapabilityLabels(settings, provider);
-  const badges = [
-    sharesExternally ? uiLabel("hostedNetwork") : uiLabel("localLoopback"),
-    needsKey ? uiLabel("apiKeyRequired") : uiLabel("noApiKey"),
-    canPull ? uiLabel("pullSupported") : uiLabel("manualModel"),
-    settings.includeNearbyContext !== false ? uiLabel("nearbyContextOn") : uiLabel("nearbyContextOff")
-  ];
-  return {
-    name: preset?.label || provider?.name || settings.providerId || "AI provider",
-    model: settings.model || DEFAULT_LOCAL_AI_MODEL,
-    badges,
-    guidance: uiSource(guidance),
-    baseLabel: uiLabel("base"),
-    baseUrl: settings.baseUrl || OLLAMA_DEFAULT_BASE_URL,
-    toolsLabel: uiLabel("tools"),
-    capabilities: capabilities.map((item) => uiSource(item)).join(" - "),
-    modelsLabel: uiLabel("models"),
-    modelsEndpoint: endpoints.models,
-    translateLabel: uiLabel("translate"),
-    translateEndpoint: endpoints.translate
-  };
-}
-
 function renderLocalAiProviderControls(settings) {
   const provider = aiProviderService.get(settings.providerId);
   const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
-  const canPull = localAiCanPullModel(settings, provider);
+  const canPull = aiProviderPresentationService.canPullModel(settings, provider);
   aiAdministrationController?.renderProvider?.({
-    privacyText: localAiPrivacyText(settings),
-    summary: localAiProviderSummaryView(settings),
+    privacyText: aiProviderPresentationService.privacyText(settings),
+    summary: aiProviderPresentationService.summaryView(settings),
     running: state.localAi.running,
     promptBusy: state.localAi.promptBusy,
     canPull,
@@ -6710,7 +6557,7 @@ function renderLocalAiCommandCentre() {
     groups.set(groupLabel, group);
   });
   const provider = aiProviderService.get(settings.providerId);
-  const canPull = localAiCanPullModel(settings, provider);
+  const canPull = aiProviderPresentationService.canPullModel(settings, provider);
   const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
   aiAdministrationController?.render?.({
     settings: {
@@ -6732,8 +6579,8 @@ function renderLocalAiCommandCentre() {
       manualLabel: uiSource("{value1} (manual)", { value1: settings.model || DEFAULT_LOCAL_AI_MODEL })
     },
     provider: {
-      privacyText: localAiPrivacyText(settings),
-      summary: localAiProviderSummaryView(settings),
+      privacyText: aiProviderPresentationService.privacyText(settings),
+      summary: aiProviderPresentationService.summaryView(settings),
       running: state.localAi.running,
       promptBusy: state.localAi.promptBusy,
       canPull,
