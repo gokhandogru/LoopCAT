@@ -1292,6 +1292,35 @@ const reportDataService = appRuntime.featureFactories.createReportDataService({
   redactSensitiveText,
   timestamp: () => new Date().toISOString()
 });
+const reportExportController = appRuntime.featureFactories.createReportExportController({
+  session: {
+    getProject: editorSessionStore.getProject,
+    replaceQaChecks: editorSessionStore.replaceQaChecks,
+    replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue
+  },
+  application: {
+    clearQaFilter: () => {
+      state.qaFilter = "";
+    }
+  },
+  data: reportDataService,
+  documents: reportDocumentCompositionService,
+  finalizeDocument: finalizeReportDocument,
+  fileSafeName,
+  download,
+  presentation: {
+    renderQaResults,
+    renderQualityWorkbench,
+    renderValidationReport
+  },
+  validation: { reportCount },
+  activity: { logOptionalProject: logOptionalProjectActivity },
+  status: {
+    appendActivityWarning,
+    exportMode: exportStatusMode,
+    set: setSaveStatus
+  }
+});
 const segmentConfirmationController = appRuntime.featureFactories.createSegmentConfirmationController({
   element: els.confirmBtn,
   editorSessionStore,
@@ -3017,9 +3046,9 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
   exportLocalization,
   exportXliff12: () => exportXliff(),
   exportXliff22,
-  exportProjectReport: () => exportProjectReport(),
-  exportQualityPassport,
-  exportAnonymizedReport: () => exportProjectReport({ anonymized: true }),
+  exportProjectReport: reportExportController.exportProjectReport,
+  exportQualityPassport: reportExportController.exportQualityPassport,
+  exportAnonymizedReport: reportExportController.exportAnonymizedReport,
   exportTmx: handleTmxExport,
   exportTbx: handleTbxExport,
   exportBackup: exportBrowserBackup,
@@ -3180,7 +3209,7 @@ const qualityReviewController = appRuntime?.featureFactories?.createQualityRevie
   saveDecision: (values) => qualityDecisionController.save(values),
   refreshRisks: refreshQualityRiskQueue,
   nextRisk: goToNextQualityRisk,
-  exportPassport: exportQualityPassport,
+  exportPassport: reportExportController.exportQualityPassport,
   openRisk: goToQualityRiskItem,
   scheduleFrame: requestAnimationFrame,
   onError: (error) => setSaveStatus(error?.message || "Quality or review action failed.", "dirty")
@@ -5104,7 +5133,7 @@ function commandList() {
     { id: "save-tm", label: "Save segment to TM", run: saveActiveSegmentToTm, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(editorSessionStore.getProject()) },
     { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "quality-passport", label: "Export Quality Passport", run: exportQualityPassport, enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "quality-passport", label: "Export Quality Passport", run: reportExportController.exportQualityPassport, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "next-quality-risk", label: "Next quality risk", run: goToNextQualityRisk, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "concordance", label: "Open concordance", run: openConcordanceSearch, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "replace-target", label: "Find and replace target text", run: openReplacePanel, enabled: Boolean(editorSessionStore.getProject()) },
@@ -5112,8 +5141,8 @@ function commandList() {
     { id: "preset-review", label: "Use Review filter preset", group: "Filters", keywords: ["needs review", "comments"], run: () => filterPresetController?.applyPreset?.("review"), enabled: Boolean(editorSessionStore.getProject()) },
     { id: "preset-qa-fixes", label: "Use QA fixes filter preset", group: "Filters", keywords: ["quality", "blocked", "fixes"], run: () => filterPresetController?.applyPreset?.("qa-fixes"), enabled: Boolean(editorSessionStore.getProject()) },
     { id: "preset-ai-review", label: "Use AI review filter preset", group: "Filters", keywords: ["AI", "risk", "suggestions"], run: () => filterPresetController?.applyPreset?.("ai-review"), enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "project-report", label: "Export project report", run: exportProjectReport, enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "anonymized-report", label: "Export anonymized report", run: () => exportProjectReport({ anonymized: true }), enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "project-report", label: "Export project report", run: reportExportController.exportProjectReport, enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "anonymized-report", label: "Export anonymized report", run: reportExportController.exportAnonymizedReport, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "local-ai-pretranslate", label: "Local AI pre-translate", run: aiPretranslationController.pretranslate, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running) },
     { id: "local-ai-review", label: "AI review active segment", run: aiReviewController.reviewActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-review-batch", label: "AI QA batch", run: aiReviewController.reviewBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
@@ -8702,67 +8731,6 @@ async function repairWorkspaceLinks() {
   renderValidationReport(report);
   renderWorkspaceStatus();
   setSaveStatus(report.ok ? "Workspace health checked" : "Workspace needs attention", report.ok ? "saved" : "dirty");
-}
-
-async function exportQualityPassport() {
-  if (!editorSessionStore.getProject()) return;
-  try {
-    const data = await reportDataService.build();
-    editorSessionStore.replaceQaChecks(data.qaChecks);
-    state.qaFilter = "";
-    editorSessionStore.replaceQualityRiskQueue(data.qualityPassport.riskQueue);
-    renderQaResults();
-    renderQualityWorkbench();
-    renderValidationReport(data.validation);
-    const base = fileSafeName(editorSessionStore.getProject().name || "project");
-    download(
-      `${base}_quality-passport.html`,
-      finalizeReportDocument(reportDocumentCompositionService.qualityPassportHtml(data)),
-      "text/html"
-    );
-    const activityLogged = await logOptionalProjectActivity("export", "Quality Passport exported", {
-      segmentCount: data.analysis.totals.segments,
-      wordCount: data.analysis.totals.words,
-      qaIssueCount: data.qaChecks.length,
-      qualityScore: data.qualityPassport.confidenceScore,
-      highRiskCount: data.qualityPassport.riskQueue.highRiskCount,
-      validationNoteCount: reportCount(data.validation)
-    }, "Quality Passport export");
-    const hasNotes = data.qaChecks.length || data.qualityPassport.riskQueue.highRiskCount || reportCount(data.validation);
-    setSaveStatus(appendActivityWarning(hasNotes ? "Quality Passport exported with notes" : "Quality Passport exported", activityLogged), exportStatusMode(hasNotes ? "dirty" : "saved", activityLogged));
-  } catch (error) {
-    setSaveStatus(error.message || "Quality Passport export failed", "dirty");
-  }
-}
-
-async function exportProjectReport(options = {}) {
-  if (!editorSessionStore.getProject()) return;
-  try {
-    const anonymized = Boolean(options.anonymized);
-    const data = await reportDataService.build();
-    editorSessionStore.replaceQaChecks(data.qaChecks);
-    state.qaFilter = "";
-    renderQaResults();
-    renderValidationReport(data.validation);
-    const base = fileSafeName(editorSessionStore.getProject().name || "project");
-    download(
-      `${base}_${anonymized ? "anonymized-" : ""}project-report.html`,
-      finalizeReportDocument(reportDocumentCompositionService.projectReportHtml(data, { anonymized })),
-      "text/html"
-    );
-    const label = anonymized ? "Anonymized report" : "Project report";
-    const activityLogged = await logOptionalProjectActivity("export", anonymized ? "Anonymized project report exported" : "Project report exported", {
-      segmentCount: data.analysis.totals.segments,
-      wordCount: data.analysis.totals.words,
-      qaIssueCount: data.qaChecks.length,
-      validationNoteCount: reportCount(data.validation),
-      anonymized
-    }, `${label} export`);
-    const message = data.qaChecks.length || reportCount(data.validation) ? `${label} exported with notes` : `${label} exported`;
-    setSaveStatus(appendActivityWarning(message, activityLogged), exportStatusMode(data.qaChecks.length || reportCount(data.validation) ? "dirty" : "saved", activityLogged));
-  } catch (error) {
-    setSaveStatus(error.message || "Project report export failed", "dirty");
-  }
 }
 
 async function exportTargetText() {

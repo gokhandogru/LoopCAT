@@ -110,6 +110,7 @@ import { createAiProviderService } from "../ai/providers/legacy-registry-adapter
 import { finalizeReportDocument } from "../reports/report-document.js";
 import { createReportDocumentCompositionService } from "../reports/report-document-composition-service.js";
 import { createReportDataService } from "../reports/report-data-service.js";
+import { createReportExportController } from "../reports/report-export-controller.js";
 import { createReportPresentationService } from "../reports/report-presentation-service.js";
 import { createLocaleLoader } from "../i18n/locale-loader.js";
 import { createUiLocalizationService } from "../i18n/ui-localization-service.js";
@@ -204,6 +205,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createImportExportController,
       createReportDataService,
       createReportDocumentCompositionService,
+      createReportExportController,
       createReportPresentationService,
       createUiLocalizationService,
       createProjectDialogController,

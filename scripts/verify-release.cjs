@@ -331,10 +331,10 @@ const uiLocalizationServiceJs = readText("src/i18n/ui-localization-service.js");
 const uiLocalizationServiceUnitTests = readText("tests/unit/ui-localization-service.test.cjs");
 const reportDataServiceJs = readText("src/reports/report-data-service.js");
 const reportDataServiceUnitTests = readText("tests/unit/report-data-service.test.cjs");
+const reportExportControllerJs = readText("src/reports/report-export-controller.js");
+const reportExportControllerUnitTests = readText("tests/unit/report-export-controller.test.cjs");
 const reportDocumentCompositionServiceJs = readText("src/reports/report-document-composition-service.js");
-const reportDocumentCompositionServiceUnitTests = readText(
-  "tests/unit/report-document-composition-service.test.cjs"
-);
+const reportDocumentCompositionServiceUnitTests = readText("tests/unit/report-document-composition-service.test.cjs");
 const reportPresentationServiceJs = readText("src/reports/report-presentation-service.js");
 const reportPresentationServiceUnitTests = readText("tests/unit/report-presentation-service.test.cjs");
 const i18nExtractScript = readText("scripts/i18n-extract.cjs");
@@ -568,6 +568,16 @@ assertIncludes(
   "createReportDataService,",
   "The application runtime must expose the checked report-data factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createReportExportController } from "../reports/report-export-controller.js";',
+  "The application runtime must install the checked report-export controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createReportExportController,",
+  "The application runtime must expose the checked report-export factory."
+);
 for (const snippet of [
   "const translate = (key, values = {})",
   "const source = (text, values = {})",
@@ -670,11 +680,7 @@ for (const boundary of [
   "qaCheckMessage",
   "qaCheckFixHint"
 ]) {
-  assertIncludes(
-    appJs,
-    boundary,
-    `report-presentation composition must inject the ${boundary} boundary.`
-  );
+  assertIncludes(appJs, boundary, `report-presentation composition must inject the ${boundary} boundary.`);
 }
 for (const method of [
   "listHtml",
@@ -721,7 +727,7 @@ for (const snippet of [
   ".slice(0, 20)",
   ".slice(0, 3)",
   '.join(" ")',
-  'Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'',
+  "Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'",
   'uiLocalizationService.source("Anonymized project")',
   "return Object.freeze({ projectReportHtml, qualityPassportHtml })"
 ]) {
@@ -749,16 +755,12 @@ for (const boundary of [
   "qualityCategoryName",
   "qualityRiskLevelLabel"
 ]) {
-  assertIncludes(
-    appJs,
-    boundary,
-    `report-document composition must inject the ${boundary} boundary.`
-  );
+  assertIncludes(appJs, boundary, `report-document composition must inject the ${boundary} boundary.`);
 }
 for (const method of ["projectReportHtml", "qualityPassportHtml"]) {
   assertIncludes(
-    appJs,
-    `reportDocumentCompositionService.${method}`,
+    reportExportControllerJs,
+    `documents.${method}`,
     `report export orchestration must call ReportDocumentCompositionService.${method} directly.`
   );
   const directGenerator = new RegExp(`function\\s+${method}\\b`);
@@ -803,7 +805,7 @@ for (const snippet of [
   "await fallback()",
   'const key = keyFn(item) || "unknown";',
   "generatedAt: timestamp()",
-  "redactSensitiveText(term.notes || \"\").trim()",
+  'redactSensitiveText(term.notes || "").trim()',
   "a.termBaseName.localeCompare(b.termBaseName) || a.sourceTerm.localeCompare(b.sourceTerm)",
   "return Object.freeze({ build })"
 ]) {
@@ -828,10 +830,11 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `report-data composition must inject the ${boundary} boundary.`);
 }
 assertIncludes(
-  appJs,
-  "const data = await reportDataService.build();",
-  "report exports must collect data through ReportDataService directly."
+  reportExportControllerJs,
+  "const reportData = await data.build();",
+  "the report-export controller must collect data through ReportDataService directly."
 );
+assertIncludes(appJs, "data: reportDataService", "app.js must inject ReportDataService into report exports.");
 assertIncludes(
   appWorkflowDriverJs,
   "const labelReportData = await reportDataService.build();",
@@ -855,6 +858,79 @@ for (const testName of [
     `focused report-data tests must retain characterization: ${testName}`
   );
 }
+for (const snippet of [
+  "if (!session.getProject()) return;",
+  "const anonymized = Boolean(options.anonymized);",
+  "session.replaceQaChecks(reportData.qaChecks);",
+  "session.replaceQualityRiskQueue(reportData.qualityPassport.riskQueue);",
+  "presentation.renderQualityWorkbench();",
+  "finalizeDocument(documents.qualityPassportHtml(reportData))",
+  "finalizeDocument(documents.projectReportHtml(reportData, { anonymized }))",
+  '"Quality Passport exported"',
+  '"Anonymized project report exported"',
+  "status.appendActivityWarning",
+  "status.exportMode",
+  "return Object.freeze({ exportProjectReport, exportAnonymizedReport, exportQualityPassport })"
+]) {
+  assertIncludes(
+    reportExportControllerJs,
+    snippet,
+    `ReportExportController must retain characterized export policy: ${snippet}`
+  );
+}
+assertIncludes(appJs, "createReportExportController({", "app.js must compose the checked report-export controller.");
+for (const boundary of [
+  "replaceQaChecks: editorSessionStore.replaceQaChecks",
+  "replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue",
+  "clearQaFilter: () =>",
+  "data: reportDataService",
+  "documents: reportDocumentCompositionService",
+  "finalizeDocument: finalizeReportDocument",
+  "fileSafeName",
+  "download",
+  "renderQaResults",
+  "renderQualityWorkbench",
+  "renderValidationReport",
+  "validation: { reportCount }",
+  "logOptionalProject: logOptionalProjectActivity",
+  "appendActivityWarning",
+  "exportMode: exportStatusMode",
+  "set: setSaveStatus"
+]) {
+  assertIncludes(appJs, boundary, `report-export composition must inject the ${boundary} boundary.`);
+}
+for (const method of ["exportProjectReport", "exportAnonymizedReport", "exportQualityPassport"]) {
+  assertIncludes(
+    appJs,
+    `reportExportController.${method}`,
+    `application report consumers must call ReportExportController.${method} directly.`
+  );
+}
+for (const removedHelper of ["exportProjectReport", "exportQualityPassport"]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} orchestration must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "ReportExportController preserves normal and anonymized report filenames, documents, activity, and status",
+  "ReportExportController preserves Quality Passport session, presentation, download, activity, and note policy",
+  "ReportExportController returns before report effects when no project is selected",
+  "ReportExportController preserves activity-warning status without treating a completed download as failure",
+  "ReportExportController contains primary failures with exact report-specific status"
+]) {
+  assertIncludes(
+    reportExportControllerUnitTests,
+    testName,
+    `focused report-export tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  'extractScript(messagesByText, reportExportControllerPath, "src/reports/report-export-controller.js")',
+  "source-catalog extraction must scan the checked report-export controller."
+);
 assertIncludes(
   appJs,
   "source: uiLocalizationService.source",
@@ -7395,7 +7471,11 @@ assertIncludes(
   "quality.js must expose risk-prioritized review queue construction."
 );
 assertIncludes(qualityJs, "function qualityCategoryLabel", "quality.js must label quality decision categories.");
-assertIncludes(appJs, "function exportQualityPassport", "app.js must wire Quality Passport export.");
+assertIncludes(
+  appJs,
+  "reportExportController.exportQualityPassport",
+  "app.js must wire Quality Passport export through the checked controller."
+);
 assertIncludes(
   appJs,
   "saveDecision: (values) => qualityDecisionController.save(values)",
