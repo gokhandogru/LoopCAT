@@ -1414,7 +1414,7 @@ targetEditController = appRuntime.featureFactories.createTargetEditController({
   editorSessionStore,
   commandBus: appRuntime.commands.bus,
   editTargetSessions: appRuntime.commands.editTargetSessions,
-  persistence: { debounce: (segment) => autosaveService.debounce(segment) },
+  persistence: { debounce: autosaveService.debounce },
   status: { commandsChanged: renderUndoControls },
   selection: {
     getActiveIndex: currentActiveIndex,
@@ -1446,7 +1446,7 @@ const targetProducerController = appRuntime.featureFactories.createTargetProduce
   editLifecycle: { finalize: finalizePendingEditCommand },
   persistence: {
     clearPending: clearPendingSave,
-    debounce: debounceSave
+    debounce: autosaveService.debounce
   },
   selection: {
     getActiveIndex: currentActiveIndex,
@@ -1540,7 +1540,16 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
     getDocumentSegments: currentDocumentSegments,
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment))
   },
-  threshold: { request: requestTmPretranslationThreshold },
+  threshold: {
+    request: () => {
+      if (!tmPretranslationDialogController?.request) {
+        throw new Error("TM pretranslation settings are unavailable in this browser.");
+      }
+      return tmPretranslationDialogController.request({
+        returnTarget: els.segmentToolsMenuSummary
+      });
+    }
+  },
   tm: {
     getNames: projectTmNames,
     findMatchesBatch: findProjectTmMatchesBatch
@@ -5161,7 +5170,7 @@ function commandList() {
     { id: "undo", label: "Undo last action", run: undoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canUndo?.(commandProjectId)) },
     { id: "redo", label: "Redo last action", run: redoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canRedo?.(commandProjectId)) },
     { id: "trash", label: "Open Trash", run: openTrash, enabled: Boolean(appRuntime?.trashRepository) },
-    { id: "confirm", label: "Confirm segment", run: confirmCurrentSegment, enabled: Boolean(currentSegment()?.target?.trim()) },
+    { id: "confirm", label: "Confirm segment", run: segmentConfirmationController.confirm, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(currentSegments().length) },
     { id: "focus-mode", label: currentFocusMode() ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(currentApplicationView() === "editor" && currentProject()) },
     { id: "copy-source", label: "Copy source", run: targetProducerController.copySourceToTarget, enabled: Boolean(currentSegment()) },
@@ -7000,7 +7009,7 @@ async function setActiveSegment(index) {
   const oldIndex = currentActiveIndex();
   verticalFeatureState?.segmentGrid?.selectSegment(index, currentSegments()[index]?.id || "");
   verticalFeatureState?.inspector?.setContext({ segmentId: currentSegments()[index]?.id || "" });
-  renderConfirmBusyState();
+  segmentConfirmationController.renderBusy();
   ensureSegmentVisible(index);
   updateRow(oldIndex);
   updateRow(index);
@@ -7200,18 +7209,6 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
   }
 }
 
-async function replaceTargetText(scope = "visible") {
-  return targetReplacementController.replace(scope);
-}
-
-function debounceSave(segment) {
-  return autosaveService.debounce(segment);
-}
-
-function renderConfirmBusyState() {
-  return segmentConfirmationController.renderBusy();
-}
-
 function applySegmentConfirmation(segment) {
   recordSegmentTargetHistory(segment, segment.target, "confirmed", "confirm");
   segment.status = "confirmed";
@@ -7256,10 +7253,6 @@ async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = 
   }
 }
 
-async function confirmCurrentSegment() {
-  return segmentConfirmationController.confirm();
-}
-
 async function saveSegmentToTm(segment, project = currentProject()) {
   if (!segment || !project || !segment.source.trim() || !segment.target.trim()) return null;
       if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG]) throw new Error("Simulated TM save failure");
@@ -7289,17 +7282,6 @@ async function saveActiveSegmentToTm(options = {}) {
     setSaveStatus(error.message || "Save to TM failed", "dirty");
     return null;
   }
-}
-
-function requestTmPretranslationThreshold() {
-  if (!tmPretranslationDialogController?.request) {
-    throw new Error("TM pretranslation settings are unavailable in this browser.");
-  }
-  return tmPretranslationDialogController.request({ returnTarget: els.segmentToolsMenuSummary });
-}
-
-async function pretranslateFromTm() {
-  return tmPretranslationController.pretranslate();
 }
 
 function selectedConcordanceKeyword() {

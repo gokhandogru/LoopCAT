@@ -1041,7 +1041,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.replaceWithInput.value = "AnÄ±nda";
     const targetBeforeReplaceCommand = currentSegments()[segmentIndex].target;
     clearWorkspaceDirtyMarkers();
-    const replaceResult = await replaceTargetText("visible");
+    const replaceResult = await targetReplacementController.replace("visible");
     assert(currentSegments()[segmentIndex].targetHistory?.some((entry) => entry.reason === "replace"), "replace records target revision history");
     assert(replaceResult.replacementCount === 1 && currentSegments()[segmentIndex].target.startsWith("AnÄ±nda"), "visible target replace updates matching segment");
     const replacedSegments = await getProjectSegments(project.id);
@@ -1077,7 +1077,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.replaceFindInput.value = "hedef";
     els.replaceWithInput.value = "Kaydedilemeyen";
     setHiddenSegmentField(currentSegments()[segmentIndex], REPLACE_SAVE_FAILURE_TEST_FLAG, true);
-    const failedReplaceResult = await replaceTargetText("visible");
+    const failedReplaceResult = await targetReplacementController.replace("visible");
     const afterFailedReplaceStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
     assert(
       failedReplaceResult.segmentCount === 0 &&
@@ -3167,7 +3167,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     };
     const runTmPretranslationFromDialog = async () => {
       els.segmentToolsMenuSummary.focus();
-      const pending = pretranslateFromTm();
+      const pending = tmPretranslationController.pretranslate();
       await yieldToUi();
       assert(
         els.tmPretranslateDialog.open &&
@@ -3182,7 +3182,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     let tmPretranslationCommand = null;
     try {
       els.segmentToolsMenuSummary.focus();
-      const canceledPretranslation = pretranslateFromTm();
+      const canceledPretranslation = tmPretranslationController.pretranslate();
       await yieldToUi();
       els.tmPretranslateDialog.close("cancel");
       assert(
@@ -3771,7 +3771,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     if (els.segmentStatusFilter) els.segmentStatusFilter.value = "all";
     if (els.reviewStateFilter) els.reviewStateFilter.value = "";
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
-    await confirmCurrentSegment();
+    await segmentConfirmationController.confirm();
     await setActiveSegment(segmentIndex);
     renderSegments();
     const confirmedReviewedAiSegment = currentSegments()[segmentIndex];
@@ -3824,7 +3824,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await saveSegment(confirmRollbackSegment);
     const rollbackHistoryCount = confirmRollbackSegment.targetHistory?.length || 0;
     setHiddenSegmentField(confirmRollbackSegment, CONFIRM_FAILURE_TEST_FLAG, true);
-    await confirmCurrentSegment();
+    await segmentConfirmationController.confirm();
     assert(
       els.saveStatus.textContent.includes("Simulated confirm save failure") &&
         currentSegments()[segmentIndex].status === "draft" &&
@@ -3837,7 +3837,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await saveSegment(confirmRollbackSegment);
     const persistedRollbackHistoryCount = confirmRollbackSegment.targetHistory?.length || 0;
     setHiddenSegmentField(confirmRollbackSegment, CONFIRM_POST_SAVE_FAILURE_TEST_FLAG, true);
-    await confirmCurrentSegment();
+    await segmentConfirmationController.confirm();
     const persistedAfterConfirmFailure = (await getProjectSegments(project.id)).find((segment) => segment.id === confirmRollbackSegment.id);
     assert(
       els.saveStatus.textContent.includes("Simulated post-save confirm failure") &&
@@ -3851,7 +3851,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     touchSegment(confirmRollbackSegment);
     await saveSegment(confirmRollbackSegment);
     setHiddenSegmentField(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG, true);
-    await confirmCurrentSegment();
+    await segmentConfirmationController.confirm();
     const persistedAfterConfirmTmFailure = (await getProjectSegments(project.id)).find((segment) => segment.id === confirmRollbackSegment.id);
     assert(
       els.saveStatus.textContent.includes("TM save failed") &&
@@ -3867,7 +3867,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     touchSegment(confirmRollbackSegment);
     await saveSegment(confirmRollbackSegment);
     setHiddenSegmentField(confirmRollbackSegment, CONFIRM_ACTIVITY_FAILURE_TEST_FLAG, true);
-    await confirmCurrentSegment();
+    await segmentConfirmationController.confirm();
     const persistedAfterConfirmActivityFailure = (await getProjectSegments(project.id)).find((segment) => segment.id === confirmRollbackSegment.id);
     assert(
       els.saveStatus.textContent.includes("activity log failed") &&

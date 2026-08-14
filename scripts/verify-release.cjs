@@ -1361,10 +1361,21 @@ assertIncludes(
   "createTmPretranslationDialogController",
   "app.js must compose the checked TM threshold prompt controller."
 );
-assertIncludes(
-  functionBody(appJs, "function requestTmPretranslationThreshold", "async function pretranslateFromTm"),
-  "returnTarget: els.segmentToolsMenuSummary",
-  "the TM prompt must restore focus to the visible Segment tools trigger rather than its collapsed menu item."
+for (const thresholdAdapterBoundary of [
+  "if (!tmPretranslationDialogController?.request)",
+  'throw new Error("TM pretranslation settings are unavailable in this browser.")',
+  "return tmPretranslationDialogController.request({",
+  "returnTarget: els.segmentToolsMenuSummary"
+]) {
+  assertIncludes(
+    appJs,
+    thresholdAdapterBoundary,
+    `the late-bound TM threshold adapter must preserve ${thresholdAdapterBoundary}.`
+  );
+}
+assert(
+  !appJs.includes("function requestTmPretranslationThreshold"),
+  "the TM-threshold forwarding façade must not return."
 );
 assertIncludes(appJs, "createOpusCatHelpController", "app.js must compose the checked OPUS-CAT help controller.");
 assert(
@@ -1372,9 +1383,7 @@ assert(
     !appJs.includes('els.localAiOpusCatHelpBtn?.addEventListener("click"') &&
     !appJs.includes('els.closeOpusCatHelpBtn?.addEventListener("click"') &&
     !appJs.includes('els.retryOpusCatConnectionBtn?.addEventListener("click"') &&
-    !functionBody(appJs, "function requestTmPretranslationThreshold", "async function pretranslateFromTm").includes(
-      'addEventListener("close"'
-    ),
+    !appJs.includes('addEventListener("close"'),
   "migrated TM and OPUS-CAT dialogs must not retain superseded app.js lifecycle listeners."
 );
 assertIncludes(
@@ -1855,11 +1864,24 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "return segmentConfirmationController.confirm()",
-  "app.js must delegate the compatibility confirm entry point to SegmentConfirmationController."
+  "run: segmentConfirmationController.confirm",
+  "the command palette must route confirmation directly to SegmentConfirmationController."
+);
+assertIncludes(
+  appJs,
+  "segmentConfirmationController.renderBusy()",
+  "active-segment changes must render confirmation busy state directly through SegmentConfirmationController."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  "segmentConfirmationController.confirm()",
+  "workflow characterization must call SegmentConfirmationController directly."
 );
 assert(
-  !appJs.includes("confirmingSegmentIds") && !appJs.includes('els.confirmBtn.addEventListener("click"'),
+  !appJs.includes("function renderConfirmBusyState") &&
+    !appJs.includes("async function confirmCurrentSegment") &&
+    !appJs.includes("confirmingSegmentIds") &&
+    !appJs.includes('els.confirmBtn.addEventListener("click"'),
   "app.js must not regain segment-confirmation event or busy-state ownership."
 );
 assertIncludes(
@@ -1930,6 +1952,11 @@ assertIncludes(
   "await repository.saveMany(segments)",
   "AutosaveService must flush target edits through the injected repository boundary."
 );
+assert(
+  appJs.split("debounce: autosaveService.debounce").length - 1 === 2,
+  "target editing and discrete producers must schedule persistence directly through AutosaveService."
+);
+assert(!appJs.includes("function debounceSave"), "the autosave forwarding façade must not return.");
 assertIncludes(
   targetEditControllerUnitTests,
   "target editor owns focus, composition input, coalescing, blur finalization, and listener cleanup",
@@ -2074,19 +2101,12 @@ assertIncludes(
   "app.js must delegate replacement button lifecycle to TargetReplacementController."
 );
 assertIncludes(
-  appJs,
-  "return targetReplacementController.replace(scope)",
-  "app.js must retain only the checked target-replacement compatibility facade."
+  appWorkflowDriverJs,
+  'targetReplacementController.replace("visible")',
+  "workflow characterization must call TargetReplacementController directly."
 );
-const targetReplacementFacade = functionBody(appJs, "async function replaceTargetText", "function debounceSave");
 assert(
-  !targetReplacementFacade.includes("replaceOutsideProtectedTokens(") &&
-    !targetReplacementFacade.includes("flushPendingSegmentSaves(") &&
-    !targetReplacementFacade.includes("createReplaceTargetsCommand(") &&
-    !targetReplacementFacade.includes("saveSegments(") &&
-    !targetReplacementFacade.includes("logProjectActivity(") &&
-    !targetReplacementFacade.includes("renderSegments(") &&
-    !targetReplacementFacade.includes("Reflect.ownKeys") &&
+  !appJs.includes("async function replaceTargetText") &&
     !appJs.includes('els.replaceVisibleBtn.addEventListener("click"') &&
     !appJs.includes('els.replaceAllBtn.addEventListener("click"'),
   "app.js must not regain target-replacement input, event, mutation, command, persistence, activity, presentation, or rollback orchestration."
@@ -2457,23 +2477,12 @@ assertIncludes(
   "app.js must delegate the TM pretranslation button lifecycle to TmPretranslationController."
 );
 assertIncludes(
-  appJs,
-  "return tmPretranslationController.pretranslate()",
-  "app.js must retain only the checked TM-pretranslation compatibility facade."
-);
-const tmPretranslationFacade = functionBody(
-  appJs,
-  "async function pretranslateFromTm",
-  "function selectedConcordanceKeyword"
+  appWorkflowDriverJs,
+  "tmPretranslationController.pretranslate()",
+  "workflow characterization must call TmPretranslationController directly."
 );
 assert(
-  !tmPretranslationFacade.includes("currentDocumentSegments(") &&
-    !tmPretranslationFacade.includes("findProjectTmMatchesBatch(") &&
-    !tmPretranslationFacade.includes("createTmPretranslationCommand(") &&
-    !tmPretranslationFacade.includes("saveSegments(") &&
-    !tmPretranslationFacade.includes("logProjectActivity(") &&
-    !tmPretranslationFacade.includes("renderSegments(") &&
-    !tmPretranslationFacade.includes("Reflect.ownKeys") &&
+  !appJs.includes("async function pretranslateFromTm") &&
     !appJs.includes("tmPretranslating:") &&
     !appJs.includes('els.pretranslateBtn.addEventListener("click"'),
   "app.js must not regain TM-pretranslation busy, candidate, lookup-loop, mutation, command, persistence, activity, presentation, or rollback orchestration."
