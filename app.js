@@ -1758,8 +1758,8 @@ const aiProviderFormController =
       shouldLiveSync: shouldLiveSyncLanguageInput
     },
     prompt: {
-      render: renderLocalAiPromptPreview,
-      previewRequest: localAiPromptPreviewRequest
+      render: (...args) => aiPromptPreviewController.render(...args),
+      previewRequest: (...args) => aiPromptPreviewController.createRequest(...args)
     },
     help: { hideOpusCat: () => setOpusCatConnectionHelpVisible(false) },
     keys: { clearLocal: clearLocalAiKey, clearOpenAi: clearOpenAiKey },
@@ -2648,7 +2648,7 @@ const aiProviderAdministrationOperationsController =
     presentation: {
       renderPresets: aiProviderFormController.renderPresets,
       renderProvider: aiProviderFormController.renderProvider,
-      renderPrompt: renderLocalAiPromptPreview,
+      renderPrompt: (...args) => aiPromptPreviewController.render(...args),
       renderModels: aiProviderFormController.renderModels
     },
     help: {
@@ -2697,11 +2697,11 @@ const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestCon
     assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
   prompt: {
-    getMode: localAiPromptMode,
-    getSampleText: localAiSampleText,
-    createRequest: localAiPromptPreviewRequest,
-    getModeLabel: localAiPromptModeLabel,
-    getContextLabels: localAiPromptTestContextLabels,
+    getMode: aiPromptPreviewController.getMode,
+    getSampleText: aiPromptPreviewController.getSampleText,
+    createRequest: aiPromptPreviewController.createRequest,
+    getModeLabel: aiPromptPreviewController.getModeLabel,
+    getContextLabels: aiPromptPreviewController.getContextLabels,
     hasProjectBriefSamples: aiScopeSelectionService.hasProjectBriefSamples
   },
   providers: {
@@ -5966,41 +5966,6 @@ function renderAll() {
   renderProgress();
 }
 
-function localAiSampleText() {
-  return aiPromptPreviewController.getSampleText();
-}
-
-function localAiPromptMode() {
-  return aiPromptPreviewController.getMode();
-}
-
-function localAiPromptModeLabel(mode = localAiPromptMode()) {
-  return aiPromptPreviewController.getModeLabel(mode);
-}
-
-function localAiPromptTestSystem(mode = localAiPromptMode()) {
-  return aiPromptPreviewController.getSystem(mode);
-}
-
-function localAiPromptTestContextLabels(mode = localAiPromptMode()) {
-  return aiPromptPreviewController.getContextLabels(mode);
-}
-
-function localAiPreviewTermsForSegment(segment = currentSegment()) {
-  return aiPromptPreviewController.termsForSegment(segment);
-}
-
-function localAiPromptPreviewRequest(
-  settings = aiRuntimeSettingsService.localSettingsFromForm(),
-  mode = localAiPromptMode()
-) {
-  return aiPromptPreviewController.createRequest(settings, mode);
-}
-
-function renderLocalAiPromptPreview() {
-  return aiPromptPreviewController.render();
-}
-
 function renderEditor() {
   syncLegacyApplicationState();
   const hasProject = Boolean(currentProject());
@@ -7046,7 +7011,7 @@ async function setActiveSegment(index) {
   ensureSegmentVisible(index);
   updateRow(oldIndex);
   updateRow(index);
-  renderLocalAiPromptPreview();
+  aiPromptPreviewController.render();
   await refreshSidebar();
 }
 

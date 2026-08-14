@@ -2641,46 +2641,45 @@ for (const boundary of [
     `AiPromptPreviewController must retain checked ${boundary} context and routing.`
   );
 }
-for (const [start, end, delegation] of [
-  ["function localAiSampleText", "function localAiPromptMode", "return aiPromptPreviewController.getSampleText()"],
-  ["function localAiPromptMode", "function localAiPromptModeLabel", "return aiPromptPreviewController.getMode()"],
-  [
-    "function localAiPromptModeLabel",
-    "function localAiPromptTestSystem",
-    "return aiPromptPreviewController.getModeLabel(mode)"
-  ],
-  [
-    "function localAiPromptTestSystem",
-    "function localAiPromptTestContextLabels",
-    "return aiPromptPreviewController.getSystem(mode)"
-  ],
-  [
-    "function localAiPromptTestContextLabels",
-    "function localAiPreviewTermsForSegment",
-    "return aiPromptPreviewController.getContextLabels(mode)"
-  ],
-  [
-    "function localAiPreviewTermsForSegment",
-    "function localAiPromptPreviewRequest",
-    "return aiPromptPreviewController.termsForSegment(segment)"
-  ],
-  [
-    "function localAiPromptPreviewRequest",
-    "function renderLocalAiPromptPreview",
-    "return aiPromptPreviewController.createRequest(settings, mode)"
-  ],
-  ["function renderLocalAiPromptPreview", "function renderEditor", "return aiPromptPreviewController.render()"]
+for (const consumer of [
+  "render: (...args) => aiPromptPreviewController.render(...args)",
+  "previewRequest: (...args) => aiPromptPreviewController.createRequest(...args)",
+  "renderPrompt: (...args) => aiPromptPreviewController.render(...args)",
+  "getMode: aiPromptPreviewController.getMode",
+  "getSampleText: aiPromptPreviewController.getSampleText",
+  "createRequest: aiPromptPreviewController.createRequest",
+  "getModeLabel: aiPromptPreviewController.getModeLabel",
+  "getContextLabels: aiPromptPreviewController.getContextLabels",
+  "aiPromptPreviewController.render();"
 ]) {
-  const facade = functionBody(appJs, start, end);
-  assertIncludes(facade, delegation, `${start} must delegate to the checked AI-prompt-preview controller.`);
+  assertIncludes(
+    appJs,
+    consumer,
+    `app.js must route the ${consumer} consumer through the checked AI-prompt-preview controller.`
+  );
+}
+assertIncludes(
+  appWorkflowDriverJs,
+  "aiPromptPreviewController.render();",
+  "workflow characterization must route prompt-preview rendering through the checked controller."
+);
+assert(
+  !appWorkflowDriverJs.includes("renderLocalAiPromptPreview("),
+  "workflow characterization must not retain the removed AI-prompt-preview compatibility façade."
+);
+for (const removedFacade of [
+  "function localAiSampleText",
+  "function localAiPromptMode",
+  "function localAiPromptModeLabel",
+  "function localAiPromptTestSystem",
+  "function localAiPromptTestContextLabels",
+  "function localAiPreviewTermsForSegment",
+  "function localAiPromptPreviewRequest",
+  "function renderLocalAiPromptPreview"
+]) {
   assert(
-    !facade.includes("readPromptState(") &&
-      !facade.includes("currentProjectTerms(") &&
-      !facade.includes("segmentTags(") &&
-      !facade.includes("buildAiReviewPrompt(") &&
-      !facade.includes("buildTranslateGemmaPrompt(") &&
-      !facade.includes("renderPromptPreview("),
-    "app.js must not regain AI prompt mode, context, builder-routing, or preview-presentation orchestration."
+    !appJs.includes(removedFacade),
+    `${removedFacade} must not return after direct checked prompt-preview consumer wiring.`
   );
 }
 for (const testName of [

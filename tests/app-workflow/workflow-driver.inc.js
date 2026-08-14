@@ -3335,10 +3335,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.localAiPromptModeSelect?.dispatchEvent(new Event("change", { bubbles: true }));
       const reviewPromptPreview = els.localAiPromptPreview?.value || "";
       if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "tag-repair";
-      renderLocalAiPromptPreview();
+      aiPromptPreviewController.render();
       const repairPromptPreview = els.localAiPromptPreview?.value || "";
       if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "project-brief";
-      renderLocalAiPromptPreview();
+      aiPromptPreviewController.render();
       const briefPromptPreview = els.localAiPromptPreview?.value || "";
       localAiGlossaryProvider.completePrompt = async (_config, request) => {
         assert(
@@ -3355,7 +3355,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         };
       };
       if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "review";
-      renderLocalAiPromptPreview();
+      aiPromptPreviewController.render();
       const promptModeTested = await testLocalAiPrompt();
       await Promise.resolve();
       assert(
@@ -3371,7 +3371,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "checked AI administration controller owns prompt preview events and output disclosure"
       );
       if (els.localAiPromptModeSelect) els.localAiPromptModeSelect.value = "pretranslate";
-      renderLocalAiPromptPreview();
+      aiPromptPreviewController.render();
       localAiGlossaryProvider.translateSegment = async (config, request) => {
         localAiGlossaryRequest = request;
         assert(
