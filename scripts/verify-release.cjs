@@ -187,6 +187,7 @@ const requiredReleaseFiles = [
   "src/features/ai/ai-prompt-test-controller.js",
   "src/features/ai/ai-prompt-preview-controller.js",
   "src/features/ai/ai-term-candidate-persistence-service.js",
+  "src/features/ai/ai-segment-context-service.js",
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
   "src/features/ai/ai-project-brief-controller.js",
@@ -214,6 +215,7 @@ const requiredReleaseFiles = [
   "tests/unit/ai-prompt-test-controller.test.cjs",
   "tests/unit/ai-prompt-preview-controller.test.cjs",
   "tests/unit/ai-term-candidate-persistence-service.test.cjs",
+  "tests/unit/ai-segment-context-service.test.cjs",
   "tests/unit/ai-alternatives-controller.test.cjs",
   "tests/unit/ai-draft-editing-controller.test.cjs",
   "tests/unit/ai-project-brief-controller.test.cjs",
@@ -362,6 +364,8 @@ const aiTermCandidatePersistenceServiceJs = readText("src/features/ai/ai-term-ca
 const aiTermCandidatePersistenceServiceUnitTests = readText(
   "tests/unit/ai-term-candidate-persistence-service.test.cjs"
 );
+const aiSegmentContextServiceJs = readText("src/features/ai/ai-segment-context-service.js");
+const aiSegmentContextServiceUnitTests = readText("tests/unit/ai-segment-context-service.test.cjs");
 const aiPretranslationControllerJs = readText("src/features/ai/ai-pretranslation-controller.js");
 const aiPretranslationControllerUnitTests = readText("tests/unit/ai-pretranslation-controller.test.cjs");
 const aiReviewControllerJs = readText("src/features/ai/ai-review-controller.js");
@@ -2571,6 +2575,83 @@ for (const testName of [
     aiPromptPreviewControllerUnitTests,
     testName,
     `focused AI-prompt-preview tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiSegmentContextService",
+  "The application runtime must expose the checked shared AI-segment-context service boundary."
+);
+for (const boundary of [
+  "async function glossaryTermsForSegment(segment)",
+  "project.normalizeAiSettings(selectedProject.aiSettings).useTermbaseContext === false",
+  "return await lookup.findTerms({",
+  "termBaseNames: resources.getTermBaseNames()",
+  'logger.warn?.("Local AI pretranslation termbase lookup failed.", error)',
+  "async function tmMatchesForSegment(segment)",
+  "project.normalizeAiSettings(selectedProject.aiSettings).useTmContext === false",
+  "return await lookup.findTmMatches({",
+  "tmNames: resources.getTmNames()",
+  "limit: 3",
+  'logger.warn?.("Local AI pretranslation TM lookup failed.", error)',
+  "function surroundingSegmentsForSegment(segment, options = {})",
+  "const settings = options.settings || settingsBoundary.read()",
+  "Array.isArray(options.segments) && options.segments.length",
+  "const segmentIndex = segments.findIndex((item) => item?.id === segment.id)",
+  "return item?.documentId === segment.documentId",
+  "index >= 0 && before.length < 2",
+  "index < segments.length && after.length < 2",
+  "relation: `Previous segment ${before.length + 1}`",
+  "relation: `Next segment ${after.length + 1}`",
+  "return [...before, ...after]"
+]) {
+  assertIncludes(
+    aiSegmentContextServiceJs,
+    boundary,
+    `AiSegmentContextService must retain checked ${boundary} policy and selection.`
+  );
+}
+for (const [start, end, delegation] of [
+  [
+    "async function localAiGlossaryTermsForSegment",
+    "async function localAiTmMatchesForSegment",
+    "return aiSegmentContextService.glossaryTermsForSegment(segment)"
+  ],
+  [
+    "async function localAiTmMatchesForSegment",
+    "function localAiSurroundingSegmentsForSegment",
+    "return aiSegmentContextService.tmMatchesForSegment(segment)"
+  ],
+  [
+    "function localAiSurroundingSegmentsForSegment",
+    "async function pretranslateWithLocalAi",
+    "return aiSegmentContextService.surroundingSegmentsForSegment(segment, options)"
+  ]
+]) {
+  const facade = functionBody(appJs, start, end);
+  assertIncludes(facade, delegation, `${start} must delegate to the checked AI-segment-context service.`);
+  assert(
+    !facade.includes("defaultAiSettings(") &&
+      !facade.includes("findTerms(") &&
+      !facade.includes("findProjectTmMatches(") &&
+      !facade.includes("projectTermBaseNames(") &&
+      !facade.includes("projectTmNames(") &&
+      !facade.includes("currentSegments(") &&
+      !facade.includes("console.warn("),
+    "app.js must not regain shared AI termbase/TM lookup policy, warning containment, or nearby-segment selection."
+  );
+}
+for (const testName of [
+  "AI segment context preserves missing project, segment, and project-level context opt-outs",
+  "AI segment context routes exact language, resource, source, and TM-limit lookup parameters",
+  "AI segment context contains lookup failures with the existing warning messages",
+  "AI segment context returns two ordered nonblank neighbors per side from the same document",
+  "AI segment context uses settings and segment fallbacks and rejects disabled or unknown selections"
+]) {
+  assertIncludes(
+    aiSegmentContextServiceUnitTests,
+    testName,
+    `focused AI-segment-context tests must characterize ${testName}.`
   );
 }
 assertIncludes(

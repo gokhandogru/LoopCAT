@@ -1590,6 +1590,23 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
   logger: console
 });
 tmPretranslationController.mount();
+const aiSegmentContextService = appRuntime.featureFactories.createAiSegmentContextService({
+  project: {
+    get: currentProject,
+    normalizeAiSettings: defaultAiSettings
+  },
+  resources: {
+    getTermBaseNames: projectTermBaseNames,
+    getTmNames: projectTmNames
+  },
+  lookup: {
+    findTerms,
+    findTmMatches: findProjectTmMatches
+  },
+  settings: { read: localAiSettingsFromForm },
+  segments: { getAll: currentSegments },
+  logger: console
+});
 let aiPretranslationAbortController = null;
 const aiPretranslationController = appRuntime.featureFactories.createAiPretranslationController({
   editorSessionStore,
@@ -9027,70 +9044,15 @@ function localAiPretranslationOptions(settings) {
 }
 
 async function localAiGlossaryTermsForSegment(segment) {
-  if (!currentProject() || !segment) return [];
-  if (defaultAiSettings(currentProject().aiSettings).useTermbaseContext === false) return [];
-  try {
-    return await findTerms({
-      source: segment.source,
-      sourceLang: currentProject().sourceLang,
-      targetLang: currentProject().targetLang,
-      termBaseNames: projectTermBaseNames()
-    });
-  } catch (error) {
-    console.warn("Local AI pretranslation termbase lookup failed.", error);
-    return [];
-  }
+  return aiSegmentContextService.glossaryTermsForSegment(segment);
 }
 
 async function localAiTmMatchesForSegment(segment) {
-  if (!currentProject() || !segment) return [];
-  if (defaultAiSettings(currentProject().aiSettings).useTmContext === false) return [];
-  try {
-    return await findProjectTmMatches({
-      source: segment.source,
-      sourceLang: currentProject().sourceLang,
-      targetLang: currentProject().targetLang,
-      tmNames: projectTmNames(),
-      limit: 3
-    });
-  } catch (error) {
-    console.warn("Local AI pretranslation TM lookup failed.", error);
-    return [];
-  }
+  return aiSegmentContextService.tmMatchesForSegment(segment);
 }
 
 function localAiSurroundingSegmentsForSegment(segment, options = {}) {
-  if (!currentProject() || !segment) return [];
-  const settings = options.settings || localAiSettingsFromForm();
-  if (settings.includeNearbyContext === false) return [];
-  const segments = Array.isArray(options.segments) && options.segments.length ? options.segments : currentSegments();
-  const segmentIndex = segments.findIndex((item) => item?.id === segment.id);
-  if (segmentIndex < 0) return [];
-  const sameDocument = (item) => {
-    if (!segment.documentId) return true;
-    return item?.documentId === segment.documentId;
-  };
-  const before = [];
-  for (let index = segmentIndex - 1; index >= 0 && before.length < 2; index -= 1) {
-    const item = segments[index];
-    if (!sameDocument(item) || !String(item?.source || "").trim()) continue;
-    before.unshift({
-      relation: `Previous segment ${before.length + 1}`,
-      source: item.source,
-      target: item.target || ""
-    });
-  }
-  const after = [];
-  for (let index = segmentIndex + 1; index < segments.length && after.length < 2; index += 1) {
-    const item = segments[index];
-    if (!sameDocument(item) || !String(item?.source || "").trim()) continue;
-    after.push({
-      relation: `Next segment ${after.length + 1}`,
-      source: item.source,
-      target: item.target || ""
-    });
-  }
-  return [...before, ...after];
+  return aiSegmentContextService.surroundingSegmentsForSegment(segment, options);
 }
 
 async function pretranslateWithLocalAi() {
