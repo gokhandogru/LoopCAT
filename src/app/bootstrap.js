@@ -85,6 +85,7 @@ import { createAiSegmentContextService } from "../features/ai/ai-segment-context
 import { createAiScopeSelectionService } from "../features/ai/ai-scope-selection-service.js";
 import { createExternalAiConsentService } from "../features/ai/external-ai-consent-service.js";
 import { createOpusCatHelpController } from "../features/ai/opus-cat-help-controller.js";
+import { createProjectResourceSelectionController } from "../features/projects/project-resource-selection-controller.js";
 import { createTmPretranslationDialogController } from "../features/resources/tm-pretranslation-dialog-controller.js";
 import { createResourcesController } from "../features/resources/resources-controller.js";
 import { createResourcesPresentationService } from "../features/resources/resources-presentation-service.js";
@@ -219,6 +220,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createUiLocalizationService,
       createProjectDialogController,
       createProjectsController,
+      createProjectResourceSelectionController,
       createResourceCatalogService,
       createResourceLibraryExportController,
       createResourceLibraryImportController,

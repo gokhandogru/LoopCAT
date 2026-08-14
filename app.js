@@ -3154,6 +3154,41 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
   }
 });
 importExportController?.mount?.();
+const resourceCatalogService = appRuntime.featureFactories.createResourceCatalogService({
+  getState: () => resourcesController?.getState?.() || { tmEntries: [], terms: [] }
+});
+const projectResourceSelectionController =
+  appRuntime.featureFactories.createProjectResourceSelectionController({
+    elements: {
+      dialog: els.projectDialog,
+      sourceLanguageInput: els.sourceLangInput,
+      targetLanguageInput: els.targetLangInput,
+      tmResourceList: els.projectTmResourceList,
+      tbResourceList: els.projectTbResourceList,
+      newTmNameInput: els.newTmNameInput,
+      newTermBaseNameInput: els.newTermBaseNameInput
+    },
+    getProject: () => editorSessionStore.getProject(),
+    getMode: () => projectDialogController?.getMode?.() || null,
+    normalizeLanguageValue: normalizeLanguageInputValue,
+    normalizeLanguageInput: normalizeLanguageInputElement,
+    projectResources: {
+      tmNames: projectTmNames,
+      termBaseNames: projectTermBaseNames,
+      mainTmName,
+      links: projectResourceLinks
+    },
+    catalog: resourceCatalogService,
+    localization: uiLocalizationService,
+    presentation: {
+      replaceSafeHtml,
+      escapeHtml,
+      displaySafeHtml,
+      languagePairDisplay
+    },
+    names: { unique: uniqueNames, clean: cleanProjectText },
+    makeId
+  });
 const projectDialogController = appRuntime?.featureFactories?.createProjectDialogController?.({
   dialogLifecycle: dialogLifecycleController,
   elements: {
@@ -3193,7 +3228,7 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
   setLanguageValue: setLanguageInputValue,
   normalizeLanguageValue: normalizeLanguageInputElement,
   renderStorageStatus: renderProjectStorageStatus,
-  renderResourcePickers: renderProjectResourcePickers,
+  renderResourcePickers: projectResourceSelectionController.render,
   renderFrequentPairs: renderFrequentLanguagePairs,
   save: saveProjectFromDialog,
   chooseWorkspace: chooseWorkspaceFolder,
@@ -3259,9 +3294,6 @@ const resourceLibraryImportController =
     alert: uiLocalizationService.alert,
     status: { set: setSaveStatus }
   });
-const resourceCatalogService = appRuntime.featureFactories.createResourceCatalogService({
-  getState: () => resourcesController?.getState?.() || { tmEntries: [], terms: [] }
-});
 const resourceLibraryExportController =
   appRuntime.featureFactories.createResourceLibraryExportController({
     resources: { labelFromKey: resourceCatalogService.labelFromKey, items: resourceItems },
@@ -5103,7 +5135,7 @@ function renderFrequentLanguagePairs() {
   const pairs = [...recentLanguagePairs(), ...DEFAULT_LANGUAGE_PAIRS]
     .filter(([source, target], index, values) => source && target && values.findIndex(([a, b]) => a === source && b === target) === index)
     .slice(0, 6);
-  const current = projectDialogValues();
+  const current = projectResourceSelectionController.values();
   replaceSafeHtml(els.frequentLanguagePairs, pairs.map(([source, target]) => {
     const active = source === current.sourceLang && target === current.targetLang;
     return `<button type="button" class="${active ? "active" : ""}" data-source-lang="${escapeHtml(source)}" data-target-lang="${escapeHtml(target)}">${escapeHtml(languagePairDisplay(source, target))}</button>`;
@@ -5633,100 +5665,8 @@ function showProjectHome() {
   renderAll();
 }
 
-function projectDialogValues() {
-  return {
-    sourceLang: normalizeLanguageInputValue(els.sourceLangInput.value),
-    targetLang: normalizeLanguageInputValue(els.targetLangInput.value)
-  };
-}
-
-function resourceOptionHtml(resource, type, selected, main) {
-  const countLabel = resource.count
-    ? uiLocalizationService.label(type === "tm" ? "unitCount" : "termCount", { count: resource.count })
-    : uiLocalizationService.label("empty");
-  const checkbox = `<input type="checkbox" data-resource-type="${type}" data-resource-name="${escapeHtml(resource.name)}" ${selected ? "checked" : ""}>`;
-  const radio = type === "tm"
-    ? `<input type="radio" name="projectMainTm" data-main-tm="${escapeHtml(resource.name)}" ${main ? "checked" : ""}>`
-    : "";
-  return `
-    <label class="resource-option">
-      <span class="resource-option-check">${checkbox}</span>
-      <span class="resource-option-body">
-        <strong>${displaySafeHtml(resource.name)}</strong>
-        <span>${escapeHtml(languagePairDisplay(resource.sourceLang, resource.targetLang))} - ${countLabel}</span>
-      </span>
-      <span class="resource-option-main">${radio}</span>
-    </label>
-  `;
-}
-
-function renderProjectResourcePickers(project = editorSessionStore.getProject()) {
-  const { sourceLang, targetLang } = projectDialogValues();
-  if (!sourceLang || !targetLang) return;
-  const editing = projectDialogController?.getMode?.() === "edit";
-  const selectedTmNames = editing ? projectTmNames(project) : [];
-  const selectedTbNames = editing ? projectTermBaseNames(project) : [];
-  const main = editing ? mainTmName(project) : "";
-  const tmResources = resourceCatalogService.matching("tm", sourceLang, targetLang, selectedTmNames);
-  const tbResources = resourceCatalogService.matching("tb", sourceLang, targetLang, selectedTbNames);
-  replaceSafeHtml(els.projectTmResourceList, tmResources.length
-    ? tmResources.map((resource) => resourceOptionHtml(resource, "tm", selectedTmNames.includes(resource.name), resource.name === main)).join("")
-    : `<div class="muted">${uiLocalizationService.labelHtml("noMatchingTms")}</div>`);
-  replaceSafeHtml(els.projectTbResourceList, tbResources.length
-    ? tbResources.map((resource) => resourceOptionHtml(resource, "tb", selectedTbNames.includes(resource.name), false)).join("")
-    : `<div class="muted">${uiLocalizationService.labelHtml("noMatchingTbs")}</div>`);
-}
-
 function openProjectDialog(mode = "create") {
   return projectDialogController?.open?.(mode, { returnTarget: document.activeElement }) || Promise.resolve(false);
-}
-
-function collectCheckedResourceNames(type) {
-  return Array.from(els.projectDialog.querySelectorAll(`[data-resource-type="${type}"]:checked`)).map((input) => input.dataset.resourceName);
-}
-
-function collectProjectResourceSettings(existingProject = null) {
-  const sourceLang = normalizeLanguageInputElement(els.sourceLangInput);
-  const targetLang = normalizeLanguageInputElement(els.targetLangInput);
-  const existingLinks = projectResourceLinks(existingProject);
-  let tmNames = uniqueNames(collectCheckedResourceNames("tm"));
-  let tbNames = uniqueNames(collectCheckedResourceNames("tb"));
-  const newTmName = els.newTmNameInput.value.trim();
-  const newTbName = els.newTermBaseNameInput.value.trim();
-  let main = els.projectDialog.querySelector('[data-main-tm]:checked')?.dataset.mainTm || "";
-  if (newTmName) {
-    tmNames = uniqueNames([newTmName, ...tmNames]);
-    main = newTmName;
-  }
-  if (!tmNames.length) {
-    main = cleanProjectText(existingProject?.mainTmName, cleanProjectText(existingProject?.tmName, "Default TM"));
-    tmNames = [main];
-  }
-  if (!main || !tmNames.includes(main)) main = tmNames[0];
-  if (newTbName) tbNames = uniqueNames([...tbNames, newTbName]);
-  if (!tbNames.length) tbNames = [cleanProjectText(existingProject?.termBaseName, "Default TB")];
-  return {
-    sourceLang,
-    targetLang,
-    tmNames,
-    termBaseNames: tbNames,
-    mainTmName: main,
-    tmName: main,
-    termBaseName: tbNames[0],
-    resourceLinks: [
-      ...tmNames.map((name) => ({
-        id: existingLinks.find((link) => link.type === "tm" && link.name === name)?.id || makeId("resource-link"),
-        type: "tm",
-        name,
-        role: name === main ? "main" : "reference"
-      })),
-      ...tbNames.map((name) => ({
-        id: existingLinks.find((link) => link.type === "termbase" && link.name === name)?.id || makeId("resource-link"),
-        type: "termbase",
-        name
-      }))
-    ]
-  };
 }
 
 async function refreshResources() {
@@ -8272,7 +8212,7 @@ async function saveProjectFromDialog() {
     return false;
   }
   const editing = projectDialogController?.getMode?.() === "edit" && Boolean(editorSessionStore.getProject());
-  const settings = collectProjectResourceSettings(editing ? editorSessionStore.getProject() : null);
+  const settings = projectResourceSelectionController.collect(editing ? editorSessionStore.getProject() : null);
   const shouldSaveToFolder = Boolean(els.saveProjectToFolderInput?.checked);
   if (shouldSaveToFolder && workspaceStorage?.isSupported() && !state.workspaceStatus?.connected) {
     try {

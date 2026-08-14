@@ -204,6 +204,7 @@ const requiredReleaseFiles = [
   "src/features/ai/ai-tag-repair-controller.js",
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
+  "src/features/projects/project-resource-selection-controller.js",
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-decision-controller.js",
   "src/features/quality/quality-review-controller.js",
@@ -261,6 +262,7 @@ const requiredReleaseFiles = [
   "tests/unit/opus-cat-provider-adapter.test.cjs",
   "tests/unit/perplexity-provider-adapter.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
+  "tests/unit/project-resource-selection-controller.test.cjs",
   "tests/unit/quality-profile-controller.test.cjs",
   "tests/unit/quality-decision-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
@@ -383,6 +385,12 @@ const dialogControllerJs = readText("src/ui/dialog-controller.js");
 const dialogControllerUnitTests = readText("tests/unit/dialog-controller.test.cjs");
 const projectDialogControllerJs = readText("src/features/projects/project-dialog-controller.js");
 const projectDialogControllerUnitTests = readText("tests/unit/project-dialog-controller.test.cjs");
+const projectResourceSelectionControllerJs = readText(
+  "src/features/projects/project-resource-selection-controller.js"
+);
+const projectResourceSelectionControllerUnitTests = readText(
+  "tests/unit/project-resource-selection-controller.test.cjs"
+);
 const opusCatHelpControllerJs = readText("src/features/ai/opus-cat-help-controller.js");
 const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-pretranslation-dialog-controller.js");
 const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
@@ -617,6 +625,16 @@ assertIncludes(
   appBootstrapJs,
   "createProjectResourceTransferController,",
   "The application runtime must expose the checked project-resource transfer factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectResourceSelectionController } from "../features/projects/project-resource-selection-controller.js";',
+  "The application runtime must install the checked project resource-selection controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectResourceSelectionController,",
+  "The application runtime must expose the checked project resource-selection factory."
 );
 assertIncludes(
   appBootstrapJs,
@@ -1263,9 +1281,10 @@ assertIncludes(
   "resource-catalog composition must inject current Resources state with the original empty fallback."
 );
 for (const method of ["key", "labelFromKey", "summarize", "matching"]) {
+  const consumerSnippet = method === "matching" ? "catalog: resourceCatalogService" : `resourceCatalogService.${method}`;
   assertIncludes(
     `${appJs}\n${appWorkflowDriverJs}`,
-    `resourceCatalogService.${method}`,
+    consumerSnippet,
     `resource-catalog consumers must call ResourceCatalogService.${method} directly.`
   );
 }
@@ -1297,6 +1316,111 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/resources/resource-catalog-service.js"',
   "source-catalog extraction must scan the checked resource-catalog service."
+);
+for (const snippet of [
+  "sourceLang: normalizeLanguageValue(sourceLanguageInput.value)",
+  "targetLang: normalizeLanguageValue(targetLanguageInput.value)",
+  'const editing = getMode() === "edit"',
+  "const selectedTmNames = editing ? projectResources.tmNames(project) : []",
+  "const selectedTbNames = editing ? projectResources.termBaseNames(project) : []",
+  "const main = editing ? projectResources.mainTmName(project) : \"\"",
+  'catalog.matching("tm", sourceLang, targetLang, selectedTmNames)',
+  'catalog.matching("tb", sourceLang, targetLang, selectedTbNames)',
+  'localization.label(type === "tm" ? "unitCount" : "termCount", { count: resource.count })',
+  'localization.label("empty")',
+  'data-resource-type="${type}"',
+  'data-main-tm="${presentation.escapeHtml(resource.name)}"',
+  'localization.labelHtml("noMatchingTms")',
+  'localization.labelHtml("noMatchingTbs")',
+  'dialog.querySelectorAll(`[data-resource-type="${type}"]:checked`)',
+  "const sourceLang = normalizeLanguageInput(sourceLanguageInput)",
+  "const targetLang = normalizeLanguageInput(targetLanguageInput)",
+  "const existingLinks = projectResources.links(existingProject)",
+  'let tmNames = names.unique(checkedNames("tm"))',
+  'let tbNames = names.unique(checkedNames("tb"))',
+  "const newTmName = newTmNameInput.value.trim()",
+  "const newTbName = newTermBaseNameInput.value.trim()",
+  'dialog.querySelector("[data-main-tm]:checked")?.dataset.mainTm || ""',
+  'names.clean(existingProject?.tmName, "Default TM")',
+  'names.clean(existingProject?.termBaseName, "Default TB")',
+  "if (!main || !tmNames.includes(main)) main = tmNames[0]",
+  'makeId("resource-link")',
+  'role: name === main ? "main" : "reference"',
+  'type: "termbase"',
+  "return Object.freeze({ values, render, collect })"
+]) {
+  assertIncludes(
+    projectResourceSelectionControllerJs,
+    snippet,
+    `ProjectResourceSelectionController must retain characterized selection policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createProjectResourceSelectionController({",
+  "app.js must compose the checked project resource-selection controller."
+);
+for (const boundary of [
+  "dialog: els.projectDialog",
+  "sourceLanguageInput: els.sourceLangInput",
+  "targetLanguageInput: els.targetLangInput",
+  "tmResourceList: els.projectTmResourceList",
+  "tbResourceList: els.projectTbResourceList",
+  "newTmNameInput: els.newTmNameInput",
+  "newTermBaseNameInput: els.newTermBaseNameInput",
+  "getProject: () => editorSessionStore.getProject()",
+  "getMode: () => projectDialogController?.getMode?.() || null",
+  "normalizeLanguageValue: normalizeLanguageInputValue",
+  "normalizeLanguageInput: normalizeLanguageInputElement",
+  "tmNames: projectTmNames",
+  "termBaseNames: projectTermBaseNames",
+  "mainTmName",
+  "links: projectResourceLinks",
+  "catalog: resourceCatalogService",
+  "localization: uiLocalizationService",
+  "names: { unique: uniqueNames, clean: cleanProjectText }",
+  "makeId"
+]) {
+  assertIncludes(appJs, boundary, `project resource-selection composition must inject the ${boundary} boundary.`);
+}
+for (const method of ["values", "render", "collect"]) {
+  assertIncludes(
+    `${appJs}\n${appWorkflowDriverJs}`,
+    `projectResourceSelectionController.${method}`,
+    `project resource-selection consumers must call ProjectResourceSelectionController.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "projectDialogValues",
+  "resourceOptionHtml",
+  "renderProjectResourcePickers",
+  "collectCheckedResourceNames",
+  "collectProjectResourceSettings"
+]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} project resource-selection helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "ProjectResourceSelectionController preserves normalized dialog values and immutable checked API",
+  "ProjectResourceSelectionController preserves no-language early return without replacing picker content",
+  "ProjectResourceSelectionController preserves create-mode safe picker options, counts, and localized empty state",
+  "ProjectResourceSelectionController preserves edit-mode selected and main picker controls",
+  "ProjectResourceSelectionController preserves new-resource precedence, IDs, roles, and selected-name order",
+  "ProjectResourceSelectionController preserves legacy defaults, valid-main correction, and generated links"
+]) {
+  assertIncludes(
+    projectResourceSelectionControllerUnitTests,
+    testName,
+    `focused project resource-selection tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/project-resource-selection-controller.js"',
+  "source-catalog extraction must scan the checked project resource-selection controller."
 );
 for (const snippet of [
   'renderDashboard("tm", resourceState)',

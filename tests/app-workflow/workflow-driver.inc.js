@@ -179,8 +179,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     catalanTurkishQuickPair.click();
     assert(
-      projectDialogValues().sourceLang === "ca" &&
-        projectDialogValues().targetLang === "tr" &&
+      projectResourceSelectionController.values().sourceLang === "ca" &&
+        projectResourceSelectionController.values().targetLang === "tr" &&
         document.querySelector("#sourceLangInput").value === languageOptionValue("ca") &&
         document.querySelector("#targetLangInput").value === languageOptionValue("tr"),
       "frequent language pair chips update project language fields as normalized codes"
@@ -368,7 +368,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "OPUS-CAT help close restores focus to the visible connection-help entry point"
     );
     opusCatHelpController.setVisible(false);
-    const legacyDialogSettings = collectProjectResourceSettings({
+    const legacyDialogSettings = projectResourceSelectionController.collect({
       ...editorSessionStore.getProject(),
       resourceLinks: [
         null,
