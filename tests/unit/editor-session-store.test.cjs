@@ -8,6 +8,53 @@ const test = require("node:test");
 const root = path.resolve(__dirname, "../..");
 const moduleAt = (relativePath) => import(pathToFileURL(path.join(root, relativePath)).href);
 
+test("EditorSessionStore getters expose stable default and latest record references", async () => {
+  const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
+  const store = createEditorSessionStore();
+  const initial = store.getState();
+
+  assert.equal(store.getProjects(), initial.projects);
+  assert.equal(store.getProject(), null);
+  assert.equal(store.getSegments(), initial.segments);
+  assert.equal(store.getProjectSummaries(), initial.projectSummaries);
+  assert.equal(store.getProjectTerms(), initial.projectTerms);
+  assert.equal(store.getActivityEvents(), initial.activityEvents);
+  assert.equal(store.getQaChecks(), initial.qaChecks);
+  assert.equal(store.getQualityRiskQueue(), null);
+  assert.equal(store.getProgressSummary(), null);
+
+  const project = { id: "project-1" };
+  const projects = [project];
+  const segments = [{ id: "segment-1", projectId: project.id }];
+  const projectSummaries = [{ id: project.id, wordCount: 3 }];
+  const projectTerms = [{ id: "term-1" }];
+  const activityEvents = [{ id: "activity-1" }];
+  const qaChecks = [{ id: "qa-1" }];
+  const qualityRiskQueue = { projectId: project.id, items: [] };
+  const progressSummary = { projectId: project.id, total: 1 };
+  store.replace({
+    projects,
+    project,
+    segments,
+    projectSummaries,
+    projectTerms,
+    activityEvents,
+    qaChecks,
+    qualityRiskQueue,
+    progressSummary
+  });
+
+  assert.equal(store.getProjects(), projects);
+  assert.equal(store.getProject(), project);
+  assert.equal(store.getSegments(), segments);
+  assert.equal(store.getProjectSummaries(), projectSummaries);
+  assert.equal(store.getProjectTerms(), projectTerms);
+  assert.equal(store.getActivityEvents(), activityEvents);
+  assert.equal(store.getQaChecks(), qaChecks);
+  assert.equal(store.getQualityRiskQueue(), qualityRiskQueue);
+  assert.equal(store.getProgressSummary(), progressSummary);
+});
+
 test("EditorSessionStore owns current project data behind a checked immutable snapshot", async () => {
   const { createEditorSessionStore } = await moduleAt("src/features/editor/editor-session-store.js");
   const store = createEditorSessionStore();

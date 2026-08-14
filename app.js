@@ -739,42 +739,6 @@ const state = {
 };
 const editorSessionStore = appRuntime.editorSession;
 
-function currentProjects() {
-  return editorSessionStore.getProjects();
-}
-
-function currentProject() {
-  return editorSessionStore.getProject();
-}
-
-function currentSegments() {
-  return editorSessionStore.getSegments();
-}
-
-function currentProjectSummaries() {
-  return editorSessionStore.getProjectSummaries();
-}
-
-function currentProjectTerms() {
-  return editorSessionStore.getProjectTerms();
-}
-
-function currentActivityEvents() {
-  return editorSessionStore.getActivityEvents();
-}
-
-function currentQaChecks() {
-  return editorSessionStore.getQaChecks();
-}
-
-function storedQualityRiskQueue() {
-  return editorSessionStore.getQualityRiskQueue();
-}
-
-function currentProgressSummary() {
-  return editorSessionStore.getProgressSummary();
-}
-
 function currentApplicationView() {
   return applicationStore.getState().navigation.view;
 }
@@ -807,7 +771,7 @@ function updateEditorFilters(patch) {
   return editorFilterStore.update(patch);
 }
 
-function selectApplicationSegment(activeIndex, segmentId = currentSegments()[activeIndex]?.id || "") {
+function selectApplicationSegment(activeIndex, segmentId = editorSessionStore.getSegments()[activeIndex]?.id || "") {
   return applicationNavigation.selectSegment({ activeIndex, segmentId });
 }
 
@@ -1610,7 +1574,7 @@ const aiCredentialStorageService =
       readLocal: () => aiRuntimeSettingsService.localSettingsFromForm(),
       normalizeLocal: (settings) =>
         localAISettingsStore?.defaults
-          ? localAISettingsStore.defaults(settings || {}, currentProject())
+          ? localAISettingsStore.defaults(settings || {}, editorSessionStore.getProject())
           : (settings || {}),
       normalizeProviderBaseUrl: normalizedProviderBaseUrl
     },
@@ -1626,7 +1590,7 @@ const aiCredentialStorageService =
   });
 const aiRuntimeSettingsService =
   appRuntime.featureFactories.createAiRuntimeSettingsService({
-    project: { get: currentProject },
+    project: { get: editorSessionStore.getProject },
     administration: {
       readLocalForm: () => aiAdministrationController?.readLocalForm?.() || {},
       readSecrets: () => aiAdministrationController?.readSecrets?.() || {}
@@ -1675,7 +1639,7 @@ const aiLocalSettingsPersistenceController =
   });
 const aiSegmentContextService = appRuntime.featureFactories.createAiSegmentContextService({
   project: {
-    get: currentProject,
+    get: editorSessionStore.getProject,
     normalizeAiSettings: aiRuntimeSettingsService.normalizeProjectSettings
   },
   resources: {
@@ -1687,14 +1651,14 @@ const aiSegmentContextService = appRuntime.featureFactories.createAiSegmentConte
     findTmMatches: findProjectTmMatches
   },
   settings: { read: () => aiRuntimeSettingsService.localSettingsFromForm() },
-  segments: { getAll: currentSegments },
+  segments: { getAll: editorSessionStore.getSegments },
   logger: console
 });
 const aiScopeSelectionService = appRuntime.featureFactories.createAiScopeSelectionService({
-  project: { get: currentProject },
+  project: { get: editorSessionStore.getProject },
   settings: { read: () => aiRuntimeSettingsService.localSettingsFromForm() },
   segments: {
-    getAll: currentSegments,
+    getAll: editorSessionStore.getSegments,
     getDocument: currentDocumentSegments,
     getActive: currentSegment
   },
@@ -1747,7 +1711,7 @@ const aiProviderFormController =
       readForm: aiRuntimeSettingsService.localSettingsFromForm,
       readProject: (project) => localAISettingsStore.projectSettings(project)
     },
-    project: { get: currentProject, getSegment: currentSegment },
+    project: { get: editorSessionStore.getProject, getSegment: currentSegment },
     providers: {
       get: (providerId) => aiProviderService.get(providerId),
       presets: LOCAL_AI_PROVIDER_PRESETS,
@@ -1914,7 +1878,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
   scope: {
     getVisibleSegments: () =>
       filteredSegmentIndexes()
-        .map((index) => currentSegments()[index])
+        .map((index) => editorSessionStore.getSegments()[index])
         .filter(Boolean),
     getDocumentSegments: currentDocumentSegments,
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment))
@@ -1991,7 +1955,7 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
   scope: {
     getVisibleSegments: () =>
       filteredSegmentIndexes()
-        .map((index) => currentSegments()[index])
+        .map((index) => editorSessionStore.getSegments()[index])
         .filter(Boolean),
     getDocumentSegments: currentDocumentSegments,
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
@@ -2070,7 +2034,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
   scope: {
     getVisibleSegments: () =>
       filteredSegmentIndexes()
-        .map((index) => currentSegments()[index])
+        .map((index) => editorSessionStore.getSegments()[index])
         .filter(Boolean),
     getDocumentSegments: currentDocumentSegments,
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
@@ -2158,7 +2122,7 @@ const aiTerminologyApplicationController =
     scope: {
       getVisibleSegments: () =>
         filteredSegmentIndexes()
-          .map((index) => currentSegments()[index])
+          .map((index) => editorSessionStore.getSegments()[index])
           .filter(Boolean),
       getDocumentSegments: currentDocumentSegments,
       isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
@@ -2235,7 +2199,7 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
   scope: {
     getVisibleSegments: () =>
       filteredSegmentIndexes()
-        .map((index) => currentSegments()[index])
+        .map((index) => editorSessionStore.getSegments()[index])
         .filter(Boolean),
     getDocumentSegments: currentDocumentSegments,
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
@@ -2312,7 +2276,7 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
 });
 const aiTermCandidatePersistenceService =
   appRuntime.featureFactories.createAiTermCandidatePersistenceService({
-    project: { get: currentProject },
+    project: { get: editorSessionStore.getProject },
     termbase: {
       list: listTerms,
       save: saveTerm
@@ -2470,7 +2434,7 @@ const aiSuggestionApplicationController =
     workspace: {
       markDirty: markWorkspaceDirty,
       markActivityWarningDirty: () => {
-        if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
+        if (editorSessionStore.getProject()?.id) markWorkspaceDirty(editorSessionStore.getProject().id);
       }
     },
     status: { set: setSaveStatus },
@@ -2510,7 +2474,7 @@ const aiSuggestionPersistenceController =
     workspace: {
       markDirty: markWorkspaceDirty,
       markActivityWarningDirty: () => {
-        if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
+        if (editorSessionStore.getProject()?.id) markWorkspaceDirty(editorSessionStore.getProject().id);
       }
     },
     status: { set: setSaveStatus },
@@ -2570,7 +2534,7 @@ const aiOpenAiSuggestionController = appRuntime.featureFactories.createAiOpenAiS
   defaults: { model: OPENAI_DEFAULT_MODEL },
   testHooks: {
     beforeProjectSave: () => {
-      if (LOOPCAT_TEST_BUILD && currentProject()[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) {
+      if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) {
         throw new Error("Simulated AI settings save failure");
       }
     }
@@ -2614,7 +2578,7 @@ const aiSettingsPersistenceController =
     workspace: {
       markDirty: markWorkspaceDirty,
       markActivityWarningDirty: () => {
-        if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
+        if (editorSessionStore.getProject()?.id) markWorkspaceDirty(editorSessionStore.getProject().id);
       },
       markRollbackDirty: markOpenAiProjectRollbackDirty
     },
@@ -2636,7 +2600,7 @@ const aiSettingsPersistenceController =
   });
 const aiProviderAdministrationOperationsController =
   appRuntime.featureFactories.createAiProviderAdministrationOperationsController({
-    project: { exists: () => Boolean(currentProject()) },
+    project: { exists: () => Boolean(editorSessionStore.getProject()) },
     settings: {
       persist: aiLocalSettingsPersistenceController.persistSilently,
       runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
@@ -2690,9 +2654,9 @@ const aiPromptPreviewController = appRuntime.featureFactories.createAiPromptPrev
   },
   settings: { read: aiRuntimeSettingsService.localSettingsFromForm },
   project: {
-    get: currentProject,
+    get: editorSessionStore.getProject,
     getActiveSegment: currentSegment,
-    getTerms: currentProjectTerms,
+    getTerms: editorSessionStore.getProjectTerms,
     getDocuments: projectDocuments,
     getSampleSegments: aiScopeSelectionService.projectBriefSampleSegments,
     getSurroundingSegments: aiSegmentContextService.surroundingSegmentsForSegment,
@@ -2712,7 +2676,7 @@ const aiPromptPreviewController = appRuntime.featureFactories.createAiPromptPrev
   normalize: { stableLower }
 });
 const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestController({
-  project: { get: currentProject },
+  project: { get: editorSessionStore.getProject },
   settings: {
     persist: aiLocalSettingsPersistenceController.persistSilently,
     runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
@@ -2806,7 +2770,7 @@ structuralSegmentController.mount();
 
 const editorContextController = appRuntime?.featureFactories?.createEditorContextController?.({
   getContext: () => ({
-    projectId: currentProject()?.id || "",
+    projectId: editorSessionStore.getProject()?.id || "",
     segmentId: currentSegment()?.id || ""
   }),
   renderReview: () =>
@@ -2821,7 +2785,7 @@ const editorContextController = appRuntime?.featureFactories?.createEditorContex
 const filterPresetController = appRuntime?.featureFactories?.createFilterPresetController?.({
   select: els.filterPresetSelect,
   preferencesRepository: appRuntime.preferencesRepository,
-  getProjectId: () => currentProject()?.id || "",
+  getProjectId: () => editorSessionStore.getProject()?.id || "",
   applyFilters: async (preset) => {
     updateEditorFilters({ status: preset.status, reviewState: preset.reviewState, aiState: preset.aiState });
     els.segmentStatusFilter.value = preset.status;
@@ -2888,7 +2852,7 @@ const diagnosticsService = appRuntime?.featureFactories?.createDiagnosticsServic
     const counts = new Map();
     for (const segment of segments) counts.set(segment.projectId, (counts.get(segment.projectId) || 0) + 1);
     return {
-      projectCount: currentProjects().length,
+      projectCount: editorSessionStore.getProjects().length,
       segmentCount: segments.length,
       largestProjectSegmentCount: Math.max(0, ...counts.values())
     };
@@ -3042,7 +3006,7 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
     resourceTbxImportInput: els.resourceTbxImportInput,
     resourceTermListImportInput: els.resourceTermListImportInput
   },
-  hasProject: () => Boolean(currentProject()),
+  hasProject: () => Boolean(editorSessionStore.getProject()),
   runImportTask: runFileImportTask,
   importProjectFile: importProjectDocument,
   importProjectPackage: async (file) => {
@@ -3111,7 +3075,7 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
     { element: els.editorProjectSettingsBtn, mode: "edit" },
     { element: els.openProjectAiSettingsBtn, mode: "edit", focusAi: true }
   ],
-  getProject: () => currentProject(),
+  getProject: () => editorSessionStore.getProject(),
   refreshResources,
   suggestedCreatorName,
   cleanCreatorName,
@@ -3458,7 +3422,7 @@ function refreshLocalizedUi() {
   renderProjectStorageStatus();
   if (currentApplicationView() === "projects") renderProjectsView();
   if (currentApplicationView() === "resources") renderResourcesView();
-  if (currentProject()) {
+  if (editorSessionStore.getProject()) {
     if (currentApplicationView() === "project") {
       renderProjectHome();
       void renderProjectAnalysis();
@@ -3505,7 +3469,7 @@ function setSaveStatus(text, mode = "") {
   appRuntime?.status?.controller?.fromLegacy?.({
     text: displayText,
     mode,
-    projectId: currentProject()?.id || null,
+    projectId: editorSessionStore.getProject()?.id || null,
     segmentId: currentSegmentId()
   });
   els.saveStatus.textContent = uiSource(displayText);
@@ -3522,7 +3486,7 @@ function setSaveStatus(text, mode = "") {
 }
 
 function renderUndoControls() {
-  const projectId = state.commandProjectId || currentProject()?.id || null;
+  const projectId = state.commandProjectId || editorSessionStore.getProject()?.id || null;
   if (els.undoBtn) els.undoBtn.disabled = !appRuntime?.commands?.bus?.canUndo?.(projectId);
   if (els.redoBtn) els.redoBtn.disabled = !appRuntime?.commands?.bus?.canRedo?.(projectId);
 }
@@ -3556,27 +3520,27 @@ async function synchronizeResourceTrashChange(entry, { refreshSuggestions = fals
 }
 
 async function undoLastCommand() {
-  const projectId = state.commandProjectId || currentProject()?.id || null;
+  const projectId = state.commandProjectId || editorSessionStore.getProject()?.id || null;
   if (projectId) targetEditController.finalizeProject(projectId);
   else targetEditController.finalizeAll();
   const result = await appRuntime?.commands?.bus?.undo?.(projectId);
   if (!result) return false;
   const requestedActiveSegmentId = result.result?.activeSegmentId || "";
   await loadProjects(false);
-  if (currentProject()?.id === projectId) {
-    editorSessionStore.replaceProject(currentProjects().find((project) => project.id === projectId) || currentProject());
+  if (editorSessionStore.getProject()?.id === projectId) {
+    editorSessionStore.replaceProject(editorSessionStore.getProjects().find((project) => project.id === projectId) || editorSessionStore.getProject());
     editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(projectId)));
     const requestedIndex = requestedActiveSegmentId
-      ? currentSegments().findIndex((segment) => segment.id === requestedActiveSegmentId)
+      ? editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveSegmentId)
       : -1;
-    const nextIndex = currentSegments().length
+    const nextIndex = editorSessionStore.getSegments().length
       ? requestedIndex >= 0
         ? requestedIndex
-        : Math.max(0, Math.min(currentActiveIndex(), currentSegments().length - 1))
+        : Math.max(0, Math.min(currentActiveIndex(), editorSessionStore.getSegments().length - 1))
       : -1;
     selectApplicationSegment(nextIndex);
     renderAll();
-  } else if (!currentProject() && projectId && currentProjects().some((project) => project.id === projectId)) {
+  } else if (!editorSessionStore.getProject() && projectId && editorSessionStore.getProjects().some((project) => project.id === projectId)) {
     await openProject(projectId);
   }
   await synchronizeResourceTrashChange(resourceTrashEntryFromCommandResult(result));
@@ -3589,30 +3553,30 @@ async function undoLastCommand() {
 }
 
 async function redoLastCommand() {
-  const projectId = state.commandProjectId || currentProject()?.id || null;
+  const projectId = state.commandProjectId || editorSessionStore.getProject()?.id || null;
   if (projectId) targetEditController.finalizeProject(projectId);
   else targetEditController.finalizeAll();
   const result = await appRuntime?.commands?.bus?.redo?.(projectId);
   if (!result) return false;
   const requestedActiveSegmentId = result.result?.activeSegmentId || "";
-  if (result.receipt.commandId === "delete-project" && currentProject()?.id === projectId) {
+  if (result.receipt.commandId === "delete-project" && editorSessionStore.getProject()?.id === projectId) {
     editorSessionStore.replaceProject(null);
     editorSessionStore.replaceSegments([]);
     setView("projects");
     applicationNavigation.clearSelection();
   }
   await loadProjects(false);
-  if (result.receipt.commandId === "delete-document" && currentProject()?.id === projectId) {
-    editorSessionStore.replaceProject(currentProjects().find((project) => project.id === projectId) || currentProject());
+  if (result.receipt.commandId === "delete-document" && editorSessionStore.getProject()?.id === projectId) {
+    editorSessionStore.replaceProject(editorSessionStore.getProjects().find((project) => project.id === projectId) || editorSessionStore.getProject());
     editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(projectId)));
-    const nextIndex = currentSegments().length
-      ? Math.max(0, Math.min(currentActiveIndex(), currentSegments().length - 1))
+    const nextIndex = editorSessionStore.getSegments().length
+      ? Math.max(0, Math.min(currentActiveIndex(), editorSessionStore.getSegments().length - 1))
       : -1;
     selectApplicationSegment(nextIndex);
     renderAll();
-  } else if (currentProject()?.id === projectId && requestedActiveSegmentId) {
+  } else if (editorSessionStore.getProject()?.id === projectId && requestedActiveSegmentId) {
     editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(projectId)));
-    const requestedIndex = currentSegments().findIndex((segment) => segment.id === requestedActiveSegmentId);
+    const requestedIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveSegmentId);
     if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
     renderAll();
   }
@@ -3724,7 +3688,7 @@ function syncAllPanelToggleStates() {
 }
 
 function renderFocusMode() {
-  const active = Boolean(currentFocusMode() && currentApplicationView() === "editor" && currentProject());
+  const active = Boolean(currentFocusMode() && currentApplicationView() === "editor" && editorSessionStore.getProject());
   document.body.classList.toggle("focus-mode", active);
   els.workspace.classList.toggle("focus-mode", active);
   if (els.focusModeBtn) {
@@ -3741,11 +3705,11 @@ function renderFocusMode() {
 function setFocusMode(enabled) {
   applicationStore?.dispatch?.({
     type: "interface/focus-mode-changed",
-    payload: { enabled: Boolean(enabled && currentProject()) }
+    payload: { enabled: Boolean(enabled && editorSessionStore.getProject()) }
   });
   renderFocusMode();
   document.querySelectorAll(".menu[open]").forEach((menu) => menu.removeAttribute("open"));
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   requestAnimationFrame(() => {
     renderSegments({ preserveScroll: true });
     if (currentFocusMode()) targetEditController.focusActive();
@@ -3991,7 +3955,7 @@ function sourceWordCount(segment) {
 }
 
 function currentSegment() {
-  return currentSegments()[currentActiveIndex()] || null;
+  return editorSessionStore.getSegments()[currentActiveIndex()] || null;
 }
 
 function setHiddenSegmentField(segment, field, value) {
@@ -4016,7 +3980,7 @@ function prepareSegmentHistoryState(segment) {
   return segment;
 }
 
-function prepareSegmentHistoryStates(segments = currentSegments()) {
+function prepareSegmentHistoryStates(segments = editorSessionStore.getSegments()) {
   (segments || []).forEach(prepareSegmentHistoryState);
   return segments;
 }
@@ -4118,7 +4082,7 @@ function touchSegment(segment, options = {}) {
   return segment;
 }
 
-function languagePair(project = currentProject()) {
+function languagePair(project = editorSessionStore.getProject()) {
   return project ? languagePairDisplay(project.sourceLang, project.targetLang) : "";
 }
 
@@ -4321,7 +4285,7 @@ async function suggestedCreatorName() {
   return "This computer";
 }
 
-function projectDocumentManifest(project = currentProject()) {
+function projectDocumentManifest(project = editorSessionStore.getProject()) {
   const seen = new Set();
   return (Array.isArray(project?.documents) ? project.documents : [])
     .map((documentInfo) => {
@@ -4385,23 +4349,23 @@ function projectResourceLinks(project) {
   return links;
 }
 
-function mainTmName(project = currentProject()) {
+function mainTmName(project = editorSessionStore.getProject()) {
   return projectResourceLinks(project).find((link) => link.type === "tm" && link.role === "main")?.name || cleanProjectText(project?.mainTmName, cleanProjectText(project?.tmName, "Default TM"));
 }
 
-function projectTmNames(project = currentProject()) {
+function projectTmNames(project = editorSessionStore.getProject()) {
   return uniqueNames([mainTmName(project), ...projectResourceLinks(project).filter((link) => link.type === "tm").map((link) => link.name)]);
 }
 
-function projectTermBaseNames(project = currentProject()) {
+function projectTermBaseNames(project = editorSessionStore.getProject()) {
   return uniqueNames(projectResourceLinks(project).filter((link) => link.type === "termbase").map((link) => link.name));
 }
 
-function primaryTermBaseName(project = currentProject()) {
+function primaryTermBaseName(project = editorSessionStore.getProject()) {
   return projectTermBaseNames(project)[0] || cleanProjectText(project?.termBaseName, "Default TB");
 }
 
-function projectResourceSummary(project = currentProject()) {
+function projectResourceSummary(project = editorSessionStore.getProject()) {
   const tmNames = projectTmNames(project);
   const tbNames = projectTermBaseNames(project);
   return {
@@ -4561,7 +4525,7 @@ function segmentPassesFilters(segment, queryMatches = segmentQueryMatcher()) {
 }
 
 function projectSegmentIndexes() {
-  return currentSegments().map((_, index) => index);
+  return editorSessionStore.getSegments().map((_, index) => index);
 }
 
 function segmentFilterCacheKey() {
@@ -4584,7 +4548,7 @@ function filteredSegmentIndexes() {
   if (state.segmentFilterCache.key === key) return state.segmentFilterCache.indexes;
   const indexes = [];
   const queryMatches = segmentQueryMatcher();
-  currentSegments().forEach((segment, index) => {
+  editorSessionStore.getSegments().forEach((segment, index) => {
     if (segmentPassesFilters(segment, queryMatches)) indexes.push(index);
   });
   const positions = new Map(indexes.map((segmentIndex, position) => [segmentIndex, position]));
@@ -4604,21 +4568,21 @@ function firstVisibleSegmentIndex() {
 
 function projectDocuments() {
   const map = new Map();
-  projectDocumentManifest(currentProject()).forEach((documentInfo) => {
+  projectDocumentManifest(editorSessionStore.getProject()).forEach((documentInfo) => {
     const id = documentInfo?.id || "";
     if (!id || map.has(id)) return;
     map.set(id, {
       id,
-      name: documentInfo.name || currentProject()?.sourceFileName || "Document",
+      name: documentInfo.name || editorSessionStore.getProject()?.sourceFileName || "Document",
       type: stableLower(documentInfo.type || "docx") || "docx"
     });
   });
-  currentSegments().forEach((segment) => {
+  editorSessionStore.getSegments().forEach((segment) => {
     const id = segment.documentId || "default-document";
     if (!map.has(id)) {
       map.set(id, {
         id,
-        name: segment.documentName || currentProject()?.sourceFileName || "Document",
+        name: segment.documentName || editorSessionStore.getProject()?.sourceFileName || "Document",
         type: stableLower(segment.documentType || "docx") || "docx"
       });
       return;
@@ -4626,7 +4590,7 @@ function projectDocuments() {
     const current = map.get(id);
     map.set(id, {
       ...current,
-      name: current.name || segment.documentName || currentProject()?.sourceFileName || "Document",
+      name: current.name || segment.documentName || editorSessionStore.getProject()?.sourceFileName || "Document",
       type: stableLower(current.type || segment.documentType || "docx") || "docx"
     });
   });
@@ -4651,7 +4615,7 @@ function exportDocumentForTypes(supportedTypes, selectedTypeMessage, missingMess
 }
 
 function documentSegments(documentId) {
-  return currentSegments().filter((segment) => segment.documentId === documentId);
+  return editorSessionStore.getSegments().filter((segment) => segment.documentId === documentId);
 }
 
 function emptyDocumentStats() {
@@ -4674,7 +4638,7 @@ function finalizeDocumentStats(stats) {
 
 function projectDocumentStats(documents = projectDocuments()) {
   const map = new Map(documents.map((documentInfo) => [documentInfo.id, emptyDocumentStats()]));
-  currentSegments().forEach((segment) => {
+  editorSessionStore.getSegments().forEach((segment) => {
     const id = segment.documentId || "default-document";
     if (!map.has(id)) map.set(id, emptyDocumentStats());
     addSegmentToDocumentStats(map.get(id), segment);
@@ -4697,7 +4661,7 @@ function aggregateDocumentStats(statsById) {
 
 function documentStats(documentId) {
   const stats = emptyDocumentStats();
-  currentSegments().forEach((segment) => {
+  editorSessionStore.getSegments().forEach((segment) => {
     if (segment.documentId === documentId) addSegmentToDocumentStats(stats, segment);
   });
   return finalizeDocumentStats(stats);
@@ -4705,8 +4669,8 @@ function documentStats(documentId) {
 
 function currentDocumentSegments() {
   return currentDocumentId()
-    ? currentSegments().filter((segment) => segment.documentId === currentDocumentId())
-    : currentSegments();
+    ? editorSessionStore.getSegments().filter((segment) => segment.documentId === currentDocumentId())
+    : editorSessionStore.getSegments();
 }
 
 function currentSelectedDocument() {
@@ -4718,12 +4682,12 @@ function deliveryExportScope() {
   const documentInfo = currentSelectedDocument();
   return {
     documentInfo,
-    segments: documentInfo ? currentSegments().filter((segment) => segment.documentId === documentInfo.id) : currentSegments()
+    segments: documentInfo ? editorSessionStore.getSegments().filter((segment) => segment.documentId === documentInfo.id) : editorSessionStore.getSegments()
   };
 }
 
 function scopedExportBaseName(baseName, documentInfo) {
-  const base = fileSafeName(baseName || currentProject()?.name || "project");
+  const base = fileSafeName(baseName || editorSessionStore.getProject()?.name || "project");
   return documentInfo ? `${base}_${fileSafeName(documentInfo.name || "current-file")}` : base;
 }
 
@@ -4882,11 +4846,11 @@ function shouldLiveSyncLanguageInput(input) {
   return Boolean(LANGUAGE_ALIAS_CODES[lookup]) || lookup === stableLanguageLookupKey(code);
 }
 
-function languagePairKey(project = currentProject()) {
+function languagePairKey(project = editorSessionStore.getProject()) {
   return project ? `${normalizeLanguageInputValue(project.sourceLang)}::${normalizeLanguageInputValue(project.targetLang)}` : "";
 }
 
-function targetSpellcheckLanguage(project = currentProject()) {
+function targetSpellcheckLanguage(project = editorSessionStore.getProject()) {
   return normalizeLanguageInputValue(project?.targetLang || "");
 }
 
@@ -4964,7 +4928,7 @@ function textDecodingOptions() {
 }
 
 function recentLanguagePairs(limit = 4) {
-  return [...currentProjects()]
+  return [...editorSessionStore.getProjects()]
     .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
     .map((project) => [normalizeLanguageInputValue(project.sourceLang), normalizeLanguageInputValue(project.targetLang)])
     .filter(([source, target]) => source && target)
@@ -5172,46 +5136,46 @@ function segmentStatusLabel(status) {
 }
 
 function commandList() {
-  const commandProjectId = state.commandProjectId || currentProject()?.id || null;
+  const commandProjectId = state.commandProjectId || editorSessionStore.getProject()?.id || null;
   const commands = [
     { id: "undo", label: "Undo last action", run: undoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canUndo?.(commandProjectId)) },
     { id: "redo", label: "Redo last action", run: redoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canRedo?.(commandProjectId)) },
     { id: "trash", label: "Open Trash", run: openTrash, enabled: Boolean(appRuntime?.trashRepository) },
     { id: "confirm", label: "Confirm segment", run: segmentConfirmationController.confirm, enabled: Boolean(currentSegment()?.target?.trim()) },
-    { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(currentSegments().length) },
-    { id: "focus-mode", label: currentFocusMode() ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(currentApplicationView() === "editor" && currentProject()) },
+    { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(editorSessionStore.getSegments().length) },
+    { id: "focus-mode", label: currentFocusMode() ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(currentApplicationView() === "editor" && editorSessionStore.getProject()) },
     { id: "copy-source", label: "Copy source", run: targetProducerController.copySourceToTarget, enabled: Boolean(currentSegment()) },
     { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: structuralSegmentController.split, enabled: Boolean(currentSegment() && structuralSegmentController.canSplit(currentSegment())) },
     { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: structuralSegmentController.merge, enabled: Boolean(currentSegment() && structuralSegmentController.canMerge(currentSegment(), structuralSegmentController.nextForMerge(currentSegment()))) },
     { id: "save-tm", label: "Save segment to TM", run: saveActiveSegmentToTm, enabled: Boolean(currentSegment()?.target?.trim()) },
-    { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(currentProject()) },
-    { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(currentProject()) },
-    { id: "quality-passport", label: "Export Quality Passport", run: exportQualityPassport, enabled: Boolean(currentProject()) },
-    { id: "next-quality-risk", label: "Next quality risk", run: goToNextQualityRisk, enabled: Boolean(currentProject()) },
-    { id: "concordance", label: "Open concordance", run: openConcordanceSearch, enabled: Boolean(currentProject()) },
-    { id: "replace-target", label: "Find and replace target text", run: openReplacePanel, enabled: Boolean(currentProject()) },
-    { id: "preset-translate", label: "Use Translate filter preset", group: "Filters", keywords: ["open", "segments", "matches"], run: () => filterPresetController?.applyPreset?.("translate"), enabled: Boolean(currentProject()) },
-    { id: "preset-review", label: "Use Review filter preset", group: "Filters", keywords: ["needs review", "comments"], run: () => filterPresetController?.applyPreset?.("review"), enabled: Boolean(currentProject()) },
-    { id: "preset-qa-fixes", label: "Use QA fixes filter preset", group: "Filters", keywords: ["quality", "blocked", "fixes"], run: () => filterPresetController?.applyPreset?.("qa-fixes"), enabled: Boolean(currentProject()) },
-    { id: "preset-ai-review", label: "Use AI review filter preset", group: "Filters", keywords: ["AI", "risk", "suggestions"], run: () => filterPresetController?.applyPreset?.("ai-review"), enabled: Boolean(currentProject()) },
-    { id: "project-report", label: "Export project report", run: exportProjectReport, enabled: Boolean(currentProject()) },
-    { id: "anonymized-report", label: "Export anonymized report", run: () => exportProjectReport({ anonymized: true }), enabled: Boolean(currentProject()) },
-    { id: "local-ai-pretranslate", label: "Local AI pre-translate", run: aiPretranslationController.pretranslate, enabled: Boolean(currentProject() && !state.localAi.running) },
+    { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "quality-passport", label: "Export Quality Passport", run: exportQualityPassport, enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "next-quality-risk", label: "Next quality risk", run: goToNextQualityRisk, enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "concordance", label: "Open concordance", run: openConcordanceSearch, enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "replace-target", label: "Find and replace target text", run: openReplacePanel, enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "preset-translate", label: "Use Translate filter preset", group: "Filters", keywords: ["open", "segments", "matches"], run: () => filterPresetController?.applyPreset?.("translate"), enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "preset-review", label: "Use Review filter preset", group: "Filters", keywords: ["needs review", "comments"], run: () => filterPresetController?.applyPreset?.("review"), enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "preset-qa-fixes", label: "Use QA fixes filter preset", group: "Filters", keywords: ["quality", "blocked", "fixes"], run: () => filterPresetController?.applyPreset?.("qa-fixes"), enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "preset-ai-review", label: "Use AI review filter preset", group: "Filters", keywords: ["AI", "risk", "suggestions"], run: () => filterPresetController?.applyPreset?.("ai-review"), enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "project-report", label: "Export project report", run: exportProjectReport, enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "anonymized-report", label: "Export anonymized report", run: () => exportProjectReport({ anonymized: true }), enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "local-ai-pretranslate", label: "Local AI pre-translate", run: aiPretranslationController.pretranslate, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running) },
     { id: "local-ai-review", label: "AI review active segment", run: aiReviewController.reviewActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-review-batch", label: "AI QA batch", run: aiReviewController.reviewBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-review-batch", label: "AI QA batch", run: aiReviewController.reviewBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-tag-repair", label: "Suggest AI tag repair", run: aiTagRepairController.repairActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-tag-repair-batch", label: "Repair AI tags batch", run: aiTagRepairController.repairBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-tag-repair-batch", label: "Repair AI tags batch", run: aiTagRepairController.repairBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-polish-draft", label: "Polish active draft with AI", run: aiDraftEditingController.polishActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-polish-batch", label: "Polish AI drafts batch", run: aiDraftEditingController.polishBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-polish-batch", label: "Polish AI drafts batch", run: aiDraftEditingController.polishBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-adapt-draft", label: "Adapt active draft with AI", run: aiDraftEditingController.adaptActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-adapt-batch", label: "Adapt AI drafts batch", run: aiDraftEditingController.adaptBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-adapt-batch", label: "Adapt AI drafts batch", run: aiDraftEditingController.adaptBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-variants", label: "Suggest AI alternatives", run: aiAlternativesController.suggestActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-variants-batch", label: "Suggest AI alternatives batch", run: aiAlternativesController.suggestBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-variants-batch", label: "Suggest AI alternatives batch", run: aiAlternativesController.suggestBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-apply-terms", label: "Apply AI terminology", run: aiTerminologyApplicationController.applyActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-apply-terms-batch", label: "Apply AI terminology batch", run: aiTerminologyApplicationController.applyBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-apply-terms-batch", label: "Apply AI terminology batch", run: aiTerminologyApplicationController.applyBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-terms", label: "Extract AI terms", run: aiTerminologyExtractionController.extractActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-terms-batch", label: "Extract AI terms batch", run: aiTerminologyExtractionController.extractBatch, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-project-brief", label: "Generate AI project brief", run: aiProjectBriefController.generate, enabled: Boolean(currentProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-terms-batch", label: "Extract AI terms batch", run: aiTerminologyExtractionController.extractBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-project-brief", label: "Generate AI project brief", run: aiProjectBriefController.generate, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "openai-ai", label: "Create OpenAI suggestion", run: aiOpenAiSuggestionController.create, enabled: Boolean(currentSegment()) }
   ];
   const shortcuts = {
@@ -5269,7 +5233,7 @@ function restoreWorkspaceDirtyIds() {
 }
 
 function pruneWorkspaceDirtyProjectIds() {
-  const knownIds = new Set(currentProjects().map((project) => project.id).filter(Boolean));
+  const knownIds = new Set(editorSessionStore.getProjects().map((project) => project.id).filter(Boolean));
   const nextIds = workspaceDirtyIds().filter((id) => knownIds.has(id));
   const nextRecoveryIds = Array.from(state.workspaceRecoveryProjectIds).filter((id) => knownIds.has(id) && nextIds.includes(id));
   const dirtyChanged = nextIds.length !== state.workspaceDirtyProjectIds.size;
@@ -5299,7 +5263,7 @@ function handleBeforeUnload(event) {
   event.returnValue = "";
 }
 
-function markWorkspaceDirty(projectId = currentProject()?.id) {
+function markWorkspaceDirty(projectId = editorSessionStore.getProject()?.id) {
   if (!projectId) return;
   const changed = !state.workspaceDirtyProjectIds.has(projectId);
   state.workspaceDirtyProjectIds.add(projectId);
@@ -5330,14 +5294,14 @@ function projectUsesResource(project, type, name, sourceLang = "", targetLang = 
 }
 
 function markProjectsUsingResourceDirty(type, name, sourceLang = "", targetLang = "") {
-  const projectIds = currentProjects()
+  const projectIds = editorSessionStore.getProjects()
     .filter((project) => projectUsesResource(project, type, name, sourceLang, targetLang))
     .map((project) => project.id);
   markWorkspaceProjectsDirty(projectIds);
   return projectIds.length;
 }
 
-function clearWorkspaceDirty(projectId = currentProject()?.id) {
+function clearWorkspaceDirty(projectId = editorSessionStore.getProject()?.id) {
   if (projectId) state.workspaceDirtyProjectIds.delete(projectId);
   if (projectId) state.workspaceRecoveryProjectIds.delete(projectId);
   persistWorkspaceDirtyIds();
@@ -5369,7 +5333,7 @@ function renderWorkspaceStatus() {
     storageLine: storageDurabilityLine(state.storageDurability),
     storageWarnings,
     importBusy: Boolean(state.importTask),
-    hasProject: Boolean(currentProject())
+    hasProject: Boolean(editorSessionStore.getProject())
   });
   renderWorkspaceRecoveryPanel();
 }
@@ -5411,7 +5375,7 @@ function isBackupReminderDismissed(projectId, now = new Date()) {
   return until ? new Date(until).getTime() > now.getTime() : false;
 }
 
-function dismissBackupReminder(projectId = currentProject()?.id, hours = BACKUP_REMINDER_DISMISS_HOURS) {
+function dismissBackupReminder(projectId = editorSessionStore.getProject()?.id, hours = BACKUP_REMINDER_DISMISS_HOURS) {
   if (!projectId) return;
   const dismissed = backupReminderDismissals();
   dismissed[projectId] = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
@@ -5423,12 +5387,12 @@ function dismissBackupReminder(projectId = currentProject()?.id, hours = BACKUP_
   renderBackupReminder();
 }
 
-function latestProjectPackageExport(project = currentProject()) {
+function latestProjectPackageExport(project = editorSessionStore.getProject()) {
   const history = (project?.exportHistory || []).filter((entry) => entry.type === "project-package" && entry.createdAt);
   return history.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0] || null;
 }
 
-function backupReminderInfo(project = currentProject(), activityEvents = currentActivityEvents(), now = new Date()) {
+function backupReminderInfo(project = editorSessionStore.getProject(), activityEvents = editorSessionStore.getActivityEvents(), now = new Date()) {
   if (!project || isBackupReminderDismissed(project.id, now)) return null;
   const latestExport = latestProjectPackageExport(project);
   const projectAgeDays = daysBetween(project.createdAt, now);
@@ -5455,9 +5419,9 @@ function renderBackupReminder() {
 }
 
 function knownProjectById(projectId) {
-  return currentProject()?.id === projectId
-    ? currentProject()
-    : currentProjects().find((project) => project.id === projectId) || currentProjectSummaries().find((project) => project.id === projectId) || null;
+  return editorSessionStore.getProject()?.id === projectId
+    ? editorSessionStore.getProject()
+    : editorSessionStore.getProjects().find((project) => project.id === projectId) || editorSessionStore.getProjectSummaries().find((project) => project.id === projectId) || null;
 }
 
 async function refreshWorkspaceStatus() {
@@ -5521,8 +5485,8 @@ async function summarizeProject(project, segments = null, summaryRevision = proj
 }
 
 async function refreshProjectSummaries() {
-  const cachedById = new Map(currentProjectSummaries().map((summary) => [summary.id, summary]));
-  const projectSummaries = await Promise.all(currentProjects().map((project) => {
+  const cachedById = new Map(editorSessionStore.getProjectSummaries().map((summary) => [summary.id, summary]));
+  const projectSummaries = await Promise.all(editorSessionStore.getProjects().map((project) => {
     const revision = projectSummaryRevision(project.id);
     const cached = cachedById.get(project.id);
     if (cached && cached.updatedAt === project.updatedAt && cached.summaryRevision === revision) {
@@ -5536,7 +5500,7 @@ async function refreshProjectSummaries() {
         summaryRevision: revision
       };
     }
-    const inMemorySegments = currentProject()?.id === project.id ? currentSegments() : null;
+    const inMemorySegments = editorSessionStore.getProject()?.id === project.id ? editorSessionStore.getSegments() : null;
     return summarizeProject(project, inMemorySegments, revision);
   }));
   editorSessionStore.replaceProjectSummaries(projectSummaries);
@@ -5546,22 +5510,22 @@ async function refreshProjectSummaries() {
 
 async function loadProjects(selectFirst = false) {
   editorSessionStore.replaceProjects(await listProjects());
-  const knownProjectIds = new Set(currentProjects().map((project) => project.id));
+  const knownProjectIds = new Set(editorSessionStore.getProjects().map((project) => project.id));
   editorSessionStore.pruneProjectSummaryRevisions(knownProjectIds);
   pruneWorkspaceDirtyProjectIds();
   await refreshProjectSummaries();
   renderProjectList();
   renderEditor();
   void refreshTrashSummary();
-  if (selectFirst && !currentProject() && currentProjects()[0]) {
-    await openProject(currentProjects()[0].id);
+  if (selectFirst && !editorSessionStore.getProject() && editorSessionStore.getProjects()[0]) {
+    await openProject(editorSessionStore.getProjects()[0].id);
   }
 }
 
 function setView(view) {
   if (view === "projects") applicationNavigation?.openProjects?.();
   else if (view === "resources") applicationNavigation?.openResources?.();
-  else if (view === "project") applicationNavigation?.openProject?.(currentProject()?.id || null, currentActiveIndex());
+  else if (view === "project") applicationNavigation?.openProject?.(editorSessionStore.getProject()?.id || null, currentActiveIndex());
   else applicationNavigation?.openEditor?.(applicationNavigationPayload({ view: "editor" }));
   renderEditor();
   if (view === "projects") refreshProjectSummaries();
@@ -5569,9 +5533,9 @@ function setView(view) {
 }
 
 function showProjectHome() {
-  if (!currentProject()) return;
-  const activeIndex = currentSegments().length ? 0 : -1;
-  applicationNavigation?.openProject?.(currentProject().id, activeIndex);
+  if (!editorSessionStore.getProject()) return;
+  const activeIndex = editorSessionStore.getSegments().length ? 0 : -1;
+  applicationNavigation?.openProject?.(editorSessionStore.getProject().id, activeIndex);
   renderAll();
 }
 
@@ -5658,7 +5622,7 @@ function resourceOptionHtml(resource, type, selected, main) {
   `;
 }
 
-function renderProjectResourcePickers(project = currentProject()) {
+function renderProjectResourcePickers(project = editorSessionStore.getProject()) {
   const { sourceLang, targetLang } = projectDialogValues();
   if (!sourceLang || !targetLang) return;
   const editing = projectDialogController?.getMode?.() === "edit";
@@ -5733,13 +5697,13 @@ async function refreshResources() {
 }
 
 async function refreshProjectTerms({ rerender = false } = {}) {
-  if (!currentProject()) {
+  if (!editorSessionStore.getProject()) {
     editorSessionStore.replaceProjectTerms([]);
     return;
   }
   editorSessionStore.replaceProjectTerms(await listTerms({
-    sourceLang: currentProject().sourceLang,
-    targetLang: currentProject().targetLang,
+    sourceLang: editorSessionStore.getProject().sourceLang,
+    targetLang: editorSessionStore.getProject().targetLang,
     termBaseNames: projectTermBaseNames()
   }));
   invalidateSegmentFilterCache();
@@ -5748,18 +5712,18 @@ async function refreshProjectTerms({ rerender = false } = {}) {
 }
 
 async function projectTermsForValidation() {
-  if (!currentProject()) return [];
+  if (!editorSessionStore.getProject()) return [];
   return listTerms({
-    sourceLang: currentProject().sourceLang,
-    targetLang: currentProject().targetLang,
+    sourceLang: editorSessionStore.getProject().sourceLang,
+    targetLang: editorSessionStore.getProject().targetLang,
     termBaseNames: projectTermBaseNames()
   });
 }
 
-async function logProjectActivity(type, summary, detail = {}, project = currentProject()) {
+async function logProjectActivity(type, summary, detail = {}, project = editorSessionStore.getProject()) {
   if (!project) return null;
   const event = await recordActivityEvent({ projectId: project.id, type, summary, detail });
-  if (event && currentProject()?.id === project.id) {
+  if (event && editorSessionStore.getProject()?.id === project.id) {
     editorSessionStore.prependActivityEvent(event);
     renderBackupReminder();
   }
@@ -5785,28 +5749,28 @@ function draftProjectActivityEvent(project, type, summary, detail = {}) {
 
 async function logOptionalProjectActivity(type, summary, detail = {}, label = summary || type) {
   try {
-    if (LOOPCAT_TEST_BUILD && ["export", "resource-export"].includes(type) && currentProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]) {
+    if (LOOPCAT_TEST_BUILD && ["export", "resource-export"].includes(type) && editorSessionStore.getProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]) {
       throw new Error("Simulated export activity log failure");
     }
-    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || currentProject()?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
+    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || editorSessionStore.getProject()?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
       throw new Error("Simulated import activity log failure");
     }
     await logProjectActivity(type, summary, detail);
     return true;
   } catch (activityError) {
     console.warn(`${label} activity log failed.`, activityError);
-    if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
+    if (editorSessionStore.getProject()?.id) markWorkspaceDirty(editorSessionStore.getProject().id);
     return false;
   }
 }
 
 async function logOptionalActivityForProject(projectId, type, summary, detail = {}, label = summary || type) {
   try {
-    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || currentProject()?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
+    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || editorSessionStore.getProject()?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
       throw new Error("Simulated import activity log failure");
     }
     const event = await recordActivityEvent({ projectId, type, summary, detail });
-    if (currentProject()?.id === projectId) {
+    if (editorSessionStore.getProject()?.id === projectId) {
       editorSessionStore.replaceActivityEvents(await listActivityEvents(projectId));
       renderBackupReminder();
     }
@@ -5868,11 +5832,11 @@ function renderValidationReport(report) {
 
 async function renderProjectAnalysis() {
   const run = (state.projectAnalysisRun += 1);
-  const project = currentProject();
+  const project = editorSessionStore.getProject();
   if (!project || currentApplicationView() !== "project" || !els.projectAnalysis) return;
-  const segments = currentSegments();
+  const segments = editorSessionStore.getSegments();
   const tmEntries = await getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`);
-  if (run !== state.projectAnalysisRun || currentApplicationView() !== "project" || currentProject()?.id !== project.id) return;
+  if (run !== state.projectAnalysisRun || currentApplicationView() !== "project" || editorSessionStore.getProject()?.id !== project.id) return;
   const tmNames = new Set(projectTmNames(project));
   const analysis = analyzeProject(project, segments, tmEntries.filter((entry) => tmNames.has(entry.tmName)));
   const ai = analysis.ai || {};
@@ -5893,14 +5857,14 @@ async function renderProjectAnalysis() {
 }
 
 function renderProjectList() {
-  if (!currentProjects().length) {
+  if (!editorSessionStore.getProjects().length) {
     replaceSafeHtml(els.projectList, `<div class="muted">${translatedSourceHtml("No projects yet.")}</div>`);
     return;
   }
   const fragment = document.createDocumentFragment();
-  currentProjects().forEach((project) => {
+  editorSessionStore.getProjects().forEach((project) => {
     const button = document.createElement("button");
-    button.className = `project-item ${currentProject()?.id === project.id ? "active" : ""}`;
+    button.className = `project-item ${editorSessionStore.getProject()?.id === project.id ? "active" : ""}`;
     replaceSafeHtml(button, `<strong>${displaySafeHtml(project.name)}</strong><span>${escapeHtml(languagePair(project))}</span><span>${project.sourceFileName ? displaySafeHtml(project.sourceFileName) : uiLabelHtml("noSourceFile")}</span>`);
     button.addEventListener("click", () => openProject(project.id));
     fragment.append(button);
@@ -5910,26 +5874,26 @@ function renderProjectList() {
 
 async function openProject(projectId) {
   await autosaveService.flush();
-  editorSessionStore.replaceProject(currentProjects().find((project) => project.id === projectId) || null);
-  state.commandProjectId = currentProject()?.id || projectId || "";
-  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(currentProject() ? await getProjectSegments(projectId) : []));
-  editorSessionStore.replaceActivityEvents(currentProject() ? await listActivityEvents(projectId) : []);
+  editorSessionStore.replaceProject(editorSessionStore.getProjects().find((project) => project.id === projectId) || null);
+  state.commandProjectId = editorSessionStore.getProject()?.id || projectId || "";
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(editorSessionStore.getProject() ? await getProjectSegments(projectId) : []));
+  editorSessionStore.replaceActivityEvents(editorSessionStore.getProject() ? await listActivityEvents(projectId) : []);
   await refreshProjectTerms();
-  const activeIndex = currentSegments().length ? 0 : -1;
+  const activeIndex = editorSessionStore.getSegments().length ? 0 : -1;
   await filterPresetReady;
-  await filterPresetController?.restoreForProject?.(currentProject()?.id || projectId);
-  applicationNavigation?.openProject?.(currentProject()?.id || projectId, activeIndex);
+  await filterPresetController?.restoreForProject?.(editorSessionStore.getProject()?.id || projectId);
+  applicationNavigation?.openProject?.(editorSessionStore.getProject()?.id || projectId, activeIndex);
   renderAll();
   if (currentApplicationView() === "editor") await editorContextController.refresh();
 }
 
 async function openProjectFile(documentId) {
-  if (!currentProject()) return;
-  const first = currentSegments().findIndex((segment) => segment.documentId === documentId);
+  if (!editorSessionStore.getProject()) return;
+  const first = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
   applicationNavigation?.openEditor?.({
-    projectId: currentProject().id,
+    projectId: editorSessionStore.getProject().id,
     documentId,
-    segmentId: currentSegments()[first]?.id || "",
+    segmentId: editorSessionStore.getSegments()[first]?.id || "",
     activeIndex: first
   });
   renderAll();
@@ -5949,7 +5913,7 @@ function renderAll() {
 
 function renderEditor() {
   syncLegacyApplicationState();
-  const hasProject = Boolean(currentProject());
+  const hasProject = Boolean(editorSessionStore.getProject());
   void syncDesktopSpellcheckLanguage();
   renderWorkspaceStatus();
   renderBackupReminder();
@@ -5971,29 +5935,29 @@ function renderEditor() {
     els.inspectorToggleBtn.setAttribute("aria-expanded", String(state.inspectorOpen));
     els.inspectorToggleBtn.textContent = state.inspectorOpen ? uiSource("Hide inspector") : uiSource("Show inspector");
   }
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
 
   const resources = projectResourceSummary();
-  els.projectTitle.textContent = displaySafeText(currentProject().name);
+  els.projectTitle.textContent = displaySafeText(editorSessionStore.getProject().name);
   els.projectMeta.textContent = `${languagePair()} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
-  els.projectDomainEditInput.value = currentProject().domain || "";
+  els.projectDomainEditInput.value = editorSessionStore.getProject().domain || "";
   els.domainForm.classList.add("clean");
-  els.domainForm.classList.toggle("hidden", Boolean((currentProject().domain || "").trim()));
+  els.domainForm.classList.toggle("hidden", Boolean((editorSessionStore.getProject().domain || "").trim()));
   replaceSafeHtml(els.projectInfo, `
-    <dt>${uiLabelHtml("name")}</dt><dd>${displaySafeHtml(currentProject().name)}</dd>
-    <dt>${translatedSourceHtml("Creator")}</dt><dd>${displaySafeHtml(currentProject().creatorName || uiLabel("notSet"))}</dd>
-    <dt>${translatedSourceHtml("Domain")}</dt><dd>${displaySafeHtml(currentProject().domain || uiLabel("notSet"))}</dd>
+    <dt>${uiLabelHtml("name")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().name)}</dd>
+    <dt>${translatedSourceHtml("Creator")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().creatorName || uiLabel("notSet"))}</dd>
+    <dt>${translatedSourceHtml("Domain")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().domain || uiLabel("notSet"))}</dd>
     <dt>${uiLabelHtml("languages")}</dt><dd>${escapeHtml(languagePair())}</dd>
-    <dt>${translatedSourceHtml("Workspace")}</dt><dd>${escapeHtml(currentProject().workspaceId || "local-workspace")}</dd>
-    <dt>${uiLabelHtml("sourceFile")}</dt><dd>${displaySafeHtml(currentProject().sourceFileName || uiLabel("notImported"))}</dd>
+    <dt>${translatedSourceHtml("Workspace")}</dt><dd>${escapeHtml(editorSessionStore.getProject().workspaceId || "local-workspace")}</dd>
+    <dt>${uiLabelHtml("sourceFile")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().sourceFileName || uiLabel("notImported"))}</dd>
     <dt>${uiLabelHtml("mainTm")}</dt><dd>${displaySafeHtml(resources.mainTm)}</dd>
     <dt>${uiLabelHtml("linkedTms")}</dt><dd>${displaySafeHtml(resources.tmNames.join(", "))}</dd>
     <dt>${uiLabelHtml("linkedTbs")}</dt><dd>${displaySafeHtml(resources.tbNames.join(", "))}</dd>
     <dt>${translatedSourceHtml("Documents")}</dt><dd>${projectDocuments().length || 0}</dd>
-    <dt>${uiLabelHtml("segmentsTitle")}</dt><dd>${currentSegments().length}</dd>
-    <dt>${uiLabelHtml("activity")}</dt><dd>${uiLabelHtml("eventCount", { count: currentActivityEvents().length })}</dd>
+    <dt>${uiLabelHtml("segmentsTitle")}</dt><dd>${editorSessionStore.getSegments().length}</dd>
+    <dt>${uiLabelHtml("activity")}</dt><dd>${uiLabelHtml("eventCount", { count: editorSessionStore.getActivityEvents().length })}</dd>
   `);
-  const ai = aiRuntimeSettingsService.normalizeProjectSettings(currentProject().aiSettings);
+  const ai = aiRuntimeSettingsService.normalizeProjectSettings(editorSessionStore.getProject().aiSettings);
   aiAdministrationController?.renderGlobalSettings?.({
     settings: ai,
     storedKey: aiCredentialStorageService.storedOpenAiKey(),
@@ -6021,18 +5985,18 @@ function renderTermbaseSelect() {
 }
 
 function renderProjectHome() {
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   const documents = projectDocuments();
   const documentStatsById = projectDocumentStats(documents);
   const total = aggregateDocumentStats(documentStatsById);
   const sourceWords = total.words;
   const resources = projectResourceSummary();
-  els.projectHomeTitle.textContent = displaySafeText(currentProject().name);
-  els.projectHomeMeta.textContent = `${languagePair()} - ${displaySafeText(currentProject().domain || uiLabel("noDomain"))} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
+  els.projectHomeTitle.textContent = displaySafeText(editorSessionStore.getProject().name);
+  els.projectHomeMeta.textContent = `${languagePair()} - ${displaySafeText(editorSessionStore.getProject().domain || uiLabel("noDomain"))} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
   replaceSafeHtml(els.projectHomeStats, `
     <div><strong>${total.percent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
     <div><strong>${documents.length}</strong><span>${uiLabelHtml("files")}</span></div>
-    <div><strong>${currentSegments().length}</strong><span>${uiLabelHtml("segments")}</span></div>
+    <div><strong>${editorSessionStore.getSegments().length}</strong><span>${uiLabelHtml("segments")}</span></div>
     <div><strong>${sourceWords}</strong><span>${uiLabelHtml("sourceWords")}</span></div>
   `);
   els.fileCountText.textContent = documents.length ? uiLabel("fileCount", { count: documents.length }) : uiSource("No files imported");
@@ -6104,7 +6068,7 @@ function renderDocumentFilter() {
 
 function renderLanguagePairFilter() {
   const current = els.languagePairFilter.value;
-  const pairs = Array.from(new Set(currentProjects().map((project) => languagePairKey(project)).filter((pair) => pair !== "::"))).sort();
+  const pairs = Array.from(new Set(editorSessionStore.getProjects().map((project) => languagePairKey(project)).filter((pair) => pair !== "::"))).sort();
   const fragment = document.createDocumentFragment();
   const allOption = document.createElement("option");
   allOption.value = "";
@@ -6190,7 +6154,7 @@ function projectEmptyState({ hasProjects }) {
 function renderProjectsView() {
   const query = stableLower(els.projectSearchInput.value.trim());
   const pair = els.languagePairFilter.value;
-  const summaries = currentProjectSummaries().map((project) => ({
+  const summaries = editorSessionStore.getProjectSummaries().map((project) => ({
     ...project,
     searchText: project.searchText || stableLower(`${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`),
     languagePairKey: project.languagePairKey || languagePairKey(project)
@@ -6209,8 +6173,8 @@ function renderProjectsView() {
   els.projectDashboard.replaceChildren(...(visible.length ? visible.map(createProjectTile) : [projectEmptyState({ hasProjects: summaries.length > 0 })]));
 }
 
-async function confirmDeleteProject(projectId = currentProject()?.id) {
-  const project = currentProjects().find((item) => item.id === projectId);
+async function confirmDeleteProject(projectId = editorSessionStore.getProject()?.id) {
+  const project = editorSessionStore.getProjects().find((item) => item.id === projectId);
   if (!project) return false;
   const ok = uiConfirm(`Move project "${displaySafeText(project.name)}" and all of its files to Trash?`);
   if (!ok) return false;
@@ -6222,7 +6186,7 @@ async function confirmDeleteProject(projectId = currentProject()?.id) {
     await appRuntime.commands.bus.execute(command);
     state.commandProjectId = project.id;
     clearWorkspaceDirty(project.id);
-    if (currentProject()?.id === project.id) {
+    if (editorSessionStore.getProject()?.id === project.id) {
       editorSessionStore.replaceProject(null);
       editorSessionStore.replaceSegments([]);
       applicationNavigation.openProjects();
@@ -6239,24 +6203,24 @@ async function confirmDeleteProject(projectId = currentProject()?.id) {
 }
 
 async function confirmDeleteFile(documentInfo) {
-  if (!currentProject() || !documentInfo) return false;
+  if (!editorSessionStore.getProject() || !documentInfo) return false;
   const ok = uiConfirm(`Move file "${displaySafeText(documentInfo.name)}" to Trash?`);
   if (!ok) return false;
   try {
-    await autosaveService.flush(currentProject().id);
+    await autosaveService.flush(editorSessionStore.getProject().id);
     if (LOOPCAT_TEST_BUILD && documentInfo[FILE_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated file delete failure");
     const command = appRuntime?.commands?.createDeleteDocumentCommand?.({
-      project: currentProject(),
+      project: editorSessionStore.getProject(),
       documentId: documentInfo.id
     });
     if (!command) throw new Error("The reversible file deletion service is unavailable.");
     const commandResult = await appRuntime.commands.bus.execute(command);
-    state.commandProjectId = currentProject().id;
+    state.commandProjectId = editorSessionStore.getProject().id;
     editorSessionStore.replaceProject(commandResult.result.project);
-    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
-    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
+    editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
+    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(editorSessionStore.getProject().id)));
     selectApplicationDocument("");
-    selectApplicationSegment(currentSegments().length ? 0 : -1);
+    selectApplicationSegment(editorSessionStore.getSegments().length ? 0 : -1);
     markWorkspaceDirty();
     let fileDeleteActivityFailed = false;
     try {
@@ -6360,23 +6324,23 @@ function renderResourceDashboard(type, resourceState) {
 }
 
 function canAddResourceToCurrentProject(type, resource) {
-  if (!currentProject()) return false;
-  if (resource.sourceLang !== currentProject().sourceLang || resource.targetLang !== currentProject().targetLang) return false;
+  if (!editorSessionStore.getProject()) return false;
+  if (resource.sourceLang !== editorSessionStore.getProject().sourceLang || resource.targetLang !== editorSessionStore.getProject().targetLang) return false;
   const names = type === "tm" ? projectTmNames() : projectTermBaseNames();
   return !names.includes(resource.name);
 }
 
 async function addResourceToCurrentProject(type, resource) {
-  if (!currentProject() || !canAddResourceToCurrentProject(type, resource)) return;
-  const links = projectResourceLinks(currentProject());
+  if (!editorSessionStore.getProject() || !canAddResourceToCurrentProject(type, resource)) return;
+  const links = projectResourceLinks(editorSessionStore.getProject());
   links.push({
     id: makeId("resource-link"),
     type: type === "tm" ? "tm" : "termbase",
     name: resource.name,
     role: type === "tm" ? "reference" : undefined
   });
-  editorSessionStore.replaceProject(await updateProject({ ...currentProject(), resourceLinks: links }));
-  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
+  editorSessionStore.replaceProject(await updateProject({ ...editorSessionStore.getProject(), resourceLinks: links }));
+  editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
   await refreshProjectTerms({ rerender: true });
   await refreshProjectSummaries();
   renderAll();
@@ -6462,7 +6426,7 @@ async function deleteTmResourceEntry(entry) {
     const command = appRuntime?.commands?.createDeleteResourceEntryCommand?.({
       resourceType: "tm",
       entityId: entry.id,
-      projectId: currentProject()?.id || null
+      projectId: editorSessionStore.getProject()?.id || null
     });
     const result = await executeResourceTrashCommand(command);
     setSaveStatus(
@@ -6485,7 +6449,7 @@ async function deleteTermResourceEntry(term, options = {}) {
     const command = appRuntime?.commands?.createDeleteResourceEntryCommand?.({
       resourceType: "tb",
       entityId: term.id,
-      projectId: currentProject()?.id || null
+      projectId: editorSessionStore.getProject()?.id || null
     });
     const result = await executeResourceTrashCommand(command, { refreshSuggestions });
     setSaveStatus(
@@ -6618,7 +6582,7 @@ async function confirmDeleteResource(type, key) {
         languagePair: info.languagePair
       },
       affectedIds: items.map((item) => item.id),
-      projectId: currentProject()?.id || null
+      projectId: editorSessionStore.getProject()?.id || null
     });
     const result = await executeResourceTrashCommand(command, { refreshSuggestions: type === "tb" });
     setSaveStatus(
@@ -6697,7 +6661,7 @@ function rangesOverlap(a, b) {
 function appendTextWithSourceMarkup(container, segment) {
   const text = segment.source || "";
   const tagMarkers = sourceTagMarkers(text, segmentTags(segment));
-  const termMarkers = termRanges(text, currentProjectTerms())
+  const termMarkers = termRanges(text, editorSessionStore.getProjectTerms())
     .filter((range) => !tagMarkers.some((tagMarker) => rangesOverlap(range, tagMarker)))
     .map((range) => ({ type: "term", index: range.index, length: range.length, range }));
   const markers = [...tagMarkers, ...termMarkers].sort((a, b) => a.index - b.index || (a.type === "tag" ? -1 : 1));
@@ -6782,7 +6746,7 @@ function spacerRow(height) {
 }
 
 function renderSegmentRow(index) {
-  const segment = currentSegments()[index];
+  const segment = editorSessionStore.getSegments()[index];
   const row = els.rowTemplate.content.firstElementChild.cloneNode(true);
   row.dataset.index = String(index);
   row.classList.toggle("active", index === currentActiveIndex());
@@ -6918,7 +6882,7 @@ function renderSegments(options = {}) {
 
 function updateRow(index) {
   const row = els.segmentBody.querySelector(`tr[data-index="${index}"]`);
-  const segment = currentSegments()[index];
+  const segment = editorSessionStore.getSegments()[index];
   if (!row || !segment) return;
   row.classList.toggle("active", index === currentActiveIndex());
   row.classList.toggle("tag-warning-row", hasTagIssue(segment));
@@ -6939,24 +6903,24 @@ function scheduleRevisionHistoryRender() {
 }
 
 function calculateProgressSummary() {
-  const total = currentSegments().length;
+  const total = editorSessionStore.getSegments().length;
   let confirmed = 0;
   let words = 0;
-  for (const segment of currentSegments()) {
+  for (const segment of editorSessionStore.getSegments()) {
     if (segment.status === "confirmed") confirmed += 1;
     words += sourceWordCount(segment);
   }
-  return { projectId: currentProject()?.id || "", total, confirmed, words };
+  return { projectId: editorSessionStore.getProject()?.id || "", total, confirmed, words };
 }
 
 function renderProgress(options = {}) {
   const previousStatus = options.previousStatus;
   const nextStatus = options.nextStatus;
-  const cached = currentProgressSummary();
+  const cached = editorSessionStore.getProgressSummary();
   const canApplyStatusDelta =
     cached &&
-    cached.projectId === (currentProject()?.id || "") &&
-    cached.total === currentSegments().length &&
+    cached.projectId === (editorSessionStore.getProject()?.id || "") &&
+    cached.total === editorSessionStore.getSegments().length &&
     previousStatus !== undefined &&
     nextStatus !== undefined;
   let summary;
@@ -6983,11 +6947,11 @@ function ensureSegmentVisible(index) {
 }
 
 async function setActiveSegment(index) {
-  if (index < 0 || index >= currentSegments().length) return;
+  if (index < 0 || index >= editorSessionStore.getSegments().length) return;
   if (index === currentActiveIndex()) return;
   const oldIndex = currentActiveIndex();
-  verticalFeatureState?.segmentGrid?.selectSegment(index, currentSegments()[index]?.id || "");
-  verticalFeatureState?.inspector?.setContext({ segmentId: currentSegments()[index]?.id || "" });
+  verticalFeatureState?.segmentGrid?.selectSegment(index, editorSessionStore.getSegments()[index]?.id || "");
+  verticalFeatureState?.inspector?.setContext({ segmentId: editorSessionStore.getSegments()[index]?.id || "" });
   segmentConfirmationController.renderBusy();
   ensureSegmentVisible(index);
   updateRow(oldIndex);
@@ -6997,14 +6961,14 @@ async function setActiveSegment(index) {
 }
 
 async function goToNextOpenSegment() {
-  if (!currentSegments().length) return;
+  if (!editorSessionStore.getSegments().length) return;
   const start = Math.max(currentActiveIndex() + 1, 0);
-  const afterCurrent = currentSegments().findIndex((segment, index) => index >= start && isOpenSegment(segment));
-  const beforeCurrent = currentSegments().findIndex((segment, index) => index < start && isOpenSegment(segment));
+  const afterCurrent = editorSessionStore.getSegments().findIndex((segment, index) => index >= start && isOpenSegment(segment));
+  const beforeCurrent = editorSessionStore.getSegments().findIndex((segment, index) => index < start && isOpenSegment(segment));
   const next = afterCurrent !== -1 ? afterCurrent : beforeCurrent;
   if (next === -1) return;
   await setActiveSegment(next);
-  if (!segmentPassesFilters(currentSegments()[next])) {
+  if (!segmentPassesFilters(editorSessionStore.getSegments()[next])) {
     updateEditorFilters({ status: "all" });
     els.segmentStatusFilter.value = "all";
     renderSegments();
@@ -7050,9 +7014,9 @@ function prepareCommandRestoreSegmentSnapshot(snapshot, current) {
 }
 
 async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}) {
-  const index = currentSegments().findIndex((item) => item.id === segmentId);
+  const index = editorSessionStore.getSegments().findIndex((item) => item.id === segmentId);
   if (index < 0) throw new Error("The affected segment is no longer available.");
-  const segment = currentSegments()[index];
+  const segment = editorSessionStore.getSegments()[index];
   const currentPatch = targetCommandPatch(segment);
   const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
   try {
@@ -7098,15 +7062,15 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
   }
   const currentById = new Map();
   const indexes = segmentIds.map((segmentId) => {
-    const index = currentSegments().findIndex((segment) => segment.id === segmentId);
+    const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === segmentId);
     if (index < 0) throw new Error("An affected pretranslation segment is no longer available.");
-    currentById.set(segmentId, targetCommandPatch(currentSegments()[index]));
+    currentById.set(segmentId, targetCommandPatch(editorSessionStore.getSegments()[index]));
     return index;
   });
   const previousActiveId = currentSegment()?.id || "";
   try {
     const restored = patches.map((patch, offset) => {
-      const segment = currentSegments()[indexes[offset]];
+      const segment = editorSessionStore.getSegments()[indexes[offset]];
       const currentPatch = currentById.get(segment.id);
       const restoredPatch = structuredClone(patch);
       restoredPatch.revision = Math.max(
@@ -7120,7 +7084,7 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
     });
     await saveSegments(restored);
     const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
-    const requestedIndex = currentSegments().findIndex((segment) => segment.id === requestedActiveId);
+    const requestedIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveId);
     if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
     invalidateSegmentFilterCache();
     markWorkspaceDirty();
@@ -7135,8 +7099,8 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
     };
   } catch (error) {
     currentById.forEach((patch, segmentId) => {
-      const index = currentSegments().findIndex((segment) => segment.id === segmentId);
-      if (index >= 0) applyTargetCommandPatch(currentSegments()[index], patch);
+      const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === segmentId);
+      if (index >= 0) applyTargetCommandPatch(editorSessionStore.getSegments()[index], patch);
     });
     invalidateSegmentFilterCache();
     renderAll();
@@ -7149,10 +7113,10 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
   const currentById = new Map();
   const indexes = [];
   for (const snapshot of snapshots) {
-    const index = currentSegments().findIndex((segment) => segment.id === snapshot?.id);
+    const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === snapshot?.id);
     if (index < 0) throw new Error("An affected segment is no longer available.");
     indexes.push(index);
-    currentById.set(snapshot.id, structuredClone(currentSegments()[index]));
+    currentById.set(snapshot.id, structuredClone(editorSessionStore.getSegments()[index]));
   }
   const previousActiveId = currentSegment()?.id || "";
   try {
@@ -7164,7 +7128,7 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
     });
     await saveSegments(restored);
     const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
-    const requestedIndex = currentSegments().findIndex((segment) => segment.id === requestedActiveId);
+    const requestedIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveId);
     if (requestedIndex >= 0) selectApplicationSegment(requestedIndex);
     markWorkspaceDirty();
     renderAll();
@@ -7176,7 +7140,7 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
     };
   } catch (error) {
     for (const [segmentId, snapshot] of currentById) {
-      const index = currentSegments().findIndex((segment) => segment.id === segmentId);
+      const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === segmentId);
       if (index >= 0) editorSessionStore.replaceSegmentAt(index, prepareSegmentHistoryState(snapshot));
     }
     renderAll();
@@ -7202,9 +7166,9 @@ function preparePersistedConfirmationRollback(segment, savedConfirmedRevision) {
 }
 
 async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = {}) {
-  const index = currentSegments().findIndex((item) => item.id === segmentId);
+  const index = editorSessionStore.getSegments().findIndex((item) => item.id === segmentId);
   if (index < 0) throw new Error("The affected segment is no longer available.");
-  const currentSnapshot = structuredClone(currentSegments()[index]);
+  const currentSnapshot = structuredClone(editorSessionStore.getSegments()[index]);
   try {
     const restored = prepareCommandRestoreSegmentSnapshot(nextSnapshot, currentSnapshot);
     editorSessionStore.replaceSegmentAt(index, restored);
@@ -7228,7 +7192,7 @@ async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = 
   }
 }
 
-async function saveSegmentToTm(segment, project = currentProject()) {
+async function saveSegmentToTm(segment, project = editorSessionStore.getProject()) {
   if (!segment || !project || !segment.source.trim() || !segment.target.trim()) return null;
       if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG]) throw new Error("Simulated TM save failure");
   const entry = await saveTmEntry({
@@ -7246,9 +7210,9 @@ async function saveSegmentToTm(segment, project = currentProject()) {
 async function saveActiveSegmentToTm(options = {}) {
   const { reportStatus = true } = options || {};
   const segment = currentSegment();
-  if (!segment || !currentProject() || !segment.source.trim() || !segment.target.trim()) return null;
+  if (!segment || !editorSessionStore.getProject() || !segment.source.trim() || !segment.target.trim()) return null;
   try {
-    const entry = await saveSegmentToTm(segment, currentProject());
+    const entry = await saveSegmentToTm(segment, editorSessionStore.getProject());
     await refreshTmMatches();
     if (reportStatus) setSaveStatus("Segment saved to TM", "saved");
     return entry;
@@ -7298,7 +7262,7 @@ function handleGlobalKeydown(event) {
   const key = stableLower(event.key);
   const editableTarget = event.target?.matches?.("input, textarea, [contenteditable='true']");
   if ((event.ctrlKey || event.metaKey) && key === "z" && !editableTarget) {
-    const projectId = state.commandProjectId || currentProject()?.id || null;
+    const projectId = state.commandProjectId || editorSessionStore.getProject()?.id || null;
     const canRun = event.shiftKey
       ? appRuntime?.commands?.bus?.canRedo?.(projectId)
       : appRuntime?.commands?.bus?.canUndo?.(projectId);
@@ -7322,7 +7286,7 @@ function handleGlobalKeydown(event) {
     openCommandPalette();
     return;
   }
-  if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "f" && currentApplicationView() === "editor" && currentProject()) {
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "f" && currentApplicationView() === "editor" && editorSessionStore.getProject()) {
     event.preventDefault();
     event.stopPropagation();
     toggleFocusMode();
@@ -7352,7 +7316,7 @@ function handleGlobalKeydown(event) {
 }
 
 async function openConcordanceSearch() {
-  if (currentApplicationView() !== "editor" || !currentProject()) return;
+  if (currentApplicationView() !== "editor" || !editorSessionStore.getProject()) return;
   const keyword = selectedConcordanceKeyword();
   if (!keyword) {
     setSaveStatus("Select a source word, then press Ctrl+K or Alt+K.", "dirty");
@@ -7362,7 +7326,7 @@ async function openConcordanceSearch() {
   const entries = await listTmEntries();
   const tmNames = new Set(projectTmNames());
   const results = entries
-    .filter((entry) => entry.sourceLang === currentProject().sourceLang && entry.targetLang === currentProject().targetLang)
+    .filter((entry) => entry.sourceLang === editorSessionStore.getProject().sourceLang && entry.targetLang === editorSessionStore.getProject().targetLang)
     .filter((entry) => tmNames.has(entry.tmName))
     .filter((entry) => stableLower(entry.source).includes(query))
     .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
@@ -7446,7 +7410,7 @@ function qualityDecisionSeverityLabel(value) {
   return uiSource(label);
 }
 
-function qualityQaBySegment(qaChecks = currentQaChecks()) {
+function qualityQaBySegment(qaChecks = editorSessionStore.getQaChecks()) {
   const map = new Map();
   (qaChecks || []).forEach((check) => {
     const segmentId = check?.segmentId || "";
@@ -7457,13 +7421,13 @@ function qualityQaBySegment(qaChecks = currentQaChecks()) {
   return map;
 }
 
-function currentQualityRiskQueue(qaChecks = currentQaChecks()) {
-  if (!currentProject()) return null;
+function currentQualityRiskQueue(qaChecks = editorSessionStore.getQaChecks()) {
+  if (!editorSessionStore.getProject()) return null;
   return buildRiskQueue({
-    project: currentProject(),
+    project: editorSessionStore.getProject(),
     segments: currentDocumentSegments(),
     qaChecks,
-    profile: currentProject().qualityProfile
+    profile: editorSessionStore.getProject().qualityProfile
   });
 }
 
@@ -7480,46 +7444,46 @@ function qualityRiskLevelLabel(level) {
 
 function activeQualityEvidence(queue = null) {
   const segment = currentSegment();
-  if (!currentProject() || !segment) return null;
+  if (!editorSessionStore.getProject() || !segment) return null;
   const queuedItem = (queue?.items || []).find((item) => item.segmentId === segment.id);
   if (queuedItem) return queuedItem;
   return scoreSegment(segment, currentActiveIndex(), {
-    profile: currentProject().qualityProfile,
+    profile: editorSessionStore.getProject().qualityProfile,
     qaBySegment: qualityQaBySegment()
   });
 }
 
 function renderQualityWorkbench() {
-  const storedQueue = storedQualityRiskQueue();
-  const queue = currentProject()
-    ? storedQueue?.projectId === currentProject().id
+  const storedQueue = editorSessionStore.getQualityRiskQueue();
+  const queue = editorSessionStore.getProject()
+    ? storedQueue?.projectId === editorSessionStore.getProject().id
       ? storedQueue
       : currentQualityRiskQueue()
     : null;
-  if (currentProject()) editorSessionStore.replaceQualityRiskQueue(queue);
+  if (editorSessionStore.getProject()) editorSessionStore.replaceQualityRiskQueue(queue);
   qualityReviewController?.renderQuality?.({
-    project: currentProject(),
+    project: editorSessionStore.getProject(),
     segment: currentSegment(),
     activeIndex: currentActiveIndex(),
-    profile: currentProject()?.qualityProfile,
+    profile: editorSessionStore.getProject()?.qualityProfile,
     queue,
     evidence: activeQualityEvidence(queue)
   });
 }
 
 async function refreshQualityRiskQueue() {
-  if (!currentProject()) return null;
+  if (!editorSessionStore.getProject()) return null;
   const checks = await runProjectQa();
   if (!checks) return null;
   editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue(checks));
   renderQualityWorkbench();
-  return storedQualityRiskQueue();
+  return editorSessionStore.getQualityRiskQueue();
 }
 
 async function goToQualityRiskItem(item) {
-  const index = currentSegments().findIndex((segment) => segment.id === item?.segmentId);
+  const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === item?.segmentId);
   if (index === -1) return;
-  const segment = currentSegments()[index];
+  const segment = editorSessionStore.getSegments()[index];
   if (!segmentPassesFilters(segment)) {
     if (currentDocumentId() && segment.documentId !== currentDocumentId()) {
       selectApplicationDocument("");
@@ -7538,12 +7502,12 @@ async function goToQualityRiskItem(item) {
 }
 
 async function goToNextQualityRisk() {
-  if (!currentProject()) return;
-  const storedQueue = storedQualityRiskQueue();
-  if (!storedQueue || storedQueue.projectId !== currentProject().id) {
+  if (!editorSessionStore.getProject()) return;
+  const storedQueue = editorSessionStore.getQualityRiskQueue();
+  if (!storedQueue || storedQueue.projectId !== editorSessionStore.getProject().id) {
     editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
   }
-  const queue = storedQualityRiskQueue();
+  const queue = editorSessionStore.getQualityRiskQueue();
   if (!queue?.items?.length) {
     setSaveStatus("No quality risks in this scope", "saved");
     return;
@@ -7551,7 +7515,7 @@ async function goToNextQualityRisk() {
   const indexedItems = queue.items
     .map((item) => ({
       ...item,
-      globalIndex: currentSegments().findIndex((segment) => segment.id === item.segmentId)
+      globalIndex: editorSessionStore.getSegments().findIndex((segment) => segment.id === item.segmentId)
     }))
     .filter((item) => item.globalIndex !== -1)
     .sort((a, b) => a.globalIndex - b.globalIndex);
@@ -7619,7 +7583,7 @@ function qaCheckFixHint(check) {
 }
 
 function renderQaResults() {
-  const qaChecks = currentQaChecks();
+  const qaChecks = editorSessionStore.getQaChecks();
   const checks = state.qaFilter ? qaChecks.filter((check) => check.type === state.qaFilter) : qaChecks;
   if (!qaChecks.length) {
     els.qaResults.textContent = uiSource("No QA issues found.");
@@ -7661,7 +7625,7 @@ function renderQaResults() {
     button.type = "button";
     button.textContent = uiLabel("go");
     button.addEventListener("click", async () => {
-      const index = currentSegments().findIndex((segment) => segment.id === check.segmentId);
+      const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === check.segmentId);
       if (index !== -1) {
         await setActiveSegment(index);
         renderSegments();
@@ -7676,20 +7640,20 @@ function renderQaResults() {
 
 async function refreshTmMatches() {
   const segment = currentSegment();
-  if (!segment || !currentProject()) {
+  if (!segment || !editorSessionStore.getProject()) {
     els.tmMatches.textContent = uiSource("No active segment.");
     els.tmMatches.classList.add("muted");
     return;
   }
   const segmentId = segment.id;
-  const projectId = currentProject().id;
+  const projectId = editorSessionStore.getProject().id;
   const matches = await findProjectTmMatches({
     source: segment.source,
-    sourceLang: currentProject().sourceLang,
-    targetLang: currentProject().targetLang,
+    sourceLang: editorSessionStore.getProject().sourceLang,
+    targetLang: editorSessionStore.getProject().targetLang,
     tmNames: projectTmNames()
   });
-  if (currentProject()?.id !== projectId || currentSegment()?.id !== segmentId) return;
+  if (editorSessionStore.getProject()?.id !== projectId || currentSegment()?.id !== segmentId) return;
   els.tmMatches.classList.toggle("muted", !matches.length);
   if (!matches.length) {
     els.tmMatches.textContent = uiSource("No TM matches.");
@@ -7719,20 +7683,20 @@ async function refreshTmMatches() {
 
 async function refreshTerms() {
   const segment = currentSegment();
-  if (!segment || !currentProject()) {
+  if (!segment || !editorSessionStore.getProject()) {
     els.termSuggestions.textContent = uiSource("No active segment.");
     els.termSuggestions.classList.add("muted");
     return;
   }
   const segmentId = segment.id;
-  const projectId = currentProject().id;
+  const projectId = editorSessionStore.getProject().id;
   const suggestions = await findTerms({
     source: segment.source,
-    sourceLang: currentProject().sourceLang,
-    targetLang: currentProject().targetLang,
+    sourceLang: editorSessionStore.getProject().sourceLang,
+    targetLang: editorSessionStore.getProject().targetLang,
     termBaseNames: projectTermBaseNames()
   });
-  if (currentProject()?.id !== projectId || currentSegment()?.id !== segmentId) return;
+  if (editorSessionStore.getProject()?.id !== projectId || currentSegment()?.id !== segmentId) return;
   els.termSuggestions.classList.toggle("muted", !suggestions.length);
   if (!suggestions.length) {
     els.termSuggestions.textContent = uiSource("No terms found in this segment.");
@@ -7756,7 +7720,7 @@ async function refreshTerms() {
 }
 
 async function saveTermFromForm() {
-  if (!currentProject() || !els.sourceTermInput.value.trim() || !els.targetTermInput.value.trim()) return null;
+  if (!editorSessionStore.getProject() || !els.sourceTermInput.value.trim() || !els.targetTermInput.value.trim()) return null;
   const termBaseName = els.termBaseSelect.value || primaryTermBaseName();
   try {
     if (LOOPCAT_TEST_BUILD && els.termForm[TERM_FORM_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated term form save failure");
@@ -7764,12 +7728,12 @@ async function saveTermFromForm() {
       sourceTerm: els.sourceTermInput.value,
       targetTerm: els.targetTermInput.value,
       notes: els.termNotesInput.value,
-      sourceLang: currentProject().sourceLang,
-      targetLang: currentProject().targetLang,
+      sourceLang: editorSessionStore.getProject().sourceLang,
+      targetLang: editorSessionStore.getProject().targetLang,
       termBaseName,
       isForbidden: els.termForbiddenInput?.checked
     });
-    markProjectsUsingResourceDirty("termbase", termBaseName, currentProject().sourceLang, currentProject().targetLang);
+    markProjectsUsingResourceDirty("termbase", termBaseName, editorSessionStore.getProject().sourceLang, editorSessionStore.getProject().targetLang);
     els.termForm.reset();
     renderTermbaseSelect();
     try {
@@ -7787,12 +7751,12 @@ async function saveTermFromForm() {
 }
 
 async function runProjectQa() {
-  if (!currentProject()) return null;
+  if (!editorSessionStore.getProject()) return null;
   try {
-    if (LOOPCAT_TEST_BUILD && currentProject()[QA_RUN_FAILURE_TEST_FLAG]) throw new Error("Simulated QA run failure");
+    if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[QA_RUN_FAILURE_TEST_FLAG]) throw new Error("Simulated QA run failure");
     const terms = await listTerms({
-      sourceLang: currentProject().sourceLang,
-      targetLang: currentProject().targetLang,
+      sourceLang: editorSessionStore.getProject().sourceLang,
+      targetLang: editorSessionStore.getProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
     const qaSegments = currentDocumentSegments().map((segment) => ({
@@ -7809,7 +7773,7 @@ async function runProjectQa() {
     editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue(checks));
     renderQualityWorkbench();
     try {
-    if (LOOPCAT_TEST_BUILD && currentProject()[QA_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated QA activity log failure");
+    if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[QA_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated QA activity log failure");
       await logProjectActivity("qa-run", "QA checks run", { issueCount: checks.length, documentId: currentDocumentId() });
     } catch (activityError) {
       console.warn("QA activity log failed.", activityError);
@@ -7824,24 +7788,24 @@ async function runProjectQa() {
 }
 
 async function saveProjectDomainFromForm() {
-  if (!currentProject()) return false;
-  const previousProject = structuredClone(currentProject());
-  const previousProjects = currentProjects().map((project) => structuredClone(project));
+  if (!editorSessionStore.getProject()) return false;
+  const previousProject = structuredClone(editorSessionStore.getProject());
+  const previousProjects = editorSessionStore.getProjects().map((project) => structuredClone(project));
   const domain = els.projectDomainEditInput.value.trim();
   try {
-    if (LOOPCAT_TEST_BUILD && currentProject()[PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated project domain save failure");
-    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), domain }));
-    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
+    if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated project domain save failure");
+    editorSessionStore.replaceProject(await updateProject({ ...editorSessionStore.getProject(), domain }));
+    editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
     await refreshProjectSummaries();
     renderAll();
-    els.domainForm.classList.toggle("hidden", Boolean((currentProject().domain || "").trim()));
+    els.domainForm.classList.toggle("hidden", Boolean((editorSessionStore.getProject().domain || "").trim()));
     markWorkspaceDirty();
     setSaveStatus("Project domain saved", "saved");
     return true;
   } catch (error) {
     editorSessionStore.replaceProject(previousProject);
     editorSessionStore.replaceProjects(previousProjects);
-    els.domainForm.classList.toggle("clean", domain === (currentProject().domain || ""));
+    els.domainForm.classList.toggle("clean", domain === (editorSessionStore.getProject().domain || ""));
     setSaveStatus(error.message || "Project domain save failed", "dirty");
     return false;
   }
@@ -7863,21 +7827,21 @@ async function importDocx(file) {
   const result = await extractDocxSegments(file);
   await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
   const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  const documents = [...projectDocumentManifest(currentProject()), { id: documentId, name: result.fileName, type: "docx" }];
-  const docxStructures = { ...(currentProject().docxStructures || {}), [documentId]: result.structure };
+  const documents = [...projectDocumentManifest(editorSessionStore.getProject()), { id: documentId, name: result.fileName, type: "docx" }];
+  const docxStructures = { ...(editorSessionStore.getProject().docxStructures || {}), [documentId]: result.structure };
   const importResult = await appendProjectSegmentsAndUpdateProject(
-    { ...currentProject(), sourceFileName: result.fileName, docxStructure: result.structure, docxStructures, documents },
+    { ...editorSessionStore.getProject(), sourceFileName: result.fileName, docxStructure: result.structure, docxStructures, documents },
     result.segments,
     { documentId, documentName: result.fileName, documentType: "docx" }
   );
   await reportImportProgress("Refreshing project view", file);
   editorSessionStore.replaceProject(importResult.project);
-  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
-  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(editorSessionStore.getProject().id)));
+  editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
   await refreshProjectSummaries();
-  const activeIndex = currentSegments().findIndex((segment) => segment.documentId === documentId);
+  const activeIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
   selectApplicationDocument(documentId, {
-    segmentId: currentSegments()[activeIndex]?.id || "",
+    segmentId: editorSessionStore.getSegments()[activeIndex]?.id || "",
     activeIndex
   });
   const extractedParts = result.structure?.textPartSummary?.filter((part) => part.segments > 0).length || 1;
@@ -7894,23 +7858,23 @@ async function importLocalization(file) {
   const result = await parseLocalizationFile(file, textDecodingOptions());
   await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
   const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  const documents = [...projectDocumentManifest(currentProject()), { id: documentId, name: result.fileName, type: result.documentType }];
+  const documents = [...projectDocumentManifest(editorSessionStore.getProject()), { id: documentId, name: result.fileName, type: result.documentType }];
   const localizationStructures = result.structure
-    ? { ...(currentProject().localizationStructures || {}), [documentId]: result.structure }
-    : currentProject().localizationStructures;
+    ? { ...(editorSessionStore.getProject().localizationStructures || {}), [documentId]: result.structure }
+    : editorSessionStore.getProject().localizationStructures;
   const importResult = await appendProjectSegmentsAndUpdateProject(
-    { ...currentProject(), documents, localizationStructures },
+    { ...editorSessionStore.getProject(), documents, localizationStructures },
     result.segments,
     { documentId, documentName: result.fileName, documentType: result.documentType }
   );
   await reportImportProgress("Refreshing project view", file);
   editorSessionStore.replaceProject(importResult.project);
-  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
-  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(editorSessionStore.getProject().id)));
+  editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
   await refreshProjectSummaries();
-  const activeIndex = currentSegments().findIndex((segment) => segment.documentId === documentId);
+  const activeIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
   selectApplicationDocument(documentId, {
-    segmentId: currentSegments()[activeIndex]?.id || "",
+    segmentId: editorSessionStore.getSegments()[activeIndex]?.id || "",
     activeIndex
   });
   const activityLogged = await logOptionalProjectActivity("import", "Localization file imported", { fileName: file.name, documentType: result.documentType, segmentCount: result.segments.length, documentId }, "Localization import");
@@ -7926,24 +7890,24 @@ async function importXliff(file) {
   const result = await parseXliffFile(file, textDecodingOptions());
   await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
   const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  const documents = [...projectDocumentManifest(currentProject()), { id: documentId, name: result.fileName, type: result.documentType }];
+  const documents = [...projectDocumentManifest(editorSessionStore.getProject()), { id: documentId, name: result.fileName, type: result.documentType }];
   const localizationStructures = {
-    ...(currentProject().localizationStructures || {}),
+    ...(editorSessionStore.getProject().localizationStructures || {}),
     [documentId]: result.structure
   };
   const importResult = await appendProjectSegmentsAndUpdateProject(
-    { ...currentProject(), documents, localizationStructures },
+    { ...editorSessionStore.getProject(), documents, localizationStructures },
     result.segments,
     { documentId, documentName: result.fileName, documentType: result.documentType }
   );
   await reportImportProgress("Refreshing project view", file);
   editorSessionStore.replaceProject(importResult.project);
-  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(currentProject().id)));
-  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
+  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(editorSessionStore.getProject().id)));
+  editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
   await refreshProjectSummaries();
-  const activeIndex = currentSegments().findIndex((segment) => segment.documentId === documentId);
+  const activeIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
   selectApplicationDocument(documentId, {
-    segmentId: currentSegments()[activeIndex]?.id || "",
+    segmentId: editorSessionStore.getSegments()[activeIndex]?.id || "",
     activeIndex
   });
   const activityLogged = await logOptionalProjectActivity("import", "XLIFF imported", { fileName: file.name, segmentCount: result.segments.length, documentId }, "XLIFF import");
@@ -7965,7 +7929,7 @@ function confirmDuplicateImport(file) {
 }
 
 async function importProjectDocument(file) {
-  if (!currentProject() || !file) return;
+  if (!editorSessionStore.getProject() || !file) return;
   assertFileSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);
   if (!confirmDuplicateImport(file)) {
     setSaveStatus("Import canceled", "saved");
@@ -8003,7 +7967,7 @@ function clonePortableRecord(record) {
 
 function importedCopyName(name) {
   const base = `${String(name || "Imported project").trim() || "Imported project"} (copy)`;
-  const usedNames = new Set(currentProjects().map((project) => project.name).filter(Boolean));
+  const usedNames = new Set(editorSessionStore.getProjects().map((project) => project.name).filter(Boolean));
   if (!usedNames.has(base)) return base;
   let counter = 2;
   while (usedNames.has(`${base} ${counter}`)) counter += 1;
@@ -8138,10 +8102,10 @@ async function runFileImportTask(label, action) {
   }
 }
 
-async function buildProjectPackage(project = currentProject(), segmentRecords = null, options = {}) {
+async function buildProjectPackage(project = editorSessionStore.getProject(), segmentRecords = null, options = {}) {
   if (!project) return null;
   await autosaveService.flush(project.id);
-  const projectSegments = segmentRecords || (project.id === currentProject()?.id ? currentSegments() : await getProjectSegments(project.id));
+  const projectSegments = segmentRecords || (project.id === editorSessionStore.getProject()?.id ? editorSessionStore.getSegments() : await getProjectSegments(project.id));
   const [tmEntries, terms, activityEvents] = await Promise.all([
     getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`),
     listTerms({
@@ -8258,8 +8222,8 @@ function reportProjectPackageExportFailure(error, pkg = null) {
 }
 
 async function exportProjectPackage() {
-  if (!currentProject()) return;
-  const base = fileSafeName(currentProject().name || "project");
+  if (!editorSessionStore.getProject()) return;
+  const base = fileSafeName(editorSessionStore.getProject().name || "project");
   const filename = `${base}.loopcat.json`;
   let previewPackage = null;
   try {
@@ -8272,17 +8236,17 @@ async function exportProjectPackage() {
   const warnings = reportCount(previewPackage.validation);
   const exportHistoryEntry = { id: `export-${Date.now()}`, type: "project-package", filename, warningCount: warnings, createdAt: new Date().toISOString() };
   const pendingProject = {
-    ...currentProject(),
+    ...editorSessionStore.getProject(),
     exportHistory: [
-      ...(currentProject().exportHistory || []),
+      ...(editorSessionStore.getProject().exportHistory || []),
       exportHistoryEntry
     ].slice(-25)
   };
   const activityDetail = { filename, warningCount: warnings };
-  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && currentProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]);
+  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && editorSessionStore.getProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]);
   const pendingActivityEvent = shouldSimulateActivityFailure
     ? null
-    : draftProjectActivityEvent(currentProject(), "export", "Project package exported", activityDetail);
+    : draftProjectActivityEvent(editorSessionStore.getProject(), "export", "Project package exported", activityDetail);
   let pkg = null;
   try {
     pkg = await buildProjectPackage(pendingProject, null, {
@@ -8302,10 +8266,10 @@ async function exportProjectPackage() {
   }
   try {
     editorSessionStore.replaceProject(await updateProject(pendingProject));
-    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
+    editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
   } catch (error) {
     console.warn("Project package export history update failed.", error);
-    markWorkspaceDirty(currentProject()?.id);
+    markWorkspaceDirty(editorSessionStore.getProject()?.id);
     renderValidationReport(pkg.validation);
     renderEditor();
     setSaveStatus("Project package exported; local export history failed", "dirty");
@@ -8316,14 +8280,14 @@ async function exportProjectPackage() {
     if (shouldSimulateActivityFailure) throw new Error("Simulated export activity log failure");
     if (pendingActivityEvent) {
       await bulkPut("activityEvents", [pendingActivityEvent]);
-      editorSessionStore.replaceActivityEvents(await listActivityEvents(currentProject().id));
+      editorSessionStore.replaceActivityEvents(await listActivityEvents(editorSessionStore.getProject().id));
     }
-    markWorkspaceDirty(currentProject().id);
+    markWorkspaceDirty(editorSessionStore.getProject().id);
     renderBackupReminder();
   } catch (activityError) {
     activityLogged = false;
     console.warn("Project package export activity log failed.", activityError);
-    if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
+    if (editorSessionStore.getProject()?.id) markWorkspaceDirty(editorSessionStore.getProject().id);
   }
   renderValidationReport(pkg.validation);
   renderEditor();
@@ -8341,7 +8305,7 @@ async function importProjectPackageData(pkg, options = {}) {
     setSaveStatus("Project package import failed validation", "dirty");
     return null;
   }
-  const existing = currentProjects().find((project) => project.id === pkg.project.id);
+  const existing = editorSessionStore.getProjects().find((project) => project.id === pkg.project.id);
   let importAsCopy = false;
   if (existing) {
     const replace = options.replaceExisting ?? uiConfirm(`A project named "${displaySafeText(existing.name)}" already exists. Replace it with this package?`);
@@ -8418,7 +8382,7 @@ async function restoreBackupData(backup) {
   applicationNavigation.openProjects();
   applicationNavigation.clearSelection();
   await loadProjects(false);
-  const restoredProjectIds = currentProjects().map((project) => project.id).filter(Boolean);
+  const restoredProjectIds = editorSessionStore.getProjects().map((project) => project.id).filter(Boolean);
   if (state.workspaceStatus?.connected) {
     clearWorkspaceDirtyMarkers();
     markWorkspaceProjectsDirty(restoredProjectIds);
@@ -8470,17 +8434,17 @@ async function chooseWorkspaceFolder() {
 }
 
 async function saveCurrentProjectPackageToWorkspace() {
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   await autosaveService.flush();
   if (!state.workspaceStatus?.connected) await chooseWorkspaceFolder();
   if (!state.workspaceStatus?.connected) return;
-  const previewPackage = await buildProjectPackage(currentProject());
+  const previewPackage = await buildProjectPackage(editorSessionStore.getProject());
   assertValidProjectPackageForWrite(previewPackage, "save project package to workspace");
   const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && state[WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG]);
   const pendingActivityEvent = shouldSimulateActivityFailure
     ? null
-    : draftProjectActivityEvent(currentProject(), "workspace-save", "Project package saved to workspace folder");
-  const { pkg, result } = await saveProjectPackageToWorkspaceById(currentProject().id, {
+    : draftProjectActivityEvent(editorSessionStore.getProject(), "workspace-save", "Project package saved to workspace folder");
+  const { pkg, result } = await saveProjectPackageToWorkspaceById(editorSessionStore.getProject().id, {
     activityEvents: pendingActivityEvent ? [pendingActivityEvent] : []
   });
   let activityLogged = true;
@@ -8488,14 +8452,14 @@ async function saveCurrentProjectPackageToWorkspace() {
     if (shouldSimulateActivityFailure) throw new Error("Simulated workspace save activity failure");
     if (pendingActivityEvent) {
       await bulkPut("activityEvents", [pendingActivityEvent]);
-      editorSessionStore.replaceActivityEvents(await listActivityEvents(currentProject().id));
+      editorSessionStore.replaceActivityEvents(await listActivityEvents(editorSessionStore.getProject().id));
     }
     renderBackupReminder();
   } catch (activityError) {
     activityLogged = false;
     console.warn("Workspace save activity log failed.", activityError);
   }
-  if (!activityLogged) markWorkspaceDirty(currentProject().id);
+  if (!activityLogged) markWorkspaceDirty(editorSessionStore.getProject().id);
   state.workspaceStatus = await workspaceStorage.getStatus();
   renderValidationReport(pkg.validation);
   const validationReportWarning = result.validationReportSaved === false ? "; validation report sidecar failed" : "";
@@ -8513,7 +8477,7 @@ async function saveProjectPackageToWorkspaceById(projectId, options = {}) {
     const pkg = await buildProjectPackage(project, null, options);
     assertValidProjectPackageForWrite(pkg, "save project package to workspace");
     const result = await workspaceStorage.saveProjectPackage(pkg);
-    if (currentProject()?.id === projectId) {
+    if (editorSessionStore.getProject()?.id === projectId) {
       state.workspaceStatus = await workspaceStorage.getStatus();
     }
     clearWorkspaceDirty(projectId);
@@ -8566,7 +8530,7 @@ function startWorkspaceAutosave() {
 }
 
 async function maybeSaveProjectPackageFromSettings(shouldSaveToFolder = Boolean(els.saveProjectToFolderInput?.checked)) {
-  if (!shouldSaveToFolder || !currentProject()) return false;
+  if (!shouldSaveToFolder || !editorSessionStore.getProject()) return false;
   if (!workspaceStorage?.isSupported()) return false;
   try {
     if (!state.workspaceStatus?.connected) await chooseWorkspaceFolder();
@@ -8588,8 +8552,8 @@ async function saveProjectFromDialog() {
     setSaveStatus("Complete required project fields.", "dirty");
     return false;
   }
-  const editing = projectDialogController?.getMode?.() === "edit" && Boolean(currentProject());
-  const settings = collectProjectResourceSettings(editing ? currentProject() : null);
+  const editing = projectDialogController?.getMode?.() === "edit" && Boolean(editorSessionStore.getProject());
+  const settings = collectProjectResourceSettings(editing ? editorSessionStore.getProject() : null);
   const shouldSaveToFolder = Boolean(els.saveProjectToFolderInput?.checked);
   if (shouldSaveToFolder && workspaceStorage?.isSupported() && !state.workspaceStatus?.connected) {
     try {
@@ -8600,17 +8564,17 @@ async function saveProjectFromDialog() {
       renderProjectStorageStatus();
     }
   }
-  if (editing && currentProject()) {
+  if (editing && editorSessionStore.getProject()) {
     const creatorName = rememberCreatorName(els.projectCreatorInput?.value || "");
     editorSessionStore.replaceProject(await updateProject({
-      ...currentProject(),
+      ...editorSessionStore.getProject(),
       name: els.projectNameInput.value.trim(),
       creatorName,
-      creatorOrigin: currentProject().creatorOrigin || "manual",
+      creatorOrigin: editorSessionStore.getProject().creatorOrigin || "manual",
       domain: els.projectDomainInput.value.trim(),
       ...settings
     }));
-    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
+    editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
     await refreshProjectTerms({ rerender: true });
     await refreshProjectSummaries();
     renderAll();
@@ -8638,7 +8602,7 @@ async function saveProjectFromDialog() {
         activityLogged ? "saved" : "dirty"
       );
     }
-    return currentProject();
+    return editorSessionStore.getProject();
   }
 
   const creatorName = rememberCreatorName(els.projectCreatorInput?.value || "");
@@ -8757,7 +8721,7 @@ async function repairWorkspaceLinks() {
   state.workspaceStatus = await workspaceStorage.getStatus();
   const [tmEntries, terms] = await Promise.all([listTmEntries(), getAll("terms")]);
   const report = await workspaceStorage.buildHealthReport({
-    projects: currentProjects(),
+    projects: editorSessionStore.getProjects(),
     tmEntries,
     terms,
     dirtyProjectIds: workspaceDirtyIds()
@@ -8834,29 +8798,29 @@ async function buildProjectReportData() {
   await autosaveService.flush();
   const tmNames = new Set(projectTmNames());
   const [tmEntries, terms, activityEvents] = await Promise.all([
-    getAllByIndex("tmEntries", "languagePair", `${currentProject().sourceLang}::${currentProject().targetLang}`),
+    getAllByIndex("tmEntries", "languagePair", `${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`),
     listTerms({
-      sourceLang: currentProject().sourceLang,
-      targetLang: currentProject().targetLang,
+      sourceLang: editorSessionStore.getProject().sourceLang,
+      targetLang: editorSessionStore.getProject().targetLang,
       termBaseNames: projectTermBaseNames()
     }),
-    listActivityEvents(currentProject().id)
+    listActivityEvents(editorSessionStore.getProject().id)
   ]);
   const scopedTm = tmEntries.filter((entry) => tmNames.has(entry.tmName));
   const reportActivityEvents = sanitizePortableValue(activityEvents, "activityEvents");
-  const validation = validateExportReadiness({ project: currentProject(), segments: currentSegments(), format: "project-report", terms });
-  const analysis = analyzeProject(currentProject(), currentSegments(), scopedTm);
-  const qaSegments = currentSegments().map((segment) => ({
+  const validation = validateExportReadiness({ project: editorSessionStore.getProject(), segments: editorSessionStore.getSegments(), format: "project-report", terms });
+  const analysis = analyzeProject(editorSessionStore.getProject(), editorSessionStore.getSegments(), scopedTm);
+  const qaSegments = editorSessionStore.getSegments().map((segment) => ({
     ...segment,
     tags: segmentTags(segment)
   }));
-  const fallback = () => Promise.resolve(runQaChecks(currentSegments(), terms, { missingTags }));
+  const fallback = () => Promise.resolve(runQaChecks(editorSessionStore.getSegments(), terms, { missingTags }));
   const qaChecks = workerClient?.runQaChecks
     ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
     : await fallback();
   const qualityPassport = buildQualityPassportData({
-    project: currentProject(),
-    segments: currentSegments(),
+    project: editorSessionStore.getProject(),
+    segments: editorSessionStore.getSegments(),
     qaChecks,
     validation,
     analysis,
@@ -8865,25 +8829,25 @@ async function buildProjectReportData() {
     tmEntries: scopedTm,
     tmEntryCount: scopedTm.length,
     termCount: terms.length,
-    profile: currentProject().qualityProfile
+    profile: editorSessionStore.getProject().qualityProfile
   });
   return {
     generatedAt: new Date().toISOString(),
-    project: currentProject(),
-    resources: projectResourceSummary(currentProject()),
+    project: editorSessionStore.getProject(),
+    resources: projectResourceSummary(editorSessionStore.getProject()),
     analysis,
     validation,
     qualityPassport,
     qaChecks,
     qaBySeverity: countBy(qaChecks, (check) => check.severity),
     qaByType: countBy(qaChecks, (check) => check.type),
-    reviewByState: countBy(currentSegments().filter((segment) => segment.reviewState), (segment) => segment.reviewState),
+    reviewByState: countBy(editorSessionStore.getSegments().filter((segment) => segment.reviewState), (segment) => segment.reviewState),
     activityEvents: reportActivityEvents,
     activityByType: countBy(reportActivityEvents, (event) => event.type),
     tmEntryCount: scopedTm.length,
     termCount: terms.length,
     forbiddenTermCount: terms.filter((term) => term.isForbidden).length,
-    revisionCount: currentSegments().reduce((sum, segment) => sum + (Array.isArray(segment.targetHistory) ? segment.targetHistory.length : 0), 0),
+    revisionCount: editorSessionStore.getSegments().reduce((sum, segment) => sum + (Array.isArray(segment.targetHistory) ? segment.targetHistory.length : 0), 0),
     terms: terms
       .map((term) => ({
         sourceTerm: term.sourceTerm || "",
@@ -9214,7 +9178,7 @@ function qualityPassportHtml(data) {
 }
 
 async function exportQualityPassport() {
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   try {
     const data = await buildProjectReportData();
     editorSessionStore.replaceQaChecks(data.qaChecks);
@@ -9223,7 +9187,7 @@ async function exportQualityPassport() {
     renderQaResults();
     renderQualityWorkbench();
     renderValidationReport(data.validation);
-    const base = fileSafeName(currentProject().name || "project");
+    const base = fileSafeName(editorSessionStore.getProject().name || "project");
     download(`${base}_quality-passport.html`, finalizeReportDocument(qualityPassportHtml(data)), "text/html");
     const activityLogged = await logOptionalProjectActivity("export", "Quality Passport exported", {
       segmentCount: data.analysis.totals.segments,
@@ -9241,7 +9205,7 @@ async function exportQualityPassport() {
 }
 
 async function exportProjectReport(options = {}) {
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   try {
     const anonymized = Boolean(options.anonymized);
     const data = await buildProjectReportData();
@@ -9249,7 +9213,7 @@ async function exportProjectReport(options = {}) {
     state.qaFilter = "";
     renderQaResults();
     renderValidationReport(data.validation);
-    const base = fileSafeName(currentProject().name || "project");
+    const base = fileSafeName(editorSessionStore.getProject().name || "project");
     download(
       `${base}_${anonymized ? "anonymized-" : ""}project-report.html`,
       finalizeReportDocument(projectReportHtml(data, { anonymized })),
@@ -9271,24 +9235,24 @@ async function exportProjectReport(options = {}) {
 }
 
 async function exportTargetText() {
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   try {
     await autosaveService.flush();
     const { documentInfo, segments } = deliveryExportScope();
     const exportPlan = planDeliveryExport({ format: "txt", documentInfo, segments });
-    const report = validateExportReadiness({ project: currentProject(), segments, format: "txt", terms: await projectTermsForValidation(), exportPlan });
+    const report = validateExportReadiness({ project: editorSessionStore.getProject(), segments, format: "txt", terms: await projectTermsForValidation(), exportPlan });
     addScopedExportReportNote(report, documentInfo, "Target TXT");
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, documentInfo, currentProject().name || "project")) {
+    if (!confirmIncompleteExport(exportPlan, documentInfo, editorSessionStore.getProject().name || "project")) {
       cancelIncompleteExport();
       return;
     }
     const content = exportPlan.segments
       .map((segment) => segment.target.trim())
       .join("\n\n");
-    const base = scopedExportBaseName(currentProject().name || "project", documentInfo);
-    download(`${base}_${currentProject().targetLang}.txt`, content, "text/plain");
+    const base = scopedExportBaseName(editorSessionStore.getProject().name || "project", documentInfo);
+    download(`${base}_${editorSessionStore.getProject().targetLang}.txt`, content, "text/plain");
     const activityLogged = await logOptionalProjectActivity("export", "Target TXT exported", {
       documentId: documentInfo?.id || "",
       fileName: documentInfo?.name || "",
@@ -9303,24 +9267,24 @@ async function exportTargetText() {
 }
 
 async function exportTargetDocx() {
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   try {
     await autosaveService.flush();
     const documentInfo = exportDocumentForTypes(new Set(["docx"]), "The selected file is not a DOCX document.", "Select a DOCX document to export.");
     if (!documentInfo) return;
-    const segments = currentSegments().filter((segment) => segment.documentId === documentInfo.id);
+    const segments = editorSessionStore.getSegments().filter((segment) => segment.documentId === documentInfo.id);
     const exportPlan = planDeliveryExport({ format: "docx", documentInfo, segments });
-    const report = validateExportReadiness({ project: currentProject(), segments, documentInfo, format: "docx", terms: await projectTermsForValidation(), exportPlan });
+    const report = validateExportReadiness({ project: editorSessionStore.getProject(), segments, documentInfo, format: "docx", terms: await projectTermsForValidation(), exportPlan });
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, documentInfo, currentProject().name || "project")) {
+    if (!confirmIncompleteExport(exportPlan, documentInfo, editorSessionStore.getProject().name || "project")) {
       cancelIncompleteExport();
       return;
     }
-    const docxStructure = currentProject().docxStructures?.[documentInfo.id] || currentProject().docxStructure;
-    const base = fileSafeName(currentProject().name || "project");
-    const bytes = await buildTargetDocx({ ...currentProject(), docxStructure }, exportPlan.segments);
-    download(`${base}_${fileSafeName(documentInfo.name)}_${currentProject().targetLang}.docx`, bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    const docxStructure = editorSessionStore.getProject().docxStructures?.[documentInfo.id] || editorSessionStore.getProject().docxStructure;
+    const base = fileSafeName(editorSessionStore.getProject().name || "project");
+    const bytes = await buildTargetDocx({ ...editorSessionStore.getProject(), docxStructure }, exportPlan.segments);
+    download(`${base}_${fileSafeName(documentInfo.name)}_${editorSessionStore.getProject().targetLang}.docx`, bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     const activityLogged = await logOptionalProjectActivity("export", "Target DOCX exported", {
       documentId: documentInfo.id,
       fileName: documentInfo.name,
@@ -9335,28 +9299,28 @@ async function exportTargetDocx() {
 }
 
 async function exportBilingualDocx() {
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   try {
     await autosaveService.flush();
     const terms = await projectTermsForValidation();
-    const report = validateExportReadiness({ project: currentProject(), segments: currentSegments(), format: "bilingual-docx", terms });
+    const report = validateExportReadiness({ project: editorSessionStore.getProject(), segments: editorSessionStore.getSegments(), format: "bilingual-docx", terms });
     renderValidationReport(report);
     if (!canRunBilingualDocxExport(report)) return;
-    const qaSegments = currentSegments().map((segment) => ({
+    const qaSegments = editorSessionStore.getSegments().map((segment) => ({
       ...segment,
       tags: segmentTags(segment)
     }));
-    const fallback = () => Promise.resolve(runQaChecks(currentSegments(), terms, { missingTags }));
+    const fallback = () => Promise.resolve(runQaChecks(editorSessionStore.getSegments(), terms, { missingTags }));
     const qaChecks = workerClient?.runQaChecks
       ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
       : await fallback();
     editorSessionStore.replaceQaChecks(qaChecks);
     state.qaFilter = "";
     renderQaResults();
-    const base = fileSafeName(currentProject().name || "project");
-    const bytes = buildBilingualDocx(currentProject(), currentSegments(), { qaChecks });
+    const base = fileSafeName(editorSessionStore.getProject().name || "project");
+    const bytes = buildBilingualDocx(editorSessionStore.getProject(), editorSessionStore.getSegments(), { qaChecks });
     download(`${base}_bilingual.docx`, bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    const activityLogged = await logOptionalProjectActivity("export", "Bilingual DOCX exported", { segmentCount: currentSegments().length, qaIssueCount: qaChecks.length, validationNoteCount: reportCount(report) }, "Bilingual DOCX export");
+    const activityLogged = await logOptionalProjectActivity("export", "Bilingual DOCX exported", { segmentCount: editorSessionStore.getSegments().length, qaIssueCount: qaChecks.length, validationNoteCount: reportCount(report) }, "Bilingual DOCX export");
     const message = reportCount(report) || qaChecks.length ? "Bilingual DOCX exported with notes" : "Bilingual DOCX exported";
     setSaveStatus(appendActivityWarning(message, activityLogged), exportStatusMode(reportCount(report) || qaChecks.length ? "dirty" : "saved", activityLogged));
   } catch (error) {
@@ -9366,7 +9330,7 @@ async function exportBilingualDocx() {
 
 async function exportLocalization() {
   try {
-    if (!currentProject()) return;
+    if (!editorSessionStore.getProject()) return;
     await autosaveService.flush();
     const documentInfo = exportDocumentForTypes(
       LOCALIZATION_EXPORT_TYPES,
@@ -9376,11 +9340,11 @@ async function exportLocalization() {
     if (!documentInfo) return;
     const documentType = projectDocumentType(documentInfo);
     const exportDocumentInfo = { ...documentInfo, type: documentType };
-    const segments = currentSegments().filter((segment) => segment.documentId === documentInfo.id);
-    const structure = currentProject().localizationStructures?.[documentInfo.id];
+    const segments = editorSessionStore.getSegments().filter((segment) => segment.documentId === documentInfo.id);
+    const structure = editorSessionStore.getProject().localizationStructures?.[documentInfo.id];
     const exportPlan = planDeliveryExport({ format: documentType, documentInfo: exportDocumentInfo, structure, segments });
     const report = validateExportReadiness({
-      project: currentProject(),
+      project: editorSessionStore.getProject(),
       segments,
       documentInfo: exportDocumentInfo,
       format: documentType,
@@ -9390,16 +9354,16 @@ async function exportLocalization() {
     });
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, exportDocumentInfo, currentProject().name || "project")) {
+    if (!confirmIncompleteExport(exportPlan, exportDocumentInfo, editorSessionStore.getProject().name || "project")) {
       cancelIncompleteExport();
       return;
     }
     const content = XLIFF_DOCUMENT_TYPES.has(documentType)
-      ? buildTargetXliff(currentProject(), exportPlan.segments, structure)
+      ? buildTargetXliff(editorSessionStore.getProject(), exportPlan.segments, structure)
       : await buildLocalizationFile(documentType, exportPlan.segments, structure);
     const ext = documentType === "yml" ? "yaml" : documentType === "markdown" ? "md" : documentType;
     const type = localizationDownloadMimeType(ext, structure);
-    download(`${fileSafeName(documentInfo.name)}_${currentProject().targetLang}.${ext}`, content, type);
+    download(`${fileSafeName(documentInfo.name)}_${editorSessionStore.getProject().targetLang}.${ext}`, content, type);
     const activityLogged = await logOptionalProjectActivity("export", "Localization file exported", {
       documentId: documentInfo.id,
       documentType,
@@ -9414,26 +9378,26 @@ async function exportLocalization() {
 }
 
 async function exportXliff(version = "1.2") {
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   try {
     await autosaveService.flush();
     const { documentInfo, segments } = deliveryExportScope();
     const exportPlan = planDeliveryExport({ format: "xliff", documentInfo, segments });
-    const report = validateExportReadiness({ project: currentProject(), segments, format: "xliff", terms: await projectTermsForValidation(), exportPlan });
+    const report = validateExportReadiness({ project: editorSessionStore.getProject(), segments, format: "xliff", terms: await projectTermsForValidation(), exportPlan });
     addScopedExportReportNote(report, documentInfo, "XLIFF");
     renderValidationReport(report);
     if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, documentInfo, currentProject().name || "project")) {
+    if (!confirmIncompleteExport(exportPlan, documentInfo, editorSessionStore.getProject().name || "project")) {
       cancelIncompleteExport();
       return;
     }
-    const base = scopedExportBaseName(currentProject().name || "project", documentInfo);
-    const exportProject = documentInfo ? { ...currentProject(), sourceFileName: documentInfo.name } : currentProject();
+    const base = scopedExportBaseName(editorSessionStore.getProject().name || "project", documentInfo);
+    const exportProject = documentInfo ? { ...editorSessionStore.getProject(), sourceFileName: documentInfo.name } : editorSessionStore.getProject();
     const isXliff22 = version === "2.2";
     const content = isXliff22 ? buildXliff22(exportProject, exportPlan.segments) : buildXliff(exportProject, exportPlan.segments);
     const label = isXliff22 ? "XLIFF 2.2" : "XLIFF";
     const exportedMessage = isXliff22 ? "XLIFF 2.2 exported" : "XLIFF exported";
-    download(`${base}_${currentProject().sourceLang}-${currentProject().targetLang}.xlf`, content, xliffMimeType(version));
+    download(`${base}_${editorSessionStore.getProject().sourceLang}-${editorSessionStore.getProject().targetLang}.xlf`, content, xliffMimeType(version));
     const activityLogged = await logOptionalProjectActivity("export", exportedMessage, {
       documentId: documentInfo?.id || "",
       fileName: documentInfo?.name || "",
@@ -9453,16 +9417,16 @@ async function exportXliff22() {
 }
 
 async function handleTmxImport(file) {
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   assertFileSize(file, "TMX file", MAX_RESOURCE_IMPORT_BYTES);
   await reportImportProgress("Reading TMX", file);
   const text = await readImportTextFile(file);
   await reportImportProgress("Parsing TMX", file);
   const entries = await parseTmxAsync(text, {
-    sourceLang: currentProject().sourceLang,
-    targetLang: currentProject().targetLang,
+    sourceLang: editorSessionStore.getProject().sourceLang,
+    targetLang: editorSessionStore.getProject().targetLang,
     tmName: mainTmName(),
-    projectName: `${currentProject().name} TMX import`
+    projectName: `${editorSessionStore.getProject().name} TMX import`
   }, {
     yieldFn: yieldToUi,
     onProgress: (progress) => reportImportProgress(
@@ -9484,7 +9448,7 @@ async function handleTmxImport(file) {
       importProgressDetail(progress.saved, progress.total, "index rows")
     )
   });
-  markProjectsUsingResourceDirty("tm", mainTmName(), currentProject().sourceLang, currentProject().targetLang);
+  markProjectsUsingResourceDirty("tm", mainTmName(), editorSessionStore.getProject().sourceLang, editorSessionStore.getProject().targetLang);
   await reportImportProgress("Refreshing TM matches", file);
   await refreshTmMatches();
   const activityLogged = await logOptionalProjectActivity("resource-import", "TMX imported", { fileName: file.name, entryCount: entries.length, tmName: mainTmName() }, "TMX import");
@@ -9492,12 +9456,12 @@ async function handleTmxImport(file) {
 }
 
 async function handleTmxExport() {
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   try {
     const tmNames = new Set(projectTmNames());
-    const entries = (await getAllByIndex("tmEntries", "languagePair", `${currentProject().sourceLang}::${currentProject().targetLang}`))
+    const entries = (await getAllByIndex("tmEntries", "languagePair", `${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`))
       .filter((entry) => tmNames.has(entry.tmName));
-    download(`${fileSafeName(currentProject().name)}_project-tms.tmx`, buildTmx(entries, { ...currentProject(), tmName: mainTmName() }), "application/xml");
+    download(`${fileSafeName(editorSessionStore.getProject().name)}_project-tms.tmx`, buildTmx(entries, { ...editorSessionStore.getProject(), tmName: mainTmName() }), "application/xml");
     const activityLogged = await logOptionalProjectActivity("resource-export", "TMX exported", { entryCount: entries.length, tmNames: Array.from(tmNames) }, "TMX export");
     setSaveStatus(appendActivityWarning(`Exported ${entries.length} project TM entr${entries.length === 1 ? "y" : "ies"}`, activityLogged), exportStatusMode("saved", activityLogged));
   } catch (error) {
@@ -9506,14 +9470,14 @@ async function handleTmxExport() {
 }
 
 async function handleTbxImport(file) {
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   assertFileSize(file, "TBX file", MAX_RESOURCE_IMPORT_BYTES);
   await reportImportProgress("Reading TBX", file);
   const text = await readImportTextFile(file);
   await reportImportProgress("Parsing TBX", file);
   const terms = await parseTbxAsync(text, {
-    sourceLang: currentProject().sourceLang,
-    targetLang: currentProject().targetLang,
+    sourceLang: editorSessionStore.getProject().sourceLang,
+    targetLang: editorSessionStore.getProject().targetLang,
     termBaseName: els.termBaseSelect.value || primaryTermBaseName()
   }, {
     yieldFn: yieldToUi,
@@ -9536,7 +9500,7 @@ async function handleTbxImport(file) {
       importProgressDetail(progress.saved, progress.total, "index rows")
     )
   });
-  markProjectsUsingResourceDirty("termbase", els.termBaseSelect.value || primaryTermBaseName(), currentProject().sourceLang, currentProject().targetLang);
+  markProjectsUsingResourceDirty("termbase", els.termBaseSelect.value || primaryTermBaseName(), editorSessionStore.getProject().sourceLang, editorSessionStore.getProject().targetLang);
   await reportImportProgress("Refreshing terms", file);
   await refreshProjectTerms({ rerender: true });
   await refreshTerms();
@@ -9552,13 +9516,13 @@ async function parseTermListFile(file, options) {
 }
 
 async function handleTermListImport(file) {
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   assertFileSize(file, "Term list file", MAX_RESOURCE_IMPORT_BYTES);
   const termBaseName = els.termBaseSelect.value || primaryTermBaseName();
   await reportImportProgress("Reading term list", file);
   const terms = await parseTermListFile(file, {
-    sourceLang: currentProject().sourceLang,
-    targetLang: currentProject().targetLang,
+    sourceLang: editorSessionStore.getProject().sourceLang,
+    targetLang: editorSessionStore.getProject().targetLang,
     termBaseName,
     fileName: file.name
   });
@@ -9575,7 +9539,7 @@ async function handleTermListImport(file) {
       importProgressDetail(progress.saved, progress.total, "index rows")
     )
   });
-  markProjectsUsingResourceDirty("termbase", termBaseName, currentProject().sourceLang, currentProject().targetLang);
+  markProjectsUsingResourceDirty("termbase", termBaseName, editorSessionStore.getProject().sourceLang, editorSessionStore.getProject().targetLang);
   await reportImportProgress("Refreshing terms", file);
   await refreshProjectTerms({ rerender: true });
   await refreshTerms();
@@ -9584,14 +9548,14 @@ async function handleTermListImport(file) {
 }
 
 async function handleTbxExport() {
-  if (!currentProject()) return;
+  if (!editorSessionStore.getProject()) return;
   try {
     const terms = await listTerms({
-      sourceLang: currentProject().sourceLang,
-      targetLang: currentProject().targetLang,
+      sourceLang: editorSessionStore.getProject().sourceLang,
+      targetLang: editorSessionStore.getProject().targetLang,
       termBaseNames: projectTermBaseNames()
     });
-    download(`${fileSafeName(currentProject().name)}_project-termbases.tbx`, buildTbx(terms, { ...currentProject(), termBaseName: primaryTermBaseName() }), "application/xml");
+    download(`${fileSafeName(editorSessionStore.getProject().name)}_project-termbases.tbx`, buildTbx(terms, { ...editorSessionStore.getProject(), termBaseName: primaryTermBaseName() }), "application/xml");
     const activityLogged = await logOptionalProjectActivity("resource-export", "TBX exported", { termCount: terms.length, termBaseNames: projectTermBaseNames() }, "TBX export");
     setSaveStatus(appendActivityWarning(`Exported ${terms.length} project term${terms.length === 1 ? "" : "s"}`, activityLogged), exportStatusMode("saved", activityLogged));
   } catch (error) {
@@ -9878,7 +9842,7 @@ function wireEvents() {
     await saveProjectDomainFromForm();
   });
   els.projectDomainEditInput.addEventListener("input", () => {
-    const current = currentProject()?.domain || "";
+    const current = editorSessionStore.getProject()?.domain || "";
     els.domainForm.classList.toggle("clean", els.projectDomainEditInput.value.trim() === current);
   });
 
@@ -9930,7 +9894,7 @@ function wireEvents() {
   await loadProjects(false);
   if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: loading interface preferences";
   await Promise.all([
-    themeController?.initialize?.({ freshProfile: currentProjects().length === 0 }),
+    themeController?.initialize?.({ freshProfile: editorSessionStore.getProjects().length === 0 }),
     workspaceLayoutController?.initialize?.()
   ]);
   if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: starting workflow characterization";

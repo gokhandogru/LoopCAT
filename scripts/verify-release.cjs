@@ -319,6 +319,7 @@ const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-reg
 const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-module-registry.test.cjs");
 const installRuntimeJs = readText("src/app/install-runtime.js");
 const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
+const editorSessionStoreUnitTests = readText("tests/unit/editor-session-store.test.cjs");
 const editorContextControllerJs = readText("src/features/editor/editor-context-controller.js");
 const editorContextControllerUnitTests = readText("tests/unit/editor-context-controller.test.cjs");
 const segmentGridControllerJs = readText("src/features/editor/segment-grid-controller.js");
@@ -605,6 +606,53 @@ for (const method of [
 ]) {
   assertIncludes(editorSessionStoreJs, method, `EditorSessionStore must retain explicit ${method} ownership.`);
 }
+for (const [removedSelector, directGetter] of [
+  ["currentProjects", "getProjects"],
+  ["currentProject", "getProject"],
+  ["currentSegments", "getSegments"],
+  ["currentProjectSummaries", "getProjectSummaries"],
+  ["currentProjectTerms", "getProjectTerms"],
+  ["currentActivityEvents", "getActivityEvents"],
+  ["currentQaChecks", "getQaChecks"],
+  ["storedQualityRiskQueue", "getQualityRiskQueue"],
+  ["currentProgressSummary", "getProgressSummary"]
+]) {
+  assert(
+    !appJs.includes(`function ${removedSelector}(`) &&
+      !new RegExp(`\\b${removedSelector}\\b`).test(appWorkflowDriverJs),
+    `${removedSelector} EditorSessionStore selector facade must not return.`
+  );
+  assertIncludes(
+    appJs,
+    `editorSessionStore.${directGetter}`,
+    `application consumers must call EditorSessionStore.${directGetter} directly.`
+  );
+}
+assertIncludes(
+  appJs,
+  "project: { get: editorSessionStore.getProject }",
+  "controller composition must pass the stable EditorSessionStore project getter directly."
+);
+assertIncludes(
+  appJs,
+  "segments: { getAll: editorSessionStore.getSegments }",
+  "controller composition must pass the stable EditorSessionStore segment getter directly."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  "editorSessionStore.getProject()",
+  "workflow characterization must read the active project directly from EditorSessionStore."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  "editorSessionStore.getSegments()",
+  "workflow characterization must read segment records directly from EditorSessionStore."
+);
+assertIncludes(
+  editorSessionStoreUnitTests,
+  "EditorSessionStore getters expose stable default and latest record references",
+  "focused EditorSessionStore tests must characterize every direct getter's default and latest reference identity."
+);
 assert(
   !editorSessionStoreJs.includes("attachCompatibility") && !appJs.includes("attachCompatibility"),
   "The completed EditorSessionStore migration must not restore the temporary compatibility bridge."
@@ -7361,7 +7409,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "for (const segment of currentSegments())",
+  "for (const segment of editorSessionStore.getSegments())",
   "app.js must render project progress with one segment pass."
 );
 assertIncludes(
@@ -8187,7 +8235,7 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "function projectDocuments()", "function projectDocumentType"),
-  "projectDocumentManifest(currentProject())",
+  "projectDocumentManifest(editorSessionStore.getProject())",
   "app.js document lists must include saved project document metadata even when a document has no segment rows."
 );
 assertIncludes(
@@ -8257,7 +8305,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  'draftProjectActivityEvent(currentProject(), "export", "Project package exported"',
+  'draftProjectActivityEvent(editorSessionStore.getProject(), "export", "Project package exported"',
   "app.js must draft project-package export activity before download so success history can be committed only after download succeeds."
 );
 assertIncludes(
@@ -9965,7 +10013,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "buildProjectPackage(currentProject(), packageSourceSegments)",
+  "buildProjectPackage(editorSessionStore.getProject(), packageSourceSegments)",
   "app workflow package-copy fixture must build from current project metadata so segment document IDs match the exported manifest."
 );
 assertIncludes(
