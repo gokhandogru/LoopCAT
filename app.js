@@ -1105,6 +1105,10 @@ const textEncodingInputService = appRuntime.featureFactories.createTextEncodingI
   replaceSafeHtml
 });
 
+const protectedTagInspectionService = appRuntime.featureFactories.createProtectedTagInspectionService({
+  detectTags: detectProtectedTags
+});
+
 const projectLanguageContextController = appRuntime.featureFactories.createProjectLanguageContextController({
   getProject: () => editorSessionStore.getProject(),
   languageInput: languageInputService,
@@ -1332,7 +1336,7 @@ const reportDataService = appRuntime.featureFactories.createReportDataService({
   portable: { sanitize: sanitizePortableValue },
   reporting: { validateExportReadiness, analyzeProject, runQaChecks, buildQualityPassportData },
   worker: workerClient,
-  tags: { forSegment: segmentTags, missing: missingTags },
+  tags: { forSegment: protectedTagInspectionService.sourceTags, missing: protectedTagInspectionService.missing },
   redactSensitiveText,
   timestamp: () => new Date().toISOString()
 });
@@ -1392,8 +1396,8 @@ const deliveryExportController = appRuntime.featureFactories.createDeliveryExpor
   qa: {
     worker: workerClient,
     run: runQaChecks,
-    tagsForSegment: segmentTags,
-    missingTags
+    tagsForSegment: protectedTagInspectionService.sourceTags,
+    missingTags: protectedTagInspectionService.missing
   },
   formats: {
     localizationTypes: LOCALIZATION_EXPORT_TYPES,
@@ -1471,8 +1475,8 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
     goToNextOpen: goToNextOpenSegment
   },
   validation: {
-    missingTags,
-    tagLabel: tagDisplayText
+    missingTags: protectedTagInspectionService.missing,
+    tagLabel: protectedTagInspectionService.displayText
   },
   filters: { matches: segmentPassesFilters },
   mutation: {
@@ -1621,7 +1625,7 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
       Object.assign(segment, snapshot);
     },
     prepareHistory: prepareSegmentHistoryState,
-    hasTagIssue
+    hasTagIssue: protectedTagInspectionService.hasIssue
   },
   restoration: { restoreSnapshots: restoreSegmentCommandSnapshots },
   selection: {
@@ -2110,9 +2114,9 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
         .filter(Boolean),
     getDocumentSegments: projectDocumentCatalogService.currentSegments,
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
-    getTags: segmentTags,
-    getMissingTags: missingTags,
-    tagText: tagDisplayText
+    getTags: protectedTagInspectionService.sourceTags,
+    getMissingTags: protectedTagInspectionService.missing,
+    tagText: protectedTagInspectionService.displayText
   },
   settings: {
     persist: aiLocalSettingsPersistenceController.persistSilently,
@@ -2189,7 +2193,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
         .filter(Boolean),
     getDocumentSegments: projectDocumentCatalogService.currentSegments,
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
-    getTags: segmentTags
+    getTags: protectedTagInspectionService.sourceTags
   },
   settings: {
     persist: aiLocalSettingsPersistenceController.persistSilently,
@@ -2277,7 +2281,7 @@ const aiTerminologyApplicationController =
           .filter(Boolean),
       getDocumentSegments: projectDocumentCatalogService.currentSegments,
       isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
-      getTags: segmentTags
+      getTags: protectedTagInspectionService.sourceTags
     },
     settings: {
       persist: aiLocalSettingsPersistenceController.persistSilently,
@@ -2354,7 +2358,7 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
         .filter(Boolean),
     getDocumentSegments: projectDocumentCatalogService.currentSegments,
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
-    getTags: segmentTags
+    getTags: protectedTagInspectionService.sourceTags
   },
   settings: {
     persist: aiLocalSettingsPersistenceController.persistSilently,
@@ -2811,7 +2815,7 @@ const aiPromptPreviewController = appRuntime.featureFactories.createAiPromptPrev
     getDocuments: projectDocumentCatalogService.list,
     getSampleSegments: aiScopeSelectionService.projectBriefSampleSegments,
     getSurroundingSegments: aiSegmentContextService.surroundingSegmentsForSegment,
-    getTags: segmentTags
+    getTags: protectedTagInspectionService.sourceTags
   },
   builders: {
     translate: buildTranslateGemmaPrompt,
@@ -4853,43 +4857,6 @@ function selectedEditorText() {
   return currentSegment()?.source || "";
 }
 
-function segmentTags(segment) {
-  const stored = Array.isArray(segment?.tags) ? segment.tags.filter((tag) => tag?.text || tag?.label) : [];
-  const detected = detectProtectedTags(segment?.source || "");
-  if (!stored.length) return detected;
-  if (!detected.length) return stored;
-  const storedCounts = new Map();
-  stored.forEach((tag) => {
-    const text = String(tag.text || tag.label || "");
-    if (text) storedCounts.set(text, (storedCounts.get(text) || 0) + 1);
-  });
-  const detectedCounts = new Map();
-  const merged = [...stored];
-  detected.forEach((tag) => {
-    const text = String(tag.text || tag.label || "");
-    if (!text) return;
-    const count = (detectedCounts.get(text) || 0) + 1;
-    detectedCounts.set(text, count);
-    if (count > (storedCounts.get(text) || 0)) merged.push(tag);
-  });
-  return merged;
-}
-
-function tagDisplayText(tag) {
-  return tag?.label || tag?.text || "";
-}
-
-function missingTags(segment) {
-  const target = segment.target || "";
-  const seen = new Map();
-  return segmentTags(segment).filter((tag) => {
-    const used = seen.get(tag.text) || 0;
-    const occurrences = target.split(tag.text).length - 1;
-    seen.set(tag.text, used + 1);
-    return occurrences <= used;
-  });
-}
-
 function replacePlainTextChunk(text, findText, replacement, options = {}) {
   const source = String(text || "");
   const find = String(findText || "");
@@ -4938,10 +4905,6 @@ function replaceOutsideProtectedTokens(text, findText, replacement, options = {}
   });
   const tail = replacePlainTextChunk(source.slice(cursor), findText, replacement, options);
   return { text: output + tail.text, count: count + tail.count };
-}
-
-function hasTagIssue(segment) {
-  return Boolean((segment.target || "").trim() && missingTags(segment).length);
 }
 
 function reviewLabel(value) {
@@ -5979,7 +5942,7 @@ function appendTextWithTags(container, text, tags, options = {}) {
     const chip = document.createElement(options.interactive ? "button" : "span");
     if (options.interactive) chip.type = "button";
     chip.className = `tag-chip tag-chip-${tag.type || "placeholder"}${options.interactive ? " tag-chip-action" : ""}`;
-    chip.textContent = tagDisplayText(tag);
+    chip.textContent = protectedTagInspectionService.displayText(tag);
     chip.title = options.interactive ? `Insert protected text: ${tag.text}` : `Protected text: ${tag.text}`;
     if (options.interactive) {
       chip.addEventListener("click", (event) => {
@@ -6012,7 +5975,7 @@ function rangesOverlap(a, b) {
 
 function appendTextWithSourceMarkup(container, segment) {
   const text = segment.source || "";
-  const tagMarkers = sourceTagMarkers(text, segmentTags(segment));
+  const tagMarkers = sourceTagMarkers(text, protectedTagInspectionService.sourceTags(segment));
   const termMarkers = termRanges(text, editorSessionStore.getProjectTerms())
     .filter((range) => !tagMarkers.some((tagMarker) => rangesOverlap(range, tagMarker)))
     .map((range) => ({ type: "term", index: range.index, length: range.length, range }));
@@ -6025,7 +5988,7 @@ function appendTextWithSourceMarkup(container, segment) {
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = `tag-chip tag-chip-${marker.tag.type || "placeholder"} tag-chip-action`;
-      chip.textContent = tagDisplayText(marker.tag);
+      chip.textContent = protectedTagInspectionService.displayText(marker.tag);
       chip.title = `Insert protected text: ${marker.tag.text}`;
       chip.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -6047,7 +6010,7 @@ function appendTextWithSourceMarkup(container, segment) {
 }
 
 function renderTagTray(row, segment) {
-  const tags = segmentTags(segment);
+  const tags = protectedTagInspectionService.sourceTags(segment);
   if (!tags.length) return;
   const tray = document.createElement("div");
   tray.className = "tag-tray";
@@ -6055,7 +6018,7 @@ function renderTagTray(row, segment) {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = `tag-chip tag-chip-${tag.type || "placeholder"} tag-chip-action`;
-    chip.textContent = tagDisplayText(tag);
+    chip.textContent = protectedTagInspectionService.displayText(tag);
     chip.title = `Insert protected text: ${tag.text}`;
     chip.addEventListener("click", () => targetProducerController.insertProtectedTag(tag.text));
     tray.append(chip);
@@ -6064,15 +6027,11 @@ function renderTagTray(row, segment) {
   targetCell.append(tray);
 }
 
-function targetTags(segment) {
-  return detectProtectedTags(segment.target || "");
-}
-
 function renderTargetTagPreview(row, segment) {
   const preview = row.querySelector(".target-tag-preview");
   const targetCell = row.querySelector(".target-cell");
   if (!preview) return;
-  const tags = targetTags(segment);
+  const tags = protectedTagInspectionService.targetTags(segment);
   preview.textContent = "";
   targetCell?.classList.toggle("has-target-preview", Boolean(tags.length));
   preview.classList.toggle("hidden", !tags.length);
@@ -6102,7 +6061,7 @@ function renderSegmentRow(index) {
   const row = els.rowTemplate.content.firstElementChild.cloneNode(true);
   row.dataset.index = String(index);
   row.classList.toggle("active", index === applicationStore.getState().navigation.activeIndex);
-  row.classList.toggle("tag-warning-row", hasTagIssue(segment));
+  row.classList.toggle("tag-warning-row", protectedTagInspectionService.hasIssue(segment));
   row.querySelector(".num-col").textContent = String(index + 1);
   const sourceCell = row.querySelector(".source-cell");
   sourceCell.textContent = "";
@@ -6140,10 +6099,15 @@ function renderStatusCell(row, segment) {
     badge.title = item.title;
     statusCell.append(badge);
   }
-  if (hasTagIssue(segment)) {
+  if (protectedTagInspectionService.hasIssue(segment)) {
     const warning = document.createElement("div");
     warning.className = "tag-warning";
-    warning.textContent = uiLocalizationService.label("missingValue", { value: missingTags(segment).map(tagDisplayText).join(", ") });
+    warning.textContent = uiLocalizationService.label("missingValue", {
+      value: protectedTagInspectionService
+        .missing(segment)
+        .map(protectedTagInspectionService.displayText)
+        .join(", ")
+    });
     statusCell.append(warning);
   }
   if (segment.reviewState) {
@@ -6237,7 +6201,7 @@ function updateRow(index) {
   const segment = editorSessionStore.getSegments()[index];
   if (!row || !segment) return;
   row.classList.toggle("active", index === applicationStore.getState().navigation.activeIndex);
-  row.classList.toggle("tag-warning-row", hasTagIssue(segment));
+  row.classList.toggle("tag-warning-row", protectedTagInspectionService.hasIssue(segment));
   renderTargetTagPreview(row, segment);
   renderStatusCell(row, segment);
 }
@@ -7116,9 +7080,14 @@ async function runProjectQa() {
     });
     const qaSegments = projectDocumentCatalogService.currentSegments().map((segment) => ({
       ...segment,
-      tags: segmentTags(segment)
+      tags: protectedTagInspectionService.sourceTags(segment)
     }));
-    const fallback = () => Promise.resolve(runQaChecks(projectDocumentCatalogService.currentSegments(), terms, { missingTags }));
+    const fallback = () =>
+      Promise.resolve(
+        runQaChecks(projectDocumentCatalogService.currentSegments(), terms, {
+          missingTags: protectedTagInspectionService.missing
+        })
+      );
     const checks = workerClient?.runQaChecks
       ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
       : await fallback();

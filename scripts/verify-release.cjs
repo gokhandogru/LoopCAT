@@ -168,6 +168,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-confirmation-controller.js",
   "src/features/editor/target-edit-controller.js",
   "src/features/editor/target-producer-controller.js",
+  "src/features/editor/protected-tag-inspection-service.js",
   "src/features/editor/structural-segment-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -254,6 +255,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-confirmation-controller.test.cjs",
   "tests/unit/target-edit-controller.test.cjs",
   "tests/unit/target-producer-controller.test.cjs",
+  "tests/unit/protected-tag-inspection-service.test.cjs",
   "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
@@ -373,6 +375,7 @@ const autosaveServiceJs = readText("src/features/editor/autosave-service.js");
 const segmentConfirmationControllerJs = readText("src/features/editor/segment-confirmation-controller.js");
 const targetEditControllerJs = readText("src/features/editor/target-edit-controller.js");
 const targetProducerControllerJs = readText("src/features/editor/target-producer-controller.js");
+const protectedTagInspectionServiceJs = readText("src/features/editor/protected-tag-inspection-service.js");
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
@@ -380,6 +383,7 @@ const autosaveServiceUnitTests = readText("tests/unit/autosave-service.test.cjs"
 const segmentConfirmationControllerUnitTests = readText("tests/unit/segment-confirmation-controller.test.cjs");
 const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
+const protectedTagInspectionServiceUnitTests = readText("tests/unit/protected-tag-inspection-service.test.cjs");
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
@@ -1124,7 +1128,7 @@ for (const boundary of [
   "sanitize: sanitizePortableValue",
   "validateExportReadiness, analyzeProject, runQaChecks, buildQualityPassportData",
   "worker: workerClient",
-  "forSegment: segmentTags, missing: missingTags",
+  "forSegment: protectedTagInspectionService.sourceTags, missing: protectedTagInspectionService.missing",
   "redactSensitiveText",
   "timestamp: () => new Date().toISOString()"
 ]) {
@@ -4129,6 +4133,16 @@ assertIncludes(
   "createTargetProducerController",
   "The application runtime must expose the checked target-producer controller boundary."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createProtectedTagInspectionService } from "../features/editor/protected-tag-inspection-service.js";',
+  "The application runtime must install the checked protected-tag inspection service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProtectedTagInspectionService,",
+  "The application runtime must expose the checked protected-tag inspection factory."
+);
 for (const boundary of [
   "editLifecycle.finalize(segment.id)",
   "persistence.clearPending(segment, { finalizeEdit: false })",
@@ -4193,6 +4207,70 @@ assertIncludes(
   targetProducerControllerUnitTests,
   "filter membership changes preserve scroll while producer failure restores the exact target patch and caret",
   "focused target-producer tests must characterize rendering and failure recovery."
+);
+for (const snippet of [
+  "const stored = Array.isArray(segment?.tags)",
+  'const detected = detectTags(segment?.source || "")',
+  "if (!stored.length) return detected",
+  "if (!detected.length) return stored",
+  "const storedCounts = new Map()",
+  "const detectedCounts = new Map()",
+  "if (count > (storedCounts.get(text) || 0)) merged.push(tag)",
+  'return tag?.label || tag?.text || ""',
+  "const seen = new Map()",
+  "const occurrences = target.split(tag.text).length - 1",
+  'return detectTags(segment.target || "")',
+  'return Boolean((segment.target || "").trim() && missing(segment).length)',
+  "return Object.freeze({ sourceTags, displayText, missing, targetTags, hasIssue })"
+]) {
+  assertIncludes(
+    protectedTagInspectionServiceJs,
+    snippet,
+    `ProtectedTagInspectionService must retain characterized read-only tag policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createProtectedTagInspectionService({",
+  "app.js must compose the checked protected-tag inspection service."
+);
+assertIncludes(
+  appJs,
+  "detectTags: detectProtectedTags",
+  "protected-tag inspection composition must inject the checked detection boundary."
+);
+for (const method of ["sourceTags", "displayText", "missing", "targetTags", "hasIssue"]) {
+  assertIncludes(
+    appJs,
+    `protectedTagInspectionService.${method}`,
+    `protected-tag inspection consumers must call ProtectedTagInspectionService.${method} directly.`
+  );
+}
+for (const removedHelper of ["segmentTags", "tagDisplayText", "missingTags", "targetTags", "hasTagIssue"]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} protected-tag inspection helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "ProtectedTagInspectionService preserves detected-only and stored-only source-tag branches",
+  "ProtectedTagInspectionService preserves stored-first duplicate reconciliation and record immutability",
+  "ProtectedTagInspectionService preserves label-before-text display fallbacks",
+  "ProtectedTagInspectionService preserves exact duplicate occurrence accounting and missing-tag order",
+  "ProtectedTagInspectionService preserves target detection and nonblank missing-tag warning policy",
+  "ProtectedTagInspectionService validates its boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    protectedTagInspectionServiceUnitTests,
+    testName,
+    `focused protected-tag inspection tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/protected-tag-inspection-service.js"',
+  "source-catalog extraction must scan the checked protected-tag inspection service."
 );
 assertIncludes(
   appBootstrapJs,

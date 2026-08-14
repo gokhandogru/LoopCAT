@@ -85,6 +85,13 @@ const textEncodingInputServicePath = path.join(
   "import-export",
   "text-encoding-input-service.js"
 );
+const protectedTagInspectionServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "editor",
+  "protected-tag-inspection-service.js"
+);
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const resourceMutationControllerPath = path.join(
   root,
@@ -284,6 +291,11 @@ function main() {
     messagesByText,
     textEncodingInputServicePath,
     "src/features/import-export/text-encoding-input-service.js"
+  );
+  extractScript(
+    messagesByText,
+    protectedTagInspectionServicePath,
+    "src/features/editor/protected-tag-inspection-service.js"
   );
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(
