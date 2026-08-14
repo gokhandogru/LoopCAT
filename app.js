@@ -81,8 +81,10 @@ const applicationStore = appRuntime?.store;
 const applicationNavigation = appRuntime?.navigation;
 const APP_NAME = "LoopCAT";
 const LEGACY_APP_NAME = "CatHan";
-const OPENAI_KEY_STORAGE = "loopcat.openai.apiKey";
-const LOCAL_AI_KEY_STORAGE = "loopcat.localAi.apiKey";
+const {
+  openAi: OPENAI_KEY_STORAGE,
+  localAiLegacy: LOCAL_AI_KEY_STORAGE
+} = appRuntime.featureFactories.aiCredentialStorageKeys;
 const CREATOR_NAME_STORAGE = "loopcat.creatorName";
 const WORKSPACE_DIRTY_STORAGE = "loopcat.workspace.dirtyProjectIds";
 const BACKUP_REMINDER_STORAGE = "loopcat.backupReminder.dismissedUntil";
@@ -1657,6 +1659,29 @@ const aiProviderPresentationService =
       model: DEFAULT_LOCAL_AI_MODEL
     }
   });
+const aiCredentialStorageService =
+  appRuntime.featureFactories.createAiCredentialStorageService({
+    storage: {
+      get: (kind) => (kind === "local" ? globalThis.localStorage : globalThis.sessionStorage)
+    },
+    settings: {
+      readLocal: localAiSettingsFromForm,
+      normalizeLocal: (settings) =>
+        localAISettingsStore?.defaults
+          ? localAISettingsStore.defaults(settings || {}, currentProject())
+          : (settings || {}),
+      normalizeProviderBaseUrl: normalizedProviderBaseUrl
+    },
+    defaults: {
+      ollamaBaseUrl: OLLAMA_DEFAULT_BASE_URL,
+      openAiBaseUrl: OPENAI_DEFAULT_BASE_URL
+    },
+    failures: {
+      beforeOpenAiSave: () =>
+        LOOPCAT_TEST_BUILD && state[OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG]
+    },
+    logger: console
+  });
 let aiPretranslationAbortController = null;
 const aiPretranslationController = appRuntime.featureFactories.createAiPretranslationController({
   editorSessionStore,
@@ -2543,10 +2568,10 @@ const aiOpenAiSuggestionController = appRuntime.featureFactories.createAiOpenAiS
     request: openAiSuggestion
   },
   keys: {
-    readStored: storedOpenAiKey,
-    snapshot: openAiKeySnapshot,
-    save: saveOpenAiKey,
-    restore: safeRestoreOpenAiKeySnapshot
+    readStored: aiCredentialStorageService.storedOpenAiKey,
+    snapshot: aiCredentialStorageService.openAiSnapshot,
+    save: aiCredentialStorageService.saveOpenAiKey,
+    restore: aiCredentialStorageService.safeRestoreOpenAiSnapshot
   },
   consent: { externalShare: externalAiConsentService.confirmShare },
   persistence: { updateProject },
@@ -2593,16 +2618,16 @@ const aiSettingsPersistenceController =
     provider: { isOpenAi: (aiSettings) => isOpenAiProvider({ aiSettings }) },
     keys: {
       openAi: {
-        snapshot: openAiKeySnapshot,
-        save: saveOpenAiKey,
-        restore: safeRestoreOpenAiKeySnapshot,
-        storageLabel: openAiKeyStorageLabel
+        snapshot: aiCredentialStorageService.openAiSnapshot,
+        save: aiCredentialStorageService.saveOpenAiKey,
+        restore: aiCredentialStorageService.safeRestoreOpenAiSnapshot,
+        storageLabel: aiCredentialStorageService.openAiStorageLabel
       },
       local: {
-        snapshot: localAiKeySnapshot,
-        save: saveLocalAiKey,
-        restore: safeRestoreLocalAiKeySnapshot,
-        storageLabel: localAiKeyStorageLabel
+        snapshot: aiCredentialStorageService.localAiSnapshot,
+        save: aiCredentialStorageService.saveLocalAiKey,
+        restore: aiCredentialStorageService.safeRestoreLocalAiSnapshot,
+        storageLabel: aiCredentialStorageService.localAiStorageLabel
       }
     },
     persistence: { updateProject },
@@ -4177,102 +4202,9 @@ function redactSensitiveText(value) {
   return String(value || "").replace(new RegExp(SENSITIVE_TEXT_VALUE_PATTERN.source, "gi"), "[redacted secret]");
 }
 
-function openAiStorage(kind) {
-  try {
-    return kind === "local" ? globalThis.localStorage : globalThis.sessionStorage;
-  } catch (error) {
-    console.warn(`OpenAI ${kind} key storage is unavailable.`, error);
-    return null;
-  }
-}
-
-function readOpenAiKeyStorage(kind) {
-  const storage = openAiStorage(kind);
-  if (!storage) return null;
-  try {
-    return storage.getItem(OPENAI_KEY_STORAGE);
-  } catch (error) {
-    console.warn(`OpenAI ${kind} key storage read failed.`, error);
-    return null;
-  }
-}
-
-function writeOpenAiKeyStorage(kind, value) {
-  const storage = openAiStorage(kind);
-  if (!storage) return false;
-  try {
-    storage.setItem(OPENAI_KEY_STORAGE, value);
-    return true;
-  } catch (error) {
-    console.warn(`OpenAI ${kind} key storage write failed.`, error);
-    return false;
-  }
-}
-
-function removeOpenAiKeyStorage(kind) {
-  const storage = openAiStorage(kind);
-  if (!storage) return true;
-  try {
-    storage.removeItem(OPENAI_KEY_STORAGE);
-    return true;
-  } catch (error) {
-    console.warn(`OpenAI ${kind} key storage clear failed.`, error);
-    return false;
-  }
-}
-
-function openAiKeySnapshot() {
-  return {
-    local: readOpenAiKeyStorage("local"),
-    session: readOpenAiKeyStorage("session")
-  };
-}
-
-function restoreOpenAiKeySnapshot(snapshot = {}) {
-  const localOk = snapshot.local !== null && snapshot.local !== undefined
-    ? writeOpenAiKeyStorage("local", snapshot.local)
-    : removeOpenAiKeyStorage("local");
-  const sessionOk = snapshot.session !== null && snapshot.session !== undefined
-    ? writeOpenAiKeyStorage("session", snapshot.session)
-    : removeOpenAiKeyStorage("session");
-  if (!localOk || !sessionOk) throw new Error("OpenAI key storage restore failed.");
-  return true;
-}
-
-function safeRestoreOpenAiKeySnapshot(snapshot) {
-  try {
-    restoreOpenAiKeySnapshot(snapshot);
-    return true;
-  } catch (error) {
-    console.warn("OpenAI key storage restore failed.", error);
-    return false;
-  }
-}
-
-function storedOpenAiKey() {
-  const snapshot = openAiKeySnapshot();
-  return snapshot.session || snapshot.local || "";
-}
-
-function saveOpenAiKey(value, remember) {
-  const key = String(value || "").trim();
-  const previousKey = openAiKeySnapshot();
-  try {
-    restoreOpenAiKeySnapshot({ local: null, session: null });
-    const forcedKeyStorageFailure = LOOPCAT_TEST_BUILD && state[OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG];
-    if (forcedKeyStorageFailure) throw new Error(typeof forcedKeyStorageFailure === "string" ? forcedKeyStorageFailure : "Simulated OpenAI key storage failure");
-    if (!key) return;
-    const saved = remember ? writeOpenAiKeyStorage("local", key) : writeOpenAiKeyStorage("session", key);
-    if (!saved) throw new Error("OpenAI key could not be saved in this browser.");
-  } catch (error) {
-    safeRestoreOpenAiKeySnapshot(previousKey);
-    throw error;
-  }
-}
-
 function clearOpenAiKey() {
   try {
-    saveOpenAiKey("", false);
+    aiCredentialStorageService.saveOpenAiKey("", false);
   } catch (error) {
     aiAdministrationController?.renderGlobalConnectionStatus?.(
       redactSensitiveText(error.message || "OpenAI key could not be cleared.")
@@ -4286,147 +4218,10 @@ function clearOpenAiKey() {
   return true;
 }
 
-function openAiKeyStorageLabel() {
-  const snapshot = openAiKeySnapshot();
-  if (snapshot.local) return "Saved in this browser";
-  if (snapshot.session) return "Saved for this tab";
-  return "Not saved";
-}
-
-function localAiStorage(kind) {
-  try {
-    return kind === "local" ? globalThis.localStorage : globalThis.sessionStorage;
-  } catch (error) {
-    console.warn(`Local AI ${kind} key storage is unavailable.`, error);
-    return null;
-  }
-}
-
-function localAiKeyStorageKey(settings = localAiSettingsFromForm()) {
-  const clean = localAISettingsStore?.defaults
-    ? localAISettingsStore.defaults(settings || {}, currentProject())
-    : (settings || {});
-  const providerId = String(clean.providerId || clean.provider || "ollama").trim() || "ollama";
-  const fallbackBaseUrl = clean.baseUrl || (providerId === "ollama" ? OLLAMA_DEFAULT_BASE_URL : OPENAI_DEFAULT_BASE_URL);
-  const normalizedBaseUrl = normalizedProviderBaseUrl(providerId, fallbackBaseUrl);
-  return `${LOCAL_AI_KEY_STORAGE}:${providerId}:${normalizedBaseUrl}`;
-}
-
-function readLocalAiKeyStorageItem(kind, key) {
-  const storage = localAiStorage(kind);
-  if (!storage) return null;
-  try {
-    return storage.getItem(key);
-  } catch (error) {
-    console.warn(`Local AI ${kind} key storage read failed.`, error);
-    return null;
-  }
-}
-
-function writeLocalAiKeyStorageItem(kind, key, value) {
-  const storage = localAiStorage(kind);
-  if (!storage) return false;
-  try {
-    storage.setItem(key, value);
-    return true;
-  } catch (error) {
-    console.warn(`Local AI ${kind} key storage write failed.`, error);
-    return false;
-  }
-}
-
-function removeLocalAiKeyStorageItem(kind, key) {
-  const storage = localAiStorage(kind);
-  if (!storage) return true;
-  try {
-    storage.removeItem(key);
-    return true;
-  } catch (error) {
-    console.warn(`Local AI ${kind} key storage clear failed.`, error);
-    return false;
-  }
-}
-
-function readLocalAiKeyStorage(kind, settings = localAiSettingsFromForm()) {
-  return readLocalAiKeyStorageItem(kind, localAiKeyStorageKey(settings));
-}
-
-function writeLocalAiKeyStorage(kind, value, settings = localAiSettingsFromForm()) {
-  const scopedWriteOk = writeLocalAiKeyStorageItem(kind, localAiKeyStorageKey(settings), value);
-  const legacyClearOk = removeLocalAiKeyStorageItem(kind, LOCAL_AI_KEY_STORAGE);
-  return scopedWriteOk && legacyClearOk;
-}
-
-function removeLocalAiKeyStorage(kind, settings = localAiSettingsFromForm()) {
-  const scopedClearOk = removeLocalAiKeyStorageItem(kind, localAiKeyStorageKey(settings));
-  const legacyClearOk = removeLocalAiKeyStorageItem(kind, LOCAL_AI_KEY_STORAGE);
-  return scopedClearOk && legacyClearOk;
-}
-
-function localAiKeySnapshot(settings = localAiSettingsFromForm()) {
-  const scopedKey = localAiKeyStorageKey(settings);
-  return {
-    key: scopedKey,
-    local: readLocalAiKeyStorageItem("local", scopedKey),
-    session: readLocalAiKeyStorageItem("session", scopedKey),
-    legacyLocal: readLocalAiKeyStorageItem("local", LOCAL_AI_KEY_STORAGE),
-    legacySession: readLocalAiKeyStorageItem("session", LOCAL_AI_KEY_STORAGE)
-  };
-}
-
-function restoreLocalAiKeySnapshot(snapshot = {}) {
-  const scopedKey = snapshot.key || LOCAL_AI_KEY_STORAGE;
-  const localOk = snapshot.local !== null && snapshot.local !== undefined
-    ? writeLocalAiKeyStorageItem("local", scopedKey, snapshot.local)
-    : removeLocalAiKeyStorageItem("local", scopedKey);
-  const sessionOk = snapshot.session !== null && snapshot.session !== undefined
-    ? writeLocalAiKeyStorageItem("session", scopedKey, snapshot.session)
-    : removeLocalAiKeyStorageItem("session", scopedKey);
-  const legacyLocalOk = snapshot.legacyLocal !== null && snapshot.legacyLocal !== undefined
-    ? writeLocalAiKeyStorageItem("local", LOCAL_AI_KEY_STORAGE, snapshot.legacyLocal)
-    : removeLocalAiKeyStorageItem("local", LOCAL_AI_KEY_STORAGE);
-  const legacySessionOk = snapshot.legacySession !== null && snapshot.legacySession !== undefined
-    ? writeLocalAiKeyStorageItem("session", LOCAL_AI_KEY_STORAGE, snapshot.legacySession)
-    : removeLocalAiKeyStorageItem("session", LOCAL_AI_KEY_STORAGE);
-  if (!localOk || !sessionOk || !legacyLocalOk || !legacySessionOk) throw new Error("Local AI key storage restore failed.");
-  return true;
-}
-
-function safeRestoreLocalAiKeySnapshot(snapshot) {
-  try {
-    restoreLocalAiKeySnapshot(snapshot);
-    return true;
-  } catch (error) {
-    console.warn("Local AI key storage restore failed.", error);
-    return false;
-  }
-}
-
-function storedLocalAiKey(settings = localAiSettingsFromForm()) {
-  const snapshot = localAiKeySnapshot(settings);
-  return snapshot.session || snapshot.local || "";
-}
-
-function saveLocalAiKey(value, remember, settings = localAiSettingsFromForm()) {
-  const key = String(value || "").trim();
-  const previousKey = localAiKeySnapshot(settings);
-  try {
-    const localOk = removeLocalAiKeyStorage("local", settings);
-    const sessionOk = removeLocalAiKeyStorage("session", settings);
-    if (!localOk || !sessionOk) throw new Error("Local AI key storage could not be cleared.");
-    if (!key) return;
-    const saved = remember ? writeLocalAiKeyStorage("local", key, settings) : writeLocalAiKeyStorage("session", key, settings);
-    if (!saved) throw new Error("Local AI key could not be saved in this browser.");
-  } catch (error) {
-    safeRestoreLocalAiKeySnapshot(previousKey);
-    throw error;
-  }
-}
-
 function clearLocalAiKey() {
   const settings = localAiSettingsFromForm();
   try {
-    saveLocalAiKey("", false, settings);
+    aiCredentialStorageService.saveLocalAiKey("", false, settings);
   } catch (error) {
     setLocalAiStatus("error", redactSensitiveText(error.message || "Local AI key could not be cleared."));
     return false;
@@ -4434,13 +4229,6 @@ function clearLocalAiKey() {
   aiAdministrationController?.clearLocalAiSecret?.();
   setLocalAiStatus("disconnected", "Local AI key cleared for this provider");
   return true;
-}
-
-function localAiKeyStorageLabel(settings = localAiSettingsFromForm()) {
-  const snapshot = localAiKeySnapshot(settings);
-  if (snapshot.local) return "Saved in this browser for this provider";
-  if (snapshot.session) return "Saved for this tab and provider";
-  return "Not saved";
 }
 
 function markOpenAiProjectRollbackDirty(projectId) {
@@ -6344,9 +6132,18 @@ function localAiRuntimeConfig(settings = localAiSettingsFromForm()) {
   const secrets = aiAdministrationController?.readSecrets?.() || {};
   const typedKey = String(secrets.localAiKey || "").trim();
   if (typedKey) {
-    saveLocalAiKey(typedKey, Boolean(secrets.rememberLocalAiKey), settings);
+    aiCredentialStorageService.saveLocalAiKey(
+      typedKey,
+      Boolean(secrets.rememberLocalAiKey),
+      settings
+    );
   }
-  const apiKey = typedKey || storedLocalAiKey(settings) || (settings.providerId === "openai" ? storedOpenAiKey() : "");
+  const apiKey =
+    typedKey ||
+    aiCredentialStorageService.storedLocalAiKey(settings) ||
+    (settings.providerId === "openai"
+      ? aiCredentialStorageService.storedOpenAiKey()
+      : "");
   return {
     ...settings,
     apiKey
@@ -6439,8 +6236,8 @@ function renderLocalAiProviderControls(settings) {
       : uiSource("Pull unavailable"),
     canStartServer: canStartLmStudioServer(settings),
     needsKey,
-    rememberLocalKey: Boolean(localAiKeySnapshot(settings).local),
-    storedLocalKey: storedLocalAiKey(settings)
+    rememberLocalKey: Boolean(aiCredentialStorageService.localAiSnapshot(settings).local),
+    storedLocalKey: aiCredentialStorageService.storedLocalAiKey(settings)
   });
 }
 
@@ -6589,8 +6386,8 @@ function renderLocalAiCommandCentre() {
         : uiSource("Pull unavailable"),
       canStartServer: canStartLmStudioServer(settings),
       needsKey,
-      rememberLocalKey: Boolean(localAiKeySnapshot(settings).local),
-      storedLocalKey: storedLocalAiKey(settings)
+      rememberLocalKey: Boolean(aiCredentialStorageService.localAiSnapshot(settings).local),
+      storedLocalKey: aiCredentialStorageService.storedLocalAiKey(settings)
     },
     status: {
       connectionStatus: state.localAi.connectionStatus,
@@ -6679,9 +6476,9 @@ function renderEditor() {
   const ai = defaultAiSettings(currentProject().aiSettings);
   aiAdministrationController?.renderGlobalSettings?.({
     settings: ai,
-    storedKey: storedOpenAiKey(),
-    rememberKey: Boolean(openAiKeySnapshot().local),
-    storageText: `OpenAI key: ${openAiKeyStorageLabel()}. API keys stay in this browser and are never exported with project packages.`
+    storedKey: aiCredentialStorageService.storedOpenAiKey(),
+    rememberKey: Boolean(aiCredentialStorageService.openAiSnapshot().local),
+    storageText: `OpenAI key: ${aiCredentialStorageService.openAiStorageLabel()}. API keys stay in this browser and are never exported with project packages.`
   });
   renderLocalAiCommandCentre();
   renderQualityWorkbench();

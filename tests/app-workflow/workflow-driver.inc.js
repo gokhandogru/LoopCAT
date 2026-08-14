@@ -1,5 +1,13 @@
 const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTest() {
   if (window.location.hash !== "#app-workflow-test") return;
+  const {
+    localAiSnapshot: localAiKeySnapshot,
+    localAiStorageLabel: localAiKeyStorageLabel,
+    safeRestoreLocalAiSnapshot: safeRestoreLocalAiKeySnapshot,
+    saveLocalAiKey,
+    storedLocalAiKey,
+    storedOpenAiKey
+  } = aiCredentialStorageService;
   const out = [];
   const publishProgress = () => {
     let output = document.querySelector("#appWorkflowTestResults");

@@ -69,6 +69,10 @@ import { createAiSuggestionPersistenceController } from "../features/ai/ai-sugge
 import { createAiSettingsPersistenceController } from "../features/ai/ai-settings-persistence-controller.js";
 import { createAiProviderAdministrationOperationsController } from "../features/ai/ai-provider-administration-operations-controller.js";
 import { createAiProviderPresentationService } from "../features/ai/ai-provider-presentation-service.js";
+import {
+  AI_CREDENTIAL_STORAGE_KEYS,
+  createAiCredentialStorageService
+} from "../features/ai/ai-credential-storage-service.js";
 import { createAiPromptTestController } from "../features/ai/ai-prompt-test-controller.js";
 import { createAiPromptPreviewController } from "../features/ai/ai-prompt-preview-controller.js";
 import { createAiTermCandidatePersistenceService } from "../features/ai/ai-term-candidate-persistence-service.js";
@@ -147,7 +151,9 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       undoStore
     }),
     featureFactories: Object.freeze({
+      aiCredentialStorageKeys: AI_CREDENTIAL_STORAGE_KEYS,
       createAiAdministrationController,
+      createAiCredentialStorageService,
       createAiContextController,
       createAiPretranslationController,
       createAiReviewController,

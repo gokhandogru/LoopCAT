@@ -364,6 +364,8 @@ const aiProviderAdministrationOperationsControllerUnitTests = readText(
 );
 const aiProviderPresentationServiceJs = readText("src/features/ai/ai-provider-presentation-service.js");
 const aiProviderPresentationServiceUnitTests = readText("tests/unit/ai-provider-presentation-service.test.cjs");
+const aiCredentialStorageServiceJs = readText("src/features/ai/ai-credential-storage-service.js");
+const aiCredentialStorageServiceUnitTests = readText("tests/unit/ai-credential-storage-service.test.cjs");
 const aiPromptTestControllerJs = readText("src/features/ai/ai-prompt-test-controller.js");
 const aiPromptTestControllerUnitTests = readText("tests/unit/ai-prompt-test-controller.test.cjs");
 const aiPromptPreviewControllerJs = readText("src/features/ai/ai-prompt-preview-controller.js");
@@ -2865,6 +2867,100 @@ for (const testName of [
     aiProviderPresentationServiceUnitTests,
     testName,
     `focused AI-provider-presentation tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "AI_CREDENTIAL_STORAGE_KEYS",
+  "The application runtime must expose checked AI credential-storage key constants."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createAiCredentialStorageService",
+  "The application runtime must expose the checked AI credential-storage service boundary."
+);
+for (const boundary of [
+  'openAi: "loopcat.openai.apiKey"',
+  'localAiLegacy: "loopcat.localAi.apiKey"',
+  "function storageFor(label, kind)",
+  "function openAiSnapshot()",
+  "function restoreOpenAiSnapshot(snapshot = {})",
+  "function safeRestoreOpenAiSnapshot(snapshot)",
+  "function storedOpenAiKey()",
+  "function saveOpenAiKey(value, remember)",
+  "function openAiStorageLabel()",
+  "function localAiStorageKey(settings = settingsBoundary.readLocal())",
+  "function localAiSnapshot(settings = settingsBoundary.readLocal())",
+  "function restoreLocalAiSnapshot(snapshot = {})",
+  "function safeRestoreLocalAiSnapshot(snapshot)",
+  "function storedLocalAiKey(settings = settingsBoundary.readLocal())",
+  "function saveLocalAiKey(value, remember, settings = settingsBoundary.readLocal())",
+  "function localAiStorageLabel(settings = settingsBoundary.readLocal())",
+  'snapshot.session || snapshot.local || ""',
+  "safeRestoreOpenAiSnapshot(previousKey)",
+  "safeRestoreLocalAiSnapshot(previousKey)",
+  "AI_CREDENTIAL_STORAGE_KEYS.localAiLegacy"
+]) {
+  assertIncludes(
+    aiCredentialStorageServiceJs,
+    boundary,
+    `AiCredentialStorageService must retain checked ${boundary} storage and rollback policy.`
+  );
+}
+for (const consumer of [
+  "appRuntime.featureFactories.createAiCredentialStorageService({",
+  "readStored: aiCredentialStorageService.storedOpenAiKey",
+  "snapshot: aiCredentialStorageService.openAiSnapshot",
+  "save: aiCredentialStorageService.saveOpenAiKey",
+  "restore: aiCredentialStorageService.safeRestoreOpenAiSnapshot",
+  "snapshot: aiCredentialStorageService.localAiSnapshot",
+  "save: aiCredentialStorageService.saveLocalAiKey",
+  "restore: aiCredentialStorageService.safeRestoreLocalAiSnapshot",
+  "storageLabel: aiCredentialStorageService.localAiStorageLabel"
+]) {
+  assertIncludes(appJs, consumer, `AI credential consumer must use the checked service: ${consumer}.`);
+}
+for (const removedFacade of [
+  "function openAiStorage",
+  "function readOpenAiKeyStorage",
+  "function writeOpenAiKeyStorage",
+  "function removeOpenAiKeyStorage",
+  "function openAiKeySnapshot",
+  "function restoreOpenAiKeySnapshot",
+  "function safeRestoreOpenAiKeySnapshot",
+  "function storedOpenAiKey",
+  "function saveOpenAiKey",
+  "function openAiKeyStorageLabel",
+  "function localAiStorage",
+  "function localAiKeyStorageKey",
+  "function readLocalAiKeyStorage",
+  "function writeLocalAiKeyStorage",
+  "function removeLocalAiKeyStorage",
+  "function localAiKeySnapshot",
+  "function restoreLocalAiKeySnapshot",
+  "function safeRestoreLocalAiKeySnapshot",
+  "function storedLocalAiKey",
+  "function saveLocalAiKey",
+  "function localAiKeyStorageLabel"
+]) {
+  assert(
+    !appJs.includes(removedFacade),
+    `app.js must not regain coordinator-private AI credential storage policy: ${removedFacade}.`
+  );
+}
+for (const testName of [
+  "AI credential storage preserves exact key constants and provider/base scoped normalization",
+  "OpenAI credential storage preserves session precedence, labels, remember routing, and blank clearing",
+  "OpenAI credential storage restores the exact snapshot after forced or browser write failure",
+  "AI credential storage contains unavailable and throwing storage with exact warnings",
+  "local AI credential storage preserves scoped precedence, legacy cleanup, labels, and blank clearing",
+  "local AI credential storage restores scoped and legacy records after primary failure",
+  "AI credential storage safe local restoration preserves failure result and warning copy"
+]) {
+  assertIncludes(
+    aiCredentialStorageServiceUnitTests,
+    testName,
+    `focused AI-credential-storage tests must characterize ${testName}.`
   );
 }
 assertIncludes(
@@ -5988,9 +6084,9 @@ assertIncludes(
   "app workflow test must verify unsupported hosted-compatible endpoints fail before key/settings persistence."
 );
 assertIncludes(
-  appJs,
-  "localAiKeyStorageKey(settings",
-  "app.js must scope Local AI API-key storage by active provider settings."
+  aiCredentialStorageServiceJs,
+  "localAiStorageKey(settings",
+  "the checked AI credential-storage service must scope Local AI API keys by active provider settings."
 );
 assertIncludes(
   aiAdministrationControllerJs,
@@ -7400,7 +7496,7 @@ assertIncludes(
   "app.js must redact credential-looking text before displaying save/status messages."
 );
 assertIncludes(
-  functionBody(appJs, "function clearOpenAiKey", "function openAiKeyStorageLabel"),
+  functionBody(appJs, "function clearOpenAiKey", "function clearLocalAiKey"),
   'redactSensitiveText(error.message || "OpenAI key could not be cleared.")',
   "app.js must redact credential-looking text from AI key-storage status errors."
 );
@@ -10656,14 +10752,14 @@ assertIncludes(
   "app workflow tests must be able to simulate browser key-storage failure after project AI settings are written."
 );
 assertIncludes(
-  appJs,
-  "function writeOpenAiKeyStorage",
-  "app.js must wrap OpenAI key writes so browser storage failures can be rolled back consistently."
+  aiCredentialStorageServiceJs,
+  "function writeStorageItem(label, kind, key, value)",
+  "the checked AI credential-storage service must wrap OpenAI key writes so browser storage failures can be rolled back consistently."
 );
 assertIncludes(
-  appJs,
+  aiCredentialStorageServiceJs,
   "OpenAI key could not be saved in this browser.",
-  "app.js must report browser OpenAI key storage failures clearly."
+  "the checked AI credential-storage service must report browser OpenAI key storage failures clearly."
 );
 assertIncludes(
   readText("regression-test.html"),
