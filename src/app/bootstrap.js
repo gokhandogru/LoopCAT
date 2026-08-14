@@ -88,6 +88,7 @@ import { createOpusCatHelpController } from "../features/ai/opus-cat-help-contro
 import { createTmPretranslationDialogController } from "../features/resources/tm-pretranslation-dialog-controller.js";
 import { createResourcesController } from "../features/resources/resources-controller.js";
 import { createResourcesPresentationService } from "../features/resources/resources-presentation-service.js";
+import { createResourceCatalogService } from "../features/resources/resource-catalog-service.js";
 import { createResourceLibraryImportController } from "../features/resources/resource-library-import-controller.js";
 import { createResourceLibraryExportController } from "../features/resources/resource-library-export-controller.js";
 import { createResourceMutationController } from "../features/resources/resource-mutation-controller.js";
@@ -218,6 +219,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createUiLocalizationService,
       createProjectDialogController,
       createProjectsController,
+      createResourceCatalogService,
       createResourceLibraryExportController,
       createResourceLibraryImportController,
       createResourceMutationController,

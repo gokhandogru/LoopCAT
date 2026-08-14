@@ -3259,9 +3259,12 @@ const resourceLibraryImportController =
     alert: uiLocalizationService.alert,
     status: { set: setSaveStatus }
   });
+const resourceCatalogService = appRuntime.featureFactories.createResourceCatalogService({
+  getState: () => resourcesController?.getState?.() || { tmEntries: [], terms: [] }
+});
 const resourceLibraryExportController =
   appRuntime.featureFactories.createResourceLibraryExportController({
-    resources: { labelFromKey: resourceLabelFromKey, items: resourceItems },
+    resources: { labelFromKey: resourceCatalogService.labelFromKey, items: resourceItems },
     builders: { buildTmx, buildTbx },
     fileSafeName,
     download,
@@ -3274,7 +3277,7 @@ const resourceMutationController = appRuntime.featureFactories.createResourceMut
     markProjectsUsingDirty: markProjectsUsingResourceDirty,
     refresh: refreshResources,
     refreshProjectTerms,
-    labelFromKey: resourceLabelFromKey,
+    labelFromKey: resourceCatalogService.labelFromKey,
     items: resourceItems
   },
   commands: {
@@ -3328,8 +3331,8 @@ const resourcesPresentationService = appRuntime?.featureFactories?.createResourc
     tbDetail: els.tbResourceDetail
   },
   document,
-  summarizeResources,
-  labelFromKey: resourceLabelFromKey,
+  summarizeResources: resourceCatalogService.summarize,
+  labelFromKey: resourceCatalogService.labelFromKey,
   items: resourceItems,
   localization: uiLocalizationService,
   languagePairDisplay,
@@ -3360,7 +3363,7 @@ const resourcesController = appRuntime?.featureFactories?.createResourcesControl
   },
   navigate: () => setView("resources"),
   render: resourcesPresentationService.render,
-  keyForItem: (item, type) => resourceKey(item, type === "tm" ? "tmName" : "termBaseName"),
+  keyForItem: (item, type) => resourceCatalogService.key(item, type === "tm" ? "tmName" : "termBaseName"),
   normalizeLanguageInput: normalizeLanguageInputElement,
   runImportTask: runFileImportTask,
   importTm: resourceLibraryImportController.importTmx,
@@ -5630,62 +5633,6 @@ function showProjectHome() {
   renderAll();
 }
 
-function resourceKey(item, nameField) {
-  return `${item[nameField] || "Unnamed resource"}::${item.languagePair || `${item.sourceLang || ""}::${item.targetLang || ""}`}`;
-}
-
-function resourceLabelFromKey(key) {
-  const parts = String(key || "").split("::");
-  const targetLang = parts.pop() || "";
-  const sourceLang = parts.pop() || "";
-  const name = parts.join("::") || "Unnamed resource";
-  return { name, sourceLang: sourceLang || "", targetLang: targetLang || "", languagePair: `${sourceLang || ""}::${targetLang || ""}` };
-}
-
-function summarizeResources(items, nameField) {
-  const map = new Map();
-  items.forEach((item) => {
-    const key = resourceKey(item, nameField);
-    if (!map.has(key)) {
-      map.set(key, {
-        key,
-        name: item[nameField] || "Unnamed resource",
-        sourceLang: item.sourceLang,
-        targetLang: item.targetLang,
-        languagePair: item.languagePair,
-        count: 0,
-        updatedAt: item.updatedAt || item.createdAt || ""
-      });
-    }
-    const summary = map.get(key);
-    summary.count += 1;
-    if (new Date(item.updatedAt || item.createdAt || 0) > new Date(summary.updatedAt || 0)) {
-      summary.updatedAt = item.updatedAt || item.createdAt || "";
-    }
-  });
-  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name) || String(a.languagePair || "").localeCompare(String(b.languagePair || "")));
-}
-
-function matchingResourceSummaries(type, sourceLang, targetLang, selectedNames = []) {
-  const isTm = type === "tm";
-  const resourceState = resourcesController?.getState?.() || { tmEntries: [], terms: [] };
-  const summaries = summarizeResources(isTm ? resourceState.tmEntries : resourceState.terms, isTm ? "tmName" : "termBaseName")
-    .filter((resource) => resource.sourceLang === sourceLang && resource.targetLang === targetLang);
-  selectedNames.forEach((name) => {
-    if (summaries.some((resource) => resource.name === name)) return;
-    summaries.push({
-      key: `${name}::${sourceLang}::${targetLang}`,
-      name,
-      sourceLang,
-      targetLang,
-      languagePair: `${sourceLang}::${targetLang}`,
-      count: 0,
-      updatedAt: ""
-    });
-  });
-  return summaries.sort((a, b) => a.name.localeCompare(b.name));
-}
-
 function projectDialogValues() {
   return {
     sourceLang: normalizeLanguageInputValue(els.sourceLangInput.value),
@@ -5720,8 +5667,8 @@ function renderProjectResourcePickers(project = editorSessionStore.getProject())
   const selectedTmNames = editing ? projectTmNames(project) : [];
   const selectedTbNames = editing ? projectTermBaseNames(project) : [];
   const main = editing ? mainTmName(project) : "";
-  const tmResources = matchingResourceSummaries("tm", sourceLang, targetLang, selectedTmNames);
-  const tbResources = matchingResourceSummaries("tb", sourceLang, targetLang, selectedTbNames);
+  const tmResources = resourceCatalogService.matching("tm", sourceLang, targetLang, selectedTmNames);
+  const tbResources = resourceCatalogService.matching("tb", sourceLang, targetLang, selectedTbNames);
   replaceSafeHtml(els.projectTmResourceList, tmResources.length
     ? tmResources.map((resource) => resourceOptionHtml(resource, "tm", selectedTmNames.includes(resource.name), resource.name === main)).join("")
     : `<div class="muted">${uiLocalizationService.labelHtml("noMatchingTms")}</div>`);

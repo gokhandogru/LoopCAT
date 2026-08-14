@@ -42,6 +42,13 @@ const resourcesPresentationServicePath = path.join(
   "resources",
   "resources-presentation-service.js"
 );
+const resourceCatalogServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "resources",
+  "resource-catalog-service.js"
+);
 const resourceMutationControllerPath = path.join(
   root,
   "src",
@@ -209,6 +216,11 @@ function main() {
     messagesByText,
     resourcesPresentationServicePath,
     "src/features/resources/resources-presentation-service.js"
+  );
+  extractScript(
+    messagesByText,
+    resourceCatalogServicePath,
+    "src/features/resources/resource-catalog-service.js"
   );
   extractScript(
     messagesByText,

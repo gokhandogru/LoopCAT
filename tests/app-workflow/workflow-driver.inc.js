@@ -287,8 +287,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         malformedResourceSummary.tbNames.includes("Workflow TB"),
       "local project resource summaries tolerate malformed legacy links"
     );
-    const delimiterResourceKey = resourceKey({ tmName: "Workflow::TM", sourceLang: "en", targetLang: "tr" }, "tmName");
-    const delimiterResourceInfo = resourceLabelFromKey(delimiterResourceKey);
+    const delimiterResourceKey = resourceCatalogService.key(
+      { tmName: "Workflow::TM", sourceLang: "en", targetLang: "tr" },
+      "tmName"
+    );
+    const delimiterResourceInfo = resourceCatalogService.labelFromKey(delimiterResourceKey);
     assert(
       delimiterResourceKey === "Workflow::TM::en::tr" &&
         delimiterResourceInfo.name === "Workflow::TM" &&

@@ -213,6 +213,7 @@ const requiredReleaseFiles = [
   "src/features/editor/tm-pretranslation-controller.js",
   "src/features/resources/resources-controller.js",
   "src/features/resources/resources-presentation-service.js",
+  "src/features/resources/resource-catalog-service.js",
   "src/features/resources/tm-pretranslation-dialog-controller.js",
   "src/features/import-export/import-export-controller.js",
   "src/features/workspace/recovery-workspace-controller.js",
@@ -271,6 +272,7 @@ const requiredReleaseFiles = [
   "tests/unit/resource-trash.test.cjs",
   "tests/unit/resources-controller.test.cjs",
   "tests/unit/resources-presentation-service.test.cjs",
+  "tests/unit/resource-catalog-service.test.cjs",
   "scripts/generate-brand-icons.cjs",
   "scripts/publish-repository-downloads.cjs",
   "scripts/verify-web-artifact.cjs",
@@ -490,6 +492,8 @@ const resourcesControllerJs = readText("src/features/resources/resources-control
 const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
 const resourcesPresentationServiceJs = readText("src/features/resources/resources-presentation-service.js");
 const resourcesPresentationServiceUnitTests = readText("tests/unit/resources-presentation-service.test.cjs");
+const resourceCatalogServiceJs = readText("src/features/resources/resource-catalog-service.js");
+const resourceCatalogServiceUnitTests = readText("tests/unit/resource-catalog-service.test.cjs");
 const resourceLibraryExportControllerJs = readText("src/features/resources/resource-library-export-controller.js");
 const resourceLibraryExportControllerUnitTests = readText("tests/unit/resource-library-export-controller.test.cjs");
 const resourceLibraryImportControllerJs = readText("src/features/resources/resource-library-import-controller.js");
@@ -623,6 +627,16 @@ assertIncludes(
   appBootstrapJs,
   "createResourcesPresentationService,",
   "The application runtime must expose the checked Resources presentation factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createResourceCatalogService } from "../features/resources/resource-catalog-service.js";',
+  "The application runtime must install the checked resource-catalog service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createResourceCatalogService,",
+  "The application runtime must expose the checked resource-catalog factory."
 );
 assertIncludes(
   appBootstrapJs,
@@ -1219,6 +1233,72 @@ assertIncludes(
   "source-catalog extraction must scan the checked project-resource transfer controller."
 );
 for (const snippet of [
+  'item[nameField] || "Unnamed resource"',
+  'item.languagePair || `${item.sourceLang || ""}::${item.targetLang || ""}`',
+  'String(resourceKey || "").split("::")',
+  'parts.join("::") || "Unnamed resource"',
+  "const map = new Map()",
+  "summary.count += 1",
+  "new Date(item.updatedAt || item.createdAt || 0) > new Date(summary.updatedAt || 0)",
+  'a.name.localeCompare(b.name) || String(a.languagePair || "").localeCompare(String(b.languagePair || ""))',
+  'const isTm = type === "tm"',
+  'isTm ? "tmName" : "termBaseName"',
+  "resource.sourceLang === sourceLang && resource.targetLang === targetLang",
+  "selectedNames.forEach",
+  "summaries.some((resource) => resource.name === name)",
+  "count: 0",
+  "return summaries.sort((a, b) => a.name.localeCompare(b.name))",
+  "return Object.freeze({ key, labelFromKey, summarize, matching })"
+]) {
+  assertIncludes(
+    resourceCatalogServiceJs,
+    snippet,
+    `ResourceCatalogService must retain characterized catalog policy: ${snippet}`
+  );
+}
+assertIncludes(appJs, "createResourceCatalogService({", "app.js must compose the checked resource-catalog service.");
+assertIncludes(
+  appJs,
+  "getState: () => resourcesController?.getState?.() || { tmEntries: [], terms: [] }",
+  "resource-catalog composition must inject current Resources state with the original empty fallback."
+);
+for (const method of ["key", "labelFromKey", "summarize", "matching"]) {
+  assertIncludes(
+    `${appJs}\n${appWorkflowDriverJs}`,
+    `resourceCatalogService.${method}`,
+    `resource-catalog consumers must call ResourceCatalogService.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "resourceKey",
+  "resourceLabelFromKey",
+  "summarizeResources",
+  "matchingResourceSummaries"
+]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} resource-catalog helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "ResourceCatalogService preserves delimiter-safe keys, language-pair derivation, and descriptor fallbacks",
+  "ResourceCatalogService preserves grouping, counts, latest updates, and deterministic catalog ordering",
+  "ResourceCatalogService preserves TM and termbase matching, selected fallbacks, deduplication, and name order",
+  "ResourceCatalogService uses an empty state fallback and exposes an immutable checked API"
+]) {
+  assertIncludes(
+    resourceCatalogServiceUnitTests,
+    testName,
+    `focused resource-catalog tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/resources/resource-catalog-service.js"',
+  "source-catalog extraction must scan the checked resource-catalog service."
+);
+for (const snippet of [
   'renderDashboard("tm", resourceState)',
   'renderDashboard("tb", resourceState)',
   'isTm ? "noTranslationMemories" : "noTermbases"',
@@ -1259,8 +1339,8 @@ for (const boundary of [
   "tmDetail: els.tmResourceDetail",
   "tbDetail: els.tbResourceDetail",
   "document",
-  "summarizeResources",
-  "labelFromKey: resourceLabelFromKey",
+  "summarizeResources: resourceCatalogService.summarize",
+  "labelFromKey: resourceCatalogService.labelFromKey",
   "items: resourceItems",
   "localization: uiLocalizationService",
   "languagePairDisplay",
@@ -1334,7 +1414,7 @@ assertIncludes(
   "app.js must compose the checked resource-library export controller."
 );
 for (const boundary of [
-  "resources: { labelFromKey: resourceLabelFromKey, items: resourceItems }",
+  "resources: { labelFromKey: resourceCatalogService.labelFromKey, items: resourceItems }",
   "builders: { buildTmx, buildTbx }",
   "fileSafeName",
   "download",
@@ -1497,7 +1577,7 @@ for (const boundary of [
   "markProjectsUsingDirty: markProjectsUsingResourceDirty",
   "refresh: refreshResources",
   "refreshProjectTerms",
-  "labelFromKey: resourceLabelFromKey",
+  "labelFromKey: resourceCatalogService.labelFromKey",
   "items: resourceItems",
   "execute: (...args) => appRuntime.commands.bus.execute(...args)",
   "createDeleteEntry: appRuntime.commands.createDeleteResourceEntryCommand",
