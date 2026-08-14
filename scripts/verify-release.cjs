@@ -356,6 +356,8 @@ const aiSuggestionApplicationControllerJs = readText("src/features/ai/ai-suggest
 const aiSuggestionApplicationControllerUnitTests = readText("tests/unit/ai-suggestion-application-controller.test.cjs");
 const aiOpenAiSuggestionControllerJs = readText("src/features/ai/ai-openai-suggestion-controller.js");
 const aiOpenAiSuggestionControllerUnitTests = readText("tests/unit/ai-openai-suggestion-controller.test.cjs");
+const aiSuggestionPersistenceControllerJs = readText("src/features/ai/ai-suggestion-persistence-controller.js");
+const aiSuggestionPersistenceControllerUnitTests = readText("tests/unit/ai-suggestion-persistence-controller.test.cjs");
 const aiTerminologyApplicationControllerJs = readText("src/features/ai/ai-terminology-application-controller.js");
 const aiTerminologyApplicationControllerUnitTests = readText(
   "tests/unit/ai-terminology-application-controller.test.cjs"
@@ -3148,6 +3150,84 @@ for (const testName of [
     aiOpenAiSuggestionControllerUnitTests,
     testName,
     `focused direct-OpenAI-suggestion tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiSuggestionPersistenceController",
+  "The application runtime must expose the checked AI-suggestion-persistence controller boundary."
+);
+for (const boundary of [
+  "function normalize(suggestion = {})",
+  "id: String(source.id || options.ids.suggestion())",
+  'provider: options.redact(source.provider || "AI").trim() || "AI"',
+  "confidence: Number.isFinite(confidence) ? confidence : 0",
+  ".slice(0, 8)",
+  "segment.aiSuggestions = [...(segment.aiSuggestions || []), safeSuggestion]",
+  "mutation.touch(segment)",
+  "persistence.clearPending(segment)",
+  "await persistence.save(segment)",
+  "await activity.log(activityType, activityMessage, {",
+  "workspace.markActivityWarningDirty()",
+  "presentation.renderSuggestions()",
+  "workspace.markDirty()",
+  "mutation.restoreInPlace(segment, snapshot)",
+  "mutation.prepareHistory(segment)",
+  "presentation.renderHistory()"
+]) {
+  assertIncludes(
+    aiSuggestionPersistenceControllerJs,
+    boundary,
+    `AiSuggestionPersistenceController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return aiSuggestionPersistenceController.normalize(suggestion)",
+  "app.js must retain only the checked AI-suggestion-normalization compatibility facade."
+);
+assertIncludes(
+  appJs,
+  "return aiSuggestionPersistenceController.append(",
+  "app.js must retain only the checked AI-suggestion-append compatibility facade."
+);
+const savedAiSuggestionFacade = functionBody(
+  appJs,
+  "function savedAiSuggestionRecord",
+  "async function appendAiSuggestion"
+);
+const appendAiSuggestionFacade = functionBody(
+  appJs,
+  "async function appendAiSuggestion",
+  "async function applyAiSuggestion"
+);
+for (const facade of [savedAiSuggestionFacade, appendAiSuggestionFacade]) {
+  assert(
+    !facade.includes("redactSensitiveText(") &&
+      !facade.includes("makeId(") &&
+      !facade.includes("touchSegment(") &&
+      !facade.includes("clearPendingSave(") &&
+      !facade.includes("saveSegment(") &&
+      !facade.includes("logProjectActivity(") &&
+      !facade.includes("renderAiSuggestions(") &&
+      !facade.includes("renderRevisionHistory(") &&
+      !facade.includes("markWorkspaceDirty(") &&
+      !facade.includes("setSaveStatus("),
+    "app.js must not regain AI-suggestion normalization, append, persistence, activity, presentation, workspace, status, or recovery orchestration."
+  );
+}
+for (const testName of [
+  "AI suggestion persistence normalizes a portable bounded redacted storage record",
+  "AI suggestion persistence preserves supplied finite metadata and IDs",
+  "AI suggestion persistence appends, saves, logs, presents, and marks workspace dirty",
+  "primary AI suggestion persistence failure restores the exact segment and presentation",
+  "secondary AI suggestion activity failure keeps the durable record and reports dirty",
+  "AI suggestion persistence is inert for missing segment or suggestion input"
+]) {
+  assertIncludes(
+    aiSuggestionPersistenceControllerUnitTests,
+    testName,
+    `focused AI-suggestion-persistence tests must characterize ${testName}.`
   );
 }
 assertIncludes(

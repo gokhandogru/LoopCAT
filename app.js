@@ -2413,6 +2413,48 @@ const aiSuggestionApplicationController =
     },
     logger: console
   });
+const aiSuggestionPersistenceController =
+  appRuntime.featureFactories.createAiSuggestionPersistenceController({
+    mutation: {
+      touch: touchSegment,
+      restoreInPlace: (segment, snapshot) => {
+        Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
+        Object.assign(segment, snapshot);
+      },
+      prepareHistory: prepareSegmentHistoryState
+    },
+    persistence: {
+      clearPending: clearPendingSave,
+      save: saveSegment
+    },
+    activity: { log: logProjectActivity },
+    presentation: {
+      renderSuggestions: renderAiSuggestions,
+      renderHistory: renderRevisionHistory
+    },
+    workspace: {
+      markDirty: markWorkspaceDirty,
+      markActivityWarningDirty: () => {
+        if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
+      }
+    },
+    status: { set: setSaveStatus },
+    redact: redactSensitiveText,
+    ids: { suggestion: () => makeId("ai-suggestion") },
+    testHooks: {
+      beforeSave: (segment) => {
+        if (LOOPCAT_TEST_BUILD && segment[AI_APPEND_SAVE_FAILURE_TEST_FLAG]) {
+          throw new Error("Simulated AI suggestion save failure");
+        }
+      },
+      beforeActivity: (segment) => {
+        if (LOOPCAT_TEST_BUILD && segment[AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG]) {
+          throw new Error("Simulated AI suggestion activity failure");
+        }
+      }
+    },
+    logger: console
+  });
 const aiOpenAiSuggestionController = appRuntime.featureFactories.createAiOpenAiSuggestionController({
   editorSessionStore,
   selection: { getActiveIndex: currentActiveIndex },
@@ -8771,65 +8813,16 @@ async function aiContextForSegment(segment, ai) {
 }
 
 function savedAiSuggestionRecord(suggestion = {}) {
-  const source = suggestion && typeof suggestion === "object" ? suggestion : {};
-  const confidence = Number(source.confidence);
-  return {
-    id: String(source.id || makeId("ai-suggestion")),
-    provider: redactSensitiveText(source.provider || "AI").trim() || "AI",
-    model: redactSensitiveText(source.model || "").trim(),
-    segmentId: String(source.segmentId || "").trim(),
-    suggestedTarget: String(source.suggestedTarget || ""),
-    confidence: Number.isFinite(confidence) ? confidence : 0,
-    explanation: Array.isArray(source.explanation)
-      ? source.explanation.map((item) => redactSensitiveText(item || "").trim()).filter(Boolean).slice(0, 8)
-      : [],
-    status: redactSensitiveText(source.status || "review").trim() || "review",
-    origin: redactSensitiveText(source.origin || source.provider || "AI").trim() || "AI",
-    scope: redactSensitiveText(source.scope || "active segment").trim() || "active segment",
-    reviewState: redactSensitiveText(source.reviewState || "suggested").trim() || "suggested",
-    contextDisclosure: Array.isArray(source.contextDisclosure)
-      ? source.contextDisclosure.map((item) => redactSensitiveText(item || "").trim()).filter(Boolean).slice(0, 8)
-      : [],
-    createdAt: String(source.createdAt || new Date().toISOString()).trim()
-  };
+  return aiSuggestionPersistenceController.normalize(suggestion);
 }
 
 async function appendAiSuggestion(segment, suggestion, activityType, activityMessage) {
-  if (!segment || !suggestion) return false;
-  const safeSuggestion = savedAiSuggestionRecord(suggestion);
-  const snapshot = structuredClone(segment);
-  let activityLogged = true;
-  try {
-    segment.aiSuggestions = [...(segment.aiSuggestions || []), safeSuggestion];
-    touchSegment(segment);
-    clearPendingSave(segment);
-    if (LOOPCAT_TEST_BUILD && segment[AI_APPEND_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI suggestion save failure");
-    await saveSegment(segment);
-    try {
-      if (LOOPCAT_TEST_BUILD && segment[AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated AI suggestion activity failure");
-      await logProjectActivity(activityType, activityMessage, {
-        segmentId: segment.id,
-        provider: safeSuggestion.provider,
-        model: safeSuggestion.model
-      });
-    } catch (activityError) {
-      activityLogged = false;
-      console.warn("AI suggestion activity log failed.", activityError);
-      if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
-    }
-    renderAiSuggestions();
-    markWorkspaceDirty();
-    if (!activityLogged) setSaveStatus(`${activityMessage}; activity log failed`, "dirty");
-    return { ok: true, activityLogged };
-  } catch (error) {
-    Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-    Object.assign(segment, snapshot);
-    prepareSegmentHistoryState(segment);
-    renderAiSuggestions();
-    renderRevisionHistory();
-    setSaveStatus(error.message || "AI suggestion save failed", "dirty");
-    return false;
-  }
+  return aiSuggestionPersistenceController.append(
+    segment,
+    suggestion,
+    activityType,
+    activityMessage
+  );
 }
 
 async function applyAiSuggestion(suggestionId, options = {}) {
