@@ -95,7 +95,7 @@ const reportDocumentCompositionService = appRuntime.featureFactories.createRepor
   redactSensitiveText,
   defaultQualityProfile,
   sanitizeValidationReportForDisplay,
-  languagePairDisplay,
+  languagePairDisplay: (...args) => languageInputService.pairDisplay(...args),
   formatDateTime,
   qualityLabel,
   qualityCategoryName,
@@ -1082,6 +1082,23 @@ const els = {
   backupExportBtn: document.querySelector("#backupExportBtn")
 };
 
+const languageInputService = appRuntime.featureFactories.createLanguageInputService({
+  entries: LANGUAGE_ENTRIES,
+  aliases: LANGUAGE_ALIAS_CODES,
+  redact: redactSensitiveText,
+  localization: uiLocalizationService,
+  getLocale: () => uiI18n?.getLocale?.() || "",
+  getNavigatorLanguage: () => navigator.language || "en",
+  intl: Intl,
+  datalists: {
+    labels: els.languageOptions,
+    codes: els.languageCodeOptions,
+    names: els.languageNameOptions
+  },
+  escapeHtml,
+  replaceSafeHtml
+});
+
 const aiContextController = appRuntime?.featureFactories?.createAiContextController?.({
   adminSection: els.aiSettingsForm,
   adminMount: els.projectAiSettingsMount,
@@ -1707,8 +1724,8 @@ const aiRuntimeSettingsService =
       defaults: (settings, project) => localAISettingsStore.defaults(settings, project)
     },
     languages: {
-      normalizeInput: normalizeLanguageInputValue,
-      nameForUi: languageNameForUi
+      normalizeInput: languageInputService.normalizeInput,
+      nameForUi: languageInputService.nameForUi
     },
     endpoints: {
       isAllowedHostedCompatible: isAllowedOpenAiCompatibleHostedBaseUrl
@@ -1836,9 +1853,9 @@ const aiProviderFormController =
         aiProviderAdministrationOperationsController.canStartServer(settings)
     },
     languages: {
-      normalizeInput: normalizeLanguageInputValue,
-      nameForUi: languageNameForUi,
-      shouldLiveSync: shouldLiveSyncLanguageInput
+      normalizeInput: languageInputService.normalizeInput,
+      nameForUi: languageInputService.nameForUi,
+      shouldLiveSync: languageInputService.shouldLiveSync
     },
     prompt: {
       render: (...args) => aiPromptPreviewController.render(...args),
@@ -3170,8 +3187,8 @@ const projectResourceSelectionController =
     },
     getProject: () => editorSessionStore.getProject(),
     getMode: () => projectDialogController?.getMode?.() || null,
-    normalizeLanguageValue: normalizeLanguageInputValue,
-    normalizeLanguageInput: normalizeLanguageInputElement,
+    normalizeLanguageValue: languageInputService.normalizeInput,
+    normalizeLanguageInput: languageInputService.normalizeElement,
     projectResources: {
       tmNames: projectTmNames,
       termBaseNames: projectTermBaseNames,
@@ -3184,7 +3201,7 @@ const projectResourceSelectionController =
       replaceSafeHtml,
       escapeHtml,
       displaySafeHtml,
-      languagePairDisplay
+      languagePairDisplay: languageInputService.pairDisplay
     },
     names: { unique: uniqueNames, clean: cleanProjectText },
     makeId
@@ -3194,9 +3211,9 @@ const projectLanguagePairShortcutsController =
     root: els.frequentLanguagePairs,
     getProjects: () => editorSessionStore.getProjects(),
     getCurrentValues: projectResourceSelectionController.values,
-    normalizeLanguage: normalizeLanguageInputValue,
+    normalizeLanguage: languageInputService.normalizeInput,
     defaultPairs: DEFAULT_LANGUAGE_PAIRS,
-    languagePairDisplay,
+    languagePairDisplay: languageInputService.pairDisplay,
     escapeHtml,
     replaceSafeHtml
   });
@@ -3236,8 +3253,8 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
   refreshResources,
   suggestedCreatorName,
   cleanCreatorName,
-  setLanguageValue: setLanguageInputValue,
-  normalizeLanguageValue: normalizeLanguageInputElement,
+  setLanguageValue: languageInputService.setInput,
+  normalizeLanguageValue: languageInputService.normalizeElement,
   renderStorageStatus: renderProjectStorageStatus,
   renderResourcePickers: projectResourceSelectionController.render,
   renderFrequentPairs: projectLanguagePairShortcutsController.render,
@@ -3280,7 +3297,7 @@ const resourceLibraryImportController =
       tmTargetLanguageInput: els.tmResourceTargetLangInput,
       tbSourceLanguageInput: els.tbResourceSourceLangInput,
       tbTargetLanguageInput: els.tbResourceTargetLangInput,
-      normalizeLanguageInput: normalizeLanguageInputElement
+      normalizeLanguageInput: languageInputService.normalizeElement
     },
     files: {
       assertSize: (file, label) => assertFileSize(file, label, MAX_RESOURCE_IMPORT_BYTES),
@@ -3378,7 +3395,7 @@ const resourcesPresentationService = appRuntime?.featureFactories?.createResourc
   labelFromKey: resourceCatalogService.labelFromKey,
   items: resourceItems,
   localization: uiLocalizationService,
-  languagePairDisplay,
+  languagePairDisplay: languageInputService.pairDisplay,
   formatDate,
   displaySafeHtml,
   displaySafeText,
@@ -3407,7 +3424,7 @@ const resourcesController = appRuntime?.featureFactories?.createResourcesControl
   navigate: () => setView("resources"),
   render: resourcesPresentationService.render,
   keyForItem: (item, type) => resourceCatalogService.key(item, type === "tm" ? "tmName" : "termBaseName"),
-  normalizeLanguageInput: normalizeLanguageInputElement,
+  normalizeLanguageInput: languageInputService.normalizeElement,
   runImportTask: runFileImportTask,
   importTm: resourceLibraryImportController.importTmx,
   importTb: resourceLibraryImportController.importTbx,
@@ -4318,7 +4335,7 @@ function touchSegment(segment, options = {}) {
 }
 
 function languagePair(project = editorSessionStore.getProject()) {
-  return project ? languagePairDisplay(project.sourceLang, project.targetLang) : "";
+  return project ? languageInputService.pairDisplay(project.sourceLang, project.targetLang) : "";
 }
 
 function fileSafeName(value) {
@@ -4912,151 +4929,14 @@ function displayLanguageName(code) {
   return clean;
 }
 
-let languageCatalogCache = null;
-let languageEntryNameCache = null;
-
-function canonicalLanguageCode(value) {
-  const clean = redactSensitiveText(value || "").trim().replaceAll("_", "-");
-  if (!clean) return "";
-  try {
-    if (typeof Intl.getCanonicalLocales === "function") return Intl.getCanonicalLocales(clean)[0] || clean;
-  } catch {}
-  return clean
-    .split("-")
-    .map((part, index) => {
-      if (index === 0) return part.toLowerCase();
-      if (part.length === 2 || /^\d{3}$/.test(part)) return part.toUpperCase();
-      if (part.length === 4) return part[0].toUpperCase() + part.slice(1).toLowerCase();
-      return part;
-    })
-    .join("-");
-}
-
-function languageEntryNames() {
-  if (languageEntryNameCache) return languageEntryNameCache;
-  languageEntryNameCache = new Map();
-  LANGUAGE_ENTRIES.forEach(([code, name]) => {
-    const clean = canonicalLanguageCode(code);
-    if (clean && !languageEntryNameCache.has(clean)) languageEntryNameCache.set(clean, name);
-  });
-  return languageEntryNameCache;
-}
-
-function configuredLanguageName(code) {
-  return languageEntryNames().get(canonicalLanguageCode(code)) || "";
-}
-
-function languageNameForUi(code) {
-  const clean = canonicalLanguageCode(code);
-  if (!clean) return "";
-  const configuredName = configuredLanguageName(clean);
-  if (configuredName) return uiLocalizationService.source(configuredName);
-  try {
-    if (typeof Intl.DisplayNames === "function") {
-      const names = new Intl.DisplayNames([uiI18n?.getLocale?.() || navigator.language || "en"], { type: "language" });
-      const label = names.of(clean);
-      if (label && label !== clean) return label;
-    }
-  } catch {}
-  return clean;
-}
-
-function languageOptionValue(code) {
-  const clean = canonicalLanguageCode(code);
-  if (!clean) return "";
-  const name = languageNameForUi(clean);
-  return name && name !== clean ? `${name} (${clean})` : clean;
-}
-
-function stableLanguageLookupKey(value) {
-  return String(value || "")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
-}
-
-function languageCatalog() {
-  if (languageCatalogCache) return languageCatalogCache;
-  const seen = new Set();
-  languageCatalogCache = LANGUAGE_ENTRIES
-    .map(([code, name]) => ({ code: canonicalLanguageCode(code), name: name || "" }))
-    .filter((item) => {
-      if (!item.code || seen.has(item.code)) return false;
-      seen.add(item.code);
-      return true;
-    })
-    .map((item) => {
-      const name = item.name || languageNameForUi(item.code);
-      return {
-        code: item.code,
-        name,
-        label: name && name !== item.code ? `${name} (${item.code})` : item.code
-      };
-    })
-    .sort((a, b) => a.name.localeCompare(b.name) || a.code.localeCompare(b.code));
-  return languageCatalogCache;
-}
-
-function normalizeLanguageInputValue(value) {
-  const clean = redactSensitiveText(value || "").trim();
-  if (!clean) return "";
-  const parentheticalCode = clean.match(/\(([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*)\)\s*$/);
-  if (parentheticalCode) {
-    const candidate = canonicalLanguageCode(parentheticalCode[1]);
-    if (languageEntryNames().has(candidate) || candidate.includes("-")) return candidate;
-  }
-  const leadingCode = clean.match(/^([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*)\s+-\s+/);
-  if (leadingCode) {
-    const candidate = canonicalLanguageCode(leadingCode[1]);
-    if (languageEntryNames().has(candidate) || candidate.includes("-")) return candidate;
-  }
-  const lookup = stableLanguageLookupKey(clean);
-  const alias = LANGUAGE_ALIAS_CODES[lookup];
-  if (alias) return canonicalLanguageCode(alias);
-  const match = languageCatalog().find((item) => (
-    stableLanguageLookupKey(item.code) === lookup ||
-    stableLanguageLookupKey(item.name) === lookup ||
-    stableLanguageLookupKey(item.label) === lookup
-  ));
-  if (match) return match.code;
-  return canonicalLanguageCode(clean);
-}
-
-function displayLanguageInputValue(value) {
-  const code = normalizeLanguageInputValue(value);
-  return code ? languageOptionValue(code) : "";
-}
-
-function setLanguageInputValue(input, value, options = {}) {
-  if (!input) return;
-  const code = normalizeLanguageInputValue(value);
-  input.value = options.codeOnly ? code : displayLanguageInputValue(code);
-}
-
-function normalizeLanguageInputElement(input, options = {}) {
-  if (!input) return "";
-  const code = normalizeLanguageInputValue(input.value);
-  if (code && options.updateDisplay !== false) input.value = options.codeOnly ? code : displayLanguageInputValue(code);
-  return code;
-}
-
-function shouldLiveSyncLanguageInput(input) {
-  const raw = redactSensitiveText(input?.value || "").trim();
-  if (!raw) return false;
-  const code = normalizeLanguageInputValue(raw);
-  if (!code) return false;
-  if (languageCatalog().some((item) => item.code === code)) return true;
-  const lookup = stableLanguageLookupKey(raw);
-  return Boolean(LANGUAGE_ALIAS_CODES[lookup]) || lookup === stableLanguageLookupKey(code);
-}
-
 function languagePairKey(project = editorSessionStore.getProject()) {
-  return project ? `${normalizeLanguageInputValue(project.sourceLang)}::${normalizeLanguageInputValue(project.targetLang)}` : "";
+  return project
+    ? `${languageInputService.normalizeInput(project.sourceLang)}::${languageInputService.normalizeInput(project.targetLang)}`
+    : "";
 }
 
 function targetSpellcheckLanguage(project = editorSessionStore.getProject()) {
-  return normalizeLanguageInputValue(project?.targetLang || "");
+  return languageInputService.normalizeInput(project?.targetLang || "");
 }
 
 async function syncDesktopSpellcheckLanguage() {
@@ -5078,40 +4958,6 @@ function applyTargetSpellcheckLanguage(element) {
   const targetLang = targetSpellcheckLanguage();
   if (targetLang) element.lang = targetLang;
   else element.removeAttribute("lang");
-}
-
-function languagePairDisplay(sourceLang, targetLang) {
-  const source = normalizeLanguageInputValue(sourceLang);
-  const target = normalizeLanguageInputValue(targetLang);
-  if (!source && !target) return "";
-  return `${languageOptionValue(source) || source || "-"} -> ${languageOptionValue(target) || target || "-"}`;
-}
-
-function renderLanguageDatalists() {
-  if (els.languageOptions) {
-    replaceSafeHtml(
-      els.languageOptions,
-      languageCatalog()
-        .map((item) => `<option value="${escapeHtml(item.label)}"></option>`)
-        .join("")
-    );
-  }
-  if (els.languageCodeOptions) {
-    replaceSafeHtml(
-      els.languageCodeOptions,
-      languageCatalog()
-        .map((item) => `<option value="${escapeHtml(item.code)}" label="${escapeHtml(item.name)}"></option>`)
-        .join("")
-    );
-  }
-  if (els.languageNameOptions) {
-    replaceSafeHtml(
-      els.languageNameOptions,
-      languageCatalog()
-        .map((item) => `<option value="${escapeHtml(item.name)}" label="${escapeHtml(item.code)}"></option>`)
-        .join("")
-    );
-  }
 }
 
 function renderTextEncodingOptions() {
@@ -6057,7 +5903,7 @@ function renderLanguagePairFilter() {
     const [sourceLang, targetLang] = pair.split("::");
     const option = document.createElement("option");
     option.value = pair;
-    option.textContent = languagePairDisplay(sourceLang, targetLang);
+    option.textContent = languageInputService.pairDisplay(sourceLang, targetLang);
     fragment.append(option);
   });
   els.languagePairFilter.replaceChildren(fragment);
@@ -8263,8 +8109,8 @@ async function saveProjectFromDialog() {
     ...settings
   });
   els.projectForm.reset();
-  setLanguageInputValue(els.sourceLangInput, "en");
-  setLanguageInputValue(els.targetLangInput, "tr");
+  languageInputService.setInput(els.sourceLangInput, "en");
+  languageInputService.setInput(els.targetLangInput, "tr");
   els.newTmNameInput.value = "";
   els.newTermBaseNameInput.value = "";
   els.projectDialog.close();
@@ -8383,7 +8229,7 @@ async function repairWorkspaceLinks() {
 
 function wireEvents() {
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "rendering language datalists";
-  renderLanguageDatalists();
+  languageInputService.renderDatalists();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "rendering text encodings";
   renderTextEncodingOptions();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "attaching event listeners";

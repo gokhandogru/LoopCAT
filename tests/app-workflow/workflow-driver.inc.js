@@ -165,11 +165,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const languageOptionValues = Array.from(els.languageOptions.querySelectorAll("option")).map((option) => option.value);
     assert(
       Boolean(catalanTurkishQuickPair) &&
-        normalizeLanguageInputValue("English (en)") === "en" &&
-        normalizeLanguageInputValue("Turkish (tr)") === "tr" &&
-        normalizeLanguageInputValue("English (USA)") === "en-US" &&
-        normalizeLanguageInputValue("Spanish (Latin America) (es-419)") === "es-419" &&
-        normalizeLanguageInputValue("Urdu (Latin script) (ur-Latn-PK)") === "ur-Latn-PK" &&
+        languageInputService.normalizeInput("English (en)") === "en" &&
+        languageInputService.normalizeInput("Turkish (tr)") === "tr" &&
+        languageInputService.normalizeInput("English (USA)") === "en-US" &&
+        languageInputService.normalizeInput("Spanish (Latin America) (es-419)") === "es-419" &&
+        languageInputService.normalizeInput("Urdu (Latin script) (ur-Latn-PK)") === "ur-Latn-PK" &&
         languageOptionValues.length > 500 &&
         languageOptionValues.includes("Acehnese (ace-ID)") &&
         languageOptionValues.includes("Catalan (Valencia) (cav-ES)") &&
@@ -181,13 +181,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(
       projectResourceSelectionController.values().sourceLang === "ca" &&
         projectResourceSelectionController.values().targetLang === "tr" &&
-        document.querySelector("#sourceLangInput").value === languageOptionValue("ca") &&
-        document.querySelector("#targetLangInput").value === languageOptionValue("tr"),
+        document.querySelector("#sourceLangInput").value === languageInputService.optionValue("ca") &&
+        document.querySelector("#targetLangInput").value === languageInputService.optionValue("tr"),
       "frequent language pair chips update project language fields as normalized codes"
     );
     document.querySelector("#projectNameInput").value = "";
-    document.querySelector("#sourceLangInput").value = languageOptionValue("en");
-    document.querySelector("#targetLangInput").value = languageOptionValue("tr");
+    document.querySelector("#sourceLangInput").value = languageInputService.optionValue("en");
+    document.querySelector("#targetLangInput").value = languageInputService.optionValue("tr");
     const invalidDialogProjectCount = editorSessionStore.getProjects().length;
     const invalidDialogProject = await saveProjectFromDialog();
     assert(
@@ -257,18 +257,18 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await openProject(project.id);
     assert(editorSessionStore.getProject()?.id === project.id, "real app project creation");
     els.localAiSourceCodeInput.value = "en";
-    els.localAiSourceLangInput.value = languageOptionValue("es");
+    els.localAiSourceLangInput.value = languageInputService.optionValue("es");
     els.localAiSourceLangInput.dispatchEvent(new Event("change", { bubbles: true }));
     els.localAiTargetLangInput.value = "Turkish";
-    els.localAiTargetCodeInput.value = languageOptionValue("ca");
+    els.localAiTargetCodeInput.value = languageInputService.optionValue("ca");
     els.localAiTargetCodeInput.dispatchEvent(new Event("change", { bubbles: true }));
     await Promise.resolve();
     const syncedLocalAiSettings = localAiSettingsFromForm();
     assert(
       syncedLocalAiSettings.sourceCode === "es" &&
-        syncedLocalAiSettings.sourceLanguage === languageNameForUi("es") &&
+        syncedLocalAiSettings.sourceLanguage === languageInputService.nameForUi("es") &&
         syncedLocalAiSettings.targetCode === "ca" &&
-        syncedLocalAiSettings.targetLanguage === languageNameForUi("ca"),
+        syncedLocalAiSettings.targetLanguage === languageInputService.nameForUi("ca"),
       "local AI language dropdowns keep language names and codes synchronized for prompts"
     );
     const malformedResourceSummary = projectResourceSummary({
@@ -5460,8 +5460,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     clearWorkspaceDirtyMarkers();
     els.tmResourceNameInput.value = "Workflow TM";
-    els.tmResourceSourceLangInput.value = languageOptionValue("en");
-    els.tmResourceTargetLangInput.value = languageOptionValue("tr");
+    els.tmResourceSourceLangInput.value = languageInputService.optionValue("en");
+    els.tmResourceTargetLangInput.value = languageInputService.optionValue("tr");
     const linkedResourceTmx = buildTmx([{ source: "Linked resource TM source", target: "Linked resource TM target", sourceLang: "en", targetLang: "tr", projectName: "Resource dirty regression" }], { sourceLang: "en", targetLang: "tr" });
     await resourceLibraryImportController.importTmx(new File([linkedResourceTmx], "linked-resource.tmx", { type: "application/xml" }));
     assert(state.workspaceDirtyProjectIds.has(project.id), "TMX resource import marks linked project package dirty");
@@ -5472,8 +5472,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       Boolean(linkedTmEntry) &&
         linkedTmEntry.sourceLang === "en" &&
         linkedTmEntry.targetLang === "tr" &&
-        els.tmResourceSourceLangInput.value === languageOptionValue("en") &&
-        els.tmResourceTargetLangInput.value === languageOptionValue("tr"),
+        els.tmResourceSourceLangInput.value === languageInputService.optionValue("en") &&
+        els.tmResourceTargetLangInput.value === languageInputService.optionValue("tr"),
       "linked TM resource import normalizes friendly language labels before memory lookup"
     );
     clearWorkspaceDirtyMarkers();
@@ -5488,8 +5488,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     clearWorkspaceDirtyMarkers();
     els.tbResourceNameInput.value = "Workflow TB";
-    els.tbResourceSourceLangInput.value = languageOptionValue("en");
-    els.tbResourceTargetLangInput.value = languageOptionValue("tr");
+    els.tbResourceSourceLangInput.value = languageInputService.optionValue("en");
+    els.tbResourceTargetLangInput.value = languageInputService.optionValue("tr");
     const linkedResourceTbx = `<?xml version="1.0" encoding="UTF-8"?>
 <tbx>
   <text>
@@ -5524,8 +5524,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       Boolean(linkedTerm) &&
         linkedTerm.sourceLang === "en" &&
         linkedTerm.targetLang === "tr" &&
-        els.tbResourceSourceLangInput.value === languageOptionValue("en") &&
-        els.tbResourceTargetLangInput.value === languageOptionValue("tr"),
+        els.tbResourceSourceLangInput.value === languageInputService.optionValue("en") &&
+        els.tbResourceTargetLangInput.value === languageInputService.optionValue("tr"),
       "linked TB resource imports normalize friendly language labels before terminology lookup"
     );
     assert(linkedTerm?.notes === "Linked TBX context note", "TBX resource import preserves termbase notes");

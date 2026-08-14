@@ -219,6 +219,7 @@ const requiredReleaseFiles = [
   "src/features/resources/tm-pretranslation-dialog-controller.js",
   "src/features/import-export/import-export-controller.js",
   "src/features/workspace/recovery-workspace-controller.js",
+  "src/i18n/language-input-service.js",
   "src/i18n/ui-localization-service.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
@@ -272,6 +273,7 @@ const requiredReleaseFiles = [
   "tests/unit/review-state-controller.test.cjs",
   "tests/unit/import-export-controller.test.cjs",
   "tests/unit/recovery-workspace-controller.test.cjs",
+  "tests/unit/language-input-service.test.cjs",
   "tests/unit/ui-localization-service.test.cjs",
   "tests/unit/resource-trash.test.cjs",
   "tests/unit/resources-controller.test.cjs",
@@ -335,6 +337,8 @@ const appBootstrapJs = readText("src/app/bootstrap.js");
 const appStoreJs = readText("src/app/app-store.js");
 const appStoreUnitTests = readText("tests/unit/app-store.test.cjs");
 const navigationControllerJs = readText("src/app/navigation-controller.js");
+const languageInputServiceJs = readText("src/i18n/language-input-service.js");
+const languageInputServiceUnitTests = readText("tests/unit/language-input-service.test.cjs");
 const uiLocalizationServiceJs = readText("src/i18n/ui-localization-service.js");
 const uiLocalizationServiceUnitTests = readText("tests/unit/ui-localization-service.test.cjs");
 const reportDataServiceJs = readText("src/reports/report-data-service.js");
@@ -576,6 +580,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createLanguageInputService } from "../i18n/language-input-service.js";',
+  "The application runtime must install the checked language-input service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createLanguageInputService,",
+  "The application runtime must expose the checked language-input factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createReportPresentationService } from "../reports/report-presentation-service.js";',
   "The application runtime must install the checked report-presentation service."
 );
@@ -757,6 +771,117 @@ for (const method of [
     `application consumers must call UiLocalizationService.${method} directly.`
   );
 }
+for (const snippet of [
+  'const clean = redact(value || "")',
+  '.replaceAll("_", "-")',
+  "intl.getCanonicalLocales(clean)[0] || clean",
+  "if (index === 0) return part.toLowerCase()",
+  "if (part.length === 2 || /^\\d{3}$/.test(part)) return part.toUpperCase()",
+  'new intl.DisplayNames([getLocale() || getNavigatorLanguage() || "en"], { type: "language" })',
+  '.normalize("NFKD")',
+  ".replace(/[^a-z0-9]+/g, \"\")",
+  "if (catalogCache) return catalogCache",
+  "if (entryNameCache) return entryNameCache",
+  "const parentheticalCode = clean.match",
+  "const leadingCode = clean.match",
+  "const alias = aliases[lookup]",
+  "inputOptions.codeOnly ? code : displayInput(code)",
+  "if (catalog().some((item) => item.code === code)) return true",
+  'return `${optionValue(source) || source || "-"} -> ${optionValue(target) || target || "-"}`',
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    languageInputServiceJs,
+    snippet,
+    `LanguageInputService must retain characterized language-input policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createLanguageInputService({",
+  "app.js must compose the checked language-input service."
+);
+for (const boundary of [
+  "entries: LANGUAGE_ENTRIES",
+  "aliases: LANGUAGE_ALIAS_CODES",
+  "redact: redactSensitiveText",
+  "localization: uiLocalizationService",
+  'getLocale: () => uiI18n?.getLocale?.() || ""',
+  'getNavigatorLanguage: () => navigator.language || "en"',
+  "intl: Intl",
+  "labels: els.languageOptions",
+  "codes: els.languageCodeOptions",
+  "names: els.languageNameOptions",
+  "escapeHtml",
+  "replaceSafeHtml"
+]) {
+  assertIncludes(appJs, boundary, `language-input composition must inject the ${boundary} boundary.`);
+}
+for (const method of [
+  "normalizeInput",
+  "nameForUi",
+  "optionValue",
+  "setInput",
+  "normalizeElement",
+  "shouldLiveSync",
+  "pairDisplay",
+  "renderDatalists"
+]) {
+  assertIncludes(
+    `${appJs}\n${appWorkflowDriverJs}`,
+    `languageInputService.${method}`,
+    `language-input consumers must call LanguageInputService.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "canonicalLanguageCode",
+  "languageEntryNames",
+  "configuredLanguageName",
+  "languageNameForUi",
+  "languageOptionValue",
+  "stableLanguageLookupKey",
+  "languageCatalog",
+  "normalizeLanguageInputValue",
+  "displayLanguageInputValue",
+  "setLanguageInputValue",
+  "normalizeLanguageInputElement",
+  "shouldLiveSyncLanguageInput",
+  "languagePairDisplay",
+  "renderLanguageDatalists"
+]) {
+  const directHelper = new RegExp(`(?:function\\s+${removedHelper}\\b|(?<![.:])\\b${removedHelper}\\s*\\()`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} language-input helper must not return outside the checked service.`
+  );
+}
+for (const removedCache of ["languageCatalogCache", "languageEntryNameCache"]) {
+  assert(
+    !new RegExp(`\\b${removedCache}\\b`).test(appJs) && !new RegExp(`\\b${removedCache}\\b`).test(appWorkflowDriverJs),
+    `${removedCache} language-input cache must not return outside the checked service.`
+  );
+}
+for (const testName of [
+  "LanguageInputService preserves Intl canonicalization, underscore conversion, and manual casing fallback",
+  "LanguageInputService preserves configured-name localization, Intl fallback, catalog deduplication, ordering, and caching",
+  "LanguageInputService preserves parenthetical, leading-code, alias, name, label, accent, and unknown input normalization",
+  "LanguageInputService preserves friendly display and input mutation flags",
+  "LanguageInputService preserves live-sync eligibility for catalog, aliases, canonical raw codes, and incomplete input",
+  "LanguageInputService preserves localized pair display, missing-side placeholders, and empty result",
+  "LanguageInputService preserves all escaped datalist shapes and absent-list behavior",
+  "LanguageInputService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    languageInputServiceUnitTests,
+    testName,
+    `focused language-input tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/i18n/language-input-service.js"',
+  "source-catalog extraction must scan the checked language-input service."
+);
 for (const removedFacade of ["reportLocale", "reportDir", "reportText", "reportHtml"]) {
   assert(
     !new RegExp(`\\b${removedFacade}\\b`).test(appJs) &&
@@ -1388,8 +1513,8 @@ for (const boundary of [
   "newTermBaseNameInput: els.newTermBaseNameInput",
   "getProject: () => editorSessionStore.getProject()",
   "getMode: () => projectDialogController?.getMode?.() || null",
-  "normalizeLanguageValue: normalizeLanguageInputValue",
-  "normalizeLanguageInput: normalizeLanguageInputElement",
+  "normalizeLanguageValue: languageInputService.normalizeInput",
+  "normalizeLanguageInput: languageInputService.normalizeElement",
   "tmNames: projectTmNames",
   "termBaseNames: projectTermBaseNames",
   "mainTmName",
@@ -1473,9 +1598,9 @@ for (const boundary of [
   "root: els.frequentLanguagePairs",
   "getProjects: () => editorSessionStore.getProjects()",
   "getCurrentValues: projectResourceSelectionController.values",
-  "normalizeLanguage: normalizeLanguageInputValue",
+  "normalizeLanguage: languageInputService.normalizeInput",
   "defaultPairs: DEFAULT_LANGUAGE_PAIRS",
-  "languagePairDisplay",
+  "languagePairDisplay: languageInputService.pairDisplay",
   "escapeHtml",
   "replaceSafeHtml"
 ]) {
@@ -1703,7 +1828,7 @@ for (const boundary of [
   "tmTargetLanguageInput: els.tmResourceTargetLangInput",
   "tbSourceLanguageInput: els.tbResourceSourceLangInput",
   "tbTargetLanguageInput: els.tbResourceTargetLangInput",
-  "normalizeLanguageInput: normalizeLanguageInputElement",
+  "normalizeLanguageInput: languageInputService.normalizeElement",
   "assertSize: (file, label) => assertFileSize(file, label, MAX_RESOURCE_IMPORT_BYTES)",
   "readText: readImportTextFile",
   "reportProgress: reportImportProgress",
@@ -11417,9 +11542,9 @@ assertIncludes(appJs, "Catalan (Valencia) (cav-ES)", "app.js language catalog mu
 assertIncludes(appJs, "Spanish (Latin America) (es-419)", "app.js language catalog must include locale es-419.");
 assertIncludes(appJs, "Urdu (Latin script) (ur-Latn-PK)", "app.js language catalog must include locale ur-Latn-PK.");
 assertIncludes(
-  appJs,
-  "function normalizeLanguageInputValue",
-  "app.js must normalize friendly language labels back to stored resource/project codes."
+  languageInputServiceJs,
+  "function normalizeInput(value)",
+  "LanguageInputService must normalize friendly language labels back to stored resource/project codes."
 );
 assertIncludes(
   projectLanguagePairShortcutsControllerJs,
