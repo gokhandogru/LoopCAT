@@ -4241,14 +4241,9 @@ assertIncludes(
   "structural segment writes and created-segment deletion must share one IndexedDB transaction."
 );
 assertIncludes(
-  appJs,
-  "restoreSplitSegmentCommandSegments",
-  "SplitSegment Undo/Redo must share the atomic structural restoration boundary."
-);
-assertIncludes(
-  appJs,
-  "return structuralSegmentController.restoreSplit(nextSnapshots, options)",
-  "app.js must delegate SplitSegment restoration to StructuralSegmentController."
+  structuralSegmentControllerJs,
+  "restoreSegments: restoreSplit",
+  "SplitSegment Undo/Redo must use the controller-owned atomic restoration boundary."
 );
 assertIncludes(
   appJs,
@@ -4266,14 +4261,9 @@ assertIncludes(
   "Segment commands must expose an independently reversible MergeSegment boundary."
 );
 assertIncludes(
-  appJs,
-  "restoreMergeSegmentCommandSegments",
-  "MergeSegment Undo/Redo must share the atomic structural restoration boundary."
-);
-assertIncludes(
-  appJs,
-  "return structuralSegmentController.restoreMerge(nextSnapshots, options)",
-  "app.js must delegate MergeSegment restoration to StructuralSegmentController."
+  structuralSegmentControllerJs,
+  "restoreSegments: restoreMerge",
+  "MergeSegment Undo/Redo must use the controller-owned atomic restoration boundary."
 );
 assertIncludes(
   appJs,
@@ -4290,27 +4280,51 @@ assertIncludes(
   "structuralSegmentController.mount()",
   "app.js must delegate structural segment button lifecycle to StructuralSegmentController."
 );
-for (const delegation of [
-  "return structuralSegmentController.split()",
-  "return structuralSegmentController.merge()",
-  "return structuralSegmentController.mappedSourceSplitIndex(source, target, targetCursor)",
-  "return structuralSegmentController.canSplit(segment)",
-  "return structuralSegmentController.canMerge(segment, next)",
-  "return structuralSegmentController.nextForMerge(segment)"
+for (const directCommandConsumer of [
+  "run: structuralSegmentController.split",
+  "structuralSegmentController.canSplit(currentSegment())",
+  "run: structuralSegmentController.merge",
+  "structuralSegmentController.canMerge(",
+  "structuralSegmentController.nextForMerge(currentSegment())"
 ]) {
-  assertIncludes(appJs, delegation, `app.js must retain only the checked ${delegation} compatibility facade.`);
+  assertIncludes(
+    appJs,
+    directCommandConsumer,
+    `the command palette must call StructuralSegmentController directly: ${directCommandConsumer}.`
+  );
+}
+for (const directWorkflowConsumer of [
+  "structuralSegmentController.mappedSourceSplitIndex(",
+  "structuralSegmentController.splitProtectedRanges(",
+  "structuralSegmentController.split()",
+  "structuralSegmentController.merge()"
+]) {
+  assertIncludes(
+    appWorkflowDriverJs,
+    directWorkflowConsumer,
+    `workflow characterization must call StructuralSegmentController directly: ${directWorkflowConsumer}.`
+  );
+}
+for (const removedFacade of [
+  "function splitProtectedRanges(",
+  "function mappedSourceSplitIndex(",
+  "function canSplitSegmentStructure(",
+  "function canMergeSegmentStructures(",
+  "function nextSegmentForMerge(",
+  "async function splitCurrentSegment(",
+  "async function mergeWithNextSegment(",
+  "async function restoreSplitSegmentCommandSegments(",
+  "async function restoreMergeSegmentCommandSegments("
+]) {
+  assert(!appJs.includes(removedFacade), `${removedFacade} must not return after direct structural wiring.`);
 }
 assert(
   !appJs.includes("function normalizeStructuralSegmentOrder") &&
     !appJs.includes("function safeSplitIndex") &&
     !appJs.includes('els.splitSegmentBtn.addEventListener("click"') &&
     !appJs.includes('els.mergeNextBtn.addEventListener("click"') &&
-    !functionBody(appJs, "async function splitCurrentSegment", "async function mergeWithNextSegment").includes(
-      "createSplitSegmentCommand"
-    ) &&
-    !functionBody(appJs, "async function mergeWithNextSegment", "async function importDocx").includes(
-      "createMergeSegmentCommand"
-    ),
+    !appJs.includes("createSplitSegmentCommand({") &&
+    !appJs.includes("createMergeSegmentCommand({"),
   "app.js must not regain structural mapping, command, restoration, or button lifecycle ownership."
 );
 for (const testName of [

@@ -149,8 +149,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "checked import/export controller restores import controls after an import task finishes"
     );
     const splitFixture = "First <b>bold part</b> continues. Second sentence.";
-    const splitFixtureIndex = mappedSourceSplitIndex(splitFixture, "Hedef metin burada daha uzun olabilir.", 16);
-    assert(splitFixtureIndex > 0 && splitFixtureIndex < splitFixture.length && !splitProtectedRanges(splitFixture).some((range) => splitFixtureIndex > range.start && splitFixtureIndex < range.end), "segment split maps target cursor to safe source boundary");
+    const splitFixtureIndex = structuralSegmentController.mappedSourceSplitIndex(splitFixture, "Hedef metin burada daha uzun olabilir.", 16);
+    assert(splitFixtureIndex > 0 && splitFixtureIndex < splitFixture.length && !structuralSegmentController.splitProtectedRanges(splitFixture).some((range) => splitFixtureIndex > range.start && splitFixtureIndex < range.end), "segment split maps target cursor to safe source boundary");
     els.newProjectBtn.focus();
     await openProjectDialog("create");
     assert(
@@ -5869,7 +5869,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     let splitTextarea = els.segmentBody.querySelector(`tr[data-index="${splitIndex}"] textarea`);
     splitTextarea?.setSelectionRange(24, 24);
     setHiddenSegmentField(currentSegments()[splitIndex], SPLIT_SAVE_FAILURE_TEST_FLAG, true);
-    await splitCurrentSegment();
+    await structuralSegmentController.split();
     let splitFailureStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
     assert(
       els.saveStatus.textContent.includes("Simulated split save failure") &&
@@ -5882,7 +5882,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await setActiveSegment(splitIndex);
     splitTextarea = els.segmentBody.querySelector(`tr[data-index="${splitIndex}"] textarea`);
     splitTextarea?.setSelectionRange(24, 24);
-    const splitCommandResult = await splitCurrentSegment();
+    const splitCommandResult = await structuralSegmentController.split();
     const splitAppliedVisible = currentSegments().filter((segment) => segment.documentId === structuralDocument.id);
     const splitCreatedSegment = splitAppliedVisible.find((segment) => !structuralSegmentIdsBeforeSplit.has(segment.id));
     const splitSuccessStored = (await getProjectSegments(project.id)).filter(
@@ -5958,7 +5958,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const mergeFailureTargets = mergeCandidates.map((item) => item.segment.target);
     await setActiveSegment(mergeCandidates[0].index);
     setHiddenSegmentField(currentSegments()[mergeCandidates[0].index], MERGE_POST_DELETE_FAILURE_TEST_FLAG, true);
-    const failedMergeCommand = await mergeWithNextSegment();
+    const failedMergeCommand = await structuralSegmentController.merge();
     const mergeFailureVisible = currentSegments().filter((segment) => segment.documentId === structuralDocument.id);
     const mergeFailureStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
     assert(
@@ -5991,7 +5991,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const expectedMergedSource = `${mergeFirstBefore.source} ${mergeSecondBefore.source}`.trim();
     const expectedMergedTarget = `${mergeFirstBefore.target || ""} ${mergeSecondBefore.target || ""}`.trim();
     await setActiveSegment(mergeCandidates[0].index);
-    const mergeCommandResult = await mergeWithNextSegment();
+    const mergeCommandResult = await structuralSegmentController.merge();
     const mergeAppliedVisible = currentSegments().filter((segment) => segment.documentId === structuralDocument.id);
     const mergeSuccessStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
     const mergeAppliedSurvivor = mergeAppliedVisible.find((segment) => segment.id === mergeFirstBefore.id);
@@ -6134,7 +6134,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     taggedTextarea?.setSelectionRange(4, 4);
     const beforeBlockedSplitCount = currentSegments().length;
-    await splitCurrentSegment();
+    await structuralSegmentController.split();
     assert(currentSegments().length === beforeBlockedSplitCount && els.saveStatus.textContent.includes("Split is unavailable"), "split is blocked for structure-preserving localization segments");
     currentSegments()[taggedIndex].target = "Etiketi eksik hedef.";
     currentSegments()[taggedIndex].status = "draft";
@@ -6215,7 +6215,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(structuredMergeIndexes.length === 2, "structured merge fixture has two segments");
     await setActiveSegment(structuredMergeIndexes[0]);
     const beforeBlockedMergeCount = currentSegments().length;
-    await mergeWithNextSegment();
+    await structuralSegmentController.merge();
     const afterBlockedMergeSegments = currentSegments().filter((segment) => segment.documentId === structuredMergeDocument.id);
     assert(
       currentSegments().length === beforeBlockedMergeCount &&

@@ -5006,26 +5006,6 @@ function tagDisplayText(tag) {
   return tag?.label || tag?.text || "";
 }
 
-function splitProtectedRanges(text) {
-  return structuralSegmentController.splitProtectedRanges(text);
-}
-
-function mappedSourceSplitIndex(source, target, targetCursor) {
-  return structuralSegmentController.mappedSourceSplitIndex(source, target, targetCursor);
-}
-
-function canSplitSegmentStructure(segment) {
-  return structuralSegmentController.canSplit(segment);
-}
-
-function canMergeSegmentStructures(segment, next) {
-  return structuralSegmentController.canMerge(segment, next);
-}
-
-function nextSegmentForMerge(segment = currentSegment()) {
-  return structuralSegmentController.nextForMerge(segment);
-}
-
 function missingTags(segment) {
   const target = segment.target || "";
   const seen = new Map();
@@ -5185,8 +5165,8 @@ function commandList() {
     { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(currentSegments().length) },
     { id: "focus-mode", label: currentFocusMode() ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(currentApplicationView() === "editor" && currentProject()) },
     { id: "copy-source", label: "Copy source", run: targetProducerController.copySourceToTarget, enabled: Boolean(currentSegment()) },
-    { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: splitCurrentSegment, enabled: Boolean(currentSegment() && canSplitSegmentStructure(currentSegment())) },
-    { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: mergeWithNextSegment, enabled: Boolean(currentSegment() && canMergeSegmentStructures(currentSegment(), nextSegmentForMerge(currentSegment()))) },
+    { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: structuralSegmentController.split, enabled: Boolean(currentSegment() && structuralSegmentController.canSplit(currentSegment())) },
+    { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: structuralSegmentController.merge, enabled: Boolean(currentSegment() && structuralSegmentController.canMerge(currentSegment(), structuralSegmentController.nextForMerge(currentSegment()))) },
     { id: "save-tm", label: "Save segment to TM", run: saveActiveSegmentToTm, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(currentProject()) },
     { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(currentProject()) },
@@ -7220,14 +7200,6 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
   }
 }
 
-async function restoreSplitSegmentCommandSegments(nextSnapshots, options = {}) {
-  return structuralSegmentController.restoreSplit(nextSnapshots, options);
-}
-
-async function restoreMergeSegmentCommandSegments(nextSnapshots, options = {}) {
-  return structuralSegmentController.restoreMerge(nextSnapshots, options);
-}
-
 async function replaceTargetText(scope = "visible") {
   return targetReplacementController.replace(scope);
 }
@@ -7954,14 +7926,6 @@ function aiReviewRiskLabel(level) {
     high: uiLabel("highRisk"),
     critical: uiLabel("criticalRisk")
   }[level] || uiLabel("unrankedRisk");
-}
-
-async function splitCurrentSegment() {
-  return structuralSegmentController.split();
-}
-
-async function mergeWithNextSegment() {
-  return structuralSegmentController.merge();
 }
 
 async function importDocx(file) {
