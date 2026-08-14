@@ -534,6 +534,7 @@ for (const snippet of [
   "const translate = (key, values = {})",
   "const source = (text, values = {})",
   'documentElement?.lang || "en-US"',
+  'i18n?.localeDir?.(locale()) || "ltr"',
   "translate(`ui.label.${key}`, values)",
   "escapeHtml(label(key, values))",
   "escapeHtml(source(text, values))",
@@ -564,13 +565,45 @@ for (const removedFacade of [
     `${removedFacade} UI-localization consumer facade must not return.`
   );
 }
-for (const method of ["translate", "source", "locale", "label", "labelHtml", "sourceHtml", "confirm", "alert"]) {
+for (const method of [
+  "translate",
+  "source",
+  "locale",
+  "direction",
+  "label",
+  "labelHtml",
+  "sourceHtml",
+  "confirm",
+  "alert"
+]) {
   assertIncludes(
     appJs,
     `uiLocalizationService.${method}`,
     `application consumers must call UiLocalizationService.${method} directly.`
   );
 }
+for (const removedFacade of ["reportLocale", "reportDir", "reportText", "reportHtml"]) {
+  assert(
+    !new RegExp(`\\b${removedFacade}\\b`).test(appJs) &&
+      !new RegExp(`\\b${removedFacade}\\b`).test(appWorkflowDriverJs),
+    `${removedFacade} report-localization consumer facade must not return.`
+  );
+}
+assertIncludes(
+  appJs,
+  '<html lang="${escapeHtml(uiLocalizationService.locale())}" dir="${escapeHtml(uiLocalizationService.direction())}">',
+  "generated reports must use the checked locale and direction methods directly."
+);
+assertIncludes(
+  appJs,
+  'uiLocalizationService.sourceHtml("LoopCAT Quality Passport")',
+  "generated reports must use checked HTML-safe source localization directly."
+);
+assertIncludes(
+  uiLocalizationServiceUnitTests,
+  "throwingDirection.direction()",
+  "focused localization tests must characterize locale-direction delegate failures."
+);
 assertIncludes(
   appJs,
   "source: uiLocalizationService.source",

@@ -23,6 +23,11 @@ test("UiLocalizationService preserves delegation, labels, locale, and one-time e
     getLocale() {
       assert.equal(this, i18n);
       return "ca-ES";
+    },
+    localeDir(locale) {
+      assert.equal(this, i18n);
+      calls.push(["localeDir", locale]);
+      return "rtl";
     }
   };
   const escaped = [];
@@ -43,6 +48,7 @@ test("UiLocalizationService preserves delegation, labels, locale, and one-time e
   assert.equal(service.translate("app.saved"), "t:app.saved:");
   assert.equal(service.source("Saved", { count: 2 }), "s:Saved:2");
   assert.equal(service.locale(), "ca-ES");
+  assert.equal(service.direction(), "rtl");
   assert.equal(service.label("files", { count: 3 }), "t:ui.label.files:3");
   assert.equal(service.labelHtml("files", { count: 4 }), "escaped:t:ui.label.files:4");
   assert.equal(service.sourceHtml("Open", { count: 5 }), "escaped:s:Open:5");
@@ -67,6 +73,7 @@ test("UiLocalizationService preserves missing-i18n and locale fallbacks", async 
   assert.equal(service.source("Original"), "Original");
   assert.equal(service.source(0), "");
   assert.equal(service.locale(), "tr-TR");
+  assert.equal(service.direction(), "ltr");
   assert.equal(service.label("empty"), "ui.label.empty");
   assert.equal(service.labelHtml("empty"), "[ui.label.empty]");
   assert.equal(service.sourceHtml("<Open>"), "[<Open>]");
@@ -79,6 +86,7 @@ test("UiLocalizationService preserves missing-i18n and locale fallbacks", async 
     alert: () => {}
   });
   assert.equal(defaultLocale.locale(), "en-US");
+  assert.equal(defaultLocale.direction(), "ltr");
 });
 
 test("UiLocalizationService preserves translated confirm, alert, and delegate failures", async () => {
@@ -123,6 +131,23 @@ test("UiLocalizationService preserves translated confirm, alert, and delegate fa
   assert.throws(
     () => throwing.alert("Stopped"),
     (error) => error === failure
+  );
+  const directionFailure = new Error("direction failed");
+  const throwingDirection = createUiLocalizationService({
+    i18n: {
+      getLocale: () => "ar-SA",
+      localeDir() {
+        throw directionFailure;
+      }
+    },
+    documentElement: { lang: "en-US" },
+    escapeHtml: String,
+    confirm: () => true,
+    alert: () => {}
+  });
+  assert.throws(
+    () => throwingDirection.direction(),
+    (error) => error === directionFailure
   );
   assert.throws(() => createUiLocalizationService(), /HTML escaping boundary/);
 });

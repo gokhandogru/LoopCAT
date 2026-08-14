@@ -3,7 +3,8 @@
  *   i18n?: {
  *     t?: (key: unknown, values?: Record<string, unknown>) => string,
  *     source?: (text: unknown, values?: Record<string, unknown>) => string,
- *     getLocale?: () => string
+ *     getLocale?: () => string,
+ *     localeDir?: (locale: string) => string
  *   } | null,
  *   documentElement?: { lang?: string } | null,
  *   escapeHtml?: (value: unknown) => string,
@@ -19,6 +20,7 @@ export function createUiLocalizationService({ i18n, documentElement, escapeHtml,
   const translate = (key, values = {}) => (i18n?.t ? i18n.t(key, values) : key);
   const source = (text, values = {}) => (i18n?.source ? i18n.source(text, values) : String(text || ""));
   const locale = () => i18n?.getLocale?.() || documentElement?.lang || "en-US";
+  const direction = () => i18n?.localeDir?.(locale()) || "ltr";
   const label = (key, values = {}) => translate(`ui.label.${key}`, values);
   const labelHtml = (key, values = {}) => escapeHtml(label(key, values));
   const sourceHtml = (text, values = {}) => escapeHtml(source(text, values));
@@ -29,6 +31,7 @@ export function createUiLocalizationService({ i18n, documentElement, escapeHtml,
     translate,
     source,
     locale,
+    direction,
     label,
     labelHtml,
     sourceHtml,
