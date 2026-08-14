@@ -54,8 +54,17 @@ function createHarness(createController, overrides = {}) {
     },
     selection: { getActiveSegment: () => active },
     scope: {
-      getVisibleSegments: () => overrides.visibleSegments || segments.slice(0, 2),
-      getDocumentSegments: () => overrides.documentSegments || segments.slice(0, 3)
+      getSegments(value = {}) {
+        const mode = value.mode || "untranslated";
+        if (mode === "selected") return active ? [active] : [];
+        if (mode === "visible") return overrides.visibleSegments || segments.slice(0, 2);
+        if (mode === "project") return segments;
+        const documentSegments = overrides.documentSegments || segments.slice(0, 3);
+        if (mode === "untranslated") {
+          return documentSegments.filter((segment) => !String(segment.target || "").trim());
+        }
+        return documentSegments;
+      }
     },
     termbase: {
       getSelectedName() {

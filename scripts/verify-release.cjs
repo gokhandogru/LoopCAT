@@ -188,6 +188,7 @@ const requiredReleaseFiles = [
   "src/features/ai/ai-prompt-preview-controller.js",
   "src/features/ai/ai-term-candidate-persistence-service.js",
   "src/features/ai/ai-segment-context-service.js",
+  "src/features/ai/ai-scope-selection-service.js",
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
   "src/features/ai/ai-project-brief-controller.js",
@@ -216,6 +217,7 @@ const requiredReleaseFiles = [
   "tests/unit/ai-prompt-preview-controller.test.cjs",
   "tests/unit/ai-term-candidate-persistence-service.test.cjs",
   "tests/unit/ai-segment-context-service.test.cjs",
+  "tests/unit/ai-scope-selection-service.test.cjs",
   "tests/unit/ai-alternatives-controller.test.cjs",
   "tests/unit/ai-draft-editing-controller.test.cjs",
   "tests/unit/ai-project-brief-controller.test.cjs",
@@ -366,6 +368,8 @@ const aiTermCandidatePersistenceServiceUnitTests = readText(
 );
 const aiSegmentContextServiceJs = readText("src/features/ai/ai-segment-context-service.js");
 const aiSegmentContextServiceUnitTests = readText("tests/unit/ai-segment-context-service.test.cjs");
+const aiScopeSelectionServiceJs = readText("src/features/ai/ai-scope-selection-service.js");
+const aiScopeSelectionServiceUnitTests = readText("tests/unit/ai-scope-selection-service.test.cjs");
 const aiPretranslationControllerJs = readText("src/features/ai/ai-pretranslation-controller.js");
 const aiPretranslationControllerUnitTests = readText("tests/unit/ai-pretranslation-controller.test.cjs");
 const aiReviewControllerJs = readText("src/features/ai/ai-review-controller.js");
@@ -2655,6 +2659,82 @@ for (const testName of [
   );
 }
 assertIncludes(
+  appBootstrapJs,
+  "createAiScopeSelectionService",
+  "The application runtime must expose the checked shared AI-scope-selection service boundary."
+);
+for (const boundary of [
+  "function terminologySegments(settings = settingsBoundary.read())",
+  "if (!project.get()) return []",
+  'if (settings.mode === "selected") return segments.getActive() ? [segments.getActive()] : []',
+  'if (settings.mode === "visible")',
+  ".map((index) => segments.getAll()[index])",
+  'if (settings.mode === "project") return segments.getAll()',
+  'if (settings.mode === "untranslated")',
+  'return segments.getDocument().filter((segment) => !String(segment.target || "").trim())',
+  "function projectBriefSampleSegments(limit = 6)",
+  "const source = scoped.length ? scoped : segments.getAll()",
+  'if (!String(segment.source || "").trim()) continue',
+  "if (picked.length >= limit) break",
+  "function pretranslationSegments(settings)",
+  'settings.mode === "project" || settings.mode === "visible" || settings.mode === "selected"',
+  "function pretranslationOptions(settings)",
+  "selectedSegmentIds: segments.getActive()?.id ? [segments.getActive().id] : []",
+  ".map((index) => segments.getAll()[index]?.id)",
+  "return projectBriefSampleSegments(1).length > 0"
+]) {
+  assertIncludes(
+    aiScopeSelectionServiceJs,
+    boundary,
+    `AiScopeSelectionService must retain checked ${boundary} scope and sample policy.`
+  );
+}
+for (const consumer of [
+  "getSegments: aiScopeSelectionService.pretranslationSegments",
+  "getOptions: aiScopeSelectionService.pretranslationOptions",
+  "getSegments: aiScopeSelectionService.terminologySegments",
+  "getSampleSegments: aiScopeSelectionService.projectBriefSampleSegments",
+  "hasProjectBriefSamples: aiScopeSelectionService.hasProjectBriefSamples"
+]) {
+  assertIncludes(appJs, consumer, `AI scope/sample consumer must use the checked service: ${consumer}.`);
+}
+for (const removedFacade of [
+  "function localAiTerminologySegments",
+  "function projectBriefSampleSegments",
+  "function localAiPretranslationSegments",
+  "function localAiPretranslationOptions"
+]) {
+  assert(
+    !appJs.includes(removedFacade),
+    `app.js must not regain coordinator-private AI scope/sample policy: ${removedFacade}.`
+  );
+}
+assertIncludes(
+  aiTerminologyExtractionControllerJs,
+  "scope.getSegments(settings).filter",
+  "AI terminology extraction must consume the checked shared scope selection."
+);
+assert(
+  !aiTerminologyExtractionControllerJs.includes('if (mode === "selected")') &&
+    !aiTerminologyExtractionControllerJs.includes('if (mode === "visible")') &&
+    !aiTerminologyExtractionControllerJs.includes('if (mode === "project")'),
+  "AI terminology extraction must not duplicate shared scope-selection policy."
+);
+for (const testName of [
+  "AI scope selection preserves missing-project and form-settings terminology behavior",
+  "AI terminology scope preserves selected, sparse visible, project, untranslated, and document modes",
+  "AI pretranslation scope preserves project-backed and document-backed source choices",
+  "AI pretranslation options preserve active and ordered sparse visible stable IDs",
+  "AI project-brief samples prefer the active document, skip blank sources, and preserve target fallback",
+  "AI project-brief samples fall back to the project and retain the default six-sample bound"
+]) {
+  assertIncludes(
+    aiScopeSelectionServiceUnitTests,
+    testName,
+    `focused AI-scope-selection tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
   segmentCommandsJs,
   "createTmPretranslationCommand",
   "Segment commands must expose an atomic TM pretranslation boundary."
@@ -3151,7 +3231,7 @@ for (const facade of [
   ],
   [
     "async function polishBatchDraftsWithLocalAi",
-    "function localAiTerminologySegments",
+    "async function extractActiveSegmentTermsWithLocalAi",
     "return aiDraftEditingController.polishBatch()"
   ]
 ]) {
@@ -3261,7 +3341,7 @@ for (const boundary of [
   "const { savedTerms } = await termbase.saveCandidates(result.terms || [], termBaseName)",
   "await activity.logActive({",
   "await refreshTermsAfterExtraction(false)",
-  "const segments = scopedSegments(settings).filter(",
+  "const segments = scope.getSegments(settings).filter(",
   "abortController = createAbortController()",
   "for (const segment of segments)",
   "allCandidates.push(...(result.terms || []))",
@@ -3300,7 +3380,7 @@ const activeAiTerminologyExtractionFacade = functionBody(
 const batchAiTerminologyExtractionFacade = functionBody(
   appJs,
   "async function extractBatchTermsWithLocalAi",
-  "function projectBriefSampleSegments"
+  "async function generateProjectBriefWithLocalAi"
 );
 for (const facade of [activeAiTerminologyExtractionFacade, batchAiTerminologyExtractionFacade]) {
   assert(
@@ -3372,7 +3452,7 @@ assertIncludes(
 const aiProjectBriefFacade = functionBody(
   appJs,
   "async function generateProjectBriefWithLocalAi",
-  "function localAiPretranslationSegments"
+  "async function localAiGlossaryTermsForSegment"
 );
 assert(
   !aiProjectBriefFacade.includes("persistLocalAiSettings(") &&

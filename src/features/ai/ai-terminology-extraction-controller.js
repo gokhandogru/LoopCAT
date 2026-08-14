@@ -6,9 +6,9 @@
  * repositories stay injected.
  *
  * @param {{
- *   editorSessionStore: { getProject: () => any, getSegments: () => any[] },
+ *   editorSessionStore: { getProject: () => any },
  *   selection: { getActiveSegment: () => any },
- *   scope: { getVisibleSegments: () => any[], getDocumentSegments: () => any[] },
+ *   scope: { getSegments: (settings: any) => any[] },
  *   termbase: { getSelectedName: () => string, saveCandidates: (terms: any[], termBaseName: string) => Promise<{ savedTerms: any[], duplicateCount: number }> },
  *   settings: { persist: () => Promise<any>, runtimeConfig: (settings: any) => any, assertReady: (settings: any, config: any, action: string) => void },
  *   providers: { get: (settings: any) => any, sharesExternally: (settings: any) => boolean },
@@ -39,10 +39,8 @@ export function createAiTerminologyExtractionController(options) {
 
   if (
     typeof editorSessionStore?.getProject !== "function" ||
-    typeof editorSessionStore?.getSegments !== "function" ||
     typeof selection?.getActiveSegment !== "function" ||
-    typeof scope?.getVisibleSegments !== "function" ||
-    typeof scope?.getDocumentSegments !== "function"
+    typeof scope?.getSegments !== "function"
   ) {
     throw new TypeError(
       "AiTerminologyExtractionController requires EditorSessionStore, selection, and scope boundaries."
@@ -234,17 +232,6 @@ export function createAiTerminologyExtractionController(options) {
     }
   }
 
-  function scopedSegments(settings = {}) {
-    const mode = settings.mode || "untranslated";
-    if (mode === "selected") return selection.getActiveSegment() ? [selection.getActiveSegment()] : [];
-    if (mode === "visible") return scope.getVisibleSegments();
-    if (mode === "project") return editorSessionStore.getSegments();
-    if (mode === "untranslated") {
-      return scope.getDocumentSegments().filter((segment) => !String(segment.target || "").trim());
-    }
-    return scope.getDocumentSegments();
-  }
-
   async function extractBatch() {
     const project = editorSessionStore.getProject();
     if (!project || running || promptBusy || lifecycle.isRunning() || lifecycle.isPromptBusy()) return false;
@@ -262,7 +249,7 @@ export function createAiTerminologyExtractionController(options) {
       status.set("Batch AI term extraction is not available for this provider.", "dirty");
       return false;
     }
-    const segments = scopedSegments(settings).filter((segment) => String(segment?.source || "").trim());
+    const segments = scope.getSegments(settings).filter((segment) => String(segment?.source || "").trim());
     if (!segments.length) {
       status.set("No source segments are available for batch AI term extraction.", "dirty");
       return false;

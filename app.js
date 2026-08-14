@@ -1607,6 +1607,16 @@ const aiSegmentContextService = appRuntime.featureFactories.createAiSegmentConte
   segments: { getAll: currentSegments },
   logger: console
 });
+const aiScopeSelectionService = appRuntime.featureFactories.createAiScopeSelectionService({
+  project: { get: currentProject },
+  settings: { read: localAiSettingsFromForm },
+  segments: {
+    getAll: currentSegments,
+    getDocument: currentDocumentSegments,
+    getActive: currentSegment
+  },
+  filters: { getVisibleIndexes: filteredSegmentIndexes }
+});
 let aiPretranslationAbortController = null;
 const aiPretranslationController = appRuntime.featureFactories.createAiPretranslationController({
   editorSessionStore,
@@ -1629,8 +1639,8 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
       )
   },
   scope: {
-    getSegments: localAiPretranslationSegments,
-    getOptions: localAiPretranslationOptions
+    getSegments: aiScopeSelectionService.pretranslationSegments,
+    getOptions: aiScopeSelectionService.pretranslationOptions
   },
   domain: {
     selectSegments: (segments, options) => preTranslationService.selectSegments(segments, options),
@@ -2251,11 +2261,7 @@ const aiTerminologyExtractionController =
     editorSessionStore,
     selection: { getActiveSegment: currentSegment },
     scope: {
-      getVisibleSegments: () =>
-        filteredSegmentIndexes()
-          .map((index) => currentSegments()[index])
-          .filter(Boolean),
-      getDocumentSegments: currentDocumentSegments
+      getSegments: aiScopeSelectionService.terminologySegments
     },
     termbase: {
       getSelectedName: () => els.termBaseSelect?.value || primaryTermBaseName(),
@@ -2339,7 +2345,7 @@ const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBrie
   },
   consent: { externalShare: confirmExternalAiPromptShare },
   context: {
-    getSampleSegments: projectBriefSampleSegments,
+    getSampleSegments: aiScopeSelectionService.projectBriefSampleSegments,
     getDocuments: projectDocuments,
     getTerms: (project) =>
       listTerms({
@@ -2646,7 +2652,7 @@ const aiPromptPreviewController = appRuntime.featureFactories.createAiPromptPrev
     getActiveSegment: currentSegment,
     getTerms: currentProjectTerms,
     getDocuments: projectDocuments,
-    getSampleSegments: projectBriefSampleSegments,
+    getSampleSegments: aiScopeSelectionService.projectBriefSampleSegments,
     getSurroundingSegments: localAiSurroundingSegmentsForSegment,
     getTags: segmentTags
   },
@@ -2677,7 +2683,7 @@ const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestCon
     createRequest: localAiPromptPreviewRequest,
     getModeLabel: localAiPromptModeLabel,
     getContextLabels: localAiPromptTestContextLabels,
-    hasProjectBriefSamples: () => projectBriefSampleSegments(1).length > 0
+    hasProjectBriefSamples: aiScopeSelectionService.hasProjectBriefSamples
   },
   providers: {
     get: currentLocalAiProvider,
@@ -8994,15 +9000,6 @@ async function polishBatchDraftsWithLocalAi() {
   return aiDraftEditingController.polishBatch();
 }
 
-function localAiTerminologySegments(settings = localAiSettingsFromForm()) {
-  if (!currentProject()) return [];
-  if (settings.mode === "selected") return currentSegment() ? [currentSegment()] : [];
-  if (settings.mode === "visible") return filteredSegmentIndexes().map((index) => currentSegments()[index]).filter(Boolean);
-  if (settings.mode === "project") return currentSegments();
-  if (settings.mode === "untranslated") return currentDocumentSegments().filter((segment) => !String(segment.target || "").trim());
-  return currentDocumentSegments();
-}
-
 async function extractActiveSegmentTermsWithLocalAi() {
   return aiTerminologyExtractionController.extractActive();
 }
@@ -9011,36 +9008,8 @@ async function extractBatchTermsWithLocalAi() {
   return aiTerminologyExtractionController.extractBatch();
 }
 
-function projectBriefSampleSegments(limit = 6) {
-  const scoped = currentDocumentSegments();
-  const source = scoped.length ? scoped : currentSegments();
-  const picked = [];
-  for (const segment of source) {
-    if (!String(segment.source || "").trim()) continue;
-    picked.push({
-      source: segment.source,
-      target: segment.target || ""
-    });
-    if (picked.length >= limit) break;
-  }
-  return picked;
-}
-
 async function generateProjectBriefWithLocalAi() {
   return aiProjectBriefController.generate();
-}
-
-function localAiPretranslationSegments(settings) {
-  if (settings.mode === "project" || settings.mode === "visible" || settings.mode === "selected") return currentSegments();
-  return currentDocumentSegments();
-}
-
-function localAiPretranslationOptions(settings) {
-  return {
-    mode: settings.mode,
-    selectedSegmentIds: currentSegment()?.id ? [currentSegment().id] : [],
-    visibleSegmentIds: filteredSegmentIndexes().map((index) => currentSegments()[index]?.id).filter(Boolean)
-  };
 }
 
 async function localAiGlossaryTermsForSegment(segment) {
