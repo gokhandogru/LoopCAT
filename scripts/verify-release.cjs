@@ -372,6 +372,10 @@ const aiCredentialStorageServiceJs = readText("src/features/ai/ai-credential-sto
 const aiCredentialStorageServiceUnitTests = readText("tests/unit/ai-credential-storage-service.test.cjs");
 const aiRuntimeSettingsServiceJs = readText("src/features/ai/ai-runtime-settings-service.js");
 const aiRuntimeSettingsServiceUnitTests = readText("tests/unit/ai-runtime-settings-service.test.cjs");
+const aiLocalSettingsPersistenceControllerJs = readText("src/features/ai/ai-local-settings-persistence-controller.js");
+const aiLocalSettingsPersistenceControllerUnitTests = readText(
+  "tests/unit/ai-local-settings-persistence-controller.test.cjs"
+);
 const aiPromptTestControllerJs = readText("src/features/ai/ai-prompt-test-controller.js");
 const aiPromptTestControllerUnitTests = readText("tests/unit/ai-prompt-test-controller.test.cjs");
 const aiPromptPreviewControllerJs = readText("src/features/ai/ai-prompt-preview-controller.js");
@@ -2566,11 +2570,7 @@ for (const [start, end, delegation] of [
     "function renderLocalAiPromptPreview",
     "return aiPromptPreviewController.createRequest(settings, mode)"
   ],
-  [
-    "function renderLocalAiPromptPreview",
-    "async function persistLocalAiSettings",
-    "return aiPromptPreviewController.render()"
-  ]
+  ["function renderLocalAiPromptPreview", "function renderEditor", "return aiPromptPreviewController.render()"]
 ]) {
   const facade = functionBody(appJs, start, end);
   assertIncludes(facade, delegation, `${start} must delegate to the checked AI-prompt-preview controller.`);
@@ -2595,6 +2595,80 @@ for (const testName of [
     aiPromptPreviewControllerUnitTests,
     testName,
     `focused AI-prompt-preview tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiLocalSettingsPersistenceController",
+  "The application runtime must expose the checked local AI settings-persistence controller boundary."
+);
+for (const boundary of [
+  "async function persist(persistOptions = {})",
+  "const project = store.getProject()",
+  "const localSettings = form.readSettings()",
+  "if (!project) return localSettings",
+  "endpoint.assertAllowed(localSettings)",
+  "catch {",
+  "localStore.save(localSettings)",
+  "const aiSettings = settingsBoundary.normalize({",
+  "...project.aiSettings",
+  "...settingsBoundary.projectUpdateFields(localSettings, project)",
+  "store.replaceProject(await persistence.updateProject({ ...project, aiSettings }))",
+  "const savedProject = store.getProject()",
+  "store.replaceProjects(",
+  "item.id === savedProject.id ? savedProject : item",
+  "workspace.markDirty()",
+  'if (!persistOptions.silent) status.set("Local AI settings saved", "saved")',
+  "function persistSilently()",
+  "return persist({ silent: true })"
+]) {
+  assertIncludes(
+    aiLocalSettingsPersistenceControllerJs,
+    boundary,
+    `AiLocalSettingsPersistenceController must retain checked ${boundary} sequencing.`
+  );
+}
+for (const consumer of [
+  "appRuntime.featureFactories.createAiLocalSettingsPersistenceController({",
+  "form: { readSettings: aiRuntimeSettingsService.localSettingsFromForm }",
+  "normalize: aiRuntimeSettingsService.normalizeProjectSettings",
+  "endpoint: { assertAllowed: aiRuntimeSettingsService.assertEndpointAllowed }",
+  "persist: aiLocalSettingsPersistenceController.persistSilently"
+]) {
+  assertIncludes(
+    appJs,
+    consumer,
+    `local AI settings-persistence consumer must use the checked controller: ${consumer}.`
+  );
+}
+assert(
+  (appJs.match(/persist: aiLocalSettingsPersistenceController\.persistSilently/g) || []).length === 10,
+  "all ten local/hosted AI command controllers must consume checked silent settings persistence."
+);
+assert(
+  appJs.indexOf("const aiRuntimeSettingsService =") >= 0 &&
+    appJs.indexOf("const aiRuntimeSettingsService =") < appJs.indexOf("const aiLocalSettingsPersistenceController =") &&
+    appJs.indexOf("const aiLocalSettingsPersistenceController =") < appJs.indexOf("const aiSegmentContextService ="),
+  "local AI settings persistence must initialize after settings policy and before AI command consumers."
+);
+assert(
+  !appJs.includes("async function persistLocalAiSettings") &&
+    !appJs.includes("const aiSettings = aiRuntimeSettingsService.normalizeProjectSettings({") &&
+    !appJs.includes('setSaveStatus("Local AI settings saved", "saved")'),
+  "app.js must not regain command-time local AI settings persistence sequencing."
+);
+for (const testName of [
+  "local AI settings persistence requires checked session and effect boundaries",
+  "local AI settings persistence returns form settings without effects when no project is selected",
+  "local AI settings persistence preserves the non-throwing unsaved endpoint rejection",
+  "local AI settings persistence preserves store, project, list, workspace, and visible status order",
+  "silent local AI settings persistence omits status and propagates downstream failures in order",
+  "local settings-store failures propagate before project persistence"
+]) {
+  assertIncludes(
+    aiLocalSettingsPersistenceControllerUnitTests,
+    testName,
+    `focused local AI settings-persistence tests must characterize ${testName}.`
   );
 }
 assertIncludes(

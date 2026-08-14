@@ -1649,6 +1649,21 @@ const aiRuntimeSettingsService =
       localModel: DEFAULT_LOCAL_AI_MODEL
     }
   });
+const aiLocalSettingsPersistenceController =
+  appRuntime.featureFactories.createAiLocalSettingsPersistenceController({
+    editorSessionStore,
+    form: { readSettings: aiRuntimeSettingsService.localSettingsFromForm },
+    settings: {
+      normalize: aiRuntimeSettingsService.normalizeProjectSettings,
+      projectUpdateFields: (settings, project) =>
+        localAISettingsStore.projectUpdateFields(settings, project)
+    },
+    endpoint: { assertAllowed: aiRuntimeSettingsService.assertEndpointAllowed },
+    localStore: { save: (settings) => localAISettingsStore.save(settings) },
+    persistence: { updateProject },
+    workspace: { markDirty: markWorkspaceDirty },
+    status: { set: setSaveStatus }
+  });
 const aiSegmentContextService = appRuntime.featureFactories.createAiSegmentContextService({
   project: {
     get: currentProject,
@@ -1781,7 +1796,7 @@ let aiPretranslationAbortController = null;
 const aiPretranslationController = appRuntime.featureFactories.createAiPretranslationController({
   editorSessionStore,
   settings: {
-    persist: () => persistLocalAiSettings({ silent: true }),
+    persist: aiLocalSettingsPersistenceController.persistSilently,
     runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
     assertReady: aiRuntimeSettingsService.assertRuntimeReady,
     projectDefaults: (project) =>
@@ -1901,7 +1916,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
     isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment))
   },
   settings: {
-    persist: () => persistLocalAiSettings({ silent: true }),
+    persist: aiLocalSettingsPersistenceController.persistSilently,
     runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
     assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
@@ -2001,7 +2016,7 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
     tagText: tagDisplayText
   },
   settings: {
-    persist: () => persistLocalAiSettings({ silent: true }),
+    persist: aiLocalSettingsPersistenceController.persistSilently,
     runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
     assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
@@ -2102,7 +2117,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
     getTags: segmentTags
   },
   settings: {
-    persist: () => persistLocalAiSettings({ silent: true }),
+    persist: aiLocalSettingsPersistenceController.persistSilently,
     runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
     assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
@@ -2214,7 +2229,7 @@ const aiTerminologyApplicationController =
       getTags: segmentTags
     },
     settings: {
-      persist: () => persistLocalAiSettings({ silent: true }),
+      persist: aiLocalSettingsPersistenceController.persistSilently,
       runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
       assertReady: aiRuntimeSettingsService.assertRuntimeReady
     },
@@ -2315,7 +2330,7 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
     getTags: segmentTags
   },
   settings: {
-    persist: () => persistLocalAiSettings({ silent: true }),
+    persist: aiLocalSettingsPersistenceController.persistSilently,
     runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
     assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
@@ -2430,7 +2445,7 @@ const aiTerminologyExtractionController =
         aiTermCandidatePersistenceService.saveCandidates(terms, termBaseName)
     },
     settings: {
-      persist: () => persistLocalAiSettings({ silent: true }),
+      persist: aiLocalSettingsPersistenceController.persistSilently,
       runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
       assertReady: aiRuntimeSettingsService.assertRuntimeReady
     },
@@ -2494,7 +2509,7 @@ let aiProjectBriefOwnsPromptBusy = false;
 const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBriefController({
   editorSessionStore,
   settings: {
-    persist: () => persistLocalAiSettings({ silent: true }),
+    persist: aiLocalSettingsPersistenceController.persistSilently,
     runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
     assertReady: aiRuntimeSettingsService.assertRuntimeReady,
     normalizeProjectAiSettings: aiRuntimeSettingsService.normalizeProjectSettings
@@ -2758,7 +2773,7 @@ const aiProviderAdministrationOperationsController =
   appRuntime.featureFactories.createAiProviderAdministrationOperationsController({
     project: { exists: () => Boolean(currentProject()) },
     settings: {
-      persist: () => persistLocalAiSettings({ silent: true }),
+      persist: aiLocalSettingsPersistenceController.persistSilently,
       runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
       assertReady: aiRuntimeSettingsService.assertRuntimeReady,
       normalizeBaseUrl: normalizedProviderBaseUrl
@@ -2834,7 +2849,7 @@ let aiPromptTestOwnsPromptBusy = false;
 const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestController({
   project: { get: currentProject },
   settings: {
-    persist: () => persistLocalAiSettings({ silent: true }),
+    persist: aiLocalSettingsPersistenceController.persistSilently,
     runtimeConfig: aiRuntimeSettingsService.runtimeConfig,
     assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
@@ -6151,26 +6166,6 @@ function localAiPromptPreviewRequest(
 
 function renderLocalAiPromptPreview() {
   return aiPromptPreviewController.render();
-}
-
-async function persistLocalAiSettings(options = {}) {
-  if (!currentProject()) return aiRuntimeSettingsService.localSettingsFromForm();
-  const settings = aiRuntimeSettingsService.localSettingsFromForm();
-  try {
-    aiRuntimeSettingsService.assertEndpointAllowed(settings);
-  } catch {
-    return settings;
-  }
-  localAISettingsStore.save(settings);
-  const aiSettings = aiRuntimeSettingsService.normalizeProjectSettings({
-    ...currentProject().aiSettings,
-    ...localAISettingsStore.projectUpdateFields(settings, currentProject())
-  });
-  editorSessionStore.replaceProject(await updateProject({ ...currentProject(), aiSettings }));
-  editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
-  markWorkspaceDirty();
-  if (!options.silent) setSaveStatus("Local AI settings saved", "saved");
-  return settings;
 }
 
 function renderEditor() {
