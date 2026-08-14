@@ -185,6 +185,7 @@ const requiredReleaseFiles = [
   "src/features/ai/ai-administration-controller.js",
   "src/features/ai/ai-provider-administration-operations-controller.js",
   "src/features/ai/ai-prompt-test-controller.js",
+  "src/features/ai/ai-term-candidate-persistence-service.js",
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
   "src/features/ai/ai-project-brief-controller.js",
@@ -210,6 +211,7 @@ const requiredReleaseFiles = [
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/ai-provider-administration-operations-controller.test.cjs",
   "tests/unit/ai-prompt-test-controller.test.cjs",
+  "tests/unit/ai-term-candidate-persistence-service.test.cjs",
   "tests/unit/ai-alternatives-controller.test.cjs",
   "tests/unit/ai-draft-editing-controller.test.cjs",
   "tests/unit/ai-project-brief-controller.test.cjs",
@@ -352,6 +354,10 @@ const aiProviderAdministrationOperationsControllerUnitTests = readText(
 );
 const aiPromptTestControllerJs = readText("src/features/ai/ai-prompt-test-controller.js");
 const aiPromptTestControllerUnitTests = readText("tests/unit/ai-prompt-test-controller.test.cjs");
+const aiTermCandidatePersistenceServiceJs = readText("src/features/ai/ai-term-candidate-persistence-service.js");
+const aiTermCandidatePersistenceServiceUnitTests = readText(
+  "tests/unit/ai-term-candidate-persistence-service.test.cjs"
+);
 const aiPretranslationControllerJs = readText("src/features/ai/ai-pretranslation-controller.js");
 const aiPretranslationControllerUnitTests = readText("tests/unit/ai-pretranslation-controller.test.cjs");
 const aiReviewControllerJs = readText("src/features/ai/ai-review-controller.js");
@@ -2972,7 +2978,7 @@ for (const facade of [
   ],
   [
     "async function polishBatchDraftsWithLocalAi",
-    "async function saveAiTermCandidates",
+    "function localAiTerminologySegments",
     "return aiDraftEditingController.polishBatch()"
   ]
 ]) {
@@ -3017,6 +3023,54 @@ for (const testName of [
     aiDraftEditingControllerUnitTests,
     testName,
     `focused AI-draft-editing tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiTermCandidatePersistenceService",
+  "The application runtime must expose the checked AI-term-candidate-persistence service boundary."
+);
+for (const boundary of [
+  "function termKey(term = {})",
+  "async function saveCandidates(terms = [], termBaseName)",
+  "const existingTerms = await termbase.list({",
+  "termBaseNames: [termBaseName]",
+  "const existingKeys = new Set(existingTerms.map(termKey))",
+  "const candidates = (terms || []).filter((term) =>",
+  "for (const term of candidates)",
+  "const saved = await termbase.save({",
+  'notes: ["AI extracted term candidate. Review before relying on it.", term.note]',
+  "isForbidden: false",
+  "workspace.markProjectsUsingResourceDirty(",
+  "duplicateCount: Math.max(0, (terms || []).length - savedTerms.length)"
+]) {
+  assertIncludes(
+    aiTermCandidatePersistenceServiceJs,
+    boundary,
+    `AiTermCandidatePersistenceService must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "aiTermCandidatePersistenceService.saveCandidates(terms, termBaseName)",
+  "app.js must inject the checked AI-term-candidate-persistence service into terminology extraction."
+);
+assert(
+  !appJs.includes("async function saveAiTermCandidates") &&
+    !appJs.includes("existingTerms.map((term) => `${stableLower(term.sourceTerm)}::") &&
+    !appJs.includes('["AI extracted term candidate. Review before relying on it.", term.note]'),
+  "app.js must not regain AI term-candidate lookup, deduplication, record construction, save-loop, or workspace orchestration."
+);
+for (const testName of [
+  "AI term candidate persistence deduplicates existing and repeated pairs before ordered saves",
+  "AI term candidate persistence reports empty input without writes or linked-project dirtiness",
+  "AI term candidate persistence counts all existing duplicates without marking projects dirty",
+  "AI term candidate persistence preserves sequential partial saves and propagates failure before dirtiness"
+]) {
+  assertIncludes(
+    aiTermCandidatePersistenceServiceUnitTests,
+    testName,
+    `focused AI-term-candidate-persistence tests must characterize ${testName}.`
   );
 }
 assertIncludes(

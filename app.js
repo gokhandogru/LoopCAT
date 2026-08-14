@@ -2219,6 +2219,16 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
 });
 let aiTerminologyExtractionAbortController = null;
 let aiTerminologyExtractionOwnsPromptBusy = false;
+const aiTermCandidatePersistenceService =
+  appRuntime.featureFactories.createAiTermCandidatePersistenceService({
+    project: { get: currentProject },
+    termbase: {
+      list: listTerms,
+      save: saveTerm
+    },
+    normalize: { stableLower },
+    workspace: { markProjectsUsingResourceDirty }
+  });
 const aiTerminologyExtractionController =
   appRuntime.featureFactories.createAiTerminologyExtractionController({
     editorSessionStore,
@@ -2232,7 +2242,8 @@ const aiTerminologyExtractionController =
     },
     termbase: {
       getSelectedName: () => els.termBaseSelect?.value || primaryTermBaseName(),
-      saveCandidates: saveAiTermCandidates
+      saveCandidates: (terms, termBaseName) =>
+        aiTermCandidatePersistenceService.saveCandidates(terms, termBaseName)
     },
     settings: {
       persist: () => persistLocalAiSettings({ silent: true }),
@@ -9029,39 +9040,6 @@ async function adaptBatchDraftsWithLocalAi() {
 
 async function polishBatchDraftsWithLocalAi() {
   return aiDraftEditingController.polishBatch();
-}
-
-async function saveAiTermCandidates(terms = [], termBaseName = primaryTermBaseName()) {
-  const existingTerms = await listTerms({
-    sourceLang: currentProject().sourceLang,
-    targetLang: currentProject().targetLang,
-    termBaseNames: [termBaseName]
-  });
-  const existingKeys = new Set(existingTerms.map((term) => `${stableLower(term.sourceTerm)}::${stableLower(term.targetTerm)}`));
-  const candidates = (terms || []).filter((term) => {
-    const key = `${stableLower(term.sourceTerm)}::${stableLower(term.targetTerm)}`;
-    if (existingKeys.has(key)) return false;
-    existingKeys.add(key);
-    return true;
-  });
-  const savedTerms = [];
-  for (const term of candidates) {
-    const saved = await saveTerm({
-      sourceTerm: term.sourceTerm,
-      targetTerm: term.targetTerm,
-      notes: ["AI extracted term candidate. Review before relying on it.", term.note].filter(Boolean).join(" "),
-      sourceLang: currentProject().sourceLang,
-      targetLang: currentProject().targetLang,
-      termBaseName,
-      isForbidden: false
-    });
-    savedTerms.push(saved);
-  }
-  if (savedTerms.length) markProjectsUsingResourceDirty("termbase", termBaseName, currentProject().sourceLang, currentProject().targetLang);
-  return {
-    savedTerms,
-    duplicateCount: Math.max(0, (terms || []).length - savedTerms.length)
-  };
 }
 
 function localAiTerminologySegments(settings = localAiSettingsFromForm()) {
