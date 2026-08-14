@@ -376,6 +376,8 @@ const aiLocalSettingsPersistenceControllerJs = readText("src/features/ai/ai-loca
 const aiLocalSettingsPersistenceControllerUnitTests = readText(
   "tests/unit/ai-local-settings-persistence-controller.test.cjs"
 );
+const aiCommandLifecycleCoordinatorJs = readText("src/features/ai/ai-command-lifecycle-coordinator.js");
+const aiCommandLifecycleCoordinatorUnitTests = readText("tests/unit/ai-command-lifecycle-coordinator.test.cjs");
 const aiPromptTestControllerJs = readText("src/features/ai/ai-prompt-test-controller.js");
 const aiPromptTestControllerUnitTests = readText("tests/unit/ai-prompt-test-controller.test.cjs");
 const aiPromptPreviewControllerJs = readText("src/features/ai/ai-prompt-preview-controller.js");
@@ -2069,6 +2071,98 @@ for (const testName of [
 }
 assertIncludes(
   appBootstrapJs,
+  "createAiCommandLifecycleCoordinator",
+  "The application runtime must expose the checked AI command-lifecycle coordinator boundary."
+);
+for (const boundary of [
+  "const owners = new Map()",
+  "function createLifecycle(ownerId, lifecycleOptions = {})",
+  "owners.has(id)",
+  "alwaysSyncProgress || progress !== undefined",
+  "state.patch({ progress })",
+  "if (lifecycleOptions.trackPromptBusy)",
+  "owner.ownsPromptBusy = true",
+  "state.patch({ promptBusy: false })",
+  "owner.abortController = abortController",
+  "state.patch({ running: true, abortController })",
+  "readState().abortController === owner.abortController",
+  "state.patch({ running: false, abortController: null })",
+  "isBusy: () => Boolean(readState().running)",
+  "isPromptBusy: () => Boolean(readState().promptBusy)",
+  "function setCancelHandlers(handlers)",
+  "cancelHandlers = handlers.slice()",
+  "for (const handler of cancelHandlers)",
+  "if (handler.cancel()) return true",
+  "currentState.abortController?.abort()",
+  "...(currentState.progress || {})",
+  "canceled: true",
+  "presentation.renderProgress()",
+  'status.set("Canceling local AI batch...", "dirty")'
+]) {
+  assertIncludes(
+    aiCommandLifecycleCoordinatorJs,
+    boundary,
+    `AiCommandLifecycleCoordinator must retain checked ${boundary} lifecycle and cancellation orchestration.`
+  );
+}
+for (const consumer of [
+  "appRuntime.featureFactories.createAiCommandLifecycleCoordinator({",
+  'createLifecycle("pretranslation", {',
+  'createLifecycle("review", {',
+  'createLifecycle("tag-repair", {',
+  'createLifecycle("alternatives", {',
+  'createLifecycle("terminology-application", {',
+  'createLifecycle("draft-editing", {',
+  'createLifecycle("terminology-extraction", {',
+  "aiCommandLifecycleCoordinator.setCancelHandlers([",
+  "cancel: (...args) => aiCommandLifecycleCoordinator.cancel(...args)"
+]) {
+  assertIncludes(appJs, consumer, `AI command-lifecycle consumer must use the checked coordinator: ${consumer}.`);
+}
+assert(
+  appJs.indexOf("const aiSuggestionListController =") >= 0 &&
+    appJs.indexOf("const aiSuggestionListController =") < appJs.indexOf("const aiCommandLifecycleCoordinator =") &&
+    appJs.indexOf("const aiCommandLifecycleCoordinator =") < appJs.indexOf("const aiPretranslationController ="),
+  "AI command-lifecycle coordination must initialize before its command consumers."
+);
+for (const removedFacade of [
+  "let aiPretranslationAbortController",
+  "let aiReviewAbortController",
+  "let aiReviewOwnsPromptBusy",
+  "let aiTagRepairAbortController",
+  "let aiTagRepairOwnsPromptBusy",
+  "let aiAlternativesAbortController",
+  "let aiAlternativesOwnsPromptBusy",
+  "let aiTerminologyApplicationAbortController",
+  "let aiTerminologyApplicationOwnsPromptBusy",
+  "let aiDraftEditingAbortController",
+  "let aiDraftEditingOwnsPromptBusy",
+  "let aiTerminologyExtractionAbortController",
+  "let aiTerminologyExtractionOwnsPromptBusy",
+  "function cancelLocalAiBatch"
+]) {
+  assert(
+    !appJs.includes(removedFacade),
+    `app.js must not regain coordinator-private AI lifecycle/cancellation state: ${removedFacade}.`
+  );
+}
+for (const testName of [
+  "AI command lifecycle coordinator requires checked state, presentation, and status boundaries",
+  "AI command lifecycle adapter mirrors pretranslation progress and running state",
+  "AI command lifecycle adapter preserves conditional progress and owned prompt-busy state",
+  "AI command lifecycle identity guard prevents a finished owner clearing the latest active command",
+  "AI command lifecycle cancellation preserves registered priority and stops after acceptance",
+  "AI command lifecycle fallback aborts, merges canceled progress, renders, and reports dirty",
+  "AI command lifecycle rejects duplicate owners and invalid cancel handlers"
+]) {
+  assertIncludes(
+    aiCommandLifecycleCoordinatorUnitTests,
+    testName,
+    `focused AI command-lifecycle tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
   "createQualityProfileController",
   "The application runtime must expose the checked quality-profile controller boundary."
 );
@@ -3349,13 +3443,13 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "if (aiPretranslationController.cancel()) return;",
-  "the shared AI cancel facade must delegate owned pretranslation cancellation first."
+  "  aiPretranslationController,",
+  "the shared AI cancel order must register pretranslation first."
 );
 const aiPretranslationFacade = functionBody(
   appJs,
   "async function pretranslateWithLocalAi",
-  "function cancelLocalAiBatch"
+  "async function splitCurrentSegment"
 );
 assert(
   !aiPretranslationFacade.includes("persistLocalAiSettings(") &&
@@ -3430,11 +3524,7 @@ assertIncludes(
   "return aiReviewController.reviewBatch()",
   "app.js must retain only the checked batch AI-review compatibility facade."
 );
-assertIncludes(
-  appJs,
-  "if (aiReviewController.cancel()) return;",
-  "the shared AI cancel facade must delegate owned AI-review cancellation."
-);
+assertIncludes(appJs, "  aiReviewController,", "the shared AI cancel order must register AI review.");
 const activeAiReviewFacade = functionBody(
   appJs,
   "async function reviewActiveSegmentWithLocalAi",
@@ -3516,11 +3606,7 @@ assertIncludes(
   "return aiTagRepairController.repairBatch()",
   "app.js must retain only the checked batch AI-tag-repair compatibility facade."
 );
-assertIncludes(
-  appJs,
-  "if (aiTagRepairController.cancel()) return;",
-  "the shared AI cancel facade must delegate owned tag-repair cancellation."
-);
+assertIncludes(appJs, "  aiTagRepairController,", "the shared AI cancel order must register tag repair.");
 const activeAiTagRepairFacade = functionBody(
   appJs,
   "async function repairActiveSegmentTagsWithLocalAi",
@@ -3605,11 +3691,7 @@ assertIncludes(
   "return aiAlternativesController.suggestBatch()",
   "app.js must retain only the checked batch AI-alternatives compatibility facade."
 );
-assertIncludes(
-  appJs,
-  "if (aiAlternativesController.cancel()) return;",
-  "the shared AI cancel facade must delegate owned alternatives cancellation."
-);
+assertIncludes(appJs, "  aiAlternativesController,", "the shared AI cancel order must register alternatives.");
 const activeAiAlternativesFacade = functionBody(
   appJs,
   "async function suggestActiveSegmentVariantsWithLocalAi",
@@ -3699,8 +3781,8 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "if (aiTerminologyApplicationController.cancel()) return;",
-  "the shared AI cancel facade must delegate owned terminology-application cancellation."
+  "  aiTerminologyApplicationController,",
+  "the shared AI cancel order must register terminology application."
 );
 const activeAiTerminologyApplicationFacade = functionBody(
   appJs,
@@ -3820,11 +3902,7 @@ for (const facade of [
     "app.js must not regain AI-draft-editing validation, consent, lifecycle, selection, context, provider, suggestion, persistence, activity, presentation, or recovery orchestration."
   );
 }
-assertIncludes(
-  appJs,
-  "if (aiDraftEditingController.cancel()) return;",
-  "the shared AI cancel facade must delegate owned draft-editing cancellation."
-);
+assertIncludes(appJs, "  aiDraftEditingController,", "the shared AI cancel order must register draft editing.");
 for (const testName of [
   "active AI draft editing preserves shared busy, source, target, provider, and consent safeguards",
   "active AI polish routes TM, termbase, style, and protected tokens into a non-overwriting suggestion",
@@ -3934,8 +4012,8 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "if (aiTerminologyExtractionController.cancel()) return;",
-  "the shared AI cancel facade must delegate owned terminology-extraction cancellation."
+  "  aiTerminologyExtractionController",
+  "the shared AI cancel order must register terminology extraction last."
 );
 const activeAiTerminologyExtractionFacade = functionBody(
   appJs,

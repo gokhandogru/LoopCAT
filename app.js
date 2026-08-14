@@ -1252,7 +1252,7 @@ const aiAdministrationController = appRuntime?.featureFactories?.createAiAdminis
     variantsSegment: suggestActiveSegmentVariantsWithLocalAi,
     applyTermsSegment: applyActiveSegmentTerminologyWithLocalAi,
     openAiSuggestion: createOpenAiSuggestion,
-    cancel: cancelLocalAiBatch,
+    cancel: (...args) => aiCommandLifecycleCoordinator.cancel(...args),
     testConnection: testLocalAiConnection,
     startLmStudio: startLmStudioServerAndTestConnection,
     refreshModels: refreshLocalAiModels,
@@ -1792,7 +1792,15 @@ const aiSuggestionListController =
     label: uiLabel,
     formatDateTime
   });
-let aiPretranslationAbortController = null;
+const aiCommandLifecycleCoordinator =
+  appRuntime.featureFactories.createAiCommandLifecycleCoordinator({
+    state: {
+      read: () => state.localAi,
+      patch: (values) => Object.assign(state.localAi, values)
+    },
+    presentation: { renderProgress: aiProviderFormController.renderProgress },
+    status: { set: setSaveStatus }
+  });
 const aiPretranslationController = appRuntime.featureFactories.createAiPretranslationController({
   editorSessionStore,
   settings: {
@@ -1827,24 +1835,9 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
     tmMatchesForSegment: localAiTmMatchesForSegment,
     surroundingSegmentsForSegment: localAiSurroundingSegmentsForSegment
   },
-  lifecycle: {
-    isBusy: () => state.localAi.running,
-    sync: ({ running, abortController, progress }) => {
-      state.localAi.progress = progress;
-      if (running) {
-        aiPretranslationAbortController = abortController;
-        state.localAi.running = true;
-        state.localAi.abortController = abortController;
-      } else if (
-        aiPretranslationAbortController &&
-        state.localAi.abortController === aiPretranslationAbortController
-      ) {
-        state.localAi.running = false;
-        state.localAi.abortController = null;
-        aiPretranslationAbortController = null;
-      }
-    }
-  },
+  lifecycle: aiCommandLifecycleCoordinator.createLifecycle("pretranslation", {
+    alwaysSyncProgress: true
+  }),
   commands: {
     bus: appRuntime.commands.bus,
     create: appRuntime.commands.createAiPretranslationCommand,
@@ -1899,8 +1892,6 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
   },
   logger: console
 });
-let aiReviewAbortController = null;
-let aiReviewOwnsPromptBusy = false;
 const aiReviewController = appRuntime.featureFactories.createAiReviewController({
   editorSessionStore,
   selection: {
@@ -1934,29 +1925,9 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
     reviewSegment: (options) => aiCommandService.reviewSegment(options),
     parseRisk: parseAiReviewRisk
   },
-  lifecycle: {
-    isRunning: () => state.localAi.running,
-    isPromptBusy: () => state.localAi.promptBusy,
-    sync: ({ running, promptBusy, abortController, progress }) => {
-      if (progress !== undefined) state.localAi.progress = progress;
-      if (promptBusy) {
-        aiReviewOwnsPromptBusy = true;
-        state.localAi.promptBusy = true;
-      } else if (aiReviewOwnsPromptBusy) {
-        state.localAi.promptBusy = false;
-        aiReviewOwnsPromptBusy = false;
-      }
-      if (running) {
-        aiReviewAbortController = abortController;
-        state.localAi.running = true;
-        state.localAi.abortController = abortController;
-      } else if (aiReviewAbortController && state.localAi.abortController === aiReviewAbortController) {
-        state.localAi.running = false;
-        state.localAi.abortController = null;
-        aiReviewAbortController = null;
-      }
-    }
-  },
+  lifecycle: aiCommandLifecycleCoordinator.createLifecycle("review", {
+    trackPromptBusy: true
+  }),
   persistence: {
     flush: flushPendingSegmentSaves,
     saveOne: saveSegment,
@@ -1999,8 +1970,6 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
   clock: { now: () => new Date().toISOString() },
   logger: console
 });
-let aiTagRepairAbortController = null;
-let aiTagRepairOwnsPromptBusy = false;
 const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairController({
   editorSessionStore,
   selection: { getActiveSegment: currentSegment },
@@ -2027,32 +1996,9 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
   },
   consent: { externalShare: externalAiConsentService.confirmShare },
   domain: { repairSegmentTags: (options) => aiCommandService.repairSegmentTags(options) },
-  lifecycle: {
-    isRunning: () => state.localAi.running,
-    isPromptBusy: () => state.localAi.promptBusy,
-    sync: ({ running, promptBusy, abortController, progress }) => {
-      if (progress !== undefined) state.localAi.progress = progress;
-      if (promptBusy) {
-        aiTagRepairOwnsPromptBusy = true;
-        state.localAi.promptBusy = true;
-      } else if (aiTagRepairOwnsPromptBusy) {
-        state.localAi.promptBusy = false;
-        aiTagRepairOwnsPromptBusy = false;
-      }
-      if (running) {
-        aiTagRepairAbortController = abortController;
-        state.localAi.running = true;
-        state.localAi.abortController = abortController;
-      } else if (
-        aiTagRepairAbortController &&
-        state.localAi.abortController === aiTagRepairAbortController
-      ) {
-        state.localAi.running = false;
-        state.localAi.abortController = null;
-        aiTagRepairAbortController = null;
-      }
-    }
-  },
+  lifecycle: aiCommandLifecycleCoordinator.createLifecycle("tag-repair", {
+    trackPromptBusy: true
+  }),
   suggestions: {
     append: (segment, suggestion) =>
       appendAiSuggestion(
@@ -2099,8 +2045,6 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
   redact: redactSensitiveText,
   logger: console
 });
-let aiAlternativesAbortController = null;
-let aiAlternativesOwnsPromptBusy = false;
 const aiAlternativesController = appRuntime.featureFactories.createAiAlternativesController({
   editorSessionStore,
   selection: {
@@ -2140,32 +2084,9 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
   domain: {
     suggestSegmentVariants: (options) => aiCommandService.suggestSegmentVariants(options)
   },
-  lifecycle: {
-    isRunning: () => state.localAi.running,
-    isPromptBusy: () => state.localAi.promptBusy,
-    sync: ({ running, promptBusy, abortController, progress }) => {
-      if (progress !== undefined) state.localAi.progress = progress;
-      if (promptBusy) {
-        aiAlternativesOwnsPromptBusy = true;
-        state.localAi.promptBusy = true;
-      } else if (aiAlternativesOwnsPromptBusy) {
-        state.localAi.promptBusy = false;
-        aiAlternativesOwnsPromptBusy = false;
-      }
-      if (running) {
-        aiAlternativesAbortController = abortController;
-        state.localAi.running = true;
-        state.localAi.abortController = abortController;
-      } else if (
-        aiAlternativesAbortController &&
-        state.localAi.abortController === aiAlternativesAbortController
-      ) {
-        state.localAi.running = false;
-        state.localAi.abortController = null;
-        aiAlternativesAbortController = null;
-      }
-    }
-  },
+  lifecycle: aiCommandLifecycleCoordinator.createLifecycle("alternatives", {
+    trackPromptBusy: true
+  }),
   suggestions: {
     normalize: savedAiSuggestionRecord,
     nextId: () => makeId("ai-suggestion")
@@ -2210,8 +2131,6 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
   redact: redactSensitiveText,
   logger: console
 });
-let aiTerminologyApplicationAbortController = null;
-let aiTerminologyApplicationOwnsPromptBusy = false;
 const aiTerminologyApplicationController =
   appRuntime.featureFactories.createAiTerminologyApplicationController({
     editorSessionStore,
@@ -2241,32 +2160,9 @@ const aiTerminologyApplicationController =
     consent: { externalShare: externalAiConsentService.confirmShare },
     context: { termsForSegment: localAiGlossaryTermsForSegment },
     domain: { applyTerminology: (options) => aiCommandService.applyTerminology(options) },
-    lifecycle: {
-      isRunning: () => state.localAi.running,
-      isPromptBusy: () => state.localAi.promptBusy,
-      sync: ({ running, promptBusy, abortController, progress }) => {
-        if (progress !== undefined) state.localAi.progress = progress;
-        if (promptBusy) {
-          aiTerminologyApplicationOwnsPromptBusy = true;
-          state.localAi.promptBusy = true;
-        } else if (aiTerminologyApplicationOwnsPromptBusy) {
-          state.localAi.promptBusy = false;
-          aiTerminologyApplicationOwnsPromptBusy = false;
-        }
-        if (running) {
-          aiTerminologyApplicationAbortController = abortController;
-          state.localAi.running = true;
-          state.localAi.abortController = abortController;
-        } else if (
-          aiTerminologyApplicationAbortController &&
-          state.localAi.abortController === aiTerminologyApplicationAbortController
-        ) {
-          state.localAi.running = false;
-          state.localAi.abortController = null;
-          aiTerminologyApplicationAbortController = null;
-        }
-      }
-    },
+    lifecycle: aiCommandLifecycleCoordinator.createLifecycle("terminology-application", {
+      trackPromptBusy: true
+    }),
     suggestions: {
       append: (segment, suggestion) =>
         appendAiSuggestion(
@@ -2315,8 +2211,6 @@ const aiTerminologyApplicationController =
     redact: redactSensitiveText,
     logger: console
   });
-let aiDraftEditingAbortController = null;
-let aiDraftEditingOwnsPromptBusy = false;
 const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditingController({
   editorSessionStore,
   selection: { getActiveSegment: currentSegment },
@@ -2348,32 +2242,9 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
     polish: (options) => aiCommandService.polishSegmentStyle(options),
     adapt: (options) => aiCommandService.adaptSegmentDraft(options)
   },
-  lifecycle: {
-    isRunning: () => state.localAi.running,
-    isPromptBusy: () => state.localAi.promptBusy,
-    sync: ({ running, promptBusy, abortController, progress }) => {
-      if (progress !== undefined) state.localAi.progress = progress;
-      if (promptBusy) {
-        aiDraftEditingOwnsPromptBusy = true;
-        state.localAi.promptBusy = true;
-      } else if (aiDraftEditingOwnsPromptBusy) {
-        state.localAi.promptBusy = false;
-        aiDraftEditingOwnsPromptBusy = false;
-      }
-      if (running) {
-        aiDraftEditingAbortController = abortController;
-        state.localAi.running = true;
-        state.localAi.abortController = abortController;
-      } else if (
-        aiDraftEditingAbortController &&
-        state.localAi.abortController === aiDraftEditingAbortController
-      ) {
-        state.localAi.running = false;
-        state.localAi.abortController = null;
-        aiDraftEditingAbortController = null;
-      }
-    }
-  },
+  lifecycle: aiCommandLifecycleCoordinator.createLifecycle("draft-editing", {
+    trackPromptBusy: true
+  }),
   suggestions: {
     append: (operation, segment, suggestion) =>
       appendAiSuggestion(
@@ -2420,8 +2291,6 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
   redact: redactSensitiveText,
   logger: console
 });
-let aiTerminologyExtractionAbortController = null;
-let aiTerminologyExtractionOwnsPromptBusy = false;
 const aiTermCandidatePersistenceService =
   appRuntime.featureFactories.createAiTermCandidatePersistenceService({
     project: { get: currentProject },
@@ -2458,32 +2327,9 @@ const aiTerminologyExtractionController =
     domain: {
       extractSegmentTerms: (options) => aiCommandService.extractSegmentTerms(options)
     },
-    lifecycle: {
-      isRunning: () => state.localAi.running,
-      isPromptBusy: () => state.localAi.promptBusy,
-      sync: ({ running, promptBusy, abortController, progress }) => {
-        if (progress !== undefined) state.localAi.progress = progress;
-        if (promptBusy) {
-          aiTerminologyExtractionOwnsPromptBusy = true;
-          state.localAi.promptBusy = true;
-        } else if (aiTerminologyExtractionOwnsPromptBusy) {
-          state.localAi.promptBusy = false;
-          aiTerminologyExtractionOwnsPromptBusy = false;
-        }
-        if (running) {
-          aiTerminologyExtractionAbortController = abortController;
-          state.localAi.running = true;
-          state.localAi.abortController = abortController;
-        } else if (
-          aiTerminologyExtractionAbortController &&
-          state.localAi.abortController === aiTerminologyExtractionAbortController
-        ) {
-          state.localAi.running = false;
-          state.localAi.abortController = null;
-          aiTerminologyExtractionAbortController = null;
-        }
-      }
-    },
+    lifecycle: aiCommandLifecycleCoordinator.createLifecycle("terminology-extraction", {
+      trackPromptBusy: true
+    }),
     presentation: {
       renderCommandCentre: aiProviderFormController.renderCommandCentre,
       renderAiProgress: aiProviderFormController.renderProgress,
@@ -2505,6 +2351,15 @@ const aiTerminologyExtractionController =
     status: { set: setSaveStatus },
     logger: console
   });
+aiCommandLifecycleCoordinator.setCancelHandlers([
+  aiPretranslationController,
+  aiReviewController,
+  aiTagRepairController,
+  aiAlternativesController,
+  aiTerminologyApplicationController,
+  aiDraftEditingController,
+  aiTerminologyExtractionController
+]);
 let aiProjectBriefOwnsPromptBusy = false;
 const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBriefController({
   editorSessionStore,
@@ -8341,23 +8196,6 @@ function localAiSurroundingSegmentsForSegment(segment, options = {}) {
 
 async function pretranslateWithLocalAi() {
   return aiPretranslationController.pretranslate();
-}
-
-function cancelLocalAiBatch() {
-  if (aiPretranslationController.cancel()) return;
-  if (aiReviewController.cancel()) return;
-  if (aiTagRepairController.cancel()) return;
-  if (aiAlternativesController.cancel()) return;
-  if (aiTerminologyApplicationController.cancel()) return;
-  if (aiDraftEditingController.cancel()) return;
-  if (aiTerminologyExtractionController.cancel()) return;
-  state.localAi.abortController?.abort();
-  state.localAi.progress = {
-    ...(state.localAi.progress || {}),
-    canceled: true
-  };
-  aiProviderFormController.renderProgress();
-  setSaveStatus("Canceling local AI batch...", "dirty");
 }
 
 async function splitCurrentSegment() {
