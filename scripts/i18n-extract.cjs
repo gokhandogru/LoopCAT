@@ -63,6 +63,13 @@ const projectLanguagePairShortcutsControllerPath = path.join(
   "projects",
   "project-language-pair-shortcuts-controller.js"
 );
+const projectLanguageContextControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "projects",
+  "project-language-context-controller.js"
+);
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const resourceMutationControllerPath = path.join(
   root,
@@ -246,6 +253,11 @@ function main() {
     messagesByText,
     projectLanguagePairShortcutsControllerPath,
     "src/features/projects/project-language-pair-shortcuts-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    projectLanguageContextControllerPath,
+    "src/features/projects/project-language-context-controller.js"
   );
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(

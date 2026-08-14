@@ -206,6 +206,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-dialog-controller.js",
   "src/features/projects/project-resource-selection-controller.js",
   "src/features/projects/project-language-pair-shortcuts-controller.js",
+  "src/features/projects/project-language-context-controller.js",
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-decision-controller.js",
   "src/features/quality/quality-review-controller.js",
@@ -266,6 +267,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/project-resource-selection-controller.test.cjs",
   "tests/unit/project-language-pair-shortcuts-controller.test.cjs",
+  "tests/unit/project-language-context-controller.test.cjs",
   "tests/unit/quality-profile-controller.test.cjs",
   "tests/unit/quality-decision-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
@@ -402,6 +404,12 @@ const projectLanguagePairShortcutsControllerJs = readText(
 );
 const projectLanguagePairShortcutsControllerUnitTests = readText(
   "tests/unit/project-language-pair-shortcuts-controller.test.cjs"
+);
+const projectLanguageContextControllerJs = readText(
+  "src/features/projects/project-language-context-controller.js"
+);
+const projectLanguageContextControllerUnitTests = readText(
+  "tests/unit/project-language-context-controller.test.cjs"
 );
 const opusCatHelpControllerJs = readText("src/features/ai/opus-cat-help-controller.js");
 const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-pretranslation-dialog-controller.js");
@@ -667,6 +675,16 @@ assertIncludes(
   appBootstrapJs,
   "createProjectLanguagePairShortcutsController,",
   "The application runtime must expose the checked project language-pair shortcuts factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectLanguageContextController } from "../features/projects/project-language-context-controller.js";',
+  "The application runtime must install the checked project-language context controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectLanguageContextController,",
+  "The application runtime must expose the checked project-language context factory."
 );
 assertIncludes(
   appBootstrapJs,
@@ -1634,6 +1652,84 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/projects/project-language-pair-shortcuts-controller.js"',
   "source-catalog extraction must scan the checked project language-pair shortcuts controller."
+);
+for (const snippet of [
+  "let desktopSpellcheckTargetLang = null",
+  "return project ? languageInput.pairDisplay(project.sourceLang, project.targetLang) : \"\"",
+  "`${languageInput.normalizeInput(project.sourceLang)}::${languageInput.normalizeInput(project.targetLang)}`",
+  'return languageInput.normalizeInput(project?.targetLang || "")',
+  "if (desktopSpellcheckTargetLang === targetLang) return null",
+  "desktopSpellcheckTargetLang = targetLang",
+  "const desktop = getDesktop()",
+  "if (!desktop?.setSpellCheckerLanguages) return null",
+  "desktop.setSpellCheckerLanguages(targetLang ? [targetLang] : [])",
+  'warn("Desktop spellcheck language sync failed.", error)',
+  "if (targetLang) element.lang = targetLang",
+  'else element.removeAttribute("lang")',
+  "return Object.freeze({ display, key, target, syncDesktopSpellcheck, applyTargetLanguage })"
+]) {
+  assertIncludes(
+    projectLanguageContextControllerJs,
+    snippet,
+    `ProjectLanguageContextController must retain characterized context/spellcheck policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createProjectLanguageContextController({",
+  "app.js must compose the checked project-language context controller."
+);
+for (const boundary of [
+  "getProject: () => editorSessionStore.getProject()",
+  "languageInput: languageInputService",
+  "getDesktop: () => window.LoopCATDesktop",
+  "warn: (...args) => console.warn(...args)"
+]) {
+  assertIncludes(appJs, boundary, `project-language context composition must inject the ${boundary} boundary.`);
+}
+for (const method of ["display", "key", "syncDesktopSpellcheck", "applyTargetLanguage"]) {
+  assertIncludes(
+    `${appJs}\n${appWorkflowDriverJs}`,
+    `projectLanguageContextController.${method}`,
+    `project-language consumers must call ProjectLanguageContextController.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "languagePair",
+  "displayLanguageName",
+  "languagePairKey",
+  "targetSpellcheckLanguage",
+  "syncDesktopSpellcheckLanguage",
+  "applyTargetSpellcheckLanguage"
+]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} project-language helper must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  !/\\bdesktopSpellcheckTargetLang\\b/.test(appJs) && !/\\bdesktopSpellcheckTargetLang\\b/.test(appWorkflowDriverJs),
+  "desktopSpellcheckTargetLang cache must not return outside the checked project-language controller."
+);
+for (const testName of [
+  "ProjectLanguageContextController preserves current and explicit pair display, keys, targets, and empty fallbacks",
+  "ProjectLanguageContextController preserves desktop language arrays and duplicate suppression",
+  "ProjectLanguageContextController caches before bridge availability and does not replay an unchanged target",
+  "ProjectLanguageContextController contains desktop rejection, warns exactly once, and preserves the cached target",
+  "ProjectLanguageContextController preserves target element lang assignment, removal, and absent-element behavior",
+  "ProjectLanguageContextController validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectLanguageContextControllerUnitTests,
+    testName,
+    `focused project-language context tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/project-language-context-controller.js"',
+  "source-catalog extraction must scan the checked project-language context controller."
 );
 for (const snippet of [
   'renderDashboard("tm", resourceState)',
@@ -9110,7 +9206,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "languagePairKey: languagePairKey(project)",
+  "languagePairKey: projectLanguageContextController.key(project)",
   "app.js project summaries must cache dashboard language-pair keys for filtering."
 );
 assertIncludes(

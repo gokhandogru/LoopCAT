@@ -749,7 +749,6 @@ const state = {
   lastValidationReport: null,
   commandQuery: "",
   commandProjectId: "",
-  desktopSpellcheckTargetLang: null,
   workspaceStatus: null,
   storageDurability: { checked: false, supported: false, persisted: false, requested: false, usageBytes: 0, quotaBytes: 0 },
   workspaceDirtyProjectIds: new Set(),
@@ -1097,6 +1096,13 @@ const languageInputService = appRuntime.featureFactories.createLanguageInputServ
   },
   escapeHtml,
   replaceSafeHtml
+});
+
+const projectLanguageContextController = appRuntime.featureFactories.createProjectLanguageContextController({
+  getProject: () => editorSessionStore.getProject(),
+  languageInput: languageInputService,
+  getDesktop: () => window.LoopCATDesktop,
+  warn: (...args) => console.warn(...args)
 });
 
 const aiContextController = appRuntime?.featureFactories?.createAiContextController?.({
@@ -4334,10 +4340,6 @@ function touchSegment(segment, options = {}) {
   return segment;
 }
 
-function languagePair(project = editorSessionStore.getProject()) {
-  return project ? languageInputService.pairDisplay(project.sourceLang, project.targetLang) : "";
-}
-
 function fileSafeName(value) {
   return (redactSensitiveText(value || "export").trim() || "export").replace(/[^\p{L}\p{N}-]+/gu, "_");
 }
@@ -4917,49 +4919,6 @@ function currentSelectedDocument() {
   return projectDocuments().find((documentInfo) => documentInfo.id === applicationStore.getState().navigation.documentId) || null;
 }
 
-function displayLanguageName(code) {
-  const clean = redactSensitiveText(code || "").trim();
-  if (!clean) return "the target language";
-  try {
-    if (typeof Intl.DisplayNames === "function") {
-      const names = new Intl.DisplayNames([navigator.language || "en"], { type: "language" });
-      return names.of(clean) || clean;
-    }
-  } catch {}
-  return clean;
-}
-
-function languagePairKey(project = editorSessionStore.getProject()) {
-  return project
-    ? `${languageInputService.normalizeInput(project.sourceLang)}::${languageInputService.normalizeInput(project.targetLang)}`
-    : "";
-}
-
-function targetSpellcheckLanguage(project = editorSessionStore.getProject()) {
-  return languageInputService.normalizeInput(project?.targetLang || "");
-}
-
-async function syncDesktopSpellcheckLanguage() {
-  const targetLang = targetSpellcheckLanguage();
-  if (state.desktopSpellcheckTargetLang === targetLang) return null;
-  state.desktopSpellcheckTargetLang = targetLang;
-  const desktop = window.LoopCATDesktop;
-  if (!desktop?.setSpellCheckerLanguages) return null;
-  try {
-    return await desktop.setSpellCheckerLanguages(targetLang ? [targetLang] : []);
-  } catch (error) {
-    console.warn("Desktop spellcheck language sync failed.", error);
-    return null;
-  }
-}
-
-function applyTargetSpellcheckLanguage(element) {
-  if (!element) return;
-  const targetLang = targetSpellcheckLanguage();
-  if (targetLang) element.lang = targetLang;
-  else element.removeAttribute("lang");
-}
-
 function renderTextEncodingOptions() {
   if (!els.fileEncodingSelect) return;
   const options = encodingApi.TEXT_ENCODING_OPTIONS || [["auto", "Auto"], ["utf-8", "UTF-8"]];
@@ -5436,7 +5395,7 @@ function projectSummaryRecord(project, segments, summaryRevision = projectSummar
     progress,
     wordCount: progress.words,
     searchText: projectSearchText,
-    languagePairKey: languagePairKey(project),
+    languagePairKey: projectLanguageContextController.key(project),
     summaryRevision
   };
 }
@@ -5458,7 +5417,7 @@ async function refreshProjectSummaries() {
         progress: cached.progress,
         wordCount: cached.wordCount,
         searchText: stableLower(`${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`),
-        languagePairKey: languagePairKey(project),
+        languagePairKey: projectLanguageContextController.key(project),
         summaryRevision: revision
       };
     }
@@ -5679,7 +5638,7 @@ function renderProjectList() {
   editorSessionStore.getProjects().forEach((project) => {
     const button = document.createElement("button");
     button.className = `project-item ${editorSessionStore.getProject()?.id === project.id ? "active" : ""}`;
-    replaceSafeHtml(button, `<strong>${displaySafeHtml(project.name)}</strong><span>${escapeHtml(languagePair(project))}</span><span>${project.sourceFileName ? displaySafeHtml(project.sourceFileName) : uiLocalizationService.labelHtml("noSourceFile")}</span>`);
+    replaceSafeHtml(button, `<strong>${displaySafeHtml(project.name)}</strong><span>${escapeHtml(projectLanguageContextController.display(project))}</span><span>${project.sourceFileName ? displaySafeHtml(project.sourceFileName) : uiLocalizationService.labelHtml("noSourceFile")}</span>`);
     button.addEventListener("click", () => openProject(project.id));
     fragment.append(button);
   });
@@ -5739,7 +5698,7 @@ function renderEditor() {
     payload: { locale: uiI18n?.getLocale?.() || "" }
   });
   const hasProject = Boolean(editorSessionStore.getProject());
-  void syncDesktopSpellcheckLanguage();
+  void projectLanguageContextController.syncDesktopSpellcheck();
   renderWorkspaceStatus();
   renderBackupReminder();
   if (verticalFeatureState?.editor) {
@@ -5764,7 +5723,7 @@ function renderEditor() {
 
   const resources = projectResourceSummary();
   els.projectTitle.textContent = displaySafeText(editorSessionStore.getProject().name);
-  els.projectMeta.textContent = `${languagePair()} - ${uiLocalizationService.label("mainTm")}: ${displaySafeText(resources.mainTm, uiLocalizationService.label("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
+  els.projectMeta.textContent = `${projectLanguageContextController.display()} - ${uiLocalizationService.label("mainTm")}: ${displaySafeText(resources.mainTm, uiLocalizationService.label("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
   els.projectDomainEditInput.value = editorSessionStore.getProject().domain || "";
   els.domainForm.classList.add("clean");
   els.domainForm.classList.toggle("hidden", Boolean((editorSessionStore.getProject().domain || "").trim()));
@@ -5772,7 +5731,7 @@ function renderEditor() {
     <dt>${uiLocalizationService.labelHtml("name")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().name)}</dd>
     <dt>${uiLocalizationService.sourceHtml("Creator")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().creatorName || uiLocalizationService.label("notSet"))}</dd>
     <dt>${uiLocalizationService.sourceHtml("Domain")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().domain || uiLocalizationService.label("notSet"))}</dd>
-    <dt>${uiLocalizationService.labelHtml("languages")}</dt><dd>${escapeHtml(languagePair())}</dd>
+    <dt>${uiLocalizationService.labelHtml("languages")}</dt><dd>${escapeHtml(projectLanguageContextController.display())}</dd>
     <dt>${uiLocalizationService.sourceHtml("Workspace")}</dt><dd>${escapeHtml(editorSessionStore.getProject().workspaceId || "local-workspace")}</dd>
     <dt>${uiLocalizationService.labelHtml("sourceFile")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().sourceFileName || uiLocalizationService.label("notImported"))}</dd>
     <dt>${uiLocalizationService.labelHtml("mainTm")}</dt><dd>${displaySafeHtml(resources.mainTm)}</dd>
@@ -5817,7 +5776,7 @@ function renderProjectHome() {
   const sourceWords = total.words;
   const resources = projectResourceSummary();
   els.projectHomeTitle.textContent = displaySafeText(editorSessionStore.getProject().name);
-  els.projectHomeMeta.textContent = `${languagePair()} - ${displaySafeText(editorSessionStore.getProject().domain || uiLocalizationService.label("noDomain"))} - ${uiLocalizationService.label("mainTm")}: ${displaySafeText(resources.mainTm, uiLocalizationService.label("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
+  els.projectHomeMeta.textContent = `${projectLanguageContextController.display()} - ${displaySafeText(editorSessionStore.getProject().domain || uiLocalizationService.label("noDomain"))} - ${uiLocalizationService.label("mainTm")}: ${displaySafeText(resources.mainTm, uiLocalizationService.label("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
   replaceSafeHtml(els.projectHomeStats, `
     <div><strong>${total.percent}%</strong><span>${uiLocalizationService.labelHtml("confirmed")}</span></div>
     <div><strong>${documents.length}</strong><span>${uiLocalizationService.labelHtml("files")}</span></div>
@@ -5893,7 +5852,7 @@ function renderDocumentFilter() {
 
 function renderLanguagePairFilter() {
   const current = els.languagePairFilter.value;
-  const pairs = Array.from(new Set(editorSessionStore.getProjects().map((project) => languagePairKey(project)).filter((pair) => pair !== "::"))).sort();
+  const pairs = Array.from(new Set(editorSessionStore.getProjects().map((project) => projectLanguageContextController.key(project)).filter((pair) => pair !== "::"))).sort();
   const fragment = document.createDocumentFragment();
   const allOption = document.createElement("option");
   allOption.value = "";
@@ -5919,7 +5878,7 @@ function createProjectTile(project) {
         <h3>${displaySafeHtml(project.name)}</h3>
         <p>${displaySafeHtml(project.domain ? `${project.domain} - ${project.sourceFileName || uiLocalizationService.label("noSourceFileImported")}` : project.sourceFileName || uiLocalizationService.label("noSourceFileImported"))}</p>
       </div>
-      <span class="language-badge">${escapeHtml(languagePair(project))}</span>
+      <span class="language-badge">${escapeHtml(projectLanguageContextController.display(project))}</span>
     </header>
     <div class="project-stats">
       <div><strong>${project.progress.percent}%</strong><span>${uiLocalizationService.labelHtml("confirmed")}</span></div>
@@ -5982,7 +5941,7 @@ function renderProjectsView() {
   const summaries = editorSessionStore.getProjectSummaries().map((project) => ({
     ...project,
     searchText: project.searchText || stableLower(`${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`),
-    languagePairKey: project.languagePairKey || languagePairKey(project)
+    languagePairKey: project.languagePairKey || projectLanguageContextController.key(project)
   }));
   if (verticalFeatureState?.projects) {
     verticalFeatureState.projects.render({
@@ -6248,7 +6207,7 @@ function renderSegmentRow(index) {
   const textarea = row.querySelector("textarea");
   textarea.dir = "auto";
   textarea.setAttribute("aria-label", uiLocalizationService.source("Target translation for segment {value1}", { value1: index + 1 }));
-  applyTargetSpellcheckLanguage(textarea);
+  projectLanguageContextController.applyTargetLanguage(textarea);
   textarea.value = segment.target || "";
   targetEditController.bindTargetEditor({
     textarea,
@@ -6822,7 +6781,7 @@ async function openConcordanceSearch() {
   els.concordanceMeta.textContent = uiLocalizationService.label("concordanceResultSummary", {
     keyword,
     resource: projectResourceSummary().tmLabel,
-    pair: languagePair(),
+    pair: projectLanguageContextController.display(),
     count: results.length
   });
   if (!results.length) {
