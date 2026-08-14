@@ -1094,9 +1094,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         afterFailedReplaceStored?.target === beforeFailedReplaceTarget,
       "target replace save failure restores visible and persisted target text"
     );
-    const protectedReplace = replaceOutsideProtectedTokens("<b>bold</b> %s b", "b", "strong", { regex: false, caseSensitive: true });
+    const protectedReplace = protectedTextReplacementService.replace("<b>bold</b> %s b", "b", "strong", { regex: false, caseSensitive: true });
     assert(protectedReplace.text === "<b>strongold</b> %s strong", "target replace skips protected tag and placeholder tokens");
-    const localeStableReplace = replaceOutsideProtectedTokens("INSTALL token", "install", "kur", { regex: false, caseSensitive: false });
+    const localeStableReplace = protectedTextReplacementService.replace("INSTALL token", "install", "kur", { regex: false, caseSensitive: false });
     assert(
       "INSTALL".toLocaleLowerCase("tr") !== "install" && localeStableReplace.text === "kur token",
       "case-insensitive target replace is stable under Turkish locale casing"

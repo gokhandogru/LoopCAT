@@ -169,6 +169,7 @@ const requiredReleaseFiles = [
   "src/features/editor/target-edit-controller.js",
   "src/features/editor/target-producer-controller.js",
   "src/features/editor/protected-tag-inspection-service.js",
+  "src/features/editor/protected-text-replacement-service.js",
   "src/features/editor/structural-segment-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -256,6 +257,7 @@ const requiredReleaseFiles = [
   "tests/unit/target-edit-controller.test.cjs",
   "tests/unit/target-producer-controller.test.cjs",
   "tests/unit/protected-tag-inspection-service.test.cjs",
+  "tests/unit/protected-text-replacement-service.test.cjs",
   "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
@@ -376,6 +378,7 @@ const segmentConfirmationControllerJs = readText("src/features/editor/segment-co
 const targetEditControllerJs = readText("src/features/editor/target-edit-controller.js");
 const targetProducerControllerJs = readText("src/features/editor/target-producer-controller.js");
 const protectedTagInspectionServiceJs = readText("src/features/editor/protected-tag-inspection-service.js");
+const protectedTextReplacementServiceJs = readText("src/features/editor/protected-text-replacement-service.js");
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
@@ -384,6 +387,7 @@ const segmentConfirmationControllerUnitTests = readText("tests/unit/segment-conf
 const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
 const protectedTagInspectionServiceUnitTests = readText("tests/unit/protected-tag-inspection-service.test.cjs");
+const protectedTextReplacementServiceUnitTests = readText("tests/unit/protected-text-replacement-service.test.cjs");
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
@@ -4143,6 +4147,16 @@ assertIncludes(
   "createProtectedTagInspectionService,",
   "The application runtime must expose the checked protected-tag inspection factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createProtectedTextReplacementService } from "../features/editor/protected-text-replacement-service.js";',
+  "The application runtime must install the checked protected-text replacement service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProtectedTextReplacementService,",
+  "The application runtime must expose the checked protected-text replacement factory."
+);
 for (const boundary of [
   "editLifecycle.finalize(segment.id)",
   "persistence.clearPending(segment, { finalizeEdit: false })",
@@ -4271,6 +4285,72 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/protected-tag-inspection-service.js"',
   "source-catalog extraction must scan the checked protected-tag inspection service."
+);
+for (const snippet of [
+  'const source = String(text || "")',
+  'const find = String(findText || "")',
+  "if (!find) return { text: source, count: 0 }",
+  'const flags = replaceOptions.caseSensitive ? "g" : "gi"',
+  "const regex = new RegExp(find, flags)",
+  'if (match === "") emptyMatch = true',
+  'throw new Error("Find pattern must not match empty text.")',
+  "const needle = replaceOptions.caseSensitive ? find : normalizeCase(find)",
+  "const haystack = replaceOptions.caseSensitive ? source : normalizeCase(source)",
+  "cursor = index + find.length",
+  "detectTags(source).sort((a, b) => a.index - b.index || b.text.length - a.text.length)",
+  "if (token.index < cursor) return",
+  "output += chunk.text + token.text",
+  "return { text: output + tail.text, count: count + tail.count }",
+  "return Object.freeze({ replacePlain, replace })"
+]) {
+  assertIncludes(
+    protectedTextReplacementServiceJs,
+    snippet,
+    `ProtectedTextReplacementService must retain characterized pure transformation policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createProtectedTextReplacementService({",
+  "app.js must compose the checked protected-text replacement service."
+);
+for (const boundary of ["detectTags: detectProtectedTags", "normalizeCase: stableLower"]) {
+  assertIncludes(appJs, boundary, `protected-text replacement composition must inject the ${boundary} boundary.`);
+}
+assertIncludes(
+  appJs,
+  "transform: { replace: protectedTextReplacementService.replace }",
+  "TargetReplacementController must consume the protected-text replacement service directly."
+);
+assert(
+  appWorkflowDriverJs.split("protectedTextReplacementService.replace(").length - 1 === 2,
+  "workflow characterization must call ProtectedTextReplacementService directly for protected and locale-stable replacement."
+);
+for (const removedHelper of ["replacePlainTextChunk", "replaceOutsideProtectedTokens"]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} protected-text replacement helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "ProtectedTextReplacementService preserves coercion and empty-find no-op behavior",
+  "ProtectedTextReplacementService preserves literal case-sensitive and normalized matching with counts",
+  "ProtectedTextReplacementService preserves global regex flags, counts, invalid-pattern failures, and empty-match rejection",
+  "ProtectedTextReplacementService preserves sorted protected tokens and replaces only surrounding chunks",
+  "ProtectedTextReplacementService skips overlapping tokens and aggregates chunk and tail counts",
+  "ProtectedTextReplacementService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    protectedTextReplacementServiceUnitTests,
+    testName,
+    `focused protected-text replacement tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/protected-text-replacement-service.js"',
+  "source-catalog extraction must scan the checked protected-text replacement service."
 );
 assertIncludes(
   appBootstrapJs,

@@ -92,6 +92,13 @@ const protectedTagInspectionServicePath = path.join(
   "editor",
   "protected-tag-inspection-service.js"
 );
+const protectedTextReplacementServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "editor",
+  "protected-text-replacement-service.js"
+);
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const resourceMutationControllerPath = path.join(
   root,
@@ -296,6 +303,11 @@ function main() {
     messagesByText,
     protectedTagInspectionServicePath,
     "src/features/editor/protected-tag-inspection-service.js"
+  );
+  extractScript(
+    messagesByText,
+    protectedTextReplacementServicePath,
+    "src/features/editor/protected-text-replacement-service.js"
   );
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(

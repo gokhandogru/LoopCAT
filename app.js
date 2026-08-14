@@ -1109,6 +1109,11 @@ const protectedTagInspectionService = appRuntime.featureFactories.createProtecte
   detectTags: detectProtectedTags
 });
 
+const protectedTextReplacementService = appRuntime.featureFactories.createProtectedTextReplacementService({
+  detectTags: detectProtectedTags,
+  normalizeCase: stableLower
+});
+
 const projectLanguageContextController = appRuntime.featureFactories.createProjectLanguageContextController({
   getProject: () => editorSessionStore.getProject(),
   languageInput: languageInputService,
@@ -1606,7 +1611,7 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
     }),
     getIndexes: (scope) => (scope === "all" ? projectSegmentIndexes() : filteredSegmentIndexes())
   },
-  transform: { replace: replaceOutsideProtectedTokens },
+  transform: { replace: protectedTextReplacementService.replace },
   commands: {
     bus: appRuntime.commands.bus,
     create: appRuntime.commands.createReplaceTargetsCommand,
@@ -4855,56 +4860,6 @@ function selectedEditorText() {
   const pageSelection = window.getSelection()?.toString().trim();
   if (pageSelection) return pageSelection;
   return currentSegment()?.source || "";
-}
-
-function replacePlainTextChunk(text, findText, replacement, options = {}) {
-  const source = String(text || "");
-  const find = String(findText || "");
-  if (!find) return { text: source, count: 0 };
-  if (options.regex) {
-    const flags = options.caseSensitive ? "g" : "gi";
-    const regex = new RegExp(find, flags);
-    let emptyMatch = false;
-    let count = 0;
-    const replaced = source.replace(regex, (match) => {
-      if (match === "") emptyMatch = true;
-      count += 1;
-      return replacement;
-    });
-    if (emptyMatch) throw new Error("Find pattern must not match empty text.");
-    return { text: replaced, count };
-  }
-  const needle = options.caseSensitive ? find : stableLower(find);
-  const haystack = options.caseSensitive ? source : stableLower(source);
-  let cursor = 0;
-  let count = 0;
-  let output = "";
-  while (cursor < source.length) {
-    const index = haystack.indexOf(needle, cursor);
-    if (index === -1) break;
-    output += source.slice(cursor, index) + replacement;
-    cursor = index + find.length;
-    count += 1;
-  }
-  return { text: count ? output + source.slice(cursor) : source, count };
-}
-
-function replaceOutsideProtectedTokens(text, findText, replacement, options = {}) {
-  const source = String(text || "");
-  const protectedTokens = detectProtectedTags(source)
-    .sort((a, b) => a.index - b.index || b.text.length - a.text.length);
-  let cursor = 0;
-  let count = 0;
-  let output = "";
-  protectedTokens.forEach((token) => {
-    if (token.index < cursor) return;
-    const chunk = replacePlainTextChunk(source.slice(cursor, token.index), findText, replacement, options);
-    output += chunk.text + token.text;
-    count += chunk.count;
-    cursor = token.index + token.text.length;
-  });
-  const tail = replacePlainTextChunk(source.slice(cursor), findText, replacement, options);
-  return { text: output + tail.text, count: count + tail.count };
 }
 
 function reviewLabel(value) {
