@@ -1787,7 +1787,7 @@ const aiSuggestionListController =
   appRuntime.featureFactories.createAiSuggestionListController({
     root: els.aiSuggestionList,
     getSegment: currentSegment,
-    apply: applyAiSuggestion,
+    apply: (...args) => aiSuggestionApplicationController.apply(...args),
     source: uiSource,
     label: uiLabel,
     formatDateTime
@@ -1831,9 +1831,9 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
     pretranslateSegments: (options) => preTranslationService.pretranslateSegments(options)
   },
   context: {
-    glossaryTermsForSegment: localAiGlossaryTermsForSegment,
-    tmMatchesForSegment: localAiTmMatchesForSegment,
-    surroundingSegmentsForSegment: localAiSurroundingSegmentsForSegment
+    glossaryTermsForSegment: aiSegmentContextService.glossaryTermsForSegment,
+    tmMatchesForSegment: aiSegmentContextService.tmMatchesForSegment,
+    surroundingSegmentsForSegment: aiSegmentContextService.surroundingSegmentsForSegment
   },
   lifecycle: aiCommandLifecycleCoordinator.createLifecycle("pretranslation", {
     alwaysSyncProgress: true
@@ -2001,13 +2001,13 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
   }),
   suggestions: {
     append: (segment, suggestion) =>
-      appendAiSuggestion(
+      aiSuggestionPersistenceController.append(
         segment,
         suggestion,
         "ai-tag-repair",
         "AI tag repair suggestion created"
       ),
-    normalize: savedAiSuggestionRecord,
+    normalize: (...args) => aiSuggestionPersistenceController.normalize(...args),
     nextId: () => makeId("ai-suggestion")
   },
   persistence: {
@@ -2079,7 +2079,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
         targetLang: project.targetLang,
         termBaseNames: projectTermBaseNames()
       }),
-    batchTerms: localAiGlossaryTermsForSegment
+    batchTerms: aiSegmentContextService.glossaryTermsForSegment
   },
   domain: {
     suggestSegmentVariants: (options) => aiCommandService.suggestSegmentVariants(options)
@@ -2088,7 +2088,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
     trackPromptBusy: true
   }),
   suggestions: {
-    normalize: savedAiSuggestionRecord,
+    normalize: (...args) => aiSuggestionPersistenceController.normalize(...args),
     nextId: () => makeId("ai-suggestion")
   },
   persistence: {
@@ -2158,20 +2158,20 @@ const aiTerminologyApplicationController =
         localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
     },
     consent: { externalShare: externalAiConsentService.confirmShare },
-    context: { termsForSegment: localAiGlossaryTermsForSegment },
+    context: { termsForSegment: aiSegmentContextService.glossaryTermsForSegment },
     domain: { applyTerminology: (options) => aiCommandService.applyTerminology(options) },
     lifecycle: aiCommandLifecycleCoordinator.createLifecycle("terminology-application", {
       trackPromptBusy: true
     }),
     suggestions: {
       append: (segment, suggestion) =>
-        appendAiSuggestion(
+        aiSuggestionPersistenceController.append(
           segment,
           suggestion,
           "ai-apply-terminology",
           "AI terminology suggestion created"
         ),
-      normalize: savedAiSuggestionRecord,
+      normalize: (...args) => aiSuggestionPersistenceController.normalize(...args),
       nextId: () => makeId("ai-suggestion")
     },
     persistence: {
@@ -2235,8 +2235,8 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
   },
   consent: { externalShare: externalAiConsentService.confirmShare },
   context: {
-    termsForSegment: localAiGlossaryTermsForSegment,
-    tmMatchesForSegment: localAiTmMatchesForSegment
+    termsForSegment: aiSegmentContextService.glossaryTermsForSegment,
+    tmMatchesForSegment: aiSegmentContextService.tmMatchesForSegment
   },
   domain: {
     polish: (options) => aiCommandService.polishSegmentStyle(options),
@@ -2247,7 +2247,7 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
   }),
   suggestions: {
     append: (operation, segment, suggestion) =>
-      appendAiSuggestion(
+      aiSuggestionPersistenceController.append(
         segment,
         suggestion,
         operation === "adapt" ? "ai-adapt-draft" : "ai-polish-draft",
@@ -2255,7 +2255,7 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
           ? "AI draft adaptation suggestion created"
           : "AI draft polish suggestion created"
       ),
-    normalize: savedAiSuggestionRecord,
+    normalize: (...args) => aiSuggestionPersistenceController.normalize(...args),
     nextId: () => makeId("ai-suggestion")
   },
   persistence: {
@@ -2533,7 +2533,7 @@ const aiOpenAiSuggestionController = appRuntime.featureFactories.createAiOpenAiS
   context: { forSegment: aiContextForSegment },
   suggestions: {
     append: (segment, suggestion) =>
-      appendAiSuggestion(
+      aiSuggestionPersistenceController.append(
         segment,
         suggestion,
         "ai-openai-suggestion",
@@ -2673,7 +2673,7 @@ const aiPromptPreviewController = appRuntime.featureFactories.createAiPromptPrev
     getTerms: currentProjectTerms,
     getDocuments: projectDocuments,
     getSampleSegments: aiScopeSelectionService.projectBriefSampleSegments,
-    getSurroundingSegments: localAiSurroundingSegmentsForSegment,
+    getSurroundingSegments: aiSegmentContextService.surroundingSegmentsForSegment,
     getTags: segmentTags
   },
   builders: {
@@ -7964,23 +7964,6 @@ async function aiContextForSegment(segment, ai) {
   ]);
 }
 
-function savedAiSuggestionRecord(suggestion = {}) {
-  return aiSuggestionPersistenceController.normalize(suggestion);
-}
-
-async function appendAiSuggestion(segment, suggestion, activityType, activityMessage) {
-  return aiSuggestionPersistenceController.append(
-    segment,
-    suggestion,
-    activityType,
-    activityMessage
-  );
-}
-
-async function applyAiSuggestion(suggestionId, options = {}) {
-  return aiSuggestionApplicationController.apply(suggestionId, options);
-}
-
 function currentLocalAiProvider(settings = aiRuntimeSettingsService.localSettingsFromForm()) {
   return aiProviderService.get(settings.providerId);
 }
@@ -8005,18 +7988,6 @@ function aiReviewRiskLabel(level) {
     high: uiLabel("highRisk"),
     critical: uiLabel("criticalRisk")
   }[level] || uiLabel("unrankedRisk");
-}
-
-async function localAiGlossaryTermsForSegment(segment) {
-  return aiSegmentContextService.glossaryTermsForSegment(segment);
-}
-
-async function localAiTmMatchesForSegment(segment) {
-  return aiSegmentContextService.tmMatchesForSegment(segment);
-}
-
-function localAiSurroundingSegmentsForSegment(segment, options = {}) {
-  return aiSegmentContextService.surroundingSegmentsForSegment(segment, options);
 }
 
 async function splitCurrentSegment() {

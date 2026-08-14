@@ -2505,7 +2505,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       explanation: ["Must roll back when suggestion save fails."]
     };
     setHiddenSegmentField(currentSegments()[segmentIndex], AI_APPEND_SAVE_FAILURE_TEST_FLAG, true);
-    const failedAiSuggestionSave = await appendAiSuggestion(currentSegments()[segmentIndex], failedAiSuggestion, "ai-test-suggestion", "AI suggestion created");
+    const failedAiSuggestionSave = await aiSuggestionPersistenceController.append(currentSegments()[segmentIndex], failedAiSuggestion, "ai-test-suggestion", "AI suggestion created");
     const failedAiSuggestionStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
     assert(
       !failedAiSuggestionSave &&
@@ -2524,7 +2524,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       responseId: "workflow-response-id-that-must-not-store",
       customEndpoint: "https://provider.example/trace-that-must-not-store"
     };
-    const successfulAiSuggestionSave = await appendAiSuggestion(currentSegments()[segmentIndex], savedAiSuggestion, "ai-test-suggestion", "AI suggestion created");
+    const successfulAiSuggestionSave = await aiSuggestionPersistenceController.append(currentSegments()[segmentIndex], savedAiSuggestion, "ai-test-suggestion", "AI suggestion created");
     const savedAiSuggestionStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
     const savedAiSuggestionRecordJson = JSON.stringify(savedAiSuggestionStored?.aiSuggestions?.find((suggestion) => suggestion.id === savedAiSuggestion.id) || {});
     const savedAiSuggestionActivityJson = JSON.stringify(currentActivityEvents().find((event) => event.type === "ai-test-suggestion" && event.detail?.segmentId === currentSegments()[segmentIndex].id) || {});
@@ -2578,7 +2578,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       explanation: ["Activity log failure warning fixture."]
     };
     setHiddenSegmentField(currentSegments()[segmentIndex], AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const aiSuggestionActivityWarning = await appendAiSuggestion(currentSegments()[segmentIndex], activityWarningAiSuggestion, "ai-test-suggestion", "AI suggestion created");
+    const aiSuggestionActivityWarning = await aiSuggestionPersistenceController.append(currentSegments()[segmentIndex], activityWarningAiSuggestion, "ai-test-suggestion", "AI suggestion created");
     const aiSuggestionActivityWarningStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
     assert(
       aiSuggestionActivityWarning?.ok &&
@@ -2592,7 +2592,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiApplyTargetBeforeFailure = currentSegments()[segmentIndex].target;
     const aiApplyHistoryBeforeFailure = currentSegments()[segmentIndex].targetHistory?.length || 0;
     setHiddenSegmentField(currentSegments()[segmentIndex], AI_APPLY_SAVE_FAILURE_TEST_FLAG, true);
-    const failedAiApply = await applyAiSuggestion(savedAiSuggestion.id);
+    const failedAiApply = await aiSuggestionApplicationController.apply(savedAiSuggestion.id);
     const failedAiApplyStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
     assert(
       !failedAiApply &&
@@ -2603,7 +2603,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "AI suggestion apply failure restores visible and persisted target text"
     );
     setHiddenSegmentField(currentSegments()[segmentIndex], AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const aiApplyActivityWarning = await applyAiSuggestion(activityWarningAiSuggestion.id);
+    const aiApplyActivityWarning = await aiSuggestionApplicationController.apply(activityWarningAiSuggestion.id);
     const aiApplyActivityWarningStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
     assert(
       aiApplyActivityWarning &&
@@ -2613,7 +2613,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "AI suggestion apply activity log failure reports warning after successful target save"
     );
     Reflect.deleteProperty(currentSegments()[segmentIndex], AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG);
-    const successfulAiApply = await applyAiSuggestion(savedAiSuggestion.id);
+    const successfulAiApply = await aiSuggestionApplicationController.apply(savedAiSuggestion.id);
     const savedAiApplyStored = (await getProjectSegments(project.id)).find((segment) => segment.id === currentSegments()[segmentIndex].id);
     assert(
       successfulAiApply &&

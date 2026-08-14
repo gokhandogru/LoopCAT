@@ -2867,35 +2867,22 @@ for (const boundary of [
     `AiSegmentContextService must retain checked ${boundary} policy and selection.`
   );
 }
-for (const [start, end, delegation] of [
-  [
-    "async function localAiGlossaryTermsForSegment",
-    "async function localAiTmMatchesForSegment",
-    "return aiSegmentContextService.glossaryTermsForSegment(segment)"
-  ],
-  [
-    "async function localAiTmMatchesForSegment",
-    "function localAiSurroundingSegmentsForSegment",
-    "return aiSegmentContextService.tmMatchesForSegment(segment)"
-  ],
-  [
-    "function localAiSurroundingSegmentsForSegment",
-    "async function splitCurrentSegment",
-    "return aiSegmentContextService.surroundingSegmentsForSegment(segment, options)"
-  ]
+for (const consumer of [
+  "glossaryTermsForSegment: aiSegmentContextService.glossaryTermsForSegment",
+  "tmMatchesForSegment: aiSegmentContextService.tmMatchesForSegment",
+  "surroundingSegmentsForSegment: aiSegmentContextService.surroundingSegmentsForSegment",
+  "batchTerms: aiSegmentContextService.glossaryTermsForSegment",
+  "termsForSegment: aiSegmentContextService.glossaryTermsForSegment",
+  "getSurroundingSegments: aiSegmentContextService.surroundingSegmentsForSegment"
 ]) {
-  const facade = functionBody(appJs, start, end);
-  assertIncludes(facade, delegation, `${start} must delegate to the checked AI-segment-context service.`);
-  assert(
-    !facade.includes("defaultAiSettings(") &&
-      !facade.includes("findTerms(") &&
-      !facade.includes("findProjectTmMatches(") &&
-      !facade.includes("projectTermBaseNames(") &&
-      !facade.includes("projectTmNames(") &&
-      !facade.includes("currentSegments(") &&
-      !facade.includes("console.warn("),
-    "app.js must not regain shared AI termbase/TM lookup policy, warning containment, or nearby-segment selection."
-  );
+  assertIncludes(appJs, consumer, `AI segment-context consumer must use the checked service: ${consumer}.`);
+}
+for (const removedFacade of [
+  "async function localAiGlossaryTermsForSegment",
+  "async function localAiTmMatchesForSegment",
+  "function localAiSurroundingSegmentsForSegment"
+]) {
+  assert(!appJs.includes(removedFacade), `${removedFacade} must not return after direct context wiring.`);
 }
 for (const testName of [
   "AI segment context preserves missing project, segment, and project-level context opt-outs",
@@ -3430,7 +3417,7 @@ for (const consumer of [
   "appRuntime.featureFactories.createAiSuggestionListController({",
   "root: els.aiSuggestionList",
   "getSegment: currentSegment",
-  "apply: applyAiSuggestion",
+  "apply: (...args) => aiSuggestionApplicationController.apply(...args)",
   "renderSuggestions: aiSuggestionListController.render",
   "renderAi: aiSuggestionListController.render"
 ]) {
@@ -3948,26 +3935,17 @@ for (const boundary of [
 }
 assertIncludes(
   appJs,
-  "return aiSuggestionApplicationController.apply(suggestionId, options)",
-  "app.js must retain only the checked AI-suggestion-application compatibility facade."
+  "apply: (...args) => aiSuggestionApplicationController.apply(...args)",
+  "the suggestion list must late-bind directly to checked suggestion application."
 );
-const aiSuggestionApplicationFacade = functionBody(
-  appJs,
-  "async function applyAiSuggestion",
-  "function currentLocalAiProvider"
+assertIncludes(
+  appWorkflowDriverJs,
+  "aiSuggestionApplicationController.apply(",
+  "workflow characterization must call checked suggestion application directly."
 );
 assert(
-  !aiSuggestionApplicationFacade.includes("flushPendingSegmentSaves(") &&
-    !aiSuggestionApplicationFacade.includes("createApplyAiSuggestionCommand(") &&
-    !aiSuggestionApplicationFacade.includes("setSegmentTargetAndStatus(") &&
-    !aiSuggestionApplicationFacade.includes("prepareCommandRestoreSegmentSnapshot(") &&
-    !aiSuggestionApplicationFacade.includes("editorSessionStore.replaceSegmentAt(") &&
-    !aiSuggestionApplicationFacade.includes("saveSegment(") &&
-    !aiSuggestionApplicationFacade.includes("logProjectActivity(") &&
-    !aiSuggestionApplicationFacade.includes("renderSegments(") &&
-    !aiSuggestionApplicationFacade.includes("goToNextOpenSegment(") &&
-    !aiSuggestionApplicationFacade.includes("setSaveStatus("),
-  "app.js must not regain AI-suggestion-application validation, command, restoration, mutation, persistence, activity, presentation, navigation, status, or recovery orchestration."
+  !appJs.includes("async function applyAiSuggestion"),
+  "the AI-suggestion-application forwarding façade must not return."
 );
 for (const testName of [
   "AI suggestion application preserves project, segment, suggestion, confirmed, and locked safeguards",
@@ -4062,40 +4040,21 @@ for (const boundary of [
     `AiSuggestionPersistenceController must retain checked ${boundary} orchestration.`
   );
 }
-assertIncludes(
-  appJs,
-  "return aiSuggestionPersistenceController.normalize(suggestion)",
-  "app.js must retain only the checked AI-suggestion-normalization compatibility facade."
+assert(
+  appJs.split("normalize: (...args) => aiSuggestionPersistenceController.normalize(...args)").length - 1 === 4,
+  "all four early AI suggestion producers must late-bind normalization to checked persistence."
+);
+assert(
+  appJs.split("aiSuggestionPersistenceController.append(").length - 1 === 4,
+  "all four AI suggestion append consumers must call checked persistence directly or through exact late binding."
 );
 assertIncludes(
-  appJs,
-  "return aiSuggestionPersistenceController.append(",
-  "app.js must retain only the checked AI-suggestion-append compatibility facade."
+  appWorkflowDriverJs,
+  "aiSuggestionPersistenceController.append(",
+  "workflow characterization must call checked suggestion persistence directly."
 );
-const savedAiSuggestionFacade = functionBody(
-  appJs,
-  "function savedAiSuggestionRecord",
-  "async function appendAiSuggestion"
-);
-const appendAiSuggestionFacade = functionBody(
-  appJs,
-  "async function appendAiSuggestion",
-  "async function applyAiSuggestion"
-);
-for (const facade of [savedAiSuggestionFacade, appendAiSuggestionFacade]) {
-  assert(
-    !facade.includes("redactSensitiveText(") &&
-      !facade.includes("makeId(") &&
-      !facade.includes("touchSegment(") &&
-      !facade.includes("clearPendingSave(") &&
-      !facade.includes("saveSegment(") &&
-      !facade.includes("logProjectActivity(") &&
-      !facade.includes("renderAiSuggestions(") &&
-      !facade.includes("renderRevisionHistory(") &&
-      !facade.includes("markWorkspaceDirty(") &&
-      !facade.includes("setSaveStatus("),
-    "app.js must not regain AI-suggestion normalization, append, persistence, activity, presentation, workspace, status, or recovery orchestration."
-  );
+for (const removedFacade of ["function savedAiSuggestionRecord", "async function appendAiSuggestion"]) {
+  assert(!appJs.includes(removedFacade), `${removedFacade} must not return after direct suggestion wiring.`);
 }
 for (const testName of [
   "AI suggestion persistence normalizes a portable bounded redacted storage record",
@@ -6103,12 +6062,12 @@ assertIncludes(appJs, "aiProjectBriefController.generate", "app.js must wire the
 assertIncludes(appJs, "localAiProjectBriefBtn", "app.js must bind the AI project brief button.");
 assertIncludes(
   appJs,
-  "tmMatchesForSegment: localAiTmMatchesForSegment",
+  "tmMatchesForSegment: aiSegmentContextService.tmMatchesForSegment",
   "app.js must pass per-segment TM hints into Local AI pretranslation."
 );
 assertIncludes(
   appJs,
-  "glossaryTermsForSegment: localAiGlossaryTermsForSegment",
+  "glossaryTermsForSegment: aiSegmentContextService.glossaryTermsForSegment",
   "app.js must pass per-segment termbase hints into Local AI pretranslation."
 );
 assertIncludes(
@@ -8208,7 +8167,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "function savedAiSuggestionRecord",
+  "aiSuggestionPersistenceController.normalize",
   "app.js must normalize AI suggestions through an allowlist before local segment storage."
 );
 assertIncludes(
