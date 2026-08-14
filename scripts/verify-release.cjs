@@ -156,8 +156,10 @@ const requiredReleaseFiles = [
   "src/entry/renderer-bootstrap.js",
   "src/entry/test.js",
   "src/app/bootstrap.js",
+  "src/app/app-store.js",
   "src/app/compatibility-module-registry.js",
   "src/app/install-runtime.js",
+  "src/features/editor/filter-store.js",
   "src/features/editor/editor-session-store.js",
   "src/features/editor/editor-context-controller.js",
   "src/features/editor/segment-grid-controller.js",
@@ -233,6 +235,8 @@ const requiredReleaseFiles = [
   "tests/unit/anthropic-provider-adapter.test.cjs",
   "tests/unit/cohere-provider-adapter.test.cjs",
   "tests/unit/compatibility-module-registry.test.cjs",
+  "tests/unit/app-store.test.cjs",
+  "tests/unit/editor-state.test.cjs",
   "tests/unit/editor-session-store.test.cjs",
   "tests/unit/editor-context-controller.test.cjs",
   "tests/unit/autosave-service.test.cjs",
@@ -315,11 +319,15 @@ const regressionHtml = readText("regression-test.html");
 const appJs = readText("app.js");
 const appWorkflowDriverJs = readText("tests/app-workflow/workflow-driver.inc.js");
 const appBootstrapJs = readText("src/app/bootstrap.js");
+const appStoreJs = readText("src/app/app-store.js");
+const appStoreUnitTests = readText("tests/unit/app-store.test.cjs");
 const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-registry.js");
 const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-module-registry.test.cjs");
 const installRuntimeJs = readText("src/app/install-runtime.js");
 const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
 const editorSessionStoreUnitTests = readText("tests/unit/editor-session-store.test.cjs");
+const editorFilterStoreJs = readText("src/features/editor/filter-store.js");
+const editorStateUnitTests = readText("tests/unit/editor-state.test.cjs");
 const editorContextControllerJs = readText("src/features/editor/editor-context-controller.js");
 const editorContextControllerUnitTests = readText("tests/unit/editor-context-controller.test.cjs");
 const segmentGridControllerJs = readText("src/features/editor/segment-grid-controller.js");
@@ -555,6 +563,51 @@ assertIncludes(
   appJs,
   "const editorFilterStore = appRuntime.featureFactories.createFilterStore();",
   "app.js must install one authoritative checked editor FilterStore."
+);
+assertIncludes(appStoreJs, "getState()", "AppStore must retain its explicit state snapshot API.");
+assertIncludes(editorFilterStoreJs, "getState: () => state", "FilterStore must retain its stable state getter.");
+assertIncludes(editorFilterStoreJs, "update(patch = {})", "FilterStore must retain its atomic update API.");
+for (const [removedFacade, directAccess] of [
+  ["currentApplicationView", "applicationStore.getState().navigation.view"],
+  ["currentProjectId", "applicationStore.getState().navigation.projectId"],
+  ["currentDocumentId", "applicationStore.getState().navigation.documentId"],
+  ["currentActiveIndex", "applicationStore.getState().navigation.activeIndex"],
+  ["currentSegmentId", "applicationStore.getState().navigation.segmentId"],
+  ["currentFocusMode", "applicationStore.getState().interface.focusMode"],
+  ["currentEditorFilters", "editorFilterStore.getState()"],
+  ["updateEditorFilters", "editorFilterStore.update("]
+]) {
+  assert(
+    !new RegExp(`\\b${removedFacade}\\b`).test(appJs) &&
+      !new RegExp(`\\b${removedFacade}\\b`).test(appWorkflowDriverJs),
+    `${removedFacade} AppStore/FilterStore consumer facade must not return.`
+  );
+  assertIncludes(appJs, directAccess, `application consumers must use ${directAccess} directly.`);
+}
+assertIncludes(
+  appJs,
+  "getActiveIndex: () => applicationStore.getState().navigation.activeIndex",
+  "controller composition must preserve call-time active-index selection without a consumer facade."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  "applicationStore.getState().navigation.activeIndex",
+  "workflow characterization must read AppStore navigation directly."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  "editorFilterStore.update(",
+  "workflow characterization must update FilterStore through its checked receiver method."
+);
+assertIncludes(
+  appStoreUnitTests,
+  "AppStore getState exposes stable defaults and latest snapshot references",
+  "focused AppStore tests must characterize direct call-time snapshot reads."
+);
+assertIncludes(
+  editorStateUnitTests,
+  "assert.equal(updated, getState())",
+  "focused FilterStore tests must characterize direct getter identity and update return values."
 );
 assertIncludes(
   appBootstrapJs,
@@ -7535,7 +7588,7 @@ assertIncludes(
 assertIncludes(appJs, "projectAnalysisRun", "app.js must guard async project analysis renders against stale updates.");
 assertIncludes(
   appJs,
-  'currentApplicationView() !== "project"',
+  'applicationStore.getState().navigation.view !== "project"',
   "app.js must skip project analysis work when AppStore reports that the project home panel is not visible."
 );
 assertIncludes(

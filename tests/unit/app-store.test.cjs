@@ -9,6 +9,27 @@ function moduleAt(relativePath) {
   return import(pathToFileURL(path.join(root, relativePath)).href);
 }
 
+test("AppStore getState exposes stable defaults and latest snapshot references", async () => {
+  const { createAppStore } = await moduleAt("src/app/app-store.js");
+  const store = createAppStore();
+  const getState = store.getState;
+  const initial = getState();
+
+  assert.equal(getState, store.getState);
+  assert.equal(getState(), initial);
+  assert.deepEqual(initial, {
+    navigation: { view: "projects", projectId: null, documentId: "", segmentId: "", activeIndex: -1 },
+    interface: { locale: "", focusMode: false }
+  });
+
+  store.dispatch({ type: "navigation/changed", payload: { view: "editor", projectId: "project-1" } });
+  const latest = getState();
+  assert.notEqual(latest, initial);
+  assert.equal(getState(), latest);
+  assert.equal(latest.navigation.view, "editor");
+  assert.equal(latest.navigation.projectId, "project-1");
+});
+
 test("AppStore normalizes navigation and clears focus mode outside the editor", async () => {
   const { createAppStore } = await moduleAt("src/app/app-store.js");
   const store = createAppStore({ navigation: { view: "editor", projectId: "project-1" } });

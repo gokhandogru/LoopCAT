@@ -688,10 +688,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const docxLandingDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-docx-landing.docx");
     assert(
       docxLandingDocument &&
-        currentDocumentId() === docxLandingDocument.id &&
+        applicationStore.getState().navigation.documentId === docxLandingDocument.id &&
         els.documentFilter.value === docxLandingDocument.id &&
-        currentActiveIndex() >= 0 &&
-        editorSessionStore.getSegments()[currentActiveIndex()]?.documentId === docxLandingDocument.id,
+        applicationStore.getState().navigation.activeIndex >= 0 &&
+        editorSessionStore.getSegments()[applicationStore.getState().navigation.activeIndex]?.documentId === docxLandingDocument.id,
       "DOCX import selects newly imported document"
     );
     const completedDocxLandingSegments = editorSessionStore.getSegments()
@@ -773,7 +773,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(document.activeElement === els.confirmBtn, "command palette restores focus to its opener");
     els.brandHomeLink.click();
     assert(
-      currentApplicationView() === "projects" && !els.projectsView.classList.contains("hidden"),
+      applicationStore.getState().navigation.view === "projects" && !els.projectsView.classList.contains("hidden"),
       "LoopCAT brand navigates to the Projects view"
     );
     showProjectHome();
@@ -807,7 +807,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(Boolean(els.focusModeBtn && els.exitFocusModeBtn), "focus view controls are available in the editor");
     setFocusMode(true);
     assert(
-      currentFocusMode() &&
+      applicationStore.getState().interface.focusMode &&
         document.body.classList.contains("focus-mode") &&
         els.workspace.classList.contains("focus-mode") &&
         els.focusModeBtn.getAttribute("aria-pressed") === "true" &&
@@ -817,7 +817,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     setFocusMode(false);
     assert(
-      !currentFocusMode() &&
+      !applicationStore.getState().interface.focusMode &&
         !document.body.classList.contains("focus-mode") &&
         !els.workspace.classList.contains("focus-mode") &&
         els.focusModeBtn.getAttribute("aria-pressed") === "false" &&
@@ -886,7 +886,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         JSON.stringify(targetCommandPatch(editorSessionStore.getSegments()[segmentIndex]).aiApplication) ===
           JSON.stringify(editTargetBefore.aiApplication) &&
         editTargetStoredAfterUndo?.target === editTargetBefore.target &&
-        currentActiveIndex() === segmentIndex,
+        applicationStore.getState().navigation.activeIndex === segmentIndex,
       "one coalesced EditTarget Undo restores target state, history, provenance, persistence, and selection"
     );
     const editTargetUndoRevision = Number(editorSessionStore.getSegments()[segmentIndex].revision || 0);
@@ -900,7 +900,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         JSON.stringify(editorSessionStore.getSegments()[segmentIndex].targetHistory) === JSON.stringify(editTargetApplied.targetHistory) &&
         Number(editorSessionStore.getSegments()[segmentIndex].revision || 0) > editTargetUndoRevision &&
         editTargetStoredAfterRedo?.target === editTargetApplied.target &&
-        currentActiveIndex() === segmentIndex,
+        applicationStore.getState().navigation.activeIndex === segmentIndex,
       "EditTarget Redo reapplies the coalesced patch with a monotonic revision"
     );
     const keyboardEditBefore = targetCommandPatch(editorSessionStore.getSegments()[segmentIndex]);
@@ -1053,12 +1053,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(
       editorSessionStore.getSegments()[segmentIndex].target === targetBeforeReplaceCommand &&
         undoReplaceStored?.target === targetBeforeReplaceCommand &&
-        currentActiveIndex() === segmentIndex,
+        applicationStore.getState().navigation.activeIndex === segmentIndex,
       `Undo restores target replacement atomically and preserves selection (${JSON.stringify({
         visible: editorSessionStore.getSegments()[segmentIndex].target,
         stored: undoReplaceStored?.target,
         expected: targetBeforeReplaceCommand,
-        activeIndex: currentActiveIndex(),
+        activeIndex: applicationStore.getState().navigation.activeIndex,
         segmentIndex,
         commandId: undoReplaceCommand?.receipt?.commandId || "none"
       })})`
@@ -1149,7 +1149,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
     );
     assert(
-      currentActiveIndex() === segmentIndex &&
+      applicationStore.getState().navigation.activeIndex === segmentIndex &&
         editorSessionStore.getSegments()[segmentIndex].reviewState === "needs-review" &&
         undoneReviewStateStored?.reviewState === "needs-review",
       "Undo restores quick review state and active segment"
@@ -1159,7 +1159,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
     );
     assert(
-      currentActiveIndex() === segmentIndex &&
+      applicationStore.getState().navigation.activeIndex === segmentIndex &&
         editorSessionStore.getSegments()[segmentIndex].reviewState === "reviewed" &&
         redoneReviewStateStored?.reviewState === "reviewed",
       "Redo reapplies quick review state and active segment"
@@ -1167,7 +1167,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     const aiReviewProvider = aiProviderService.get("ollama");
     const originalAiReviewCompletePrompt = aiReviewProvider.completePrompt;
-    const originalAiReviewSegmentFilter = currentEditorFilters().aiState;
+    const originalAiReviewSegmentFilter = editorFilterStore.getState().aiState;
     try {
       if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
@@ -1194,7 +1194,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const aiReviewSaved = await aiReviewController.reviewActive();
       const aiReviewStored = (await getProjectSegments(project.id)).find((segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id);
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = "ai-review-risk";
-      updateEditorFilters({ aiState: "ai-review-risk" });
+      editorFilterStore.update({ aiState: "ai-review-risk" });
       renderSegments();
       assert(
         aiReviewSaved &&
@@ -1214,7 +1214,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
     } finally {
       aiReviewProvider.completePrompt = originalAiReviewCompletePrompt;
-      updateEditorFilters({ aiState: originalAiReviewSegmentFilter });
+      editorFilterStore.update({ aiState: originalAiReviewSegmentFilter });
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalAiReviewSegmentFilter;
       renderSegments();
     }
@@ -1223,14 +1223,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiBatchReviewIndexes = editorSessionStore.getSegments().map((_, index) => index).slice(0, 3);
     const aiBatchReviewSnapshots = new Map(aiBatchReviewIndexes.map((index) => [editorSessionStore.getSegments()[index].id, structuredClone(editorSessionStore.getSegments()[index])]));
     const originalBatchReviewFilters = {
-      documentFilter: currentDocumentId(),
-      segmentQuery: currentEditorFilters().query,
-      segmentSearchScope: currentEditorFilters().scope,
-      segmentRegex: currentEditorFilters().regex,
-      segmentCaseSensitive: currentEditorFilters().caseSensitive,
-      segmentStatusFilter: currentEditorFilters().status,
-      reviewStateFilter: currentEditorFilters().reviewState,
-      aiSegmentFilter: currentEditorFilters().aiState,
+      documentFilter: applicationStore.getState().navigation.documentId,
+      segmentQuery: editorFilterStore.getState().query,
+      segmentSearchScope: editorFilterStore.getState().scope,
+      segmentRegex: editorFilterStore.getState().regex,
+      segmentCaseSensitive: editorFilterStore.getState().caseSensitive,
+      segmentStatusFilter: editorFilterStore.getState().status,
+      reviewStateFilter: editorFilterStore.getState().reviewState,
+      aiSegmentFilter: editorFilterStore.getState().aiState,
       localAiMode: els.localAiModeSelect?.value || ""
     };
     try {
@@ -1240,7 +1240,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-review-model";
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
       selectApplicationDocument("");
-      updateEditorFilters({
+      editorFilterStore.update({
         query: "workflow batch qa",
         scope: "both",
         regex: false,
@@ -1291,7 +1291,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const storedFailedSegment = batchReviewStored.find((segment) => segment.id === failedSegment.id);
       const storedLockedSegment = batchReviewStored.find((segment) => segment.id === lockedSegment.id);
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = "high-ai-risk";
-      updateEditorFilters({ aiState: "high-ai-risk" });
+      editorFilterStore.update({ aiState: "high-ai-risk" });
       renderSegments();
       assert(
         batchReviewSummary?.commented === 1 &&
@@ -1319,7 +1319,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } finally {
       aiReviewProvider.completePrompt = originalAiBatchReviewCompletePrompt;
       selectApplicationDocument(originalBatchReviewFilters.documentFilter);
-      updateEditorFilters({
+      editorFilterStore.update({
         query: originalBatchReviewFilters.segmentQuery,
         scope: originalBatchReviewFilters.segmentSearchScope,
         regex: originalBatchReviewFilters.segmentRegex,
@@ -1402,13 +1402,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiBatchRepairIndexes = editorSessionStore.getSegments().map((_, index) => index).slice(0, 3);
     const aiBatchRepairSnapshots = new Map(aiBatchRepairIndexes.map((index) => [editorSessionStore.getSegments()[index].id, structuredClone(editorSessionStore.getSegments()[index])]));
     const originalBatchRepairFilters = {
-      documentFilter: currentDocumentId(),
-      segmentQuery: currentEditorFilters().query,
-      segmentSearchScope: currentEditorFilters().scope,
-      segmentRegex: currentEditorFilters().regex,
-      segmentCaseSensitive: currentEditorFilters().caseSensitive,
-      segmentStatusFilter: currentEditorFilters().status,
-      reviewStateFilter: currentEditorFilters().reviewState,
+      documentFilter: applicationStore.getState().navigation.documentId,
+      segmentQuery: editorFilterStore.getState().query,
+      segmentSearchScope: editorFilterStore.getState().scope,
+      segmentRegex: editorFilterStore.getState().regex,
+      segmentCaseSensitive: editorFilterStore.getState().caseSensitive,
+      segmentStatusFilter: editorFilterStore.getState().status,
+      reviewStateFilter: editorFilterStore.getState().reviewState,
       localAiMode: els.localAiModeSelect?.value || ""
     };
     try {
@@ -1418,7 +1418,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-repair-model";
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
       selectApplicationDocument("");
-      updateEditorFilters({
+      editorFilterStore.update({
         query: "workflow batch tag repair",
         scope: "both",
         regex: false,
@@ -1503,7 +1503,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } finally {
       aiRepairProvider.completePrompt = originalAiBatchRepairCompletePrompt;
       selectApplicationDocument(originalBatchRepairFilters.documentFilter);
-      updateEditorFilters({
+      editorFilterStore.update({
         query: originalBatchRepairFilters.segmentQuery,
         scope: originalBatchRepairFilters.segmentSearchScope,
         regex: originalBatchRepairFilters.segmentRegex,
@@ -1534,13 +1534,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiVariantsProjectSettingsSnapshot = structuredClone(editorSessionStore.getProject().aiSettings || {});
     const originalAiVariantsMode = els.localAiVariantModeSelect?.value || "";
     const originalAiVariantsFilters = {
-      documentFilter: currentDocumentId(),
-      segmentQuery: currentEditorFilters().query,
-      segmentSearchScope: currentEditorFilters().scope,
-      segmentRegex: currentEditorFilters().regex,
-      segmentCaseSensitive: currentEditorFilters().caseSensitive,
-      segmentStatusFilter: currentEditorFilters().status,
-      reviewStateFilter: currentEditorFilters().reviewState,
+      documentFilter: applicationStore.getState().navigation.documentId,
+      segmentQuery: editorFilterStore.getState().query,
+      segmentSearchScope: editorFilterStore.getState().scope,
+      segmentRegex: editorFilterStore.getState().regex,
+      segmentCaseSensitive: editorFilterStore.getState().caseSensitive,
+      segmentStatusFilter: editorFilterStore.getState().status,
+      reviewStateFilter: editorFilterStore.getState().reviewState,
       localAiMode: els.localAiModeSelect?.value || "",
       activeSegmentId: editorSessionStore.getSegments()[segmentIndex]?.id || ""
     };
@@ -1613,7 +1613,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch variants alpha source.</p><p>Workflow batch variants beta source.</p><p>Workflow batch variants failure source.</p><p>Workflow batch variants locked source.</p></body></html>"], "workflow-ai-batch-variants.html", { type: "text/html" }));
       const aiBatchVariantsDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-ai-batch-variants.html");
       await openProjectFile(aiBatchVariantsDocument.id);
-      updateEditorFilters({
+      editorFilterStore.update({
         query: "",
         scope: "both",
         regex: false,
@@ -1683,7 +1683,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiVariantModeSelect) els.localAiVariantModeSelect.value = originalAiVariantsMode;
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiVariantsFilters.localAiMode;
       selectApplicationDocument(originalAiVariantsFilters.documentFilter);
-      updateEditorFilters({
+      editorFilterStore.update({
         query: originalAiVariantsFilters.segmentQuery,
         scope: originalAiVariantsFilters.segmentSearchScope,
         regex: originalAiVariantsFilters.segmentRegex,
@@ -1785,13 +1785,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiBatchApplyTermsIndexes = editorSessionStore.getSegments().map((_, index) => index).slice(0, 3);
     const aiBatchApplyTermsSnapshots = new Map(aiBatchApplyTermsIndexes.map((index) => [editorSessionStore.getSegments()[index].id, structuredClone(editorSessionStore.getSegments()[index])]));
     const originalBatchApplyTermsFilters = {
-      documentFilter: currentDocumentId(),
-      segmentQuery: currentEditorFilters().query,
-      segmentSearchScope: currentEditorFilters().scope,
-      segmentRegex: currentEditorFilters().regex,
-      segmentCaseSensitive: currentEditorFilters().caseSensitive,
-      segmentStatusFilter: currentEditorFilters().status,
-      reviewStateFilter: currentEditorFilters().reviewState,
+      documentFilter: applicationStore.getState().navigation.documentId,
+      segmentQuery: editorFilterStore.getState().query,
+      segmentSearchScope: editorFilterStore.getState().scope,
+      segmentRegex: editorFilterStore.getState().regex,
+      segmentCaseSensitive: editorFilterStore.getState().caseSensitive,
+      segmentStatusFilter: editorFilterStore.getState().status,
+      reviewStateFilter: editorFilterStore.getState().reviewState,
       localAiMode: els.localAiModeSelect?.value || ""
     };
     const aiBatchApplyTermsSavedTerms = [];
@@ -1802,7 +1802,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-batch-apply-terms-model";
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
       selectApplicationDocument("");
-      updateEditorFilters({
+      editorFilterStore.update({
         query: "workflow batch apply terminology",
         scope: "both",
         regex: false,
@@ -1901,7 +1901,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       aiApplyTermsProvider.completePrompt = originalAiBatchApplyTermsCompletePrompt;
       await Promise.all(aiBatchApplyTermsSavedTerms.filter((term) => term?.id).map((term) => deleteTerm(term.id)));
       selectApplicationDocument(originalBatchApplyTermsFilters.documentFilter);
-      updateEditorFilters({
+      editorFilterStore.update({
         query: originalBatchApplyTermsFilters.segmentQuery,
         scope: originalBatchApplyTermsFilters.segmentSearchScope,
         regex: originalBatchApplyTermsFilters.segmentRegex,
@@ -1931,15 +1931,15 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiPolishSegmentSnapshot = structuredClone(editorSessionStore.getSegments()[segmentIndex]);
     const aiPolishProjectSettingsSnapshot = structuredClone(editorSessionStore.getProject().aiSettings || {});
     const originalAiPolishFilters = {
-      documentFilter: currentDocumentId(),
-      segmentQuery: currentEditorFilters().query,
-      segmentSearchScope: currentEditorFilters().scope,
-      segmentRegex: currentEditorFilters().regex,
-      segmentCaseSensitive: currentEditorFilters().caseSensitive,
-      segmentStatusFilter: currentEditorFilters().status,
-      reviewStateFilter: currentEditorFilters().reviewState,
+      documentFilter: applicationStore.getState().navigation.documentId,
+      segmentQuery: editorFilterStore.getState().query,
+      segmentSearchScope: editorFilterStore.getState().scope,
+      segmentRegex: editorFilterStore.getState().regex,
+      segmentCaseSensitive: editorFilterStore.getState().caseSensitive,
+      segmentStatusFilter: editorFilterStore.getState().status,
+      reviewStateFilter: editorFilterStore.getState().reviewState,
       localAiMode: els.localAiModeSelect?.value || "",
-      activeIndex: currentActiveIndex()
+      activeIndex: applicationStore.getState().navigation.activeIndex
     };
     let aiPolishTerm = null;
     let aiPolishTmEntry = null;
@@ -2035,7 +2035,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch polish alpha source.</p><p>Workflow batch polish beta source.</p></body></html>"], "workflow-ai-batch-polish.html", { type: "text/html" }));
       const aiBatchPolishDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-ai-batch-polish.html");
       await openProjectFile(aiBatchPolishDocument.id);
-      updateEditorFilters({
+      editorFilterStore.update({
         query: "",
         scope: "both",
         regex: false,
@@ -2076,7 +2076,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       aiPolishProvider.completePrompt = originalAiPolishCompletePrompt;
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiPolishFilters.localAiMode;
       selectApplicationDocument(originalAiPolishFilters.documentFilter);
-      updateEditorFilters({
+      editorFilterStore.update({
         query: originalAiPolishFilters.segmentQuery,
         scope: originalAiPolishFilters.segmentSearchScope,
         regex: originalAiPolishFilters.segmentRegex,
@@ -2210,13 +2210,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const originalAiBatchAdaptCompletePrompt = aiBatchAdaptProvider.completePrompt;
     const aiBatchAdaptProjectSettingsSnapshot = structuredClone(editorSessionStore.getProject().aiSettings || {});
     const originalAiBatchAdaptFilters = {
-      documentFilter: currentDocumentId(),
-      segmentQuery: currentEditorFilters().query,
-      segmentSearchScope: currentEditorFilters().scope,
-      segmentRegex: currentEditorFilters().regex,
-      segmentCaseSensitive: currentEditorFilters().caseSensitive,
-      segmentStatusFilter: currentEditorFilters().status,
-      reviewStateFilter: currentEditorFilters().reviewState,
+      documentFilter: applicationStore.getState().navigation.documentId,
+      segmentQuery: editorFilterStore.getState().query,
+      segmentSearchScope: editorFilterStore.getState().scope,
+      segmentRegex: editorFilterStore.getState().regex,
+      segmentCaseSensitive: editorFilterStore.getState().caseSensitive,
+      segmentStatusFilter: editorFilterStore.getState().status,
+      reviewStateFilter: editorFilterStore.getState().reviewState,
       localAiMode: els.localAiModeSelect?.value || "",
       localAiAdaptMode: els.localAiAdaptModeSelect?.value || "",
       activeSegmentId: editorSessionStore.getSegments()[segmentIndex]?.id || ""
@@ -2237,7 +2237,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch adapt alpha source.</p><p>Workflow batch adapt beta source.</p><p>Workflow batch adapt failure source.</p><p>Workflow batch adapt locked source.</p></body></html>"], "workflow-ai-batch-adapt.html", { type: "text/html" }));
       const aiBatchAdaptDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-ai-batch-adapt.html");
       await openProjectFile(aiBatchAdaptDocument.id);
-      updateEditorFilters({
+      editorFilterStore.update({
         query: "",
         scope: "both",
         regex: false,
@@ -2339,7 +2339,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiBatchAdaptFilters.localAiMode;
       if (els.localAiAdaptModeSelect) els.localAiAdaptModeSelect.value = originalAiBatchAdaptFilters.localAiAdaptMode;
       selectApplicationDocument(originalAiBatchAdaptFilters.documentFilter);
-      updateEditorFilters({
+      editorFilterStore.update({
         query: originalAiBatchAdaptFilters.segmentQuery,
         scope: originalAiBatchAdaptFilters.segmentSearchScope,
         regex: originalAiBatchAdaptFilters.segmentRegex,
@@ -2362,8 +2362,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const aiTermsProvider = aiProviderService.get("ollama");
     const originalAiTermsCompletePrompt = aiTermsProvider.completePrompt;
     const originalAiTermsMode = els.localAiModeSelect?.value || "";
-    const originalAiTermsDocumentFilter = currentDocumentId();
-    const originalAiTermsActiveIndex = currentActiveIndex();
+    const originalAiTermsDocumentFilter = applicationStore.getState().navigation.documentId;
+    const originalAiTermsActiveIndex = applicationStore.getState().navigation.activeIndex;
     let aiExtractedTermIds = [];
     let aiTermsPromptCount = 0;
     try {
@@ -3261,7 +3261,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const originalLocalAiGlossaryTranslateSegment = localAiGlossaryProvider.translateSegment;
     const originalLocalAiGlossaryCompletePrompt = localAiGlossaryProvider.completePrompt;
     const originalLocalAiGlossaryMode = els.localAiModeSelect?.value || "";
-    const originalLocalAiGlossaryAiFilter = currentEditorFilters().aiState;
+    const originalLocalAiGlossaryAiFilter = editorFilterStore.getState().aiState;
     let localAiGlossaryTerm = null;
     let localAiTmEntry = null;
     let localAiGlossaryRequest = null;
@@ -3440,7 +3440,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "Local AI pretranslation Redo restores review/provenance patches with a monotonic revision"
       );
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = "ai-draft";
-      updateEditorFilters({ aiState: "ai-draft" });
+      editorFilterStore.update({ aiState: "ai-draft" });
       renderSegments();
       assert(
         localAiGlossaryRequest?.segment?.id === localAiGlossarySegment?.id &&
@@ -3469,7 +3469,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       localAiGlossarySegment.status = localAiConfirmedPreviousStatus;
       localAiGlossarySegment.reviewState = localAiConfirmedPreviousReviewState;
-      updateEditorFilters({ aiState: originalLocalAiGlossaryAiFilter });
+      editorFilterStore.update({ aiState: originalLocalAiGlossaryAiFilter });
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalLocalAiGlossaryAiFilter;
       renderSegments();
       setSegmentTargetAndStatus(localAiGlossarySegment, "", "draft", "ai-cancel-fixture");
@@ -3673,7 +3673,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       localAiGlossaryProvider.translateSegment = originalLocalAiGlossaryTranslateSegment;
       localAiGlossaryProvider.completePrompt = originalLocalAiGlossaryCompletePrompt;
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalLocalAiGlossaryMode;
-      updateEditorFilters({ aiState: originalLocalAiGlossaryAiFilter });
+      editorFilterStore.update({ aiState: originalLocalAiGlossaryAiFilter });
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalLocalAiGlossaryAiFilter;
       if (localAiTmEntry?.id) await deleteTmEntry(localAiTmEntry.id);
       if (localAiGlossaryTerm?.id) await deleteTerm(localAiGlossaryTerm.id);
@@ -3763,11 +3763,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     touchSegment(confirmRollbackSegment);
     await saveSegment(confirmRollbackSegment);
     const originalConfirmReviewedFilters = {
-      segmentStatusFilter: currentEditorFilters().status,
-      reviewStateFilter: currentEditorFilters().reviewState,
-      aiSegmentFilter: currentEditorFilters().aiState
+      segmentStatusFilter: editorFilterStore.getState().status,
+      reviewStateFilter: editorFilterStore.getState().reviewState,
+      aiSegmentFilter: editorFilterStore.getState().aiState
     };
-    updateEditorFilters({ status: "all", reviewState: "", aiState: "" });
+    editorFilterStore.update({ status: "all", reviewState: "", aiState: "" });
     if (els.segmentStatusFilter) els.segmentStatusFilter.value = "all";
     if (els.reviewStateFilter) els.reviewStateFilter.value = "";
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
@@ -3796,7 +3796,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         editorSessionStore.getSegments()[segmentIndex].reviewState === "needs-review" &&
         undoneConfirmedSegment?.status === "draft" &&
         undoneConfirmedSegment?.reviewState === "needs-review" &&
-        currentActiveIndex() === segmentIndex,
+        applicationStore.getState().navigation.activeIndex === segmentIndex,
       "Undo restores confirmed segment status, review state, persistence, and selection"
     );
     await redoLastCommand();
@@ -3808,7 +3808,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         (redoneConfirmedSegment?.reviewState || "") === "",
       "Redo reapplies confirmed segment state"
     );
-    updateEditorFilters({
+    editorFilterStore.update({
       status: originalConfirmReviewedFilters.segmentStatusFilter,
       reviewState: originalConfirmReviewedFilters.reviewStateFilter,
       aiState: originalConfirmReviewedFilters.aiSegmentFilter
@@ -4479,7 +4479,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     workflowTmOpenButton?.click();
     await yieldToUi();
     const resourceOpenFocusState = {
-      view: currentApplicationView(),
+      view: applicationStore.getState().navigation.view,
       detailHidden: els.tmResourceDetail.classList.contains("hidden"),
       activeAction: document.activeElement?.dataset?.resourceAction || "",
       activeKey: document.activeElement?.dataset?.resourceKey || "",
@@ -5909,7 +5909,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       (segment) => segment.documentId === structuralDocument.id
     );
     const splitUndoOriginal = splitUndoVisible.find((segment) => segment.id === structuralSegmentsBefore[0].id);
-    const splitUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
+    const splitUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] textarea`);
     assert(
       splitUndoVisible.length === 3 &&
         splitUndoStored.length === 3 &&
@@ -5931,7 +5931,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     const splitRedoCreated = splitRedoVisible.find((segment) => segment.id === splitCreatedSegment?.id);
     const splitRedoOriginal = splitRedoVisible.find((segment) => segment.id === structuralSegmentsBefore[0].id);
-    const splitRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
+    const splitRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] textarea`);
     assert(
       splitRedoVisible.length === 4 &&
         splitRedoStored.length === 4 &&
@@ -5995,7 +5995,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const mergeAppliedVisible = editorSessionStore.getSegments().filter((segment) => segment.documentId === structuralDocument.id);
     const mergeSuccessStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
     const mergeAppliedSurvivor = mergeAppliedVisible.find((segment) => segment.id === mergeFirstBefore.id);
-    const mergeAppliedTextarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
+    const mergeAppliedTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] textarea`);
     const mergeAppliedRevision = Number(mergeAppliedSurvivor?.revision || 0);
     const mergeAppliedHistory = structuredClone(mergeAppliedSurvivor?.targetHistory || []);
     assert(
@@ -6026,7 +6026,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     const mergeUndoFirst = mergeUndoVisible.find((segment) => segment.id === mergeFirstBefore.id);
     const mergeUndoSecond = mergeUndoVisible.find((segment) => segment.id === mergeSecondBefore.id);
-    const mergeUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
+    const mergeUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] textarea`);
     const mergeUndoFirstRevision = Number(mergeUndoFirst?.revision || 0);
     assert(
       mergeUndoResult?.receipt?.commandId === "merge-segments" &&
@@ -6053,7 +6053,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       (segment) => segment.documentId === structuralDocument.id
     );
     const mergeRedoSurvivor = mergeRedoVisible.find((segment) => segment.id === mergeFirstBefore.id);
-    const mergeRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${currentActiveIndex()}"] textarea`);
+    const mergeRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] textarea`);
     assert(
       mergeRedoResult?.receipt?.commandId === "merge-segments" &&
         mergeRedoVisible.length === 3 &&

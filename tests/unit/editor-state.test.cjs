@@ -68,7 +68,15 @@ test("segment grid owns virtualization and coalesced render scheduling", async (
 test("filter state updates atomically and resets to deterministic defaults", async () => {
   const { createFilterStore } = await moduleAt("src/features/editor/filter-store.js");
   const filters = createFilterStore({ status: "draft" });
-  filters.update({ query: "term", regex: true });
+  const getState = filters.getState;
+  const initial = getState();
+  const updates = [];
+  filters.subscribe((next, previous) => updates.push({ next, previous }));
+  const updated = filters.update({ query: "term", regex: true });
+  assert.equal(getState, filters.getState);
+  assert.equal(updated, getState());
+  assert.equal(updates[0].previous, initial);
+  assert.equal(updates[0].next, updated);
   assert.equal(filters.getState().status, "draft");
   assert.equal(filters.getState().query, "term");
   filters.reset();
