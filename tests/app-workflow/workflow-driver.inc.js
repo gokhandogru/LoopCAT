@@ -783,7 +783,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(
       analysisPanel?.classList.contains("collapsed") &&
         analysisToggle?.getAttribute("aria-expanded") === "false" &&
-        analysisToggle?.getAttribute("aria-label")?.startsWith(uiSource("Expand")) &&
+        analysisToggle?.getAttribute("aria-label")?.startsWith(uiLocalizationService.source("Expand")) &&
         getComputedStyle(document.querySelector("#projectAnalysisContent")).display === "none",
       "Project analysis can be collapsed"
     );
@@ -791,13 +791,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(
       !analysisPanel?.classList.contains("collapsed") &&
         analysisToggle?.getAttribute("aria-expanded") === "true" &&
-        analysisToggle?.getAttribute("aria-label")?.startsWith(uiSource("Minimize")),
+        analysisToggle?.getAttribute("aria-label")?.startsWith(uiLocalizationService.source("Minimize")),
       "Project analysis can be expanded"
     );
     await openProjectFile(documentInfo.id);
     const activeTargetEditor = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
     assert(
-      activeTargetEditor?.getAttribute("aria-label") === uiSource("Target translation for segment {value1}", { value1: segmentIndex + 1 }),
+      activeTargetEditor?.getAttribute("aria-label") === uiLocalizationService.source("Target translation for segment {value1}", { value1: segmentIndex + 1 }),
       "segment target editors expose a segment-specific accessible name"
     );
     assert(

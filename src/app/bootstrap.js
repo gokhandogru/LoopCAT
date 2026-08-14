@@ -109,6 +109,7 @@ import { createStatusController } from "../status/status-controller.js";
 import { createAiProviderService } from "../ai/providers/legacy-registry-adapter.js";
 import { finalizeReportDocument } from "../reports/report-document.js";
 import { createLocaleLoader } from "../i18n/locale-loader.js";
+import { createUiLocalizationService } from "../i18n/ui-localization-service.js";
 
 export function createApplicationRuntime({ browserWindow, compatibilityModules, desktopBridge }) {
   const store = createAppStore();
@@ -198,6 +199,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createFilterPresetController,
       createInspectorController,
       createImportExportController,
+      createUiLocalizationService,
       createProjectDialogController,
       createProjectsController,
       createQualityReviewController,

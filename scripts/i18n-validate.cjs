@@ -38,8 +38,14 @@ function collectDataKeys(html) {
 
 function collectCodeKeys(js) {
   const keys = [];
-  for (const match of js.matchAll(/\b(?:t|uiT)\(\s*["']([^"']+)["']/g)) keys.push(match[1]);
-  for (const match of js.matchAll(/\buiLabel(?:Html)?\(\s*["']([^"']+)["']/g)) keys.push(`ui.label.${match[1]}`);
+  for (const match of js.matchAll(/\b(?:t|uiT|uiLocalizationService\.translate)\(\s*["']([^"']+)["']/g)) {
+    keys.push(match[1]);
+  }
+  for (const match of js.matchAll(
+    /\b(?:uiLabel(?:Html)?|uiLocalizationService\.label(?:Html)?)\(\s*["']([^"']+)["']/g
+  )) {
+    keys.push(`ui.label.${match[1]}`);
+  }
   return keys;
 }
 
@@ -52,25 +58,31 @@ function validate() {
   });
 
   if (fs.existsSync(localeDir)) {
-    fs.readdirSync(localeDir).filter((name) => name.endsWith(".json")).forEach((name) => {
-      const localePath = path.join(localeDir, name);
-      const locale = readJson(localePath);
-      const messages = locale.messages || {};
-      Object.keys(sourceMessages).forEach((key) => {
-        if (!Object.prototype.hasOwnProperty.call(messages, key)) {
-          errors.push(`${name} is missing key ${key}.`);
-          return;
-        }
-        const target = messages[key];
-        if (locale.locale !== source.locale && !String(target || "").trim()) return;
-        const placeholders = samePlaceholders(sourceMessages[key].message, target);
-        placeholders.missing.forEach((placeholder) => errors.push(`${name}:${key} is missing placeholder {${placeholder}}.`));
-        placeholders.extra.forEach((placeholder) => errors.push(`${name}:${key} has unknown placeholder {${placeholder}}.`));
+    fs.readdirSync(localeDir)
+      .filter((name) => name.endsWith(".json"))
+      .forEach((name) => {
+        const localePath = path.join(localeDir, name);
+        const locale = readJson(localePath);
+        const messages = locale.messages || {};
+        Object.keys(sourceMessages).forEach((key) => {
+          if (!Object.prototype.hasOwnProperty.call(messages, key)) {
+            errors.push(`${name} is missing key ${key}.`);
+            return;
+          }
+          const target = messages[key];
+          if (locale.locale !== source.locale && !String(target || "").trim()) return;
+          const placeholders = samePlaceholders(sourceMessages[key].message, target);
+          placeholders.missing.forEach((placeholder) =>
+            errors.push(`${name}:${key} is missing placeholder {${placeholder}}.`)
+          );
+          placeholders.extra.forEach((placeholder) =>
+            errors.push(`${name}:${key} has unknown placeholder {${placeholder}}.`)
+          );
+        });
+        Object.keys(messages).forEach((key) => {
+          if (!Object.prototype.hasOwnProperty.call(sourceMessages, key)) errors.push(`${name} has extra key ${key}.`);
+        });
       });
-      Object.keys(messages).forEach((key) => {
-        if (!Object.prototype.hasOwnProperty.call(sourceMessages, key)) errors.push(`${name} has extra key ${key}.`);
-      });
-    });
   }
 
   const referencedKeys = [
@@ -78,14 +90,17 @@ function validate() {
     ...collectCodeKeys(fs.existsSync(appPath) ? fs.readFileSync(appPath, "utf8") : "")
   ];
   referencedKeys.forEach((key) => {
-    if (!Object.prototype.hasOwnProperty.call(sourceMessages, key)) errors.push(`Referenced i18n key is missing from source: ${key}`);
+    if (!Object.prototype.hasOwnProperty.call(sourceMessages, key))
+      errors.push(`Referenced i18n key is missing from source: ${key}`);
   });
 
   if (errors.length) {
     console.error(errors.join("\n"));
     process.exit(1);
   }
-  console.log(`Validated ${Object.keys(sourceMessages).length} source messages and ${referencedKeys.length} explicit key references.`);
+  console.log(
+    `Validated ${Object.keys(sourceMessages).length} source messages and ${referencedKeys.length} explicit key references.`
+  );
 }
 
 validate();

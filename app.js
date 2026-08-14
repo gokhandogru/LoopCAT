@@ -73,6 +73,13 @@ const {
 const workerClient = compatibilityModules.workerClient;
 const workspaceStorage = compatibilityModules.workspaceStorage;
 const uiI18n = compatibilityModules.i18n;
+const uiLocalizationService = appRuntime.featureFactories.createUiLocalizationService({
+  i18n: uiI18n,
+  documentElement: document.documentElement,
+  escapeHtml,
+  confirm: (message) => window.confirm(message),
+  alert: (message) => window.alert(message)
+});
 const focusController = compatibilityModules.focusController.createFocusController();
 const replaceSafeHtml = appRuntime.safeHtml.replace;
 const finalizeReportDocument = appRuntime.reports.finalize;
@@ -1180,7 +1187,7 @@ const aiAdministrationController = appRuntime?.featureFactories?.createAiAdminis
     formChanged: (...args) => aiProviderFormController.handleFormChanged(...args),
     languageChanged: (...args) => aiProviderFormController.handleLanguageChanged(...args)
   },
-  source: uiSource,
+  source: uiLocalizationService.source,
   onError: (error) => setSaveStatus(error?.message || "AI action failed.", "dirty")
 });
 aiAdministrationController?.mount?.();
@@ -1604,7 +1611,7 @@ const aiScopeSelectionService = appRuntime.featureFactories.createAiScopeSelecti
   filters: { getVisibleIndexes: filteredSegmentIndexes }
 });
 const externalAiConsentService = appRuntime.featureFactories.createExternalAiConsentService({
-  confirm: uiConfirm
+  confirm: uiLocalizationService.confirm
 });
 const aiProviderPresentationService =
   appRuntime.featureFactories.createAiProviderPresentationService({
@@ -1636,7 +1643,7 @@ const aiProviderPresentationService =
       "openai-compatible": openAiCompatibleApiUrl
     },
     network: { isOllamaCloudBaseUrl },
-    localization: { label: uiLabel, source: uiSource },
+    localization: { label: uiLocalizationService.label, source: uiLocalizationService.source },
     defaults: {
       providerId: "ollama",
       baseUrl: OLLAMA_DEFAULT_BASE_URL,
@@ -1689,7 +1696,7 @@ const aiProviderFormController =
       }
     },
     status: { setSave: setSaveStatus },
-    localization: { label: uiLabel, source: uiSource },
+    localization: { label: uiLocalizationService.label, source: uiLocalizationService.source },
     redact: redactSensitiveText,
     defaults: {
       localBaseUrl: OLLAMA_DEFAULT_BASE_URL,
@@ -1703,8 +1710,8 @@ const aiSuggestionListController =
     root: els.aiSuggestionList,
     getSegment: currentSegment,
     apply: (...args) => aiSuggestionApplicationController.apply(...args),
-    source: uiSource,
-    label: uiLabel,
+    source: uiLocalizationService.source,
+    label: uiLocalizationService.label,
     formatDateTime
   });
 const aiCommandLifecycleCoordinator =
@@ -1734,7 +1741,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
   consent: {
     externalShare: externalAiConsentService.confirmShare,
     overwrite: () =>
-      uiConfirm(
+      uiLocalizationService.confirm(
         "Overwrite existing target text in eligible draft segments? Confirmed and locked segments are always preserved."
       )
   },
@@ -2755,7 +2762,7 @@ const paletteController = appRuntime?.featureFactories?.createPaletteController?
   closeButton: els.closeCommandPaletteBtn,
   appShell: document.querySelector(".app-shell"),
   getCommands: commandList,
-  translate: uiSource,
+  translate: uiLocalizationService.source,
   focusController,
   preferencesRepository: appRuntime.preferencesRepository,
   onError: (error) => setSaveStatus(error?.message || "Command failed", "dirty")
@@ -2801,7 +2808,7 @@ const diagnosticsService = appRuntime?.featureFactories?.createDiagnosticsServic
     };
   },
   getInterfaceSummary: () => ({
-    locale: currentUiLocale(),
+    locale: uiLocalizationService.locale(),
     theme: themeController?.getPreference?.() || "light",
     density: workspaceLayoutController?.getState?.().density || "balanced",
     offlineUpdateAvailable: !els.updateReadyBanner?.classList.contains("hidden")
@@ -2819,7 +2826,7 @@ const diagnosticsController = appRuntime?.featureFactories?.createDiagnosticsCon
   service: diagnosticsService,
   platform: appRuntime.platform,
   download: (text, filename, type) => download(filename, text, type),
-  translate: uiSource
+  translate: uiLocalizationService.source
 });
 
 const dialogLifecycleController = appRuntime?.featureFactories?.createDialogController?.({
@@ -2827,7 +2834,7 @@ const dialogLifecycleController = appRuntime?.featureFactories?.createDialogCont
   getActiveElement: () => document.activeElement,
   onError: (error, context) => {
     if (context?.id === "diagnostics" && els.diagnosticsMessage) {
-      els.diagnosticsMessage.textContent = uiSource(error?.message || "Diagnostics could not be collected.");
+      els.diagnosticsMessage.textContent = uiLocalizationService.source(error?.message || "Diagnostics could not be collected.");
       return;
     }
     setSaveStatus(error?.message || "Dialog could not be opened.", "dirty");
@@ -2849,7 +2856,7 @@ dialogLifecycleController?.register?.({
   returnTarget: els.workspaceMenuSummary,
   afterOpen: () => {
     void diagnosticsController?.refresh?.().catch((error) => {
-      els.diagnosticsMessage.textContent = uiSource(error?.message || "Diagnostics could not be collected.");
+      els.diagnosticsMessage.textContent = uiLocalizationService.source(error?.message || "Diagnostics could not be collected.");
     });
   }
 });
@@ -2885,9 +2892,9 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
     saveProjectToFolderInput: els.saveProjectToFolderInput,
     projectChooseWorkspaceButton: els.projectChooseWorkspaceBtn
   },
-  translate: uiT,
-  source: uiSource,
-  label: uiLabel,
+  translate: uiLocalizationService.translate,
+  source: uiLocalizationService.source,
+  label: uiLocalizationService.label,
   formatDateTime,
   safeText: displaySafeText,
   chooseWorkspace: chooseWorkspaceFolder,
@@ -2902,15 +2909,15 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
   onError: (error, context) => {
     if (error?.name === "AbortError" && context?.phase === "choose-workspace") return;
     const fallback = {
-      "choose-workspace": uiSource("Could not choose workspace folder"),
-      "save-project": uiSource("Project package save failed"),
-      "sync-workspace": uiSource("Workspace sync failed"),
-      "export-workspace-backup": uiSource("Workspace backup failed"),
-      "repair-workspace": uiSource("Workspace repair check failed"),
-      "save-recovery": uiSource("Workspace recovery save failed"),
-      "export-recovery-copy": uiSource("Recovery copy export failed"),
-      "dismiss-backup-reminder": uiSource("Backup reminder could not be dismissed")
-    }[context?.phase] || uiSource("Workspace action failed");
+      "choose-workspace": uiLocalizationService.source("Could not choose workspace folder"),
+      "save-project": uiLocalizationService.source("Project package save failed"),
+      "sync-workspace": uiLocalizationService.source("Workspace sync failed"),
+      "export-workspace-backup": uiLocalizationService.source("Workspace backup failed"),
+      "repair-workspace": uiLocalizationService.source("Workspace repair check failed"),
+      "save-recovery": uiLocalizationService.source("Workspace recovery save failed"),
+      "export-recovery-copy": uiLocalizationService.source("Recovery copy export failed"),
+      "dismiss-backup-reminder": uiLocalizationService.source("Backup reminder could not be dismissed")
+    }[context?.phase] || uiLocalizationService.source("Workspace action failed");
     setSaveStatus(error?.message || fallback, "dirty");
     if (context?.phase === "save-recovery") renderWorkspaceRecoveryPanel();
   }
@@ -2982,7 +2989,7 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
   scheduleFrame: requestAnimationFrame,
   onError: (error, context) => {
     console.warn(`Import/export action failed (${context?.phase || "unknown"}).`, error);
-    setSaveStatus(error?.message || uiSource("Import or export action failed."), "dirty");
+    setSaveStatus(error?.message || uiLocalizationService.source("Import or export action failed."), "dirty");
   }
 });
 importExportController?.mount?.();
@@ -3030,7 +3037,7 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
   save: saveProjectFromDialog,
   chooseWorkspace: chooseWorkspaceFolder,
   workspaceSupported: () => Boolean(workspaceStorage?.isSupported()),
-  translate: uiSource,
+  translate: uiLocalizationService.source,
   scheduleFrame: requestAnimationFrame,
   onError: (error) => setSaveStatus(error?.message || "Dialog could not be opened.", "dirty")
 });
@@ -3122,8 +3129,8 @@ const qualityReviewController = appRuntime?.featureFactories?.createQualityRevie
     qualityRiskList: els.qualityRiskList
   },
   defaultProfile: defaultQualityProfile,
-  source: uiSource,
-  label: uiLabel,
+  source: uiLocalizationService.source,
+  label: uiLocalizationService.label,
   profileLabel: qualityLabel,
   categoryLabel: qualityCategoryName,
   riskLevelLabel: qualityRiskLevelLabel,
@@ -3304,49 +3311,13 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
 });
 dialogLifecycleController?.mount?.();
 
-function uiT(key, values = {}) {
-  return uiI18n?.t ? uiI18n.t(key, values) : key;
-}
-
-function uiSource(text, values = {}) {
-  return uiI18n?.source ? uiI18n.source(text, values) : String(text || "");
-}
-
-function currentUiLocale() {
-  return uiI18n?.getLocale?.() || document.documentElement.lang || "en-US";
-}
-
-function uiLabel(key, values = {}) {
-  return uiT(`ui.label.${key}`, values);
-}
-
-function uiLabelHtml(key, values = {}) {
-  return escapeHtml(uiLabel(key, values));
-}
-
-function translatedSourceText(text, values = {}) {
-  return uiSource(text, values);
-}
-
-function translatedSourceHtml(text, values = {}) {
-  return escapeHtml(translatedSourceText(text, values));
-}
-
-function uiConfirm(message, values = {}) {
-  return window.confirm(uiSource(message, values));
-}
-
-function uiAlert(message) {
-  window.alert(uiSource(message));
-}
-
 function renderUiLocaleOptions() {
   if (!els.uiLocaleSelect || !uiI18n?.availableLocales) return;
   const current = uiI18n.getLocale();
   els.uiLocaleSelect.replaceChildren(...uiI18n.availableLocales().map((locale) => {
     const option = document.createElement("option");
     option.value = locale.locale;
-    option.textContent = `${locale.label || locale.locale}${locale.custom ? ` (${uiSource("custom")})` : ""}`;
+    option.textContent = `${locale.label || locale.locale}${locale.custom ? ` (${uiLocalizationService.source("custom")})` : ""}`;
     return option;
   }));
   els.uiLocaleSelect.value = current;
@@ -3415,13 +3386,13 @@ function setSaveStatus(text, mode = "") {
     projectId: editorSessionStore.getProject()?.id || null,
     segmentId: applicationStore.getState().navigation.segmentId
   });
-  els.saveStatus.textContent = uiSource(displayText);
+  els.saveStatus.textContent = uiLocalizationService.source(displayText);
   els.saveStatus.className = `save-status ${mode}`;
   const operationActive = /^(saving|starting|requesting|sending|running|generating|extracting|polishing|adapting|pretranslating|canceling)|:\s*(reading|parsing|importing|saving)/i.test(displayText);
   els.saveStatus.setAttribute("aria-busy", String(operationActive));
   if ((mode === "saved" || displayText.startsWith("Saved to ")) && displayText !== "Saved") {
     state.saveStatusTimer = setTimeout(() => {
-      els.saveStatus.textContent = uiT("app.status.saved");
+      els.saveStatus.textContent = uiLocalizationService.translate("app.status.saved");
       els.saveStatus.className = "save-status saved";
       state.saveStatusTimer = 0;
     }, 5000);
@@ -3535,8 +3506,8 @@ async function redoLastCommand() {
 async function refreshTrashSummary() {
   if (!els.trashBtn || !appRuntime?.trashRepository) return [];
   const entries = await appRuntime.trashRepository.list();
-  els.trashBtn.textContent = entries.length ? uiSource("Trash ({value1})", { value1: entries.length }) : uiSource("Trash");
-  els.trashBtn.setAttribute("aria-label", uiSource("Trash, {value1} item(s)", { value1: entries.length }));
+  els.trashBtn.textContent = entries.length ? uiLocalizationService.source("Trash ({value1})", { value1: entries.length }) : uiLocalizationService.source("Trash");
+  els.trashBtn.setAttribute("aria-label", uiLocalizationService.source("Trash, {value1} item(s)", { value1: entries.length }));
   return entries;
 }
 
@@ -3561,7 +3532,7 @@ async function renderTrashList() {
   if (!entries.length) {
     const empty = document.createElement("div");
     empty.className = "muted";
-    empty.textContent = uiSource("Trash is empty. Deleted projects, files, memories, and termbases will appear here.");
+    empty.textContent = uiLocalizationService.source("Trash is empty. Deleted projects, files, memories, and termbases will appear here.");
     els.trashList.replaceChildren(empty);
     els.emptyTrashBtn.disabled = true;
     return entries;
@@ -3572,24 +3543,24 @@ async function renderTrashList() {
     item.className = "trash-item";
     const copy = document.createElement("div");
     const title = document.createElement("strong");
-    title.textContent = displaySafeText(entry.label, uiSource("Deleted item"));
+    title.textContent = displaySafeText(entry.label, uiLocalizationService.source("Deleted item"));
     const meta = document.createElement("p");
     const entityLabel =
       entry.entityType === "document"
-        ? uiSource("Project file")
+        ? uiLocalizationService.source("Project file")
         : entry.entityType === "project"
-          ? uiSource("Project")
+          ? uiLocalizationService.source("Project")
           : entry.resourceType === "tm"
-            ? uiSource("Translation memory")
-            : uiSource("Termbase");
+            ? uiLocalizationService.source("Translation memory")
+            : uiLocalizationService.source("Termbase");
     meta.textContent = `${entityLabel} · ${formatDate(entry.deletedAt)}`;
     copy.append(title, meta);
     const actions = document.createElement("div");
     actions.className = "trash-item-actions";
     const restore = document.createElement("button");
     restore.type = "button";
-    restore.textContent = uiSource("Restore");
-    restore.setAttribute("aria-label", uiSource("Restore {value1}", { value1: displaySafeText(entry.label) }));
+    restore.textContent = uiLocalizationService.source("Restore");
+    restore.setAttribute("aria-label", uiLocalizationService.source("Restore {value1}", { value1: displaySafeText(entry.label) }));
     restore.addEventListener("click", () => restoreTrashEntry(entry.id));
     actions.append(restore);
     item.append(copy, actions);
@@ -3607,7 +3578,7 @@ async function openTrash() {
 async function emptyTrashPermanently() {
   const entries = await appRuntime.trashRepository.list();
   if (!entries.length) return false;
-  const confirmed = uiConfirm("Permanently delete every item in Trash? This cannot be undone.");
+  const confirmed = uiLocalizationService.confirm("Permanently delete every item in Trash? This cannot be undone.");
   if (!confirmed) return false;
   await appRuntime.trashRepository.emptyAll();
   await renderTrashList();
@@ -3623,7 +3594,7 @@ function syncPanelToggleState(button) {
   const panelLabel = button.dataset.panelLabel || existingLabel.replace(/^(?:Expand|Minimize|Collapse)\s+/i, "") || panel.querySelector("h2, h3")?.textContent || "panel";
   button.dataset.panelLabel = panelLabel;
   button.setAttribute("aria-expanded", String(!collapsed));
-  button.setAttribute("aria-label", uiSource(`${collapsed ? "Expand" : "Minimize"} ${panelLabel}`));
+  button.setAttribute("aria-label", uiLocalizationService.source(`${collapsed ? "Expand" : "Minimize"} ${panelLabel}`));
 }
 
 function syncAllPanelToggleStates() {
@@ -3635,8 +3606,8 @@ function renderFocusMode() {
   document.body.classList.toggle("focus-mode", active);
   els.workspace.classList.toggle("focus-mode", active);
   if (els.focusModeBtn) {
-    els.focusModeBtn.textContent = active ? uiT("app.focus.normalView") : uiT("app.focus.focus");
-    els.focusModeBtn.title = active ? uiT("app.focus.returnTitle") : uiT("app.focus.showOnlyTitle");
+    els.focusModeBtn.textContent = active ? uiLocalizationService.translate("app.focus.normalView") : uiLocalizationService.translate("app.focus.focus");
+    els.focusModeBtn.title = active ? uiLocalizationService.translate("app.focus.returnTitle") : uiLocalizationService.translate("app.focus.showOnlyTitle");
     els.focusModeBtn.setAttribute("aria-pressed", String(active));
   }
   if (els.exitFocusModeBtn) {
@@ -4137,12 +4108,12 @@ function renderOfflineUpdateState(update) {
     error: ["Update paused", update.message || "Your current version is still active and your work was preserved."]
   };
   const [title, message] = messages[update.state] || messages.ready;
-  els.updateReadyTitle.textContent = uiSource(title);
-  els.updateReadyMessage.textContent = uiSource(message);
+  els.updateReadyTitle.textContent = uiLocalizationService.source(title);
+  els.updateReadyMessage.textContent = uiLocalizationService.source(message);
   const busy = ["saving", "activating", "reloading"].includes(update.state);
   els.reloadUpdateBtn.disabled = busy;
   els.deferUpdateBtn.disabled = busy;
-  els.reloadUpdateBtn.textContent = update.state === "error" ? uiSource("Try again") : uiSource("Reload now");
+  els.reloadUpdateBtn.textContent = update.state === "error" ? uiLocalizationService.source("Try again") : uiLocalizationService.source("Reload now");
 }
 
 function registerOfflineAppShell() {
@@ -4368,10 +4339,10 @@ function segmentHasAiDraft(segment = {}) {
 function aiPretranslationBadge(segment = {}) {
   return {
     className: "ai-initiated",
-    text: uiSource("AI initiated"),
+    text: uiLocalizationService.source("AI initiated"),
     title: segment.aiPretranslation?.model
-      ? uiLabel("aiInitiatedPretranslationModel", { model: segment.aiPretranslation.model })
-      : uiLabel("aiInitiatedPretranslation")
+      ? uiLocalizationService.label("aiInitiatedPretranslationModel", { model: segment.aiPretranslation.model })
+      : uiLocalizationService.label("aiInitiatedPretranslation")
   };
 }
 
@@ -4392,8 +4363,8 @@ function tmPretranslationBadge(segment = {}) {
     className: "tm-pretranslation",
     text: `TM ${score}%`,
     title: tmName
-      ? uiSource("TM pretranslation match: {value1}% from {value2}", { value1: score, value2: tmName })
-      : uiSource("TM pretranslation match: {value1}%", { value1: score })
+      ? uiLocalizationService.source("TM pretranslation match: {value1}% from {value2}", { value1: score, value2: tmName })
+      : uiLocalizationService.source("TM pretranslation match: {value1}%", { value1: score })
   };
 }
 
@@ -4688,7 +4659,7 @@ function languageNameForUi(code) {
   const clean = canonicalLanguageCode(code);
   if (!clean) return "";
   const configuredName = configuredLanguageName(clean);
-  if (configuredName) return uiSource(configuredName);
+  if (configuredName) return uiLocalizationService.source(configuredName);
   try {
     if (typeof Intl.DisplayNames === "function") {
       const names = new Intl.DisplayNames([uiI18n?.getLocale?.() || navigator.language || "en"], { type: "language" });
@@ -5033,20 +5004,20 @@ function incompleteExportScopeLabel(documentInfo, fallbackLabel) {
 function confirmIncompleteExport(plan, documentInfo, fallbackLabel) {
   if (!plan.requiresConfirmation) return true;
   const lines = [
-    uiSource("The export scope {value1} contains incomplete translation work.", {
+    uiLocalizationService.source("The export scope {value1} contains incomplete translation work.", {
       value1: incompleteExportScopeLabel(documentInfo, fallbackLabel)
     })
   ];
   if (plan.sourceFallbackCount) {
-    lines.push(uiSource("{value1} empty target segment(s) will export source text.", { value1: plan.sourceFallbackCount }));
+    lines.push(uiLocalizationService.source("{value1} empty target segment(s) will export source text.", { value1: plan.sourceFallbackCount }));
   }
   if (plan.preservedEmptyTargetCount) {
-    lines.push(uiSource("{value1} empty target segment(s) will remain empty in the exported interchange file.", { value1: plan.preservedEmptyTargetCount }));
+    lines.push(uiLocalizationService.source("{value1} empty target segment(s) will remain empty in the exported interchange file.", { value1: plan.preservedEmptyTargetCount }));
   }
   if (plan.draftTargetCount) {
-    lines.push(uiSource("{value1} non-empty unconfirmed target segment(s) will export as written.", { value1: plan.draftTargetCount }));
+    lines.push(uiLocalizationService.source("{value1} non-empty unconfirmed target segment(s) will export as written.", { value1: plan.draftTargetCount }));
   }
-  lines.push(uiSource("Export anyway?"));
+  lines.push(uiLocalizationService.source("Export anyway?"));
   return window.confirm(lines.join("\n\n"));
 }
 
@@ -5064,18 +5035,18 @@ function cancelIncompleteExport() {
 
 function reviewLabel(value) {
   return {
-    "needs-review": uiSource("Needs review"),
-    reviewed: uiSource("Reviewed"),
-    blocked: uiSource("Blocked")
+    "needs-review": uiLocalizationService.source("Needs review"),
+    reviewed: uiLocalizationService.source("Reviewed"),
+    blocked: uiLocalizationService.source("Blocked")
   }[value] || "";
 }
 
 function segmentStatusLabel(status) {
   return {
-    empty: uiLabel("empty"),
-    draft: uiLabel("draft"),
-    confirmed: uiLabel("confirmed")
-  }[status] || uiSource(status);
+    empty: uiLocalizationService.label("empty"),
+    draft: uiLocalizationService.label("draft"),
+    confirmed: uiLocalizationService.label("confirmed")
+  }[status] || uiLocalizationService.source(status);
 }
 
 function commandList() {
@@ -5135,12 +5106,12 @@ function commandList() {
 }
 
 function formatDate(value) {
-  if (!value) return uiSource("Never");
+  if (!value) return uiLocalizationService.source("Never");
   return new Intl.DateTimeFormat(uiI18n?.getLocale?.() || undefined, { dateStyle: "medium" }).format(new Date(value));
 }
 
 function formatDateTime(value) {
-  if (!value) return uiSource("Never");
+  if (!value) return uiLocalizationService.source("Never");
   return new Intl.DateTimeFormat(uiI18n?.getLocale?.() || undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
@@ -5547,8 +5518,8 @@ function projectDialogValues() {
 
 function resourceOptionHtml(resource, type, selected, main) {
   const countLabel = resource.count
-    ? uiLabel(type === "tm" ? "unitCount" : "termCount", { count: resource.count })
-    : uiLabel("empty");
+    ? uiLocalizationService.label(type === "tm" ? "unitCount" : "termCount", { count: resource.count })
+    : uiLocalizationService.label("empty");
   const checkbox = `<input type="checkbox" data-resource-type="${type}" data-resource-name="${escapeHtml(resource.name)}" ${selected ? "checked" : ""}>`;
   const radio = type === "tm"
     ? `<input type="radio" name="projectMainTm" data-main-tm="${escapeHtml(resource.name)}" ${main ? "checked" : ""}>`
@@ -5576,10 +5547,10 @@ function renderProjectResourcePickers(project = editorSessionStore.getProject())
   const tbResources = matchingResourceSummaries("tb", sourceLang, targetLang, selectedTbNames);
   replaceSafeHtml(els.projectTmResourceList, tmResources.length
     ? tmResources.map((resource) => resourceOptionHtml(resource, "tm", selectedTmNames.includes(resource.name), resource.name === main)).join("")
-    : `<div class="muted">${uiLabelHtml("noMatchingTms")}</div>`);
+    : `<div class="muted">${uiLocalizationService.labelHtml("noMatchingTms")}</div>`);
   replaceSafeHtml(els.projectTbResourceList, tbResources.length
     ? tbResources.map((resource) => resourceOptionHtml(resource, "tb", selectedTbNames.includes(resource.name), false)).join("")
-    : `<div class="muted">${uiLabelHtml("noMatchingTbs")}</div>`);
+    : `<div class="muted">${uiLocalizationService.labelHtml("noMatchingTbs")}</div>`);
 }
 
 function openProjectDialog(mode = "create") {
@@ -5759,16 +5730,16 @@ function renderValidationReport(report) {
     report: displayReport,
     summary: displayReport ? reportSummary(displayReport) : "",
     groups: [
-      { key: "errors", label: uiLabel("errors") },
-      { key: "risky", label: uiLabel("risk") },
-      { key: "warnings", label: uiSource("Warnings") },
-      { key: "simplified", label: uiLabel("simplified") },
-      { key: "skipped", label: uiLabel("skipped") },
-      { key: "preserved", label: uiLabel("preserved") }
+      { key: "errors", label: uiLocalizationService.label("errors") },
+      { key: "risky", label: uiLocalizationService.label("risk") },
+      { key: "warnings", label: uiLocalizationService.source("Warnings") },
+      { key: "simplified", label: uiLocalizationService.label("simplified") },
+      { key: "skipped", label: uiLocalizationService.label("skipped") },
+      { key: "preserved", label: uiLocalizationService.label("preserved") }
     ],
-    dismissLabel: uiSource("Dismiss validation report"),
-    dismissText: uiSource("Dismiss"),
-    emptyLabel: uiSource("No validation issues."),
+    dismissLabel: uiLocalizationService.source("Dismiss validation report"),
+    dismissText: uiLocalizationService.source("Dismiss"),
+    emptyLabel: uiLocalizationService.source("No validation issues."),
     autoDismissMs: displayReport?.ok ? (reportCount(displayReport) ? 12000 : 7000) : 0
   });
 }
@@ -5783,32 +5754,32 @@ async function renderProjectAnalysis() {
   const tmNames = new Set(projectTmNames(project));
   const analysis = analyzeProject(project, segments, tmEntries.filter((entry) => tmNames.has(entry.tmName)));
   const ai = analysis.ai || {};
-  els.analysisMeta.textContent = uiLabel("generatedAt", { date: formatDate(analysis.generatedAt) });
+  els.analysisMeta.textContent = uiLocalizationService.label("generatedAt", { date: formatDate(analysis.generatedAt) });
   replaceSafeHtml(els.projectAnalysis, `
-    <div><strong>${analysis.totals.confirmedPercent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
-    <div><strong>${analysis.totals.untranslated}</strong><span>${translatedSourceHtml("empty targets")}</span></div>
-    <div><strong>${analysis.totals.repetitions}</strong><span>${uiLabelHtml("repetitions")}</span></div>
-    <div><strong>${analysis.leverage.exact}</strong><span>${uiLabelHtml("exactTm")}</span></div>
-    <div><strong>${analysis.leverage.fuzzy95 + analysis.leverage.fuzzy85}</strong><span>${uiLabelHtml("strongFuzzy")}</span></div>
-    <div><strong>${analysis.totals.segments - analysis.totals.confirmed}</strong><span>${uiLabelHtml("openSegments")}</span></div>
-    <div><strong>${analysis.totals.files}</strong><span>${uiLabelHtml("files")}</span></div>
-    <div><strong>${analysis.totals.words}</strong><span>${uiLabelHtml("sourceWords")}</span></div>
-    <div><strong>${ai.drafts || 0}</strong><span>${translatedSourceHtml("AI initiated")}</span></div>
-    <div><strong>${ai.suggestionSegments || 0}</strong><span>${uiLabelHtml("aiSuggestionRows")}</span></div>
-    <div><strong>${ai.highRisk || 0}</strong><span>${uiLabelHtml("highAiRisk")}</span></div>
+    <div><strong>${analysis.totals.confirmedPercent}%</strong><span>${uiLocalizationService.labelHtml("confirmed")}</span></div>
+    <div><strong>${analysis.totals.untranslated}</strong><span>${uiLocalizationService.sourceHtml("empty targets")}</span></div>
+    <div><strong>${analysis.totals.repetitions}</strong><span>${uiLocalizationService.labelHtml("repetitions")}</span></div>
+    <div><strong>${analysis.leverage.exact}</strong><span>${uiLocalizationService.labelHtml("exactTm")}</span></div>
+    <div><strong>${analysis.leverage.fuzzy95 + analysis.leverage.fuzzy85}</strong><span>${uiLocalizationService.labelHtml("strongFuzzy")}</span></div>
+    <div><strong>${analysis.totals.segments - analysis.totals.confirmed}</strong><span>${uiLocalizationService.labelHtml("openSegments")}</span></div>
+    <div><strong>${analysis.totals.files}</strong><span>${uiLocalizationService.labelHtml("files")}</span></div>
+    <div><strong>${analysis.totals.words}</strong><span>${uiLocalizationService.labelHtml("sourceWords")}</span></div>
+    <div><strong>${ai.drafts || 0}</strong><span>${uiLocalizationService.sourceHtml("AI initiated")}</span></div>
+    <div><strong>${ai.suggestionSegments || 0}</strong><span>${uiLocalizationService.labelHtml("aiSuggestionRows")}</span></div>
+    <div><strong>${ai.highRisk || 0}</strong><span>${uiLocalizationService.labelHtml("highAiRisk")}</span></div>
   `);
 }
 
 function renderProjectList() {
   if (!editorSessionStore.getProjects().length) {
-    replaceSafeHtml(els.projectList, `<div class="muted">${translatedSourceHtml("No projects yet.")}</div>`);
+    replaceSafeHtml(els.projectList, `<div class="muted">${uiLocalizationService.sourceHtml("No projects yet.")}</div>`);
     return;
   }
   const fragment = document.createDocumentFragment();
   editorSessionStore.getProjects().forEach((project) => {
     const button = document.createElement("button");
     button.className = `project-item ${editorSessionStore.getProject()?.id === project.id ? "active" : ""}`;
-    replaceSafeHtml(button, `<strong>${displaySafeHtml(project.name)}</strong><span>${escapeHtml(languagePair(project))}</span><span>${project.sourceFileName ? displaySafeHtml(project.sourceFileName) : uiLabelHtml("noSourceFile")}</span>`);
+    replaceSafeHtml(button, `<strong>${displaySafeHtml(project.name)}</strong><span>${escapeHtml(languagePair(project))}</span><span>${project.sourceFileName ? displaySafeHtml(project.sourceFileName) : uiLocalizationService.labelHtml("noSourceFile")}</span>`);
     button.addEventListener("click", () => openProject(project.id));
     fragment.append(button);
   });
@@ -5887,29 +5858,29 @@ function renderEditor() {
   renderFocusMode();
   if (els.inspectorToggleBtn) {
     els.inspectorToggleBtn.setAttribute("aria-expanded", String(state.inspectorOpen));
-    els.inspectorToggleBtn.textContent = state.inspectorOpen ? uiSource("Hide inspector") : uiSource("Show inspector");
+    els.inspectorToggleBtn.textContent = state.inspectorOpen ? uiLocalizationService.source("Hide inspector") : uiLocalizationService.source("Show inspector");
   }
   if (!editorSessionStore.getProject()) return;
 
   const resources = projectResourceSummary();
   els.projectTitle.textContent = displaySafeText(editorSessionStore.getProject().name);
-  els.projectMeta.textContent = `${languagePair()} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
+  els.projectMeta.textContent = `${languagePair()} - ${uiLocalizationService.label("mainTm")}: ${displaySafeText(resources.mainTm, uiLocalizationService.label("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
   els.projectDomainEditInput.value = editorSessionStore.getProject().domain || "";
   els.domainForm.classList.add("clean");
   els.domainForm.classList.toggle("hidden", Boolean((editorSessionStore.getProject().domain || "").trim()));
   replaceSafeHtml(els.projectInfo, `
-    <dt>${uiLabelHtml("name")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().name)}</dd>
-    <dt>${translatedSourceHtml("Creator")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().creatorName || uiLabel("notSet"))}</dd>
-    <dt>${translatedSourceHtml("Domain")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().domain || uiLabel("notSet"))}</dd>
-    <dt>${uiLabelHtml("languages")}</dt><dd>${escapeHtml(languagePair())}</dd>
-    <dt>${translatedSourceHtml("Workspace")}</dt><dd>${escapeHtml(editorSessionStore.getProject().workspaceId || "local-workspace")}</dd>
-    <dt>${uiLabelHtml("sourceFile")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().sourceFileName || uiLabel("notImported"))}</dd>
-    <dt>${uiLabelHtml("mainTm")}</dt><dd>${displaySafeHtml(resources.mainTm)}</dd>
-    <dt>${uiLabelHtml("linkedTms")}</dt><dd>${displaySafeHtml(resources.tmNames.join(", "))}</dd>
-    <dt>${uiLabelHtml("linkedTbs")}</dt><dd>${displaySafeHtml(resources.tbNames.join(", "))}</dd>
-    <dt>${translatedSourceHtml("Documents")}</dt><dd>${projectDocuments().length || 0}</dd>
-    <dt>${uiLabelHtml("segmentsTitle")}</dt><dd>${editorSessionStore.getSegments().length}</dd>
-    <dt>${uiLabelHtml("activity")}</dt><dd>${uiLabelHtml("eventCount", { count: editorSessionStore.getActivityEvents().length })}</dd>
+    <dt>${uiLocalizationService.labelHtml("name")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().name)}</dd>
+    <dt>${uiLocalizationService.sourceHtml("Creator")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().creatorName || uiLocalizationService.label("notSet"))}</dd>
+    <dt>${uiLocalizationService.sourceHtml("Domain")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().domain || uiLocalizationService.label("notSet"))}</dd>
+    <dt>${uiLocalizationService.labelHtml("languages")}</dt><dd>${escapeHtml(languagePair())}</dd>
+    <dt>${uiLocalizationService.sourceHtml("Workspace")}</dt><dd>${escapeHtml(editorSessionStore.getProject().workspaceId || "local-workspace")}</dd>
+    <dt>${uiLocalizationService.labelHtml("sourceFile")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().sourceFileName || uiLocalizationService.label("notImported"))}</dd>
+    <dt>${uiLocalizationService.labelHtml("mainTm")}</dt><dd>${displaySafeHtml(resources.mainTm)}</dd>
+    <dt>${uiLocalizationService.labelHtml("linkedTms")}</dt><dd>${displaySafeHtml(resources.tmNames.join(", "))}</dd>
+    <dt>${uiLocalizationService.labelHtml("linkedTbs")}</dt><dd>${displaySafeHtml(resources.tbNames.join(", "))}</dd>
+    <dt>${uiLocalizationService.sourceHtml("Documents")}</dt><dd>${projectDocuments().length || 0}</dd>
+    <dt>${uiLocalizationService.labelHtml("segmentsTitle")}</dt><dd>${editorSessionStore.getSegments().length}</dd>
+    <dt>${uiLocalizationService.labelHtml("activity")}</dt><dd>${uiLocalizationService.labelHtml("eventCount", { count: editorSessionStore.getActivityEvents().length })}</dd>
   `);
   const ai = aiRuntimeSettingsService.normalizeProjectSettings(editorSessionStore.getProject().aiSettings);
   aiAdministrationController?.renderGlobalSettings?.({
@@ -5946,16 +5917,16 @@ function renderProjectHome() {
   const sourceWords = total.words;
   const resources = projectResourceSummary();
   els.projectHomeTitle.textContent = displaySafeText(editorSessionStore.getProject().name);
-  els.projectHomeMeta.textContent = `${languagePair()} - ${displaySafeText(editorSessionStore.getProject().domain || uiLabel("noDomain"))} - ${uiLabel("mainTm")}: ${displaySafeText(resources.mainTm, uiLabel("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
+  els.projectHomeMeta.textContent = `${languagePair()} - ${displaySafeText(editorSessionStore.getProject().domain || uiLocalizationService.label("noDomain"))} - ${uiLocalizationService.label("mainTm")}: ${displaySafeText(resources.mainTm, uiLocalizationService.label("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
   replaceSafeHtml(els.projectHomeStats, `
-    <div><strong>${total.percent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
-    <div><strong>${documents.length}</strong><span>${uiLabelHtml("files")}</span></div>
-    <div><strong>${editorSessionStore.getSegments().length}</strong><span>${uiLabelHtml("segments")}</span></div>
-    <div><strong>${sourceWords}</strong><span>${uiLabelHtml("sourceWords")}</span></div>
+    <div><strong>${total.percent}%</strong><span>${uiLocalizationService.labelHtml("confirmed")}</span></div>
+    <div><strong>${documents.length}</strong><span>${uiLocalizationService.labelHtml("files")}</span></div>
+    <div><strong>${editorSessionStore.getSegments().length}</strong><span>${uiLocalizationService.labelHtml("segments")}</span></div>
+    <div><strong>${sourceWords}</strong><span>${uiLocalizationService.labelHtml("sourceWords")}</span></div>
   `);
-  els.fileCountText.textContent = documents.length ? uiLabel("fileCount", { count: documents.length }) : uiSource("No files imported");
+  els.fileCountText.textContent = documents.length ? uiLocalizationService.label("fileCount", { count: documents.length }) : uiLocalizationService.source("No files imported");
   if (!documents.length) {
-    replaceSafeHtml(els.projectFileList, `<div class="empty-file-state">${translatedSourceHtml("Import a DOCX or other format file to start translating this project.")}</div>`);
+    replaceSafeHtml(els.projectFileList, `<div class="empty-file-state">${uiLocalizationService.sourceHtml("Import a DOCX or other format file to start translating this project.")}</div>`);
     return;
   }
   const fragment = document.createDocumentFragment();
@@ -5972,28 +5943,28 @@ function renderProjectHome() {
         <span class="language-badge">${stats.percent}%</span>
       </header>
       <div class="project-stats">
-        <div><strong>${stats.words}</strong><span>${uiLabelHtml("words")}</span></div>
-        <div><strong>${stats.segments}</strong><span>${uiLabelHtml("segments")}</span></div>
+        <div><strong>${stats.words}</strong><span>${uiLocalizationService.labelHtml("words")}</span></div>
+        <div><strong>${stats.segments}</strong><span>${uiLocalizationService.labelHtml("segments")}</span></div>
       </div>
       <div class="progress-bar"><div style="width:${stats.percent}%"></div></div>
       <footer>
-        <span>${uiLabelHtml("emptyDraftCount", { empty: stats.empty, draft: stats.draft })}</span>
+        <span>${uiLocalizationService.labelHtml("emptyDraftCount", { empty: stats.empty, draft: stats.draft })}</span>
         <div class="file-card-actions"></div>
       </footer>
     `);
     card.querySelector(".progress-bar > div").style.width = `${stats.percent}%`;
     const deleteButton = document.createElement("button");
-    const fileLabel = displaySafeText(documentInfo.name, uiSource("file"));
+    const fileLabel = displaySafeText(documentInfo.name, uiLocalizationService.source("file"));
     deleteButton.className = "danger-small";
     deleteButton.type = "button";
-    deleteButton.textContent = uiSource("Delete");
-    deleteButton.setAttribute("aria-label", uiSource("Delete file {value1}", { value1: fileLabel }));
+    deleteButton.textContent = uiLocalizationService.source("Delete");
+    deleteButton.setAttribute("aria-label", uiLocalizationService.source("Delete file {value1}", { value1: fileLabel }));
     deleteButton.addEventListener("click", () => confirmDeleteFile(documentInfo));
     const openButton = document.createElement("button");
     openButton.className = "primary";
     openButton.type = "button";
-    openButton.textContent = uiSource("Open");
-    openButton.setAttribute("aria-label", uiSource("Open file {value1}", { value1: fileLabel }));
+    openButton.textContent = uiLocalizationService.source("Open");
+    openButton.setAttribute("aria-label", uiLocalizationService.source("Open file {value1}", { value1: fileLabel }));
     openButton.addEventListener("click", () => openProjectFile(documentInfo.id));
     card.querySelector(".file-card-actions").append(deleteButton, openButton);
     fragment.append(card);
@@ -6007,7 +5978,7 @@ function renderDocumentFilter() {
   const fragment = document.createDocumentFragment();
   const allOption = document.createElement("option");
   allOption.value = "";
-  allOption.textContent = uiSource("All documents");
+  allOption.textContent = uiLocalizationService.source("All documents");
   fragment.append(allOption);
   documents.forEach((documentInfo) => {
     const option = document.createElement("option");
@@ -6026,7 +5997,7 @@ function renderLanguagePairFilter() {
   const fragment = document.createDocumentFragment();
   const allOption = document.createElement("option");
   allOption.value = "";
-  allOption.textContent = uiSource("All language pairs");
+  allOption.textContent = uiLocalizationService.source("All language pairs");
   fragment.append(allOption);
   pairs.forEach((pair) => {
     const [sourceLang, targetLang] = pair.split("::");
@@ -6046,33 +6017,33 @@ function createProjectTile(project) {
     <header>
       <div>
         <h3>${displaySafeHtml(project.name)}</h3>
-        <p>${displaySafeHtml(project.domain ? `${project.domain} - ${project.sourceFileName || uiLabel("noSourceFileImported")}` : project.sourceFileName || uiLabel("noSourceFileImported"))}</p>
+        <p>${displaySafeHtml(project.domain ? `${project.domain} - ${project.sourceFileName || uiLocalizationService.label("noSourceFileImported")}` : project.sourceFileName || uiLocalizationService.label("noSourceFileImported"))}</p>
       </div>
       <span class="language-badge">${escapeHtml(languagePair(project))}</span>
     </header>
     <div class="project-stats">
-      <div><strong>${project.progress.percent}%</strong><span>${uiLabelHtml("confirmed")}</span></div>
-      <div><strong>${project.progress.total}</strong><span>${uiLabelHtml("segments")}</span></div>
-      <div><strong>${project.wordCount}</strong><span>${uiLabelHtml("words")}</span></div>
+      <div><strong>${project.progress.percent}%</strong><span>${uiLocalizationService.labelHtml("confirmed")}</span></div>
+      <div><strong>${project.progress.total}</strong><span>${uiLocalizationService.labelHtml("segments")}</span></div>
+      <div><strong>${project.wordCount}</strong><span>${uiLocalizationService.labelHtml("words")}</span></div>
     </div>
     <div class="progress-bar"><div style="width:${project.progress.percent}%"></div></div>
     <footer>
-      <span>${uiLabelHtml("updatedAt", { date: formatDate(project.updatedAt) })}</span>
+      <span>${uiLocalizationService.labelHtml("updatedAt", { date: formatDate(project.updatedAt) })}</span>
     </footer>
   `);
   tile.querySelector(".progress-bar > div").style.width = `${project.progress.percent}%`;
   const deleteButton = document.createElement("button");
-  const projectLabel = displaySafeText(project.name, uiSource("project"));
+  const projectLabel = displaySafeText(project.name, uiLocalizationService.source("project"));
   deleteButton.className = "danger-small";
   deleteButton.type = "button";
-  deleteButton.textContent = uiSource("Delete");
-  deleteButton.setAttribute("aria-label", uiSource("Delete project {value1}", { value1: projectLabel }));
+  deleteButton.textContent = uiLocalizationService.source("Delete");
+  deleteButton.setAttribute("aria-label", uiLocalizationService.source("Delete project {value1}", { value1: projectLabel }));
   deleteButton.addEventListener("click", () => confirmDeleteProject(project.id));
   const openButton = document.createElement("button");
   openButton.className = "primary";
   openButton.type = "button";
-  openButton.textContent = uiSource("Open");
-  openButton.setAttribute("aria-label", uiSource("Open project {value1}", { value1: projectLabel }));
+  openButton.textContent = uiLocalizationService.source("Open");
+  openButton.setAttribute("aria-label", uiLocalizationService.source("Open project {value1}", { value1: projectLabel }));
   openButton.addEventListener("click", () => openProject(project.id));
   tile.querySelector("footer").append(deleteButton, openButton);
   return tile;
@@ -6086,9 +6057,9 @@ function projectEmptyState({ hasProjects }) {
   const action = document.createElement("button");
   action.type = "button";
   if (hasProjects) {
-    heading.textContent = uiSource("No matching projects");
-    message.textContent = uiSource("Clear the search and language filters to see every local project.");
-    action.textContent = uiSource("Clear filters");
+    heading.textContent = uiLocalizationService.source("No matching projects");
+    message.textContent = uiLocalizationService.source("Clear the search and language filters to see every local project.");
+    action.textContent = uiLocalizationService.source("Clear filters");
     action.addEventListener("click", () => {
       els.projectSearchInput.value = "";
       els.languagePairFilter.value = "";
@@ -6096,9 +6067,9 @@ function projectEmptyState({ hasProjects }) {
       els.projectSearchInput.focus();
     });
   } else {
-    heading.textContent = uiSource("Start your first translation");
-    message.textContent = uiSource("Choose New project above, or bring in an existing LoopCAT project package.");
-    action.textContent = uiSource("Import project package");
+    heading.textContent = uiLocalizationService.source("Start your first translation");
+    message.textContent = uiLocalizationService.source("Choose New project above, or bring in an existing LoopCAT project package.");
+    action.textContent = uiLocalizationService.source("Import project package");
     action.addEventListener("click", () => els.projectPackageImportInput.click());
   }
   empty.append(heading, message, action);
@@ -6130,7 +6101,7 @@ function renderProjectsView() {
 async function confirmDeleteProject(projectId = editorSessionStore.getProject()?.id) {
   const project = editorSessionStore.getProjects().find((item) => item.id === projectId);
   if (!project) return false;
-  const ok = uiConfirm(`Move project "${displaySafeText(project.name)}" and all of its files to Trash?`);
+  const ok = uiLocalizationService.confirm(`Move project "${displaySafeText(project.name)}" and all of its files to Trash?`);
   if (!ok) return false;
   try {
     await autosaveService.flush(project.id);
@@ -6158,7 +6129,7 @@ async function confirmDeleteProject(projectId = editorSessionStore.getProject()?
 
 async function confirmDeleteFile(documentInfo) {
   if (!editorSessionStore.getProject() || !documentInfo) return false;
-  const ok = uiConfirm(`Move file "${displaySafeText(documentInfo.name)}" to Trash?`);
+  const ok = uiLocalizationService.confirm(`Move file "${displaySafeText(documentInfo.name)}" to Trash?`);
   if (!ok) return false;
   try {
     await autosaveService.flush(editorSessionStore.getProject().id);
@@ -6218,11 +6189,11 @@ function renderResourceDashboard(type, resourceState) {
     const empty = document.createElement("div");
     empty.className = "empty-file-state actionable-empty-state";
     const message = document.createElement("p");
-    message.textContent = uiLabel(isTm ? "noTranslationMemories" : "noTermbases");
+    message.textContent = uiLocalizationService.label(isTm ? "noTranslationMemories" : "noTermbases");
     const action = document.createElement("button");
     action.type = "button";
     action.className = "primary";
-    action.textContent = uiSource(isTm ? "Import a TMX file" : "Import a TBX or term-list file");
+    action.textContent = uiLocalizationService.source(isTm ? "Import a TMX file" : "Import a TBX or term-list file");
     action.dataset.resourceAction = "import";
     action.dataset.resourceType = type;
     empty.append(message, action);
@@ -6242,36 +6213,36 @@ function renderResourceDashboard(type, resourceState) {
         <span class="language-badge">${resource.count}</span>
       </header>
       <div class="project-stats">
-        <div><strong>${resource.count}</strong><span>${uiLabelHtml(isTm ? "entries" : "terms")}</span></div>
-        <div><strong>${escapeHtml(resource.sourceLang || "-")}</strong><span>${uiLabelHtml("source")}</span></div>
-        <div><strong>${escapeHtml(resource.targetLang || "-")}</strong><span>${uiLabelHtml("target")}</span></div>
+        <div><strong>${resource.count}</strong><span>${uiLocalizationService.labelHtml(isTm ? "entries" : "terms")}</span></div>
+        <div><strong>${escapeHtml(resource.sourceLang || "-")}</strong><span>${uiLocalizationService.labelHtml("source")}</span></div>
+        <div><strong>${escapeHtml(resource.targetLang || "-")}</strong><span>${uiLocalizationService.labelHtml("target")}</span></div>
       </div>
       <footer>
-        <span>${uiLabelHtml("updatedAt", { date: formatDate(resource.updatedAt) })}</span>
+        <span>${uiLocalizationService.labelHtml("updatedAt", { date: formatDate(resource.updatedAt) })}</span>
         <div class="resource-card-actions"></div>
       </footer>
     `);
     const deleteButton = document.createElement("button");
-    const resourceLabel = displaySafeText(resource.name, uiSource("resource"));
+    const resourceLabel = displaySafeText(resource.name, uiLocalizationService.source("resource"));
     deleteButton.className = "danger-small";
     deleteButton.type = "button";
-    deleteButton.textContent = uiSource("Delete");
-    deleteButton.setAttribute("aria-label", uiSource("Delete resource {value1}", { value1: resourceLabel }));
+    deleteButton.textContent = uiLocalizationService.source("Delete");
+    deleteButton.setAttribute("aria-label", uiLocalizationService.source("Delete resource {value1}", { value1: resourceLabel }));
     deleteButton.dataset.resourceAction = "delete-resource";
     deleteButton.dataset.resourceType = type;
     deleteButton.dataset.resourceKey = resource.key;
     const exportButton = document.createElement("button");
     exportButton.type = "button";
-    exportButton.textContent = uiSource("Export");
-    exportButton.setAttribute("aria-label", uiSource("Export resource {value1}", { value1: resourceLabel }));
+    exportButton.textContent = uiLocalizationService.source("Export");
+    exportButton.setAttribute("aria-label", uiLocalizationService.source("Export resource {value1}", { value1: resourceLabel }));
     exportButton.dataset.resourceAction = "export";
     exportButton.dataset.resourceType = type;
     exportButton.dataset.resourceKey = resource.key;
     const openButton = document.createElement("button");
     openButton.className = "primary";
     openButton.type = "button";
-    openButton.textContent = uiSource("Open");
-    openButton.setAttribute("aria-label", uiSource("Open resource {value1}", { value1: resourceLabel }));
+    openButton.textContent = uiLocalizationService.source("Open");
+    openButton.setAttribute("aria-label", uiLocalizationService.source("Open resource {value1}", { value1: resourceLabel }));
     openButton.dataset.resourceAction = "open";
     openButton.dataset.resourceType = type;
     openButton.dataset.resourceKey = resource.key;
@@ -6435,9 +6406,9 @@ function renderTmResourceDetail(resourceState) {
     <div class="resource-detail-header">
       <div>
         <h3>${displaySafeHtml(info.name)}</h3>
-        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${uiLabelHtml("entryCount", { count: entries.length })}</p>
+        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${uiLocalizationService.labelHtml("entryCount", { count: entries.length })}</p>
       </div>
-      <button id="closeTmResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tm">${translatedSourceHtml("Close")}</button>
+      <button id="closeTmResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tm">${uiLocalizationService.sourceHtml("Close")}</button>
     </div>
     <div class="resource-table"></div>
   `);
@@ -6457,9 +6428,9 @@ function renderTbResourceDetail(resourceState) {
     <div class="resource-detail-header">
       <div>
         <h3>${displaySafeHtml(info.name)}</h3>
-        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${uiLabelHtml("termCount", { count: terms.length })}</p>
+        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${uiLocalizationService.labelHtml("termCount", { count: terms.length })}</p>
       </div>
-      <button id="closeTbResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tb">${translatedSourceHtml("Close")}</button>
+      <button id="closeTbResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tb">${uiLocalizationService.sourceHtml("Close")}</button>
     </div>
     <div class="resource-table"></div>
   `);
@@ -6473,21 +6444,21 @@ function renderTmEntryRow(entry) {
   row.dataset.resourceRow = "tm";
   row.dataset.resourceId = entry.id;
   replaceSafeHtml(row, `
-    <textarea data-field="source" aria-label="${translatedSourceHtml("Source")}">${escapeHtml(entry.source)}</textarea>
-    <textarea data-field="target" aria-label="${translatedSourceHtml("Target")}">${escapeHtml(entry.target)}</textarea>
+    <textarea data-field="source" aria-label="${uiLocalizationService.sourceHtml("Source")}">${escapeHtml(entry.source)}</textarea>
+    <textarea data-field="target" aria-label="${uiLocalizationService.sourceHtml("Target")}">${escapeHtml(entry.target)}</textarea>
     <div class="resource-row-actions"></div>
   `);
   const actions = row.querySelector(".resource-row-actions");
   const saveButton = document.createElement("button");
   saveButton.type = "button";
-  saveButton.textContent = uiSource("Save");
+  saveButton.textContent = uiLocalizationService.source("Save");
   saveButton.dataset.resourceAction = "save-entry";
   saveButton.dataset.resourceType = "tm";
   saveButton.dataset.resourceId = entry.id;
   const deleteButton = document.createElement("button");
   deleteButton.className = "danger-small";
   deleteButton.type = "button";
-  deleteButton.textContent = uiSource("Delete");
+  deleteButton.textContent = uiLocalizationService.source("Delete");
   deleteButton.dataset.resourceAction = "delete-entry";
   deleteButton.dataset.resourceType = "tm";
   deleteButton.dataset.resourceId = entry.id;
@@ -6501,23 +6472,23 @@ function renderTermRow(term) {
   row.dataset.resourceRow = "tb";
   row.dataset.resourceId = term.id;
   replaceSafeHtml(row, `
-    <input data-field="sourceTerm" aria-label="${translatedSourceHtml("Source term")}" value="${escapeHtml(term.sourceTerm)}">
-    <input data-field="targetTerm" aria-label="${translatedSourceHtml("Target term")}" value="${escapeHtml(term.targetTerm)}">
-    <input data-field="notes" aria-label="${translatedSourceHtml("Notes")}" value="${escapeHtml(term.notes || "")}">
-    <label class="checkbox-row resource-checkbox"><input data-field="isForbidden" type="checkbox" ${term.isForbidden ? "checked" : ""}>${uiLabelHtml("forbidden")}</label>
+    <input data-field="sourceTerm" aria-label="${uiLocalizationService.sourceHtml("Source term")}" value="${escapeHtml(term.sourceTerm)}">
+    <input data-field="targetTerm" aria-label="${uiLocalizationService.sourceHtml("Target term")}" value="${escapeHtml(term.targetTerm)}">
+    <input data-field="notes" aria-label="${uiLocalizationService.sourceHtml("Notes")}" value="${escapeHtml(term.notes || "")}">
+    <label class="checkbox-row resource-checkbox"><input data-field="isForbidden" type="checkbox" ${term.isForbidden ? "checked" : ""}>${uiLocalizationService.labelHtml("forbidden")}</label>
     <div class="resource-row-actions"></div>
   `);
   const actions = row.querySelector(".resource-row-actions");
   const saveButton = document.createElement("button");
   saveButton.type = "button";
-  saveButton.textContent = uiSource("Save");
+  saveButton.textContent = uiLocalizationService.source("Save");
   saveButton.dataset.resourceAction = "save-entry";
   saveButton.dataset.resourceType = "tb";
   saveButton.dataset.resourceId = term.id;
   const deleteButton = document.createElement("button");
   deleteButton.className = "danger-small";
   deleteButton.type = "button";
-  deleteButton.textContent = uiSource("Delete");
+  deleteButton.textContent = uiLocalizationService.source("Delete");
   deleteButton.dataset.resourceAction = "delete-entry";
   deleteButton.dataset.resourceType = "tb";
   deleteButton.dataset.resourceId = term.id;
@@ -6716,7 +6687,7 @@ function renderSegmentRow(index) {
   appendTextWithSourceMarkup(sourceCell, segment);
   const textarea = row.querySelector("textarea");
   textarea.dir = "auto";
-  textarea.setAttribute("aria-label", uiSource("Target translation for segment {value1}", { value1: index + 1 }));
+  textarea.setAttribute("aria-label", uiLocalizationService.source("Target translation for segment {value1}", { value1: index + 1 }));
   applyTargetSpellcheckLanguage(textarea);
   textarea.value = segment.target || "";
   targetEditController.bindTargetEditor({
@@ -6749,7 +6720,7 @@ function renderStatusCell(row, segment) {
   if (hasTagIssue(segment)) {
     const warning = document.createElement("div");
     warning.className = "tag-warning";
-    warning.textContent = uiLabel("missingValue", { value: missingTags(segment).map(tagDisplayText).join(", ") });
+    warning.textContent = uiLocalizationService.label("missingValue", { value: missingTags(segment).map(tagDisplayText).join(", ") });
     statusCell.append(warning);
   }
   if (segment.reviewState) {
@@ -6762,7 +6733,7 @@ function renderStatusCell(row, segment) {
   if (commentCount) {
     const marker = document.createElement("div");
     marker.className = "comment-marker";
-    marker.textContent = uiLabel("noteCount", { count: commentCount });
+    marker.textContent = uiLocalizationService.label("noteCount", { count: commentCount });
     statusCell.append(marker);
   }
   const aiBadges = [];
@@ -6772,8 +6743,8 @@ function renderStatusCell(row, segment) {
   if (segmentHasAiSuggestions(segment)) {
     aiBadges.push({
       className: "ai-suggestion",
-      text: uiLabel("aiSuggestionCount", { count: segment.aiSuggestions.length }),
-      title: uiSource("Reviewable AI suggestions are available for this segment")
+      text: uiLocalizationService.label("aiSuggestionCount", { count: segment.aiSuggestions.length }),
+      title: uiLocalizationService.source("Reviewable AI suggestions are available for this segment")
     });
   }
   const riskLevel = aiReviewRiskLevel(segment);
@@ -6781,7 +6752,7 @@ function renderStatusCell(row, segment) {
     aiBadges.push({
       className: `ai-risk ai-risk-${riskLevel}`,
       text: `${aiReviewRiskLabel(riskLevel)}`,
-      title: uiSource("Risk-ranked AI review comment")
+      title: uiLocalizationService.source("Risk-ranked AI review comment")
     });
   }
   aiBadges.forEach((item) => {
@@ -6806,7 +6777,7 @@ function renderSegments(options = {}) {
     const cell = document.createElement("td");
     cell.colSpan = 4;
     cell.className = "muted";
-    cell.textContent = uiSource("No segments match this view.");
+    cell.textContent = uiLocalizationService.source("No segments match this view.");
     row.append(cell);
     els.segmentBody.replaceChildren(row);
     return;
@@ -6893,8 +6864,8 @@ function renderProgress(options = {}) {
   editorSessionStore.replaceProgressSummary(summary);
   const { total, confirmed, words } = summary;
   const open = total - confirmed;
-  els.progressText.textContent = uiLabel("progressSummary", { confirmed, open, total });
-  els.wordCountText.textContent = uiLabel("sourceWordCount", { count: words });
+  els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
+  els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
@@ -7288,14 +7259,14 @@ async function openConcordanceSearch() {
     .filter((entry) => tmNames.has(entry.tmName))
     .filter((entry) => stableLower(entry.source).includes(query))
     .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
-  els.concordanceMeta.textContent = uiLabel("concordanceResultSummary", {
+  els.concordanceMeta.textContent = uiLocalizationService.label("concordanceResultSummary", {
     keyword,
     resource: projectResourceSummary().tmLabel,
     pair: languagePair(),
     count: results.length
   });
   if (!results.length) {
-    replaceSafeHtml(els.concordanceResults, `<div class="muted">${translatedSourceHtml("No TM units contain this keyword.")}</div>`);
+    replaceSafeHtml(els.concordanceResults, `<div class="muted">${uiLocalizationService.sourceHtml("No TM units contain this keyword.")}</div>`);
   } else {
     const fragment = document.createDocumentFragment();
     results.forEach((entry) => {
@@ -7308,7 +7279,7 @@ async function openConcordanceSearch() {
       `);
       const insertButton = document.createElement("button");
       insertButton.type = "button";
-      insertButton.textContent = uiSource("Insert target");
+      insertButton.textContent = uiLocalizationService.source("Insert target");
       insertButton.addEventListener("click", () => {
         targetProducerController.insertTmTarget(entry.target, {
           channel: "concordance",
@@ -7341,7 +7312,7 @@ function qualityLabel(value) {
     "hosted-disclosed": "Hosted disclosed",
     "client-approved": "Client approved"
   }[value] || value || "";
-  return uiSource(label);
+  return uiLocalizationService.source(label);
 }
 
 function qualityCategoryName(value) {
@@ -7355,7 +7326,7 @@ function qualityCategoryName(value) {
     compliance: "Compliance",
     review: "Review"
   }[value] || value || "Review";
-  return uiSource(label);
+  return uiLocalizationService.source(label);
 }
 
 function qualityDecisionSeverityLabel(value) {
@@ -7365,7 +7336,7 @@ function qualityDecisionSeverityLabel(value) {
     high: "High",
     critical: "Critical"
   }[value] || "Medium";
-  return uiSource(label);
+  return uiLocalizationService.source(label);
 }
 
 function qualityQaBySegment(qaChecks = editorSessionStore.getQaChecks()) {
@@ -7397,7 +7368,7 @@ function qualityRiskLevelLabel(level) {
     low: "Low",
     clear: "Clear"
   }[level] || "Risk";
-  return uiSource(label);
+  return uiLocalizationService.source(label);
 }
 
 function activeQualityEvidence(queue = null) {
@@ -7494,20 +7465,20 @@ function revisionReasonLabel(reason) {
     split: "Split",
     merge: "Merge"
   }[reason] || reason || "Change";
-  return uiSource(label);
+  return uiLocalizationService.source(label);
 }
 
 function renderRevisionHistory() {
   if (!els.revisionHistoryList) return;
   const segment = currentSegment();
   if (!segment) {
-    els.revisionHistoryList.textContent = uiSource("No active segment.");
+    els.revisionHistoryList.textContent = uiLocalizationService.source("No active segment.");
     els.revisionHistoryList.classList.add("muted");
     return;
   }
   const history = Array.isArray(segment.targetHistory) ? segment.targetHistory.slice().reverse() : [];
   if (!history.length) {
-    els.revisionHistoryList.textContent = uiSource("No target revisions yet.");
+    els.revisionHistoryList.textContent = uiLocalizationService.source("No target revisions yet.");
     els.revisionHistoryList.classList.add("muted");
     return;
   }
@@ -7517,8 +7488,8 @@ function renderRevisionHistory() {
       <header><strong>${escapeHtml(revisionReasonLabel(entry.reason))}</strong><span>${escapeHtml(formatDateTime(entry.updatedAt || entry.createdAt))}</span></header>
       <div class="revision-status">${escapeHtml(segmentStatusLabel(entry.fromStatus || "empty"))} -> ${escapeHtml(segmentStatusLabel(entry.toStatus || "empty"))}</div>
       <div class="revision-pair">
-        <div><span>${uiLabelHtml("before")}</span><p>${escapeHtml(entry.fromTarget || "") || "&nbsp;"}</p></div>
-        <div><span>${uiLabelHtml("after")}</span><p>${escapeHtml(entry.toTarget || "") || "&nbsp;"}</p></div>
+        <div><span>${uiLocalizationService.labelHtml("before")}</span><p>${escapeHtml(entry.fromTarget || "") || "&nbsp;"}</p></div>
+        <div><span>${uiLocalizationService.labelHtml("after")}</span><p>${escapeHtml(entry.toTarget || "") || "&nbsp;"}</p></div>
       </div>
     </article>
   `).join(""));
@@ -7533,18 +7504,18 @@ function qaSummary(checks) {
 }
 
 function qaCheckMessage(check) {
-  return uiSource(check?.message || "", check?.messageValues || {});
+  return uiLocalizationService.source(check?.message || "", check?.messageValues || {});
 }
 
 function qaCheckFixHint(check) {
-  return check?.fixHint ? uiSource(check.fixHint, check.fixHintValues || {}) : "";
+  return check?.fixHint ? uiLocalizationService.source(check.fixHint, check.fixHintValues || {}) : "";
 }
 
 function renderQaResults() {
   const qaChecks = editorSessionStore.getQaChecks();
   const checks = state.qaFilter ? qaChecks.filter((check) => check.type === state.qaFilter) : qaChecks;
   if (!qaChecks.length) {
-    els.qaResults.textContent = uiSource("No QA issues found.");
+    els.qaResults.textContent = uiLocalizationService.source("No QA issues found.");
     els.qaResults.classList.add("muted");
     return;
   }
@@ -7556,7 +7527,7 @@ function renderQaResults() {
   const allButton = document.createElement("button");
   allButton.type = "button";
   allButton.className = state.qaFilter ? "" : "active";
-  allButton.textContent = uiSource("All {value1}", { value1: qaChecks.length });
+  allButton.textContent = uiLocalizationService.source("All {value1}", { value1: qaChecks.length });
   allButton.addEventListener("click", () => {
     state.qaFilter = "";
     renderQaResults();
@@ -7566,7 +7537,7 @@ function renderQaResults() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = state.qaFilter === type ? "active" : "";
-    button.textContent = `${uiSource(type)} ${count}`;
+    button.textContent = `${uiLocalizationService.source(type)} ${count}`;
     button.addEventListener("click", () => {
       state.qaFilter = state.qaFilter === type ? "" : type;
       renderQaResults();
@@ -7578,10 +7549,10 @@ function renderQaResults() {
     const card = document.createElement("article");
     card.className = "qa-card";
     const fixHint = qaCheckFixHint(check);
-    replaceSafeHtml(card, `<header><strong>${escapeHtml(uiSource(check.type))}</strong><span class="severity-pill ${escapeHtml(check.severity || "info")}">${escapeHtml(uiSource(check.severity || "info"))}</span><span>#${escapeHtml(check.label)}</span></header><p>${escapeHtml(qaCheckMessage(check))}</p>${fixHint ? `<p class="muted">${escapeHtml(fixHint)}</p>` : ""}`);
+    replaceSafeHtml(card, `<header><strong>${escapeHtml(uiLocalizationService.source(check.type))}</strong><span class="severity-pill ${escapeHtml(check.severity || "info")}">${escapeHtml(uiLocalizationService.source(check.severity || "info"))}</span><span>#${escapeHtml(check.label)}</span></header><p>${escapeHtml(qaCheckMessage(check))}</p>${fixHint ? `<p class="muted">${escapeHtml(fixHint)}</p>` : ""}`);
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = uiLabel("go");
+    button.textContent = uiLocalizationService.label("go");
     button.addEventListener("click", async () => {
       const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === check.segmentId);
       if (index !== -1) {
@@ -7599,7 +7570,7 @@ function renderQaResults() {
 async function refreshTmMatches() {
   const segment = currentSegment();
   if (!segment || !editorSessionStore.getProject()) {
-    els.tmMatches.textContent = uiSource("No active segment.");
+    els.tmMatches.textContent = uiLocalizationService.source("No active segment.");
     els.tmMatches.classList.add("muted");
     return;
   }
@@ -7614,19 +7585,19 @@ async function refreshTmMatches() {
   if (editorSessionStore.getProject()?.id !== projectId || currentSegment()?.id !== segmentId) return;
   els.tmMatches.classList.toggle("muted", !matches.length);
   if (!matches.length) {
-    els.tmMatches.textContent = uiSource("No TM matches.");
+    els.tmMatches.textContent = uiLocalizationService.source("No TM matches.");
     return;
   }
   const fragment = document.createDocumentFragment();
   matches.forEach((match) => {
     const card = document.createElement("article");
     card.className = "match-card";
-    replaceSafeHtml(card, `<header><strong>${uiLabelHtml("matchPercent", { score: match.score })}</strong><span>${escapeHtml(match.tmName || "")}</span></header>
+    replaceSafeHtml(card, `<header><strong>${uiLocalizationService.labelHtml("matchPercent", { score: match.score })}</strong><span>${escapeHtml(match.tmName || "")}</span></header>
       <p>${escapeHtml(match.source)}</p>
       <p><strong>${escapeHtml(match.target)}</strong></p>
       ${match.projectName ? `<p class="muted">${escapeHtml(match.projectName)}</p>` : ""}`);
     const button = document.createElement("button");
-    button.textContent = uiLabel("insert");
+    button.textContent = uiLocalizationService.label("insert");
     button.addEventListener("click", () =>
       targetProducerController.insertTmTarget(match.target, {
         channel: "match",
@@ -7642,7 +7613,7 @@ async function refreshTmMatches() {
 async function refreshTerms() {
   const segment = currentSegment();
   if (!segment || !editorSessionStore.getProject()) {
-    els.termSuggestions.textContent = uiSource("No active segment.");
+    els.termSuggestions.textContent = uiLocalizationService.source("No active segment.");
     els.termSuggestions.classList.add("muted");
     return;
   }
@@ -7657,17 +7628,17 @@ async function refreshTerms() {
   if (editorSessionStore.getProject()?.id !== projectId || currentSegment()?.id !== segmentId) return;
   els.termSuggestions.classList.toggle("muted", !suggestions.length);
   if (!suggestions.length) {
-    els.termSuggestions.textContent = uiSource("No terms found in this segment.");
+    els.termSuggestions.textContent = uiLocalizationService.source("No terms found in this segment.");
     return;
   }
   const fragment = document.createDocumentFragment();
   suggestions.forEach((term) => {
     const card = document.createElement("article");
     card.className = `term-card${term.isForbidden ? " forbidden-term-card" : ""}`;
-    replaceSafeHtml(card, `<header><strong>${escapeHtml(term.sourceTerm)}</strong><span>${escapeHtml(term.targetTerm)}</span><span>${uiLabelHtml(term.isForbidden ? "forbidden" : "approved")}</span><span>${escapeHtml(term.termBaseName || "")}</span></header>
+    replaceSafeHtml(card, `<header><strong>${escapeHtml(term.sourceTerm)}</strong><span>${escapeHtml(term.targetTerm)}</span><span>${uiLocalizationService.labelHtml(term.isForbidden ? "forbidden" : "approved")}</span><span>${escapeHtml(term.termBaseName || "")}</span></header>
       ${term.notes ? `<p>${escapeHtml(term.notes)}</p>` : ""}`);
     const button = document.createElement("button");
-    button.textContent = uiSource("Delete");
+    button.textContent = uiLocalizationService.source("Delete");
     button.addEventListener("click", async () => {
       await deleteTermResourceEntry(term, { refreshResourceView: false, refreshSuggestions: true });
     });
@@ -7771,12 +7742,12 @@ async function saveProjectDomainFromForm() {
 
 function aiReviewRiskLabel(level) {
   return {
-    none: uiLabel("noIssuesFound"),
-    low: uiLabel("lowRisk"),
-    medium: uiLabel("mediumRisk"),
-    high: uiLabel("highRisk"),
-    critical: uiLabel("criticalRisk")
-  }[level] || uiLabel("unrankedRisk");
+    none: uiLocalizationService.label("noIssuesFound"),
+    low: uiLocalizationService.label("lowRisk"),
+    medium: uiLocalizationService.label("mediumRisk"),
+    high: uiLocalizationService.label("highRisk"),
+    critical: uiLocalizationService.label("criticalRisk")
+  }[level] || uiLocalizationService.label("unrankedRisk");
 }
 
 async function importDocx(file) {
@@ -7886,7 +7857,7 @@ function projectHasDocumentNamed(fileName) {
 
 function confirmDuplicateImport(file) {
   if (!projectHasDocumentNamed(file.name)) return true;
-  return uiConfirm(`A file named "${displaySafeText(file.name)}" already exists in this project. Import it again anyway?`);
+  return uiLocalizationService.confirm(`A file named "${displaySafeText(file.name)}" already exists in this project. Import it again anyway?`);
 }
 
 async function importProjectDocument(file) {
@@ -8261,7 +8232,7 @@ async function importProjectPackageData(pkg, options = {}) {
   await reportImportProgress("Validating project package", { name: sourceName });
   const validation = validateProjectPackage(pkg);
   if (!validation.ok) {
-    if (!options.suppressAlert) uiAlert(validationAlertText(validation, "Project package import failed validation"));
+    if (!options.suppressAlert) uiLocalizationService.alert(validationAlertText(validation, "Project package import failed validation"));
     renderValidationReport(validation);
     setSaveStatus("Project package import failed validation", "dirty");
     return null;
@@ -8269,9 +8240,9 @@ async function importProjectPackageData(pkg, options = {}) {
   const existing = editorSessionStore.getProjects().find((project) => project.id === pkg.project.id);
   let importAsCopy = false;
   if (existing) {
-    const replace = options.replaceExisting ?? uiConfirm(`A project named "${displaySafeText(existing.name)}" already exists. Replace it with this package?`);
+    const replace = options.replaceExisting ?? uiLocalizationService.confirm(`A project named "${displaySafeText(existing.name)}" already exists. Replace it with this package?`);
     if (!replace) {
-      importAsCopy = options.importAsCopy ?? uiConfirm("Keep the existing project and import this package as a separate copy?");
+      importAsCopy = options.importAsCopy ?? uiLocalizationService.confirm("Keep the existing project and import this package as a separate copy?");
       if (!importAsCopy) return null;
     }
   }
@@ -8702,7 +8673,7 @@ function countBy(items, keyFn) {
 }
 
 function reportLocale() {
-  return currentUiLocale();
+  return uiLocalizationService.locale();
 }
 
 function reportDir() {
@@ -8710,7 +8681,7 @@ function reportDir() {
 }
 
 function reportText(text, values = {}) {
-  return uiSource(text, values);
+  return uiLocalizationService.source(text, values);
 }
 
 function reportHtml(text, values = {}) {
@@ -9530,7 +9501,7 @@ async function handleResourceTmxImport(file) {
   const sourceLang = normalizeLanguageInputElement(els.tmResourceSourceLangInput);
   const targetLang = normalizeLanguageInputElement(els.tmResourceTargetLangInput);
   if (!tmName || !sourceLang || !targetLang) {
-    uiAlert("Enter a TM name, source language, and target language before importing.");
+    uiLocalizationService.alert("Enter a TM name, source language, and target language before importing.");
     return;
   }
   await reportImportProgress("Reading TMX resource", file);
@@ -9578,7 +9549,7 @@ async function handleResourceTbxImport(file) {
   const sourceLang = normalizeLanguageInputElement(els.tbResourceSourceLangInput);
   const targetLang = normalizeLanguageInputElement(els.tbResourceTargetLangInput);
   if (!termBaseName || !sourceLang || !targetLang) {
-    uiAlert("Enter a TB name, source language, and target language before importing.");
+    uiLocalizationService.alert("Enter a TB name, source language, and target language before importing.");
     return;
   }
   await reportImportProgress("Reading TBX resource", file);
@@ -9626,7 +9597,7 @@ async function handleResourceTermListImport(file) {
   const sourceLang = normalizeLanguageInputElement(els.tbResourceSourceLangInput);
   const targetLang = normalizeLanguageInputElement(els.tbResourceTargetLangInput);
   if (!termBaseName || !sourceLang || !targetLang) {
-    uiAlert("Enter a TB name, source language, and target language before importing.");
+    uiLocalizationService.alert("Enter a TB name, source language, and target language before importing.");
     return;
   }
   await reportImportProgress("Reading term list resource", file);

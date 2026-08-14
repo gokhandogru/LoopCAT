@@ -112,7 +112,7 @@ function extractScript(messagesByText, filePath, sourceName) {
   lines.forEach((line, index) => {
     const location = `${sourceName}:${index + 1}`;
     const likelyUiLine =
-      /uiSource\(|reportText\(|reportHtml\(|textContent\s*=|innerHTML\s*=|setSaveStatus\(|setLocalAiStatus\(|window\.confirm\(|confirmExternalAiPromptShare\(|new Error\(|throw new Error\(|message:|fixHint:|label:|title:|aria-label|placeholder|button\.textContent|option\.textContent|return \{|\[/.test(
+      /uiSource\(|uiLocalizationService\.(?:source|sourceHtml|confirm|alert)\(|reportText\(|reportHtml\(|textContent\s*=|innerHTML\s*=|setSaveStatus\(|setLocalAiStatus\(|window\.confirm\(|confirmExternalAiPromptShare\(|new Error\(|throw new Error\(|message:|fixHint:|label:|title:|aria-label|placeholder|button\.textContent|option\.textContent|return \{|\[/.test(
         line
       );
     if (!likelyUiLine) return;

@@ -215,6 +215,7 @@ const requiredReleaseFiles = [
   "src/features/resources/tm-pretranslation-dialog-controller.js",
   "src/features/import-export/import-export-controller.js",
   "src/features/workspace/recovery-workspace-controller.js",
+  "src/i18n/ui-localization-service.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/ai-provider-administration-operations-controller.test.cjs",
@@ -265,6 +266,7 @@ const requiredReleaseFiles = [
   "tests/unit/review-state-controller.test.cjs",
   "tests/unit/import-export-controller.test.cjs",
   "tests/unit/recovery-workspace-controller.test.cjs",
+  "tests/unit/ui-localization-service.test.cjs",
   "tests/unit/resource-trash.test.cjs",
   "tests/unit/resources-controller.test.cjs",
   "scripts/generate-brand-icons.cjs",
@@ -283,6 +285,8 @@ const requiredReleaseFiles = [
   "scripts/verify-release-evidence.cjs",
   "scripts/verify-release-evidence-selftest.cjs",
   "scripts/capture-modernization-baseline.cjs",
+  "scripts/i18n-extract.cjs",
+  "scripts/i18n-validate.cjs",
   "scripts/verify-bundle-contract.cjs",
   "scripts/verify-bundle-contract-selftest.cjs",
   "scripts/bundle-contract.json",
@@ -323,6 +327,10 @@ const appBootstrapJs = readText("src/app/bootstrap.js");
 const appStoreJs = readText("src/app/app-store.js");
 const appStoreUnitTests = readText("tests/unit/app-store.test.cjs");
 const navigationControllerJs = readText("src/app/navigation-controller.js");
+const uiLocalizationServiceJs = readText("src/i18n/ui-localization-service.js");
+const uiLocalizationServiceUnitTests = readText("tests/unit/ui-localization-service.test.cjs");
+const i18nExtractScript = readText("scripts/i18n-extract.cjs");
+const i18nValidateScript = readText("scripts/i18n-validate.cjs");
 const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-registry.js");
 const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-module-registry.test.cjs");
 const installRuntimeJs = readText("src/app/install-runtime.js");
@@ -512,6 +520,98 @@ assertIncludes(
   "compatibilityModules.i18n",
   "The application runtime must inject localization through the compatibility module registry."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createUiLocalizationService } from "../i18n/ui-localization-service.js";',
+  "The application runtime must install the checked UI-localization service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createUiLocalizationService,",
+  "The application runtime must expose the checked UI-localization factory."
+);
+for (const snippet of [
+  "const translate = (key, values = {})",
+  "const source = (text, values = {})",
+  'documentElement?.lang || "en-US"',
+  "translate(`ui.label.${key}`, values)",
+  "escapeHtml(label(key, values))",
+  "escapeHtml(source(text, values))",
+  "confirm(source(message, values))",
+  "alert(source(message))",
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    uiLocalizationServiceJs,
+    snippet,
+    `UiLocalizationService must retain characterized localization policy: ${snippet}`
+  );
+}
+for (const removedFacade of [
+  "uiT",
+  "uiSource",
+  "currentUiLocale",
+  "uiLabel",
+  "uiLabelHtml",
+  "translatedSourceText",
+  "translatedSourceHtml",
+  "uiConfirm",
+  "uiAlert"
+]) {
+  assert(
+    !new RegExp(`\\b${removedFacade}\\b`).test(appJs) &&
+      !new RegExp(`\\b${removedFacade}\\b`).test(appWorkflowDriverJs),
+    `${removedFacade} UI-localization consumer facade must not return.`
+  );
+}
+for (const method of ["translate", "source", "locale", "label", "labelHtml", "sourceHtml", "confirm", "alert"]) {
+  assertIncludes(
+    appJs,
+    `uiLocalizationService.${method}`,
+    `application consumers must call UiLocalizationService.${method} directly.`
+  );
+}
+assertIncludes(
+  appJs,
+  "source: uiLocalizationService.source",
+  "controller composition must pass the stable localized-source method directly."
+);
+assertIncludes(
+  appJs,
+  "confirm: uiLocalizationService.confirm",
+  "controller composition must pass the stable translated-confirm method directly."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  'uiLocalizationService.source("Target translation for segment {value1}"',
+  "workflow characterization must read localized source text through the checked service."
+);
+assertIncludes(
+  i18nExtractScript,
+  "uiLocalizationService\\.(?:source|sourceHtml|confirm|alert)",
+  "source-catalog extraction must recognize direct UiLocalizationService source and dialog calls."
+);
+assertIncludes(
+  i18nValidateScript,
+  "uiLocalizationService\\.translate",
+  "i18n key validation must recognize direct UiLocalizationService translation calls."
+);
+assertIncludes(
+  i18nValidateScript,
+  "uiLocalizationService\\.label",
+  "i18n key validation must recognize direct UiLocalizationService label calls."
+);
+for (const testName of [
+  "UiLocalizationService preserves delegation, labels, locale, and one-time escaping",
+  "UiLocalizationService preserves missing-i18n and locale fallbacks",
+  "UiLocalizationService preserves translated confirm, alert, and delegate failures"
+]) {
+  assertIncludes(
+    uiLocalizationServiceUnitTests,
+    testName,
+    `focused UI-localization tests must retain characterization: ${testName}`
+  );
+}
 assertIncludes(
   compatibilityModuleRegistryJs,
   '"workspaceStorage"',
@@ -6683,7 +6783,11 @@ assertIncludes(
   "project report includes count-only AI triage metrics",
   "app workflow test must verify project reports expose AI triage counts without segment text."
 );
-assertIncludes(appJs, 'uiLabelHtml("highAiRisk")', "Project analysis must surface high-risk AI review counts.");
+assertIncludes(
+  appJs,
+  'uiLocalizationService.labelHtml("highAiRisk")',
+  "Project analysis must surface high-risk AI review counts."
+);
 assertIncludes(
   readText("analysis.js"),
   "aiSuggestionSegments",
@@ -7963,7 +8067,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "uiAlert(validationAlertText(validation",
+  "uiLocalizationService.alert(validationAlertText(validation",
   "app.js project-package validation alerts must use sanitized validation text."
 );
 assertIncludes(
