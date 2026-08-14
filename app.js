@@ -2618,6 +2618,34 @@ const aiProviderAdministrationOperationsController =
     },
     defaults: { model: DEFAULT_LOCAL_AI_MODEL }
   });
+const aiPromptPreviewController = appRuntime.featureFactories.createAiPromptPreviewController({
+  administration: {
+    readPromptState: () => aiAdministrationController?.readPromptState?.() || {},
+    renderPromptPreview: (prompt) => aiAdministrationController?.renderPromptPreview?.(prompt)
+  },
+  settings: { read: localAiSettingsFromForm },
+  project: {
+    get: currentProject,
+    getActiveSegment: currentSegment,
+    getTerms: currentProjectTerms,
+    getDocuments: projectDocuments,
+    getSampleSegments: projectBriefSampleSegments,
+    getSurroundingSegments: localAiSurroundingSegmentsForSegment,
+    getTags: segmentTags
+  },
+  builders: {
+    translate: buildTranslateGemmaPrompt,
+    review: buildAiReviewPrompt,
+    tagRepair: buildTagRepairPrompt,
+    polish: buildStylePolishPrompt,
+    adapt: buildDraftAdaptationPrompt,
+    variants: buildTargetVariantsPrompt,
+    applyTerms: buildTerminologyApplicationPrompt,
+    extractTerms: buildTerminologyExtractionPrompt,
+    projectBrief: buildProjectBriefPrompt
+  },
+  normalize: { stableLower }
+});
 let aiPromptTestOwnsPromptBusy = false;
 const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestController({
   project: { get: currentProject },
@@ -6291,128 +6319,35 @@ function renderLocalAiModelOptions(settings) {
 }
 
 function localAiSampleText() {
-  return aiAdministrationController?.readPromptState?.().sample || currentSegment()?.source || "";
+  return aiPromptPreviewController.getSampleText();
 }
 
 function localAiPromptMode() {
-  return aiAdministrationController?.readPromptState?.().mode || "pretranslate";
+  return aiPromptPreviewController.getMode();
 }
 
 function localAiPromptModeLabel(mode = localAiPromptMode()) {
-  return {
-    pretranslate: "pre-translation",
-    review: "review / QA",
-    "tag-repair": "tag repair",
-    polish: "draft polish",
-    adapt: "draft adaptation",
-    variants: "alternatives",
-    "apply-terms": "terminology application",
-    "extract-terms": "terminology extraction",
-    "project-brief": "project brief"
-  }[mode] || "prompt";
+  return aiPromptPreviewController.getModeLabel(mode);
 }
 
 function localAiPromptTestSystem(mode = localAiPromptMode()) {
-  return {
-    review: "You are a senior translation reviewer inside LoopCAT. Return review notes only; do not translate, rewrite the full segment, or add generic encouragement.",
-    "tag-repair": "You are a CAT-tool tag repair assistant. Return only the repaired target segment.",
-    polish: "You are a CAT-tool style polishing assistant. Return only the improved target segment.",
-    adapt: "You are a CAT-tool target adaptation assistant. Return only the adapted target segment.",
-    variants: "You are a CAT-tool target alternatives assistant. Return only the requested alternatives.",
-    "apply-terms": "You are a CAT-tool terminology application assistant. Return only the revised target segment.",
-    "extract-terms": "You are a CAT-tool terminology extraction assistant. Return only the requested JSON array.",
-    "project-brief": "You are a CAT-tool project brief assistant. Return only concise reusable translation instructions."
-  }[mode] || "You are a professional CAT-tool translation assistant. Return only the requested output.";
+  return aiPromptPreviewController.getSystem(mode);
 }
 
 function localAiPromptTestContextLabels(mode = localAiPromptMode()) {
-  const common = ["configured provider URL"];
-  if (mode === "project-brief") return ["project metadata", "document names", "sample segments", "termbase hints", ...common];
-  if (mode === "extract-terms") return ["sample source text", "current target draft", ...common];
-  if (mode === "pretranslate") return ["sample source text", ...common];
-  if (mode === "review") return ["sample source text", "current target draft", "project glossary hints", ...common];
-  if (mode === "apply-terms") return ["sample source text", "current target draft", "project terminology hints", ...common];
-  return ["sample source text", "current target draft", "project style instructions", "project glossary hints", ...common];
+  return aiPromptPreviewController.getContextLabels(mode);
 }
 
 function localAiPreviewTermsForSegment(segment = currentSegment()) {
-  const projectTerms = currentProjectTerms();
-  if (!projectTerms.length) return [];
-  const source = stableLower(String(segment?.source || ""));
-  const target = stableLower(String(segment?.target || ""));
-  const matching = projectTerms.filter((term) => {
-    const sourceTerm = stableLower(term.sourceTerm || "");
-    const targetTerm = stableLower(term.targetTerm || "");
-    return Boolean(
-      (sourceTerm && source.includes(sourceTerm)) ||
-        (targetTerm && target.includes(targetTerm))
-    );
-  });
-  return (matching.length ? matching : projectTerms).slice(0, 12);
+  return aiPromptPreviewController.termsForSegment(segment);
 }
 
 function localAiPromptPreviewRequest(settings = localAiSettingsFromForm(), mode = localAiPromptMode()) {
-  const activeSegment = currentSegment();
-  const sourceText = String(localAiSampleText() || activeSegment?.source || "");
-  const previewSegment = {
-    ...(activeSegment || {}),
-    source: sourceText,
-    target: activeSegment?.target || "",
-    tags: activeSegment ? segmentTags(activeSegment) : []
-  };
-  const glossaryTerms = localAiPreviewTermsForSegment(previewSegment);
-  const common = {
-    project: currentProject(),
-    segment: previewSegment,
-    sourceLanguage: settings.sourceLanguage,
-    sourceCode: settings.sourceCode,
-    targetLanguage: settings.targetLanguage,
-    targetCode: settings.targetCode,
-    sourceText,
-    targetText: previewSegment.target,
-    protectedTokens: previewSegment.tags.map((tag) => tag.text || tag.label || "").filter(Boolean),
-    glossaryTerms,
-    terms: glossaryTerms,
-    tmMatches: [],
-    styleGuide: currentProject()?.aiSettings?.styleGuide || "",
-    variantMode: settings.variantMode,
-    adaptMode: settings.adaptMode,
-    surroundingSegments: settings.includeNearbyContext && activeSegment
-      ? localAiSurroundingSegmentsForSegment(activeSegment, { settings })
-      : []
-  };
-  const prompt = {
-    review: () => buildAiReviewPrompt(common),
-    "tag-repair": () => buildTagRepairPrompt(common),
-    polish: () => buildStylePolishPrompt(common),
-    adapt: () => buildDraftAdaptationPrompt(common),
-    variants: () => buildTargetVariantsPrompt(common),
-    "apply-terms": () => buildTerminologyApplicationPrompt(common),
-    "extract-terms": () => buildTerminologyExtractionPrompt(common),
-    "project-brief": () => buildProjectBriefPrompt({
-      ...common,
-      documents: projectDocuments(),
-      sampleSegments: projectBriefSampleSegments(),
-      terms: currentProjectTerms().slice(0, 12)
-    })
-  }[mode]?.() || buildTranslateGemmaPrompt({
-    ...common,
-    text: sourceText
-  });
-  return {
-    mode,
-    label: localAiPromptModeLabel(mode),
-    prompt,
-    sourceText,
-    segment: previewSegment,
-    glossaryTerms,
-    system: localAiPromptTestSystem(mode)
-  };
+  return aiPromptPreviewController.createRequest(settings, mode);
 }
 
 function renderLocalAiPromptPreview() {
-  const settings = localAiSettingsFromForm();
-  aiAdministrationController?.renderPromptPreview?.(localAiPromptPreviewRequest(settings).prompt);
+  return aiPromptPreviewController.render();
 }
 
 function renderLocalAiProgress() {

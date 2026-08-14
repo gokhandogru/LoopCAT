@@ -185,6 +185,7 @@ const requiredReleaseFiles = [
   "src/features/ai/ai-administration-controller.js",
   "src/features/ai/ai-provider-administration-operations-controller.js",
   "src/features/ai/ai-prompt-test-controller.js",
+  "src/features/ai/ai-prompt-preview-controller.js",
   "src/features/ai/ai-term-candidate-persistence-service.js",
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
@@ -211,6 +212,7 @@ const requiredReleaseFiles = [
   "tests/unit/ai-administration-controller.test.cjs",
   "tests/unit/ai-provider-administration-operations-controller.test.cjs",
   "tests/unit/ai-prompt-test-controller.test.cjs",
+  "tests/unit/ai-prompt-preview-controller.test.cjs",
   "tests/unit/ai-term-candidate-persistence-service.test.cjs",
   "tests/unit/ai-alternatives-controller.test.cjs",
   "tests/unit/ai-draft-editing-controller.test.cjs",
@@ -354,6 +356,8 @@ const aiProviderAdministrationOperationsControllerUnitTests = readText(
 );
 const aiPromptTestControllerJs = readText("src/features/ai/ai-prompt-test-controller.js");
 const aiPromptTestControllerUnitTests = readText("tests/unit/ai-prompt-test-controller.test.cjs");
+const aiPromptPreviewControllerJs = readText("src/features/ai/ai-prompt-preview-controller.js");
+const aiPromptPreviewControllerUnitTests = readText("tests/unit/ai-prompt-preview-controller.test.cjs");
 const aiTermCandidatePersistenceServiceJs = readText("src/features/ai/ai-term-candidate-persistence-service.js");
 const aiTermCandidatePersistenceServiceUnitTests = readText(
   "tests/unit/ai-term-candidate-persistence-service.test.cjs"
@@ -2479,6 +2483,94 @@ for (const testName of [
     aiPromptTestControllerUnitTests,
     testName,
     `focused AI-prompt-test tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiPromptPreviewController",
+  "The application runtime must expose the checked AI-prompt-preview controller boundary."
+);
+for (const boundary of [
+  'pretranslate: "pre-translation"',
+  'review: "review / QA"',
+  '"project-brief": "project brief"',
+  "function getContextLabels(mode = getMode())",
+  "function termsForSegment(segment = project.getActiveSegment())",
+  "return (matching.length ? matching : projectTerms).slice(0, 12)",
+  "function createRequest(settings = settingsBoundary.read(), mode = getMode())",
+  'const sourceText = String(getSampleText() || activeSegment?.source || "")',
+  "tags: activeSegment ? project.getTags(activeSegment) : []",
+  "protectedTokens: previewSegment.tags",
+  "tmMatches: []",
+  'styleGuide: currentProject?.aiSettings?.styleGuide || ""',
+  "project.getSurroundingSegments(activeSegment, { settings })",
+  "review: () => builders.review(common)",
+  '"project-brief": () =>',
+  "documents: project.getDocuments()",
+  "sampleSegments: project.getSampleSegments()",
+  "terms: project.getTerms().slice(0, 12)",
+  "builders.translate({ ...common, text: sourceText })",
+  "administration.renderPromptPreview(createRequest(settings).prompt)"
+]) {
+  assertIncludes(
+    aiPromptPreviewControllerJs,
+    boundary,
+    `AiPromptPreviewController must retain checked ${boundary} context and routing.`
+  );
+}
+for (const [start, end, delegation] of [
+  ["function localAiSampleText", "function localAiPromptMode", "return aiPromptPreviewController.getSampleText()"],
+  ["function localAiPromptMode", "function localAiPromptModeLabel", "return aiPromptPreviewController.getMode()"],
+  [
+    "function localAiPromptModeLabel",
+    "function localAiPromptTestSystem",
+    "return aiPromptPreviewController.getModeLabel(mode)"
+  ],
+  [
+    "function localAiPromptTestSystem",
+    "function localAiPromptTestContextLabels",
+    "return aiPromptPreviewController.getSystem(mode)"
+  ],
+  [
+    "function localAiPromptTestContextLabels",
+    "function localAiPreviewTermsForSegment",
+    "return aiPromptPreviewController.getContextLabels(mode)"
+  ],
+  [
+    "function localAiPreviewTermsForSegment",
+    "function localAiPromptPreviewRequest",
+    "return aiPromptPreviewController.termsForSegment(segment)"
+  ],
+  [
+    "function localAiPromptPreviewRequest",
+    "function renderLocalAiPromptPreview",
+    "return aiPromptPreviewController.createRequest(settings, mode)"
+  ],
+  ["function renderLocalAiPromptPreview", "function renderLocalAiProgress", "return aiPromptPreviewController.render()"]
+]) {
+  const facade = functionBody(appJs, start, end);
+  assertIncludes(facade, delegation, `${start} must delegate to the checked AI-prompt-preview controller.`);
+  assert(
+    !facade.includes("readPromptState(") &&
+      !facade.includes("currentProjectTerms(") &&
+      !facade.includes("segmentTags(") &&
+      !facade.includes("buildAiReviewPrompt(") &&
+      !facade.includes("buildTranslateGemmaPrompt(") &&
+      !facade.includes("renderPromptPreview("),
+    "app.js must not regain AI prompt mode, context, builder-routing, or preview-presentation orchestration."
+  );
+}
+for (const testName of [
+  "AI prompt preview preserves every mode label, system instruction, and consent-context mapping",
+  "AI prompt preview synthesizes sample, segment, term, token, style, and nearby context before mode routing",
+  "AI prompt preview falls back to active source and bounded project terms for translation",
+  "AI project-brief preview adds bounded document, sample, and term context",
+  "AI prompt preview rendering reads current settings and presents the routed prompt"
+]) {
+  assertIncludes(
+    aiPromptPreviewControllerUnitTests,
+    testName,
+    `focused AI-prompt-preview tests must characterize ${testName}.`
   );
 }
 assertIncludes(
