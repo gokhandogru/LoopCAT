@@ -81,6 +81,24 @@ test("AI command lifecycle adapter preserves conditional progress and owned prom
   assert.equal(item.shared.promptBusy, false);
 });
 
+test("prompt-only AI lifecycle owners release only prompt-busy state they acquired", async () => {
+  const { createAiCommandLifecycleCoordinator } = await loadFactory();
+  const item = harness(createAiCommandLifecycleCoordinator);
+  const projectBrief = item.coordinator.createLifecycle("project-brief", { trackPromptBusy: true });
+  const promptTest = item.coordinator.createLifecycle("prompt-test", { trackPromptBusy: true });
+
+  item.shared.promptBusy = true;
+  promptTest.sync({ promptBusy: false });
+  assert.equal(item.shared.promptBusy, true);
+
+  projectBrief.sync({ promptBusy: true });
+  assert.equal(projectBrief.isPromptBusy(), true);
+  projectBrief.sync({ promptBusy: false });
+  assert.equal(item.shared.promptBusy, false);
+  projectBrief.sync({ promptBusy: false });
+  assert.equal(item.shared.promptBusy, false);
+});
+
 test("AI command lifecycle identity guard prevents a finished owner clearing the latest active command", async () => {
   const { createAiCommandLifecycleCoordinator } = await loadFactory();
   const item = harness(createAiCommandLifecycleCoordinator);

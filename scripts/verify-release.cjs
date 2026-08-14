@@ -2114,6 +2114,8 @@ for (const consumer of [
   'createLifecycle("terminology-application", {',
   'createLifecycle("draft-editing", {',
   'createLifecycle("terminology-extraction", {',
+  'createLifecycle("project-brief", {',
+  'createLifecycle("prompt-test", {',
   "aiCommandLifecycleCoordinator.setCancelHandlers([",
   "cancel: (...args) => aiCommandLifecycleCoordinator.cancel(...args)"
 ]) {
@@ -2139,6 +2141,8 @@ for (const removedFacade of [
   "let aiDraftEditingOwnsPromptBusy",
   "let aiTerminologyExtractionAbortController",
   "let aiTerminologyExtractionOwnsPromptBusy",
+  "let aiProjectBriefOwnsPromptBusy",
+  "let aiPromptTestOwnsPromptBusy",
   "function cancelLocalAiBatch"
 ]) {
   assert(
@@ -2150,6 +2154,7 @@ for (const testName of [
   "AI command lifecycle coordinator requires checked state, presentation, and status boundaries",
   "AI command lifecycle adapter mirrors pretranslation progress and running state",
   "AI command lifecycle adapter preserves conditional progress and owned prompt-busy state",
+  "prompt-only AI lifecycle owners release only prompt-busy state they acquired",
   "AI command lifecycle identity guard prevents a finished owner clearing the latest active command",
   "AI command lifecycle cancellation preserves registered priority and stops after acceptance",
   "AI command lifecycle fallback aborts, merges canceled progress, renders, and reports dirty",

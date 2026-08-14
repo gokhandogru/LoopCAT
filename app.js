@@ -2360,7 +2360,6 @@ aiCommandLifecycleCoordinator.setCancelHandlers([
   aiDraftEditingController,
   aiTerminologyExtractionController
 ]);
-let aiProjectBriefOwnsPromptBusy = false;
 const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBriefController({
   editorSessionStore,
   settings: {
@@ -2388,19 +2387,9 @@ const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBrie
   domain: {
     generateProjectBrief: (options) => aiCommandService.generateProjectBrief(options)
   },
-  lifecycle: {
-    isRunning: () => state.localAi.running,
-    isPromptBusy: () => state.localAi.promptBusy,
-    sync: ({ promptBusy }) => {
-      if (promptBusy) {
-        aiProjectBriefOwnsPromptBusy = true;
-        state.localAi.promptBusy = true;
-      } else if (aiProjectBriefOwnsPromptBusy) {
-        state.localAi.promptBusy = false;
-        aiProjectBriefOwnsPromptBusy = false;
-      }
-    }
-  },
+  lifecycle: aiCommandLifecycleCoordinator.createLifecycle("project-brief", {
+    trackPromptBusy: true
+  }),
   persistence: { updateProject },
   administration: {
     setStyleGuide: (value) => aiAdministrationController?.setGlobalStyleGuide?.(value)
@@ -2700,7 +2689,6 @@ const aiPromptPreviewController = appRuntime.featureFactories.createAiPromptPrev
   },
   normalize: { stableLower }
 });
-let aiPromptTestOwnsPromptBusy = false;
 const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestController({
   project: { get: currentProject },
   settings: {
@@ -2722,19 +2710,9 @@ const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestCon
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
   consent: { externalShare: externalAiConsentService.confirmShare },
-  lifecycle: {
-    isRunning: () => state.localAi.running,
-    isPromptBusy: () => state.localAi.promptBusy,
-    sync: ({ promptBusy }) => {
-      if (promptBusy) {
-        aiPromptTestOwnsPromptBusy = true;
-        state.localAi.promptBusy = true;
-      } else if (aiPromptTestOwnsPromptBusy) {
-        state.localAi.promptBusy = false;
-        aiPromptTestOwnsPromptBusy = false;
-      }
-    }
-  },
+  lifecycle: aiCommandLifecycleCoordinator.createLifecycle("prompt-test", {
+    trackPromptBusy: true
+  }),
   output: {
     set: (value) => {
       state.localAi.promptOutput = value;
