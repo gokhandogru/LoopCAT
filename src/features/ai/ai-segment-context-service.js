@@ -1,6 +1,7 @@
 /**
  * Owns shared optional AI termbase/TM context policy, lookup parameters,
- * failure containment, and ordered nearby same-document segment selection.
+ * direct-OpenAI explicit-settings composition, failure containment, and
+ * ordered nearby same-document segment selection.
  * Repositories, project/resource records, settings normalization, segment
  * storage, and logging remain injected.
  *
@@ -73,6 +74,28 @@ export function createAiSegmentContextService(options) {
     }
   }
 
+  async function resourceContextForSegment(segment, settings) {
+    const selectedProject = project.get();
+    return await Promise.all([
+      settings.useTmContext
+        ? lookup.findTmMatches({
+            source: segment.source,
+            sourceLang: selectedProject.sourceLang,
+            targetLang: selectedProject.targetLang,
+            tmNames: resources.getTmNames()
+          })
+        : [],
+      settings.useTermbaseContext
+        ? lookup.findTerms({
+            source: segment.source,
+            sourceLang: selectedProject.sourceLang,
+            targetLang: selectedProject.targetLang,
+            termBaseNames: resources.getTermBaseNames()
+          })
+        : []
+    ]);
+  }
+
   function surroundingSegmentsForSegment(segment, options = {}) {
     if (!project.get() || !segment) return [];
     const settings = options.settings || settingsBoundary.read();
@@ -108,5 +131,10 @@ export function createAiSegmentContextService(options) {
     return [...before, ...after];
   }
 
-  return Object.freeze({ glossaryTermsForSegment, surroundingSegmentsForSegment, tmMatchesForSegment });
+  return Object.freeze({
+    glossaryTermsForSegment,
+    resourceContextForSegment,
+    surroundingSegmentsForSegment,
+    tmMatchesForSegment
+  });
 }

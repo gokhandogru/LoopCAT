@@ -34,12 +34,14 @@ function createHarness(createService, overrides = {}) {
     lookup: {
       findTerms: (query) => {
         calls.push(["findTerms", query]);
+        if (overrides.termLookup) return overrides.termLookup(query);
         return overrides.termError
           ? Promise.reject(overrides.termError)
           : Promise.resolve(overrides.termResult || [{ sourceTerm: "house", targetTerm: "ev" }]);
       },
       findTmMatches: (query) => {
         calls.push(["findTmMatches", query]);
+        if (overrides.tmLookup) return overrides.tmLookup(query);
         return overrides.tmError
           ? Promise.reject(overrides.tmError)
           : Promise.resolve(overrides.tmResult || [{ target: "Örnek", score: 91 }]);
@@ -121,6 +123,75 @@ test("AI segment context contains lookup failures with the existing warning mess
     ["Local AI pretranslation termbase lookup failed.", termError],
     ["Local AI pretranslation TM lookup failed.", tmError]
   ]);
+});
+
+test("AI segment context composes explicit direct-OpenAI resources concurrently in TM-first order", async () => {
+  const { createAiSegmentContextService } = await loadFactory();
+  let resolveTerms;
+  let resolveTm;
+  const termPromise = new Promise((resolve) => {
+    resolveTerms = resolve;
+  });
+  const tmPromise = new Promise((resolve) => {
+    resolveTm = resolve;
+  });
+  const harness = createHarness(createAiSegmentContextService, {
+    useTermbaseContext: false,
+    useTmContext: false,
+    termLookup: () => termPromise,
+    tmLookup: () => tmPromise
+  });
+  const pending = harness.service.resourceContextForSegment(
+    { id: "segment-1", source: "House" },
+    { useTmContext: true, useTermbaseContext: true }
+  );
+  assert.deepEqual(harness.calls, [
+    [
+      "findTmMatches",
+      {
+        source: "House",
+        sourceLang: "en",
+        targetLang: "tr",
+        tmNames: ["Main TM", "Reference TM"]
+      }
+    ],
+    [
+      "findTerms",
+      {
+        source: "House",
+        sourceLang: "en",
+        targetLang: "tr",
+        termBaseNames: ["Project TB", "Shared TB"]
+      }
+    ]
+  ]);
+  resolveTerms([{ sourceTerm: "house", targetTerm: "ev" }]);
+  resolveTm([{ target: "Ev", score: 94 }]);
+  assert.deepEqual(await pending, [[{ target: "Ev", score: 94 }], [{ sourceTerm: "house", targetTerm: "ev" }]]);
+});
+
+test("AI segment context honors explicit direct-OpenAI opt-outs and propagates lookup rejection", async () => {
+  const { createAiSegmentContextService } = await loadFactory();
+  const disabled = createHarness(createAiSegmentContextService);
+  assert.deepEqual(
+    await disabled.service.resourceContextForSegment(
+      { id: "segment-1", source: "House" },
+      { useTmContext: false, useTermbaseContext: false }
+    ),
+    [[], []]
+  );
+  assert.deepEqual(disabled.calls, []);
+
+  const tmError = new Error("direct OpenAI TM context failed");
+  const rejected = createHarness(createAiSegmentContextService, { tmError });
+  await assert.rejects(
+    rejected.service.resourceContextForSegment(
+      { id: "segment-1", source: "House" },
+      { useTmContext: true, useTermbaseContext: false }
+    ),
+    tmError
+  );
+  assert.deepEqual(rejected.warnings, []);
 });
 
 test("AI segment context returns two ordered nonblank neighbors per side from the same document", async () => {

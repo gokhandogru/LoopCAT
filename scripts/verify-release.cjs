@@ -2862,6 +2862,12 @@ for (const boundary of [
   "tmNames: resources.getTmNames()",
   "limit: 3",
   'logger.warn?.("Local AI pretranslation TM lookup failed.", error)',
+  "async function resourceContextForSegment(segment, settings)",
+  "return await Promise.all([",
+  "settings.useTmContext",
+  "tmNames: resources.getTmNames()",
+  "settings.useTermbaseContext",
+  "termBaseNames: resources.getTermBaseNames()",
   "function surroundingSegmentsForSegment(segment, options = {})",
   "const settings = options.settings || settingsBoundary.read()",
   "Array.isArray(options.segments) && options.segments.length",
@@ -2885,6 +2891,7 @@ for (const consumer of [
   "surroundingSegmentsForSegment: aiSegmentContextService.surroundingSegmentsForSegment",
   "batchTerms: aiSegmentContextService.glossaryTermsForSegment",
   "termsForSegment: aiSegmentContextService.glossaryTermsForSegment",
+  "forSegment: aiSegmentContextService.resourceContextForSegment",
   "getSurroundingSegments: aiSegmentContextService.surroundingSegmentsForSegment"
 ]) {
   assertIncludes(appJs, consumer, `AI segment-context consumer must use the checked service: ${consumer}.`);
@@ -2892,7 +2899,8 @@ for (const consumer of [
 for (const removedFacade of [
   "async function localAiGlossaryTermsForSegment",
   "async function localAiTmMatchesForSegment",
-  "function localAiSurroundingSegmentsForSegment"
+  "function localAiSurroundingSegmentsForSegment",
+  "async function aiContextForSegment"
 ]) {
   assert(!appJs.includes(removedFacade), `${removedFacade} must not return after direct context wiring.`);
 }
@@ -2900,6 +2908,8 @@ for (const testName of [
   "AI segment context preserves missing project, segment, and project-level context opt-outs",
   "AI segment context routes exact language, resource, source, and TM-limit lookup parameters",
   "AI segment context contains lookup failures with the existing warning messages",
+  "AI segment context composes explicit direct-OpenAI resources concurrently in TM-first order",
+  "AI segment context honors explicit direct-OpenAI opt-outs and propagates lookup rejection",
   "AI segment context returns two ordered nonblank neighbors per side from the same document",
   "AI segment context uses settings and segment fallbacks and rejects disabled or unknown selections"
 ]) {
@@ -3978,6 +3988,15 @@ assertIncludes(
   appBootstrapJs,
   "createAiOpenAiSuggestionController",
   "The application runtime must expose the checked direct-OpenAI-suggestion controller boundary."
+);
+assertIncludes(
+  appJs,
+  "context: { forSegment: aiSegmentContextService.resourceContextForSegment }",
+  "direct OpenAI suggestions must consume explicit-settings resource context from the checked segment-context service."
+);
+assert(
+  !appJs.includes("async function aiContextForSegment"),
+  "direct-OpenAI resource-context orchestration must not return to app.js."
 );
 for (const boundary of [
   "const globalForm = administration.readGlobalForm() || {}",

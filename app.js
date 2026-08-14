@@ -2541,7 +2541,7 @@ const aiOpenAiSuggestionController = appRuntime.featureFactories.createAiOpenAiS
   },
   consent: { externalShare: externalAiConsentService.confirmShare },
   persistence: { updateProject },
-  context: { forSegment: aiContextForSegment },
+  context: { forSegment: aiSegmentContextService.resourceContextForSegment },
   suggestions: {
     append: (segment, suggestion) =>
       aiSuggestionPersistenceController.append(
@@ -7958,23 +7958,6 @@ async function saveProjectDomainFromForm() {
     setSaveStatus(error.message || "Project domain save failed", "dirty");
     return false;
   }
-}
-
-async function aiContextForSegment(segment, ai) {
-  return Promise.all([
-    ai.useTmContext ? findProjectTmMatches({
-      source: segment.source,
-      sourceLang: currentProject().sourceLang,
-      targetLang: currentProject().targetLang,
-      tmNames: projectTmNames()
-    }) : [],
-    ai.useTermbaseContext ? findTerms({
-      source: segment.source,
-      sourceLang: currentProject().sourceLang,
-      targetLang: currentProject().targetLang,
-      termBaseNames: projectTermBaseNames()
-    }) : []
-  ]);
 }
 
 function aiReviewRiskLabel(level) {
