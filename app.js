@@ -2502,6 +2502,63 @@ const aiOpenAiSuggestionController = appRuntime.featureFactories.createAiOpenAiS
   },
   logger: console
 });
+const aiSettingsPersistenceController =
+  appRuntime.featureFactories.createAiSettingsPersistenceController({
+    editorSessionStore,
+    forms: {
+      readGlobal: () => aiAdministrationController?.readGlobalForm?.() || {},
+      readSecrets: () => aiAdministrationController?.readSecrets?.() || {},
+      readLocalSettings: localAiSettingsFromForm
+    },
+    settings: {
+      normalize: defaultAiSettings,
+      projectUpdateFields: (localSettings, project) =>
+        localAISettingsStore.projectUpdateFields(localSettings, project)
+    },
+    endpoint: { assertAllowed: assertLocalAiEndpointAllowed },
+    provider: { isOpenAi: (aiSettings) => isOpenAiProvider({ aiSettings }) },
+    keys: {
+      openAi: {
+        snapshot: openAiKeySnapshot,
+        save: saveOpenAiKey,
+        restore: safeRestoreOpenAiKeySnapshot,
+        storageLabel: openAiKeyStorageLabel
+      },
+      local: {
+        snapshot: localAiKeySnapshot,
+        save: saveLocalAiKey,
+        restore: safeRestoreLocalAiKeySnapshot,
+        storageLabel: localAiKeyStorageLabel
+      }
+    },
+    persistence: { updateProject },
+    activity: {
+      log: (details) => logProjectActivity("ai-settings", "AI settings updated", details)
+    },
+    presentation: { renderEditor },
+    workspace: {
+      markDirty: markWorkspaceDirty,
+      markActivityWarningDirty: () => {
+        if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
+      },
+      markRollbackDirty: markOpenAiProjectRollbackDirty
+    },
+    status: { set: setSaveStatus },
+    defaults: { model: OPENAI_DEFAULT_MODEL },
+    testHooks: {
+      beforeSave: (project) => {
+        if (LOOPCAT_TEST_BUILD && project[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) {
+          throw new Error("Simulated AI settings save failure");
+        }
+      },
+      beforeActivity: (project) => {
+        if (LOOPCAT_TEST_BUILD && project[AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG]) {
+          throw new Error("Simulated AI settings activity failure");
+        }
+      }
+    },
+    logger: console
+  });
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
     splitButton: els.splitSegmentBtn,
@@ -4192,23 +4249,6 @@ function localAiKeyStorageLabel(settings = localAiSettingsFromForm()) {
 
 function markOpenAiProjectRollbackDirty(projectId) {
   if (projectId) markWorkspaceDirty(projectId);
-}
-
-async function restoreProjectAfterOpenAiSetupFailure(previousProject, previousProjects, projectPersisted) {
-  if (!projectPersisted) {
-    editorSessionStore.replaceProject(previousProject);
-    editorSessionStore.replaceProjects(previousProjects);
-    return;
-  }
-  try {
-    editorSessionStore.replaceProject(await updateProject(previousProject));
-    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
-  } catch (rollbackError) {
-    console.warn("Project AI settings rollback failed.", rollbackError);
-    editorSessionStore.replaceProject(previousProject);
-    editorSessionStore.replaceProjects(previousProjects);
-    markOpenAiProjectRollbackDirty(previousProject.id);
-  }
 }
 
 async function waitForOfflineAppShellReady(timeoutMs = 10000) {
@@ -8659,67 +8699,7 @@ async function saveProjectDomainFromForm() {
 }
 
 async function saveAiSettings() {
-  if (!currentProject()) return;
-  const previousProject = structuredClone(currentProject());
-  const previousProjects = currentProjects().map((project) => structuredClone(project));
-  const previousOpenAiKey = openAiKeySnapshot();
-  const globalForm = aiAdministrationController?.readGlobalForm?.() || {};
-  const secrets = aiAdministrationController?.readSecrets?.() || {};
-  const apiKeyInput = secrets.openAiKey || "";
-  const rememberApiKey = Boolean(secrets.rememberOpenAiKey);
-  const localAiKeyInput = secrets.localAiKey || "";
-  const rememberLocalAiKey = Boolean(secrets.rememberLocalAiKey);
-  const localAiSettings = localAiSettingsFromForm();
-  const previousLocalAiKey = localAiKeySnapshot(localAiSettings);
-  let projectPersisted = false;
-  let activityLogged = true;
-  const aiSettings = defaultAiSettings({
-    enabled: Boolean(globalForm.enabled),
-    provider: globalForm.provider || "OpenAI",
-    model: globalForm.model || OPENAI_DEFAULT_MODEL,
-    sendSourceToAi: Boolean(globalForm.sendSourceToAi),
-    useTmContext: globalForm.useTmContext !== false,
-    useTermbaseContext: globalForm.useTermbaseContext !== false,
-    styleGuide: globalForm.styleGuide || "",
-    ...localAISettingsStore.projectUpdateFields(localAiSettings, currentProject())
-  });
-  const shouldUpdateOpenAiKey = Boolean(String(apiKeyInput || "").trim()) && isOpenAiProvider({ aiSettings });
-  const shouldUpdateLocalAiKey = Boolean(String(localAiKeyInput || "").trim());
-  try {
-    assertLocalAiEndpointAllowed(localAiSettings);
-  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && currentProject()[AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG]);
-  if (LOOPCAT_TEST_BUILD && currentProject()[AI_SETTINGS_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated AI settings save failure");
-    editorSessionStore.replaceProject(await updateProject({ ...currentProject(), aiSettings }));
-    projectPersisted = true;
-    editorSessionStore.replaceProjects(currentProjects().map((project) => (project.id === currentProject().id ? currentProject() : project)));
-    if (shouldUpdateOpenAiKey) saveOpenAiKey(apiKeyInput, rememberApiKey);
-    if (shouldUpdateLocalAiKey) saveLocalAiKey(localAiKeyInput, rememberLocalAiKey, localAiSettings);
-    try {
-      if (shouldSimulateActivityFailure) throw new Error("Simulated AI settings activity failure");
-      await logProjectActivity("ai-settings", "AI settings updated", {
-        enabled: aiSettings.enabled,
-        provider: aiSettings.provider,
-        model: aiSettings.model,
-        sendSourceToAi: aiSettings.sendSourceToAi,
-        keyStorage: isOpenAiProvider({ aiSettings }) ? openAiKeyStorageLabel() : "Not applicable",
-        localAiKeyStorage: shouldUpdateLocalAiKey ? localAiKeyStorageLabel(localAiSettings) : "Not changed"
-      });
-    } catch (activityError) {
-      activityLogged = false;
-      console.warn("AI settings activity log failed.", activityError);
-      if (currentProject()?.id) markWorkspaceDirty(currentProject().id);
-    }
-    renderEditor();
-    markWorkspaceDirty();
-    setSaveStatus(activityLogged ? "AI settings saved" : "AI settings saved; activity log failed", activityLogged ? "saved" : "dirty");
-    return true;
-  } catch (error) {
-    await restoreProjectAfterOpenAiSetupFailure(previousProject, previousProjects, projectPersisted);
-    safeRestoreOpenAiKeySnapshot(previousOpenAiKey);
-    safeRestoreLocalAiKeySnapshot(previousLocalAiKey);
-    setSaveStatus(error.message || "AI settings save failed", "dirty");
-    return false;
-  }
+  return aiSettingsPersistenceController.save();
 }
 
 function renderAiSuggestions() {

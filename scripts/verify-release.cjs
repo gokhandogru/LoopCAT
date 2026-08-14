@@ -358,6 +358,8 @@ const aiOpenAiSuggestionControllerJs = readText("src/features/ai/ai-openai-sugge
 const aiOpenAiSuggestionControllerUnitTests = readText("tests/unit/ai-openai-suggestion-controller.test.cjs");
 const aiSuggestionPersistenceControllerJs = readText("src/features/ai/ai-suggestion-persistence-controller.js");
 const aiSuggestionPersistenceControllerUnitTests = readText("tests/unit/ai-suggestion-persistence-controller.test.cjs");
+const aiSettingsPersistenceControllerJs = readText("src/features/ai/ai-settings-persistence-controller.js");
+const aiSettingsPersistenceControllerUnitTests = readText("tests/unit/ai-settings-persistence-controller.test.cjs");
 const aiTerminologyApplicationControllerJs = readText("src/features/ai/ai-terminology-application-controller.js");
 const aiTerminologyApplicationControllerUnitTests = readText(
   "tests/unit/ai-terminology-application-controller.test.cjs"
@@ -3228,6 +3230,77 @@ for (const testName of [
     aiSuggestionPersistenceControllerUnitTests,
     testName,
     `focused AI-suggestion-persistence tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiSettingsPersistenceController",
+  "The application runtime must expose the checked AI-settings-persistence controller boundary."
+);
+for (const boundary of [
+  "const previousProject = structuredClone(project)",
+  "const previousOpenAiKey = keys.openAi.snapshot()",
+  "const globalForm = forms.readGlobal() || {}",
+  "const secrets = forms.readSecrets() || {}",
+  "const localSettings = forms.readLocalSettings()",
+  "const previousLocalKey = keys.local.snapshot(localSettings)",
+  "const aiSettings = settingsBoundary.normalize({",
+  "...settingsBoundary.projectUpdateFields(localSettings, project)",
+  "endpoint.assertAllowed(localSettings)",
+  "const savedProject = await persistence.updateProject({ ...project, aiSettings })",
+  "if (shouldUpdateOpenAiKey) keys.openAi.save(apiKeyInput, rememberApiKey)",
+  "if (shouldUpdateLocalKey) keys.local.save(localAiKeyInput, rememberLocalAiKey, localSettings)",
+  "await activity.log({",
+  "workspace.markActivityWarningDirty()",
+  "await restoreProject(previousProject, previousProjects, projectPersisted)",
+  "keys.openAi.restore(previousOpenAiKey)",
+  "keys.local.restore(previousLocalKey)",
+  "workspace.markRollbackDirty(previousProject.id)"
+]) {
+  assertIncludes(
+    aiSettingsPersistenceControllerJs,
+    boundary,
+    `AiSettingsPersistenceController must retain checked ${boundary} orchestration.`
+  );
+}
+assertIncludes(
+  appJs,
+  "return aiSettingsPersistenceController.save()",
+  "app.js must retain only the checked AI-settings-persistence compatibility facade."
+);
+const aiSettingsPersistenceFacade = functionBody(
+  appJs,
+  "async function saveAiSettings",
+  "function renderAiSuggestions"
+);
+assert(
+  !aiSettingsPersistenceFacade.includes("readGlobalForm(") &&
+    !aiSettingsPersistenceFacade.includes("readSecrets(") &&
+    !aiSettingsPersistenceFacade.includes("localAiSettingsFromForm(") &&
+    !aiSettingsPersistenceFacade.includes("defaultAiSettings(") &&
+    !aiSettingsPersistenceFacade.includes("assertLocalAiEndpointAllowed(") &&
+    !aiSettingsPersistenceFacade.includes("updateProject(") &&
+    !aiSettingsPersistenceFacade.includes("saveOpenAiKey(") &&
+    !aiSettingsPersistenceFacade.includes("saveLocalAiKey(") &&
+    !aiSettingsPersistenceFacade.includes("logProjectActivity(") &&
+    !aiSettingsPersistenceFacade.includes("renderEditor(") &&
+    !aiSettingsPersistenceFacade.includes("markWorkspaceDirty(") &&
+    !aiSettingsPersistenceFacade.includes("setSaveStatus("),
+  "app.js must not regain AI-settings form, normalization, endpoint, snapshot, project/list/key persistence, activity, presentation, workspace, status, or recovery orchestration."
+);
+for (const testName of [
+  "AI settings persistence is inert without a selected project",
+  "AI settings persistence normalizes forms, saves project and credentials, and logs storage labels",
+  "blank credentials preserve existing keys and non-OpenAI settings suppress OpenAI storage labels",
+  "AI settings validation and primary persistence failures restore exact project, list, and key snapshots",
+  "AI settings credential failure rolls persisted project settings back before restoring keys",
+  "AI settings rollback-write failure restores memory and marks the original project dirty",
+  "secondary AI settings activity failure keeps project and keys durable and reports dirty"
+]) {
+  assertIncludes(
+    aiSettingsPersistenceControllerUnitTests,
+    testName,
+    `focused AI-settings-persistence tests must characterize ${testName}.`
   );
 }
 assertIncludes(
@@ -9604,7 +9677,7 @@ assertIncludes(
   "app workflow test must verify anonymized project reports include a restrictive CSP."
 );
 const openAiSuggestionFunction = aiOpenAiSuggestionControllerJs;
-const saveAiSettingsFunction = functionBody(appJs, "async function saveAiSettings()", "function renderAiSuggestions()");
+const saveAiSettingsFunction = aiSettingsPersistenceControllerJs;
 assert(!indexHtml.includes("chatGptBtn"), "index.html must not expose the removed GPT toolbar button.");
 assert(!appJs.includes("openChatGptForSelection"), "app.js must not retain the removed ChatGPT shortcut behavior.");
 assert(
@@ -9618,8 +9691,8 @@ assertIncludes(
 );
 assertIncludes(
   saveAiSettingsFunction,
-  "isOpenAiProvider({ aiSettings })",
-  "app.js AI settings saves must only persist typed OpenAI keys when OpenAI is the selected provider."
+  "provider.isOpenAi(aiSettings)",
+  "The checked AI-settings controller must only persist typed OpenAI keys when OpenAI is selected."
 );
 assert(
   openAiSuggestionFunction.indexOf("if (!aiSettings.enabled)") < openAiSuggestionFunction.indexOf("keys.save(apiKey"),
@@ -9665,9 +9738,9 @@ assertIncludes(
   "app workflow test must verify successful AI settings saves persist project settings and optional API key."
 );
 assertIncludes(
-  appJs,
+  saveAiSettingsFunction,
   'const shouldUpdateOpenAiKey = Boolean(String(apiKeyInput || "").trim())',
-  "app.js must not clear an existing OpenAI key when saving settings with a blank key field."
+  "The checked AI-settings controller must not clear an existing OpenAI key for a blank field."
 );
 assertIncludes(
   appJs,
@@ -9676,8 +9749,8 @@ assertIncludes(
 );
 assertIncludes(
   saveAiSettingsFunction,
-  'keyStorage: isOpenAiProvider({ aiSettings }) ? openAiKeyStorageLabel() : "Not applicable"',
-  "app.js AI settings activity details must not report OpenAI key storage for non-OpenAI providers."
+  'keyStorage: provider.isOpenAi(aiSettings) ? keys.openAi.storageLabel() : "Not applicable"',
+  "AI settings activity details must not report OpenAI key storage for non-OpenAI providers."
 );
 assertIncludes(
   appJs,
