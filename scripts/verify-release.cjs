@@ -170,6 +170,7 @@ const requiredReleaseFiles = [
   "src/features/editor/target-producer-controller.js",
   "src/features/editor/protected-tag-inspection-service.js",
   "src/features/editor/protected-text-replacement-service.js",
+  "src/features/editor/segment-provenance-service.js",
   "src/features/editor/structural-segment-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -258,6 +259,7 @@ const requiredReleaseFiles = [
   "tests/unit/target-producer-controller.test.cjs",
   "tests/unit/protected-tag-inspection-service.test.cjs",
   "tests/unit/protected-text-replacement-service.test.cjs",
+  "tests/unit/segment-provenance-service.test.cjs",
   "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
@@ -379,6 +381,7 @@ const targetEditControllerJs = readText("src/features/editor/target-edit-control
 const targetProducerControllerJs = readText("src/features/editor/target-producer-controller.js");
 const protectedTagInspectionServiceJs = readText("src/features/editor/protected-tag-inspection-service.js");
 const protectedTextReplacementServiceJs = readText("src/features/editor/protected-text-replacement-service.js");
+const segmentProvenanceServiceJs = readText("src/features/editor/segment-provenance-service.js");
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
@@ -388,6 +391,7 @@ const targetEditControllerUnitTests = readText("tests/unit/target-edit-controlle
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
 const protectedTagInspectionServiceUnitTests = readText("tests/unit/protected-tag-inspection-service.test.cjs");
 const protectedTextReplacementServiceUnitTests = readText("tests/unit/protected-text-replacement-service.test.cjs");
+const segmentProvenanceServiceUnitTests = readText("tests/unit/segment-provenance-service.test.cjs");
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
@@ -4157,6 +4161,16 @@ assertIncludes(
   "createProtectedTextReplacementService,",
   "The application runtime must expose the checked protected-text replacement factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createSegmentProvenanceService } from "../features/editor/segment-provenance-service.js";',
+  "The application runtime must install the checked segment provenance service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentProvenanceService,",
+  "The application runtime must expose the checked segment provenance factory."
+);
 for (const boundary of [
   "editLifecycle.finalize(segment.id)",
   "persistence.clearPending(segment, { finalizeEdit: false })",
@@ -4351,6 +4365,83 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/protected-text-replacement-service.js"',
   "source-catalog extraction must scan the checked protected-text replacement service."
+);
+for (const snippet of [
+  'const level = String(segment.aiReviewRisk?.level || "").trim()',
+  '["low", "medium", "high", "critical"].includes(level)',
+  "Boolean(segment.aiPretranslation?.provider || segment.aiPretranslation?.model)",
+  'className: "ai-initiated"',
+  'text: localization.source("AI initiated")',
+  'localization.label("aiInitiatedPretranslationModel", { model: segment.aiPretranslation.model })',
+  'localization.label("aiInitiatedPretranslation")',
+  "const score = Number(segment.tmPretranslation?.score)",
+  "if (!Number.isFinite(score)) return null",
+  "Math.max(0, Math.min(100, Math.round(score)))",
+  "return tmScore(segment) !== null",
+  'const tmName = String(segment.tmPretranslation?.tmName || "").trim()',
+  'className: "tm-pretranslation"',
+  "text: `TM ${score}%`",
+  'localization.source("TM pretranslation match: {value1}% from {value2}"',
+  'localization.source("TM pretranslation match: {value1}%", { value1: score })',
+  "Array.isArray(segment.aiSuggestions) && segment.aiSuggestions.length > 0",
+  "return Object.freeze({ aiRiskLevel, hasAiDraft, aiBadge, tmScore, hasTmPretranslation, tmBadge, hasAiSuggestions })"
+]) {
+  assertIncludes(
+    segmentProvenanceServiceJs,
+    snippet,
+    `SegmentProvenanceService must retain characterized classification/presentation policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createSegmentProvenanceService({",
+  "app.js must compose the checked segment provenance service."
+);
+assertIncludes(
+  appJs,
+  "localization: uiLocalizationService",
+  "segment provenance composition must inject the checked localization boundary."
+);
+for (const method of ["aiRiskLevel", "hasAiDraft", "aiBadge", "hasTmPretranslation", "tmBadge", "hasAiSuggestions"]) {
+  assertIncludes(
+    appJs,
+    `segmentProvenanceService.${method}`,
+    `segment provenance consumers must call SegmentProvenanceService.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "aiReviewRiskLevel",
+  "segmentHasAiDraft",
+  "aiPretranslationBadge",
+  "tmPretranslationScore",
+  "segmentHasTmPretranslation",
+  "tmPretranslationBadge",
+  "segmentHasAiSuggestions"
+]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} segment provenance helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "SegmentProvenanceService preserves trimmed allowlisted AI review risk levels",
+  "SegmentProvenanceService preserves provider/model AI draft and array/nonempty suggestion classification",
+  "SegmentProvenanceService preserves AI badge class, text, and model/no-model localized titles",
+  "SegmentProvenanceService preserves TM numeric conversion, rounding, clamp, nonfinite null, and zero presence",
+  "SegmentProvenanceService preserves named and unnamed TM badge metadata",
+  "SegmentProvenanceService validates localization and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentProvenanceServiceUnitTests,
+    testName,
+    `focused segment provenance tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-provenance-service.js"',
+  "source-catalog extraction must scan the checked segment provenance service."
 );
 assertIncludes(
   appBootstrapJs,
@@ -8688,8 +8779,8 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "function aiPretranslationBadge",
-  "app.js must centralize AI draft to AI initiated row-badge behavior."
+  "segmentProvenanceService.aiBadge(segment)",
+  "the checked segment provenance service must centralize AI draft to AI initiated row-badge behavior."
 );
 assertIncludes(
   readText("styles.css"),

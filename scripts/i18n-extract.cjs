@@ -99,6 +99,7 @@ const protectedTextReplacementServicePath = path.join(
   "editor",
   "protected-text-replacement-service.js"
 );
+const segmentProvenanceServicePath = path.join(root, "src", "features", "editor", "segment-provenance-service.js");
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const resourceMutationControllerPath = path.join(
   root,
@@ -309,6 +310,7 @@ function main() {
     protectedTextReplacementServicePath,
     "src/features/editor/protected-text-replacement-service.js"
   );
+  extractScript(messagesByText, segmentProvenanceServicePath, "src/features/editor/segment-provenance-service.js");
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(
     messagesByText,

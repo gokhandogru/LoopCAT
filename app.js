@@ -1114,6 +1114,10 @@ const protectedTextReplacementService = appRuntime.featureFactories.createProtec
   normalizeCase: stableLower
 });
 
+const segmentProvenanceService = appRuntime.featureFactories.createSegmentProvenanceService({
+  localization: uiLocalizationService
+});
+
 const projectLanguageContextController = appRuntime.featureFactories.createProjectLanguageContextController({
   getProject: () => editorSessionStore.getProject(),
   languageInput: languageInputService,
@@ -4697,58 +4701,13 @@ function isOpenSegment(segment) {
   return segment.status !== "confirmed";
 }
 
-function aiReviewRiskLevel(segment = {}) {
-  const level = String(segment.aiReviewRisk?.level || "").trim();
-  return ["low", "medium", "high", "critical"].includes(level) ? level : "";
-}
-
-function segmentHasAiDraft(segment = {}) {
-  return Boolean(segment.aiPretranslation?.provider || segment.aiPretranslation?.model);
-}
-
-function aiPretranslationBadge(segment = {}) {
-  return {
-    className: "ai-initiated",
-    text: uiLocalizationService.source("AI initiated"),
-    title: segment.aiPretranslation?.model
-      ? uiLocalizationService.label("aiInitiatedPretranslationModel", { model: segment.aiPretranslation.model })
-      : uiLocalizationService.label("aiInitiatedPretranslation")
-  };
-}
-
-function tmPretranslationScore(segment = {}) {
-  const score = Number(segment.tmPretranslation?.score);
-  if (!Number.isFinite(score)) return null;
-  return Math.max(0, Math.min(100, Math.round(score)));
-}
-
-function segmentHasTmPretranslation(segment = {}) {
-  return tmPretranslationScore(segment) !== null;
-}
-
-function tmPretranslationBadge(segment = {}) {
-  const score = tmPretranslationScore(segment);
-  const tmName = String(segment.tmPretranslation?.tmName || "").trim();
-  return {
-    className: "tm-pretranslation",
-    text: `TM ${score}%`,
-    title: tmName
-      ? uiLocalizationService.source("TM pretranslation match: {value1}% from {value2}", { value1: score, value2: tmName })
-      : uiLocalizationService.source("TM pretranslation match: {value1}%", { value1: score })
-  };
-}
-
-function segmentHasAiSuggestions(segment = {}) {
-  return Array.isArray(segment.aiSuggestions) && segment.aiSuggestions.length > 0;
-}
-
 function segmentPassesAiFilter(segment = {}) {
   const filter = editorFilterStore.getState().aiState;
   if (!filter) return true;
-  if (filter === "ai-draft") return segmentHasAiDraft(segment);
-  if (filter === "ai-suggestions") return segmentHasAiSuggestions(segment);
-  if (filter === "ai-review-risk") return Boolean(aiReviewRiskLevel(segment));
-  if (filter === "high-ai-risk") return ["high", "critical"].includes(aiReviewRiskLevel(segment));
+  if (filter === "ai-draft") return segmentProvenanceService.hasAiDraft(segment);
+  if (filter === "ai-suggestions") return segmentProvenanceService.hasAiSuggestions(segment);
+  if (filter === "ai-review-risk") return Boolean(segmentProvenanceService.aiRiskLevel(segment));
+  if (filter === "high-ai-risk") return ["high", "critical"].includes(segmentProvenanceService.aiRiskLevel(segment));
   return true;
 }
 
@@ -6046,8 +6005,8 @@ function renderStatusCell(row, segment) {
   pill.className = `status-pill ${segment.status}`;
   pill.textContent = segmentStatusLabel(segment.status);
   statusCell.querySelectorAll(".tag-warning, .review-pill, .comment-marker, .tm-match-badge, .ai-segment-badge").forEach((item) => item.remove());
-  if (segmentHasTmPretranslation(segment)) {
-    const item = tmPretranslationBadge(segment);
+  if (segmentProvenanceService.hasTmPretranslation(segment)) {
+    const item = segmentProvenanceService.tmBadge(segment);
     const badge = document.createElement("div");
     badge.className = `tm-match-badge ${item.className}`;
     badge.textContent = item.text;
@@ -6079,17 +6038,17 @@ function renderStatusCell(row, segment) {
     statusCell.append(marker);
   }
   const aiBadges = [];
-  if (segmentHasAiDraft(segment)) {
-    aiBadges.push(aiPretranslationBadge(segment));
+  if (segmentProvenanceService.hasAiDraft(segment)) {
+    aiBadges.push(segmentProvenanceService.aiBadge(segment));
   }
-  if (segmentHasAiSuggestions(segment)) {
+  if (segmentProvenanceService.hasAiSuggestions(segment)) {
     aiBadges.push({
       className: "ai-suggestion",
       text: uiLocalizationService.label("aiSuggestionCount", { count: segment.aiSuggestions.length }),
       title: uiLocalizationService.source("Reviewable AI suggestions are available for this segment")
     });
   }
-  const riskLevel = aiReviewRiskLevel(segment);
+  const riskLevel = segmentProvenanceService.aiRiskLevel(segment);
   if (riskLevel) {
     aiBadges.push({
       className: `ai-risk ai-risk-${riskLevel}`,
