@@ -329,6 +329,8 @@ const appStoreUnitTests = readText("tests/unit/app-store.test.cjs");
 const navigationControllerJs = readText("src/app/navigation-controller.js");
 const uiLocalizationServiceJs = readText("src/i18n/ui-localization-service.js");
 const uiLocalizationServiceUnitTests = readText("tests/unit/ui-localization-service.test.cjs");
+const reportDataServiceJs = readText("src/reports/report-data-service.js");
+const reportDataServiceUnitTests = readText("tests/unit/report-data-service.test.cjs");
 const reportDocumentCompositionServiceJs = readText("src/reports/report-document-composition-service.js");
 const reportDocumentCompositionServiceUnitTests = readText(
   "tests/unit/report-document-composition-service.test.cjs"
@@ -556,6 +558,16 @@ assertIncludes(
   "createReportDocumentCompositionService,",
   "The application runtime must expose the checked report-document composition factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createReportDataService } from "../reports/report-data-service.js";',
+  "The application runtime must install the checked report-data service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createReportDataService,",
+  "The application runtime must expose the checked report-data factory."
+);
 for (const snippet of [
   "const translate = (key, values = {})",
   "const source = (text, values = {})",
@@ -780,6 +792,67 @@ for (const hash of [
     reportDocumentCompositionServiceUnitTests,
     hash,
     `focused report-document tests must pin complete document hash ${hash}.`
+  );
+}
+for (const snippet of [
+  "await autosave.flush();",
+  "const [tmEntries, terms, activityEvents] = await Promise.all([",
+  '"tmEntries",',
+  '"languagePair",',
+  "worker?.runQaChecks",
+  "await fallback()",
+  'const key = keyFn(item) || "unknown";',
+  "generatedAt: timestamp()",
+  "redactSensitiveText(term.notes || \"\").trim()",
+  "a.termBaseName.localeCompare(b.termBaseName) || a.sourceTerm.localeCompare(b.sourceTerm)",
+  "return Object.freeze({ build })"
+]) {
+  assertIncludes(reportDataServiceJs, snippet, `ReportDataService must retain characterized data policy: ${snippet}`);
+}
+assertIncludes(appJs, "createReportDataService({", "app.js must compose the checked report-data service.");
+for (const boundary of [
+  "getProject: editorSessionStore.getProject",
+  "getSegments: editorSessionStore.getSegments",
+  "autosave: autosaveService",
+  "getTmNames: projectTmNames",
+  "getTermBaseNames: projectTermBaseNames",
+  "summarize: projectResourceSummary",
+  "getAllByIndex, listTerms, listActivityEvents",
+  "sanitize: sanitizePortableValue",
+  "validateExportReadiness, analyzeProject, runQaChecks, buildQualityPassportData",
+  "worker: workerClient",
+  "forSegment: segmentTags, missing: missingTags",
+  "redactSensitiveText",
+  "timestamp: () => new Date().toISOString()"
+]) {
+  assertIncludes(appJs, boundary, `report-data composition must inject the ${boundary} boundary.`);
+}
+assertIncludes(
+  appJs,
+  "const data = await reportDataService.build();",
+  "report exports must collect data through ReportDataService directly."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  "const labelReportData = await reportDataService.build();",
+  "workflow report characterization must collect data through ReportDataService directly."
+);
+for (const removedHelper of ["countBy", "buildProjectReportData"]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} report-data helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "ReportDataService preserves flush, query, worker QA, quality aggregation, counts, redaction, and ordering",
+  "ReportDataService preserves QA fallback for absent or capability-missing workers",
+  "ReportDataService is immutable, validates boundaries, and propagates flush, query, and worker failures"
+]) {
+  assertIncludes(
+    reportDataServiceUnitTests,
+    testName,
+    `focused report-data tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(

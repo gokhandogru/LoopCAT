@@ -1273,6 +1273,25 @@ const autosaveService = appRuntime.featureFactories.createAutosaveService({
     }
   }
 });
+const reportDataService = appRuntime.featureFactories.createReportDataService({
+  session: {
+    getProject: editorSessionStore.getProject,
+    getSegments: editorSessionStore.getSegments
+  },
+  autosave: autosaveService,
+  resources: {
+    getTmNames: projectTmNames,
+    getTermBaseNames: projectTermBaseNames,
+    summarize: projectResourceSummary
+  },
+  repositories: { getAllByIndex, listTerms, listActivityEvents },
+  portable: { sanitize: sanitizePortableValue },
+  reporting: { validateExportReadiness, analyzeProject, runQaChecks, buildQualityPassportData },
+  worker: workerClient,
+  tags: { forSegment: segmentTags, missing: missingTags },
+  redactSensitiveText,
+  timestamp: () => new Date().toISOString()
+});
 const segmentConfirmationController = appRuntime.featureFactories.createSegmentConfirmationController({
   element: els.confirmBtn,
   editorSessionStore,
@@ -8685,84 +8704,10 @@ async function repairWorkspaceLinks() {
   setSaveStatus(report.ok ? "Workspace health checked" : "Workspace needs attention", report.ok ? "saved" : "dirty");
 }
 
-function countBy(items, keyFn) {
-  return (items || []).reduce((counts, item) => {
-    const key = keyFn(item) || "unknown";
-    counts[key] = (counts[key] || 0) + 1;
-    return counts;
-  }, {});
-}
-
-async function buildProjectReportData() {
-  await autosaveService.flush();
-  const tmNames = new Set(projectTmNames());
-  const [tmEntries, terms, activityEvents] = await Promise.all([
-    getAllByIndex("tmEntries", "languagePair", `${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`),
-    listTerms({
-      sourceLang: editorSessionStore.getProject().sourceLang,
-      targetLang: editorSessionStore.getProject().targetLang,
-      termBaseNames: projectTermBaseNames()
-    }),
-    listActivityEvents(editorSessionStore.getProject().id)
-  ]);
-  const scopedTm = tmEntries.filter((entry) => tmNames.has(entry.tmName));
-  const reportActivityEvents = sanitizePortableValue(activityEvents, "activityEvents");
-  const validation = validateExportReadiness({ project: editorSessionStore.getProject(), segments: editorSessionStore.getSegments(), format: "project-report", terms });
-  const analysis = analyzeProject(editorSessionStore.getProject(), editorSessionStore.getSegments(), scopedTm);
-  const qaSegments = editorSessionStore.getSegments().map((segment) => ({
-    ...segment,
-    tags: segmentTags(segment)
-  }));
-  const fallback = () => Promise.resolve(runQaChecks(editorSessionStore.getSegments(), terms, { missingTags }));
-  const qaChecks = workerClient?.runQaChecks
-    ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
-    : await fallback();
-  const qualityPassport = buildQualityPassportData({
-    project: editorSessionStore.getProject(),
-    segments: editorSessionStore.getSegments(),
-    qaChecks,
-    validation,
-    analysis,
-    terms,
-    activityEvents: reportActivityEvents,
-    tmEntries: scopedTm,
-    tmEntryCount: scopedTm.length,
-    termCount: terms.length,
-    profile: editorSessionStore.getProject().qualityProfile
-  });
-  return {
-    generatedAt: new Date().toISOString(),
-    project: editorSessionStore.getProject(),
-    resources: projectResourceSummary(editorSessionStore.getProject()),
-    analysis,
-    validation,
-    qualityPassport,
-    qaChecks,
-    qaBySeverity: countBy(qaChecks, (check) => check.severity),
-    qaByType: countBy(qaChecks, (check) => check.type),
-    reviewByState: countBy(editorSessionStore.getSegments().filter((segment) => segment.reviewState), (segment) => segment.reviewState),
-    activityEvents: reportActivityEvents,
-    activityByType: countBy(reportActivityEvents, (event) => event.type),
-    tmEntryCount: scopedTm.length,
-    termCount: terms.length,
-    forbiddenTermCount: terms.filter((term) => term.isForbidden).length,
-    revisionCount: editorSessionStore.getSegments().reduce((sum, segment) => sum + (Array.isArray(segment.targetHistory) ? segment.targetHistory.length : 0), 0),
-    terms: terms
-      .map((term) => ({
-        sourceTerm: term.sourceTerm || "",
-        targetTerm: term.targetTerm || "",
-        termBaseName: term.termBaseName || "",
-        notes: redactSensitiveText(term.notes || "").trim(),
-        isForbidden: Boolean(term.isForbidden)
-      }))
-      .sort((a, b) => a.termBaseName.localeCompare(b.termBaseName) || a.sourceTerm.localeCompare(b.sourceTerm))
-  };
-}
-
 async function exportQualityPassport() {
   if (!editorSessionStore.getProject()) return;
   try {
-    const data = await buildProjectReportData();
+    const data = await reportDataService.build();
     editorSessionStore.replaceQaChecks(data.qaChecks);
     state.qaFilter = "";
     editorSessionStore.replaceQualityRiskQueue(data.qualityPassport.riskQueue);
@@ -8794,7 +8739,7 @@ async function exportProjectReport(options = {}) {
   if (!editorSessionStore.getProject()) return;
   try {
     const anonymized = Boolean(options.anonymized);
-    const data = await buildProjectReportData();
+    const data = await reportDataService.build();
     editorSessionStore.replaceQaChecks(data.qaChecks);
     state.qaFilter = "";
     renderQaResults();

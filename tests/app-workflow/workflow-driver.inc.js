@@ -4038,7 +4038,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           reportDownload.text.includes("[redacted secret]"),
         "project report redacts credential-looking project domain metadata"
       );
-      const labelReportData = await buildProjectReportData();
+      const labelReportData = await reportDataService.build();
       const labelReportHtml = reportDocumentCompositionService.projectReportHtml({
         ...labelReportData,
         project: { ...labelReportData.project, name: "Bearer report-project-label-token-that-must-not-appear" },
@@ -4124,7 +4124,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       assert(qualityPassportDownload.text.includes(`Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`), "quality passport export includes restrictive CSP");
       assert(!qualityPassportDownload.text.includes(reportTargetText), "quality passport omits segment target text");
-      assert(editorSessionStore.getActivityEvents().some((event) => event.type === "export" && event.summary === "Quality Passport exported"), "quality passport export records project activity");
+      assert(
+        await waitFor(
+          () => editorSessionStore.getActivityEvents().some((event) => event.type === "export" && event.summary === "Quality Passport exported"),
+          "quality passport export activity"
+        ),
+        "quality passport export records project activity"
+      );
 
       els.exportAnonymizedProjectReportBtn.click();
       const anonymizedReportDownload = await waitFor(() => reportDownloads.find((item) => item.text.includes("LoopCAT Anonymized Project Report")), "anonymized project report download");
@@ -4139,7 +4145,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "anonymized project report omits academic metadata"
       );
       assert(!anonymizedReportDownload.text.includes("forbidden-report-term") && !anonymizedReportDownload.text.includes("Workflow TM"), "anonymized project report redacts terminology and resource names");
-      assert(editorSessionStore.getActivityEvents().some((event) => event.type === "export" && event.summary === "Anonymized project report exported"), "anonymized project report export records project activity");
+      assert(
+        await waitFor(
+          () => editorSessionStore.getActivityEvents().some((event) => event.type === "export" && event.summary === "Anonymized project report exported"),
+          "anonymized project report export activity"
+        ),
+        "anonymized project report export records project activity"
+      );
     } finally {
       URL.createObjectURL = originalReportCreateObjectUrl;
       HTMLAnchorElement.prototype.click = originalReportAnchorClick;
