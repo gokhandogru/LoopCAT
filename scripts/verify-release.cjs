@@ -207,6 +207,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-resource-selection-controller.js",
   "src/features/projects/project-language-pair-shortcuts-controller.js",
   "src/features/projects/project-language-context-controller.js",
+  "src/features/projects/project-document-statistics-service.js",
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-decision-controller.js",
   "src/features/quality/quality-review-controller.js",
@@ -268,6 +269,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-resource-selection-controller.test.cjs",
   "tests/unit/project-language-pair-shortcuts-controller.test.cjs",
   "tests/unit/project-language-context-controller.test.cjs",
+  "tests/unit/project-document-statistics-service.test.cjs",
   "tests/unit/quality-profile-controller.test.cjs",
   "tests/unit/quality-decision-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
@@ -410,6 +412,12 @@ const projectLanguageContextControllerJs = readText(
 );
 const projectLanguageContextControllerUnitTests = readText(
   "tests/unit/project-language-context-controller.test.cjs"
+);
+const projectDocumentStatisticsServiceJs = readText(
+  "src/features/projects/project-document-statistics-service.js"
+);
+const projectDocumentStatisticsServiceUnitTests = readText(
+  "tests/unit/project-document-statistics-service.test.cjs"
 );
 const opusCatHelpControllerJs = readText("src/features/ai/opus-cat-help-controller.js");
 const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-pretranslation-dialog-controller.js");
@@ -685,6 +693,16 @@ assertIncludes(
   appBootstrapJs,
   "createProjectLanguageContextController,",
   "The application runtime must expose the checked project-language context factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectDocumentStatisticsService } from "../features/projects/project-document-statistics-service.js";',
+  "The application runtime must install the checked project document-statistics service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectDocumentStatisticsService,",
+  "The application runtime must expose the checked project document-statistics factory."
 );
 assertIncludes(
   appBootstrapJs,
@@ -1730,6 +1748,82 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/projects/project-language-context-controller.js"',
   "source-catalog extraction must scan the checked project-language context controller."
+);
+for (const snippet of [
+  "return { segments: 0, confirmed: 0, draft: 0, empty: 0, words: 0, percent: 0 }",
+  "stats.segments += 1",
+  'if (segment.status === "confirmed") stats.confirmed += 1',
+  'if (segment.status === "draft") stats.draft += 1',
+  'if (segment.status === "empty") stats.empty += 1',
+  "stats.words += sourceWordCount(segment)",
+  "Math.round((stats.confirmed / stats.segments) * 100)",
+  "new Map(documents.map((documentInfo) => [documentInfo.id, empty()]))",
+  'const id = segment.documentId || "default-document"',
+  "if (!map.has(id)) map.set(id, empty())",
+  "map.forEach(finalize)",
+  "total.segments += stats.segments",
+  "total.confirmed += stats.confirmed",
+  "if (segment.documentId === documentId) add(stats, segment)",
+  "return Object.freeze({ empty, byDocument, aggregate, forDocument })"
+]) {
+  assertIncludes(
+    projectDocumentStatisticsServiceJs,
+    snippet,
+    `ProjectDocumentStatisticsService must retain characterized statistics policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createProjectDocumentStatisticsService({",
+  "app.js must compose the checked project document-statistics service."
+);
+for (const boundary of [
+  "getDocuments: projectDocuments",
+  "getSegments: () => editorSessionStore.getSegments()",
+  "sourceWordCount"
+]) {
+  assertIncludes(appJs, boundary, `project document-statistics composition must inject the ${boundary} boundary.`);
+}
+for (const method of ["empty", "byDocument", "aggregate"]) {
+  assertIncludes(
+    `${appJs}\n${appWorkflowDriverJs}`,
+    `projectDocumentStatisticsService.${method}`,
+    `project statistics consumers must call ProjectDocumentStatisticsService.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "emptyDocumentStats",
+  "addSegmentToDocumentStats",
+  "finalizeDocumentStats",
+  "projectDocumentStats",
+  "aggregateDocumentStats",
+  "documentStats"
+]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} project document-statistics helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "ProjectDocumentStatisticsService preserves independent empty-stat records and immutable checked API",
+  "ProjectDocumentStatisticsService preserves status, word, rounded percentage, and unknown-status accumulation",
+  "ProjectDocumentStatisticsService preserves default documents, metadata-only entries, missing buckets, and map order",
+  "ProjectDocumentStatisticsService preserves explicit document lists without reading the default list",
+  "ProjectDocumentStatisticsService preserves aggregate totals, rounding, zero totals, and input records",
+  "ProjectDocumentStatisticsService preserves exact single-document matching without default-id coercion",
+  "ProjectDocumentStatisticsService validates every required boundary"
+]) {
+  assertIncludes(
+    projectDocumentStatisticsServiceUnitTests,
+    testName,
+    `focused project document-statistics tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/project-document-statistics-service.js"',
+  "source-catalog extraction must scan the checked project document-statistics service."
 );
 for (const snippet of [
   'renderDashboard("tm", resourceState)',
@@ -9145,23 +9239,23 @@ assertIncludes(
   "app.js must render project progress with one segment pass."
 );
 assertIncludes(
-  appJs,
-  "function projectDocumentStats",
-  "app.js must compute project document stats in one shared pass for file-card rendering."
+  projectDocumentStatisticsServiceJs,
+  "function byDocument(documents = getDocuments())",
+  "ProjectDocumentStatisticsService must compute project document stats in one shared pass for file-card rendering."
 );
 assertIncludes(
   appJs,
-  "const documentStatsById = projectDocumentStats(documents)",
+  "const documentStatsById = projectDocumentStatisticsService.byDocument(documents)",
   "app.js project home rendering must reuse precomputed document stats."
 );
 assertIncludes(
-  appJs,
-  "function aggregateDocumentStats",
-  "app.js must aggregate project-home totals from precomputed document stats."
+  projectDocumentStatisticsServiceJs,
+  "function aggregate(statsById)",
+  "ProjectDocumentStatisticsService must aggregate project-home totals from precomputed document stats."
 );
 assertIncludes(
   appJs,
-  "const total = aggregateDocumentStats(documentStatsById)",
+  "const total = projectDocumentStatisticsService.aggregate(documentStatsById)",
   "app.js project home rendering must avoid a second full segment pass for overall stats."
 );
 assertIncludes(

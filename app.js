@@ -1105,6 +1105,12 @@ const projectLanguageContextController = appRuntime.featureFactories.createProje
   warn: (...args) => console.warn(...args)
 });
 
+const projectDocumentStatisticsService = appRuntime.featureFactories.createProjectDocumentStatisticsService({
+  getDocuments: projectDocuments,
+  getSegments: () => editorSessionStore.getSegments(),
+  sourceWordCount
+});
+
 const aiContextController = appRuntime?.featureFactories?.createAiContextController?.({
   adminSection: els.aiSettingsForm,
   adminMount: els.projectAiSettingsMount,
@@ -4859,55 +4865,6 @@ function documentSegments(documentId) {
   return editorSessionStore.getSegments().filter((segment) => segment.documentId === documentId);
 }
 
-function emptyDocumentStats() {
-  return { segments: 0, confirmed: 0, draft: 0, empty: 0, words: 0, percent: 0 };
-}
-
-function addSegmentToDocumentStats(stats, segment) {
-  stats.segments += 1;
-  if (segment.status === "confirmed") stats.confirmed += 1;
-  if (segment.status === "draft") stats.draft += 1;
-  if (segment.status === "empty") stats.empty += 1;
-  stats.words += sourceWordCount(segment);
-  return stats;
-}
-
-function finalizeDocumentStats(stats) {
-  stats.percent = stats.segments ? Math.round((stats.confirmed / stats.segments) * 100) : 0;
-  return stats;
-}
-
-function projectDocumentStats(documents = projectDocuments()) {
-  const map = new Map(documents.map((documentInfo) => [documentInfo.id, emptyDocumentStats()]));
-  editorSessionStore.getSegments().forEach((segment) => {
-    const id = segment.documentId || "default-document";
-    if (!map.has(id)) map.set(id, emptyDocumentStats());
-    addSegmentToDocumentStats(map.get(id), segment);
-  });
-  map.forEach(finalizeDocumentStats);
-  return map;
-}
-
-function aggregateDocumentStats(statsById) {
-  const total = emptyDocumentStats();
-  statsById.forEach((stats) => {
-    total.segments += stats.segments;
-    total.confirmed += stats.confirmed;
-    total.draft += stats.draft;
-    total.empty += stats.empty;
-    total.words += stats.words;
-  });
-  return finalizeDocumentStats(total);
-}
-
-function documentStats(documentId) {
-  const stats = emptyDocumentStats();
-  editorSessionStore.getSegments().forEach((segment) => {
-    if (segment.documentId === documentId) addSegmentToDocumentStats(stats, segment);
-  });
-  return finalizeDocumentStats(stats);
-}
-
 function currentDocumentSegments() {
   return applicationStore.getState().navigation.documentId
     ? editorSessionStore.getSegments().filter((segment) => segment.documentId === applicationStore.getState().navigation.documentId)
@@ -5771,8 +5728,8 @@ function renderTermbaseSelect() {
 function renderProjectHome() {
   if (!editorSessionStore.getProject()) return;
   const documents = projectDocuments();
-  const documentStatsById = projectDocumentStats(documents);
-  const total = aggregateDocumentStats(documentStatsById);
+  const documentStatsById = projectDocumentStatisticsService.byDocument(documents);
+  const total = projectDocumentStatisticsService.aggregate(documentStatsById);
   const sourceWords = total.words;
   const resources = projectResourceSummary();
   els.projectHomeTitle.textContent = displaySafeText(editorSessionStore.getProject().name);
@@ -5790,7 +5747,7 @@ function renderProjectHome() {
   }
   const fragment = document.createDocumentFragment();
   documents.forEach((documentInfo) => {
-    const stats = documentStatsById.get(documentInfo.id) || emptyDocumentStats();
+    const stats = documentStatsById.get(documentInfo.id) || projectDocumentStatisticsService.empty();
     const card = document.createElement("article");
     card.className = "file-card";
     replaceSafeHtml(card, `

@@ -70,6 +70,13 @@ const projectLanguageContextControllerPath = path.join(
   "projects",
   "project-language-context-controller.js"
 );
+const projectDocumentStatisticsServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "projects",
+  "project-document-statistics-service.js"
+);
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const resourceMutationControllerPath = path.join(
   root,
@@ -258,6 +265,11 @@ function main() {
     messagesByText,
     projectLanguageContextControllerPath,
     "src/features/projects/project-language-context-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    projectDocumentStatisticsServicePath,
+    "src/features/projects/project-document-statistics-service.js"
   );
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(
