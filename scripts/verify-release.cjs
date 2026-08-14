@@ -488,6 +488,8 @@ const resourcesControllerJs = readText("src/features/resources/resources-control
 const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
 const resourceLibraryImportControllerJs = readText("src/features/resources/resource-library-import-controller.js");
 const resourceLibraryImportControllerUnitTests = readText("tests/unit/resource-library-import-controller.test.cjs");
+const resourceMutationControllerJs = readText("src/features/resources/resource-mutation-controller.js");
+const resourceMutationControllerUnitTests = readText("tests/unit/resource-mutation-controller.test.cjs");
 const resourceTrashUnitTests = readText("tests/unit/resource-trash.test.cjs");
 const trashCommandsJs = readText("src/commands/trash-commands.js");
 const trashRepositoryJs = readText("src/data/trash-repository.js");
@@ -615,6 +617,16 @@ assertIncludes(
   appBootstrapJs,
   "createResourceLibraryImportController,",
   "The application runtime must expose the checked resource-library import factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createResourceMutationController } from "../features/resources/resource-mutation-controller.js";',
+  "The application runtime must install the checked resource-mutation controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createResourceMutationController,",
+  "The application runtime must expose the checked resource-mutation factory."
 );
 for (const snippet of [
   "const translate = (key, values = {})",
@@ -1271,6 +1283,100 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/resources/resource-library-import-controller.js"',
   "source-catalog extraction must scan the checked resource-library import controller."
+);
+for (const snippet of [
+  "await repositories.updateTmEntry",
+  'resources.markProjectsUsingDirty("tm"',
+  "await repositories.updateTerm",
+  'resources.markProjectsUsingDirty("termbase"',
+  "await resources.refresh()",
+  "await resources.refreshProjectTerms({ rerender: true })",
+  "async function executeTrashCommand",
+  "The reversible resource deletion service is unavailable.",
+  "await commands.execute(command)",
+  'commands.setProjectId(command.projectId || "")',
+  "trash.entryFromCommandResult",
+  "await trash.synchronize",
+  "Resource views could not refresh after moving an item to Trash.",
+  "presentation.renderUndo()",
+  "commands.createDeleteEntry",
+  "commands.createDeleteResource",
+  "affectedIds: items.map",
+  'refreshSuggestions: type === "tb"',
+  "return Object.freeze({ saveTmEntry, saveTerm, deleteTmEntry, deleteTerm, deleteResource })"
+]) {
+  assertIncludes(
+    resourceMutationControllerJs,
+    snippet,
+    `ResourceMutationController must retain characterized mutation policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createResourceMutationController({",
+  "app.js must compose the checked resource-mutation controller."
+);
+for (const boundary of [
+  "getProjectId: () => editorSessionStore.getProject()?.id || null",
+  "repositories: { updateTmEntry, updateTerm }",
+  "markProjectsUsingDirty: markProjectsUsingResourceDirty",
+  "refresh: refreshResources",
+  "refreshProjectTerms",
+  "labelFromKey: resourceLabelFromKey",
+  "items: resourceItems",
+  "execute: (...args) => appRuntime.commands.bus.execute(...args)",
+  "createDeleteEntry: appRuntime.commands.createDeleteResourceEntryCommand",
+  "createDeleteResource: appRuntime.commands.createDeleteResourceCommand",
+  "entryFromCommandResult: resourceTrashEntryFromCommandResult",
+  "synchronize: synchronizeResourceTrashChange",
+  "renderUndo: renderUndoControls",
+  "beforeSaveTm: (entry)",
+  "beforeSaveTerm: (term)",
+  "beforeDeleteTm: (entry)",
+  "beforeDeleteTerm: (term)",
+  "beforeDeleteResource: (type, key)",
+  "logger: console"
+]) {
+  assertIncludes(appJs, boundary, `resource-mutation composition must inject the ${boundary} boundary.`);
+}
+for (const method of ["saveTmEntry", "saveTerm", "deleteTmEntry", "deleteTerm", "deleteResource"]) {
+  assertIncludes(
+    `${appJs}\n${appWorkflowDriverJs}`,
+    `resourceMutationController.${method}`,
+    `resource-mutation consumers must call ResourceMutationController.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "saveEditedTmResourceEntry",
+  "saveEditedTermResourceEntry",
+  "executeResourceTrashCommand",
+  "deleteTmResourceEntry",
+  "deleteTermResourceEntry",
+  "confirmDeleteResource"
+]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} resource-mutation orchestration must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "ResourceMutationController preserves TM and term patch, dirtiness, refresh, status, and boolean results",
+  "ResourceMutationController contains save failures before downstream effects with exact status",
+  "ResourceMutationController preserves reversible entry command arguments, project identity, Trash sync, Undo, and term options",
+  "ResourceMutationController preserves secondary refresh warnings and missing-command primary failure",
+  "ResourceMutationController preserves whole-resource descriptor, affected IDs, terminology refresh, failure boundary, and immutability"
+]) {
+  assertIncludes(
+    resourceMutationControllerUnitTests,
+    testName,
+    `focused resource-mutation tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/resources/resource-mutation-controller.js"',
+  "source-catalog extraction must scan the checked resource-mutation controller."
 );
 assertIncludes(
   appJs,
@@ -2531,7 +2637,7 @@ assert(
     "addEventListener"
   ) &&
     !functionBody(appJs, "function renderTmEntryRow", "function renderTermRow").includes("addEventListener") &&
-    !functionBody(appJs, "function renderTermRow", "async function confirmDeleteResource").includes("addEventListener"),
+    !functionBody(appJs, "function renderTermRow", "function exportResource").includes("addEventListener"),
   "Resources dashboards and rows must use controller-owned event delegation rather than per-render listeners."
 );
 assertIncludes(
@@ -10425,16 +10531,10 @@ assertIncludes(
   "whole-resource deletion must use a reversible domain command."
 );
 assert(
-  !functionBody(appJs, "async function deleteTmResourceEntry", "async function deleteTermResourceEntry").includes(
-    "deleteTmEntry("
-  ) &&
-    !functionBody(appJs, "async function deleteTermResourceEntry", "function renderTmResourceDetail").includes(
-      "deleteTerm("
-    ) &&
-    !functionBody(appJs, "async function confirmDeleteResource", "function exportResource").includes(
-      "deleteTmEntries("
-    ) &&
-    !functionBody(appJs, "async function confirmDeleteResource", "function exportResource").includes("deleteTerms("),
+  !resourceMutationControllerJs.includes("repositories.deleteTmEntry") &&
+    !resourceMutationControllerJs.includes("repositories.deleteTerm") &&
+    !resourceMutationControllerJs.includes("deleteTmEntries(") &&
+    !resourceMutationControllerJs.includes("deleteTerms("),
   "user-facing Resources deletion paths must not bypass persistent Trash with hard-delete services."
 );
 assertIncludes(

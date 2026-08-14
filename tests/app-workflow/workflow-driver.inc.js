@@ -4557,7 +4557,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const editableTerm = editableResourceState.terms.find((term) => term.id === resourceTerm.id);
     assert(Boolean(editableTmEntry && editableTerm), "resource row edit fixtures are visible in resource state");
     setHiddenSegmentField(editableTmEntry, RESOURCE_TM_SAVE_FAILURE_TEST_FLAG, true);
-    const failedResourceTmSave = await saveEditedTmResourceEntry(editableTmEntry, {
+    const failedResourceTmSave = await resourceMutationController.saveTmEntry(editableTmEntry, {
       source: resourceTmEntry.source,
       target: "Unsaved TM resource target"
     });
@@ -4570,7 +4570,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     Reflect.deleteProperty(editableTmEntry, RESOURCE_TM_SAVE_FAILURE_TEST_FLAG);
     clearWorkspaceDirtyMarkers();
-    const successfulResourceTmSave = await saveEditedTmResourceEntry(editableTmEntry, {
+    const successfulResourceTmSave = await resourceMutationController.saveTmEntry(editableTmEntry, {
       source: resourceTmEntry.source,
       target: "Saved TM resource target"
     });
@@ -4582,7 +4582,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "TM resource row save persists entry and marks linked project dirty"
     );
     setHiddenSegmentField(editableTmEntry, RESOURCE_TM_DELETE_FAILURE_TEST_FLAG, true);
-    const failedResourceTmDelete = await deleteTmResourceEntry(editableTmEntry);
+    const failedResourceTmDelete = await resourceMutationController.deleteTmEntry(editableTmEntry);
     const failedDeletedTm = (await listTmEntries()).find((entry) => entry.id === resourceTmEntry.id);
     assert(
       !failedResourceTmDelete &&
@@ -4592,7 +4592,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     Reflect.deleteProperty(editableTmEntry, RESOURCE_TM_DELETE_FAILURE_TEST_FLAG);
     clearWorkspaceDirtyMarkers();
-    const successfulResourceTmDelete = await deleteTmResourceEntry(editableTmEntry);
+    const successfulResourceTmDelete = await resourceMutationController.deleteTmEntry(editableTmEntry);
     const tmEntryTrash = (await appRuntime.trashRepository.list()).find(
       (entry) => entry.entityType === "tm-entry" && entry.entityId === resourceTmEntry.id
     );
@@ -4628,7 +4628,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "TM resource row Redo returns the entry to Trash with a fresh recovery token"
     );
     setHiddenSegmentField(editableTerm, RESOURCE_TERM_SAVE_FAILURE_TEST_FLAG, true);
-    const failedResourceTermSave = await saveEditedTermResourceEntry(editableTerm, {
+    const failedResourceTermSave = await resourceMutationController.saveTerm(editableTerm, {
       sourceTerm: resourceTerm.sourceTerm,
       targetTerm: "unsaved-resource-term-target",
       notes: "Unsaved resource term note",
@@ -4644,7 +4644,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     Reflect.deleteProperty(editableTerm, RESOURCE_TERM_SAVE_FAILURE_TEST_FLAG);
     clearWorkspaceDirtyMarkers();
-    const successfulResourceTermSave = await saveEditedTermResourceEntry(editableTerm, {
+    const successfulResourceTermSave = await resourceMutationController.saveTerm(editableTerm, {
       sourceTerm: resourceTerm.sourceTerm,
       targetTerm: "saved-resource-term-target",
       notes: "Saved resource term note",
@@ -4659,7 +4659,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "term resource row save persists term and marks linked project dirty"
     );
     setHiddenSegmentField(editableTerm, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG, true);
-    const failedResourceTermDelete = await deleteTermResourceEntry(editableTerm);
+    const failedResourceTermDelete = await resourceMutationController.deleteTerm(editableTerm);
     const failedDeletedTerm = (await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
     assert(
       !failedResourceTermDelete &&
@@ -4669,7 +4669,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     Reflect.deleteProperty(editableTerm, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG);
     clearWorkspaceDirtyMarkers();
-    const successfulResourceTermDelete = await deleteTermResourceEntry(editableTerm);
+    const successfulResourceTermDelete = await resourceMutationController.deleteTerm(editableTerm);
     const termEntryTrash = (await appRuntime.trashRepository.list()).find(
       (entry) => entry.entityType === "term" && entry.entityId === resourceTerm.id
     );
@@ -4785,7 +4785,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     await storageApi.deleteByKey("trashEntries", atomicConflictTrashId);
     RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.add(`tm:${bulkTmKey}`);
-    const failedBulkTmDelete = await confirmDeleteResource("tm", bulkTmKey);
+    const failedBulkTmDelete = await resourceMutationController.deleteResource("tm", bulkTmKey);
     const failedBulkTmEntries = (await listTmEntries()).filter((entry) => entry.tmName === bulkTmName);
     assert(
       !failedBulkTmDelete &&
@@ -4795,7 +4795,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "TM whole resource delete failure preserves every live entry and creates no Trash item"
     );
     RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.delete(`tm:${bulkTmKey}`);
-    const successfulBulkTmDelete = await confirmDeleteResource("tm", bulkTmKey);
+    const successfulBulkTmDelete = await resourceMutationController.deleteResource("tm", bulkTmKey);
     const bulkTmTrash = (await appRuntime.trashRepository.list()).find(
       (entry) => entry.entityType === "translation-memory" && entry.resourceName === bulkTmName
     );
@@ -4838,7 +4838,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await deleteTmEntry(conflictingBulkTmEntry.id);
 
     RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.add(`tb:${bulkTbKey}`);
-    const failedBulkTbDelete = await confirmDeleteResource("tb", bulkTbKey);
+    const failedBulkTbDelete = await resourceMutationController.deleteResource("tb", bulkTbKey);
     const failedBulkTbTerms = (
       await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang })
     ).filter((term) => term.termBaseName === bulkTbName);
@@ -4850,7 +4850,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "termbase whole resource delete failure preserves every live term and creates no Trash item"
     );
     RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.delete(`tb:${bulkTbKey}`);
-    const successfulBulkTbDelete = await confirmDeleteResource("tb", bulkTbKey);
+    const successfulBulkTbDelete = await resourceMutationController.deleteResource("tb", bulkTbKey);
     const bulkTbTrash = (await appRuntime.trashRepository.list()).find(
       (entry) => entry.entityType === "termbase" && entry.resourceName === bulkTbName
     );
@@ -5571,7 +5571,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const helloTermForDeleteFailure = (await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] })).find((term) => term.sourceTerm === "Hello");
     assert(Boolean(helloTermForDeleteFailure), "term suggestion delete failure fixture exists");
     setHiddenSegmentField(helloTermForDeleteFailure, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG, true);
-    const failedSuggestionDelete = await deleteTermResourceEntry(helloTermForDeleteFailure, { refreshResourceView: false, refreshSuggestions: true });
+    const failedSuggestionDelete = await resourceMutationController.deleteTerm(helloTermForDeleteFailure, { refreshResourceView: false, refreshSuggestions: true });
     assert(
       !failedSuggestionDelete &&
         els.saveStatus.textContent.includes("Simulated term resource delete failure") &&

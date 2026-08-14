@@ -28,6 +28,13 @@ const resourceLibraryImportControllerPath = path.join(
   "resources",
   "resource-library-import-controller.js"
 );
+const resourceMutationControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "resources",
+  "resource-mutation-controller.js"
+);
 const reportPresentationPath = path.join(root, "src", "reports", "report-presentation-service.js");
 const reportDocumentCompositionPath = path.join(root, "src", "reports", "report-document-composition-service.js");
 const reportExportControllerPath = path.join(root, "src", "reports", "report-export-controller.js");
@@ -178,6 +185,11 @@ function main() {
     messagesByText,
     resourceLibraryImportControllerPath,
     "src/features/resources/resource-library-import-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    resourceMutationControllerPath,
+    "src/features/resources/resource-mutation-controller.js"
   );
   extractScript(messagesByText, reportPresentationPath, "src/reports/report-presentation-service.js");
   extractScript(messagesByText, reportDocumentCompositionPath, "src/reports/report-document-composition-service.js");

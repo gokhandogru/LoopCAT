@@ -3259,6 +3259,59 @@ const resourceLibraryImportController =
     alert: uiLocalizationService.alert,
     status: { set: setSaveStatus }
   });
+const resourceMutationController = appRuntime.featureFactories.createResourceMutationController({
+  session: { getProjectId: () => editorSessionStore.getProject()?.id || null },
+  repositories: { updateTmEntry, updateTerm },
+  resources: {
+    markProjectsUsingDirty: markProjectsUsingResourceDirty,
+    refresh: refreshResources,
+    refreshProjectTerms,
+    labelFromKey: resourceLabelFromKey,
+    items: resourceItems
+  },
+  commands: {
+    execute: (...args) => appRuntime.commands.bus.execute(...args),
+    createDeleteEntry: appRuntime.commands.createDeleteResourceEntryCommand,
+    createDeleteResource: appRuntime.commands.createDeleteResourceCommand,
+    setProjectId: (projectId) => {
+      state.commandProjectId = projectId;
+    }
+  },
+  trash: {
+    entryFromCommandResult: resourceTrashEntryFromCommandResult,
+    synchronize: synchronizeResourceTrashChange
+  },
+  presentation: { renderUndo: renderUndoControls },
+  status: { set: setSaveStatus },
+  testHooks: {
+    beforeSaveTm: (entry) => {
+      if (LOOPCAT_TEST_BUILD && entry[RESOURCE_TM_SAVE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated TM resource save failure");
+      }
+    },
+    beforeSaveTerm: (term) => {
+      if (LOOPCAT_TEST_BUILD && term[RESOURCE_TERM_SAVE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated term resource save failure");
+      }
+    },
+    beforeDeleteTm: (entry) => {
+      if (LOOPCAT_TEST_BUILD && entry[RESOURCE_TM_DELETE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated TM resource delete failure");
+      }
+    },
+    beforeDeleteTerm: (term) => {
+      if (LOOPCAT_TEST_BUILD && term[RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated term resource delete failure");
+      }
+    },
+    beforeDeleteResource: (type, key) => {
+      if (LOOPCAT_TEST_BUILD && RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.has(`${type}:${key}`)) {
+        throw new Error(`Simulated ${type === "tm" ? "TM" : "termbase"} resource delete failure`);
+      }
+    }
+  },
+  logger: console
+});
 const resourcesController = appRuntime?.featureFactories?.createResourcesController?.({
   elements: {
     viewButton: els.resourcesViewBtn,
@@ -3286,12 +3339,12 @@ const resourcesController = appRuntime?.featureFactories?.createResourcesControl
   importTm: resourceLibraryImportController.importTmx,
   importTb: resourceLibraryImportController.importTbx,
   importTermList: resourceLibraryImportController.importTermList,
-  deleteResource: confirmDeleteResource,
+  deleteResource: resourceMutationController.deleteResource,
   exportResource,
-  saveTmEntry: saveEditedTmResourceEntry,
-  deleteTmEntry: deleteTmResourceEntry,
-  saveTerm: saveEditedTermResourceEntry,
-  deleteTerm: deleteTermResourceEntry,
+  saveTmEntry: resourceMutationController.saveTmEntry,
+  deleteTmEntry: resourceMutationController.deleteTmEntry,
+  saveTerm: resourceMutationController.saveTerm,
+  deleteTerm: resourceMutationController.deleteTerm,
   scheduleFrame: requestAnimationFrame,
   onError: (error) => setSaveStatus(error?.message || "Resource action failed.", "dirty")
 });
@@ -6391,106 +6444,6 @@ function replaceResourceTableRows(table, items, renderRow) {
   table.replaceChildren(fragment);
 }
 
-async function saveEditedTmResourceEntry(entry, values) {
-  try {
-    if (LOOPCAT_TEST_BUILD && entry[RESOURCE_TM_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated TM resource save failure");
-    await updateTmEntry({
-      ...entry,
-      source: values.source,
-      target: values.target
-    });
-    markProjectsUsingResourceDirty("tm", entry.tmName, entry.sourceLang, entry.targetLang);
-    await refreshResources();
-    setSaveStatus("TM entry saved", "saved");
-    return true;
-  } catch (error) {
-    setSaveStatus(error.message || "TM entry save failed", "dirty");
-    return false;
-  }
-}
-
-async function saveEditedTermResourceEntry(term, values) {
-  try {
-    if (LOOPCAT_TEST_BUILD && term[RESOURCE_TERM_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated term resource save failure");
-    await updateTerm({
-      ...term,
-      sourceTerm: values.sourceTerm,
-      targetTerm: values.targetTerm,
-      notes: values.notes,
-      isForbidden: values.isForbidden
-    });
-    markProjectsUsingResourceDirty("termbase", term.termBaseName, term.sourceLang, term.targetLang);
-    await refreshResources();
-    await refreshProjectTerms({ rerender: true });
-    setSaveStatus("Term saved", "saved");
-    return true;
-  } catch (error) {
-    setSaveStatus(error.message || "Term save failed", "dirty");
-    return false;
-  }
-}
-
-async function executeResourceTrashCommand(command, { refreshSuggestions = false } = {}) {
-  if (!command) throw new Error("The reversible resource deletion service is unavailable.");
-  const commandResult = await appRuntime.commands.bus.execute(command);
-  state.commandProjectId = command.projectId || "";
-  const entry = resourceTrashEntryFromCommandResult(commandResult);
-  let refreshFailed = false;
-  try {
-    await synchronizeResourceTrashChange(entry, { refreshSuggestions });
-  } catch (error) {
-    refreshFailed = true;
-    console.warn("Resource views could not refresh after moving an item to Trash.", error);
-  }
-  renderUndoControls();
-  return { entry, refreshFailed };
-}
-
-async function deleteTmResourceEntry(entry) {
-  try {
-    if (LOOPCAT_TEST_BUILD && entry[RESOURCE_TM_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated TM resource delete failure");
-    const command = appRuntime?.commands?.createDeleteResourceEntryCommand?.({
-      resourceType: "tm",
-      entityId: entry.id,
-      projectId: editorSessionStore.getProject()?.id || null
-    });
-    const result = await executeResourceTrashCommand(command);
-    setSaveStatus(
-      result.refreshFailed
-        ? "TM entry moved to Trash; the resource view could not refresh. Undo is available."
-        : "TM entry moved to Trash. Undo is available.",
-      "saved"
-    );
-    return true;
-  } catch (error) {
-    setSaveStatus(error.message || "TM entry could not be moved to Trash. Existing work was preserved.", "dirty");
-    return false;
-  }
-}
-
-async function deleteTermResourceEntry(term, options = {}) {
-  const { refreshSuggestions = false } = options;
-  try {
-    if (LOOPCAT_TEST_BUILD && term[RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated term resource delete failure");
-    const command = appRuntime?.commands?.createDeleteResourceEntryCommand?.({
-      resourceType: "tb",
-      entityId: term.id,
-      projectId: editorSessionStore.getProject()?.id || null
-    });
-    const result = await executeResourceTrashCommand(command, { refreshSuggestions });
-    setSaveStatus(
-      result.refreshFailed
-        ? "Term moved to Trash; terminology views could not refresh. Undo is available."
-        : "Term moved to Trash. Undo is available.",
-      "saved"
-    );
-    return true;
-  } catch (error) {
-    setSaveStatus(error.message || "Term could not be moved to Trash. Existing work was preserved.", "dirty");
-    return false;
-  }
-}
-
 function renderTmResourceDetail(resourceState) {
   if (resourceState.type !== "tm" || !resourceState.openKey) {
     els.tmResourceDetail.classList.add("hidden");
@@ -6591,40 +6544,6 @@ function renderTermRow(term) {
   deleteButton.dataset.resourceId = term.id;
   actions.append(saveButton, deleteButton);
   return row;
-}
-
-async function confirmDeleteResource(type, key) {
-  const info = resourceLabelFromKey(key);
-  try {
-    if (LOOPCAT_TEST_BUILD && RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.has(`${type}:${key}`)) throw new Error(`Simulated ${type === "tm" ? "TM" : "termbase"} resource delete failure`);
-    const items = resourceItems(type, key);
-    const command = appRuntime?.commands?.createDeleteResourceCommand?.({
-      resourceType: type,
-      descriptor: {
-        key,
-        name: info.name,
-        sourceLang: info.sourceLang,
-        targetLang: info.targetLang,
-        languagePair: info.languagePair
-      },
-      affectedIds: items.map((item) => item.id),
-      projectId: editorSessionStore.getProject()?.id || null
-    });
-    const result = await executeResourceTrashCommand(command, { refreshSuggestions: type === "tb" });
-    setSaveStatus(
-      result.refreshFailed
-        ? `${type === "tm" ? "Translation memory" : "Termbase"} moved to Trash; resource views could not refresh. Undo is available.`
-        : `${type === "tm" ? "Translation memory" : "Termbase"} moved to Trash. Undo is available.`,
-      "saved"
-    );
-    return true;
-  } catch (error) {
-    setSaveStatus(
-      error.message || `${type === "tm" ? "Translation memory" : "Termbase"} could not be moved to Trash. Existing work was preserved.`,
-      "dirty"
-    );
-    return false;
-  }
 }
 
 function exportResource(type, key) {
@@ -7737,7 +7656,10 @@ async function refreshTerms() {
     const button = document.createElement("button");
     button.textContent = uiLocalizationService.source("Delete");
     button.addEventListener("click", async () => {
-      await deleteTermResourceEntry(term, { refreshResourceView: false, refreshSuggestions: true });
+      await resourceMutationController.deleteTerm(term, {
+        refreshResourceView: false,
+        refreshSuggestions: true
+      });
     });
     card.append(button);
     fragment.append(card);
