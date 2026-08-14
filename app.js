@@ -1768,6 +1768,15 @@ const aiProviderFormController =
       geminiModel: GEMINI_DEFAULT_MODEL
     }
   });
+const aiSuggestionListController =
+  appRuntime.featureFactories.createAiSuggestionListController({
+    root: els.aiSuggestionList,
+    getSegment: currentSegment,
+    apply: applyAiSuggestion,
+    source: uiSource,
+    label: uiLabel,
+    formatDateTime
+  });
 let aiPretranslationAbortController = null;
 const aiPretranslationController = appRuntime.featureFactories.createAiPretranslationController({
   editorSessionStore,
@@ -2166,7 +2175,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
     renderCommandCentre: aiProviderFormController.renderCommandCentre,
     renderAiProgress: aiProviderFormController.renderProgress,
     renderOutput: aiProviderFormController.renderOutput,
-    renderSuggestions: renderAiSuggestions,
+    renderSuggestions: aiSuggestionListController.render,
     updateRow,
     renderAll,
     refreshSidebar
@@ -2273,7 +2282,7 @@ const aiTerminologyApplicationController =
       renderCommandCentre: aiProviderFormController.renderCommandCentre,
       renderAiProgress: aiProviderFormController.renderProgress,
       renderOutput: aiProviderFormController.renderOutput,
-      renderSuggestions: renderAiSuggestions,
+      renderSuggestions: aiSuggestionListController.render,
       updateRow,
       renderAll,
       refreshSidebar
@@ -2573,7 +2582,7 @@ const aiSuggestionApplicationController =
       renderSegments,
       renderProgress,
       renderHistory: renderRevisionHistory,
-      renderSuggestions: renderAiSuggestions,
+      renderSuggestions: aiSuggestionListController.render,
       refreshSidebar,
       renderAll,
       focusTarget: focusActiveTextarea
@@ -2615,7 +2624,7 @@ const aiSuggestionPersistenceController =
     },
     activity: { log: logProjectActivity },
     presentation: {
-      renderSuggestions: renderAiSuggestions,
+      renderSuggestions: aiSuggestionListController.render,
       renderHistory: renderRevisionHistory
     },
     workspace: {
@@ -2931,7 +2940,7 @@ const editorContextController = appRuntime?.featureFactories?.createEditorContex
   }),
   renderReview: () => renderReviewPanel(),
   renderHistory: () => renderRevisionHistory(),
-  renderAi: () => renderAiSuggestions(),
+  renderAi: aiSuggestionListController.render,
   renderQuality: () => renderQualityWorkbench(),
   refreshMatches: () => refreshTmMatches(),
   refreshTerms: () => refreshTerms()
@@ -8147,79 +8156,6 @@ async function saveProjectDomainFromForm() {
 
 async function saveAiSettings() {
   return aiSettingsPersistenceController.save();
-}
-
-function renderAiSuggestions() {
-  const segment = currentSegment();
-  const suggestions = segment?.aiSuggestions || [];
-  if (!suggestions.length) {
-    els.aiSuggestionList.textContent = uiSource("No AI suggestions yet.");
-    els.aiSuggestionList.classList.add("muted");
-    return;
-  }
-  els.aiSuggestionList.classList.remove("muted");
-  const fragment = document.createDocumentFragment();
-  suggestions.slice().reverse().slice(0, 4).forEach((suggestion) => {
-    const card = document.createElement("article");
-    card.className = "ai-suggestion-card";
-    const header = document.createElement("header");
-    const provider = document.createElement("strong");
-    provider.textContent = suggestion.provider || "AI";
-    const model = document.createElement("span");
-    model.textContent = suggestion.model || (suggestion.confidence ? `${suggestion.confidence}%` : uiSource("review"));
-    header.append(provider, model);
-
-    const provenance = document.createElement("p");
-    provenance.className = "ai-suggestion-provenance muted";
-    provenance.textContent = uiSource("{origin} suggestion · {scope} · {date}", {
-      origin: suggestion.origin || suggestion.provider || "AI",
-      scope: suggestion.scope || "active segment",
-      date: formatDateTime(suggestion.createdAt)
-    });
-
-    const inspection = document.createElement("details");
-    inspection.className = "ai-suggestion-inspection";
-    const summary = document.createElement("summary");
-    summary.textContent = uiSource("Inspect proposed change");
-    const diff = document.createElement("div");
-    diff.className = "ai-suggestion-diff";
-    const before = document.createElement("div");
-    const beforeLabel = document.createElement("strong");
-    beforeLabel.textContent = uiSource("Current target");
-    const beforeText = document.createElement("p");
-    beforeText.textContent = segment?.target || uiSource("Empty target");
-    before.append(beforeLabel, beforeText);
-    const after = document.createElement("div");
-    const afterLabel = document.createElement("strong");
-    afterLabel.textContent = uiSource("Suggested target");
-    const afterText = document.createElement("p");
-    afterText.textContent = suggestion.suggestedTarget || "";
-    after.append(afterLabel, afterText);
-    diff.append(before, after);
-    inspection.append(summary, diff);
-
-    const explanation = document.createElement("ul");
-    for (const item of suggestion.explanation || []) {
-      const entry = document.createElement("li");
-      entry.textContent = item;
-      explanation.append(entry);
-    }
-
-    const footer = document.createElement("footer");
-    const applyButton = document.createElement("button");
-    applyButton.type = "button";
-    applyButton.textContent = uiLabel("applyToTarget");
-    applyButton.addEventListener("click", () => void applyAiSuggestion(suggestion.id));
-    const applyNextButton = document.createElement("button");
-    applyNextButton.type = "button";
-    applyNextButton.className = "primary";
-    applyNextButton.textContent = uiSource("Apply and next");
-    applyNextButton.addEventListener("click", () => void applyAiSuggestion(suggestion.id, { andNext: true }));
-    footer.append(applyButton, applyNextButton);
-    card.append(header, provenance, inspection, explanation, footer);
-    fragment.append(card);
-  });
-  els.aiSuggestionList.replaceChildren(fragment);
 }
 
 async function aiContextForSegment(segment, ai) {

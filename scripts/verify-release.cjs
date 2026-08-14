@@ -366,6 +366,8 @@ const aiProviderPresentationServiceJs = readText("src/features/ai/ai-provider-pr
 const aiProviderPresentationServiceUnitTests = readText("tests/unit/ai-provider-presentation-service.test.cjs");
 const aiProviderFormControllerJs = readText("src/features/ai/ai-provider-form-controller.js");
 const aiProviderFormControllerUnitTests = readText("tests/unit/ai-provider-form-controller.test.cjs");
+const aiSuggestionListControllerJs = readText("src/features/ai/ai-suggestion-list-controller.js");
+const aiSuggestionListControllerUnitTests = readText("tests/unit/ai-suggestion-list-controller.test.cjs");
 const aiCredentialStorageServiceJs = readText("src/features/ai/ai-credential-storage-service.js");
 const aiCredentialStorageServiceUnitTests = readText("tests/unit/ai-credential-storage-service.test.cjs");
 const aiRuntimeSettingsServiceJs = readText("src/features/ai/ai-runtime-settings-service.js");
@@ -3154,6 +3156,76 @@ for (const testName of [
   );
 }
 assertIncludes(
+  appBootstrapJs,
+  "createAiSuggestionListController",
+  "The application runtime must expose the checked AI suggestion-list controller boundary."
+);
+for (const boundary of [
+  "function requireRoot(value)",
+  "function createElement(ownerDocument, tagName",
+  "function render()",
+  "Array.isArray(segment?.aiSuggestions)",
+  'root.textContent = source("No AI suggestions yet.")',
+  'root.classList.add("muted")',
+  'root.classList.remove("muted")',
+  ".reverse()",
+  ".slice(0, 4)",
+  'className: "ai-suggestion-card"',
+  'suggestion.provider || "AI"',
+  'suggestion.confidence ? `${suggestion.confidence}%` : source("review")',
+  'source("{origin} suggestion · {scope} · {date}"',
+  'className: "ai-suggestion-inspection"',
+  'className: "ai-suggestion-diff"',
+  'segment?.target || source("Empty target")',
+  "for (const item of suggestion.explanation || [])",
+  'text: label("applyToTarget")',
+  'text: source("Apply and next")',
+  "void apply(suggestion.id)",
+  "void apply(suggestion.id, { andNext: true })",
+  "root.replaceChildren(fragment)"
+]) {
+  assertIncludes(
+    aiSuggestionListControllerJs,
+    boundary,
+    `AiSuggestionListController must retain checked ${boundary} DOM and intent orchestration.`
+  );
+}
+for (const consumer of [
+  "appRuntime.featureFactories.createAiSuggestionListController({",
+  "root: els.aiSuggestionList",
+  "getSegment: currentSegment",
+  "apply: applyAiSuggestion",
+  "renderSuggestions: aiSuggestionListController.render",
+  "renderAi: aiSuggestionListController.render"
+]) {
+  assertIncludes(appJs, consumer, `AI suggestion-list consumer must use the checked controller: ${consumer}.`);
+}
+assert(
+  appJs.indexOf("const aiProviderFormController =") >= 0 &&
+    appJs.indexOf("const aiProviderFormController =") < appJs.indexOf("const aiSuggestionListController =") &&
+    appJs.indexOf("const aiSuggestionListController =") < appJs.indexOf("const aiPretranslationController ="),
+  "AI suggestion-list presentation must initialize before AI command consumers."
+);
+assert(
+  !appJs.includes("function renderAiSuggestions") &&
+    !appJs.includes("els.aiSuggestionList.replaceChildren") &&
+    !appJs.includes('applyButton.addEventListener("click"'),
+  "app.js must not regain AI suggestion-list DOM or apply-intent ownership."
+);
+for (const testName of [
+  "AI suggestion list requires checked DOM, segment, apply, and date boundaries",
+  "AI suggestion list preserves the localized muted empty state",
+  "AI suggestion list preserves the newest-first four-card bound and heading fallbacks",
+  "AI suggestion list preserves safe provenance, inspection, and ordered explanations",
+  "AI suggestion list routes Apply and Apply and next as separate intents"
+]) {
+  assertIncludes(
+    aiSuggestionListControllerUnitTests,
+    testName,
+    `focused AI-suggestion-list tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
   segmentCommandsJs,
   "createTmPretranslationCommand",
   "Segment commands must expose an atomic TM pretranslation boundary."
@@ -4161,7 +4233,7 @@ assertIncludes(
 const aiSettingsPersistenceFacade = functionBody(
   appJs,
   "async function saveAiSettings",
-  "function renderAiSuggestions"
+  "async function aiContextForSegment"
 );
 assert(
   !aiSettingsPersistenceFacade.includes("readGlobalForm(") &&
