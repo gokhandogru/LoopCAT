@@ -1352,7 +1352,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
   },
   selection: {
     getActiveIndex: currentActiveIndex,
-    focusTarget: focusActiveTextarea,
+    focusTarget: (...args) => targetEditController.focusActive(...args),
     goToNextOpen: goToNextOpenSegment
   },
   validation: {
@@ -1366,7 +1366,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
     preparePersistedRollback: preparePersistedConfirmationRollback
   },
   persistence: {
-    clearPending: clearPendingSave,
+    clearPending: autosaveService.clear,
     save: saveSegment,
     saveToTm: saveSegmentToTm,
     logActivity: (segment, project) =>
@@ -1443,16 +1443,16 @@ const targetProducerController = appRuntime.featureFactories.createTargetProduce
     createProtectedTag: appRuntime.commands.createInsertProtectedTagCommand,
     changed: renderUndoControls
   },
-  editLifecycle: { finalize: finalizePendingEditCommand },
+  editLifecycle: { finalize: targetEditController.finalize },
   persistence: {
-    clearPending: clearPendingSave,
+    clearPending: autosaveService.clear,
     debounce: autosaveService.debounce
   },
   selection: {
     getActiveIndex: currentActiveIndex,
     active: (segment) => targetEditController.activeSelection(segment),
     normalize: (selection, targetLength) => targetEditController.normalizeSelection(selection, targetLength),
-    focus: focusActiveTextarea
+    focus: targetEditController.focusActive
   },
   filters: { matches: segmentPassesFilters },
   mutation: {
@@ -1494,8 +1494,8 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
     changed: renderUndoControls
   },
   persistence: {
-    flush: flushPendingSegmentSaves,
-    clearPending: clearPendingSave,
+    flush: autosaveService.flush,
+    clearPending: autosaveService.clear,
     save: saveSegments
   },
   mutation: {
@@ -1511,7 +1511,7 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
   restoration: { restoreSnapshots: restoreSegmentCommandSnapshots },
   selection: {
     getActiveSegmentId: () => currentSegment()?.id || "",
-    focusTarget: focusActiveTextarea
+    focusTarget: targetEditController.focusActive
   },
   presentation: {
     renderSegments,
@@ -1560,7 +1560,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
     changed: renderUndoControls
   },
   persistence: {
-    flush: flushPendingSegmentSaves,
+    flush: autosaveService.flush,
     save: saveSegments
   },
   mutation: {
@@ -1576,7 +1576,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
   restoration: { restorePatches: restoreBatchTargetCommandPatches },
   selection: {
     getActiveSegmentId: () => currentSegment()?.id || "",
-    focusTarget: focusActiveTextarea
+    focusTarget: targetEditController.focusActive
   },
   presentation: {
     yieldToUi,
@@ -1857,14 +1857,14 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
     changed: renderUndoControls
   },
   persistence: {
-    flush: flushPendingSegmentSaves,
+    flush: autosaveService.flush,
     save: saveSegments,
     load: getProjectSegments
   },
   mutation: {
     capturePatch: targetCommandPatch,
     applyPatch: applyTargetCommandPatch,
-    clearPending: clearPendingSave,
+    clearPending: autosaveService.clear,
     recordHistory: (segment) =>
       recordSegmentTargetHistory(segment, segment.target, segment.status, "ai-pretranslate"),
     touch: touchSegment,
@@ -1943,14 +1943,14 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
     trackPromptBusy: true
   }),
   persistence: {
-    flush: flushPendingSegmentSaves,
+    flush: autosaveService.flush,
     saveOne: saveSegment,
     saveMany: saveSegments,
     load: getProjectSegments
   },
   mutation: {
     touch: touchSegment,
-    clearPending: clearPendingSave,
+    clearPending: autosaveService.clear,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -2026,13 +2026,13 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
     nextId: () => makeId("ai-suggestion")
   },
   persistence: {
-    flush: flushPendingSegmentSaves,
+    flush: autosaveService.flush,
     saveMany: saveSegments,
     load: getProjectSegments
   },
   mutation: {
     touch: touchSegment,
-    clearPending: clearPendingSave,
+    clearPending: autosaveService.clear,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -2108,14 +2108,14 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
     nextId: () => makeId("ai-suggestion")
   },
   persistence: {
-    flush: flushPendingSegmentSaves,
+    flush: autosaveService.flush,
     saveOne: saveSegment,
     saveMany: saveSegments,
     load: getProjectSegments
   },
   mutation: {
     touch: touchSegment,
-    clearPending: clearPendingSave,
+    clearPending: autosaveService.clear,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -2192,13 +2192,13 @@ const aiTerminologyApplicationController =
       nextId: () => makeId("ai-suggestion")
     },
     persistence: {
-      flush: flushPendingSegmentSaves,
+      flush: autosaveService.flush,
       saveMany: saveSegments,
       load: getProjectSegments
     },
     mutation: {
       touch: touchSegment,
-      clearPending: clearPendingSave,
+      clearPending: autosaveService.clear,
       restore: (segment, snapshot) => {
         Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
         Object.assign(segment, snapshot);
@@ -2277,13 +2277,13 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
     nextId: () => makeId("ai-suggestion")
   },
   persistence: {
-    flush: flushPendingSegmentSaves,
+    flush: autosaveService.flush,
     saveMany: saveSegments,
     load: getProjectSegments
   },
   mutation: {
     touch: touchSegment,
-    clearPending: clearPendingSave,
+    clearPending: autosaveService.clear,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
@@ -2449,8 +2449,8 @@ const aiSuggestionApplicationController =
       prepareRestoreSnapshot: prepareCommandRestoreSegmentSnapshot
     },
     persistence: {
-      flush: flushPendingSegmentSaves,
-      clearPending: clearPendingSave,
+      flush: autosaveService.flush,
+      clearPending: autosaveService.clear,
       save: saveSegment
     },
     activity: {
@@ -2464,7 +2464,7 @@ const aiSuggestionApplicationController =
       renderSuggestions: aiSuggestionListController.render,
       refreshSidebar,
       renderAll,
-      focusTarget: focusActiveTextarea
+      focusTarget: targetEditController.focusActive
     },
     workspace: {
       markDirty: markWorkspaceDirty,
@@ -2498,7 +2498,7 @@ const aiSuggestionPersistenceController =
       prepareHistory: prepareSegmentHistoryState
     },
     persistence: {
-      clearPending: clearPendingSave,
+      clearPending: autosaveService.clear,
       save: saveSegment
     },
     activity: { log: logProjectActivity },
@@ -2765,7 +2765,7 @@ const structuralSegmentController = appRuntime.featureFactories.createStructural
     getActiveIndex: currentActiveIndex,
     findEditor: (index) => els.segmentBody.querySelector(`tr[data-index="${index}"] textarea`),
     select: (index) => selectApplicationSegment(index),
-    focusTarget: focusActiveTextarea
+    focusTarget: targetEditController.focusActive
   },
   mutation: {
     applyTarget: setSegmentTargetAndStatus,
@@ -2775,7 +2775,7 @@ const structuralSegmentController = appRuntime.featureFactories.createStructural
     prepareRestoreSnapshot: prepareCommandRestoreSegmentSnapshot
   },
   persistence: {
-    flush: flushPendingSegmentSaves,
+    flush: autosaveService.flush,
     saveStructure: saveSegmentStructure,
     discardPending: (segmentId) => autosaveService.discard(segmentId)
   },
@@ -3044,11 +3044,11 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
   runImportTask: runFileImportTask,
   importProjectFile: importProjectDocument,
   importProjectPackage: async (file) => {
-    await flushPendingSegmentSaves();
+    await autosaveService.flush();
     return importProjectPackage(file);
   },
   restoreBackup: async (file) => {
-    await flushPendingSegmentSaves();
+    await autosaveService.flush();
     return restoreBackupFile(file);
   },
   importTmx: handleTmxImport,
@@ -3271,7 +3271,7 @@ const reviewMetadataController = appRuntime.featureFactories.createReviewMetadat
     prepareHistory: prepareSegmentHistoryState
   },
   persistence: {
-    clearPending: clearPendingSave,
+    clearPending: autosaveService.clear,
     save: saveSegment
   },
   activity: {
@@ -3312,7 +3312,7 @@ const qualityDecisionController = appRuntime.featureFactories.createQualityDecis
     prepareHistory: prepareSegmentHistoryState
   },
   persistence: {
-    clearPending: clearPendingSave,
+    clearPending: autosaveService.clear,
     save: saveSegment
   },
   risk: { buildQueue: currentQualityRiskQueue },
@@ -3359,7 +3359,7 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
     prepareHistory: prepareSegmentHistoryState
   },
   persistence: {
-    clearPending: clearPendingSave,
+    clearPending: autosaveService.clear,
     save: saveSegment
   },
   restoration: {
@@ -3552,7 +3552,8 @@ async function synchronizeResourceTrashChange(entry, { refreshSuggestions = fals
 
 async function undoLastCommand() {
   const projectId = state.commandProjectId || currentProject()?.id || null;
-  finalizePendingEditCommands(projectId || "");
+  if (projectId) targetEditController.finalizeProject(projectId);
+  else targetEditController.finalizeAll();
   const result = await appRuntime?.commands?.bus?.undo?.(projectId);
   if (!result) return false;
   const requestedActiveSegmentId = result.result?.activeSegmentId || "";
@@ -3577,14 +3578,15 @@ async function undoLastCommand() {
   setSaveStatus(result.receipt.undoLabel, "saved");
   renderUndoControls();
   if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
-    focusActiveTextarea(result.result?.selection || null);
+    targetEditController.focusActive(result.result?.selection || null);
   }
   return result;
 }
 
 async function redoLastCommand() {
   const projectId = state.commandProjectId || currentProject()?.id || null;
-  finalizePendingEditCommands(projectId || "");
+  if (projectId) targetEditController.finalizeProject(projectId);
+  else targetEditController.finalizeAll();
   const result = await appRuntime?.commands?.bus?.redo?.(projectId);
   if (!result) return false;
   const requestedActiveSegmentId = result.result?.activeSegmentId || "";
@@ -3613,7 +3615,7 @@ async function redoLastCommand() {
   setSaveStatus(result.receipt.undoLabel.replace(/^Undo\s+/i, "Redid "), "saved");
   renderUndoControls();
   if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
-    focusActiveTextarea(result.result?.selection || null);
+    targetEditController.focusActive(result.result?.selection || null);
   }
   return result;
 }
@@ -3741,7 +3743,7 @@ function setFocusMode(enabled) {
   if (!currentProject()) return;
   requestAnimationFrame(() => {
     renderSegments({ preserveScroll: true });
-    if (currentFocusMode()) focusActiveTextarea();
+    if (currentFocusMode()) targetEditController.focusActive();
   });
 }
 
@@ -4247,7 +4249,7 @@ function registerOfflineAppShell() {
     location: window.location,
     trustScriptUrl: appRuntime.safeHtml.trustedScriptUrl,
     beforeActivate: async () => {
-      await flushPendingSegmentSaves();
+      await autosaveService.flush();
       if (state.workspaceStatus?.connected && state.workspaceDirtyProjectIds.size) {
         await saveWorkspaceRecoveryPackages();
       }
@@ -5220,34 +5222,6 @@ function commandList() {
   }));
 }
 
-function finalizePendingEditCommand(segmentId) {
-  return targetEditController.finalize(segmentId);
-}
-
-function finalizePendingEditCommands(projectId = "") {
-  return projectId ? targetEditController.finalizeProject(projectId) : targetEditController.finalizeAll();
-}
-
-function clearPendingSave(segment, options = {}) {
-  return autosaveService.clear(segment, options);
-}
-
-function clearAllPendingSaves() {
-  return autosaveService.clearAll();
-}
-
-function pendingSaveRecords(projectId = "") {
-  return autosaveService.pendingRecords(projectId);
-}
-
-function clearPendingDocumentSaves(projectId, documentId) {
-  return autosaveService.clearDocument(projectId, documentId);
-}
-
-async function flushPendingSegmentSaves(projectId = "") {
-  return autosaveService.flush(projectId);
-}
-
 function formatDate(value) {
   if (!value) return uiSource("Never");
   return new Intl.DateTimeFormat(uiI18n?.getLocale?.() || undefined, { dateStyle: "medium" }).format(new Date(value));
@@ -5930,7 +5904,7 @@ function renderProjectList() {
 }
 
 async function openProject(projectId) {
-  await flushPendingSegmentSaves();
+  await autosaveService.flush();
   editorSessionStore.replaceProject(currentProjects().find((project) => project.id === projectId) || null);
   state.commandProjectId = currentProject()?.id || projectId || "";
   editorSessionStore.replaceSegments(prepareSegmentHistoryStates(currentProject() ? await getProjectSegments(projectId) : []));
@@ -6236,7 +6210,7 @@ async function confirmDeleteProject(projectId = currentProject()?.id) {
   const ok = uiConfirm(`Move project "${displaySafeText(project.name)}" and all of its files to Trash?`);
   if (!ok) return false;
   try {
-    await flushPendingSegmentSaves(project.id);
+    await autosaveService.flush(project.id);
     if (LOOPCAT_TEST_BUILD && project[PROJECT_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated project delete failure");
     const command = appRuntime?.commands?.createDeleteProjectCommand?.({ projectId: project.id });
     if (!command) throw new Error("The reversible project deletion service is unavailable.");
@@ -6264,7 +6238,7 @@ async function confirmDeleteFile(documentInfo) {
   const ok = uiConfirm(`Move file "${displaySafeText(documentInfo.name)}" to Trash?`);
   if (!ok) return false;
   try {
-    await flushPendingSegmentSaves(currentProject().id);
+    await autosaveService.flush(currentProject().id);
     if (LOOPCAT_TEST_BUILD && documentInfo[FILE_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated file delete failure");
     const command = appRuntime?.commands?.createDeleteDocumentCommand?.({
       project: currentProject(),
@@ -7030,7 +7004,7 @@ async function goToNextOpenSegment() {
     els.segmentStatusFilter.value = "all";
     renderSegments();
   }
-  focusActiveTextarea();
+  targetEditController.focusActive();
 }
 
 function applyTargetDraft({ index, segment, target }) {
@@ -7051,10 +7025,6 @@ function applyTargetDraft({ index, segment, target }) {
   scheduleRevisionHistoryRender();
   markWorkspaceDirty();
   return { segment, patch: targetCommandPatch(segment) };
-}
-
-function updateSegmentDraft(index, target) {
-  return targetEditController.updateDraft(index, target);
 }
 
 function openReplacePanel() {
@@ -7085,7 +7055,7 @@ async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}
     restoredPatch.revision = Math.max(Number(currentPatch.revision || 0), Number(restoredPatch.revision || 0)) + 1;
     restoredPatch.updatedAt = new Date().toISOString();
     applyTargetCommandPatch(segment, restoredPatch);
-    clearPendingSave(segment);
+    autosaveService.clear(segment);
     await saveSegment(segment);
     verticalFeatureState?.segmentGrid?.selectSegment(index, segment.id);
     verticalFeatureState?.inspector?.setContext({ segmentId: segment.id });
@@ -7098,7 +7068,7 @@ async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}
     const selection = options.selection
       ? targetEditController.normalizeSelection(options.selection, segment.target.length)
       : null;
-    focusActiveTextarea(selection);
+    targetEditController.focusActive(selection);
     return {
       recoveryToken: segmentId,
       activeSegmentId: segment.id,
@@ -7140,7 +7110,7 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
       ) + 1;
       restoredPatch.updatedAt = new Date().toISOString();
       applyTargetCommandPatch(segment, restoredPatch);
-      clearPendingSave(segment);
+      autosaveService.clear(segment);
       return segment;
     });
     await saveSegments(restored);
@@ -7151,7 +7121,7 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
     markWorkspaceDirty();
     renderAll();
     await refreshSidebar();
-    focusActiveTextarea();
+    targetEditController.focusActive();
     return {
       patches: restored.map((segment) => targetCommandPatch(segment)),
       activeSegmentId: currentSegment()?.id || restored[0]?.id || "",
@@ -7184,7 +7154,7 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
     const restored = snapshots.map((snapshot, offset) => {
       const next = prepareCommandRestoreSegmentSnapshot(snapshot, currentById.get(snapshot.id));
       editorSessionStore.replaceSegmentAt(indexes[offset], next);
-      clearPendingSave(next);
+      autosaveService.clear(next);
       return next;
     });
     await saveSegments(restored);
@@ -7194,7 +7164,7 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
     markWorkspaceDirty();
     renderAll();
     await refreshSidebar();
-    focusActiveTextarea();
+    targetEditController.focusActive();
     return {
       snapshots: restored.map((segment) => structuredClone(segment)),
       activeSegmentId: currentSegment()?.id || restored[0]?.id || ""
@@ -7233,7 +7203,7 @@ async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = 
   try {
     const restored = prepareCommandRestoreSegmentSnapshot(nextSnapshot, currentSnapshot);
     editorSessionStore.replaceSegmentAt(index, restored);
-    clearPendingSave(restored);
+    autosaveService.clear(restored);
     await saveSegment(restored);
     verticalFeatureState?.segmentGrid?.selectSegment(index, restored.id);
     verticalFeatureState?.inspector?.setContext({ segmentId: restored.id });
@@ -7241,7 +7211,7 @@ async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = 
     renderAll();
     await refreshSidebar();
     if (options.navigateNext) await goToNextOpenSegment();
-    else focusActiveTextarea();
+    else targetEditController.focusActive();
     return {
       snapshot: structuredClone(restored),
       activeSegmentId: currentSegment()?.id || restored.id
@@ -7427,10 +7397,6 @@ async function openConcordanceSearch() {
   els.concordanceOverlay.classList.remove("hidden");
 }
 
-function focusActiveTextarea(selection = null) {
-  return targetEditController.focusActive(selection);
-}
-
 async function refreshSidebar() {
   return editorContextController.refresh();
 }
@@ -7579,7 +7545,7 @@ async function goToQualityRiskItem(item) {
   }
   await setActiveSegment(index);
   renderSegments();
-  focusActiveTextarea();
+  targetEditController.focusActive();
 }
 
 async function goToNextQualityRisk() {
@@ -7718,7 +7684,7 @@ function renderQaResults() {
       if (index !== -1) {
         await setActiveSegment(index);
         renderSegments();
-        focusActiveTextarea();
+        targetEditController.focusActive();
       }
     });
     card.append(button);
@@ -8193,7 +8159,7 @@ async function runFileImportTask(label, action) {
 
 async function buildProjectPackage(project = currentProject(), segmentRecords = null, options = {}) {
   if (!project) return null;
-  await flushPendingSegmentSaves(project.id);
+  await autosaveService.flush(project.id);
   const projectSegments = segmentRecords || (project.id === currentProject()?.id ? currentSegments() : await getProjectSegments(project.id));
   const [tmEntries, terms, activityEvents] = await Promise.all([
     getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`),
@@ -8273,7 +8239,7 @@ function assertValidBackupForWrite(backup, actionLabel) {
 }
 
 async function buildBackupExport() {
-  await flushPendingSegmentSaves();
+  await autosaveService.flush();
   const backup = await exportAllData();
   const validation = assertValidBackupForWrite(backup, "export backup");
   return { backup, validation };
@@ -8404,7 +8370,7 @@ async function importProjectPackageData(pkg, options = {}) {
     }
   }
   const replaceProjectId = existing && !importAsCopy ? existing.id : "";
-  if (replaceProjectId) await flushPendingSegmentSaves(replaceProjectId);
+  if (replaceProjectId) await autosaveService.flush(replaceProjectId);
   const prepared = await prepareProjectPackageImport(pkg, {
     replaceProjectId,
     importAsCopy
@@ -8459,7 +8425,7 @@ async function restoreBackupData(backup) {
     setSaveStatus("Backup restore failed validation", "dirty");
     return null;
   }
-  await flushPendingSegmentSaves();
+  await autosaveService.flush();
   await reportImportProgress("Restoring backup stores", null, `${(backup.projects || []).length} project${(backup.projects || []).length === 1 ? "" : "s"}`);
   await importAllData(backup);
   await reportImportProgress("Rebuilding resource indexes");
@@ -8524,7 +8490,7 @@ async function chooseWorkspaceFolder() {
 
 async function saveCurrentProjectPackageToWorkspace() {
   if (!currentProject()) return;
-  await flushPendingSegmentSaves();
+  await autosaveService.flush();
   if (!state.workspaceStatus?.connected) await chooseWorkspaceFolder();
   if (!state.workspaceStatus?.connected) return;
   const previewPackage = await buildProjectPackage(currentProject());
@@ -8562,7 +8528,7 @@ async function saveProjectPackageToWorkspaceById(projectId, options = {}) {
   const project = knownProjectById(projectId) || (await listProjects()).find((item) => item.id === projectId);
   if (!project) throw new Error("Project package could not be found.");
   try {
-    await flushPendingSegmentSaves(projectId);
+    await autosaveService.flush(projectId);
     const pkg = await buildProjectPackage(project, null, options);
     assertValidProjectPackageForWrite(pkg, "save project package to workspace");
     const result = await workspaceStorage.saveProjectPackage(pkg);
@@ -8728,7 +8694,7 @@ async function saveProjectFromDialog() {
 
 async function syncWorkspaceFromFolder() {
   if (!workspaceStorage || !state.workspaceStatus?.connected) return;
-  await flushPendingSegmentSaves();
+  await autosaveService.flush();
   const refs = await workspaceStorage.listProjectPackages();
   const imported = [];
   const warnings = [];
@@ -8884,7 +8850,7 @@ function reportQaChecksTableHtml(checks = []) {
 }
 
 async function buildProjectReportData() {
-  await flushPendingSegmentSaves();
+  await autosaveService.flush();
   const tmNames = new Set(projectTmNames());
   const [tmEntries, terms, activityEvents] = await Promise.all([
     getAllByIndex("tmEntries", "languagePair", `${currentProject().sourceLang}::${currentProject().targetLang}`),
@@ -9326,7 +9292,7 @@ async function exportProjectReport(options = {}) {
 async function exportTargetText() {
   if (!currentProject()) return;
   try {
-    await flushPendingSegmentSaves();
+    await autosaveService.flush();
     const { documentInfo, segments } = deliveryExportScope();
     const exportPlan = planDeliveryExport({ format: "txt", documentInfo, segments });
     const report = validateExportReadiness({ project: currentProject(), segments, format: "txt", terms: await projectTermsForValidation(), exportPlan });
@@ -9358,7 +9324,7 @@ async function exportTargetText() {
 async function exportTargetDocx() {
   if (!currentProject()) return;
   try {
-    await flushPendingSegmentSaves();
+    await autosaveService.flush();
     const documentInfo = exportDocumentForTypes(new Set(["docx"]), "The selected file is not a DOCX document.", "Select a DOCX document to export.");
     if (!documentInfo) return;
     const segments = currentSegments().filter((segment) => segment.documentId === documentInfo.id);
@@ -9390,7 +9356,7 @@ async function exportTargetDocx() {
 async function exportBilingualDocx() {
   if (!currentProject()) return;
   try {
-    await flushPendingSegmentSaves();
+    await autosaveService.flush();
     const terms = await projectTermsForValidation();
     const report = validateExportReadiness({ project: currentProject(), segments: currentSegments(), format: "bilingual-docx", terms });
     renderValidationReport(report);
@@ -9420,7 +9386,7 @@ async function exportBilingualDocx() {
 async function exportLocalization() {
   try {
     if (!currentProject()) return;
-    await flushPendingSegmentSaves();
+    await autosaveService.flush();
     const documentInfo = exportDocumentForTypes(
       LOCALIZATION_EXPORT_TYPES,
       "The selected file is not exportable from Other formats.",
@@ -9469,7 +9435,7 @@ async function exportLocalization() {
 async function exportXliff(version = "1.2") {
   if (!currentProject()) return;
   try {
-    await flushPendingSegmentSaves();
+    await autosaveService.flush();
     const { documentInfo, segments } = deliveryExportScope();
     const exportPlan = planDeliveryExport({ format: "xliff", documentInfo, segments });
     const report = validateExportReadiness({ project: currentProject(), segments, format: "xliff", terms: await projectTermsForValidation(), exportPlan });
@@ -9943,13 +9909,13 @@ function wireEvents() {
   window.addEventListener("beforeunload", handleBeforeUnload);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "hidden" || !shouldWarnBeforeUnload()) return;
-    flushPendingSegmentSaves()
+    autosaveService.flush()
       .then(() => autosaveDirtyWorkspacePackages())
       .catch((error) => console.warn(error));
   });
   window.addEventListener("pagehide", () => {
     if (!shouldWarnBeforeUnload()) return;
-    flushPendingSegmentSaves()
+    autosaveService.flush()
       .then(() => autosaveDirtyWorkspacePackages())
       .catch((error) => console.warn(error));
   });

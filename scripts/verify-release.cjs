@@ -1958,6 +1958,51 @@ assert(
 );
 assert(!appJs.includes("function debounceSave"), "the autosave forwarding façade must not return.");
 assertIncludes(
+  appJs,
+  "focusTarget: (...args) => targetEditController.focusActive(...args)",
+  "the pre-construction confirmation adapter must resolve TargetEditController focus at call time."
+);
+assert(
+  appJs.split("focusTarget: (...args) => targetEditController.focusActive(...args)").length - 1 === 1,
+  "only the construction-order-sensitive confirmation adapter may retain late-bound target focus."
+);
+for (const directBoundary of [
+  "editLifecycle: { finalize: targetEditController.finalize }",
+  "clearPending: autosaveService.clear",
+  "flush: autosaveService.flush",
+  "focusTarget: targetEditController.focusActive"
+]) {
+  assertIncludes(appJs, directBoundary, `app.js must wire ${directBoundary} directly to its checked owner.`);
+}
+for (const directWorkflowBoundary of [
+  "targetEditController.updateDraft(",
+  "autosaveService.clear(",
+  "autosaveService.pendingRecords(",
+  "autosaveService.flush("
+]) {
+  assertIncludes(
+    appWorkflowDriverJs,
+    directWorkflowBoundary,
+    `workflow characterization must call ${directWorkflowBoundary} directly.`
+  );
+}
+for (const removedFacade of [
+  "finalizePendingEditCommand",
+  "finalizePendingEditCommands",
+  "clearPendingSave",
+  "clearAllPendingSaves",
+  "pendingSaveRecords",
+  "clearPendingDocumentSaves",
+  "flushPendingSegmentSaves",
+  "updateSegmentDraft",
+  "focusActiveTextarea"
+]) {
+  assert(
+    !appJs.includes(removedFacade) && !appWorkflowDriverJs.includes(removedFacade),
+    `${removedFacade} consumer facade must not return.`
+  );
+}
+assertIncludes(
   targetEditControllerUnitTests,
   "target editor owns focus, composition input, coalescing, blur finalization, and listener cleanup",
   "focused target-edit tests must characterize composition, coalescing, focus, and cleanup."
@@ -7925,12 +7970,12 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "async function restoreBackupData", "async function restoreBackupFile"),
-  "await flushPendingSegmentSaves()",
+  "await autosaveService.flush()",
   "app.js backup restore must flush pending target edits before replacing local stores."
 );
 assertIncludes(
   functionBody(appJs, "async function importProjectPackageData", "async function importProjectPackage(file)"),
-  "await flushPendingSegmentSaves(replaceProjectId)",
+  "await autosaveService.flush(replaceProjectId)",
   "app.js same-project package replacement must flush pending target edits before replacing project records."
 );
 assertIncludes(
@@ -7991,7 +8036,7 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "const importExportController", "const projectDialogController"),
-  "await flushPendingSegmentSaves();",
+  "await autosaveService.flush();",
   "app.js must flush pending edits before checked package-import and backup-restore boundaries."
 );
 assertIncludes(
@@ -9517,7 +9562,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "await flushPendingSegmentSaves(projectId)",
+  "await autosaveService.flush(projectId)",
   "app.js must flush queued active segment saves before writing workspace project packages."
 );
 assertIncludes(
