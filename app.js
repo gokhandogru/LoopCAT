@@ -1751,7 +1751,10 @@ const aiProviderFormController =
       localSnapshot: aiCredentialStorageService.localAiSnapshot,
       readLocal: aiCredentialStorageService.storedLocalAiKey
     },
-    runtime: { canStartServer: canStartLmStudioServer },
+    runtime: {
+      canStartServer: (settings = aiRuntimeSettingsService.localSettingsFromForm()) =>
+        aiProviderAdministrationOperationsController.canStartServer(settings)
+    },
     languages: {
       normalizeInput: normalizeLanguageInputValue,
       nameForUi: languageNameForUi,
@@ -1761,7 +1764,7 @@ const aiProviderFormController =
       render: (...args) => aiPromptPreviewController.render(...args),
       previewRequest: (...args) => aiPromptPreviewController.createRequest(...args)
     },
-    help: { hideOpusCat: () => setOpusCatConnectionHelpVisible(false) },
+    help: { hideOpusCat: () => opusCatHelpController?.setVisible?.(false) },
     keys: { clearLocal: clearLocalAiKey, clearOpenAi: clearOpenAiKey },
     state: {
       read: () => state.localAi,
@@ -1811,7 +1814,8 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
       aiRuntimeSettingsService.normalizeProjectSettings(project.aiSettings)
   },
   providers: {
-    get: currentLocalAiProvider,
+    get: (settings = aiRuntimeSettingsService.localSettingsFromForm()) =>
+      aiProviderService.get(settings.providerId),
     sharesExternally: (settings) =>
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
@@ -1912,7 +1916,8 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
     assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
   providers: {
-    get: currentLocalAiProvider,
+    get: (settings = aiRuntimeSettingsService.localSettingsFromForm()) =>
+      aiProviderService.get(settings.providerId),
     sharesExternally: (settings) =>
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
@@ -1990,7 +1995,8 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
     assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
   providers: {
-    get: currentLocalAiProvider,
+    get: (settings = aiRuntimeSettingsService.localSettingsFromForm()) =>
+      aiProviderService.get(settings.providerId),
     sharesExternally: (settings) =>
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
@@ -2066,7 +2072,8 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
     assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
   providers: {
-    get: currentLocalAiProvider,
+    get: (settings = aiRuntimeSettingsService.localSettingsFromForm()) =>
+      aiProviderService.get(settings.providerId),
     sharesExternally: (settings) =>
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
@@ -2153,7 +2160,8 @@ const aiTerminologyApplicationController =
       assertReady: aiRuntimeSettingsService.assertRuntimeReady
     },
     providers: {
-      get: currentLocalAiProvider,
+      get: (settings = aiRuntimeSettingsService.localSettingsFromForm()) =>
+        aiProviderService.get(settings.providerId),
       sharesExternally: (settings) =>
         localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
     },
@@ -2229,7 +2237,8 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
     assertReady: aiRuntimeSettingsService.assertRuntimeReady
   },
   providers: {
-    get: currentLocalAiProvider,
+    get: (settings = aiRuntimeSettingsService.localSettingsFromForm()) =>
+      aiProviderService.get(settings.providerId),
     sharesExternally: (settings) =>
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
@@ -2319,7 +2328,8 @@ const aiTerminologyExtractionController =
       assertReady: aiRuntimeSettingsService.assertRuntimeReady
     },
     providers: {
-      get: currentLocalAiProvider,
+      get: (settings = aiRuntimeSettingsService.localSettingsFromForm()) =>
+        aiProviderService.get(settings.providerId),
       sharesExternally: (settings) =>
         localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
     },
@@ -2369,7 +2379,8 @@ const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBrie
     normalizeProjectAiSettings: aiRuntimeSettingsService.normalizeProjectSettings
   },
   providers: {
-    get: currentLocalAiProvider,
+    get: (settings = aiRuntimeSettingsService.localSettingsFromForm()) =>
+      aiProviderService.get(settings.providerId),
     sharesExternally: (settings) =>
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
@@ -2623,7 +2634,8 @@ const aiProviderAdministrationOperationsController =
       normalizeBaseUrl: normalizedProviderBaseUrl
     },
     providers: {
-      get: currentLocalAiProvider,
+      get: (settings = aiRuntimeSettingsService.localSettingsFromForm()) =>
+        aiProviderService.get(settings.providerId),
       sharesExternally: (settings) =>
         localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model),
       canPullModel: aiProviderPresentationService.canPullModel
@@ -2705,7 +2717,8 @@ const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestCon
     hasProjectBriefSamples: aiScopeSelectionService.hasProjectBriefSamples
   },
   providers: {
-    get: currentLocalAiProvider,
+    get: (settings = aiRuntimeSettingsService.localSettingsFromForm()) =>
+      aiProviderService.get(settings.providerId),
     sharesExternally: (settings) =>
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
@@ -7962,22 +7975,6 @@ async function aiContextForSegment(segment, ai) {
       termBaseNames: projectTermBaseNames()
     }) : []
   ]);
-}
-
-function currentLocalAiProvider(settings = aiRuntimeSettingsService.localSettingsFromForm()) {
-  return aiProviderService.get(settings.providerId);
-}
-
-function canStartLmStudioServer(settings = aiRuntimeSettingsService.localSettingsFromForm()) {
-  return aiProviderAdministrationOperationsController.canStartServer(settings);
-}
-
-function setOpusCatConnectionHelpVisible(visible) {
-  opusCatHelpController?.setVisible?.(visible);
-}
-
-function showOpusCatConnectionHelp() {
-  return opusCatHelpController?.open?.();
 }
 
 function aiReviewRiskLabel(level) {

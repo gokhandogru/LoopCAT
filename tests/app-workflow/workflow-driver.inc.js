@@ -346,7 +346,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "checked project dialog controller prepares edit mode from current project state"
     );
     els.projectAiOptions.open = true;
-    setOpusCatConnectionHelpVisible(true);
+    opusCatHelpController.setVisible(true);
     els.localAiOpusCatHelpBtn.focus();
     els.localAiOpusCatHelpBtn.click();
     await yieldToUi();
@@ -364,7 +364,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         document.activeElement === els.localAiOpusCatHelpBtn,
       "OPUS-CAT help close restores focus to the visible connection-help entry point"
     );
-    setOpusCatConnectionHelpVisible(false);
+    opusCatHelpController.setVisible(false);
     const legacyDialogSettings = collectProjectResourceSettings({
       ...currentProject(),
       resourceLinks: [

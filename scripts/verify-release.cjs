@@ -2486,15 +2486,27 @@ for (const boundary of [
     `AiProviderAdministrationOperationsController must retain checked ${boundary} orchestration.`
   );
 }
-const canStartLmStudioFacade = functionBody(
-  appJs,
-  "function canStartLmStudioServer",
-  "function setOpusCatConnectionHelpVisible"
+const configuredProviderAdapters =
+  appJs.match(
+    /get: \(settings = aiRuntimeSettingsService\.localSettingsFromForm\(\)\) =>\s+aiProviderService\.get\(settings\.providerId\)/g
+  ) || [];
+assert(
+  configuredProviderAdapters.length === 10,
+  "all ten AI command consumers must resolve their configured provider directly with the call-time form fallback."
 );
-assertIncludes(
-  canStartLmStudioFacade,
-  "return aiProviderAdministrationOperationsController.canStartServer(settings)",
-  "canStartLmStudioServer must delegate to the checked provider-administration controller."
+assert(
+  !appJs.includes("function currentLocalAiProvider"),
+  "the configured-provider forwarding façade must not return."
+);
+assert(
+  /canStartServer: \(settings = aiRuntimeSettingsService\.localSettingsFromForm\(\)\) =>\s+aiProviderAdministrationOperationsController\.canStartServer\(settings\)/.test(
+    appJs
+  ),
+  "the provider form must late-bind LM Studio eligibility directly with the call-time form fallback."
+);
+assert(
+  !appJs.includes("function canStartLmStudioServer"),
+  "the LM Studio eligibility forwarding façade must not return."
 );
 for (const testName of [
   "provider administration exposes LM Studio start only for local OpenAI-compatible desktop settings",
@@ -5978,9 +5990,32 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "function showOpusCatConnectionHelp",
-  "app.js must show actionable OPUS-CAT help after a failed connection test."
+  "help: { hideOpusCat: () => opusCatHelpController?.setVisible?.(false) }",
+  "the provider form must late-bind OPUS-CAT help visibility directly to the checked controller."
 );
+assertIncludes(
+  appJs,
+  "setVisible: (visible) => opusCatHelpController?.setVisible?.(visible)",
+  "provider administration must late-bind OPUS-CAT help visibility directly to the checked controller."
+);
+assertIncludes(
+  appJs,
+  "open: () => opusCatHelpController?.open?.()",
+  "provider administration must preserve the checked OPUS-CAT open result."
+);
+for (const directWorkflowCall of [
+  "opusCatHelpController.setVisible(true)",
+  "opusCatHelpController.setVisible(false)"
+]) {
+  assertIncludes(
+    appWorkflowDriverJs,
+    directWorkflowCall,
+    `workflow characterization must call checked OPUS-CAT help directly: ${directWorkflowCall}.`
+  );
+}
+for (const removedFacade of ["function setOpusCatConnectionHelpVisible", "function showOpusCatConnectionHelp"]) {
+  assert(!appJs.includes(removedFacade), `${removedFacade} must not return after direct help wiring.`);
+}
 assertIncludes(
   aiProviderAdministrationOperationsControllerJs,
   'if (settings.providerId === "opus-cat") help.open()',
