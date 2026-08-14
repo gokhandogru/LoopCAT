@@ -80,6 +80,14 @@ const uiLocalizationService = appRuntime.featureFactories.createUiLocalizationSe
   confirm: (message) => window.confirm(message),
   alert: (message) => window.alert(message)
 });
+const reportPresentationService = appRuntime.featureFactories.createReportPresentationService({
+  localization: uiLocalizationService,
+  escapeHtml,
+  redactSensitiveText,
+  qualityCategoryName,
+  qaCheckMessage,
+  qaCheckFixHint
+});
 const focusController = compatibilityModules.focusController.createFocusController();
 const replaceSafeHtml = appRuntime.safeHtml.replace;
 const finalizeReportDocument = appRuntime.reports.finalize;
@@ -8672,44 +8680,6 @@ function countBy(items, keyFn) {
   }, {});
 }
 
-function reportListHtml(items, emptyText = "None") {
-  return items?.length
-    ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
-    : `<p class="muted">${uiLocalizationService.sourceHtml(emptyText)}</p>`;
-}
-
-function reportCountTableHtml(counts, emptyText = "None") {
-  const entries = Object.entries(counts || {}).sort(([a], [b]) => a.localeCompare(b));
-  if (!entries.length) return `<p class="muted">${uiLocalizationService.sourceHtml(emptyText)}</p>`;
-  return `<table><tbody>${entries.map(([label, count]) => `<tr><th>${escapeHtml(uiLocalizationService.source(label))}</th><td>${count}</td></tr>`).join("")}</tbody></table>`;
-}
-
-function qualityCategoryCountTableHtml(counts, emptyText = "None") {
-  const entries = Object.entries(counts || {})
-    .sort(([a], [b]) => qualityCategoryName(a).localeCompare(qualityCategoryName(b)));
-  if (!entries.length) return `<p class="muted">${uiLocalizationService.sourceHtml(emptyText)}</p>`;
-  return `<table><tbody>${entries.map(([label, count]) => `<tr><th>${escapeHtml(qualityCategoryName(label))}</th><td>${count}</td></tr>`).join("")}</tbody></table>`;
-}
-
-function reportSafeLabel(value, fallback = "") {
-  return redactSensitiveText(value || "").trim() || fallback;
-}
-
-function reportQaChecksTableHtml(checks = []) {
-  if (!checks.length) return `<p class="muted">${uiLocalizationService.sourceHtml("No QA issues found.")}</p>`;
-  const rows = checks.slice(0, 50).map((check) => `<tr>
-    <td>#${escapeHtml(check.label || "")}</td>
-    <td>${escapeHtml(uiLocalizationService.source(check.type || ""))}</td>
-    <td>${escapeHtml(uiLocalizationService.source(check.severity || "info"))}</td>
-    <td>${escapeHtml(qaCheckMessage(check))}</td>
-    <td>${escapeHtml(qaCheckFixHint(check) || uiLocalizationService.source("None"))}</td>
-  </tr>`).join("");
-  return `<table>
-    <thead><tr><th>${uiLocalizationService.sourceHtml("Segment")}</th><th>${uiLocalizationService.sourceHtml("Type")}</th><th>${uiLocalizationService.sourceHtml("Severity")}</th><th>${uiLocalizationService.sourceHtml("Message")}</th><th>${uiLocalizationService.sourceHtml("Recommendation")}</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
-}
-
 async function buildProjectReportData() {
   await autosaveService.flush();
   const tmNames = new Set(projectTmNames());
@@ -8788,14 +8758,14 @@ function projectReportHtml(data, options = {}) {
   const validation = sanitizeValidationReportForDisplay(data.validation) || { errors: [], risky: [], warnings: [], preserved: [], simplified: [], skipped: [], ok: true };
   const files = anonymized
     ? data.analysis.files.map((file, index) => ({ ...file, name: `File ${index + 1}` }))
-    : data.analysis.files.map((file) => ({ ...file, name: reportSafeLabel(file.name, "File") }));
+    : data.analysis.files.map((file) => ({ ...file, name: reportPresentationService.safeLabel(file.name, "File") }));
   const resources = anonymized
     ? data.resources
     : {
       ...data.resources,
-      mainTm: reportSafeLabel(data.resources.mainTm, "None"),
-      tmNames: (data.resources.tmNames || []).map((name) => reportSafeLabel(name)).filter(Boolean),
-      tbNames: (data.resources.tbNames || []).map((name) => reportSafeLabel(name)).filter(Boolean)
+      mainTm: reportPresentationService.safeLabel(data.resources.mainTm, "None"),
+      tmNames: (data.resources.tmNames || []).map((name) => reportPresentationService.safeLabel(name)).filter(Boolean),
+      tbNames: (data.resources.tbNames || []).map((name) => reportPresentationService.safeLabel(name)).filter(Boolean)
     };
   const validationCounts = {
     errors: validation.errors.length,
@@ -8804,7 +8774,7 @@ function projectReportHtml(data, options = {}) {
     notes: validation.preserved.length + validation.simplified.length + validation.skipped.length
   };
   const rows = (values, cells) => values.map((item) => `<tr>${cells(item).join("")}</tr>`).join("");
-  const projectTitle = anonymized ? uiLocalizationService.source("Anonymized project") : reportSafeLabel(project.name, uiLocalizationService.source("Project"));
+  const projectTitle = anonymized ? uiLocalizationService.source("Anonymized project") : reportPresentationService.safeLabel(project.name, uiLocalizationService.source("Project"));
   const reportTitle = anonymized ? uiLocalizationService.source("LoopCAT Anonymized Project Report") : uiLocalizationService.source("LoopCAT Project Report");
   return `<!doctype html>
 <html lang="${escapeHtml(uiLocalizationService.locale())}" dir="${escapeHtml(uiLocalizationService.direction())}">
@@ -8879,9 +8849,9 @@ function projectReportHtml(data, options = {}) {
           </tbody>
         </table>
         <h3>${uiLocalizationService.sourceHtml("Risk levels")}</h3>
-        ${reportCountTableHtml(qualityRiskQueue.byLevel || {}, "No unresolved quality risks.")}
+        ${reportPresentationService.countTableHtml(qualityRiskQueue.byLevel || {}, "No unresolved quality risks.")}
         <h3>${uiLocalizationService.sourceHtml("Quality categories")}</h3>
-        ${qualityCategoryCountTableHtml(qualityRiskQueue.byCategory || {}, "No categorized quality risks.")}
+        ${reportPresentationService.qualityCategoryCountTableHtml(qualityRiskQueue.byCategory || {}, "No categorized quality risks.")}
       </section>
       <section>
         <h2>${uiLocalizationService.sourceHtml("AI Triage")}</h2>
@@ -8893,7 +8863,7 @@ function projectReportHtml(data, options = {}) {
           <div class="card"><strong>${ai.highRisk || 0}</strong><span>${uiLocalizationService.sourceHtml("High AI risk")}</span></div>
         </div>
         <h3>${uiLocalizationService.sourceHtml("AI review risk levels")}</h3>
-        ${reportCountTableHtml(ai.risk || {}, "No AI review risk recorded.")}
+        ${reportPresentationService.countTableHtml(ai.risk || {}, "No AI review risk recorded.")}
       </section>
       <section>
         <h2>${uiLocalizationService.sourceHtml("Files")}</h2>
@@ -8928,7 +8898,7 @@ function projectReportHtml(data, options = {}) {
             `<td>${escapeHtml(term.sourceTerm)}</td>`,
             `<td>${escapeHtml(term.targetTerm)}</td>`,
             `<td>${uiLocalizationService.sourceHtml(term.isForbidden ? "Forbidden" : "Approved")}</td>`,
-            `<td>${escapeHtml(reportSafeLabel(term.termBaseName))}</td>`,
+            `<td>${escapeHtml(reportPresentationService.safeLabel(term.termBaseName))}</td>`,
             `<td>${escapeHtml(term.notes)}</td>`
           ])}</tbody>
         </table>` : `<p class="muted">${uiLocalizationService.sourceHtml("No linked terms.")}</p>`}
@@ -8936,20 +8906,20 @@ function projectReportHtml(data, options = {}) {
       <section>
         <h2>${uiLocalizationService.sourceHtml("QA Summary")}</h2>
         <h3>${uiLocalizationService.sourceHtml("By severity")}</h3>
-        ${reportCountTableHtml(data.qaBySeverity)}
+        ${reportPresentationService.countTableHtml(data.qaBySeverity)}
         <h3>${uiLocalizationService.sourceHtml("By type")}</h3>
-        ${reportCountTableHtml(data.qaByType)}
-        ${anonymized ? "" : `<h3>${uiLocalizationService.sourceHtml("QA details")}</h3>${reportQaChecksTableHtml(data.qaChecks)}`}
+        ${reportPresentationService.countTableHtml(data.qaByType)}
+        ${anonymized ? "" : `<h3>${uiLocalizationService.sourceHtml("QA details")}</h3>${reportPresentationService.qaChecksTableHtml(data.qaChecks)}`}
       </section>
       <section>
         <h2>${uiLocalizationService.sourceHtml("Export Readiness")}</h2>
-        ${reportCountTableHtml(validationCounts)}
+        ${reportPresentationService.countTableHtml(validationCounts)}
         <h3>${uiLocalizationService.sourceHtml("Risk and warnings")}</h3>
-        ${reportListHtml([...validation.risky, ...validation.warnings], "No risk or warning notes.")}
+        ${reportPresentationService.listHtml([...validation.risky, ...validation.warnings], "No risk or warning notes.")}
       </section>
       <section>
         <h2>${uiLocalizationService.sourceHtml("Recent Activity")}</h2>
-        ${anonymized ? reportCountTableHtml(data.activityByType || {}, "No activity recorded.") : data.activityEvents.length ? `<table><thead><tr><th>${uiLocalizationService.sourceHtml("Time")}</th><th>${uiLocalizationService.sourceHtml("Type")}</th><th>${uiLocalizationService.sourceHtml("Summary")}</th></tr></thead><tbody>${rows(data.activityEvents.slice(0, 10), (event) => [
+        ${anonymized ? reportPresentationService.countTableHtml(data.activityByType || {}, "No activity recorded.") : data.activityEvents.length ? `<table><thead><tr><th>${uiLocalizationService.sourceHtml("Time")}</th><th>${uiLocalizationService.sourceHtml("Type")}</th><th>${uiLocalizationService.sourceHtml("Summary")}</th></tr></thead><tbody>${rows(data.activityEvents.slice(0, 10), (event) => [
           `<td>${escapeHtml(formatDateTime(event.createdAt))}</td>`,
           `<td>${escapeHtml(uiLocalizationService.source(event.type))}</td>`,
           `<td>${escapeHtml(event.summary)}</td>`
@@ -8971,7 +8941,7 @@ function qualityPassportHtml(data) {
   const validation = sanitizeValidationReportForDisplay(data.validation) || { errors: [], risky: [], warnings: [], preserved: [], simplified: [], skipped: [], ok: true };
   const effort = passport.postEditingEffort || { label: "No segments", score: 0, drivers: [] };
   const rows = (values, cells) => values.map((item) => `<tr>${cells(item).join("")}</tr>`).join("");
-  const projectTitle = reportSafeLabel(project.name, uiLocalizationService.source("Project"));
+  const projectTitle = reportPresentationService.safeLabel(project.name, uiLocalizationService.source("Project"));
   const topRiskItems = (riskQueue.items || []).slice(0, 20);
   return `<!doctype html>
 <html lang="${escapeHtml(uiLocalizationService.locale())}" dir="${escapeHtml(uiLocalizationService.direction())}">
@@ -9016,8 +8986,8 @@ function qualityPassportHtml(data) {
             <tr><th>${uiLocalizationService.sourceHtml("Risk tolerance")}</th><td>${escapeHtml(qualityLabel(profile.riskTolerance))}</td></tr>
             <tr><th>${uiLocalizationService.sourceHtml("Terminology")}</th><td>${escapeHtml(qualityLabel(profile.terminologyStrictness))}</td></tr>
             <tr><th>${uiLocalizationService.sourceHtml("AI disclosure")}</th><td>${escapeHtml(qualityLabel(profile.aiDisclosure))}</td></tr>
-            <tr><th>${uiLocalizationService.sourceHtml("Audience")}</th><td>${escapeHtml(reportSafeLabel(profile.audience, uiLocalizationService.source("Not set")))}</td></tr>
-            <tr><th>${uiLocalizationService.sourceHtml("Tone")}</th><td>${escapeHtml(reportSafeLabel(profile.tone, uiLocalizationService.source("Neutral")))}</td></tr>
+            <tr><th>${uiLocalizationService.sourceHtml("Audience")}</th><td>${escapeHtml(reportPresentationService.safeLabel(profile.audience, uiLocalizationService.source("Not set")))}</td></tr>
+            <tr><th>${uiLocalizationService.sourceHtml("Tone")}</th><td>${escapeHtml(reportPresentationService.safeLabel(profile.tone, uiLocalizationService.source("Neutral")))}</td></tr>
           </tbody>
         </table>
       </section>
@@ -9035,15 +9005,15 @@ function qualityPassportHtml(data) {
       <section>
         <h2>${uiLocalizationService.sourceHtml("Risk Queue")}</h2>
         <h3>${uiLocalizationService.sourceHtml("By level")}</h3>
-        ${reportCountTableHtml(riskQueue.byLevel || {}, "No unresolved quality risks.")}
+        ${reportPresentationService.countTableHtml(riskQueue.byLevel || {}, "No unresolved quality risks.")}
         <h3>${uiLocalizationService.sourceHtml("Quality Categories")}</h3>
-        ${qualityCategoryCountTableHtml(riskQueue.byCategory || {}, "No categorized quality risks.")}
+        ${reportPresentationService.qualityCategoryCountTableHtml(riskQueue.byCategory || {}, "No categorized quality risks.")}
         <h3>${uiLocalizationService.sourceHtml("Top risks")}</h3>
         ${topRiskItems.length ? `<table>
           <thead><tr><th>${uiLocalizationService.sourceHtml("Segment")}</th><th>${uiLocalizationService.sourceHtml("File")}</th><th>${uiLocalizationService.sourceHtml("Category")}</th><th>${uiLocalizationService.sourceHtml("Risk")}</th><th>${uiLocalizationService.sourceHtml("Signals")}</th></tr></thead>
           <tbody>${rows(topRiskItems, (item) => [
             `<td>#${escapeHtml(item.label)}</td>`,
-            `<td>${escapeHtml(reportSafeLabel(item.documentName, uiLocalizationService.source("Document")))}</td>`,
+            `<td>${escapeHtml(reportPresentationService.safeLabel(item.documentName, uiLocalizationService.source("Document")))}</td>`,
             `<td>${escapeHtml(qualityCategoryName(item.category))}</td>`,
             `<td>${escapeHtml(qualityRiskLevelLabel(item.level))} ${item.score}</td>`,
             `<td>${escapeHtml(item.reasons.map((reason) => reason.label).slice(0, 3).join(" "))}</td>`
@@ -9053,11 +9023,11 @@ function qualityPassportHtml(data) {
       <section>
         <h2>${uiLocalizationService.sourceHtml("QA Evidence")}</h2>
         <h3>${uiLocalizationService.sourceHtml("By severity")}</h3>
-        ${reportCountTableHtml(data.qaBySeverity)}
+        ${reportPresentationService.countTableHtml(data.qaBySeverity)}
         <h3>${uiLocalizationService.sourceHtml("By type")}</h3>
-        ${reportCountTableHtml(data.qaByType)}
+        ${reportPresentationService.countTableHtml(data.qaByType)}
         <h3>${uiLocalizationService.sourceHtml("QA details")}</h3>
-        ${reportQaChecksTableHtml(data.qaChecks)}
+        ${reportPresentationService.qaChecksTableHtml(data.qaChecks)}
       </section>
       <section>
         <h2>${uiLocalizationService.sourceHtml("Review And AI Evidence")}</h2>
@@ -9070,7 +9040,7 @@ function qualityPassportHtml(data) {
           <div class="card"><strong>${data.termCount}</strong><span>${uiLocalizationService.sourceHtml("Linked terms")}</span></div>
         </div>
         <h3>${uiLocalizationService.sourceHtml("Review states")}</h3>
-        ${reportCountTableHtml(passport.reviewByState || {}, "No review states recorded.")}
+        ${reportPresentationService.countTableHtml(passport.reviewByState || {}, "No review states recorded.")}
       </section>
       <section>
         <h2>${uiLocalizationService.sourceHtml("Export Readiness")}</h2>
@@ -9079,11 +9049,11 @@ function qualityPassportHtml(data) {
           <div class="card"><strong>${validation.risky.length}</strong><span>${uiLocalizationService.sourceHtml("Risks")}</span></div>
           <div class="card"><strong>${validation.warnings.length}</strong><span>${uiLocalizationService.sourceHtml("Warnings")}</span></div>
         </div>
-        ${reportListHtml([...validation.errors, ...validation.risky, ...validation.warnings], "No export-readiness findings.")}
+        ${reportPresentationService.listHtml([...validation.errors, ...validation.risky, ...validation.warnings], "No export-readiness findings.")}
       </section>
       <section>
         <h2>${uiLocalizationService.sourceHtml("Effort Drivers")}</h2>
-        ${reportListHtml(effort.drivers || [], "No major post-editing drivers.")}
+        ${reportPresentationService.listHtml(effort.drivers || [], "No major post-editing drivers.")}
       </section>
       <footer>
         ${uiLocalizationService.sourceHtml("This passport contains quality settings, counts, risk signals, and readiness evidence. Segment text is not included.")}

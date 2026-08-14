@@ -7,6 +7,7 @@ const sourcePath = path.join(root, "i18n", "source.en-US.json");
 const indexPath = path.join(root, "index.html");
 const appPath = path.join(root, "app.js");
 const qaPath = path.join(root, "qa.js");
+const reportPresentationPath = path.join(root, "src", "reports", "report-presentation-service.js");
 
 function read(filePath) {
   return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : "";
@@ -112,7 +113,7 @@ function extractScript(messagesByText, filePath, sourceName) {
   lines.forEach((line, index) => {
     const location = `${sourceName}:${index + 1}`;
     const likelyUiLine =
-      /uiSource\(|uiLocalizationService\.(?:source|sourceHtml|confirm|alert)\(|reportText\(|reportHtml\(|textContent\s*=|innerHTML\s*=|setSaveStatus\(|setLocalAiStatus\(|window\.confirm\(|confirmExternalAiPromptShare\(|new Error\(|throw new Error\(|message:|fixHint:|label:|title:|aria-label|placeholder|button\.textContent|option\.textContent|return \{|\[/.test(
+      /uiSource\(|uiLocalizationService\.(?:source|sourceHtml|confirm|alert)\(|localization\.source(?:Html)?\(|reportText\(|reportHtml\(|textContent\s*=|innerHTML\s*=|setSaveStatus\(|setLocalAiStatus\(|window\.confirm\(|confirmExternalAiPromptShare\(|new Error\(|throw new Error\(|message:|fixHint:|label:|title:|aria-label|placeholder|button\.textContent|option\.textContent|return \{|\[/.test(
         line
       );
     if (!likelyUiLine) return;
@@ -140,6 +141,7 @@ function main() {
   extractHtml(messagesByText);
   extractScript(messagesByText, appPath, "app.js");
   extractScript(messagesByText, qaPath, "qa.js");
+  extractScript(messagesByText, reportPresentationPath, "src/reports/report-presentation-service.js");
 
   const existing = existingMessages();
   const existingByMessage = new Map(

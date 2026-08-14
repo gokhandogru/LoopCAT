@@ -329,6 +329,8 @@ const appStoreUnitTests = readText("tests/unit/app-store.test.cjs");
 const navigationControllerJs = readText("src/app/navigation-controller.js");
 const uiLocalizationServiceJs = readText("src/i18n/ui-localization-service.js");
 const uiLocalizationServiceUnitTests = readText("tests/unit/ui-localization-service.test.cjs");
+const reportPresentationServiceJs = readText("src/reports/report-presentation-service.js");
+const reportPresentationServiceUnitTests = readText("tests/unit/report-presentation-service.test.cjs");
 const i18nExtractScript = readText("scripts/i18n-extract.cjs");
 const i18nValidateScript = readText("scripts/i18n-validate.cjs");
 const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-registry.js");
@@ -530,6 +532,16 @@ assertIncludes(
   "createUiLocalizationService,",
   "The application runtime must expose the checked UI-localization factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createReportPresentationService } from "../reports/report-presentation-service.js";',
+  "The application runtime must install the checked report-presentation service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createReportPresentationService,",
+  "The application runtime must expose the checked report-presentation factory."
+);
 for (const snippet of [
   "const translate = (key, values = {})",
   "const source = (text, values = {})",
@@ -604,6 +616,77 @@ assertIncludes(
   "throwingDirection.direction()",
   "focused localization tests must characterize locale-direction delegate failures."
 );
+for (const snippet of [
+  "Object.entries(counts || {}).sort",
+  "qualityCategoryName(a).localeCompare(qualityCategoryName(b))",
+  ".slice(0, 50)",
+  'redactSensitiveText(value || "").trim() || fallback',
+  'localization.sourceHtml("No QA issues found.")',
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    reportPresentationServiceJs,
+    snippet,
+    `ReportPresentationService must retain characterized report policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createReportPresentationService({",
+  "app.js must compose the checked report-presentation service."
+);
+for (const boundary of [
+  "localization: uiLocalizationService",
+  "escapeHtml",
+  "redactSensitiveText",
+  "qualityCategoryName",
+  "qaCheckMessage",
+  "qaCheckFixHint"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `report-presentation composition must inject the ${boundary} boundary.`
+  );
+}
+for (const method of [
+  "listHtml",
+  "countTableHtml",
+  "qualityCategoryCountTableHtml",
+  "safeLabel",
+  "qaChecksTableHtml"
+]) {
+  assertIncludes(
+    appJs,
+    `reportPresentationService.${method}`,
+    `report generators must call ReportPresentationService.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "reportListHtml",
+  "reportCountTableHtml",
+  "qualityCategoryCountTableHtml",
+  "reportSafeLabel",
+  "reportQaChecksTableHtml"
+]) {
+  const directHelper = new RegExp(`(?:function\\s+${removedHelper}\\b|(?<!\\.)\\b${removedHelper}\\s*\\()`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} report-presentation helper must not return outside the checked service.`
+  );
+}
+for (const testName of [
+  "ReportPresentationService preserves escaped lists, localized empty states, and sorted count tables",
+  "ReportPresentationService sorts localized quality categories and preserves safe-label redaction fallbacks",
+  "ReportPresentationService preserves QA columns, fallbacks, escaping, and the 50-row bound",
+  "ReportPresentationService is immutable, validates every boundary, and propagates delegate failures"
+]) {
+  assertIncludes(
+    reportPresentationServiceUnitTests,
+    testName,
+    `focused report-presentation tests must retain characterization: ${testName}`
+  );
+}
 assertIncludes(
   appJs,
   "source: uiLocalizationService.source",
@@ -623,6 +706,16 @@ assertIncludes(
   i18nExtractScript,
   "uiLocalizationService\\.(?:source|sourceHtml|confirm|alert)",
   "source-catalog extraction must recognize direct UiLocalizationService source and dialog calls."
+);
+assertIncludes(
+  i18nExtractScript,
+  'extractScript(messagesByText, reportPresentationPath, "src/reports/report-presentation-service.js")',
+  "source-catalog extraction must scan checked report-presentation source calls."
+);
+assertIncludes(
+  i18nExtractScript,
+  "localization\\.source(?:Html)?",
+  "source-catalog extraction must recognize report-presentation localization calls."
 );
 assertIncludes(
   i18nValidateScript,
