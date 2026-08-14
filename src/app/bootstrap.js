@@ -93,6 +93,7 @@ import { createQualityDecisionController } from "../features/quality/quality-dec
 import { createReviewStateController } from "../features/quality/review-state-controller.js";
 import { createReviewMetadataController } from "../features/quality/review-metadata-controller.js";
 import { createRecoveryWorkspaceController } from "../features/workspace/recovery-workspace-controller.js";
+import { createDeliveryExportController } from "../features/import-export/delivery-export-controller.js";
 import { createImportExportController } from "../features/import-export/import-export-controller.js";
 import {
   asTrustedHtml,
@@ -202,6 +203,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createFilterStore,
       createFilterPresetController,
       createInspectorController,
+      createDeliveryExportController,
       createImportExportController,
       createReportDataService,
       createReportDocumentCompositionService,

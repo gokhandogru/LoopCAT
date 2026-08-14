@@ -419,7 +419,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     HTMLAnchorElement.prototype.click = function noopCaseInsensitiveTypeClick() {};
     window.confirm = () => true;
     try {
-      await exportLocalization();
+      await deliveryExportController.exportLocalization();
       assert(
         caseInsensitiveTypeDownloads.some((item) => item.type === "text/html") &&
           projectDocuments().find((item) => item.id === documentInfo.id)?.type === "html",
@@ -3118,7 +3118,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       format: "txt",
       terms: [{ sourceTerm: "Hello", targetTerm: "forbidden-report-term", isForbidden: true }]
     });
-    assert(!canRunDeliveryExport(forbiddenDeliveryReport) && forbiddenDeliveryReport.risky.some((item) => item.includes("forbidden terminology")), "delivery export gate blocks forbidden terminology");
+    assert(!deliveryExportController.canRun(forbiddenDeliveryReport) && forbiddenDeliveryReport.risky.some((item) => item.includes("forbidden terminology")), "delivery export gate blocks forbidden terminology");
     const emptyTargetDeliveryReport = validateExportReadiness({
       project: editorSessionStore.getProject(),
       segments: [{ ...editorSessionStore.getSegments()[segmentIndex], target: "" }],
@@ -3126,7 +3126,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       terms: []
     });
     assert(
-      canRunDeliveryExport(emptyTargetDeliveryReport) &&
+      deliveryExportController.canRun(emptyTargetDeliveryReport) &&
         emptyTargetDeliveryReport.warnings.some((item) => item.includes("will export source text")) &&
         emptyTargetDeliveryReport.exportSummary.sourceFallbackCount === 1,
       "delivery export gate permits empty target source fallback"
@@ -4363,15 +4363,15 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         renderProjectsView();
         renderResourcesView();
       }
-      await exportTargetText();
+      await deliveryExportController.exportTargetText();
       assert(els.saveStatus.textContent.startsWith("Target TXT exported") && statusDownloads.some((item) => item.type === "text/plain"), "target TXT export reports success");
-      await exportBilingualDocx();
+      await deliveryExportController.exportBilingualDocx();
       assert(els.saveStatus.textContent.startsWith("Bilingual DOCX exported") && statusDownloads.some((item) => item.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), "bilingual DOCX export reports success");
-      await exportLocalization();
+      await deliveryExportController.exportLocalization();
       assert(els.saveStatus.textContent.startsWith("Localization file exported") && statusDownloads.some((item) => item.type === "text/html"), "localization export reports success");
-      await exportXliff();
+      await deliveryExportController.exportXliff12();
       assert(els.saveStatus.textContent.startsWith("XLIFF exported") && statusDownloads.some((item) => item.type === "application/x-xliff+xml"), "XLIFF export reports success");
-      await exportXliff22();
+      await deliveryExportController.exportXliff22();
       assert(els.saveStatus.textContent.startsWith("XLIFF 2.2 exported") && statusDownloads.some((item) => item.type === "application/xliff+xml"), "XLIFF 2.2 export reports success with the registered MIME type");
       assert(
         statusConfirmMessages.every((message) => message.includes("incomplete translation work") && message.includes("Export anyway?")),
@@ -4435,7 +4435,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       const targetTxtDownloadCountBeforeActivityFailure = statusDownloads.filter((item) => item.type === "text/plain").length;
       setHiddenSegmentField(editorSessionStore.getProject(), EXPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
-      await exportTargetText();
+      await deliveryExportController.exportTargetText();
       assert(
         els.saveStatus.textContent.includes("Target TXT exported") &&
           els.saveStatus.textContent.includes("activity log failed") &&
@@ -4449,7 +4449,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       HTMLAnchorElement.prototype.click = function failingStatusDownloadClick() {
         throw new Error("Simulated download click failure");
       };
-      await exportTargetText();
+      await deliveryExportController.exportTargetText();
       assert(
         els.saveStatus.textContent.includes("Simulated download click failure") &&
           document.querySelectorAll("a[download]").length === temporaryDownloadLinksBeforeClickFailure &&
@@ -4462,9 +4462,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       URL.createObjectURL = () => {
         throw new Error("Simulated download failure");
       };
-      await exportTargetText();
+      await deliveryExportController.exportTargetText();
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "target TXT export failure reports visible status");
-      await exportXliff();
+      await deliveryExportController.exportXliff12();
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "XLIFF export failure reports visible status");
       await handleTmxExport();
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "project TMX export failure reports visible status");
@@ -6179,46 +6179,46 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     window.confirm = () => true;
     try {
       const wrongDocxSelectionDownloadCount = deliveryDownloads.length;
-      await exportTargetDocx();
+      await deliveryExportController.exportTargetDocx();
       assert(
         deliveryDownloads.length === wrongDocxSelectionDownloadCount &&
           els.saveStatus.textContent.includes("selected file is not a DOCX"),
         "DOCX export blocks non-DOCX selected document instead of silently exporting another file"
       );
-      await exportTargetText();
+      await deliveryExportController.exportTargetText();
       assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("protected placeholders")), "target TXT export blocks missing protected tags");
-      await exportLocalization();
+      await deliveryExportController.exportLocalization();
       assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("protected placeholders")), "delivery export blocks missing protected tags");
       editorSessionStore.getSegments()[taggedIndex].target = "Bu <strong>etiketi</strong></strong> koru.";
       editorSessionStore.getSegments()[taggedIndex].status = "draft";
       touchSegment(editorSessionStore.getSegments()[taggedIndex]);
       await saveSegment(editorSessionStore.getSegments()[taggedIndex]);
-      await exportLocalization();
+      await deliveryExportController.exportLocalization();
       assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("unbalanced inline markup")), "delivery export blocks unbalanced inline markup");
       editorSessionStore.getSegments()[taggedIndex].target = 'Bu <strong>etiketi</strong> koru. <img src="x" onerror="alert(1)">';
       editorSessionStore.getSegments()[taggedIndex].status = "draft";
       touchSegment(editorSessionStore.getSegments()[taggedIndex]);
       await saveSegment(editorSessionStore.getSegments()[taggedIndex]);
-      await exportLocalization();
+      await deliveryExportController.exportLocalization();
       assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("unsafe HTML markup")), "HTML delivery export blocks unsafe target markup");
       editorSessionStore.getSegments()[taggedIndex].target = 'Bu <strong>etiketi</strong> koru. <span style="background:url(javascript:alert(1))">stil</span>';
       touchSegment(editorSessionStore.getSegments()[taggedIndex]);
       await saveSegment(editorSessionStore.getSegments()[taggedIndex]);
-      await exportLocalization();
+      await deliveryExportController.exportLocalization();
       assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("unsafe HTML markup")), "HTML delivery export blocks scriptable style markup");
       editorSessionStore.getSegments()[taggedIndex].target = "Bu <strong>etiketi</strong> koru.";
       editorSessionStore.getSegments()[taggedIndex].status = "draft";
       touchSegment(editorSessionStore.getSegments()[taggedIndex]);
       await saveSegment(editorSessionStore.getSegments()[taggedIndex]);
-      await exportLocalization();
+      await deliveryExportController.exportLocalization();
       assert(deliveryDownloads.some((item) => item.type === "text/html"), "delivery export runs after protected tags are restored");
       const beforeXmlInvalidDownloadCount = deliveryDownloads.length;
       editorSessionStore.getSegments()[taggedIndex].target = `Bu <strong>etiketi</strong> koru.${String.fromCharCode(0x0b)}`;
       touchSegment(editorSessionStore.getSegments()[taggedIndex]);
       await saveSegment(editorSessionStore.getSegments()[taggedIndex]);
-      await exportBilingualDocx();
+      await deliveryExportController.exportBilingualDocx();
       assert(deliveryDownloads.length === beforeXmlInvalidDownloadCount && els.saveStatus.textContent.includes("Bilingual DOCX blocked"), "bilingual DOCX export blocks XML-invalid target characters");
-      await exportXliff();
+      await deliveryExportController.exportXliff12();
       assert(deliveryDownloads.length === beforeXmlInvalidDownloadCount && state.lastValidationReport?.risky?.some((item) => item.includes("XML-invalid characters")), "XLIFF export blocks XML-invalid target characters");
       editorSessionStore.getSegments()[taggedIndex].target = "Bu <strong>etiketi</strong> koru.";
       touchSegment(editorSessionStore.getSegments()[taggedIndex]);
@@ -6272,12 +6272,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     HTMLAnchorElement.prototype.click = function noopDuplicateDeliveryClick() {};
     window.confirm = () => true;
     try {
-      await exportLocalization();
+      await deliveryExportController.exportLocalization();
       assert(!duplicateDeliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("protected placeholders")), "delivery export blocks incomplete duplicate protected tags");
       editorSessionStore.getSegments()[duplicateTaggedIndex].target = "<strong>Bir</strong> ve <strong>iki</strong>";
       touchSegment(editorSessionStore.getSegments()[duplicateTaggedIndex]);
       await saveSegment(editorSessionStore.getSegments()[duplicateTaggedIndex]);
-      await exportLocalization();
+      await deliveryExportController.exportLocalization();
       assert(duplicateDeliveryDownloads.some((item) => item.type === "text/html"), "delivery export runs after duplicate protected tags are restored");
     } finally {
       URL.createObjectURL = originalDuplicateCreateObjectUrl;
@@ -6314,8 +6314,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     };
     window.confirm = () => true;
     try {
-      await exportTargetText();
-      await exportXliff();
+      await deliveryExportController.exportTargetText();
+      await deliveryExportController.exportXliff12();
       const scopedTxtDownload = scopedExportDownloads.find((item) => item.type === "text/plain");
       const scopedXliffDownload = scopedExportDownloads.find((item) => item.type === "application/x-xliff+xml");
       const scopedTxt = await scopedTxtDownload?.blob.text();
@@ -6348,7 +6348,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         partialExportPrompts.push(String(message || ""));
         return false;
       };
-      await exportLocalization();
+      await deliveryExportController.exportLocalization();
       assert(
         scopedExportDownloads.length === downloadsBeforeCancelledExport &&
           (await listActivityEvents(project.id)).length === activityBeforeCancelledExport &&
@@ -6361,7 +6361,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         partialExportPrompts.push(String(message || ""));
         return true;
       };
-      await exportLocalization();
+      await deliveryExportController.exportLocalization();
       const partialHtmlDownload = scopedExportDownloads.filter((item) => item.type === "text/html").at(-1);
       const partialHtml = await partialHtmlDownload?.blob.text();
       const activityAfterFallbackExport = await listActivityEvents(project.id);
@@ -6376,7 +6376,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "incomplete localization export uses source fallback without mutating editor state"
       );
 
-      await exportXliff();
+      await deliveryExportController.exportXliff12();
       const partialXliffDownload = scopedExportDownloads.filter((item) => item.type === "application/x-xliff+xml").at(-1);
       const partialXliff = await partialXliffDownload?.blob.text();
       const parsedPartialXliff = xliffApi.parseXliffText(partialXliff, "partial.xlf");
@@ -6414,7 +6414,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       applicationNavigation.selectDocument({ documentId: "" });
       renderDocumentFilter();
       clearWorkspaceDirtyMarkers();
-      await exportXliff();
+      await deliveryExportController.exportXliff12();
       const activityAfterDeliveryExport = await listActivityEvents(project.id);
       assert(
         deliveryActivityDownloads.some((item) => item.type === "application/x-xliff+xml") &&

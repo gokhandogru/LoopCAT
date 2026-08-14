@@ -478,6 +478,8 @@ const recoveryWorkspaceControllerJs = readText("src/features/workspace/recovery-
 const recoveryWorkspaceControllerUnitTests = readText("tests/unit/recovery-workspace-controller.test.cjs");
 const importExportControllerJs = readText("src/features/import-export/import-export-controller.js");
 const importExportControllerUnitTests = readText("tests/unit/import-export-controller.test.cjs");
+const deliveryExportControllerJs = readText("src/features/import-export/delivery-export-controller.js");
+const deliveryExportControllerUnitTests = readText("tests/unit/delivery-export-controller.test.cjs");
 const resourcesControllerJs = readText("src/features/resources/resources-controller.js");
 const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
 const resourceTrashUnitTests = readText("tests/unit/resource-trash.test.cjs");
@@ -577,6 +579,16 @@ assertIncludes(
   appBootstrapJs,
   "createReportExportController,",
   "The application runtime must expose the checked report-export factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createDeliveryExportController } from "../features/import-export/delivery-export-controller.js";',
+  "The application runtime must install the checked delivery-export controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createDeliveryExportController,",
+  "The application runtime must expose the checked delivery-export factory."
 );
 for (const snippet of [
   "const translate = (key, values = {})",
@@ -930,6 +942,120 @@ assertIncludes(
   i18nExtractScript,
   'extractScript(messagesByText, reportExportControllerPath, "src/reports/report-export-controller.js")',
   "source-catalog extraction must scan the checked report-export controller."
+);
+for (const snippet of [
+  "await autosave.flush();",
+  "function selectedDocumentForTypes",
+  "function scopedSegments",
+  "function canRun(report)",
+  "function confirmIncomplete",
+  "formats.buildTargetDocx",
+  "qa.worker?.runQaChecks",
+  "formats.buildBilingualDocx",
+  "formats.xliffDocumentTypes.has(documentType)",
+  "formats.buildLocalizationFile",
+  "formats.buildXliff22",
+  "formats.buildXliff12",
+  "activity.logOptionalProject",
+  "status.appendActivityWarning",
+  "status.exportMode",
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    deliveryExportControllerJs,
+    snippet,
+    `DeliveryExportController must retain characterized export policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createDeliveryExportController({",
+  "app.js must compose the checked delivery-export controller."
+);
+for (const boundary of [
+  "getDocumentId: () => applicationStore.getState().navigation.documentId",
+  "autosave: autosaveService",
+  "documents: { list: projectDocuments, type: projectDocumentType }",
+  "listForValidation: projectTermsForValidation",
+  "plan: planDeliveryExport",
+  "validate: validateExportReadiness",
+  "source: uiLocalizationService.source",
+  "confirm: (message) => window.confirm(message)",
+  "worker: workerClient",
+  "run: runQaChecks",
+  "buildTargetDocx",
+  "buildBilingualDocx",
+  "buildTargetXliff",
+  "buildLocalizationFile",
+  "buildXliff12: buildXliff",
+  "buildXliff22",
+  "localizationMimeType: localizationDownloadMimeType",
+  "xliffMimeType",
+  "logOptionalProject: logOptionalProjectActivity",
+  "set: setSaveStatus"
+]) {
+  assertIncludes(appJs, boundary, `delivery-export composition must inject the ${boundary} boundary.`);
+}
+for (const method of [
+  "canRun",
+  "exportTargetText",
+  "exportTargetDocx",
+  "exportBilingualDocx",
+  "exportLocalization",
+  "exportXliff12",
+  "exportXliff22"
+]) {
+  const source = method === "canRun" ? appWorkflowDriverJs : `${appJs}\n${appWorkflowDriverJs}`;
+  assertIncludes(
+    source,
+    `deliveryExportController.${method}`,
+    `delivery-export consumers must call DeliveryExportController.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "exportDocumentForTypes",
+  "deliveryExportScope",
+  "scopedExportBaseName",
+  "addScopedExportReportNote",
+  "canRunDeliveryExport",
+  "canRunBilingualDocxExport",
+  "exportPlanActivityDetail",
+  "exportPlanHasWarnings",
+  "incompleteExportScopeLabel",
+  "confirmIncompleteExport",
+  "incompleteExportMessage",
+  "cancelIncompleteExport",
+  "exportTargetText",
+  "exportTargetDocx",
+  "exportBilingualDocx",
+  "exportLocalization",
+  "exportXliff",
+  "exportXliff22"
+]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} delivery-export orchestration must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "DeliveryExportController preserves scoped Target TXT planning, confirmation, filename, activity, and warning status",
+  "DeliveryExportController preserves selected DOCX structure, async builder, exact download, and type rejection",
+  "DeliveryExportController preserves project-wide bilingual validation, worker/fallback QA, session refresh, and notes",
+  "DeliveryExportController preserves Other formats normalization, structures, builders, extensions, and MIME types",
+  "DeliveryExportController preserves scoped XLIFF 1.2 and 2.2 projects, builders, versions, downloads, and activity",
+  "DeliveryExportController preserves no-project, blocked, canceled, immutable, and primary-failure behavior"
+]) {
+  assertIncludes(
+    deliveryExportControllerUnitTests,
+    testName,
+    `focused delivery-export tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/import-export/delivery-export-controller.js"',
+  "source-catalog extraction must scan the checked delivery-export controller."
 );
 assertIncludes(
   appJs,
@@ -5350,9 +5476,9 @@ assertIncludes(
   "app workflow test must verify workspace sync warning labels and read errors are redacted before display."
 );
 assertIncludes(
-  appJs,
-  "function deliveryExportScope",
-  "app.js must keep TXT/XLIFF delivery exports scoped to the selected document when one is selected."
+  deliveryExportControllerJs,
+  "function scopedSegments",
+  "the checked delivery-export controller must keep TXT/XLIFF exports scoped to the selected document."
 );
 assertIncludes(
   appJs,
@@ -8540,9 +8666,9 @@ assertIncludes(
   "app workflow test must verify successful exports are not reported failed when optional activity logging fails."
 );
 assertIncludes(
-  appJs,
-  "function exportDocumentForTypes",
-  "app.js must route delivery exports through strict selected-document handling."
+  deliveryExportControllerJs,
+  "function selectedDocumentForTypes",
+  "the checked delivery-export controller must enforce strict selected-document handling."
 );
 assertIncludes(
   appJs,
@@ -10857,14 +10983,14 @@ assertIncludes(
   "app workflow tests must verify final delivery exports permit source fallback for untranslated segments."
 );
 assertIncludes(
-  appJs,
-  "function confirmIncompleteExport",
-  "app.js must require confirmation before incomplete delivery exports."
+  deliveryExportControllerJs,
+  "function confirmIncomplete",
+  "the checked delivery-export controller must require confirmation before incomplete exports."
 );
 assertIncludes(
-  appJs,
+  deliveryExportControllerJs,
   "Export cancelled; no file was created.",
-  "app.js must report cancelled incomplete exports without claiming success."
+  "the checked delivery-export controller must report canceled exports without claiming success."
 );
 assertIncludes(
   validationJs,
@@ -11166,16 +11292,20 @@ assertIncludes(
   "smoke-test.html must verify XLIFF target reconstruction rejects missing source data."
 );
 assertIncludes(
-  appJs,
+  deliveryExportControllerJs,
   "sourceFallbackCount",
-  "app.js must report source fallbacks for incomplete monolingual delivery exports."
+  "the checked delivery-export controller must report source fallbacks for incomplete monolingual exports."
 );
 assertIncludes(
-  appJs,
+  deliveryExportControllerJs,
   "preservedEmptyTargetCount",
-  "app.js must report preserved empty targets for incomplete interchange exports."
+  "the checked delivery-export controller must report preserved empty targets for interchange exports."
 );
-assertIncludes(appJs, "draftTargetCount", "app.js must report non-empty unconfirmed targets without replacing them.");
+assertIncludes(
+  deliveryExportControllerJs,
+  "draftTargetCount",
+  "the checked delivery-export controller must report non-empty unconfirmed targets without replacing them."
+);
 assertIncludes(
   docxJs,
   "function targetFor(segment, fallbackToSource = false)",

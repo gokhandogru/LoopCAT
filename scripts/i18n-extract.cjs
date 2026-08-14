@@ -7,6 +7,13 @@ const sourcePath = path.join(root, "i18n", "source.en-US.json");
 const indexPath = path.join(root, "index.html");
 const appPath = path.join(root, "app.js");
 const qaPath = path.join(root, "qa.js");
+const deliveryExportControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "import-export",
+  "delivery-export-controller.js"
+);
 const reportPresentationPath = path.join(root, "src", "reports", "report-presentation-service.js");
 const reportDocumentCompositionPath = path.join(root, "src", "reports", "report-document-composition-service.js");
 const reportExportControllerPath = path.join(root, "src", "reports", "report-export-controller.js");
@@ -143,6 +150,11 @@ function main() {
   extractHtml(messagesByText);
   extractScript(messagesByText, appPath, "app.js");
   extractScript(messagesByText, qaPath, "qa.js");
+  extractScript(
+    messagesByText,
+    deliveryExportControllerPath,
+    "src/features/import-export/delivery-export-controller.js"
+  );
   extractScript(messagesByText, reportPresentationPath, "src/reports/report-presentation-service.js");
   extractScript(messagesByText, reportDocumentCompositionPath, "src/reports/report-document-composition-service.js");
   extractScript(messagesByText, reportExportControllerPath, "src/reports/report-export-controller.js");

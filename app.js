@@ -1321,6 +1321,58 @@ const reportExportController = appRuntime.featureFactories.createReportExportCon
     set: setSaveStatus
   }
 });
+const deliveryExportController = appRuntime.featureFactories.createDeliveryExportController({
+  session: {
+    getProject: editorSessionStore.getProject,
+    getSegments: editorSessionStore.getSegments,
+    replaceQaChecks: editorSessionStore.replaceQaChecks
+  },
+  application: {
+    getDocumentId: () => applicationStore.getState().navigation.documentId,
+    clearQaFilter: () => {
+      state.qaFilter = "";
+    }
+  },
+  autosave: autosaveService,
+  documents: { list: projectDocuments, type: projectDocumentType },
+  terms: { listForValidation: projectTermsForValidation },
+  delivery: {
+    plan: planDeliveryExport,
+    validate: validateExportReadiness,
+    reportCount,
+    reportSummary
+  },
+  localization: { source: uiLocalizationService.source },
+  confirm: (message) => window.confirm(message),
+  displaySafeText,
+  qa: {
+    worker: workerClient,
+    run: runQaChecks,
+    tagsForSegment: segmentTags,
+    missingTags
+  },
+  formats: {
+    localizationTypes: LOCALIZATION_EXPORT_TYPES,
+    xliffDocumentTypes: XLIFF_DOCUMENT_TYPES,
+    buildTargetDocx,
+    buildBilingualDocx,
+    buildTargetXliff,
+    buildLocalizationFile,
+    buildXliff12: buildXliff,
+    buildXliff22,
+    localizationMimeType: localizationDownloadMimeType,
+    xliffMimeType
+  },
+  fileSafeName,
+  download,
+  presentation: { renderValidationReport, renderQaResults },
+  activity: { logOptionalProject: logOptionalProjectActivity },
+  status: {
+    appendActivityWarning,
+    exportMode: exportStatusMode,
+    set: setSaveStatus
+  }
+});
 const segmentConfirmationController = appRuntime.featureFactories.createSegmentConfirmationController({
   element: els.confirmBtn,
   editorSessionStore,
@@ -3040,12 +3092,12 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
   importTbx: handleTbxImport,
   importTermList: handleTermListImport,
   exportProjectPackage,
-  exportTargetDocx,
-  exportBilingualDocx,
-  exportTargetText,
-  exportLocalization,
-  exportXliff12: () => exportXliff(),
-  exportXliff22,
+  exportTargetDocx: deliveryExportController.exportTargetDocx,
+  exportBilingualDocx: deliveryExportController.exportBilingualDocx,
+  exportTargetText: deliveryExportController.exportTargetText,
+  exportLocalization: deliveryExportController.exportLocalization,
+  exportXliff12: deliveryExportController.exportXliff12,
+  exportXliff22: deliveryExportController.exportXliff22,
   exportProjectReport: reportExportController.exportProjectReport,
   exportQualityPassport: reportExportController.exportQualityPassport,
   exportAnonymizedReport: reportExportController.exportAnonymizedReport,
@@ -4584,19 +4636,6 @@ function projectDocumentType(documentInfo) {
   return stableLower(documentInfo?.type || "");
 }
 
-function exportDocumentForTypes(supportedTypes, selectedTypeMessage, missingMessage) {
-  const docs = projectDocuments();
-  const selected = applicationStore.getState().navigation.documentId ? docs.find((item) => item.id === applicationStore.getState().navigation.documentId) : null;
-  if (selected) {
-    if (supportedTypes.has(projectDocumentType(selected))) return selected;
-    setSaveStatus(selectedTypeMessage, "dirty");
-    return null;
-  }
-  const documentInfo = docs.find((item) => supportedTypes.has(projectDocumentType(item)));
-  if (!documentInfo) setSaveStatus(missingMessage, "dirty");
-  return documentInfo || null;
-}
-
 function documentSegments(documentId) {
   return editorSessionStore.getSegments().filter((segment) => segment.documentId === documentId);
 }
@@ -4659,23 +4698,6 @@ function currentDocumentSegments() {
 function currentSelectedDocument() {
   if (!applicationStore.getState().navigation.documentId) return null;
   return projectDocuments().find((documentInfo) => documentInfo.id === applicationStore.getState().navigation.documentId) || null;
-}
-
-function deliveryExportScope() {
-  const documentInfo = currentSelectedDocument();
-  return {
-    documentInfo,
-    segments: documentInfo ? editorSessionStore.getSegments().filter((segment) => segment.documentId === documentInfo.id) : editorSessionStore.getSegments()
-  };
-}
-
-function scopedExportBaseName(baseName, documentInfo) {
-  const base = fileSafeName(baseName || editorSessionStore.getProject()?.name || "project");
-  return documentInfo ? `${base}_${fileSafeName(documentInfo.name || "current-file")}` : base;
-}
-
-function addScopedExportReportNote(report, documentInfo, label) {
-  if (report?.preserved && documentInfo) report.preserved.push(`${displaySafeText(documentInfo.name || "Current file")} selected for ${label} export.`);
 }
 
 function displayLanguageName(code) {
@@ -5032,74 +5054,6 @@ function replaceOutsideProtectedTokens(text, findText, replacement, options = {}
 
 function hasTagIssue(segment) {
   return Boolean((segment.target || "").trim() && missingTags(segment).length);
-}
-
-function canRunDeliveryExport(report) {
-  if (!report?.ok || report?.canExport === false) {
-    if (report?.ok) setSaveStatus("Export blocked: review the validation report.", "dirty");
-    else setSaveStatus(reportSummary(report), "dirty");
-    return false;
-  }
-  return true;
-}
-
-function canRunBilingualDocxExport(report) {
-  if (!report?.ok || report?.canExport === false) {
-    if (report?.ok) setSaveStatus("Bilingual DOCX blocked: review the validation report.", "dirty");
-    else setSaveStatus(reportSummary(report), "dirty");
-    return false;
-  }
-  return true;
-}
-
-function exportPlanActivityDetail(plan) {
-  return {
-    emptyTargetPolicy: plan.policy,
-    emptyTargetCount: plan.emptyTargetCount,
-    sourceFallbackCount: plan.sourceFallbackCount,
-    preservedEmptyTargetCount: plan.preservedEmptyTargetCount,
-    draftTargetCount: plan.draftTargetCount
-  };
-}
-
-function exportPlanHasWarnings(plan) {
-  return Boolean(plan.emptyTargetCount || plan.draftTargetCount);
-}
-
-function incompleteExportScopeLabel(documentInfo, fallbackLabel) {
-  return documentInfo?.name ? displaySafeText(documentInfo.name) : fallbackLabel;
-}
-
-function confirmIncompleteExport(plan, documentInfo, fallbackLabel) {
-  if (!plan.requiresConfirmation) return true;
-  const lines = [
-    uiLocalizationService.source("The export scope {value1} contains incomplete translation work.", {
-      value1: incompleteExportScopeLabel(documentInfo, fallbackLabel)
-    })
-  ];
-  if (plan.sourceFallbackCount) {
-    lines.push(uiLocalizationService.source("{value1} empty target segment(s) will export source text.", { value1: plan.sourceFallbackCount }));
-  }
-  if (plan.preservedEmptyTargetCount) {
-    lines.push(uiLocalizationService.source("{value1} empty target segment(s) will remain empty in the exported interchange file.", { value1: plan.preservedEmptyTargetCount }));
-  }
-  if (plan.draftTargetCount) {
-    lines.push(uiLocalizationService.source("{value1} non-empty unconfirmed target segment(s) will export as written.", { value1: plan.draftTargetCount }));
-  }
-  lines.push(uiLocalizationService.source("Export anyway?"));
-  return window.confirm(lines.join("\n\n"));
-}
-
-function incompleteExportMessage(baseMessage, plan) {
-  const notes = [];
-  if (plan.sourceFallbackCount) notes.push(`${plan.sourceFallbackCount} source fallback${plan.sourceFallbackCount === 1 ? "" : "s"}`);
-  if (plan.preservedEmptyTargetCount) notes.push(`${plan.preservedEmptyTargetCount} empty target${plan.preservedEmptyTargetCount === 1 ? "" : "s"}`);
-  if (plan.draftTargetCount) notes.push(`${plan.draftTargetCount} unconfirmed target${plan.draftTargetCount === 1 ? "" : "s"}`);
-  return notes.length ? `${baseMessage} with ${notes.join(" and ")}` : baseMessage;
-}
-
-function cancelIncompleteExport() {
-  setSaveStatus("Export cancelled; no file was created.", "dirty");
 }
 
 function reviewLabel(value) {
@@ -8731,188 +8685,6 @@ async function repairWorkspaceLinks() {
   renderValidationReport(report);
   renderWorkspaceStatus();
   setSaveStatus(report.ok ? "Workspace health checked" : "Workspace needs attention", report.ok ? "saved" : "dirty");
-}
-
-async function exportTargetText() {
-  if (!editorSessionStore.getProject()) return;
-  try {
-    await autosaveService.flush();
-    const { documentInfo, segments } = deliveryExportScope();
-    const exportPlan = planDeliveryExport({ format: "txt", documentInfo, segments });
-    const report = validateExportReadiness({ project: editorSessionStore.getProject(), segments, format: "txt", terms: await projectTermsForValidation(), exportPlan });
-    addScopedExportReportNote(report, documentInfo, "Target TXT");
-    renderValidationReport(report);
-    if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, documentInfo, editorSessionStore.getProject().name || "project")) {
-      cancelIncompleteExport();
-      return;
-    }
-    const content = exportPlan.segments
-      .map((segment) => segment.target.trim())
-      .join("\n\n");
-    const base = scopedExportBaseName(editorSessionStore.getProject().name || "project", documentInfo);
-    download(`${base}_${editorSessionStore.getProject().targetLang}.txt`, content, "text/plain");
-    const activityLogged = await logOptionalProjectActivity("export", "Target TXT exported", {
-      documentId: documentInfo?.id || "",
-      fileName: documentInfo?.name || "",
-      segmentCount: segments.length,
-      ...exportPlanActivityDetail(exportPlan)
-    }, "Target TXT export");
-    const message = incompleteExportMessage("Target TXT exported", exportPlan);
-    setSaveStatus(appendActivityWarning(message, activityLogged), exportStatusMode(exportPlanHasWarnings(exportPlan) ? "dirty" : "saved", activityLogged));
-  } catch (error) {
-    setSaveStatus(error.message || "Target TXT export failed", "dirty");
-  }
-}
-
-async function exportTargetDocx() {
-  if (!editorSessionStore.getProject()) return;
-  try {
-    await autosaveService.flush();
-    const documentInfo = exportDocumentForTypes(new Set(["docx"]), "The selected file is not a DOCX document.", "Select a DOCX document to export.");
-    if (!documentInfo) return;
-    const segments = editorSessionStore.getSegments().filter((segment) => segment.documentId === documentInfo.id);
-    const exportPlan = planDeliveryExport({ format: "docx", documentInfo, segments });
-    const report = validateExportReadiness({ project: editorSessionStore.getProject(), segments, documentInfo, format: "docx", terms: await projectTermsForValidation(), exportPlan });
-    renderValidationReport(report);
-    if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, documentInfo, editorSessionStore.getProject().name || "project")) {
-      cancelIncompleteExport();
-      return;
-    }
-    const docxStructure = editorSessionStore.getProject().docxStructures?.[documentInfo.id] || editorSessionStore.getProject().docxStructure;
-    const base = fileSafeName(editorSessionStore.getProject().name || "project");
-    const bytes = await buildTargetDocx({ ...editorSessionStore.getProject(), docxStructure }, exportPlan.segments);
-    download(`${base}_${fileSafeName(documentInfo.name)}_${editorSessionStore.getProject().targetLang}.docx`, bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    const activityLogged = await logOptionalProjectActivity("export", "Target DOCX exported", {
-      documentId: documentInfo.id,
-      fileName: documentInfo.name,
-      segmentCount: segments.length,
-      ...exportPlanActivityDetail(exportPlan)
-    }, "Target DOCX export");
-    const message = incompleteExportMessage("DOCX exported", exportPlan);
-    setSaveStatus(appendActivityWarning(message, activityLogged), exportStatusMode(exportPlanHasWarnings(exportPlan) ? "dirty" : "saved", activityLogged));
-  } catch (error) {
-    setSaveStatus(error.message || "DOCX export failed", "dirty");
-  }
-}
-
-async function exportBilingualDocx() {
-  if (!editorSessionStore.getProject()) return;
-  try {
-    await autosaveService.flush();
-    const terms = await projectTermsForValidation();
-    const report = validateExportReadiness({ project: editorSessionStore.getProject(), segments: editorSessionStore.getSegments(), format: "bilingual-docx", terms });
-    renderValidationReport(report);
-    if (!canRunBilingualDocxExport(report)) return;
-    const qaSegments = editorSessionStore.getSegments().map((segment) => ({
-      ...segment,
-      tags: segmentTags(segment)
-    }));
-    const fallback = () => Promise.resolve(runQaChecks(editorSessionStore.getSegments(), terms, { missingTags }));
-    const qaChecks = workerClient?.runQaChecks
-      ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
-      : await fallback();
-    editorSessionStore.replaceQaChecks(qaChecks);
-    state.qaFilter = "";
-    renderQaResults();
-    const base = fileSafeName(editorSessionStore.getProject().name || "project");
-    const bytes = buildBilingualDocx(editorSessionStore.getProject(), editorSessionStore.getSegments(), { qaChecks });
-    download(`${base}_bilingual.docx`, bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    const activityLogged = await logOptionalProjectActivity("export", "Bilingual DOCX exported", { segmentCount: editorSessionStore.getSegments().length, qaIssueCount: qaChecks.length, validationNoteCount: reportCount(report) }, "Bilingual DOCX export");
-    const message = reportCount(report) || qaChecks.length ? "Bilingual DOCX exported with notes" : "Bilingual DOCX exported";
-    setSaveStatus(appendActivityWarning(message, activityLogged), exportStatusMode(reportCount(report) || qaChecks.length ? "dirty" : "saved", activityLogged));
-  } catch (error) {
-    setSaveStatus(error.message || "Bilingual DOCX export failed", "dirty");
-  }
-}
-
-async function exportLocalization() {
-  try {
-    if (!editorSessionStore.getProject()) return;
-    await autosaveService.flush();
-    const documentInfo = exportDocumentForTypes(
-      LOCALIZATION_EXPORT_TYPES,
-      "The selected file is not exportable from Other formats.",
-      "Select a document from Other formats to export."
-    );
-    if (!documentInfo) return;
-    const documentType = projectDocumentType(documentInfo);
-    const exportDocumentInfo = { ...documentInfo, type: documentType };
-    const segments = editorSessionStore.getSegments().filter((segment) => segment.documentId === documentInfo.id);
-    const structure = editorSessionStore.getProject().localizationStructures?.[documentInfo.id];
-    const exportPlan = planDeliveryExport({ format: documentType, documentInfo: exportDocumentInfo, structure, segments });
-    const report = validateExportReadiness({
-      project: editorSessionStore.getProject(),
-      segments,
-      documentInfo: exportDocumentInfo,
-      format: documentType,
-      terms: await projectTermsForValidation(),
-      exportPlan,
-      structure
-    });
-    renderValidationReport(report);
-    if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, exportDocumentInfo, editorSessionStore.getProject().name || "project")) {
-      cancelIncompleteExport();
-      return;
-    }
-    const content = XLIFF_DOCUMENT_TYPES.has(documentType)
-      ? buildTargetXliff(editorSessionStore.getProject(), exportPlan.segments, structure)
-      : await buildLocalizationFile(documentType, exportPlan.segments, structure);
-    const ext = documentType === "yml" ? "yaml" : documentType === "markdown" ? "md" : documentType;
-    const type = localizationDownloadMimeType(ext, structure);
-    download(`${fileSafeName(documentInfo.name)}_${editorSessionStore.getProject().targetLang}.${ext}`, content, type);
-    const activityLogged = await logOptionalProjectActivity("export", "Localization file exported", {
-      documentId: documentInfo.id,
-      documentType,
-      segmentCount: segments.length,
-      ...exportPlanActivityDetail(exportPlan)
-    }, "Localization export");
-    const message = incompleteExportMessage("Localization file exported", exportPlan);
-    setSaveStatus(appendActivityWarning(message, activityLogged), exportStatusMode(exportPlanHasWarnings(exportPlan) ? "dirty" : "saved", activityLogged));
-  } catch (error) {
-    setSaveStatus(error.message || "Localization export failed", "dirty");
-  }
-}
-
-async function exportXliff(version = "1.2") {
-  if (!editorSessionStore.getProject()) return;
-  try {
-    await autosaveService.flush();
-    const { documentInfo, segments } = deliveryExportScope();
-    const exportPlan = planDeliveryExport({ format: "xliff", documentInfo, segments });
-    const report = validateExportReadiness({ project: editorSessionStore.getProject(), segments, format: "xliff", terms: await projectTermsForValidation(), exportPlan });
-    addScopedExportReportNote(report, documentInfo, "XLIFF");
-    renderValidationReport(report);
-    if (!canRunDeliveryExport(report)) return;
-    if (!confirmIncompleteExport(exportPlan, documentInfo, editorSessionStore.getProject().name || "project")) {
-      cancelIncompleteExport();
-      return;
-    }
-    const base = scopedExportBaseName(editorSessionStore.getProject().name || "project", documentInfo);
-    const exportProject = documentInfo ? { ...editorSessionStore.getProject(), sourceFileName: documentInfo.name } : editorSessionStore.getProject();
-    const isXliff22 = version === "2.2";
-    const content = isXliff22 ? buildXliff22(exportProject, exportPlan.segments) : buildXliff(exportProject, exportPlan.segments);
-    const label = isXliff22 ? "XLIFF 2.2" : "XLIFF";
-    const exportedMessage = isXliff22 ? "XLIFF 2.2 exported" : "XLIFF exported";
-    download(`${base}_${editorSessionStore.getProject().sourceLang}-${editorSessionStore.getProject().targetLang}.xlf`, content, xliffMimeType(version));
-    const activityLogged = await logOptionalProjectActivity("export", exportedMessage, {
-      documentId: documentInfo?.id || "",
-      fileName: documentInfo?.name || "",
-      segmentCount: segments.length,
-      xliffVersion: version,
-      ...exportPlanActivityDetail(exportPlan)
-    }, `${label} export`);
-    const message = incompleteExportMessage(exportedMessage, exportPlan);
-    setSaveStatus(appendActivityWarning(message, activityLogged), exportStatusMode(exportPlanHasWarnings(exportPlan) ? "dirty" : "saved", activityLogged));
-  } catch (error) {
-    setSaveStatus(error.message || (version === "2.2" ? "XLIFF 2.2 export failed" : "XLIFF export failed"), "dirty");
-  }
-}
-
-async function exportXliff22() {
-  return exportXliff("2.2");
 }
 
 async function handleTmxImport(file) {
