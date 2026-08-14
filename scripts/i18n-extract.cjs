@@ -21,6 +21,13 @@ const projectResourceTransferControllerPath = path.join(
   "import-export",
   "project-resource-transfer-controller.js"
 );
+const resourceLibraryImportControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "resources",
+  "resource-library-import-controller.js"
+);
 const reportPresentationPath = path.join(root, "src", "reports", "report-presentation-service.js");
 const reportDocumentCompositionPath = path.join(root, "src", "reports", "report-document-composition-service.js");
 const reportExportControllerPath = path.join(root, "src", "reports", "report-export-controller.js");
@@ -166,6 +173,11 @@ function main() {
     messagesByText,
     projectResourceTransferControllerPath,
     "src/features/import-export/project-resource-transfer-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    resourceLibraryImportControllerPath,
+    "src/features/resources/resource-library-import-controller.js"
   );
   extractScript(messagesByText, reportPresentationPath, "src/reports/report-presentation-service.js");
   extractScript(messagesByText, reportDocumentCompositionPath, "src/reports/report-document-composition-service.js");

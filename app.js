@@ -3225,6 +3225,40 @@ const opusCatHelpController = appRuntime?.featureFactories?.createOpusCatHelpCon
   onError: (error) => setSaveStatus(error?.message || "OPUS-CAT connection help could not complete the action.", "dirty")
 });
 opusCatHelpController?.mount?.();
+const resourceLibraryImportController =
+  appRuntime.featureFactories.createResourceLibraryImportController({
+    forms: {
+      tmName: () => els.tmResourceNameInput.value,
+      tbName: () => els.tbResourceNameInput.value,
+      tmSourceLanguageInput: els.tmResourceSourceLangInput,
+      tmTargetLanguageInput: els.tmResourceTargetLangInput,
+      tbSourceLanguageInput: els.tbResourceSourceLangInput,
+      tbTargetLanguageInput: els.tbResourceTargetLangInput,
+      normalizeLanguageInput: normalizeLanguageInputElement
+    },
+    files: {
+      assertSize: (file, label) => assertFileSize(file, label, MAX_RESOURCE_IMPORT_BYTES),
+      readText: readImportTextFile,
+      reportProgress: reportImportProgress,
+      progressDetail: importProgressDetail,
+      yieldToUi
+    },
+    parsers: {
+      parseTmx: parseTmxAsync,
+      parseTbx: parseTbxAsync,
+      parseTermList,
+      parseTermWorkbook
+    },
+    repositories: { importTmEntries, importTerms },
+    resources: {
+      markProjectsUsingDirty: markProjectsUsingResourceDirty,
+      open: (...args) => resourcesController?.openResource?.(...args),
+      refresh: refreshResources,
+      refreshProjectTerms
+    },
+    alert: uiLocalizationService.alert,
+    status: { set: setSaveStatus }
+  });
 const resourcesController = appRuntime?.featureFactories?.createResourcesController?.({
   elements: {
     viewButton: els.resourcesViewBtn,
@@ -3249,9 +3283,9 @@ const resourcesController = appRuntime?.featureFactories?.createResourcesControl
   keyForItem: (item, type) => resourceKey(item, type === "tm" ? "tmName" : "termBaseName"),
   normalizeLanguageInput: normalizeLanguageInputElement,
   runImportTask: runFileImportTask,
-  importTm: handleResourceTmxImport,
-  importTb: handleResourceTbxImport,
-  importTermList: handleResourceTermListImport,
+  importTm: resourceLibraryImportController.importTmx,
+  importTb: resourceLibraryImportController.importTbx,
+  importTermList: resourceLibraryImportController.importTermList,
   deleteResource: confirmDeleteResource,
   exportResource,
   saveTmEntry: saveEditedTmResourceEntry,
@@ -8725,148 +8759,6 @@ async function repairWorkspaceLinks() {
   renderValidationReport(report);
   renderWorkspaceStatus();
   setSaveStatus(report.ok ? "Workspace health checked" : "Workspace needs attention", report.ok ? "saved" : "dirty");
-}
-
-async function handleResourceTmxImport(file) {
-  assertFileSize(file, "TMX resource file", MAX_RESOURCE_IMPORT_BYTES);
-  const tmName = els.tmResourceNameInput.value.trim();
-  const sourceLang = normalizeLanguageInputElement(els.tmResourceSourceLangInput);
-  const targetLang = normalizeLanguageInputElement(els.tmResourceTargetLangInput);
-  if (!tmName || !sourceLang || !targetLang) {
-    uiLocalizationService.alert("Enter a TM name, source language, and target language before importing.");
-    return;
-  }
-  await reportImportProgress("Reading TMX resource", file);
-  const text = await readImportTextFile(file);
-  await reportImportProgress("Parsing TMX resource", file);
-  const entries = await parseTmxAsync(text, {
-    sourceLang,
-    targetLang,
-    tmName,
-    projectName: "Resources import"
-  }, {
-    yieldFn: yieldToUi,
-    onProgress: (progress) => reportImportProgress(
-      "Parsing TMX resource",
-      file,
-      `${progress.percent}% - ${progress.entries} entr${progress.entries === 1 ? "y" : "ies"}`
-    )
-  });
-  await reportImportProgress("Saving TM resource entries", file, `${entries.length} entr${entries.length === 1 ? "y" : "ies"}`);
-  await importTmEntries(entries, {
-    onProgress: (progress) => reportImportProgress(
-      "Saving TM resource entries",
-      file,
-      importProgressDetail(progress.saved, progress.total, `entr${progress.saved === 1 ? "y" : "ies"}`)
-    ),
-    onIndexProgress: (progress) => reportImportProgress(
-      "Indexing TM resource entries",
-      file,
-      importProgressDetail(progress.saved, progress.total, "index rows")
-    )
-  });
-  markProjectsUsingResourceDirty("tm", tmName, sourceLang, targetLang);
-  await reportImportProgress("Refreshing resources", file);
-  resourcesController?.openResource?.("tm", `${tmName}::${sourceLang}::${targetLang}`, {
-    render: false,
-    focus: false
-  });
-  await refreshResources();
-  setSaveStatus(`Imported ${entries.length} TM entries`, "saved");
-}
-
-async function handleResourceTbxImport(file) {
-  assertFileSize(file, "TBX resource file", MAX_RESOURCE_IMPORT_BYTES);
-  const termBaseName = els.tbResourceNameInput.value.trim();
-  const sourceLang = normalizeLanguageInputElement(els.tbResourceSourceLangInput);
-  const targetLang = normalizeLanguageInputElement(els.tbResourceTargetLangInput);
-  if (!termBaseName || !sourceLang || !targetLang) {
-    uiLocalizationService.alert("Enter a TB name, source language, and target language before importing.");
-    return;
-  }
-  await reportImportProgress("Reading TBX resource", file);
-  const text = await readImportTextFile(file);
-  await reportImportProgress("Parsing TBX resource", file);
-  const terms = await parseTbxAsync(text, {
-    sourceLang,
-    targetLang,
-    termBaseName
-  }, {
-    yieldFn: yieldToUi,
-    onProgress: (progress) => reportImportProgress(
-      "Parsing TBX resource",
-      file,
-      `${progress.percent}% - ${progress.terms} term${progress.terms === 1 ? "" : "s"}`
-    )
-  });
-  await reportImportProgress("Saving termbase resource terms", file, `${terms.length} term${terms.length === 1 ? "" : "s"}`);
-  await importTerms(terms, {
-    onProgress: (progress) => reportImportProgress(
-      "Saving termbase resource terms",
-      file,
-      importProgressDetail(progress.saved, progress.total, `term${progress.saved === 1 ? "" : "s"}`)
-    ),
-    onIndexProgress: (progress) => reportImportProgress(
-      "Indexing termbase resource terms",
-      file,
-      importProgressDetail(progress.saved, progress.total, "index rows")
-    )
-  });
-  markProjectsUsingResourceDirty("termbase", termBaseName, sourceLang, targetLang);
-  await reportImportProgress("Refreshing resources", file);
-  resourcesController?.openResource?.("tb", `${termBaseName}::${sourceLang}::${targetLang}`, {
-    render: false,
-    focus: false
-  });
-  await refreshResources();
-  await refreshProjectTerms({ rerender: true });
-  setSaveStatus(`Imported ${terms.length} terms`, "saved");
-}
-
-async function handleResourceTermListImport(file) {
-  assertFileSize(file, "Term list resource file", MAX_RESOURCE_IMPORT_BYTES);
-  const termBaseName = els.tbResourceNameInput.value.trim();
-  const sourceLang = normalizeLanguageInputElement(els.tbResourceSourceLangInput);
-  const targetLang = normalizeLanguageInputElement(els.tbResourceTargetLangInput);
-  if (!termBaseName || !sourceLang || !targetLang) {
-    uiLocalizationService.alert("Enter a TB name, source language, and target language before importing.");
-    return;
-  }
-  await reportImportProgress("Reading term list resource", file);
-  const parseOptions = {
-    sourceLang,
-    targetLang,
-    termBaseName,
-    fileName: file.name
-  };
-  const isWorkbook =
-    /\.xlsx$/i.test(file?.name || "") ||
-    file?.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  const terms = isWorkbook
-    ? await parseTermWorkbook(await file.arrayBuffer(), parseOptions)
-    : await parseTermList(await readImportTextFile(file), parseOptions);
-  await reportImportProgress("Saving termbase resource terms", file, `${terms.length} term${terms.length === 1 ? "" : "s"}`);
-  await importTerms(terms, {
-    onProgress: (progress) => reportImportProgress(
-      "Saving termbase resource terms",
-      file,
-      importProgressDetail(progress.saved, progress.total, `term${progress.saved === 1 ? "" : "s"}`)
-    ),
-    onIndexProgress: (progress) => reportImportProgress(
-      "Indexing termbase resource terms",
-      file,
-      importProgressDetail(progress.saved, progress.total, "index rows")
-    )
-  });
-  markProjectsUsingResourceDirty("termbase", termBaseName, sourceLang, targetLang);
-  await reportImportProgress("Refreshing resources", file);
-  resourcesController?.openResource?.("tb", `${termBaseName}::${sourceLang}::${targetLang}`, {
-    render: false,
-    focus: false
-  });
-  await refreshResources();
-  await refreshProjectTerms({ rerender: true });
-  setSaveStatus(`Imported ${terms.length} term${terms.length === 1 ? "" : "s"}`, "saved");
 }
 
 function wireEvents() {

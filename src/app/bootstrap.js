@@ -87,6 +87,7 @@ import { createExternalAiConsentService } from "../features/ai/external-ai-conse
 import { createOpusCatHelpController } from "../features/ai/opus-cat-help-controller.js";
 import { createTmPretranslationDialogController } from "../features/resources/tm-pretranslation-dialog-controller.js";
 import { createResourcesController } from "../features/resources/resources-controller.js";
+import { createResourceLibraryImportController } from "../features/resources/resource-library-import-controller.js";
 import { createQualityReviewController } from "../features/quality/quality-review-controller.js";
 import { createQualityProfileController } from "../features/quality/quality-profile-controller.js";
 import { createQualityDecisionController } from "../features/quality/quality-decision-controller.js";
@@ -214,6 +215,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createUiLocalizationService,
       createProjectDialogController,
       createProjectsController,
+      createResourceLibraryImportController,
       createQualityReviewController,
       createQualityProfileController,
       createQualityDecisionController,

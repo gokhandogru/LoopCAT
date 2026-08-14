@@ -5459,7 +5459,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.tmResourceSourceLangInput.value = languageOptionValue("en");
     els.tmResourceTargetLangInput.value = languageOptionValue("tr");
     const linkedResourceTmx = buildTmx([{ source: "Linked resource TM source", target: "Linked resource TM target", sourceLang: "en", targetLang: "tr", projectName: "Resource dirty regression" }], { sourceLang: "en", targetLang: "tr" });
-    await handleResourceTmxImport(new File([linkedResourceTmx], "linked-resource.tmx", { type: "application/xml" }));
+    await resourceLibraryImportController.importTmx(new File([linkedResourceTmx], "linked-resource.tmx", { type: "application/xml" }));
     assert(state.workspaceDirtyProjectIds.has(project.id), "TMX resource import marks linked project package dirty");
 
     const linkedTmEntry = (await listTmEntries({ sourceLang: "en", targetLang: "tr", tmNames: ["Workflow TM"] }))
@@ -5503,7 +5503,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     </body>
   </text>
 </tbx>`;
-    await handleResourceTbxImport(new File([linkedResourceTbx], "linked-resource.tbx", { type: "application/xml" }));
+    await resourceLibraryImportController.importTbx(new File([linkedResourceTbx], "linked-resource.tbx", { type: "application/xml" }));
     assert(state.workspaceDirtyProjectIds.has(project.id), "TBX resource import marks linked project package dirty");
     clearWorkspaceDirtyMarkers();
     const linkedResourceCsv = [
@@ -5511,7 +5511,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "linked csv term,bagli csv terimi,CSV resource import,no",
       "linked forbidden csv term,yasak csv terimi,Forbidden CSV resource import,yes"
     ].join("\n");
-    await handleResourceTermListImport(new File([linkedResourceCsv], "linked-resource.csv", { type: "text/csv" }));
+    await resourceLibraryImportController.importTermList(new File([linkedResourceCsv], "linked-resource.csv", { type: "text/csv" }));
     assert(state.workspaceDirtyProjectIds.has(project.id), "CSV term resource import marks linked project package dirty");
 
     const linkedTerm = (await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] }))

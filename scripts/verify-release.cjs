@@ -486,6 +486,8 @@ const projectResourceTransferControllerJs = readText(
 const projectResourceTransferControllerUnitTests = readText("tests/unit/project-resource-transfer-controller.test.cjs");
 const resourcesControllerJs = readText("src/features/resources/resources-controller.js");
 const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
+const resourceLibraryImportControllerJs = readText("src/features/resources/resource-library-import-controller.js");
+const resourceLibraryImportControllerUnitTests = readText("tests/unit/resource-library-import-controller.test.cjs");
 const resourceTrashUnitTests = readText("tests/unit/resource-trash.test.cjs");
 const trashCommandsJs = readText("src/commands/trash-commands.js");
 const trashRepositoryJs = readText("src/data/trash-repository.js");
@@ -603,6 +605,16 @@ assertIncludes(
   appBootstrapJs,
   "createProjectResourceTransferController,",
   "The application runtime must expose the checked project-resource transfer factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createResourceLibraryImportController } from "../features/resources/resource-library-import-controller.js";',
+  "The application runtime must install the checked resource-library import controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createResourceLibraryImportController,",
+  "The application runtime must expose the checked resource-library import factory."
 );
 for (const snippet of [
   "const translate = (key, values = {})",
@@ -1167,6 +1179,98 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/import-export/project-resource-transfer-controller.js"',
   "source-catalog extraction must scan the checked project-resource transfer controller."
+);
+for (const snippet of [
+  'files.assertSize(file, "TMX resource file")',
+  "const { name: tmName, sourceLang, targetLang } = readTmForm()",
+  "forms.normalizeLanguageInput",
+  "Enter a TM name, source language, and target language before importing.",
+  'files.reportProgress("Reading TMX resource", file)',
+  "parsers.parseTmx",
+  'projectName: "Resources import"',
+  "repositories.importTmEntries",
+  'resources.markProjectsUsingDirty("tm"',
+  'resources.open("tm"',
+  "await resources.refresh()",
+  'files.assertSize(file, "TBX resource file")',
+  "const { name: termBaseName, sourceLang, targetLang } = readTbForm()",
+  "Enter a TB name, source language, and target language before importing.",
+  "parsers.parseTbx",
+  "repositories.importTerms",
+  'resources.markProjectsUsingDirty("termbase"',
+  'resources.open("tb"',
+  "await resources.refreshProjectTerms({ rerender: true })",
+  'files.assertSize(file, "Term list resource file")',
+  "async function parseTermListFile",
+  "parsers.parseTermWorkbook",
+  "parsers.parseTermList",
+  "return Object.freeze({ importTmx, importTbx, importTermList })"
+]) {
+  assertIncludes(
+    resourceLibraryImportControllerJs,
+    snippet,
+    `ResourceLibraryImportController must retain characterized import policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createResourceLibraryImportController({",
+  "app.js must compose the checked resource-library import controller."
+);
+for (const boundary of [
+  "tmName: () => els.tmResourceNameInput.value",
+  "tbName: () => els.tbResourceNameInput.value",
+  "tmSourceLanguageInput: els.tmResourceSourceLangInput",
+  "tmTargetLanguageInput: els.tmResourceTargetLangInput",
+  "tbSourceLanguageInput: els.tbResourceSourceLangInput",
+  "tbTargetLanguageInput: els.tbResourceTargetLangInput",
+  "normalizeLanguageInput: normalizeLanguageInputElement",
+  "assertSize: (file, label) => assertFileSize(file, label, MAX_RESOURCE_IMPORT_BYTES)",
+  "readText: readImportTextFile",
+  "reportProgress: reportImportProgress",
+  "progressDetail: importProgressDetail",
+  "parseTmx: parseTmxAsync",
+  "parseTbx: parseTbxAsync",
+  "repositories: { importTmEntries, importTerms }",
+  "markProjectsUsingDirty: markProjectsUsingResourceDirty",
+  "open: (...args) => resourcesController?.openResource?.(...args)",
+  "refresh: refreshResources",
+  "refreshProjectTerms",
+  "alert: uiLocalizationService.alert",
+  "status: { set: setSaveStatus }"
+]) {
+  assertIncludes(appJs, boundary, `resource-library import composition must inject the ${boundary} boundary.`);
+}
+for (const method of ["importTmx", "importTbx", "importTermList"]) {
+  assertIncludes(
+    `${appJs}\n${appWorkflowDriverJs}`,
+    `resourceLibraryImportController.${method}`,
+    `resource-library import consumers must call ResourceLibraryImportController.${method} directly.`
+  );
+}
+for (const removedHelper of ["handleResourceTmxImport", "handleResourceTbxImport", "handleResourceTermListImport"]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} resource-library import orchestration must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "ResourceLibraryImportController preserves TM form normalization, parser progress, persistence, dirtiness, selection, refresh, and status",
+  "ResourceLibraryImportController preserves TBX form policy and resource-before-project-term refresh order",
+  "ResourceLibraryImportController preserves decoded text and XLSX term-list routing with exact term status",
+  "ResourceLibraryImportController preserves size-first validation, missing-field returns, parser failure propagation, and immutability"
+]) {
+  assertIncludes(
+    resourceLibraryImportControllerUnitTests,
+    testName,
+    `focused resource-library import tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/resources/resource-library-import-controller.js"',
+  "source-catalog extraction must scan the checked resource-library import controller."
 );
 assertIncludes(
   appJs,
