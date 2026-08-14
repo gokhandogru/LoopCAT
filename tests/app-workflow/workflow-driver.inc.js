@@ -4039,7 +4039,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "project report redacts credential-looking project domain metadata"
       );
       const labelReportData = await buildProjectReportData();
-      const labelReportHtml = projectReportHtml({
+      const labelReportHtml = reportDocumentCompositionService.projectReportHtml({
         ...labelReportData,
         project: { ...labelReportData.project, name: "Bearer report-project-label-token-that-must-not-appear" },
         analysis: {

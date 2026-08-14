@@ -108,6 +108,7 @@ import { createSaveStore } from "../status/save-store.js";
 import { createStatusController } from "../status/status-controller.js";
 import { createAiProviderService } from "../ai/providers/legacy-registry-adapter.js";
 import { finalizeReportDocument } from "../reports/report-document.js";
+import { createReportDocumentCompositionService } from "../reports/report-document-composition-service.js";
 import { createReportPresentationService } from "../reports/report-presentation-service.js";
 import { createLocaleLoader } from "../i18n/locale-loader.js";
 import { createUiLocalizationService } from "../i18n/ui-localization-service.js";
@@ -200,6 +201,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createFilterPresetController,
       createInspectorController,
       createImportExportController,
+      createReportDocumentCompositionService,
       createReportPresentationService,
       createUiLocalizationService,
       createProjectDialogController,

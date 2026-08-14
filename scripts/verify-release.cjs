@@ -329,6 +329,10 @@ const appStoreUnitTests = readText("tests/unit/app-store.test.cjs");
 const navigationControllerJs = readText("src/app/navigation-controller.js");
 const uiLocalizationServiceJs = readText("src/i18n/ui-localization-service.js");
 const uiLocalizationServiceUnitTests = readText("tests/unit/ui-localization-service.test.cjs");
+const reportDocumentCompositionServiceJs = readText("src/reports/report-document-composition-service.js");
+const reportDocumentCompositionServiceUnitTests = readText(
+  "tests/unit/report-document-composition-service.test.cjs"
+);
 const reportPresentationServiceJs = readText("src/reports/report-presentation-service.js");
 const reportPresentationServiceUnitTests = readText("tests/unit/report-presentation-service.test.cjs");
 const i18nExtractScript = readText("scripts/i18n-extract.cjs");
@@ -542,6 +546,16 @@ assertIncludes(
   "createReportPresentationService,",
   "The application runtime must expose the checked report-presentation factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createReportDocumentCompositionService } from "../reports/report-document-composition-service.js";',
+  "The application runtime must install the checked report-document composition service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createReportDocumentCompositionService,",
+  "The application runtime must expose the checked report-document composition factory."
+);
 for (const snippet of [
   "const translate = (key, values = {})",
   "const source = (text, values = {})",
@@ -588,8 +602,9 @@ for (const method of [
   "confirm",
   "alert"
 ]) {
+  const consumerSource = method === "direction" ? reportDocumentCompositionServiceJs : appJs;
   assertIncludes(
-    appJs,
+    consumerSource,
     `uiLocalizationService.${method}`,
     `application consumers must call UiLocalizationService.${method} directly.`
   );
@@ -602,12 +617,12 @@ for (const removedFacade of ["reportLocale", "reportDir", "reportText", "reportH
   );
 }
 assertIncludes(
-  appJs,
+  reportDocumentCompositionServiceJs,
   '<html lang="${escapeHtml(uiLocalizationService.locale())}" dir="${escapeHtml(uiLocalizationService.direction())}">',
   "generated reports must use the checked locale and direction methods directly."
 );
 assertIncludes(
-  appJs,
+  reportDocumentCompositionServiceJs,
   'uiLocalizationService.sourceHtml("LoopCAT Quality Passport")',
   "generated reports must use checked HTML-safe source localization directly."
 );
@@ -657,7 +672,7 @@ for (const method of [
   "qaChecksTableHtml"
 ]) {
   assertIncludes(
-    appJs,
+    reportDocumentCompositionServiceJs,
     `reportPresentationService.${method}`,
     `report generators must call ReportPresentationService.${method} directly.`
   );
@@ -687,6 +702,86 @@ for (const testName of [
     `focused report-presentation tests must retain characterization: ${testName}`
   );
 }
+for (const snippet of [
+  "function projectReportHtml(data, options = {})",
+  "function qualityPassportHtml(data)",
+  ".slice(0, 10)",
+  ".slice(0, 20)",
+  ".slice(0, 3)",
+  '.join(" ")',
+  'Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'',
+  'uiLocalizationService.source("Anonymized project")',
+  "return Object.freeze({ projectReportHtml, qualityPassportHtml })"
+]) {
+  assertIncludes(
+    reportDocumentCompositionServiceJs,
+    snippet,
+    `ReportDocumentCompositionService must retain characterized document policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createReportDocumentCompositionService({",
+  "app.js must compose the checked report-document composition service."
+);
+for (const boundary of [
+  "localization: uiLocalizationService",
+  "presentation: reportPresentationService",
+  "escapeHtml",
+  "redactSensitiveText",
+  "defaultQualityProfile",
+  "sanitizeValidationReportForDisplay",
+  "languagePairDisplay",
+  "formatDateTime",
+  "qualityLabel",
+  "qualityCategoryName",
+  "qualityRiskLevelLabel"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `report-document composition must inject the ${boundary} boundary.`
+  );
+}
+for (const method of ["projectReportHtml", "qualityPassportHtml"]) {
+  assertIncludes(
+    appJs,
+    `reportDocumentCompositionService.${method}`,
+    `report export orchestration must call ReportDocumentCompositionService.${method} directly.`
+  );
+  const directGenerator = new RegExp(`function\\s+${method}\\b`);
+  assert(
+    !directGenerator.test(appJs) && !directGenerator.test(appWorkflowDriverJs),
+    `${method} report-document generator must not return to app.js or the workflow driver.`
+  );
+}
+assertIncludes(
+  appWorkflowDriverJs,
+  "reportDocumentCompositionService.projectReportHtml({",
+  "workflow characterization must call the checked Project Report composer directly."
+);
+for (const testName of [
+  "ReportDocumentCompositionService preserves complete normal and anonymized Project Report documents",
+  "ReportDocumentCompositionService preserves the complete Quality Passport and 20-risk bound",
+  "ReportDocumentCompositionService is immutable, validates every boundary, and propagates delegate failures"
+]) {
+  assertIncludes(
+    reportDocumentCompositionServiceUnitTests,
+    testName,
+    `focused report-document tests must retain characterization: ${testName}`
+  );
+}
+for (const hash of [
+  "8d1bed58355b927fc9541e7fe10b467af5b71a17ef7f08c215481b985509195b",
+  "f098d2fefffb16bbd7feaa0a8cce379a6ec7c9a50a558ab9ca73e4257f5ecbff",
+  "b4a665f0416515db9d81ba1a41c0cb65c7b1404055f8e1b167228a745c6b0512"
+]) {
+  assertIncludes(
+    reportDocumentCompositionServiceUnitTests,
+    hash,
+    `focused report-document tests must pin complete document hash ${hash}.`
+  );
+}
 assertIncludes(
   appJs,
   "source: uiLocalizationService.source",
@@ -711,6 +806,11 @@ assertIncludes(
   i18nExtractScript,
   'extractScript(messagesByText, reportPresentationPath, "src/reports/report-presentation-service.js")',
   "source-catalog extraction must scan checked report-presentation source calls."
+);
+assertIncludes(
+  i18nExtractScript,
+  '"src/reports/report-document-composition-service.js"',
+  "source-catalog extraction must scan checked report-document composition source calls."
 );
 assertIncludes(
   i18nExtractScript,
@@ -11036,11 +11136,15 @@ assertIncludes(
   "DOCX export preserves SmartTag wrappers with semantic inline tags",
   "regression-test.html must verify DOCX target reconstruction preserves SmartTag wrappers with styled text."
 );
-assertIncludes(appJs, "LoopCAT Project Report", "app.js must keep offline project report generation available.");
 assertIncludes(
-  appJs,
+  reportDocumentCompositionServiceJs,
+  "LoopCAT Project Report",
+  "The checked report-document composer must keep offline Project Report generation available."
+);
+assertIncludes(
+  reportDocumentCompositionServiceJs,
   `Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`,
-  "app.js project reports must include a restrictive CSP."
+  "Checked report documents must include a restrictive CSP."
 );
 assertIncludes(
   appJs,
