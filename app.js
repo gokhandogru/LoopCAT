@@ -3259,6 +3259,14 @@ const resourceLibraryImportController =
     alert: uiLocalizationService.alert,
     status: { set: setSaveStatus }
   });
+const resourceLibraryExportController =
+  appRuntime.featureFactories.createResourceLibraryExportController({
+    resources: { labelFromKey: resourceLabelFromKey, items: resourceItems },
+    builders: { buildTmx, buildTbx },
+    fileSafeName,
+    download,
+    status: { set: setSaveStatus }
+  });
 const resourceMutationController = appRuntime.featureFactories.createResourceMutationController({
   session: { getProjectId: () => editorSessionStore.getProject()?.id || null },
   repositories: { updateTmEntry, updateTerm },
@@ -3340,7 +3348,7 @@ const resourcesController = appRuntime?.featureFactories?.createResourcesControl
   importTb: resourceLibraryImportController.importTbx,
   importTermList: resourceLibraryImportController.importTermList,
   deleteResource: resourceMutationController.deleteResource,
-  exportResource,
+  exportResource: resourceLibraryExportController.exportResource,
   saveTmEntry: resourceMutationController.saveTmEntry,
   deleteTmEntry: resourceMutationController.deleteTmEntry,
   saveTerm: resourceMutationController.saveTerm,
@@ -6544,22 +6552,6 @@ function renderTermRow(term) {
   deleteButton.dataset.resourceId = term.id;
   actions.append(saveButton, deleteButton);
   return row;
-}
-
-function exportResource(type, key) {
-  try {
-    const info = resourceLabelFromKey(key);
-    const items = resourceItems(type, key);
-    if (type === "tm") {
-      download(`${fileSafeName(info.name)}_${info.sourceLang}-${info.targetLang}.tmx`, buildTmx(items, info), "application/xml");
-      setSaveStatus(`Exported ${items.length} TM entr${items.length === 1 ? "y" : "ies"}`, "saved");
-      return;
-    }
-    download(`${fileSafeName(info.name)}_${info.sourceLang}-${info.targetLang}.tbx`, buildTbx(items, info), "application/xml");
-    setSaveStatus(`Exported ${items.length} term${items.length === 1 ? "" : "s"}`, "saved");
-  } catch (error) {
-    setSaveStatus(error.message || "Resource export failed", "dirty");
-  }
 }
 
 function appendTextWithTags(container, text, tags, options = {}) {

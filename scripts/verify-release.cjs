@@ -486,6 +486,8 @@ const projectResourceTransferControllerJs = readText(
 const projectResourceTransferControllerUnitTests = readText("tests/unit/project-resource-transfer-controller.test.cjs");
 const resourcesControllerJs = readText("src/features/resources/resources-controller.js");
 const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
+const resourceLibraryExportControllerJs = readText("src/features/resources/resource-library-export-controller.js");
+const resourceLibraryExportControllerUnitTests = readText("tests/unit/resource-library-export-controller.test.cjs");
 const resourceLibraryImportControllerJs = readText("src/features/resources/resource-library-import-controller.js");
 const resourceLibraryImportControllerUnitTests = readText("tests/unit/resource-library-import-controller.test.cjs");
 const resourceMutationControllerJs = readText("src/features/resources/resource-mutation-controller.js");
@@ -607,6 +609,16 @@ assertIncludes(
   appBootstrapJs,
   "createProjectResourceTransferController,",
   "The application runtime must expose the checked project-resource transfer factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createResourceLibraryExportController } from "../features/resources/resource-library-export-controller.js";',
+  "The application runtime must install the checked resource-library export controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createResourceLibraryExportController,",
+  "The application runtime must expose the checked resource-library export factory."
 );
 assertIncludes(
   appBootstrapJs,
@@ -1191,6 +1203,63 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/import-export/project-resource-transfer-controller.js"',
   "source-catalog extraction must scan the checked project-resource transfer controller."
+);
+for (const snippet of [
+  "function exportResource(type, key)",
+  "resources.labelFromKey(key)",
+  "resources.items(type, key)",
+  'if (type === "tm")',
+  "builders.buildTmx(items, info)",
+  "builders.buildTbx(items, info)",
+  '"application/xml"',
+  "fileSafeName(info.name)",
+  "Resource export failed",
+  "return Object.freeze({ exportResource })"
+]) {
+  assertIncludes(
+    resourceLibraryExportControllerJs,
+    snippet,
+    `ResourceLibraryExportController must retain characterized export policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createResourceLibraryExportController({",
+  "app.js must compose the checked resource-library export controller."
+);
+for (const boundary of [
+  "resources: { labelFromKey: resourceLabelFromKey, items: resourceItems }",
+  "builders: { buildTmx, buildTbx }",
+  "fileSafeName",
+  "download",
+  "status: { set: setSaveStatus }"
+]) {
+  assertIncludes(appJs, boundary, `resource-library export composition must inject the ${boundary} boundary.`);
+}
+assertIncludes(
+  `${appJs}\n${appWorkflowDriverJs}`,
+  "resourceLibraryExportController.exportResource",
+  "resource-library export consumers must call ResourceLibraryExportController.exportResource directly."
+);
+assert(
+  !/function\s+exportResource\b/.test(appJs) && !/function\s+exportResource\b/.test(appWorkflowDriverJs),
+  "exportResource orchestration must not return to app.js or the workflow driver."
+);
+for (const testName of [
+  "ResourceLibraryExportController preserves TMX lookup, metadata, filename, XML download, singular copy, and return",
+  "ResourceLibraryExportController preserves TBX lookup, metadata, filename, XML download, and plural copy",
+  "ResourceLibraryExportController contains lookup and download failures and exposes an immutable checked API"
+]) {
+  assertIncludes(
+    resourceLibraryExportControllerUnitTests,
+    testName,
+    `focused resource-library export tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/resources/resource-library-export-controller.js"',
+  "source-catalog extraction must scan the checked resource-library export controller."
 );
 for (const snippet of [
   'files.assertSize(file, "TMX resource file")',
@@ -2637,7 +2706,7 @@ assert(
     "addEventListener"
   ) &&
     !functionBody(appJs, "function renderTmEntryRow", "function renderTermRow").includes("addEventListener") &&
-    !functionBody(appJs, "function renderTermRow", "function exportResource").includes("addEventListener"),
+    !functionBody(appJs, "function renderTermRow", "function appendTextWithTags").includes("addEventListener"),
   "Resources dashboards and rows must use controller-owned event delegation rather than per-render listeners."
 );
 assertIncludes(

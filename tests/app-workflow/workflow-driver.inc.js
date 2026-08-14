@@ -598,9 +598,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         targetLang: "tr",
         termBaseNames: projectTermBaseNames()
       });
+      const windows1254CsvTerm = windows1254CsvTerms.find((term) => term.sourceTerm === "light");
       assert(
-        windows1254CsvTerms[0]?.targetTerm === "\u0131\u015f\u0131k" &&
-          windows1254CsvTerms[0]?.notes === "\u00c7al\u0131\u015fma notu",
+        windows1254CsvTerm?.targetTerm === "\u0131\u015f\u0131k" &&
+          windows1254CsvTerm?.notes === "\u00c7al\u0131\u015fma notu",
         "CSV term list import uses manual Windows-1254 override for terminology text"
       );
     } finally {
@@ -4403,7 +4404,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       await refreshResources();
       const xmlDownloadsBeforeResourceTmx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      exportResource("tm", `${mainTmName()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
+      resourceLibraryExportController.exportResource("tm", `${mainTmName()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
       const resourceTmxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
       const resourceTmxDownload = resourceTmxDownloads[resourceTmxDownloads.length - 1];
       const resourceTmxText = await resourceTmxDownload.blob.text();
@@ -4427,7 +4428,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       await refreshResources();
       const xmlDownloadsBeforeResourceTbx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      exportResource("tb", `${primaryTermBaseName()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
+      resourceLibraryExportController.exportResource("tb", `${primaryTermBaseName()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
       const resourceTbxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
       const resourceTbxDownload = resourceTbxDownloads[resourceTbxDownloads.length - 1];
       const resourceTbxText = await resourceTbxDownload.blob.text();
@@ -4474,7 +4475,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "project TMX export failure reports visible status");
       await projectResourceTransferController.exportTbx();
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "project TBX export failure reports visible status");
-      exportResource("tm", `${mainTmName()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
+      resourceLibraryExportController.exportResource("tm", `${mainTmName()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "resource export failure reports visible status");
     } finally {
       URL.createObjectURL = originalStatusCreateObjectUrl;

@@ -28,6 +28,13 @@ const resourceLibraryImportControllerPath = path.join(
   "resources",
   "resource-library-import-controller.js"
 );
+const resourceLibraryExportControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "resources",
+  "resource-library-export-controller.js"
+);
 const resourceMutationControllerPath = path.join(
   root,
   "src",
@@ -185,6 +192,11 @@ function main() {
     messagesByText,
     resourceLibraryImportControllerPath,
     "src/features/resources/resource-library-import-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    resourceLibraryExportControllerPath,
+    "src/features/resources/resource-library-export-controller.js"
   );
   extractScript(
     messagesByText,
