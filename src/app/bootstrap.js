@@ -67,6 +67,7 @@ import { createAiSuggestionApplicationController } from "../features/ai/ai-sugge
 import { createAiOpenAiSuggestionController } from "../features/ai/ai-openai-suggestion-controller.js";
 import { createAiSuggestionPersistenceController } from "../features/ai/ai-suggestion-persistence-controller.js";
 import { createAiSettingsPersistenceController } from "../features/ai/ai-settings-persistence-controller.js";
+import { createAiProviderAdministrationOperationsController } from "../features/ai/ai-provider-administration-operations-controller.js";
 import { createOpusCatHelpController } from "../features/ai/opus-cat-help-controller.js";
 import { createTmPretranslationDialogController } from "../features/resources/tm-pretranslation-dialog-controller.js";
 import { createResourcesController } from "../features/resources/resources-controller.js";
@@ -153,6 +154,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createAiOpenAiSuggestionController,
       createAiSuggestionPersistenceController,
       createAiSettingsPersistenceController,
+      createAiProviderAdministrationOperationsController,
       createAutosaveService,
       createOpusCatHelpController,
       createAiProviderService,

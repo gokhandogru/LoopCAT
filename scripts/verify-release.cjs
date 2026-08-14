@@ -183,6 +183,7 @@ const requiredReleaseFiles = [
   "src/commands/edit-target-session.js",
   "src/ui/dialog-controller.js",
   "src/features/ai/ai-administration-controller.js",
+  "src/features/ai/ai-provider-administration-operations-controller.js",
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
   "src/features/ai/ai-project-brief-controller.js",
@@ -206,6 +207,7 @@ const requiredReleaseFiles = [
   "src/features/workspace/recovery-workspace-controller.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
+  "tests/unit/ai-provider-administration-operations-controller.test.cjs",
   "tests/unit/ai-alternatives-controller.test.cjs",
   "tests/unit/ai-draft-editing-controller.test.cjs",
   "tests/unit/ai-project-brief-controller.test.cjs",
@@ -340,6 +342,12 @@ const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-p
 const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
 const aiAdministrationControllerJs = readText("src/features/ai/ai-administration-controller.js");
 const aiAdministrationControllerUnitTests = readText("tests/unit/ai-administration-controller.test.cjs");
+const aiProviderAdministrationOperationsControllerJs = readText(
+  "src/features/ai/ai-provider-administration-operations-controller.js"
+);
+const aiProviderAdministrationOperationsControllerUnitTests = readText(
+  "tests/unit/ai-provider-administration-operations-controller.test.cjs"
+);
 const aiPretranslationControllerJs = readText("src/features/ai/ai-pretranslation-controller.js");
 const aiPretranslationControllerUnitTests = readText("tests/unit/ai-pretranslation-controller.test.cjs");
 const aiReviewControllerJs = readText("src/features/ai/ai-review-controller.js");
@@ -2309,6 +2317,95 @@ for (const testName of [
     tmPretranslationControllerUnitTests,
     testName,
     `focused TM-pretranslation tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiProviderAdministrationOperationsController",
+  "The application runtime must expose the checked AI-provider-administration-operations controller boundary."
+);
+for (const boundary of [
+  "function canStartServer(settings)",
+  'settings?.providerId === "openai-compatible"',
+  "providers.sharesExternally(settings)",
+  "function connectionErrorLooksStartable(error)",
+  'settings.providerId === "opus-cat"',
+  "administration.setBaseUrl(discoveredBaseUrl)",
+  "const rememberedSettings = await settingsBoundary.persist()",
+  "await bridge.startLmStudioServer()",
+  'settingsBoundary.assertReady(settings, config, "testing this provider")',
+  "const result = await provider.testConnection(config)",
+  "await testConnection({ skipLmStudioAutoStart: true })",
+  'settingsBoundary.assertReady(settings, config, "refreshing models")',
+  "const result = await provider.listModels(config)",
+  "modelState.replace(result.models || [])",
+  "providers.canPullModel(settings, provider)",
+  "await provider.pullModel(config, model, (progress) =>",
+  "await refreshModels()"
+]) {
+  assertIncludes(
+    aiProviderAdministrationOperationsControllerJs,
+    boundary,
+    `AiProviderAdministrationOperationsController must retain checked ${boundary} orchestration.`
+  );
+}
+for (const [start, end, delegation] of [
+  [
+    "function canStartLmStudioServer",
+    "function setOpusCatConnectionHelpVisible",
+    "return aiProviderAdministrationOperationsController.canStartServer(settings)"
+  ],
+  [
+    "async function startLmStudioServerAndTestConnection",
+    "async function testLocalAiConnection",
+    "return aiProviderAdministrationOperationsController.startServerAndTest()"
+  ],
+  [
+    "async function testLocalAiConnection",
+    "async function refreshLocalAiModels",
+    "return aiProviderAdministrationOperationsController.testConnection(options)"
+  ],
+  [
+    "async function refreshLocalAiModels",
+    "async function pullLocalAiModel",
+    "return aiProviderAdministrationOperationsController.refreshModels()"
+  ],
+  [
+    "async function pullLocalAiModel",
+    "async function testLocalAiPrompt",
+    "return aiProviderAdministrationOperationsController.pullModel()"
+  ]
+]) {
+  const facade = functionBody(appJs, start, end);
+  assertIncludes(facade, delegation, `${start} must delegate to the checked provider-administration controller.`);
+  assert(
+    !facade.includes("persistLocalAiSettings(") &&
+      !facade.includes("localAiRuntimeConfig(") &&
+      !facade.includes("assertLocalAiRuntimeReady(") &&
+      !facade.includes("currentLocalAiProvider(") &&
+      !facade.includes("startLmStudioServer(") &&
+      !facade.includes("listModels(") &&
+      !facade.includes("provider.pullModel(") &&
+      !facade.includes("setLocalAiStatus(") &&
+      !facade.includes("setSaveStatus(") &&
+      !facade.includes("state.localAi.models"),
+    "app.js must not regain provider connection, desktop retry, model-state, progress, or status orchestration."
+  );
+}
+for (const testName of [
+  "provider administration exposes LM Studio start only for local OpenAI-compatible desktop settings",
+  "provider connection validation and missing-provider outcomes stop before invocation",
+  "provider connection success preserves status version and route",
+  "OPUS-CAT discovery persists the discovered base URL and refreshes administration presentation",
+  "connection failure auto-starts LM Studio once and retries the same provider config",
+  "OPUS-CAT terminal connection failure opens setup help while other failures remain inline",
+  "model refresh replaces model state and preserves installed, pullable, and manual-model statuses",
+  "model pull reports progress, refreshes models, and preserves unsupported-provider behavior"
+]) {
+  assertIncludes(
+    aiProviderAdministrationOperationsControllerUnitTests,
+    testName,
+    `focused AI-provider-administration tests must characterize ${testName}.`
   );
 }
 assertIncludes(
@@ -5159,9 +5256,9 @@ assertIncludes(
   "app.js must treat OPUS-CAT as a local runtime workflow in the AI Command Centre."
 );
 assertIncludes(
-  appJs,
-  "finishLocalAiConnection",
-  "app.js must save an automatically discovered OPUS-CAT endpoint after a successful connection test."
+  aiProviderAdministrationOperationsControllerJs,
+  "finishConnection",
+  "The provider-administration controller must save an automatically discovered OPUS-CAT endpoint after a successful connection test."
 );
 assertIncludes(
   appJs,
@@ -5169,9 +5266,9 @@ assertIncludes(
   "app.js must show actionable OPUS-CAT help after a failed connection test."
 );
 assertIncludes(
-  functionBody(appJs, "async function testLocalAiConnection", "async function refreshLocalAiModels"),
-  "showOpusCatConnectionHelp()",
-  "app.js OPUS-CAT connection failure must open the help dialog."
+  aiProviderAdministrationOperationsControllerJs,
+  'if (settings.providerId === "opus-cat") help.open()',
+  "The provider-administration controller must open OPUS-CAT help after a failed connection test."
 );
 assertIncludes(appJs, "localAiPresetSelect", "app.js must wire the Local AI provider preset selector.");
 assertIncludes(
@@ -5405,9 +5502,9 @@ assertIncludes(
   "the checked AI administration controller must hide the LM Studio start button when the desktop helper is unavailable."
 );
 assertIncludes(
-  appJs,
-  "startLmStudioServerFromUi(settings)",
-  "app.js must let Test connection auto-start the LM Studio local server when available."
+  aiProviderAdministrationOperationsControllerJs,
+  "if (!testOptions.skipLmStudioAutoStart && canStartServer(settings)",
+  "The provider-administration controller must let Test connection auto-start the LM Studio local server when available."
 );
 assertIncludes(
   readme,

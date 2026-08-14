@@ -2559,6 +2559,54 @@ const aiSettingsPersistenceController =
     },
     logger: console
   });
+const aiProviderAdministrationOperationsController =
+  appRuntime.featureFactories.createAiProviderAdministrationOperationsController({
+    project: { exists: () => Boolean(currentProject()) },
+    settings: {
+      persist: () => persistLocalAiSettings({ silent: true }),
+      runtimeConfig: localAiRuntimeConfig,
+      assertReady: assertLocalAiRuntimeReady,
+      normalizeBaseUrl: normalizedProviderBaseUrl
+    },
+    providers: {
+      get: currentLocalAiProvider,
+      sharesExternally: (settings) =>
+        localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model),
+      canPullModel: localAiCanPullModel
+    },
+    desktop: {
+      getBridge: () =>
+        window.LoopCATDesktop &&
+        typeof window.LoopCATDesktop.startLmStudioServer === "function"
+          ? window.LoopCATDesktop
+          : null
+    },
+    administration: {
+      setBaseUrl: (value) => aiAdministrationController?.setBaseUrl?.(value),
+      readModel: () => aiAdministrationController?.readLocalForm?.().model || ""
+    },
+    modelState: {
+      get: () => state.localAi.models,
+      replace: (models) => {
+        state.localAi.models = models;
+      }
+    },
+    presentation: {
+      renderPresets: renderLocalAiPresetOptions,
+      renderProvider: renderLocalAiProviderControls,
+      renderPrompt: renderLocalAiPromptPreview,
+      renderModels: renderLocalAiModelOptions
+    },
+    help: {
+      setVisible: (visible) => opusCatHelpController?.setVisible?.(visible),
+      open: () => opusCatHelpController?.open?.()
+    },
+    status: {
+      setConnection: setLocalAiStatus,
+      setSave: setSaveStatus
+    },
+    defaults: { model: DEFAULT_LOCAL_AI_MODEL }
+  });
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
     splitButton: els.splitSegmentBtn,
@@ -8817,23 +8865,8 @@ function currentLocalAiProvider(settings = localAiSettingsFromForm()) {
   return aiProviderService.get(settings.providerId);
 }
 
-function localAiDesktopBridge() {
-  return window.LoopCATDesktop && typeof window.LoopCATDesktop.startLmStudioServer === "function"
-    ? window.LoopCATDesktop
-    : null;
-}
-
 function canStartLmStudioServer(settings = localAiSettingsFromForm()) {
-  return Boolean(
-    localAiDesktopBridge() &&
-    settings.providerId === "openai-compatible" &&
-    !localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
-  );
-}
-
-function localAiConnectionErrorLooksStartable(error) {
-  const message = String(error?.message || "");
-  return /not reachable|failed to fetch|unable to connect|connection refused/i.test(message);
+  return aiProviderAdministrationOperationsController.canStartServer(settings);
 }
 
 function setOpusCatConnectionHelpVisible(visible) {
@@ -8844,180 +8877,20 @@ function showOpusCatConnectionHelp() {
   return opusCatHelpController?.open?.();
 }
 
-async function finishLocalAiConnection(settings, provider, result, saveMessage = "AI provider connection works") {
-  const discoveredBaseUrl = String(result?.baseUrl || "").trim();
-  if (
-    settings.providerId === "opus-cat" &&
-    discoveredBaseUrl &&
-    normalizedProviderBaseUrl("opus-cat", discoveredBaseUrl) !== normalizedProviderBaseUrl("opus-cat", settings.baseUrl)
-  ) {
-    aiAdministrationController?.setBaseUrl?.(discoveredBaseUrl);
-    const rememberedSettings = await persistLocalAiSettings({ silent: true });
-    renderLocalAiPresetOptions(rememberedSettings);
-    renderLocalAiProviderControls(rememberedSettings);
-    renderLocalAiPromptPreview();
-  }
-  const version = result?.version ? ` ${result.version}` : "";
-  const route = result?.connectionMode ? ` via ${result.connectionMode}` : "";
-  setOpusCatConnectionHelpVisible(false);
-  setLocalAiStatus("connected", `${result?.provider || provider.name}${version} connected${route}`);
-  setSaveStatus(
-    result?.autoDiscovered && discoveredBaseUrl
-      ? `OPUS-CAT connection found and saved at ${discoveredBaseUrl}`
-      : saveMessage,
-    "saved"
-  );
-}
-
-async function startLmStudioServerFromUi(settings = localAiSettingsFromForm()) {
-  const bridge = localAiDesktopBridge();
-  if (!bridge || !canStartLmStudioServer(settings)) {
-    throw new Error("Automatic LM Studio server start is available only in the LoopCAT desktop app with the LM Studio local provider selected.");
-  }
-  setLocalAiStatus("checking", "Starting LM Studio server...");
-  setSaveStatus("Starting LM Studio server...");
-  const result = await bridge.startLmStudioServer();
-  if (!result?.ok) {
-    throw new Error(result?.message || "Could not start the LM Studio server.");
-  }
-  setLocalAiStatus("checking", result.message || "LM Studio server started. Checking connection...");
-  return result;
-}
-
 async function startLmStudioServerAndTestConnection() {
-  if (!currentProject()) return;
-  const settings = await persistLocalAiSettings({ silent: true });
-  try {
-    await startLmStudioServerFromUi(settings);
-    await testLocalAiConnection({ skipLmStudioAutoStart: true });
-  } catch (error) {
-    const message = error.message || "Could not start LM Studio server.";
-    setLocalAiStatus("error", message);
-    setSaveStatus(message, "dirty");
-  }
+  return aiProviderAdministrationOperationsController.startServerAndTest();
 }
 
 async function testLocalAiConnection(options = {}) {
-  if (!currentProject()) return;
-  const settings = await persistLocalAiSettings({ silent: true });
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-    assertLocalAiRuntimeReady(settings, config, "testing this provider");
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setLocalAiStatus("error", message);
-    setSaveStatus(message, "dirty");
-    return;
-  }
-  const provider = currentLocalAiProvider(settings);
-  if (!provider) {
-    const message = "This AI provider is not available.";
-    setLocalAiStatus("error", message);
-    setSaveStatus(message, "dirty");
-    return;
-  }
-  setOpusCatConnectionHelpVisible(false);
-  setLocalAiStatus("checking", "Checking AI provider...");
-  try {
-    const result = await provider.testConnection(config);
-    await finishLocalAiConnection(settings, provider, result);
-  } catch (error) {
-    if (!options.skipLmStudioAutoStart && canStartLmStudioServer(settings) && localAiConnectionErrorLooksStartable(error)) {
-      try {
-        await startLmStudioServerFromUi(settings);
-        const result = await provider.testConnection(config);
-        await finishLocalAiConnection(settings, provider, result, "LM Studio server started; AI provider connection works");
-        return;
-      } catch (startError) {
-        const message = startError.message || error.message || "AI provider connection failed.";
-        setLocalAiStatus("error", message);
-        setSaveStatus(message, "dirty");
-        return;
-      }
-    }
-    const message = error.message || "AI provider connection failed.";
-    setLocalAiStatus("error", message);
-    setSaveStatus(message, "dirty");
-    if (settings.providerId === "opus-cat") showOpusCatConnectionHelp();
-  }
+  return aiProviderAdministrationOperationsController.testConnection(options);
 }
 
 async function refreshLocalAiModels() {
-  if (!currentProject()) return;
-  const settings = await persistLocalAiSettings({ silent: true });
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-    assertLocalAiRuntimeReady(settings, config, "refreshing models");
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setLocalAiStatus("error", message);
-    setSaveStatus(message, "dirty");
-    return;
-  }
-  const provider = currentLocalAiProvider(settings);
-  if (!provider) {
-    const message = "Model refresh is not available for this provider.";
-    setLocalAiStatus("error", message);
-    setSaveStatus(message, "dirty");
-    return;
-  }
-  setLocalAiStatus("checking", "Refreshing models...");
-  try {
-    const result = await provider.listModels(config);
-    state.localAi.models = result.models || [];
-    renderLocalAiModelOptions(settings);
-    const hasModel = state.localAi.models.some((model) => model.name === settings.model);
-    const canPull = localAiCanPullModel(settings, provider);
-    setLocalAiStatus("connected", `${state.localAi.models.length} model${state.localAi.models.length === 1 ? "" : "s"} found`);
-    setSaveStatus(
-      hasModel || !settings.model
-        ? "AI models refreshed"
-        : canPull
-          ? `Model ${settings.model} is not installed. Pull it from the AI Command Centre.`
-          : `Model ${settings.model} was not returned by this provider. Check the model name or refresh models.`,
-      hasModel || !settings.model ? "saved" : "dirty"
-    );
-  } catch (error) {
-    const message = error.message || "AI model refresh failed.";
-    setLocalAiStatus("error", message);
-    setSaveStatus(message, "dirty");
-  }
+  return aiProviderAdministrationOperationsController.refreshModels();
 }
 
 async function pullLocalAiModel() {
-  if (!currentProject()) return;
-  const settings = await persistLocalAiSettings({ silent: true });
-  let config = null;
-  try {
-    config = localAiRuntimeConfig(settings);
-  } catch (error) {
-    const message = error.message || "Local AI key setup failed.";
-    setLocalAiStatus("error", message);
-    setSaveStatus(message, "dirty");
-    return;
-  }
-  const provider = currentLocalAiProvider(settings);
-  const model = (aiAdministrationController?.readLocalForm?.().model || settings.model || DEFAULT_LOCAL_AI_MODEL).trim() || DEFAULT_LOCAL_AI_MODEL;
-  if (!provider?.pullModel) {
-    const message = "Model pull is available for Ollama in this build.";
-    setSaveStatus(message, "dirty");
-    return;
-  }
-  setLocalAiStatus("checking", `Pulling ${model}...`);
-  try {
-    await provider.pullModel(config, model, (progress) => {
-      if (progress?.status) setLocalAiStatus("checking", `Pulling ${model}: ${progress.status}`);
-    });
-    setLocalAiStatus("connected", `${model} is installed`);
-    await refreshLocalAiModels();
-    setSaveStatus(`${model} pulled`, "saved");
-  } catch (error) {
-    const message = error.message || `Could not pull ${model}.`;
-    setLocalAiStatus("error", message);
-    setSaveStatus(message, "dirty");
-  }
+  return aiProviderAdministrationOperationsController.pullModel();
 }
 
 async function testLocalAiPrompt() {
