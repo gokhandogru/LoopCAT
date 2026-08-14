@@ -1617,6 +1617,9 @@ const aiScopeSelectionService = appRuntime.featureFactories.createAiScopeSelecti
   },
   filters: { getVisibleIndexes: filteredSegmentIndexes }
 });
+const externalAiConsentService = appRuntime.featureFactories.createExternalAiConsentService({
+  confirm: uiConfirm
+});
 let aiPretranslationAbortController = null;
 const aiPretranslationController = appRuntime.featureFactories.createAiPretranslationController({
   editorSessionStore,
@@ -1632,7 +1635,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
   consent: {
-    externalShare: confirmExternalAiPromptShare,
+    externalShare: externalAiConsentService.confirmShare,
     overwrite: () =>
       uiConfirm(
         "Overwrite existing target text in eligible draft segments? Confirmed and locked segments are always preserved."
@@ -1749,7 +1752,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
     sharesExternally: (settings) =>
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
-  consent: { externalShare: confirmExternalAiPromptShare },
+  consent: { externalShare: externalAiConsentService.confirmShare },
   context: {
     findTerms,
     getTermBaseNames: projectTermBaseNames
@@ -1849,7 +1852,7 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
     sharesExternally: (settings) =>
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
-  consent: { externalShare: confirmExternalAiPromptShare },
+  consent: { externalShare: externalAiConsentService.confirmShare },
   domain: { repairSegmentTags: (options) => aiCommandService.repairSegmentTags(options) },
   lifecycle: {
     isRunning: () => state.localAi.running,
@@ -1950,7 +1953,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
     sharesExternally: (settings) =>
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
-  consent: { externalShare: confirmExternalAiPromptShare },
+  consent: { externalShare: externalAiConsentService.confirmShare },
   context: {
     activeTerms: (project, segment) =>
       findTerms({
@@ -2062,7 +2065,7 @@ const aiTerminologyApplicationController =
       sharesExternally: (settings) =>
         localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
     },
-    consent: { externalShare: confirmExternalAiPromptShare },
+    consent: { externalShare: externalAiConsentService.confirmShare },
     context: { termsForSegment: localAiGlossaryTermsForSegment },
     domain: { applyTerminology: (options) => aiCommandService.applyTerminology(options) },
     lifecycle: {
@@ -2163,7 +2166,7 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
     sharesExternally: (settings) =>
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
-  consent: { externalShare: confirmExternalAiPromptShare },
+  consent: { externalShare: externalAiConsentService.confirmShare },
   context: {
     termsForSegment: localAiGlossaryTermsForSegment,
     tmMatchesForSegment: localAiTmMatchesForSegment
@@ -2278,7 +2281,7 @@ const aiTerminologyExtractionController =
       sharesExternally: (settings) =>
         localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
     },
-    consent: { externalShare: confirmExternalAiPromptShare },
+    consent: { externalShare: externalAiConsentService.confirmShare },
     domain: {
       extractSegmentTerms: (options) => aiCommandService.extractSegmentTerms(options)
     },
@@ -2343,7 +2346,7 @@ const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBrie
     sharesExternally: (settings) =>
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
-  consent: { externalShare: confirmExternalAiPromptShare },
+  consent: { externalShare: externalAiConsentService.confirmShare },
   context: {
     getSampleSegments: aiScopeSelectionService.projectBriefSampleSegments,
     getDocuments: projectDocuments,
@@ -2508,7 +2511,7 @@ const aiOpenAiSuggestionController = appRuntime.featureFactories.createAiOpenAiS
     save: saveOpenAiKey,
     restore: safeRestoreOpenAiKeySnapshot
   },
-  consent: { externalShare: confirmExternalAiPromptShare },
+  consent: { externalShare: externalAiConsentService.confirmShare },
   persistence: { updateProject },
   context: { forSegment: aiContextForSegment },
   suggestions: {
@@ -2690,7 +2693,7 @@ const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestCon
     sharesExternally: (settings) =>
       localAiProviderSharesExternally(settings.providerId, settings.baseUrl, settings.model)
   },
-  consent: { externalShare: confirmExternalAiPromptShare },
+  consent: { externalShare: externalAiConsentService.confirmShare },
   lifecycle: {
     isRunning: () => state.localAi.running,
     isPromptBusy: () => state.localAi.promptBusy,
@@ -9043,23 +9046,6 @@ function cancelLocalAiBatch() {
   };
   renderLocalAiProgress();
   setSaveStatus("Canceling local AI batch...", "dirty");
-}
-
-function humanReadableList(items) {
-  const clean = [...new Set((items || []).map((item) => String(item || "").trim()).filter(Boolean))];
-  if (clean.length <= 1) return clean[0] || "";
-  if (clean.length === 2) return `${clean[0]} and ${clean[1]}`;
-  return `${clean.slice(0, -1).join(", ")}, and ${clean[clean.length - 1]}`;
-}
-
-function confirmExternalAiPromptShare({ provider, includesSourceText, contextLabels = [] }) {
-  const payloadItems = [
-    includesSourceText ? "selected/source text" : "",
-    "project instructions",
-    ...contextLabels
-  ];
-  const payload = humanReadableList(payloadItems);
-  return uiConfirm(`Open ${provider} and send ${payload} outside LoopCAT?`);
 }
 
 async function splitCurrentSegment() {

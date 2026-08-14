@@ -73,6 +73,7 @@ import { createAiPromptPreviewController } from "../features/ai/ai-prompt-previe
 import { createAiTermCandidatePersistenceService } from "../features/ai/ai-term-candidate-persistence-service.js";
 import { createAiSegmentContextService } from "../features/ai/ai-segment-context-service.js";
 import { createAiScopeSelectionService } from "../features/ai/ai-scope-selection-service.js";
+import { createExternalAiConsentService } from "../features/ai/external-ai-consent-service.js";
 import { createOpusCatHelpController } from "../features/ai/opus-cat-help-controller.js";
 import { createTmPretranslationDialogController } from "../features/resources/tm-pretranslation-dialog-controller.js";
 import { createResourcesController } from "../features/resources/resources-controller.js";
@@ -165,6 +166,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createAiTermCandidatePersistenceService,
       createAiSegmentContextService,
       createAiScopeSelectionService,
+      createExternalAiConsentService,
       createAutosaveService,
       createOpusCatHelpController,
       createAiProviderService,

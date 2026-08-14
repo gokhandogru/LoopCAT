@@ -189,6 +189,7 @@ const requiredReleaseFiles = [
   "src/features/ai/ai-term-candidate-persistence-service.js",
   "src/features/ai/ai-segment-context-service.js",
   "src/features/ai/ai-scope-selection-service.js",
+  "src/features/ai/external-ai-consent-service.js",
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
   "src/features/ai/ai-project-brief-controller.js",
@@ -218,6 +219,7 @@ const requiredReleaseFiles = [
   "tests/unit/ai-term-candidate-persistence-service.test.cjs",
   "tests/unit/ai-segment-context-service.test.cjs",
   "tests/unit/ai-scope-selection-service.test.cjs",
+  "tests/unit/external-ai-consent-service.test.cjs",
   "tests/unit/ai-alternatives-controller.test.cjs",
   "tests/unit/ai-draft-editing-controller.test.cjs",
   "tests/unit/ai-project-brief-controller.test.cjs",
@@ -370,6 +372,8 @@ const aiSegmentContextServiceJs = readText("src/features/ai/ai-segment-context-s
 const aiSegmentContextServiceUnitTests = readText("tests/unit/ai-segment-context-service.test.cjs");
 const aiScopeSelectionServiceJs = readText("src/features/ai/ai-scope-selection-service.js");
 const aiScopeSelectionServiceUnitTests = readText("tests/unit/ai-scope-selection-service.test.cjs");
+const externalAiConsentServiceJs = readText("src/features/ai/external-ai-consent-service.js");
+const externalAiConsentServiceUnitTests = readText("tests/unit/external-ai-consent-service.test.cjs");
 const aiPretranslationControllerJs = readText("src/features/ai/ai-pretranslation-controller.js");
 const aiPretranslationControllerUnitTests = readText("tests/unit/ai-pretranslation-controller.test.cjs");
 const aiReviewControllerJs = readText("src/features/ai/ai-review-controller.js");
@@ -2732,6 +2736,53 @@ for (const testName of [
     aiScopeSelectionServiceUnitTests,
     testName,
     `focused AI-scope-selection tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createExternalAiConsentService",
+  "The application runtime must expose the checked external-AI consent service boundary."
+);
+for (const boundary of [
+  "function humanReadableList(items)",
+  "...new Set((items || []).map((item) => String(item || \"\").trim()).filter(Boolean))",
+  'if (clean.length <= 1) return clean[0] || ""',
+  'if (clean.length === 2) return `${clean[0]} and ${clean[1]}`',
+  'return `${clean.slice(0, -1).join(", ")}, and ${clean[clean.length - 1]}`',
+  "function confirmShare({ provider, includesSourceText, contextLabels = [] })",
+  'includesSourceText ? "selected/source text" : ""',
+  '"project instructions"',
+  "...contextLabels",
+  "const payload = humanReadableList(payloadItems)",
+  "return options.confirm(`Open ${provider} and send ${payload} outside LoopCAT?`)"
+]) {
+  assertIncludes(
+    externalAiConsentServiceJs,
+    boundary,
+    `ExternalAiConsentService must retain checked ${boundary} disclosure and confirmation policy.`
+  );
+}
+assert(
+  (appJs.match(/externalAiConsentService\.confirmShare/g) || []).length === 10,
+  "Every local/hosted and direct OpenAI command family must consume the checked external-AI consent service."
+);
+assert(
+  !appJs.includes("function humanReadableList") &&
+    !appJs.includes("function confirmExternalAiPromptShare") &&
+    !appJs.includes("outside LoopCAT?`"),
+  "app.js must not regain external-AI disclosure normalization, list grammar, or confirmation-copy policy."
+);
+for (const testName of [
+  "external AI consent normalizes blank, trimmed, and duplicate disclosure labels in stable order",
+  "external AI consent preserves zero, one, two, and Oxford-comma list grammar",
+  "external AI consent includes source text, mandatory project instructions, and normalized context",
+  "external AI consent omits optional source text and deduplicates mandatory project instructions",
+  "external AI consent propagates accepted and canceled confirmation results unchanged"
+]) {
+  assertIncludes(
+    externalAiConsentServiceUnitTests,
+    testName,
+    `focused external-AI-consent tests must characterize ${testName}.`
   );
 }
 assertIncludes(
