@@ -1899,6 +1899,15 @@ assertIncludes(
   "targetEditController.bindTargetEditor",
   "app.js must delegate target textarea event wiring to TargetEditController."
 );
+assertIncludes(
+  appJs,
+  "targetEditController.normalizeSelection(options.selection, segment.target.length)",
+  "target restoration must normalize caret selection directly through TargetEditController."
+);
+assert(
+  !appJs.includes("function normalizedTargetSelection"),
+  "the target-selection normalization forwarding façade must not return."
+);
 assert(
   !appJs.includes("state.saveTimers") &&
     !appJs.includes("function queueSegmentSave") &&
@@ -1989,12 +1998,37 @@ assertIncludes(
   "targetProducerController.mount()",
   "app.js must delegate the Copy Source button lifecycle to TargetProducerController."
 );
-for (const delegation of [
-  "targetProducerController.insertTmTarget(target, options)",
+assertIncludes(
+  appJs,
+  "run: targetProducerController.copySourceToTarget",
+  "the command palette must route Copy Source directly to TargetProducerController."
+);
+assert(
+  appJs.split("targetProducerController.insertTmTarget(").length - 1 === 2,
+  "TM-match and concordance UI must route directly to TargetProducerController."
+);
+assert(
+  appJs.split("targetProducerController.insertProtectedTag(").length - 1 === 3,
+  "all three protected-tag UI paths must route directly to TargetProducerController."
+);
+for (const directWorkflowCall of [
   "targetProducerController.copySourceToTarget()",
-  "targetProducerController.insertProtectedTag(tagText)"
+  "targetProducerController.insertTmTarget(tmInsertedTarget",
+  "targetProducerController.insertTmTarget(concordanceTarget",
+  'targetProducerController.insertProtectedTag("<strong>")'
 ]) {
-  assertIncludes(appJs, delegation, `app.js must retain only the checked ${delegation} compatibility facade.`);
+  assertIncludes(
+    appWorkflowDriverJs,
+    directWorkflowCall,
+    `workflow characterization must call TargetProducerController directly: ${directWorkflowCall}.`
+  );
+}
+for (const removedFacade of [
+  "function insertTarget(",
+  "function copySourceToTarget(",
+  "function insertTagIntoTarget("
+]) {
+  assert(!appJs.includes(removedFacade), `${removedFacade} must not return after direct producer wiring.`);
 }
 assert(
   !appJs.includes("async function runTargetProducerCommand") &&

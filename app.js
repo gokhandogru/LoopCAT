@@ -5184,7 +5184,7 @@ function commandList() {
     { id: "confirm", label: "Confirm segment", run: confirmCurrentSegment, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(currentSegments().length) },
     { id: "focus-mode", label: currentFocusMode() ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(currentApplicationView() === "editor" && currentProject()) },
-    { id: "copy-source", label: "Copy source", run: copySourceToTarget, enabled: Boolean(currentSegment()) },
+    { id: "copy-source", label: "Copy source", run: targetProducerController.copySourceToTarget, enabled: Boolean(currentSegment()) },
     { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: splitCurrentSegment, enabled: Boolean(currentSegment() && canSplitSegmentStructure(currentSegment())) },
     { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: mergeWithNextSegment, enabled: Boolean(currentSegment() && canMergeSegmentStructures(currentSegment(), nextSegmentForMerge(currentSegment()))) },
     { id: "save-tm", label: "Save segment to TM", run: saveActiveSegmentToTm, enabled: Boolean(currentSegment()?.target?.trim()) },
@@ -6702,7 +6702,7 @@ function appendTextWithTags(container, text, tags, options = {}) {
         event.stopPropagation();
         const rowIndex = Number(container.closest("tr")?.dataset.index);
         const ready = Number.isInteger(rowIndex) ? setActiveSegment(rowIndex) : Promise.resolve();
-        ready.then(() => insertTagIntoTarget(tag.text));
+        ready.then(() => targetProducerController.insertProtectedTag(tag.text));
       });
     }
     container.append(chip);
@@ -6747,7 +6747,7 @@ function appendTextWithSourceMarkup(container, segment) {
         event.stopPropagation();
         const rowIndex = Number(container.closest("tr")?.dataset.index);
         const ready = Number.isInteger(rowIndex) ? setActiveSegment(rowIndex) : Promise.resolve();
-        ready.then(() => insertTagIntoTarget(marker.tag.text));
+        ready.then(() => targetProducerController.insertProtectedTag(marker.tag.text));
       });
       container.append(chip);
     } else {
@@ -6773,7 +6773,7 @@ function renderTagTray(row, segment) {
     chip.className = `tag-chip tag-chip-${tag.type || "placeholder"} tag-chip-action`;
     chip.textContent = tagDisplayText(tag);
     chip.title = `Insert protected text: ${tag.text}`;
-    chip.addEventListener("click", () => insertTagIntoTarget(tag.text));
+    chip.addEventListener("click", () => targetProducerController.insertProtectedTag(tag.text));
     tray.append(chip);
   });
   const targetCell = row.querySelector(".target-cell");
@@ -7106,7 +7106,9 @@ async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}
     renderRevisionHistory();
     await refreshSidebar();
     markWorkspaceDirty();
-    const selection = options.selection ? normalizedTargetSelection(options.selection, segment.target.length) : null;
+    const selection = options.selection
+      ? targetEditController.normalizeSelection(options.selection, segment.target.length)
+      : null;
     focusActiveTextarea(selection);
     return {
       recoveryToken: segmentId,
@@ -7457,7 +7459,7 @@ async function openConcordanceSearch() {
       insertButton.type = "button";
       insertButton.textContent = uiSource("Insert target");
       insertButton.addEventListener("click", () => {
-        insertTarget(entry.target, {
+        targetProducerController.insertTmTarget(entry.target, {
           channel: "concordance",
           resourceId: entry.id || ""
         });
@@ -7803,7 +7805,7 @@ async function refreshTmMatches() {
     const button = document.createElement("button");
     button.textContent = uiLabel("insert");
     button.addEventListener("click", () =>
-      insertTarget(match.target, {
+      targetProducerController.insertTmTarget(match.target, {
         channel: "match",
         resourceId: match.id || ""
       })
@@ -7918,22 +7920,6 @@ async function runProjectQa() {
     setSaveStatus(error.message || "QA checks failed", "dirty");
     return null;
   }
-}
-
-function normalizedTargetSelection(selection, targetLength) {
-  return targetEditController.normalizeSelection(selection, targetLength);
-}
-
-function insertTarget(target, options = {}) {
-  return targetProducerController.insertTmTarget(target, options);
-}
-
-function copySourceToTarget() {
-  return targetProducerController.copySourceToTarget();
-}
-
-function insertTagIntoTarget(tagText) {
-  return targetProducerController.insertProtectedTag(tagText);
 }
 
 async function saveProjectDomainFromForm() {

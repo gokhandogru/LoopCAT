@@ -2995,7 +2995,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "non-typing target producer starts with a pending EditTarget session"
     );
     clearWorkspaceDirtyMarkers();
-    const copySourceCommand = await copySourceToTarget();
+    const copySourceCommand = await targetProducerController.copySourceToTarget();
     const copiedSourcePatch = targetCommandPatch(currentSegments()[segmentIndex]);
     assert(
       copySourceCommand?.receipt?.commandId === "copy-source-to-target" &&
@@ -3039,7 +3039,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await setActiveSegment(segmentIndex);
     const beforeTmInsert = targetCommandPatch(currentSegments()[segmentIndex]);
     const tmInsertedTarget = `TM inserted target ${Date.now()}`;
-    const tmInsertCommand = await insertTarget(tmInsertedTarget, { channel: "match", resourceId: "workflow-tm-match" });
+    const tmInsertCommand = await targetProducerController.insertTmTarget(tmInsertedTarget, { channel: "match", resourceId: "workflow-tm-match" });
     assert(
       tmInsertCommand?.receipt?.commandId === "insert-tm-target" &&
         tmInsertCommand.receipt.provenance?.channel === "match" &&
@@ -3076,7 +3076,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "TM target Redo persists the insertion with a monotonic revision"
     );
     const concordanceTarget = `Concordance inserted target ${Date.now()}`;
-    const concordanceCommand = await insertTarget(concordanceTarget, {
+    const concordanceCommand = await targetProducerController.insertTmTarget(concordanceTarget, {
       channel: "concordance",
       resourceId: "workflow-concordance-entry"
     });
@@ -6087,7 +6087,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     taggedTextarea?.setSelectionRange(0, 0);
     const beforeProtectedTagInsert = targetCommandPatch(currentSegments()[taggedIndex]);
     clearWorkspaceDirtyMarkers();
-    const protectedTagCommand = await insertTagIntoTarget("<strong>");
+    const protectedTagCommand = await targetProducerController.insertProtectedTag("<strong>");
     await flushPendingSegmentSaves(project.id);
     const protectedTagApplied = targetCommandPatch(currentSegments()[taggedIndex]);
     taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
