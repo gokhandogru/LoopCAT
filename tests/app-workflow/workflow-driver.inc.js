@@ -13,6 +13,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     normalizeProjectSettings: defaultAiSettings,
     runtimeConfig: localAiRuntimeConfig
   } = aiRuntimeSettingsService;
+  const { renderProvider: renderLocalAiProviderControls } = aiProviderFormController;
   const out = [];
   const publishProgress = () => {
     let output = document.querySelector("#appWorkflowTestResults");

@@ -1269,13 +1269,13 @@ const aiAdministrationController = appRuntime?.featureFactories?.createAiAdminis
     extractTermsBatch: extractBatchTermsWithLocalAi,
     pretranslate: pretranslateWithLocalAi,
     projectBrief: generateProjectBriefWithLocalAi,
-    presetChange: handleLocalAiPresetChange,
-    providerChange: handleLocalAiProviderChange,
-    baseUrlInput: handleLocalAiBaseUrlInput,
-    clearLocalKey: handleClearLocalAiKey,
-    clearOpenAiKey: handleClearOpenAiKey,
-    formChanged: handleLocalAiFormChanged,
-    languageChanged: handleLocalAiLanguageChanged
+    presetChange: (...args) => aiProviderFormController.handlePresetChange(...args),
+    providerChange: (...args) => aiProviderFormController.handleProviderChange(...args),
+    baseUrlInput: (...args) => aiProviderFormController.handleBaseUrlInput(...args),
+    clearLocalKey: (...args) => aiProviderFormController.handleClearLocalKey(...args),
+    clearOpenAiKey: (...args) => aiProviderFormController.handleClearOpenAiKey(...args),
+    formChanged: (...args) => aiProviderFormController.handleFormChanged(...args),
+    languageChanged: (...args) => aiProviderFormController.handleLanguageChanged(...args)
   },
   source: uiSource,
   onError: (error) => setSaveStatus(error?.message || "AI action failed.", "dirty")
@@ -1716,6 +1716,58 @@ const aiProviderPresentationService =
       model: DEFAULT_LOCAL_AI_MODEL
     }
   });
+const aiProviderFormController =
+  appRuntime.featureFactories.createAiProviderFormController({
+    administration: aiAdministrationController,
+    settings: {
+      readForm: aiRuntimeSettingsService.localSettingsFromForm,
+      readProject: (project) => localAISettingsStore.projectSettings(project)
+    },
+    project: { get: currentProject, getSegment: currentSegment },
+    providers: {
+      get: (providerId) => aiProviderService.get(providerId),
+      presets: LOCAL_AI_PROVIDER_PRESETS,
+      getPreset: localAiProviderPresetById,
+      presetForSettings: localAiProviderPresetForSettings,
+      needsApiKey: localAiProviderNeedsApiKey
+    },
+    presentation: aiProviderPresentationService,
+    credentials: {
+      localSnapshot: aiCredentialStorageService.localAiSnapshot,
+      readLocal: aiCredentialStorageService.storedLocalAiKey
+    },
+    runtime: { canStartServer: canStartLmStudioServer },
+    languages: {
+      normalizeInput: normalizeLanguageInputValue,
+      nameForUi: languageNameForUi,
+      shouldLiveSync: shouldLiveSyncLanguageInput
+    },
+    prompt: {
+      render: renderLocalAiPromptPreview,
+      previewRequest: localAiPromptPreviewRequest
+    },
+    help: { hideOpusCat: () => setOpusCatConnectionHelpVisible(false) },
+    keys: { clearLocal: clearLocalAiKey, clearOpenAi: clearOpenAiKey },
+    state: {
+      read: () => state.localAi,
+      clearModels: () => {
+        state.localAi.models = [];
+      },
+      setStatus: ({ connectionStatus, statusText }) => {
+        state.localAi.connectionStatus = connectionStatus;
+        state.localAi.statusText = statusText;
+      }
+    },
+    status: { setSave: setSaveStatus },
+    localization: { label: uiLabel, source: uiSource },
+    redact: redactSensitiveText,
+    defaults: {
+      localBaseUrl: OLLAMA_DEFAULT_BASE_URL,
+      localModel: DEFAULT_LOCAL_AI_MODEL,
+      openAiModel: OPENAI_DEFAULT_MODEL,
+      geminiModel: GEMINI_DEFAULT_MODEL
+    }
+  });
 let aiPretranslationAbortController = null;
 const aiPretranslationController = appRuntime.featureFactories.createAiPretranslationController({
   editorSessionStore,
@@ -1801,8 +1853,8 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
     renderSegments,
     renderProjectProgress: renderProgress,
     renderHistory: renderRevisionHistory,
-    renderAiProgress: renderLocalAiProgress,
-    renderCommandCentre: renderLocalAiCommandCentre,
+    renderAiProgress: aiProviderFormController.renderProgress,
+    renderCommandCentre: aiProviderFormController.renderCommandCentre,
     refreshSidebar
   },
   activity: {
@@ -1898,9 +1950,9 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
     prepareHistories: prepareSegmentHistoryStates
   },
   presentation: {
-    renderCommandCentre: renderLocalAiCommandCentre,
-    renderAiProgress: renderLocalAiProgress,
-    renderOutput: renderLocalAiOutput,
+    renderCommandCentre: aiProviderFormController.renderCommandCentre,
+    renderAiProgress: aiProviderFormController.renderProgress,
+    renderOutput: aiProviderFormController.renderOutput,
     renderReview: renderReviewPanel,
     updateRow,
     renderAll,
@@ -2004,9 +2056,9 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
     prepareHistories: prepareSegmentHistoryStates
   },
   presentation: {
-    renderCommandCentre: renderLocalAiCommandCentre,
-    renderAiProgress: renderLocalAiProgress,
-    renderOutput: renderLocalAiOutput,
+    renderCommandCentre: aiProviderFormController.renderCommandCentre,
+    renderAiProgress: aiProviderFormController.renderProgress,
+    renderOutput: aiProviderFormController.renderOutput,
     renderAll,
     refreshSidebar
   },
@@ -2111,9 +2163,9 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
     prepareHistories: prepareSegmentHistoryStates
   },
   presentation: {
-    renderCommandCentre: renderLocalAiCommandCentre,
-    renderAiProgress: renderLocalAiProgress,
-    renderOutput: renderLocalAiOutput,
+    renderCommandCentre: aiProviderFormController.renderCommandCentre,
+    renderAiProgress: aiProviderFormController.renderProgress,
+    renderOutput: aiProviderFormController.renderOutput,
     renderSuggestions: renderAiSuggestions,
     updateRow,
     renderAll,
@@ -2218,9 +2270,9 @@ const aiTerminologyApplicationController =
       prepareHistories: prepareSegmentHistoryStates
     },
     presentation: {
-      renderCommandCentre: renderLocalAiCommandCentre,
-      renderAiProgress: renderLocalAiProgress,
-      renderOutput: renderLocalAiOutput,
+      renderCommandCentre: aiProviderFormController.renderCommandCentre,
+      renderAiProgress: aiProviderFormController.renderProgress,
+      renderOutput: aiProviderFormController.renderOutput,
       renderSuggestions: renderAiSuggestions,
       updateRow,
       renderAll,
@@ -2327,9 +2379,9 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
     prepareHistories: prepareSegmentHistoryStates
   },
   presentation: {
-    renderCommandCentre: renderLocalAiCommandCentre,
-    renderAiProgress: renderLocalAiProgress,
-    renderOutput: renderLocalAiOutput,
+    renderCommandCentre: aiProviderFormController.renderCommandCentre,
+    renderAiProgress: aiProviderFormController.renderProgress,
+    renderOutput: aiProviderFormController.renderOutput,
     renderAll,
     refreshSidebar
   },
@@ -2409,9 +2461,9 @@ const aiTerminologyExtractionController =
       }
     },
     presentation: {
-      renderCommandCentre: renderLocalAiCommandCentre,
-      renderAiProgress: renderLocalAiProgress,
-      renderOutput: renderLocalAiOutput,
+      renderCommandCentre: aiProviderFormController.renderCommandCentre,
+      renderAiProgress: aiProviderFormController.renderProgress,
+      renderOutput: aiProviderFormController.renderOutput,
       refreshProjectTerms: () => refreshProjectTerms({ rerender: true }),
       refreshTerms
     },
@@ -2475,8 +2527,8 @@ const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBrie
     setStyleGuide: (value) => aiAdministrationController?.setGlobalStyleGuide?.(value)
   },
   presentation: {
-    renderCommandCentre: renderLocalAiCommandCentre,
-    renderOutput: renderLocalAiOutput
+    renderCommandCentre: aiProviderFormController.renderCommandCentre,
+    renderOutput: aiProviderFormController.renderOutput
   },
   activity: {
     log: (details) =>
@@ -2726,17 +2778,17 @@ const aiProviderAdministrationOperationsController =
       }
     },
     presentation: {
-      renderPresets: renderLocalAiPresetOptions,
-      renderProvider: renderLocalAiProviderControls,
+      renderPresets: aiProviderFormController.renderPresets,
+      renderProvider: aiProviderFormController.renderProvider,
       renderPrompt: renderLocalAiPromptPreview,
-      renderModels: renderLocalAiModelOptions
+      renderModels: aiProviderFormController.renderModels
     },
     help: {
       setVisible: (visible) => opusCatHelpController?.setVisible?.(visible),
       open: () => opusCatHelpController?.open?.()
     },
     status: {
-      setConnection: setLocalAiStatus,
+      setConnection: aiProviderFormController.setStatus,
       setSave: setSaveStatus
     },
     defaults: { model: DEFAULT_LOCAL_AI_MODEL }
@@ -2810,8 +2862,8 @@ const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestCon
     }
   },
   presentation: {
-    renderCommandCentre: renderLocalAiCommandCentre,
-    renderOutput: renderLocalAiOutput
+    renderCommandCentre: aiProviderFormController.renderCommandCentre,
+    renderOutput: aiProviderFormController.renderOutput
   },
   status: { set: setSaveStatus }
 });
@@ -4213,11 +4265,14 @@ function clearLocalAiKey() {
   try {
     aiCredentialStorageService.saveLocalAiKey("", false, settings);
   } catch (error) {
-    setLocalAiStatus("error", redactSensitiveText(error.message || "Local AI key could not be cleared."));
+    aiProviderFormController.setStatus(
+      "error",
+      redactSensitiveText(error.message || "Local AI key could not be cleared.")
+    );
     return false;
   }
   aiAdministrationController?.clearLocalAiSecret?.();
-  setLocalAiStatus("disconnected", "Local AI key cleared for this provider");
+  aiProviderFormController.setStatus("disconnected", "Local AI key cleared for this provider");
   return true;
 }
 
@@ -5041,26 +5096,6 @@ function renderFrequentLanguagePairs() {
     const active = source === current.sourceLang && target === current.targetLang;
     return `<button type="button" class="${active ? "active" : ""}" data-source-lang="${escapeHtml(source)}" data-target-lang="${escapeHtml(target)}">${escapeHtml(languagePairDisplay(source, target))}</button>`;
   }).join(""));
-}
-
-function syncLocalAiLanguageFields(changedField = "") {
-  const form = aiAdministrationController?.readLocalForm?.() || {};
-  const sourceCode = changedField === "sourceLanguage"
-    ? normalizeLanguageInputValue(form.sourceLanguage || currentProject()?.sourceLang || "")
-    : normalizeLanguageInputValue(form.sourceCode || form.sourceLanguage || currentProject()?.sourceLang || "");
-  const targetCode = changedField === "targetLanguage"
-    ? normalizeLanguageInputValue(form.targetLanguage || currentProject()?.targetLang || "")
-    : normalizeLanguageInputValue(form.targetCode || form.targetLanguage || currentProject()?.targetLang || "");
-  const fields = {};
-  if (sourceCode) {
-    if (changedField !== "sourceLanguage") fields.sourceLanguage = languageNameForUi(sourceCode);
-    if (changedField !== "sourceCode") fields.sourceCode = sourceCode;
-  }
-  if (targetCode) {
-    if (changedField !== "targetLanguage") fields.targetLanguage = languageNameForUi(targetCode);
-    if (changedField !== "targetCode") fields.targetCode = targetCode;
-  }
-  aiAdministrationController?.setLanguageFields?.(fields);
 }
 
 function selectedEditorText() {
@@ -6074,26 +6109,6 @@ function renderAll() {
   renderProgress();
 }
 
-function setLocalAiStatus(status, text) {
-  state.localAi.connectionStatus = status || "disconnected";
-  state.localAi.statusText = redactSensitiveText(text || "");
-  aiAdministrationController?.renderStatus?.({
-    connectionStatus: state.localAi.connectionStatus,
-    text: state.localAi.statusText || "Disconnected"
-  });
-}
-
-function renderLocalAiModelOptions(settings) {
-  const currentModel = settings.model || DEFAULT_LOCAL_AI_MODEL;
-  const models = state.localAi.models || [];
-  aiAdministrationController?.renderModels?.({
-    models,
-    currentModel,
-    emptyLabel: "Refresh models",
-    manualLabel: uiSource("{value1} (manual)", { value1: currentModel })
-  });
-}
-
 function localAiSampleText() {
   return aiPromptPreviewController.getSampleText();
 }
@@ -6127,205 +6142,6 @@ function localAiPromptPreviewRequest(
 
 function renderLocalAiPromptPreview() {
   return aiPromptPreviewController.render();
-}
-
-function renderLocalAiProgress() {
-  aiAdministrationController?.renderProgress?.({
-    running: state.localAi.running,
-    value: state.localAi.progress
-  });
-}
-
-function renderLocalAiOutput(value, options) {
-  aiAdministrationController?.renderOutput?.(value, options);
-}
-
-function renderLocalAiProviderControls(settings) {
-  const provider = aiProviderService.get(settings.providerId);
-  const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
-  const canPull = aiProviderPresentationService.canPullModel(settings, provider);
-  aiAdministrationController?.renderProvider?.({
-    privacyText: aiProviderPresentationService.privacyText(settings),
-    summary: aiProviderPresentationService.summaryView(settings),
-    running: state.localAi.running,
-    promptBusy: state.localAi.promptBusy,
-    canPull,
-    pullLabel: canPull
-      ? uiSource("Pull {value1}", { value1: settings.model || DEFAULT_LOCAL_AI_MODEL })
-      : uiSource("Pull unavailable"),
-    canStartServer: canStartLmStudioServer(settings),
-    needsKey,
-    rememberLocalKey: Boolean(aiCredentialStorageService.localAiSnapshot(settings).local),
-    storedLocalKey: aiCredentialStorageService.storedLocalAiKey(settings)
-  });
-}
-
-function localAiPresetGroupLabel(preset) {
-  if (!preset) return uiLabel("hostedProviders");
-  if (preset.id === "ollama-local" || preset.id === "lm-studio" || preset.id === "opus-cat") return uiLabel("localRuntimes");
-  if (preset.id === "ollama-local-cloud" || preset.id === "ollama-cloud") return uiLabel("ollamaHostedCloud");
-  if (preset.id === "azure-openai") return uiLabel("managedDeployments");
-  if (["groq", "together", "openrouter", "huggingface", "deepinfra", "fireworks"].includes(preset.id)) return uiSource("Hosted routers");
-  return uiLabel("hostedProviders");
-}
-
-function renderLocalAiPresetOptions(settings) {
-  const currentPreset = localAiProviderPresetForSettings(settings);
-  const currentValue = currentPreset?.id || "custom";
-  const groups = new Map();
-  LOCAL_AI_PROVIDER_PRESETS.forEach((preset) => {
-    const groupLabel = localAiPresetGroupLabel(preset);
-    const group = groups.get(groupLabel) || [];
-    group.push({ id: preset.id, label: preset.label });
-    groups.set(groupLabel, group);
-  });
-  aiAdministrationController?.renderPresets?.({
-    groups: Array.from(groups, ([label, options]) => ({ label, options })),
-    currentPresetId: currentValue,
-    customLabel: "Custom provider"
-  });
-}
-
-function applyLocalAiProviderPreset(presetId) {
-  const preset = localAiProviderPresetById(presetId);
-  if (!preset) return;
-  aiAdministrationController?.setProviderFields?.({
-    providerId: preset.providerId,
-    baseUrl: preset.baseUrl,
-    model: preset.model
-  });
-  state.localAi.models = [];
-  setOpusCatConnectionHelpVisible(false);
-  setLocalAiStatus("disconnected", `${preset.label} selected`);
-  const settings = aiRuntimeSettingsService.localSettingsFromForm();
-  renderLocalAiPresetOptions(settings);
-  renderLocalAiProviderControls(settings);
-  renderLocalAiModelOptions(settings);
-  renderLocalAiPromptPreview();
-}
-
-function handleLocalAiPresetChange(presetId) {
-  if (presetId !== "custom") {
-    applyLocalAiProviderPreset(presetId);
-    return;
-  }
-  renderLocalAiProviderControls(aiRuntimeSettingsService.localSettingsFromForm());
-  renderLocalAiPromptPreview();
-}
-
-function handleLocalAiProviderChange(providerId) {
-  const provider = aiProviderService.get(providerId);
-  aiAdministrationController?.setProviderFields?.({
-    providerId,
-    baseUrl: provider?.defaultBaseUrl || OLLAMA_DEFAULT_BASE_URL,
-    model:
-      provider?.defaultModel ||
-      (providerId === "openai"
-        ? OPENAI_DEFAULT_MODEL
-        : providerId === "gemini"
-          ? GEMINI_DEFAULT_MODEL
-          : DEFAULT_LOCAL_AI_MODEL)
-  });
-  state.localAi.models = [];
-  setOpusCatConnectionHelpVisible(false);
-  setLocalAiStatus("disconnected", "Disconnected");
-  const settings = aiRuntimeSettingsService.localSettingsFromForm();
-  renderLocalAiPresetOptions(settings);
-  renderLocalAiProviderControls(settings);
-  renderLocalAiModelOptions(settings);
-  renderLocalAiPromptPreview();
-}
-
-function handleLocalAiBaseUrlInput() {
-  setOpusCatConnectionHelpVisible(false);
-  setLocalAiStatus("disconnected", "Disconnected");
-  const settings = aiRuntimeSettingsService.localSettingsFromForm();
-  renderLocalAiPresetOptions(settings);
-  renderLocalAiProviderControls(settings);
-}
-
-function handleClearLocalAiKey() {
-  if (clearLocalAiKey()) setSaveStatus("Local AI key cleared from this browser", "saved");
-}
-
-function handleClearOpenAiKey() {
-  if (clearOpenAiKey()) setSaveStatus("OpenAI key cleared from this browser", "saved");
-}
-
-function handleLocalAiFormChanged({ providerChanged = false } = {}) {
-  if (providerChanged) {
-    renderLocalAiProviderControls(aiRuntimeSettingsService.localSettingsFromForm());
-  }
-  renderLocalAiPromptPreview();
-}
-
-function handleLocalAiLanguageChanged(field, value, eventType) {
-  if (eventType !== "input" || shouldLiveSyncLanguageInput({ value })) syncLocalAiLanguageFields(field);
-  renderLocalAiPromptPreview();
-}
-
-function renderLocalAiCommandCentre() {
-  const settings = localAISettingsStore.projectSettings(currentProject());
-  const currentPreset = localAiProviderPresetForSettings(settings);
-  const groups = new Map();
-  LOCAL_AI_PROVIDER_PRESETS.forEach((preset) => {
-    const groupLabel = localAiPresetGroupLabel(preset);
-    const group = groups.get(groupLabel) || [];
-    group.push({ id: preset.id, label: preset.label });
-    groups.set(groupLabel, group);
-  });
-  const provider = aiProviderService.get(settings.providerId);
-  const canPull = aiProviderPresentationService.canPullModel(settings, provider);
-  const needsKey = localAiProviderNeedsApiKey(settings.providerId, settings.baseUrl);
-  aiAdministrationController?.render?.({
-    settings: {
-      ...settings,
-      sourceLanguage: settings.sourceLanguage || languageNameForUi(settings.sourceCode || currentProject()?.sourceLang),
-      sourceCode: normalizeLanguageInputValue(settings.sourceCode || currentProject()?.sourceLang),
-      targetLanguage: settings.targetLanguage || languageNameForUi(settings.targetCode || currentProject()?.targetLang),
-      targetCode: normalizeLanguageInputValue(settings.targetCode || currentProject()?.targetLang)
-    },
-    presets: {
-      groups: Array.from(groups, ([label, options]) => ({ label, options })),
-      currentPresetId: currentPreset?.id || "custom",
-      customLabel: "Custom provider"
-    },
-    models: {
-      models: state.localAi.models || [],
-      currentModel: settings.model || DEFAULT_LOCAL_AI_MODEL,
-      emptyLabel: "Refresh models",
-      manualLabel: uiSource("{value1} (manual)", { value1: settings.model || DEFAULT_LOCAL_AI_MODEL })
-    },
-    provider: {
-      privacyText: aiProviderPresentationService.privacyText(settings),
-      summary: aiProviderPresentationService.summaryView(settings),
-      running: state.localAi.running,
-      promptBusy: state.localAi.promptBusy,
-      canPull,
-      pullLabel: canPull
-        ? uiSource("Pull {value1}", { value1: settings.model || DEFAULT_LOCAL_AI_MODEL })
-        : uiSource("Pull unavailable"),
-      canStartServer: canStartLmStudioServer(settings),
-      needsKey,
-      rememberLocalKey: Boolean(aiCredentialStorageService.localAiSnapshot(settings).local),
-      storedLocalKey: aiCredentialStorageService.storedLocalAiKey(settings)
-    },
-    status: {
-      connectionStatus: state.localAi.connectionStatus,
-      text: state.localAi.statusText || "Disconnected"
-    },
-    progress: {
-      running: state.localAi.running,
-      value: state.localAi.progress
-    },
-    promptPreview: localAiPromptPreviewRequest(settings).prompt,
-    availability: {
-      hasProject: Boolean(currentProject()),
-      hasSegment: Boolean(currentSegment()),
-      running: state.localAi.running,
-      promptBusy: state.localAi.promptBusy
-    }
-  });
 }
 
 async function persistLocalAiSettings(options = {}) {
@@ -6401,7 +6217,7 @@ function renderEditor() {
     rememberKey: Boolean(aiCredentialStorageService.openAiSnapshot().local),
     storageText: `OpenAI key: ${aiCredentialStorageService.openAiStorageLabel()}. API keys stay in this browser and are never exported with project packages.`
   });
-  renderLocalAiCommandCentre();
+  aiProviderFormController.renderCommandCentre();
   renderQualityWorkbench();
   renderTermbaseSelect();
 }
@@ -8609,7 +8425,7 @@ function cancelLocalAiBatch() {
     ...(state.localAi.progress || {}),
     canceled: true
   };
-  renderLocalAiProgress();
+  aiProviderFormController.renderProgress();
   setSaveStatus("Canceling local AI batch...", "dirty");
 }
 

@@ -74,6 +74,7 @@ import {
   createAiCredentialStorageService
 } from "../features/ai/ai-credential-storage-service.js";
 import { createAiRuntimeSettingsService } from "../features/ai/ai-runtime-settings-service.js";
+import { createAiProviderFormController } from "../features/ai/ai-provider-form-controller.js";
 import { createAiPromptTestController } from "../features/ai/ai-prompt-test-controller.js";
 import { createAiPromptPreviewController } from "../features/ai/ai-prompt-preview-controller.js";
 import { createAiTermCandidatePersistenceService } from "../features/ai/ai-term-candidate-persistence-service.js";
@@ -170,6 +171,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createAiSuggestionPersistenceController,
       createAiSettingsPersistenceController,
       createAiProviderAdministrationOperationsController,
+      createAiProviderFormController,
       createAiProviderPresentationService,
       createAiPromptTestController,
       createAiPromptPreviewController,

@@ -364,6 +364,8 @@ const aiProviderAdministrationOperationsControllerUnitTests = readText(
 );
 const aiProviderPresentationServiceJs = readText("src/features/ai/ai-provider-presentation-service.js");
 const aiProviderPresentationServiceUnitTests = readText("tests/unit/ai-provider-presentation-service.test.cjs");
+const aiProviderFormControllerJs = readText("src/features/ai/ai-provider-form-controller.js");
+const aiProviderFormControllerUnitTests = readText("tests/unit/ai-provider-form-controller.test.cjs");
 const aiCredentialStorageServiceJs = readText("src/features/ai/ai-credential-storage-service.js");
 const aiCredentialStorageServiceUnitTests = readText("tests/unit/ai-credential-storage-service.test.cjs");
 const aiRuntimeSettingsServiceJs = readText("src/features/ai/ai-runtime-settings-service.js");
@@ -1440,9 +1442,7 @@ assert(
 );
 assert(
   !aiRuntimeSettingsServiceJs.includes("els.localAi") &&
-    !functionBody(appJs, "function renderLocalAiCommandCentre", "async function persistLocalAiSettings").includes(
-      "els.localAi"
-    ) &&
+    !aiProviderFormControllerJs.includes("els.localAi") &&
     (appJs.match(/els\.localAiPromptOutput/g) || []).length === 1,
   "AI provider form values, command-centre rendering, and output presentation must be owned by the checked controller."
 );
@@ -2564,7 +2564,11 @@ for (const [start, end, delegation] of [
     "function renderLocalAiPromptPreview",
     "return aiPromptPreviewController.createRequest(settings, mode)"
   ],
-  ["function renderLocalAiPromptPreview", "function renderLocalAiProgress", "return aiPromptPreviewController.render()"]
+  [
+    "function renderLocalAiPromptPreview",
+    "async function persistLocalAiSettings",
+    "return aiPromptPreviewController.render()"
+  ]
 ]) {
   const facade = functionBody(appJs, start, end);
   assertIncludes(facade, delegation, `${start} must delegate to the checked AI-prompt-preview controller.`);
@@ -2835,13 +2839,26 @@ for (const boundary of [
     `AiProviderPresentationService must retain checked ${boundary} view-model policy.`
   );
 }
-for (const consumer of [
+assertIncludes(
+  appJs,
+  "presentation: aiProviderPresentationService",
+  "AI provider form orchestration must receive the checked provider-presentation service."
+);
+assertIncludes(
+  appJs,
   "canPullModel: aiProviderPresentationService.canPullModel",
-  "aiProviderPresentationService.canPullModel(settings, provider)",
-  "aiProviderPresentationService.privacyText(settings)",
-  "aiProviderPresentationService.summaryView(settings)"
+  "AI provider operations must retain the checked model-pull predicate."
+);
+for (const consumer of [
+  "presentation.canPullModel(settings, provider)",
+  "presentation.privacyText(settings)",
+  "presentation.summaryView(settings)"
 ]) {
-  assertIncludes(appJs, consumer, `AI provider presentation consumer must use the checked service: ${consumer}.`);
+  assertIncludes(
+    aiProviderFormControllerJs,
+    consumer,
+    `AI provider form consumer must use the checked presentation service: ${consumer}.`
+  );
 }
 for (const removedFacade of [
   "function localAiPrivacyText",
@@ -3009,8 +3026,7 @@ for (const consumer of [
 }
 assert(
   appJs.indexOf("const aiRuntimeSettingsService =") >= 0 &&
-    appJs.indexOf("const aiRuntimeSettingsService =") <
-      appJs.indexOf("const aiSegmentContextService ="),
+    appJs.indexOf("const aiRuntimeSettingsService =") < appJs.indexOf("const aiSegmentContextService ="),
   "AI credential/runtime settings services must initialize before eager segment-context consumers."
 );
 for (const removedFacade of [
@@ -3038,6 +3054,103 @@ for (const testName of [
     aiRuntimeSettingsServiceUnitTests,
     testName,
     `focused AI-runtime-settings tests must characterize ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  "createAiProviderFormController",
+  "The application runtime must expose the checked AI provider-form controller boundary."
+);
+for (const boundary of [
+  "const ROUTER_PRESET_IDS = new Set([",
+  "function setStatus(connectionStatus, text)",
+  "function modelView(settings)",
+  "function renderProgress()",
+  "function renderOutput(value, renderOptions)",
+  "function providerView(settings)",
+  "function presetGroupLabel(preset)",
+  '"ollama-local", "lm-studio", "opus-cat"',
+  '"ollama-local-cloud", "ollama-cloud"',
+  'preset.id === "azure-openai"',
+  "function presetGroups()",
+  "function presetView(settings)",
+  "function applyPreset(presetId)",
+  "function handlePresetChange(presetId)",
+  "function handleProviderChange(providerId)",
+  "function handleBaseUrlInput()",
+  "function handleClearLocalKey()",
+  "function handleClearOpenAiKey()",
+  "function handleFormChanged({ providerChanged = false } = {})",
+  'function syncLanguageFields(changedField = "")',
+  "function handleLanguageChanged(field, value, eventType)",
+  "function renderCommandCentre()",
+  'status.setSave("Local AI key cleared from this browser", "saved")',
+  'status.setSave("OpenAI key cleared from this browser", "saved")'
+]) {
+  assertIncludes(
+    aiProviderFormControllerJs,
+    boundary,
+    `AiProviderFormController must retain checked ${boundary} view-model and transition orchestration.`
+  );
+}
+for (const consumer of [
+  "appRuntime.featureFactories.createAiProviderFormController({",
+  "presetChange: (...args) => aiProviderFormController.handlePresetChange(...args)",
+  "providerChange: (...args) => aiProviderFormController.handleProviderChange(...args)",
+  "renderCommandCentre: aiProviderFormController.renderCommandCentre",
+  "renderAiProgress: aiProviderFormController.renderProgress",
+  "renderOutput: aiProviderFormController.renderOutput",
+  "renderPresets: aiProviderFormController.renderPresets",
+  "renderProvider: aiProviderFormController.renderProvider",
+  "renderModels: aiProviderFormController.renderModels",
+  "setConnection: aiProviderFormController.setStatus"
+]) {
+  assertIncludes(appJs, consumer, `AI provider-form consumer must use the checked controller: ${consumer}.`);
+}
+assert(
+  appJs.indexOf("const aiProviderPresentationService =") >= 0 &&
+    appJs.indexOf("const aiProviderPresentationService =") < appJs.indexOf("const aiProviderFormController =") &&
+    appJs.indexOf("const aiProviderFormController =") < appJs.indexOf("const aiPretranslationController ="),
+  "AI provider form orchestration must initialize after presentation policy and before AI command consumers."
+);
+for (const removedFacade of [
+  "function syncLocalAiLanguageFields",
+  "function setLocalAiStatus",
+  "function renderLocalAiModelOptions",
+  "function renderLocalAiProgress",
+  "function renderLocalAiOutput",
+  "function renderLocalAiProviderControls",
+  "function localAiPresetGroupLabel",
+  "function renderLocalAiPresetOptions",
+  "function applyLocalAiProviderPreset",
+  "function handleLocalAiPresetChange",
+  "function handleLocalAiProviderChange",
+  "function handleLocalAiBaseUrlInput",
+  "function handleClearLocalAiKey",
+  "function handleClearOpenAiKey",
+  "function handleLocalAiFormChanged",
+  "function handleLocalAiLanguageChanged",
+  "function renderLocalAiCommandCentre"
+]) {
+  assert(
+    !appJs.includes(removedFacade),
+    `app.js must not regain coordinator-private AI provider-form orchestration: ${removedFacade}.`
+  );
+}
+for (const testName of [
+  "AI provider form preserves redacted status, model, progress, and output presentation",
+  "AI provider form preserves provider controls and credential summaries",
+  "AI provider form preserves stable preset groups and current or custom selection",
+  "AI provider preset transitions preserve fields, state clearing, status, and refresh order",
+  "AI provider and base URL transitions preserve provider-specific defaults and refresh subsets",
+  "AI provider form preserves key-clear, general form, and live language transition behavior",
+  "AI provider form preserves language synchronization direction and project fallbacks",
+  "AI provider form composes the complete command-centre view model"
+]) {
+  assertIncludes(
+    aiProviderFormControllerUnitTests,
+    testName,
+    `focused AI-provider-form tests must characterize ${testName}.`
   );
 }
 assertIncludes(
@@ -6036,9 +6149,9 @@ assertIncludes(
   "app.js must pass nearby segment context into Local AI pretranslation."
 );
 assertIncludes(
-  appJs,
-  "aiProviderPresentationService.summaryView(settings)",
-  "app.js must render checked AI provider locality, key, and endpoint details."
+  aiProviderFormControllerJs,
+  "presentation.summaryView(settings)",
+  "the checked AI provider form controller must render provider locality, key, and endpoint details."
 );
 assertIncludes(
   aiJs,
