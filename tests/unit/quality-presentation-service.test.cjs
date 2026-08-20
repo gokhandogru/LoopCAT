@@ -17,6 +17,12 @@ function createHarness(createQualityPresentationService, overrides = {}) {
         calls.push(["source", value]);
         if (overrides.localizationError) throw overrides.localizationError;
         return `localized:${String(value)}`;
+      },
+      label(key) {
+        calls.push(["label", key]);
+        if (overrides.labelErrorKey === key) throw overrides.labelError;
+        if (Object.hasOwn(overrides.labelValues || {}, key)) return overrides.labelValues[key];
+        return `label:${key}`;
       }
     },
     baseCategoryLabel: overrides.withoutBaseCategoryLabel
@@ -108,13 +114,67 @@ test("QualityPresentationService preserves risk-level mappings and Risk fallback
   assert.equal(service.riskLevel(undefined), "localized:Risk");
 });
 
+test("QualityPresentationService preserves eager AI-review risk mappings and unranked fallbacks", async () => {
+  const { createQualityPresentationService } = await loadFactory();
+  const knownKeys = ["noIssuesFound", "lowRisk", "mediumRisk", "highRisk", "criticalRisk"];
+  for (const [value, expected] of [
+    ["none", "label:noIssuesFound"],
+    ["low", "label:lowRisk"],
+    ["medium", "label:mediumRisk"],
+    ["high", "label:highRisk"],
+    ["critical", "label:criticalRisk"]
+  ]) {
+    const { calls, service } = createHarness(createQualityPresentationService);
+    assert.equal(service.aiReviewRisk(value), expected);
+    assert.deepEqual(
+      calls.filter(([name]) => name === "label").map(([, key]) => key),
+      knownKeys
+    );
+  }
+
+  for (const value of ["unknown", "", null, undefined]) {
+    const { calls, service } = createHarness(createQualityPresentationService);
+    assert.equal(service.aiReviewRisk(value), "label:unrankedRisk");
+    assert.deepEqual(
+      calls.filter(([name]) => name === "label").map(([, key]) => key),
+      [...knownKeys, "unrankedRisk"]
+    );
+  }
+
+  const emptySelected = createHarness(createQualityPresentationService, { labelValues: { lowRisk: "" } });
+  assert.equal(emptySelected.service.aiReviewRisk("low"), "label:unrankedRisk");
+});
+
+test("QualityPresentationService preserves eager AI-review label delegate failure timing", async () => {
+  const { createQualityPresentationService } = await loadFactory();
+  const labelError = new Error("medium label unavailable");
+  const { calls, service } = createHarness(createQualityPresentationService, {
+    labelErrorKey: "mediumRisk",
+    labelError
+  });
+
+  assert.throws(() => service.aiReviewRisk("none"), labelError);
+  assert.deepEqual(
+    calls.filter(([name]) => name === "label"),
+    [
+      ["label", "noIssuesFound"],
+      ["label", "lowRisk"],
+      ["label", "mediumRisk"]
+    ]
+  );
+});
+
 test("QualityPresentationService validates boundaries, propagates delegates, and exposes an immutable API", async () => {
   const { createQualityPresentationService } = await loadFactory();
   assert.throws(() => createQualityPresentationService({}), /requires source localization/);
   assert.throws(
+    () => createQualityPresentationService({ localization: { source: (value) => value } }),
+    /requires label localization/
+  );
+  assert.throws(
     () =>
       createQualityPresentationService({
-        localization: { source: (value) => value },
+        localization: { source: (value) => value, label: (key) => key },
         baseCategoryLabel: "invalid"
       }),
     /base category label must be a function/

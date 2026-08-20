@@ -2416,7 +2416,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
   },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: setSaveStatus },
-  labels: { risk: aiReviewRiskLabel },
+  labels: { risk: qualityPresentationService.aiReviewRisk },
   redact: redactSensitiveText,
   ids: { next: () => (crypto.randomUUID ? crypto.randomUUID() : Date.now()) },
   clock: { now: () => new Date().toISOString() },
@@ -6154,7 +6154,7 @@ function renderStatusCell(row, segment) {
   if (riskLevel) {
     aiBadges.push({
       className: `ai-risk ai-risk-${riskLevel}`,
-      text: `${aiReviewRiskLabel(riskLevel)}`,
+      text: `${qualityPresentationService.aiReviewRisk(riskLevel)}`,
       title: uiLocalizationService.source("Risk-ranked AI review comment")
     });
   }
@@ -6241,16 +6241,6 @@ function renderProgress(options = {}) {
   els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
   els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
-}
-
-function aiReviewRiskLabel(level) {
-  return {
-    none: uiLocalizationService.label("noIssuesFound"),
-    low: uiLocalizationService.label("lowRisk"),
-    medium: uiLocalizationService.label("mediumRisk"),
-    high: uiLocalizationService.label("highRisk"),
-    critical: uiLocalizationService.label("criticalRisk")
-  }[level] || uiLocalizationService.label("unrankedRisk");
 }
 
 async function importDocx(file) {

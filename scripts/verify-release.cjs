@@ -1035,6 +1035,7 @@ assertIncludes(
   "the application runtime must expose the checked quality-presentation service factory."
 );
 for (const snippet of [
+  'throw new TypeError("QualityPresentationService requires label localization.")',
   '"student-review": "Student review"',
   '"client-approved": "Client approved"',
   "baseCategoryLabel?.(value)",
@@ -1044,7 +1045,13 @@ for (const snippet of [
   '}[String(value)] || "Medium"',
   '}[String(value)] || "Risk"',
   "return localization.source(label)",
-  "return Object.freeze({ category, decisionSeverity, profile, riskLevel })"
+  'none: localization.label("noIssuesFound")',
+  'low: localization.label("lowRisk")',
+  'medium: localization.label("mediumRisk")',
+  'high: localization.label("highRisk")',
+  'critical: localization.label("criticalRisk")',
+  '}[value] || localization.label("unrankedRisk")',
+  "return Object.freeze({ aiReviewRisk, category, decisionSeverity, profile, riskLevel })"
 ]) {
   assertIncludes(
     qualityPresentationServiceJs,
@@ -1062,7 +1069,9 @@ for (const boundary of [
   "profileLabel: qualityPresentationService.profile",
   "categoryLabel: qualityPresentationService.category",
   "riskLevelLabel: qualityPresentationService.riskLevel",
-  "severity: qualityPresentationService.decisionSeverity"
+  "severity: qualityPresentationService.decisionSeverity",
+  "labels: { risk: qualityPresentationService.aiReviewRisk }",
+  "qualityPresentationService.aiReviewRisk(riskLevel)"
 ]) {
   assertIncludes(appJs, boundary, `quality-presentation composition must inject the checked ${boundary} boundary.`);
 }
@@ -1070,7 +1079,8 @@ for (const removedFacade of [
   "qualityLabel",
   "qualityCategoryName: qualityPresentationService.category",
   "qualityDecisionSeverityLabel",
-  "qualityRiskLevelLabel"
+  "qualityRiskLevelLabel",
+  "aiReviewRiskLabel"
 ]) {
   const directFacade = new RegExp(`function\\s+${removedFacade}\\b`);
   assert(
@@ -1081,8 +1091,10 @@ for (const removedFacade of [
 assert(
   !appJs.includes('"student-review": "Student review"') &&
     !appJs.includes('accuracy: "Accuracy"') &&
-    !appJs.includes('clear: "Clear"'),
-  "quality profile, category, and risk label mappings must not return to app.js."
+    !appJs.includes('clear: "Clear"') &&
+    !appJs.includes('low: uiLocalizationService.label("lowRisk")') &&
+    (appJs.match(/\bqualityPresentationService\.aiReviewRisk\b/g) || []).length === 2,
+  "quality profile, category, general-risk, and AI-review-risk label mappings must not return to app.js, and both AI-review consumers must call the checked service."
 );
 assert(
   !qualityPresentationServiceJs.includes("uiLocalizationService") &&
@@ -1094,6 +1106,8 @@ for (const testName of [
   "QualityPresentationService preserves base category precedence, fallback mappings, and Review default",
   "QualityPresentationService preserves decision severity mappings and Medium fallback",
   "QualityPresentationService preserves risk-level mappings and Risk fallback",
+  "QualityPresentationService preserves eager AI-review risk mappings and unranked fallbacks",
+  "QualityPresentationService preserves eager AI-review label delegate failure timing",
   "QualityPresentationService validates boundaries, propagates delegates, and exposes an immutable API"
 ]) {
   assertIncludes(

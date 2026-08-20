@@ -4,7 +4,7 @@
  * remain behind their existing boundaries.
  *
  * @param {{
- *   localization: { source: (value: string) => string },
+ *   localization: { source: (value: string) => string, label: (key: string) => string },
  *   baseCategoryLabel?: ((value: unknown) => string) | null
  * }} options
  */
@@ -13,6 +13,9 @@ export function createQualityPresentationService(options) {
   const baseCategoryLabel = options?.baseCategoryLabel;
   if (typeof localization?.source !== "function") {
     throw new TypeError("QualityPresentationService requires source localization.");
+  }
+  if (typeof localization.label !== "function") {
+    throw new TypeError("QualityPresentationService requires label localization.");
   }
   if (baseCategoryLabel != null && typeof baseCategoryLabel !== "function") {
     throw new TypeError("QualityPresentationService base category label must be a function when provided.");
@@ -82,5 +85,17 @@ export function createQualityPresentationService(options) {
     return localization.source(label);
   }
 
-  return Object.freeze({ category, decisionSeverity, profile, riskLevel });
+  function aiReviewRisk(value) {
+    return (
+      {
+        none: localization.label("noIssuesFound"),
+        low: localization.label("lowRisk"),
+        medium: localization.label("mediumRisk"),
+        high: localization.label("highRisk"),
+        critical: localization.label("criticalRisk")
+      }[value] || localization.label("unrankedRisk")
+    );
+  }
+
+  return Object.freeze({ aiReviewRisk, category, decisionSeverity, profile, riskLevel });
 }
