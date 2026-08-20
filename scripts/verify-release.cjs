@@ -217,6 +217,7 @@ const requiredReleaseFiles = [
   "src/features/ai/ai-tag-repair-controller.js",
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
+  "src/features/projects/project-domain-controller.js",
   "src/features/projects/project-resource-selection-controller.js",
   "src/features/projects/project-language-pair-shortcuts-controller.js",
   "src/features/projects/project-language-context-controller.js",
@@ -289,6 +290,7 @@ const requiredReleaseFiles = [
   "tests/unit/term-suggestions-controller.test.cjs",
   "tests/unit/term-form-controller.test.cjs",
   "tests/unit/project-qa-controller.test.cjs",
+  "tests/unit/project-domain-controller.test.cjs",
   "tests/unit/concordance-controller.test.cjs",
   "tests/unit/segment-navigation-controller.test.cjs",
   "tests/unit/segment-draft-application-service.test.cjs",
@@ -455,6 +457,8 @@ const termFormControllerJs = readText("src/features/editor/term-form-controller.
 const termFormControllerUnitTests = readText("tests/unit/term-form-controller.test.cjs");
 const projectQaControllerJs = readText("src/features/quality/project-qa-controller.js");
 const projectQaControllerUnitTests = readText("tests/unit/project-qa-controller.test.cjs");
+const projectDomainControllerJs = readText("src/features/projects/project-domain-controller.js");
+const projectDomainControllerUnitTests = readText("tests/unit/project-domain-controller.test.cjs");
 const concordanceControllerUnitTests = readText("tests/unit/concordance-controller.test.cjs");
 const segmentNavigationControllerUnitTests = readText("tests/unit/segment-navigation-controller.test.cjs");
 const segmentDraftApplicationServiceUnitTests = readText("tests/unit/segment-draft-application-service.test.cjs");
@@ -4900,6 +4904,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectDomainController } from "../features/projects/project-domain-controller.js";',
+  "The application runtime must install the checked project-domain controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectDomainController,",
+  "The application runtime must expose the checked project-domain factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createConcordanceController } from "../features/editor/concordance-controller.js";',
   "The application runtime must install the checked concordance controller."
 );
@@ -6183,6 +6197,112 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/quality/project-qa-controller.js"',
   "source-catalog extraction must scan the checked project-QA controller."
+);
+for (const snippet of [
+  'throw new TypeError("ProjectDomainController requires form and input elements.")',
+  'throw new TypeError("ProjectDomainController requires project session and repository boundaries.")',
+  '"ProjectDomainController requires presentation, workspace, status, clone, and test-hook boundaries."',
+  "if (!session.getProject()) return false",
+  "const previousProject = clone(session.getProject())",
+  "const previousProjects = session.getProjects().map((project) => clone(project))",
+  "const domain = elements.input.value.trim()",
+  "testHooks.beforeSave()",
+  "session.replaceProject(await repository.update({ ...session.getProject(), domain }))",
+  ".map((project) => (project.id === session.getProject().id ? session.getProject() : project))",
+  "await presentation.refreshSummaries()",
+  "presentation.renderAll()",
+  'elements.form.classList.toggle("hidden", Boolean((session.getProject().domain || "").trim()))',
+  "workspace.markDirty()",
+  'status.set("Project domain saved", "saved")',
+  "session.replaceProject(previousProject)",
+  "session.replaceProjects(previousProjects)",
+  'elements.form.classList.toggle("clean", domain === (session.getProject().domain || ""))',
+  'status.set(error.message || "Project domain save failed", "dirty")',
+  "event.preventDefault()",
+  "await save()",
+  'const current = session.getProject()?.domain || ""',
+  'elements.form.classList.toggle("clean", elements.input.value.trim() === current)',
+  'elements.form.addEventListener("submit", handleSubmit)',
+  'elements.input.addEventListener("input", handleInput)',
+  'elements.form.removeEventListener("submit", handleSubmit)',
+  'elements.input.removeEventListener("input", handleInput)',
+  "return Object.freeze({ mount, save, unmount })"
+]) {
+  assertIncludes(
+    projectDomainControllerJs,
+    snippet,
+    `ProjectDomainController must retain characterized guard, snapshot, persistence, synchronization, presentation, rollback, and lifecycle policy: ${snippet}`
+  );
+}
+assert(
+  !projectDomainControllerJs.includes("window.") &&
+    !projectDomainControllerJs.includes("document.") &&
+    !projectDomainControllerJs.includes("editorSessionStore") &&
+    !projectDomainControllerJs.includes("updateProject") &&
+    !projectDomainControllerJs.includes("refreshProjectSummaries") &&
+    !projectDomainControllerJs.includes("markWorkspaceDirty") &&
+    !projectDomainControllerJs.includes("setSaveStatus") &&
+    !projectDomainControllerJs.includes("structuredClone") &&
+    !projectDomainControllerJs.includes("LOOPCAT_TEST_BUILD") &&
+    !projectDomainControllerJs.includes("PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG") &&
+    !projectDomainControllerJs.includes("els."),
+  "the checked project-domain controller must use injected elements, state, repository, presentation, workspace, status, clone, and test-hook boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectDomainController({",
+  "form: els.domainForm",
+  "input: els.projectDomainEditInput",
+  "getProject: editorSessionStore.getProject",
+  "getProjects: editorSessionStore.getProjects",
+  "replaceProject: editorSessionStore.replaceProject",
+  "replaceProjects: editorSessionStore.replaceProjects",
+  "repository: { update: updateProject }",
+  "refreshSummaries: refreshProjectSummaries",
+  "renderAll",
+  "workspace: { markDirty: markWorkspaceDirty }",
+  "status: { set: setSaveStatus }",
+  "clone: structuredClone",
+  "beforeSave: () =>",
+  "if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG])",
+  'throw new Error("Simulated project domain save failure")'
+]) {
+  assertIncludes(appJs, boundary, `project-domain composition must inject the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/\bprojectDomainController\.mount\b/g) || []).length === 1 &&
+    (appJs.match(/\bprojectDomainController\.save\b/g) || []).length === 0 &&
+    (appWorkflowDriverJs.match(/\bprojectDomainController\.save\b/g) || []).length === 2,
+  "the project-domain lifecycle must mount once and both workflow consumers must call ProjectDomainController directly."
+);
+assert(
+  !/async\s+function\s+saveProjectDomainFromForm\b/.test(appJs) &&
+    !/async\s+function\s+saveProjectDomainFromForm\b/.test(appWorkflowDriverJs) &&
+    !appJs.includes('els.domainForm.addEventListener("submit"') &&
+    !appJs.includes('els.projectDomainEditInput.addEventListener("input"') &&
+    !appWorkflowDriverJs.includes('els.domainForm.addEventListener("submit"') &&
+    !appWorkflowDriverJs.includes('els.projectDomainEditInput.addEventListener("input"'),
+  "saveProjectDomainFromForm and coordinator-owned project-domain listeners must not return."
+);
+for (const testName of [
+  "ProjectDomainController preserves the no-project guard and pre-try snapshot, clone, and input order",
+  "ProjectDomainController preserves exact update, selected-list synchronization, presentation, workspace, and success order",
+  "ProjectDomainController preserves list order and identities when the selected project is absent",
+  "ProjectDomainController preserves rollback, entered text, clean comparison, and status after primary failures",
+  "ProjectDomainController preserves completed effects and exact rollback after late failures",
+  "ProjectDomainController preserves the live clean comparison against the untrimmed stored domain",
+  "ProjectDomainController owns idempotent submit and input lifecycle with direct save results",
+  "ProjectDomainController validates boundaries, preserves rollback failure timing, and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectDomainControllerUnitTests,
+    testName,
+    `focused project-domain tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/project-domain-controller.js"',
+  "source-catalog extraction must scan the checked project-domain controller."
 );
 for (const snippet of [
   'throw new TypeError("ConcordanceController requires overlay elements.")',

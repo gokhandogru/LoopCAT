@@ -1245,6 +1245,28 @@ const termFormController = appRuntime.featureFactories.createTermFormController(
   }
 });
 
+const projectDomainController = appRuntime.featureFactories.createProjectDomainController({
+  elements: { form: els.domainForm, input: els.projectDomainEditInput },
+  session: {
+    getProject: editorSessionStore.getProject,
+    getProjects: editorSessionStore.getProjects,
+    replaceProject: editorSessionStore.replaceProject,
+    replaceProjects: editorSessionStore.replaceProjects
+  },
+  repository: { update: updateProject },
+  presentation: { refreshSummaries: refreshProjectSummaries, renderAll },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus },
+  clone: structuredClone,
+  testHooks: {
+    beforeSave: () => {
+      if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated project domain save failure");
+      }
+    }
+  }
+});
+
 const segmentTmSaveController = appRuntime.featureFactories.createSegmentTmSaveController({
   session: { getProject: editorSessionStore.getProject },
   selection: { getActiveSegment: currentSegment },
@@ -6221,30 +6243,6 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-async function saveProjectDomainFromForm() {
-  if (!editorSessionStore.getProject()) return false;
-  const previousProject = structuredClone(editorSessionStore.getProject());
-  const previousProjects = editorSessionStore.getProjects().map((project) => structuredClone(project));
-  const domain = els.projectDomainEditInput.value.trim();
-  try {
-    if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated project domain save failure");
-    editorSessionStore.replaceProject(await updateProject({ ...editorSessionStore.getProject(), domain }));
-    editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
-    await refreshProjectSummaries();
-    renderAll();
-    els.domainForm.classList.toggle("hidden", Boolean((editorSessionStore.getProject().domain || "").trim()));
-    markWorkspaceDirty();
-    setSaveStatus("Project domain saved", "saved");
-    return true;
-  } catch (error) {
-    editorSessionStore.replaceProject(previousProject);
-    editorSessionStore.replaceProjects(previousProjects);
-    els.domainForm.classList.toggle("clean", domain === (editorSessionStore.getProject().domain || ""));
-    setSaveStatus(error.message || "Project domain save failed", "dirty");
-    return false;
-  }
-}
-
 function aiReviewRiskLabel(level) {
   return {
     none: uiLocalizationService.label("noIssuesFound"),
@@ -7303,15 +7301,7 @@ function wireEvents() {
   });
 
   termFormController.mount();
-
-  els.domainForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await saveProjectDomainFromForm();
-  });
-  els.projectDomainEditInput.addEventListener("input", () => {
-    const current = editorSessionStore.getProject()?.domain || "";
-    els.domainForm.classList.toggle("clean", els.projectDomainEditInput.value.trim() === current);
-  });
+  projectDomainController.mount();
 
   window.addEventListener("beforeunload", handleBeforeUnload);
   document.addEventListener("visibilitychange", () => {

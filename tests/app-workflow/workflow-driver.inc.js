@@ -328,7 +328,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const originalProjectDomain = editorSessionStore.getProject().domain;
     els.projectDomainEditInput.value = "Unstored workflow domain";
     segmentTargetStateService.setHiddenField(editorSessionStore.getProject(), PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG, true);
-    const failedDomainSave = await saveProjectDomainFromForm();
+    const failedDomainSave = await projectDomainController.save();
     assert(
       !failedDomainSave &&
         els.saveStatus.textContent.includes("Simulated project domain save failure") &&
@@ -338,7 +338,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     Reflect.deleteProperty(editorSessionStore.getProject(), PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG);
     els.projectDomainEditInput.value = "Workflow saved domain";
-    const successfulDomainSave = await saveProjectDomainFromForm();
+    const successfulDomainSave = await projectDomainController.save();
     assert(successfulDomainSave && editorSessionStore.getProject().domain === "Workflow saved domain", "project domain save persists metadata");
     await openProjectDialog("edit");
     assert(
