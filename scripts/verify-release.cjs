@@ -164,6 +164,7 @@ const requiredReleaseFiles = [
   "src/app/application-persistence-lifecycle-controller.js",
   "src/app/application-save-status-controller.js",
   "src/app/application-startup-controller.js",
+  "src/app/application-trash-controller.js",
   "src/app/application-update-controls-controller.js",
   "src/app/application-view-controller.js",
   "src/app/global-keyboard-controller.js",
@@ -306,6 +307,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-persistence-lifecycle-controller.test.cjs",
   "tests/unit/application-save-status-controller.test.cjs",
   "tests/unit/application-startup-controller.test.cjs",
+  "tests/unit/application-trash-controller.test.cjs",
   "tests/unit/application-update-controls-controller.test.cjs",
   "tests/unit/application-view-controller.test.cjs",
   "tests/unit/global-keyboard-controller.test.cjs",
@@ -487,6 +489,8 @@ const applicationSaveStatusControllerJs = readText("src/app/application-save-sta
 const applicationSaveStatusControllerUnitTests = readText("tests/unit/application-save-status-controller.test.cjs");
 const applicationStartupControllerJs = readText("src/app/application-startup-controller.js");
 const applicationStartupControllerUnitTests = readText("tests/unit/application-startup-controller.test.cjs");
+const applicationTrashControllerJs = readText("src/app/application-trash-controller.js");
+const applicationTrashControllerUnitTests = readText("tests/unit/application-trash-controller.test.cjs");
 const applicationUpdateControlsControllerJs = readText("src/app/application-update-controls-controller.js");
 const applicationUpdateControlsControllerUnitTests = readText(
   "tests/unit/application-update-controls-controller.test.cjs"
@@ -5095,7 +5099,7 @@ for (const boundary of [
   "emptyTrashButton: els.emptyTrashBtn",
   "undoButton: els.undoBtn",
   "redoButton: els.redoBtn",
-  "emptyTrash: emptyTrashPermanently",
+  "emptyTrash: applicationTrashController.empty",
   "undo: applicationCommandHistoryController.undo",
   "redo: applicationCommandHistoryController.redo",
   "commandButtons: applicationCommandButtonsController"
@@ -5236,8 +5240,8 @@ for (const boundary of [
   "refreshSuggestions: () => termSuggestionsController.refresh()",
   "refreshEditorContext: () => editorContextController.refresh()",
   "isOpen: () => Boolean(els.trashDialog?.open)",
-  "renderList: () => renderTrashList()",
-  "renderSummary: () => refreshTrashSummary()",
+  "renderList: () => applicationTrashController.renderList()",
+  "renderSummary: () => applicationTrashController.renderSummary()",
   "presentation: { renderAll: () => renderAll() }",
   "status: { set: applicationSaveStatusController.set }"
 ]) {
@@ -5309,6 +5313,143 @@ for (const testName of [
     `focused command-history tests must retain characterization: ${testName}.`
   );
 }
+assertIncludes(
+  appBootstrapJs,
+  'import { createApplicationTrashController } from "./application-trash-controller.js";',
+  "the application runtime must install the checked application Trash controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationTrashController,",
+  "the application runtime must expose the checked application Trash controller factory."
+);
+for (const snippet of [
+  "ApplicationTrashController requires checked optional element boundaries.",
+  "ApplicationTrashController requires a checked optional Trash repository.",
+  "ApplicationTrashController requires checked project and command-history boundaries.",
+  "ApplicationTrashController requires checked dialog and localization boundaries.",
+  "ApplicationTrashController requires checked presentation boundaries.",
+  "ApplicationTrashController requires a checked status boundary.",
+  "if (!elements.summaryButton || !repository) return []",
+  "const entries = await repository.list()",
+  'localization.source("Trash ({value1})", { value1: entries.length })',
+  'localization.source("Trash, {value1} item(s)", { value1: entries.length })',
+  "const entry = await repository.restore(entryId)",
+  "await projects.load(false)",
+  "await commandHistory.synchronize(entry, { refreshSuggestions: true })",
+  "await renderList()",
+  'status.set(`${entry.label || "Item"} restored from Trash`, "saved")',
+  "commandHistory.render()",
+  'error.message || "Trash restore failed. Existing work was preserved."',
+  "const entries = await renderSummary()",
+  "if (!elements.list) return entries",
+  'empty.className = "muted"',
+  "elements.emptyButton.disabled = true",
+  'item.className = "trash-item"',
+  'actions.className = "trash-item-actions"',
+  'entry.entityType === "document"',
+  'entry.entityType === "project"',
+  'entry.resourceType === "tm"',
+  "date.format(entry.deletedAt)",
+  'restoreButton.addEventListener("click", () => restore(entry.id))',
+  "elements.list.replaceChildren(fragment)",
+  "elements.emptyButton.disabled = false",
+  "return await (dialog.open() || false)",
+  'localization.confirm("Permanently delete every item in Trash? This cannot be undone.")',
+  "await repository.emptyAll()",
+  'status.set("Trash emptied permanently", "saved")',
+  "return Object.freeze({ renderSummary, restore, renderList, open, empty })"
+]) {
+  assertIncludes(
+    applicationTrashControllerJs,
+    snippet,
+    `ApplicationTrashController must retain characterized summary, list, restore, open, and empty policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationTrashController({",
+  "summaryButton: els.trashBtn",
+  "list: els.trashList",
+  "emptyButton: els.emptyTrashBtn",
+  "repository: appRuntime?.trashRepository",
+  "projects: { load: (selectFirst) => loadProjects(selectFirst) }",
+  "synchronize: applicationCommandHistoryController.synchronize",
+  "render: applicationCommandHistoryController.render",
+  'dialog: { open: () => dialogLifecycleController?.open?.("trash") || false }',
+  "source: (value, variables) => uiLocalizationService.source(value, variables)",
+  "confirm: (value) => uiLocalizationService.confirm(value)",
+  "text: { safe: (value, fallback) => displaySafeText(value, fallback) }",
+  "date: { format: (value) => formatDate(value) }",
+  "createElement: (tagName) => document.createElement(tagName)",
+  "createFragment: () => document.createDocumentFragment()",
+  "status: { set: applicationSaveStatusController.set }",
+  "renderList: () => applicationTrashController.renderList()",
+  "renderSummary: () => applicationTrashController.renderSummary()",
+  "emptyTrash: applicationTrashController.empty",
+  "beforeOpen: applicationTrashController.renderList",
+  "run: applicationTrashController.open, enabled: Boolean(appRuntime?.trashRepository)",
+  "void applicationTrashController.renderSummary()"
+]) {
+  assertIncludes(appJs, boundary, `application Trash composition and consumers must retain ${boundary}.`);
+}
+assertIncludes(
+  appWorkflowDriverJs,
+  "await applicationTrashController.open()",
+  "the workflow must open Trash through ApplicationTrashController directly."
+);
+for (const removedHelper of [
+  "refreshTrashSummary",
+  "restoreTrashEntry",
+  "renderTrashList",
+  "openTrash",
+  "emptyTrashPermanently"
+]) {
+  assert(
+    !appJs.includes(removedHelper) && !appWorkflowDriverJs.includes(removedHelper),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+for (const forbiddenOwner of [
+  "appRuntime",
+  "els.",
+  "uiLocalizationService",
+  "displaySafeText",
+  "formatDate",
+  "document.",
+  "dialogLifecycleController",
+  "applicationCommandHistoryController",
+  "applicationSaveStatusController",
+  "loadProjects"
+]) {
+  assert(
+    !applicationTrashControllerJs.includes(forbiddenOwner),
+    `ApplicationTrashController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationTrashController preserves optional summary and repository guards with immutable API",
+  "ApplicationTrashController preserves empty and populated localized summary presentation",
+  "ApplicationTrashController preserves absent-list and localized empty-list branches",
+  "ApplicationTrashController renders every safe entity label and one restore listener",
+  "ApplicationTrashController restore preserves project, resource, list, status, and controls order",
+  "ApplicationTrashController restore buttons preserve entry identity and promise results",
+  "ApplicationTrashController contains every primary restore failure with preservation status",
+  "ApplicationTrashController preserves optional dialog fulfillment, fallback, and rejection",
+  "ApplicationTrashController preserves permanent-empty guards and exact success sequence",
+  "ApplicationTrashController propagates permanent-empty and rendering failures in order",
+  "ApplicationTrashController validates every injected owner and present optional element"
+]) {
+  assertIncludes(
+    applicationTrashControllerUnitTests,
+    testName,
+    `focused application Trash tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/app/application-trash-controller.js"',
+  "source-catalog extraction must scan the checked application Trash controller."
+);
 assertIncludes(
   appBootstrapJs,
   'import { createApplicationUpdateControlsController } from "./application-update-controls-controller.js";',

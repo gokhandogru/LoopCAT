@@ -1162,12 +1162,37 @@ const applicationCommandHistoryController =
     },
     trash: {
       isOpen: () => Boolean(els.trashDialog?.open),
-      renderList: () => renderTrashList(),
-      renderSummary: () => refreshTrashSummary()
+      renderList: () => applicationTrashController.renderList(),
+      renderSummary: () => applicationTrashController.renderSummary()
     },
     presentation: { renderAll: () => renderAll() },
     status: { set: applicationSaveStatusController.set }
   });
+const applicationTrashController = appRuntime.featureFactories.createApplicationTrashController({
+  elements: {
+    summaryButton: els.trashBtn,
+    list: els.trashList,
+    emptyButton: els.emptyTrashBtn
+  },
+  repository: appRuntime?.trashRepository,
+  projects: { load: (selectFirst) => loadProjects(selectFirst) },
+  commandHistory: {
+    synchronize: applicationCommandHistoryController.synchronize,
+    render: applicationCommandHistoryController.render
+  },
+  dialog: { open: () => dialogLifecycleController?.open?.("trash") || false },
+  localization: {
+    source: (value, variables) => uiLocalizationService.source(value, variables),
+    confirm: (value) => uiLocalizationService.confirm(value)
+  },
+  text: { safe: (value, fallback) => displaySafeText(value, fallback) },
+  date: { format: (value) => formatDate(value) },
+  dom: {
+    createElement: (tagName) => document.createElement(tagName),
+    createFragment: () => document.createDocumentFragment()
+  },
+  status: { set: applicationSaveStatusController.set }
+});
 
 const revisionHistoryPresentationService =
   appRuntime.featureFactories.createRevisionHistoryPresentationService({
@@ -3462,7 +3487,7 @@ const applicationCommandButtonsController =
       redoButton: els.redoBtn
     },
     actions: {
-      emptyTrash: emptyTrashPermanently,
+      emptyTrash: applicationTrashController.empty,
       undo: applicationCommandHistoryController.undo,
       redo: applicationCommandHistoryController.redo
     }
@@ -3840,7 +3865,7 @@ dialogLifecycleController?.register?.({
   opener: els.trashBtn,
   closer: els.closeTrashBtn,
   initialFocus: els.closeTrashBtn,
-  beforeOpen: renderTrashList
+  beforeOpen: applicationTrashController.renderList
 });
 let projectExportController;
 let workspacePackageSaveController;
@@ -4850,92 +4875,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
 });
 dialogLifecycleController?.mount?.();
 
-async function refreshTrashSummary() {
-  if (!els.trashBtn || !appRuntime?.trashRepository) return [];
-  const entries = await appRuntime.trashRepository.list();
-  els.trashBtn.textContent = entries.length ? uiLocalizationService.source("Trash ({value1})", { value1: entries.length }) : uiLocalizationService.source("Trash");
-  els.trashBtn.setAttribute("aria-label", uiLocalizationService.source("Trash, {value1} item(s)", { value1: entries.length }));
-  return entries;
-}
-
-async function restoreTrashEntry(entryId) {
-  try {
-    const entry = await appRuntime.trashRepository.restore(entryId);
-    await loadProjects(false);
-    await applicationCommandHistoryController.synchronize(entry, { refreshSuggestions: true });
-    await renderTrashList();
-    applicationSaveStatusController.set(`${entry.label || "Item"} restored from Trash`, "saved");
-    applicationCommandHistoryController.render();
-    return true;
-  } catch (error) {
-    applicationSaveStatusController.set(
-      error.message || "Trash restore failed. Existing work was preserved.",
-      "dirty"
-    );
-    return false;
-  }
-}
-
-async function renderTrashList() {
-  const entries = await refreshTrashSummary();
-  if (!els.trashList) return entries;
-  if (!entries.length) {
-    const empty = document.createElement("div");
-    empty.className = "muted";
-    empty.textContent = uiLocalizationService.source("Trash is empty. Deleted projects, files, memories, and termbases will appear here.");
-    els.trashList.replaceChildren(empty);
-    els.emptyTrashBtn.disabled = true;
-    return entries;
-  }
-  const fragment = document.createDocumentFragment();
-  entries.forEach((entry) => {
-    const item = document.createElement("article");
-    item.className = "trash-item";
-    const copy = document.createElement("div");
-    const title = document.createElement("strong");
-    title.textContent = displaySafeText(entry.label, uiLocalizationService.source("Deleted item"));
-    const meta = document.createElement("p");
-    const entityLabel =
-      entry.entityType === "document"
-        ? uiLocalizationService.source("Project file")
-        : entry.entityType === "project"
-          ? uiLocalizationService.source("Project")
-          : entry.resourceType === "tm"
-            ? uiLocalizationService.source("Translation memory")
-            : uiLocalizationService.source("Termbase");
-    meta.textContent = `${entityLabel} · ${formatDate(entry.deletedAt)}`;
-    copy.append(title, meta);
-    const actions = document.createElement("div");
-    actions.className = "trash-item-actions";
-    const restore = document.createElement("button");
-    restore.type = "button";
-    restore.textContent = uiLocalizationService.source("Restore");
-    restore.setAttribute("aria-label", uiLocalizationService.source("Restore {value1}", { value1: displaySafeText(entry.label) }));
-    restore.addEventListener("click", () => restoreTrashEntry(entry.id));
-    actions.append(restore);
-    item.append(copy, actions);
-    fragment.append(item);
-  });
-  els.trashList.replaceChildren(fragment);
-  els.emptyTrashBtn.disabled = false;
-  return entries;
-}
-
-async function openTrash() {
-  return dialogLifecycleController?.open?.("trash") || false;
-}
-
-async function emptyTrashPermanently() {
-  const entries = await appRuntime.trashRepository.list();
-  if (!entries.length) return false;
-  const confirmed = uiLocalizationService.confirm("Permanently delete every item in Trash? This cannot be undone.");
-  if (!confirmed) return false;
-  await appRuntime.trashRepository.emptyAll();
-  await renderTrashList();
-  applicationSaveStatusController.set("Trash emptied permanently", "saved");
-  return true;
-}
-
 function renderImportBusyState() {
   const busy = Boolean(state.importTask);
   importExportController?.renderBusy?.(busy);
@@ -5516,7 +5455,7 @@ function commandList() {
   const commands = [
     { id: "undo", label: "Undo last action", run: applicationCommandHistoryController.undo, enabled: Boolean(appRuntime?.commands?.bus?.canUndo?.(commandProjectId)) },
     { id: "redo", label: "Redo last action", run: applicationCommandHistoryController.redo, enabled: Boolean(appRuntime?.commands?.bus?.canRedo?.(commandProjectId)) },
-    { id: "trash", label: "Open Trash", run: openTrash, enabled: Boolean(appRuntime?.trashRepository) },
+    { id: "trash", label: "Open Trash", run: applicationTrashController.open, enabled: Boolean(appRuntime?.trashRepository) },
     { id: "confirm", label: "Confirm segment", run: segmentConfirmationController.confirm, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "next-open", label: "Next open segment", run: segmentNavigationController.nextOpen, enabled: Boolean(editorSessionStore.getSegments().length) },
     { id: "focus-mode", label: applicationStore.getState().interface.focusMode ? "Exit Focus view" : "Enter Focus view", run: focusModeController.toggle, enabled: Boolean(applicationStore.getState().navigation.view === "editor" && editorSessionStore.getProject()) },
@@ -5868,7 +5807,7 @@ async function loadProjects(selectFirst = false) {
   await refreshProjectSummaries();
   renderProjectList();
   renderEditor();
-  void refreshTrashSummary();
+  void applicationTrashController.renderSummary();
   if (selectFirst && !editorSessionStore.getProject() && editorSessionStore.getProjects()[0]) {
     await openProject(editorSessionStore.getProjects()[0].id);
   }

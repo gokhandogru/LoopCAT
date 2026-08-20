@@ -223,7 +223,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
 
     els.trashBtn.focus();
-    const trashOpenResult = await openTrash();
+    const trashOpenResult = await applicationTrashController.open();
     assert(
       trashOpenResult &&
         els.trashDialog.open &&

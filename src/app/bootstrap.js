@@ -7,6 +7,7 @@ import { createApplicationMenuController } from "./application-menu-controller.j
 import { createApplicationPersistenceLifecycleController } from "./application-persistence-lifecycle-controller.js";
 import { createApplicationSaveStatusController } from "./application-save-status-controller.js";
 import { createApplicationStartupController } from "./application-startup-controller.js";
+import { createApplicationTrashController } from "./application-trash-controller.js";
 import { createApplicationUpdateControlsController } from "./application-update-controls-controller.js";
 import { createApplicationViewController } from "./application-view-controller.js";
 import { createNavigationController } from "./navigation-controller.js";
@@ -345,6 +346,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createApplicationPersistenceLifecycleController,
       createApplicationSaveStatusController,
       createApplicationStartupController,
+      createApplicationTrashController,
       createApplicationUpdateControlsController,
       createApplicationViewController,
       createGlobalKeyboardController,

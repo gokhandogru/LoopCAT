@@ -8,6 +8,7 @@ const indexPath = path.join(root, "index.html");
 const appPath = path.join(root, "app.js");
 const qaPath = path.join(root, "qa.js");
 const applicationSaveStatusControllerPath = path.join(root, "src", "app", "application-save-status-controller.js");
+const applicationTrashControllerPath = path.join(root, "src", "app", "application-trash-controller.js");
 const deliveryExportControllerPath = path.join(
   root,
   "src",
@@ -379,6 +380,7 @@ function main() {
   extractHtml(messagesByText);
   extractScript(messagesByText, appPath, "app.js");
   extractScript(messagesByText, applicationSaveStatusControllerPath, "src/app/application-save-status-controller.js");
+  extractScript(messagesByText, applicationTrashControllerPath, "src/app/application-trash-controller.js");
   extractScript(messagesByText, qaPath, "qa.js");
   extractScript(
     messagesByText,
