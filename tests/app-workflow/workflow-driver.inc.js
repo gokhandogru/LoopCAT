@@ -4930,7 +4930,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       targetEditController.updateDraft(segmentIndex, packageFlushFailureText);
       segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
       const packageDownloadCountBeforeFlushFailure = packageDownloads.length;
-      await exportProjectPackage();
+      await projectExportController.exportProjectPackage();
       assert(
         els.saveStatus.textContent.includes("Simulated pending save flush failure") &&
           autosaveService.has(editorSessionStore.getSegments()[segmentIndex].id) &&
@@ -4943,7 +4943,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       URL.createObjectURL = () => {
         throw new Error("Simulated package download failure");
       };
-      await exportProjectPackage();
+      await projectExportController.exportProjectPackage();
       assert(
         els.saveStatus.textContent.includes("Simulated package download failure") &&
           !(editorSessionStore.getProject().exportHistory || []).some((entry) => entry.type === "project-package") &&
@@ -4957,7 +4957,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const packageExportTargetText = `Paket dis aktariminda saklanan hedef ${Date.now()}`;
       targetEditController.updateDraft(segmentIndex, packageExportTargetText);
       assert(autosaveService.has(editorSessionStore.getSegments()[segmentIndex].id), "pending save exists before project package export");
-      await exportProjectPackage();
+      await projectExportController.exportProjectPackage();
       const packageDownload = await waitFor(() => packageDownloads.find((item) => item.type === "application/json" && item.text.includes('"type": "project-package"')), "project package download");
       const exportedPackage = JSON.parse(packageDownload.text);
       assert((exportedPackage.segments || []).some((segment) => segment.target === packageExportTargetText), "project package export flushes pending segment edits");

@@ -227,6 +227,7 @@ const requiredReleaseFiles = [
   "src/features/import-export/project-document-import-controller.js",
   "src/features/import-export/file-import-service.js",
   "src/features/import-export/project-export-build-service.js",
+  "src/features/import-export/project-export-controller.js",
   "src/features/import-export/project-package-portability-service.js",
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-presentation-service.js",
@@ -298,6 +299,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-document-import-controller.test.cjs",
   "tests/unit/file-import-service.test.cjs",
   "tests/unit/project-export-build-service.test.cjs",
+  "tests/unit/project-export-controller.test.cjs",
   "tests/unit/project-package-portability-service.test.cjs",
   "tests/unit/concordance-controller.test.cjs",
   "tests/unit/segment-navigation-controller.test.cjs",
@@ -473,6 +475,8 @@ const fileImportServiceJs = readText("src/features/import-export/file-import-ser
 const fileImportServiceUnitTests = readText("tests/unit/file-import-service.test.cjs");
 const projectExportBuildServiceJs = readText("src/features/import-export/project-export-build-service.js");
 const projectExportBuildServiceUnitTests = readText("tests/unit/project-export-build-service.test.cjs");
+const projectExportControllerJs = readText("src/features/import-export/project-export-controller.js");
+const projectExportControllerUnitTests = readText("tests/unit/project-export-controller.test.cjs");
 const projectPackagePortabilityServiceJs = readText(
   "src/features/import-export/project-package-portability-service.js"
 );
@@ -4980,6 +4984,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectExportController } from "../features/import-export/project-export-controller.js";',
+  "The application runtime must install the checked project-export controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectExportController,",
+  "The application runtime must expose the checked project-export controller factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createProjectPackagePortabilityService } from "../features/import-export/project-package-portability-service.js";',
   "The application runtime must install the checked project-package portability service."
 );
@@ -6466,7 +6480,7 @@ assert(
   (appJs.match(/\bfileImportService\.assertSize\b/g) || []).length === 3 &&
     (appJs.match(/\bfileImportService\.readText\b/g) || []).length === 2 &&
     (appJs.match(/\bfileImportService\.progressDetail\b/g) || []).length === 2 &&
-    (appJs.match(/\bfileImportService\.errorReport\b/g) || []).length === 3 &&
+    (appJs.match(/\bfileImportService\.errorReport\b/g) || []).length === 2 &&
     (appJs.match(/\bfileImportService\.parseJson\b/g) || []).length === 2 &&
     (appJs.match(/\bfileImportService\.runTask\b/g) || []).length === 3 &&
     (appWorkflowDriverJs.match(/\bfileImportService\.readText\b/g) || []).length === 2 &&
@@ -6600,9 +6614,9 @@ for (const removedHelper of [
   );
 }
 assert(
-  (appJs.match(/\bprojectExportBuildService\.buildProjectPackage\b/g) || []).length === 4 &&
-    (appJs.match(/\bprojectExportBuildService\.assertValidProjectPackageForWrite\b/g) || []).length === 4 &&
-    (appJs.match(/\bprojectExportBuildService\.buildBackupExport\b/g) || []).length === 2 &&
+  (appJs.match(/\bprojectExportBuildService\.buildProjectPackage\b/g) || []).length === 2 &&
+    (appJs.match(/\bprojectExportBuildService\.assertValidProjectPackageForWrite\b/g) || []).length === 2 &&
+    (appJs.match(/\bprojectExportBuildService\.buildBackupExport\b/g) || []).length === 1 &&
     !appJs.includes("projectExportBuildService.assertValidBackupForWrite") &&
     (appWorkflowDriverJs.match(/\bprojectExportBuildService\.buildProjectPackage\b/g) || []).length === 4 &&
     (appWorkflowDriverJs.match(/\bprojectExportBuildService\.assertValidBackupForWrite\b/g) || []).length === 1,
@@ -6629,6 +6643,138 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/import-export/project-export-build-service.js"',
   "source-catalog extraction must scan the checked project-export build service."
+);
+for (const snippet of [
+  "ProjectExportController requires build, session, persistence, activity, file, validation, presentation, workspace, status, clock, test, and logger boundaries.",
+  "async function exportBrowserBackup()",
+  "await build.buildBackupExport()",
+  '`loopcat-backup-${clock.now().slice(0, 10)}.json`',
+  "JSON.stringify(backup, null, 2)",
+  '"application/json"',
+  "presentation.renderValidation(backupValidation)",
+  "const noteCount = validation.count(backupValidation)",
+  '`Backup exported with ${noteCount} validation note${noteCount === 1 ? "" : "s"}`',
+  'const message = error.message || "Backup export failed."',
+  "error.validation || validation.errorReport(message)",
+  "return false",
+  "function reportProjectPackageExportFailure(error, pkg = null)",
+  'error?.validation || pkg?.validation || validation.errorReport(message)',
+  "if (!session.getProject()) return",
+  'files.safeName(session.getProject().name || "project")',
+  "previewPackage = await build.buildProjectPackage()",
+  'build.assertValidProjectPackageForWrite(previewPackage, "export project package")',
+  'id: `export-${clock.nowMs()}`',
+  'type: "project-package"',
+  "createdAt: clock.now()",
+  ".slice(-25)",
+  "const shouldSimulateActivityFailure = test.shouldFailActivity()",
+  'activity.draft(session.getProject(), "export", "Project package exported", activityDetail)',
+  "build.buildProjectPackage(pendingProject, null, {",
+  "activityEvents: pendingActivityEvent ? [pendingActivityEvent] : []",
+  "const finalWarnings = validation.count(pkg.validation)",
+  "files.download(filename, JSON.stringify(pkg, null, 2), \"application/json\")",
+  "session.replaceProject(await persistence.updateProject(pendingProject))",
+  "project.id === session.getProject().id ? session.getProject() : project",
+  'logger.warn("Project package export history update failed.", error)',
+  'status.set("Project package exported; local export history failed", "dirty")',
+  'throw new Error("Simulated export activity log failure")',
+  'await persistence.bulkPut("activityEvents", [pendingActivityEvent])',
+  "session.replaceActivityEvents(await persistence.listActivityEvents(session.getProject().id))",
+  "presentation.renderBackupReminder()",
+  'logger.warn("Project package export activity log failed.", activityError)',
+  "activity.appendWarning(successMessage, activityLogged)",
+  'status.mode(finalWarnings ? "dirty" : "saved", activityLogged)',
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    projectExportControllerJs,
+    snippet,
+    `ProjectExportController must retain characterized backup/project export, history, activity, presentation, and failure policy: ${snippet}`
+  );
+}
+assert(
+  !projectExportControllerJs.includes("editorSessionStore") &&
+    !projectExportControllerJs.includes("projectExportBuildService") &&
+    !projectExportControllerJs.includes("draftProjectActivityEvent") &&
+    !projectExportControllerJs.includes("fileSafeName") &&
+    !projectExportControllerJs.includes("reportCount") &&
+    !projectExportControllerJs.includes("renderValidationReport") &&
+    !projectExportControllerJs.includes("markWorkspaceDirty") &&
+    !projectExportControllerJs.includes("setSaveStatus") &&
+    !projectExportControllerJs.includes("appendActivityWarning") &&
+    !projectExportControllerJs.includes("exportStatusMode") &&
+    !projectExportControllerJs.includes("EXPORT_ACTIVITY_FAILURE_TEST_FLAG") &&
+    !projectExportControllerJs.includes("LOOPCAT_TEST_BUILD") &&
+    !projectExportControllerJs.includes("Date.now") &&
+    !projectExportControllerJs.includes("new Date"),
+  "the checked project-export controller must use only its injected build, session, persistence, activity, file, validation, presentation, workspace, status, clock, test, and logger boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectExportController({",
+  "build: projectExportBuildService",
+  "session: editorSessionStore",
+  "updateProject,",
+  "bulkPut,",
+  "listActivityEvents",
+  "draft: draftProjectActivityEvent",
+  "appendWarning: appendActivityWarning",
+  "files: { safeName: fileSafeName, download }",
+  "count: reportCount",
+  "errorReport: fileImportService.errorReport",
+  "renderValidation: renderValidationReport",
+  "renderEditor,",
+  "renderBackupReminder",
+  "workspace: { markDirty: markWorkspaceDirty }",
+  "status: { set: setSaveStatus, mode: exportStatusMode }",
+  "now: () => new Date().toISOString()",
+  "nowMs: () => Date.now()",
+  "Boolean(LOOPCAT_TEST_BUILD && editorSessionStore.getProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG])",
+  "logger: console",
+  "exportRecoveryCopy: (...args) => projectExportController.exportProjectPackage(...args)",
+  "exportProjectPackage: projectExportController.exportProjectPackage",
+  "exportBackup: projectExportController.exportBrowserBackup"
+]) {
+  assertIncludes(appJs, boundary, `project-export controller composition must inject the checked ${boundary} boundary.`);
+}
+for (const removedHelper of [
+  "exportBrowserBackup",
+  "reportProjectPackageExportFailure",
+  "exportProjectPackage"
+]) {
+  assert(
+    !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  (appJs.match(/\bprojectExportController\.exportProjectPackage\b/g) || []).length === 2 &&
+    (appJs.match(/\bprojectExportController\.exportBrowserBackup\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bprojectExportController\.exportProjectPackage\b/g) || []).length === 3 &&
+    !appWorkflowDriverJs.includes("projectExportController.exportBrowserBackup"),
+  "ImportExportController, recovery, and all workflow manual-export consumers must call ProjectExportController directly."
+);
+for (const testName of [
+  "ProjectExportController exports a browser backup with exact file, validation, and status effects",
+  "ProjectExportController contains browser-backup failures with report precedence and exact fallback",
+  "ProjectExportController preserves the project guard and preview failure reporting",
+  "ProjectExportController completes two-pass project export, history, activity, and final presentation",
+  "ProjectExportController preserves the final-build failure and package-validation fallback",
+  "ProjectExportController stops after download failure without local export-history effects",
+  "ProjectExportController preserves post-download history failure recovery and early return",
+  "ProjectExportController preserves simulated and persisted activity warning outcomes",
+  "ProjectExportController validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectExportControllerUnitTests,
+    testName,
+    `focused project-export controller tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/import-export/project-export-controller.js"',
+  "source-catalog extraction must scan the checked project-export controller."
 );
 for (const snippet of [
   "ProjectDocumentImportController requires checked session, catalog, file, format, repository, history, progress, ID, summary, navigation, activity, workspace, status, presentation, text, and confirmation boundaries.",
@@ -13313,19 +13459,19 @@ assertIncludes(
   "app workflow test must verify failed project-package downloads do not write export history or activity."
 );
 assertIncludes(
-  appJs,
-  "const finalWarnings = reportCount(pkg.validation);",
-  "app.js must base project-package export status on the final downloaded package validation."
+  projectExportControllerJs,
+  "const finalWarnings = validation.count(pkg.validation);",
+  "ProjectExportController must base project-package export status on the final downloaded package validation."
 );
 assertIncludes(
-  appJs,
-  'draftProjectActivityEvent(editorSessionStore.getProject(), "export", "Project package exported"',
-  "app.js must draft project-package export activity before download so success history can be committed only after download succeeds."
+  projectExportControllerJs,
+  'activity.draft(session.getProject(), "export", "Project package exported"',
+  "ProjectExportController must draft project-package export activity before download so success history can be committed only after download succeeds."
 );
 assertIncludes(
-  appJs,
+  projectExportControllerJs,
   "function reportProjectPackageExportFailure",
-  "app.js must report project-package construction failures visibly before download."
+  "ProjectExportController must report project-package construction failures visibly before download."
 );
 assertIncludes(
   appJs,

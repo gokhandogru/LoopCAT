@@ -3474,6 +3474,7 @@ dialogLifecycleController?.register?.({
   initialFocus: els.closeTrashBtn,
   beforeOpen: renderTrashList
 });
+let projectExportController;
 const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecoveryWorkspaceController?.({
   elements: {
     menu: els.workspaceMenu,
@@ -3509,7 +3510,7 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
   exportWorkspaceBackup: exportWorkspaceBackupToFolder,
   repairWorkspace: repairWorkspaceLinks,
   saveRecovery: saveWorkspaceRecoveryPackages,
-  exportRecoveryCopy: exportProjectPackage,
+  exportRecoveryCopy: (...args) => projectExportController.exportProjectPackage(...args),
   dismissBackupReminder: () => dismissBackupReminder(),
   scheduleFrame: requestAnimationFrame,
   onError: (error, context) => {
@@ -3574,6 +3575,40 @@ const projectExportBuildService =
     },
     clock: { now: () => new Date().toISOString() }
   });
+projectExportController = appRuntime.featureFactories.createProjectExportController({
+  build: projectExportBuildService,
+  session: editorSessionStore,
+  persistence: {
+    updateProject,
+    bulkPut,
+    listActivityEvents
+  },
+  activity: {
+    draft: draftProjectActivityEvent,
+    appendWarning: appendActivityWarning
+  },
+  files: { safeName: fileSafeName, download },
+  validation: {
+    count: reportCount,
+    errorReport: fileImportService.errorReport
+  },
+  presentation: {
+    renderValidation: renderValidationReport,
+    renderEditor,
+    renderBackupReminder
+  },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus, mode: exportStatusMode },
+  clock: {
+    now: () => new Date().toISOString(),
+    nowMs: () => Date.now()
+  },
+  test: {
+    shouldFailActivity: () =>
+      Boolean(LOOPCAT_TEST_BUILD && editorSessionStore.getProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG])
+  },
+  logger: console
+});
 const projectDocumentImportController =
   appRuntime.featureFactories.createProjectDocumentImportController({
     session: editorSessionStore,
@@ -3661,7 +3696,7 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
   importTmx: projectResourceTransferController.importTmx,
   importTbx: projectResourceTransferController.importTbx,
   importTermList: projectResourceTransferController.importTermList,
-  exportProjectPackage,
+  exportProjectPackage: projectExportController.exportProjectPackage,
   exportTargetDocx: deliveryExportController.exportTargetDocx,
   exportBilingualDocx: deliveryExportController.exportBilingualDocx,
   exportTargetText: deliveryExportController.exportTargetText,
@@ -3673,7 +3708,7 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
   exportAnonymizedReport: reportExportController.exportAnonymizedReport,
   exportTmx: projectResourceTransferController.exportTmx,
   exportTbx: projectResourceTransferController.exportTbx,
-  exportBackup: exportBrowserBackup,
+  exportBackup: projectExportController.exportBrowserBackup,
   onValidationDismiss: () => {
     state.lastValidationReport = null;
   },
@@ -6347,111 +6382,6 @@ function renderProgress(options = {}) {
   els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
   els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
-}
-
-async function exportBrowserBackup() {
-  try {
-    const { backup, validation } = await projectExportBuildService.buildBackupExport();
-    download(
-      `loopcat-backup-${new Date().toISOString().slice(0, 10)}.json`,
-      JSON.stringify(backup, null, 2),
-      "application/json"
-    );
-    renderValidationReport(validation);
-    const noteCount = reportCount(validation);
-    setSaveStatus(
-      noteCount
-        ? `Backup exported with ${noteCount} validation note${noteCount === 1 ? "" : "s"}`
-        : "Backup exported",
-      noteCount ? "dirty" : "saved"
-    );
-    return true;
-  } catch (error) {
-    const message = error.message || "Backup export failed.";
-    renderValidationReport(error.validation || fileImportService.errorReport(message));
-    setSaveStatus(message, "dirty");
-    return false;
-  }
-}
-
-function reportProjectPackageExportFailure(error, pkg = null) {
-  const message = error?.message || "Project package export failed";
-  renderValidationReport(error?.validation || pkg?.validation || fileImportService.errorReport(message));
-  setSaveStatus(message, "dirty");
-}
-
-async function exportProjectPackage() {
-  if (!editorSessionStore.getProject()) return;
-  const base = fileSafeName(editorSessionStore.getProject().name || "project");
-  const filename = `${base}.loopcat.json`;
-  let previewPackage = null;
-  try {
-    previewPackage = await projectExportBuildService.buildProjectPackage();
-    projectExportBuildService.assertValidProjectPackageForWrite(previewPackage, "export project package");
-  } catch (error) {
-    reportProjectPackageExportFailure(error, previewPackage);
-    return;
-  }
-  const warnings = reportCount(previewPackage.validation);
-  const exportHistoryEntry = { id: `export-${Date.now()}`, type: "project-package", filename, warningCount: warnings, createdAt: new Date().toISOString() };
-  const pendingProject = {
-    ...editorSessionStore.getProject(),
-    exportHistory: [
-      ...(editorSessionStore.getProject().exportHistory || []),
-      exportHistoryEntry
-    ].slice(-25)
-  };
-  const activityDetail = { filename, warningCount: warnings };
-  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && editorSessionStore.getProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]);
-  const pendingActivityEvent = shouldSimulateActivityFailure
-    ? null
-    : draftProjectActivityEvent(editorSessionStore.getProject(), "export", "Project package exported", activityDetail);
-  let pkg = null;
-  try {
-    pkg = await projectExportBuildService.buildProjectPackage(pendingProject, null, {
-      activityEvents: pendingActivityEvent ? [pendingActivityEvent] : []
-    });
-    projectExportBuildService.assertValidProjectPackageForWrite(pkg, "export project package");
-  } catch (error) {
-    reportProjectPackageExportFailure(error, pkg);
-    return;
-  }
-  const finalWarnings = reportCount(pkg.validation);
-  try {
-    download(filename, JSON.stringify(pkg, null, 2), "application/json");
-  } catch (error) {
-    setSaveStatus(error.message || "Project package export failed", "dirty");
-    return;
-  }
-  try {
-    editorSessionStore.replaceProject(await updateProject(pendingProject));
-    editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
-  } catch (error) {
-    console.warn("Project package export history update failed.", error);
-    markWorkspaceDirty(editorSessionStore.getProject()?.id);
-    renderValidationReport(pkg.validation);
-    renderEditor();
-    setSaveStatus("Project package exported; local export history failed", "dirty");
-    return;
-  }
-  let activityLogged = true;
-  try {
-    if (shouldSimulateActivityFailure) throw new Error("Simulated export activity log failure");
-    if (pendingActivityEvent) {
-      await bulkPut("activityEvents", [pendingActivityEvent]);
-      editorSessionStore.replaceActivityEvents(await listActivityEvents(editorSessionStore.getProject().id));
-    }
-    markWorkspaceDirty(editorSessionStore.getProject().id);
-    renderBackupReminder();
-  } catch (activityError) {
-    activityLogged = false;
-    console.warn("Project package export activity log failed.", activityError);
-    if (editorSessionStore.getProject()?.id) markWorkspaceDirty(editorSessionStore.getProject().id);
-  }
-  renderValidationReport(pkg.validation);
-  renderEditor();
-  const successMessage = finalWarnings ? `Project exported with ${finalWarnings} validation warning${finalWarnings === 1 ? "" : "s"}` : "Project package exported";
-  setSaveStatus(appendActivityWarning(successMessage, activityLogged), exportStatusMode(finalWarnings ? "dirty" : "saved", activityLogged));
 }
 
 async function importProjectPackageData(pkg, options = {}) {
