@@ -51,6 +51,7 @@ import { createFilterPresetController } from "../features/editor/filter-preset-c
 import { createFocusModeController } from "../features/editor/focus-mode-controller.js";
 import { createInspectorController } from "../features/editor/inspector-controller.js";
 import { createInspectorToggleController } from "../features/editor/inspector-toggle-controller.js";
+import { createPanelToggleController } from "../features/editor/panel-toggle-controller.js";
 import { createSegmentActionButtonsController } from "../features/editor/segment-action-buttons-controller.js";
 import { createSegmentGridController } from "../features/editor/segment-grid-controller.js";
 import { createAutosaveService } from "../features/editor/autosave-service.js";
@@ -261,6 +262,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createFocusModeController,
       createInspectorController,
       createInspectorToggleController,
+      createPanelToggleController,
       createSegmentActionButtonsController,
       createDeliveryExportController,
       createProjectResourceTransferController,

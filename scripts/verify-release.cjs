@@ -168,6 +168,7 @@ const requiredReleaseFiles = [
   "src/features/editor/filter-store.js",
   "src/features/editor/focus-mode-controller.js",
   "src/features/editor/inspector-toggle-controller.js",
+  "src/features/editor/panel-toggle-controller.js",
   "src/features/editor/segment-action-buttons-controller.js",
   "src/features/editor/editor-session-store.js",
   "src/features/editor/editor-context-controller.js",
@@ -298,6 +299,7 @@ const requiredReleaseFiles = [
   "tests/unit/global-keyboard-controller.test.cjs",
   "tests/unit/focus-mode-controller.test.cjs",
   "tests/unit/inspector-toggle-controller.test.cjs",
+  "tests/unit/panel-toggle-controller.test.cjs",
   "tests/unit/segment-action-buttons-controller.test.cjs",
   "tests/unit/palette-controller-trigger.test.cjs",
   "tests/unit/editor-state.test.cjs",
@@ -471,6 +473,8 @@ const focusModeControllerJs = readText("src/features/editor/focus-mode-controlle
 const focusModeControllerUnitTests = readText("tests/unit/focus-mode-controller.test.cjs");
 const inspectorToggleControllerJs = readText("src/features/editor/inspector-toggle-controller.js");
 const inspectorToggleControllerUnitTests = readText("tests/unit/inspector-toggle-controller.test.cjs");
+const panelToggleControllerJs = readText("src/features/editor/panel-toggle-controller.js");
+const panelToggleControllerUnitTests = readText("tests/unit/panel-toggle-controller.test.cjs");
 const segmentActionButtonsControllerJs = readText("src/features/editor/segment-action-buttons-controller.js");
 const segmentActionButtonsControllerUnitTests = readText(
   "tests/unit/segment-action-buttons-controller.test.cjs"
@@ -4598,7 +4602,11 @@ assertIncludes(
   `id="commandPaletteOverlay" class="command-palette-overlay hidden" aria-hidden="true"`,
   "index.html must keep the closed command palette out of the accessibility tree."
 );
-assertIncludes(appJs, "syncPanelToggleState", "app.js must keep disclosure names and expanded states synchronized.");
+assertIncludes(
+  appJs,
+  "panelToggleController.renderAll()",
+  "localized UI refresh must keep panel disclosure names and expanded states synchronized."
+);
 assertIncludes(
   paletteControllerJs,
   "focusController.open(overlay",
@@ -4835,6 +4843,90 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/segment-action-buttons-controller.js"',
   "source-catalog extraction must scan the checked segment-action buttons controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createPanelToggleController } from "../features/editor/panel-toggle-controller.js";',
+  "the application runtime must install the checked panel-toggle controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createPanelToggleController,",
+  "the application runtime must expose the checked panel-toggle controller factory."
+);
+for (const snippet of [
+  "PanelToggleController requires a checked document query boundary.",
+  "PanelToggleController requires checked panel selectors.",
+  "PanelToggleController requires a localization boundary.",
+  "PanelToggleController requires inspector state, layout, and context boundaries.",
+  'existingLabel.replace(/^(?:Expand|Minimize|Collapse)\\s+/i, "")',
+  'button.setAttribute("aria-expanded", String(!collapsed))',
+  'localization.translate(`${collapsed ? "Expand" : "Minimize"} ${panelLabel}`)',
+  "documentRoot.querySelectorAll(selectors.toggles).forEach(render)",
+  "inspector.setOpen(true)",
+  "void inspector.persistOpen(true)",
+  "inspector.setContext({ tab: panel.dataset.inspectorSection })",
+  'panel.classList.toggle("collapsed")',
+  "return Object.freeze({ mount, render, renderAll, unmount })"
+]) {
+  assertIncludes(panelToggleControllerJs, snippet, `PanelToggleController must retain panel policy: ${snippet}.`);
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createPanelToggleController({",
+  "documentRoot: document",
+  'toggles: "[data-panel-toggle]"',
+  'panel: "[data-collapsible-panel]"',
+  'heading: "h2, h3"',
+  "state.inspectorOpen = inspectorOpen",
+  "workspaceLayoutController?.setInspectorOpen?.(inspectorOpen)",
+  "verticalFeatureState?.inspector?.setContext(context)",
+  "panelToggleController.renderAll()",
+  "panelToggleController.mount()"
+]) {
+  assertIncludes(appJs, boundary, `panel-toggle composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  appJs.indexOf("projectQaController.mount()") < appJs.indexOf("panelToggleController.mount()") &&
+    appJs.indexOf("panelToggleController.mount()") <
+      appJs.indexOf('els.documentFilter.addEventListener("change"'),
+  "panel toggles must mount between project-QA and document-filter listeners at the existing position."
+);
+for (const removedOwner of ["function syncPanelToggleState", "function syncAllPanelToggleStates"]) {
+  assert(
+    !appJs.includes(removedOwner) && !appWorkflowDriverJs.includes(removedOwner),
+    `${removedOwner} must not return to the coordinator or workflow driver.`
+  );
+}
+assert(
+  !appJs.includes('document.querySelectorAll("[data-panel-toggle]").forEach((button) =>') &&
+    !appWorkflowDriverJs.includes("panelToggleController"),
+  "panel-toggle listener ownership must not return to app.js or the workflow driver."
+);
+for (const forbiddenOwner of ["document.", "state.", "workspaceLayoutController", "verticalFeatureState", "els."]) {
+  assert(
+    !panelToggleControllerJs.includes(forbiddenOwner),
+    `PanelToggleController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "PanelToggleController renders collapsed state with every label precedence and fallback",
+  "PanelToggleController owns exact mount synchronization and listener lifecycle",
+  "PanelToggleController toggles a plain panel and ignores the native event",
+  "PanelToggleController preserves inspector open, persistence, context, toggle, and render order",
+  "PanelToggleController uses live render-all queries and tolerates missing panels",
+  "PanelToggleController preserves synchronous click and lifecycle failure timing",
+  "PanelToggleController validates injected query, selector, localization, and inspector boundaries"
+]) {
+  assertIncludes(
+    panelToggleControllerUnitTests,
+    testName,
+    `focused panel-toggle tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/panel-toggle-controller.js"',
+  "source-catalog extraction must scan the checked panel-toggle controller."
 );
 assertIncludes(
   appBootstrapJs,

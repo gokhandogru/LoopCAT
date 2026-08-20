@@ -217,6 +217,7 @@ const segmentDraftApplicationServicePath = path.join(
 );
 const focusModeControllerPath = path.join(root, "src", "features", "editor", "focus-mode-controller.js");
 const inspectorToggleControllerPath = path.join(root, "src", "features", "editor", "inspector-toggle-controller.js");
+const panelToggleControllerPath = path.join(root, "src", "features", "editor", "panel-toggle-controller.js");
 const segmentActionButtonsControllerPath = path.join(
   root,
   "src",
@@ -525,6 +526,7 @@ function main() {
   );
   extractScript(messagesByText, focusModeControllerPath, "src/features/editor/focus-mode-controller.js");
   extractScript(messagesByText, inspectorToggleControllerPath, "src/features/editor/inspector-toggle-controller.js");
+  extractScript(messagesByText, panelToggleControllerPath, "src/features/editor/panel-toggle-controller.js");
   extractScript(
     messagesByText,
     segmentActionButtonsControllerPath,

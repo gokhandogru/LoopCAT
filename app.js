@@ -3526,6 +3526,22 @@ const inspectorToggleController = appRuntime.featureFactories.createInspectorTog
     getSelected: () => document.querySelector("[data-inspector-tab][aria-selected='true']")
   }
 });
+const panelToggleController = appRuntime.featureFactories.createPanelToggleController({
+  documentRoot: document,
+  selectors: {
+    toggles: "[data-panel-toggle]",
+    panel: "[data-collapsible-panel]",
+    heading: "h2, h3"
+  },
+  localization: { translate: (value) => uiLocalizationService.source(value) },
+  inspector: {
+    setOpen: (inspectorOpen) => {
+      state.inspectorOpen = inspectorOpen;
+    },
+    persistOpen: (inspectorOpen) => workspaceLayoutController?.setInspectorOpen?.(inspectorOpen),
+    setContext: (context) => verticalFeatureState?.inspector?.setContext(context)
+  }
+});
 
 const diagnosticsService = appRuntime?.featureFactories?.createDiagnosticsService?.({
   platform: appRuntime.platform,
@@ -4617,7 +4633,7 @@ function refreshLocalizedUi() {
     payload: { locale: uiI18n?.getLocale?.() || "" }
   });
   uiI18n?.localizeStaticDom?.(document.body);
-  syncAllPanelToggleStates();
+  panelToggleController.renderAll();
   renderUiLocaleOptions();
   focusModeController.render();
   renderWorkspaceStatus();
@@ -4874,21 +4890,6 @@ async function emptyTrashPermanently() {
   await renderTrashList();
   setSaveStatus("Trash emptied permanently", "saved");
   return true;
-}
-
-function syncPanelToggleState(button) {
-  const panel = button?.closest?.("[data-collapsible-panel]");
-  if (!panel) return;
-  const collapsed = panel.classList.contains("collapsed");
-  const existingLabel = String(button.getAttribute("aria-label") || "").trim();
-  const panelLabel = button.dataset.panelLabel || existingLabel.replace(/^(?:Expand|Minimize|Collapse)\s+/i, "") || panel.querySelector("h2, h3")?.textContent || "panel";
-  button.dataset.panelLabel = panelLabel;
-  button.setAttribute("aria-expanded", String(!collapsed));
-  button.setAttribute("aria-label", uiLocalizationService.source(`${collapsed ? "Expand" : "Minimize"} ${panelLabel}`));
-}
-
-function syncAllPanelToggleStates() {
-  document.querySelectorAll("[data-panel-toggle]").forEach(syncPanelToggleState);
 }
 
 function renderImportBusyState() {
@@ -6753,20 +6754,7 @@ function wireEvents() {
   projectFilterControlsController.mount();
   segmentActionButtonsController.mount();
   projectQaController.mount();
-  document.querySelectorAll("[data-panel-toggle]").forEach((button) => {
-    syncPanelToggleState(button);
-    button.addEventListener("click", () => {
-      const panel = button.closest("[data-collapsible-panel]");
-      if (!panel) return;
-      if (panel.dataset.inspectorSection) {
-        state.inspectorOpen = true;
-        void workspaceLayoutController?.setInspectorOpen?.(true);
-        verticalFeatureState?.inspector?.setContext({ tab: panel.dataset.inspectorSection });
-      }
-      panel.classList.toggle("collapsed");
-      syncPanelToggleState(button);
-    });
-  });
+  panelToggleController.mount();
   els.documentFilter.addEventListener("change", async () => {
     applicationNavigation.selectDocument({ documentId: els.documentFilter.value });
     renderSegments();
