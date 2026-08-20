@@ -3508,6 +3508,46 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
   }
 });
 recoveryWorkspaceController?.mount?.();
+const projectDocumentImportController =
+  appRuntime.featureFactories.createProjectDocumentImportController({
+    session: editorSessionStore,
+    catalog: {
+      list: projectDocumentCatalogService.list,
+      manifest: projectDocumentManifest
+    },
+    files: {
+      assertSize: assertFileSize,
+      maxBytes: MAX_PROJECT_IMPORT_BYTES
+    },
+    formats: {
+      extractDocx: extractDocxSegments,
+      parseLocalization: parseLocalizationFile,
+      parseXliff: parseXliffFile,
+      decodingOptions: textEncodingInputService.decodingOptions,
+      isXliffType: (extension) => XLIFF_DOCUMENT_TYPES.has(extension)
+    },
+    repository: {
+      append: appendProjectSegmentsAndUpdateProject,
+      getProjectSegments
+    },
+    histories: { prepare: segmentTargetStateService.prepareHistories },
+    progress: { report: reportImportProgress },
+    ids: { next: () => (crypto.randomUUID ? crypto.randomUUID() : Date.now()) },
+    summaries: { refresh: refreshProjectSummaries },
+    navigation: { selectDocument: applicationNavigation.selectDocument },
+    activity: {
+      log: logOptionalProjectActivity,
+      appendWarning: appendActivityWarning
+    },
+    workspace: { markDirty: markWorkspaceDirty },
+    status: { set: setSaveStatus, mode: exportStatusMode },
+    presentation: {
+      renderAll,
+      refreshEditorContext: editorContextController.refresh
+    },
+    text: { lower: stableLower, safe: displaySafeText },
+    confirm: uiLocalizationService.confirm
+  });
 const importExportController = appRuntime?.featureFactories?.createImportExportController?.({
   elements: {
     projectFileImportButton: els.projectFileImportBtn,
@@ -3543,7 +3583,7 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
   },
   hasProject: () => Boolean(editorSessionStore.getProject()),
   runImportTask: runFileImportTask,
-  importProjectFile: importProjectDocument,
+  importProjectFile: projectDocumentImportController.importFile,
   importProjectPackage: async (file) => {
     await autosaveService.flush();
     return importProjectPackage(file);
@@ -6241,135 +6281,6 @@ function renderProgress(options = {}) {
   els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
   els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
-}
-
-async function importDocx(file) {
-  assertFileSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);
-  await reportImportProgress("Reading DOCX package", file);
-  const result = await extractDocxSegments(file);
-  await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
-  const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  const documents = [...projectDocumentManifest(editorSessionStore.getProject()), { id: documentId, name: result.fileName, type: "docx" }];
-  const docxStructures = { ...(editorSessionStore.getProject().docxStructures || {}), [documentId]: result.structure };
-  const importResult = await appendProjectSegmentsAndUpdateProject(
-    { ...editorSessionStore.getProject(), sourceFileName: result.fileName, docxStructure: result.structure, docxStructures, documents },
-    result.segments,
-    { documentId, documentName: result.fileName, documentType: "docx" }
-  );
-  await reportImportProgress("Refreshing project view", file);
-  editorSessionStore.replaceProject(importResult.project);
-  editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(editorSessionStore.getProject().id)));
-  editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
-  await refreshProjectSummaries();
-  const activeIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
-  applicationNavigation.selectDocument({
-    documentId,
-    segmentId: editorSessionStore.getSegments()[activeIndex]?.id || "",
-    activeIndex
-  });
-  const extractedParts = result.structure?.textPartSummary?.filter((part) => part.segments > 0).length || 1;
-  const activityLogged = await logOptionalProjectActivity("import", "DOCX imported", { fileName: file.name, segmentCount: result.segments.length, documentId }, "DOCX import");
-  markWorkspaceDirty();
-  setSaveStatus(appendActivityWarning(`Imported ${result.segments.length} segments from ${extractedParts} DOCX part${extractedParts === 1 ? "" : "s"}`, activityLogged), exportStatusMode("saved", activityLogged));
-  renderAll();
-  await editorContextController.refresh();
-}
-
-async function importLocalization(file) {
-  assertFileSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);
-  await reportImportProgress("Parsing project file", file);
-  const result = await parseLocalizationFile(file, textEncodingInputService.decodingOptions());
-  await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
-  const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  const documents = [...projectDocumentManifest(editorSessionStore.getProject()), { id: documentId, name: result.fileName, type: result.documentType }];
-  const localizationStructures = result.structure
-    ? { ...(editorSessionStore.getProject().localizationStructures || {}), [documentId]: result.structure }
-    : editorSessionStore.getProject().localizationStructures;
-  const importResult = await appendProjectSegmentsAndUpdateProject(
-    { ...editorSessionStore.getProject(), documents, localizationStructures },
-    result.segments,
-    { documentId, documentName: result.fileName, documentType: result.documentType }
-  );
-  await reportImportProgress("Refreshing project view", file);
-  editorSessionStore.replaceProject(importResult.project);
-  editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(editorSessionStore.getProject().id)));
-  editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
-  await refreshProjectSummaries();
-  const activeIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
-  applicationNavigation.selectDocument({
-    documentId,
-    segmentId: editorSessionStore.getSegments()[activeIndex]?.id || "",
-    activeIndex
-  });
-  const activityLogged = await logOptionalProjectActivity("import", "Localization file imported", { fileName: file.name, documentType: result.documentType, segmentCount: result.segments.length, documentId }, "Localization import");
-  markWorkspaceDirty();
-  setSaveStatus(appendActivityWarning("Saved", activityLogged), exportStatusMode("saved", activityLogged));
-  renderAll();
-  await editorContextController.refresh();
-}
-
-async function importXliff(file) {
-  assertFileSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);
-  await reportImportProgress("Parsing XLIFF", file);
-  const result = await parseXliffFile(file, textEncodingInputService.decodingOptions());
-  await reportImportProgress("Saving imported segments", file, `${result.segments.length} segment${result.segments.length === 1 ? "" : "s"}`);
-  const documentId = `doc-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
-  const documents = [...projectDocumentManifest(editorSessionStore.getProject()), { id: documentId, name: result.fileName, type: result.documentType }];
-  const localizationStructures = {
-    ...(editorSessionStore.getProject().localizationStructures || {}),
-    [documentId]: result.structure
-  };
-  const importResult = await appendProjectSegmentsAndUpdateProject(
-    { ...editorSessionStore.getProject(), documents, localizationStructures },
-    result.segments,
-    { documentId, documentName: result.fileName, documentType: result.documentType }
-  );
-  await reportImportProgress("Refreshing project view", file);
-  editorSessionStore.replaceProject(importResult.project);
-  editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(editorSessionStore.getProject().id)));
-  editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
-  await refreshProjectSummaries();
-  const activeIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
-  applicationNavigation.selectDocument({
-    documentId,
-    segmentId: editorSessionStore.getSegments()[activeIndex]?.id || "",
-    activeIndex
-  });
-  const activityLogged = await logOptionalProjectActivity("import", "XLIFF imported", { fileName: file.name, segmentCount: result.segments.length, documentId }, "XLIFF import");
-  markWorkspaceDirty();
-  setSaveStatus(appendActivityWarning(`Imported ${result.segments.length} XLIFF segment${result.segments.length === 1 ? "" : "s"}`, activityLogged), exportStatusMode("saved", activityLogged));
-  renderAll();
-  await editorContextController.refresh();
-}
-
-function projectHasDocumentNamed(fileName) {
-  const normalized = stableLower(String(fileName || "").trim());
-  if (!normalized) return false;
-  return projectDocumentCatalogService.list().some((documentInfo) => stableLower(documentInfo.name.trim()) === normalized);
-}
-
-function confirmDuplicateImport(file) {
-  if (!projectHasDocumentNamed(file.name)) return true;
-  return uiLocalizationService.confirm(`A file named "${displaySafeText(file.name)}" already exists in this project. Import it again anyway?`);
-}
-
-async function importProjectDocument(file) {
-  if (!editorSessionStore.getProject() || !file) return;
-  assertFileSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);
-  if (!confirmDuplicateImport(file)) {
-    setSaveStatus("Import canceled", "saved");
-    return false;
-  }
-  const ext = file.name.split(".").pop().toLowerCase();
-  if (ext === "docx") {
-    await importDocx(file);
-    return;
-  }
-  if (XLIFF_DOCUMENT_TYPES.has(ext)) {
-    await importXliff(file);
-    return;
-  }
-  await importLocalization(file);
 }
 
 function validateProjectPackage(pkg) {

@@ -224,6 +224,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-document-statistics-service.js",
   "src/features/projects/project-document-catalog-service.js",
   "src/features/import-export/text-encoding-input-service.js",
+  "src/features/import-export/project-document-import-controller.js",
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-presentation-service.js",
   "src/features/quality/quality-workbench-controller.js",
@@ -291,6 +292,7 @@ const requiredReleaseFiles = [
   "tests/unit/term-form-controller.test.cjs",
   "tests/unit/project-qa-controller.test.cjs",
   "tests/unit/project-domain-controller.test.cjs",
+  "tests/unit/project-document-import-controller.test.cjs",
   "tests/unit/concordance-controller.test.cjs",
   "tests/unit/segment-navigation-controller.test.cjs",
   "tests/unit/segment-draft-application-service.test.cjs",
@@ -459,6 +461,8 @@ const projectQaControllerJs = readText("src/features/quality/project-qa-controll
 const projectQaControllerUnitTests = readText("tests/unit/project-qa-controller.test.cjs");
 const projectDomainControllerJs = readText("src/features/projects/project-domain-controller.js");
 const projectDomainControllerUnitTests = readText("tests/unit/project-domain-controller.test.cjs");
+const projectDocumentImportControllerJs = readText("src/features/import-export/project-document-import-controller.js");
+const projectDocumentImportControllerUnitTests = readText("tests/unit/project-document-import-controller.test.cjs");
 const concordanceControllerUnitTests = readText("tests/unit/concordance-controller.test.cjs");
 const segmentNavigationControllerUnitTests = readText("tests/unit/segment-navigation-controller.test.cjs");
 const segmentDraftApplicationServiceUnitTests = readText("tests/unit/segment-draft-application-service.test.cjs");
@@ -2490,13 +2494,21 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `text-encoding input composition must inject the ${boundary} boundary.`);
 }
 for (const consumer of [
-  "parseLocalizationFile(file, textEncodingInputService.decodingOptions())",
-  "parseXliffFile(file, textEncodingInputService.decodingOptions())",
   "encodingApi.decodeTextFile(file, textEncodingInputService.decodingOptions())",
   "options = textEncodingInputService.decodingOptions()",
   "textEncodingInputService.renderOptions()"
 ]) {
   assertIncludes(appJs, consumer, `text-encoding input consumers must call the checked service directly: ${consumer}`);
+}
+for (const consumer of [
+  "formats.parseLocalization(file, formats.decodingOptions())",
+  "formats.parseXliff(file, formats.decodingOptions())"
+]) {
+  assertIncludes(
+    projectDocumentImportControllerJs,
+    consumer,
+    `checked project-document import consumers must call the injected text-decoding options directly: ${consumer}`
+  );
 }
 for (const removedHelper of ["renderTextEncodingOptions", "selectedTextEncoding", "textDecodingOptions"]) {
   const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
@@ -4928,6 +4940,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectDocumentImportController } from "../features/import-export/project-document-import-controller.js";',
+  "The application runtime must install the checked project-document import controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectDocumentImportController,",
+  "The application runtime must expose the checked project-document import factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createConcordanceController } from "../features/editor/concordance-controller.js";',
   "The application runtime must install the checked concordance controller."
 );
@@ -6317,6 +6339,124 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/projects/project-domain-controller.js"',
   "source-catalog extraction must scan the checked project-domain controller."
+);
+for (const snippet of [
+  "ProjectDocumentImportController requires checked session, catalog, file, format, repository, history, progress, ID, summary, navigation, activity, workspace, status, presentation, text, and confirmation boundaries.",
+  'files.assertSize(file, "Project file", files.maxBytes)',
+  'await progress.report("Reading DOCX package", file)',
+  'await progress.report("Parsing project file", file)',
+  'await progress.report("Parsing XLIFF", file)',
+  'await progress.report("Saving imported segments", file, segmentDetail(result.segments.length))',
+  'await progress.report("Refreshing project view", file)',
+  "session.replaceProject(importResult.project)",
+  "session.replaceSegments(histories.prepare(await repository.getProjectSegments(session.getProject().id)))",
+  "await summaries.refresh()",
+  "const activeIndex = session.getSegments().findIndex((segment) => segment.documentId === importedDocumentId)",
+  "navigation.selectDocument({",
+  "const activityLogged = await activity.log(",
+  "workspace.markDirty()",
+  'status.set(activity.appendWarning(message, activityLogged), status.mode("saved", activityLogged))',
+  "await presentation.refreshEditorContext()",
+  'const normalized = text.lower(String(fileName || "").trim())',
+  'status.set("Import canceled", "saved")',
+  'const extension = file.name.split(".").pop().toLowerCase()',
+  'if (extension === "docx")',
+  "if (formats.isXliffType(extension))",
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    projectDocumentImportControllerJs,
+    snippet,
+    `ProjectDocumentImportController must retain characterized routing, persistence, session, navigation, activity, status, and presentation policy: ${snippet}`
+  );
+}
+assert(
+  !projectDocumentImportControllerJs.includes("editorSessionStore") &&
+    !projectDocumentImportControllerJs.includes("projectDocumentCatalogService") &&
+    !projectDocumentImportControllerJs.includes("appendProjectSegmentsAndUpdateProject") &&
+    !projectDocumentImportControllerJs.includes("extractDocxSegments") &&
+    !projectDocumentImportControllerJs.includes("parseLocalizationFile") &&
+    !projectDocumentImportControllerJs.includes("parseXliffFile") &&
+    !projectDocumentImportControllerJs.includes("reportImportProgress") &&
+    !projectDocumentImportControllerJs.includes("setSaveStatus") &&
+    !projectDocumentImportControllerJs.includes("markWorkspaceDirty") &&
+    !projectDocumentImportControllerJs.includes("uiLocalizationService") &&
+    !projectDocumentImportControllerJs.includes("MAX_PROJECT_IMPORT_BYTES") &&
+    !projectDocumentImportControllerJs.includes("XLIFF_DOCUMENT_TYPES") &&
+    !projectDocumentImportControllerJs.includes("crypto.randomUUID"),
+  "the checked project-document import controller must use injected session, catalog, file, parser, repository, history, progress, ID, summary, navigation, activity, workspace, status, presentation, text, and confirmation boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectDocumentImportController({",
+  "session: editorSessionStore",
+  "list: projectDocumentCatalogService.list",
+  "manifest: projectDocumentManifest",
+  "assertSize: assertFileSize",
+  "maxBytes: MAX_PROJECT_IMPORT_BYTES",
+  "extractDocx: extractDocxSegments",
+  "parseLocalization: parseLocalizationFile",
+  "parseXliff: parseXliffFile",
+  "decodingOptions: textEncodingInputService.decodingOptions",
+  "isXliffType: (extension) => XLIFF_DOCUMENT_TYPES.has(extension)",
+  "append: appendProjectSegmentsAndUpdateProject",
+  "histories: { prepare: segmentTargetStateService.prepareHistories }",
+  "progress: { report: reportImportProgress }",
+  "navigation: { selectDocument: applicationNavigation.selectDocument }",
+  "log: logOptionalProjectActivity",
+  "appendWarning: appendActivityWarning",
+  "workspace: { markDirty: markWorkspaceDirty }",
+  "status: { set: setSaveStatus, mode: exportStatusMode }",
+  "refreshEditorContext: editorContextController.refresh",
+  "text: { lower: stableLower, safe: displaySafeText }",
+  "confirm: uiLocalizationService.confirm",
+  "importProjectFile: projectDocumentImportController.importFile"
+]) {
+  assertIncludes(appJs, boundary, `project-document import composition must inject the checked ${boundary} boundary.`);
+}
+for (const removedHelper of [
+  "importDocx",
+  "importLocalization",
+  "importXliff",
+  "projectHasDocumentNamed",
+  "confirmDuplicateImport",
+  "importProjectDocument"
+]) {
+  assert(
+    !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  (appJs.match(/\bprojectDocumentImportController\.importFile\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bprojectDocumentImportController\.importFile\b/g) || []).length === 2 &&
+    (appWorkflowDriverJs.match(/\bprojectDocumentImportController\.importDocx\b/g) || []).length === 2 &&
+    (appWorkflowDriverJs.match(/\bprojectDocumentImportController\.importXliff\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bprojectDocumentImportController\.importLocalization\b/g) || []).length === 18 &&
+    (appWorkflowDriverJs.match(/\bprojectDocumentImportController\.hasDocumentNamed\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bprojectDocumentImportController\.confirmDuplicate\b/g) || []).length === 1,
+  "ImportExportController and every workflow consumer must call ProjectDocumentImportController directly."
+);
+for (const testName of [
+  "ProjectDocumentImportController preserves project/file guards and duplicate confirmation",
+  "ProjectDocumentImportController routes DOCX, XLIFF, and localization files after the shared check",
+  "ProjectDocumentImportController preserves DOCX metadata and the complete success sequence",
+  "ProjectDocumentImportController preserves localization structures and activity warnings",
+  "ProjectDocumentImportController preserves XLIFF structure, singular copy, and navigation fallback",
+  "ProjectDocumentImportController stops exactly at size, parser, append, and summary failures",
+  "ProjectDocumentImportController preserves completed effects and late failure timing",
+  "ProjectDocumentImportController validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectDocumentImportControllerUnitTests,
+    testName,
+    `focused project-document import tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/import-export/project-document-import-controller.js"',
+  "source-catalog extraction must scan the checked project-document import controller."
 );
 for (const snippet of [
   'throw new TypeError("ConcordanceController requires overlay elements.")',
@@ -12530,24 +12670,32 @@ assertIncludes(
   "app workflow tests must report last passed assertions through the parent runner title for timeout diagnostics."
 );
 assertIncludes(
-  functionBody(appJs, "async function importDocx(file)", "async function importLocalization(file)"),
-  'assertFileSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);',
-  "app.js direct DOCX import helper must reject oversized project files before parsing."
+  functionBody(
+    projectDocumentImportControllerJs,
+    "async function importDocx(file)",
+    "async function importLocalization(file)"
+  ),
+  'files.assertSize(file, "Project file", files.maxBytes);',
+  "the checked direct DOCX import method must reject oversized project files before parsing."
 );
 assertIncludes(
-  functionBody(appJs, "async function importDocx(file)", "async function importLocalization(file)"),
-  "applicationNavigation.selectDocument({",
-  "app.js DOCX import must select the newly imported document through AppStore like other file imports."
+  projectDocumentImportControllerJs,
+  "navigation.selectDocument({",
+  "the checked DOCX import flow must select the newly imported document through the navigation boundary like other file imports."
 );
 assertIncludes(
-  functionBody(appJs, "async function importLocalization(file)", "async function importXliff(file)"),
-  'assertFileSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);',
-  "app.js direct localization import helper must reject oversized project files before parsing."
+  functionBody(
+    projectDocumentImportControllerJs,
+    "async function importLocalization(file)",
+    "async function importXliff(file)"
+  ),
+  'files.assertSize(file, "Project file", files.maxBytes);',
+  "the checked direct localization import method must reject oversized project files before parsing."
 );
 assertIncludes(
-  functionBody(appJs, "async function importXliff(file)", "function projectHasDocumentNamed"),
-  'assertFileSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);',
-  "app.js direct XLIFF import helper must reject oversized project files before parsing."
+  functionBody(projectDocumentImportControllerJs, "async function importXliff(file)", "function hasDocumentNamed"),
+  'files.assertSize(file, "Project file", files.maxBytes);',
+  "the checked direct XLIFF import method must reject oversized project files before parsing."
 );
 assertIncludes(
   appJs,

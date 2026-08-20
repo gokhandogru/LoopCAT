@@ -397,7 +397,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     Reflect.deleteProperty(els.projectForm, PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG);
 
     const file = new File(["<!doctype html><html><body><p>Hello world.</p></body></html>"], "workflow.html", { type: "text/html" });
-    await importLocalization(file);
+    await projectDocumentImportController.importLocalization(file);
     const documentInfo = editorSessionStore.getProject().documents.find((item) => item.name === "workflow.html");
     assert(Boolean(documentInfo), "real app HTML file import");
     const workflowSegmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentInfo.id);
@@ -654,7 +654,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     editorSessionStore.getProject().__atomicImportFailureProbe = () => {};
     let atomicImportError = "";
     try {
-      await importLocalization(new File(["<!doctype html><html><body><p>Atomic import failure.</p></body></html>"], "workflow-atomic-import-failure.html", { type: "text/html" }));
+      await projectDocumentImportController.importLocalization(new File(["<!doctype html><html><body><p>Atomic import failure.</p></body></html>"], "workflow-atomic-import-failure.html", { type: "text/html" }));
     } catch (error) {
       atomicImportError = error.message || String(error);
     } finally {
@@ -671,7 +671,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     segmentTargetStateService.setHiddenField(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
     const importActivityFailureDocumentCount = editorSessionStore.getProject().documents.length;
-    await importLocalization(new File(["<!doctype html><html><body><p>Import activity warning.</p></body></html>"], "workflow-import-activity-warning.html", { type: "text/html" }));
+    await projectDocumentImportController.importLocalization(new File(["<!doctype html><html><body><p>Import activity warning.</p></body></html>"], "workflow-import-activity-warning.html", { type: "text/html" }));
     const importActivityFailureDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-import-activity-warning.html");
     const importActivityFailureSegmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === importActivityFailureDocument?.id);
     assert(
@@ -684,7 +684,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     assert(
       "IMPORT".toLocaleLowerCase("tr") !== "import" &&
-        projectHasDocumentNamed("WORKFLOW-IMPORT-ACTIVITY-WARNING.HTML"),
+        projectDocumentImportController.hasDocumentNamed("WORKFLOW-IMPORT-ACTIVITY-WARNING.HTML"),
       "duplicate file detection is stable under Turkish locale casing"
     );
     Reflect.deleteProperty(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG);
@@ -692,7 +692,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       { name: "Workflow DOCX landing", sourceLang: "en", targetLang: "tr" },
       [{ source: "DOCX import landing source.", target: "", status: "empty" }]
     );
-    await importDocx(new File([docxLandingBytes], "workflow-docx-landing.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+    await projectDocumentImportController.importDocx(new File([docxLandingBytes], "workflow-docx-landing.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
     const docxLandingDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-docx-landing.docx");
     assert(
       docxLandingDocument &&
@@ -1628,7 +1628,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           els.localAiPromptOutput.textContent.includes("Workflow concise terminology alternative"),
         "AI alternatives active segment saves selected-style review suggestions without overwriting target"
       );
-      await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch variants alpha source.</p><p>Workflow batch variants beta source.</p><p>Workflow batch variants failure source.</p><p>Workflow batch variants locked source.</p></body></html>"], "workflow-ai-batch-variants.html", { type: "text/html" }));
+      await projectDocumentImportController.importLocalization(new File(["<!doctype html><html><body><p>Workflow batch variants alpha source.</p><p>Workflow batch variants beta source.</p><p>Workflow batch variants failure source.</p><p>Workflow batch variants locked source.</p></body></html>"], "workflow-ai-batch-variants.html", { type: "text/html" }));
       const aiBatchVariantsDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-ai-batch-variants.html");
       await openProjectFile(aiBatchVariantsDocument.id);
       editorFilterStore.update({
@@ -2055,7 +2055,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           els.localAiPromptOutput.textContent.includes("concise workflow wording"),
         "AI polish active segment saves review suggestion without overwriting target"
       );
-      await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch polish alpha source.</p><p>Workflow batch polish beta source.</p></body></html>"], "workflow-ai-batch-polish.html", { type: "text/html" }));
+      await projectDocumentImportController.importLocalization(new File(["<!doctype html><html><body><p>Workflow batch polish alpha source.</p><p>Workflow batch polish beta source.</p></body></html>"], "workflow-ai-batch-polish.html", { type: "text/html" }));
       const aiBatchPolishDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-ai-batch-polish.html");
       await openProjectFile(aiBatchPolishDocument.id);
       editorFilterStore.update({
@@ -2257,7 +2257,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         })
       }));
       editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((item) => (item.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : item)));
-      await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch adapt alpha source.</p><p>Workflow batch adapt beta source.</p><p>Workflow batch adapt failure source.</p><p>Workflow batch adapt locked source.</p></body></html>"], "workflow-ai-batch-adapt.html", { type: "text/html" }));
+      await projectDocumentImportController.importLocalization(new File(["<!doctype html><html><body><p>Workflow batch adapt alpha source.</p><p>Workflow batch adapt beta source.</p><p>Workflow batch adapt failure source.</p><p>Workflow batch adapt locked source.</p></body></html>"], "workflow-ai-batch-adapt.html", { type: "text/html" }));
       const aiBatchAdaptDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-ai-batch-adapt.html");
       await openProjectFile(aiBatchAdaptDocument.id);
       editorFilterStore.update({
@@ -2436,7 +2436,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           els.localAiPromptOutput.textContent.includes("workflow ai second term"),
         "AI term extraction active segment saves candidates to the project termbase"
       );
-      await importLocalization(new File(["<!doctype html><html><body><p>Workflow batch source alpha.</p><p>Workflow batch source beta.</p></body></html>"], "workflow-ai-batch-terms.html", { type: "text/html" }));
+      await projectDocumentImportController.importLocalization(new File(["<!doctype html><html><body><p>Workflow batch source alpha.</p><p>Workflow batch source beta.</p></body></html>"], "workflow-ai-batch-terms.html", { type: "text/html" }));
       const aiBatchTermsDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-ai-batch-terms.html");
       await openProjectFile(aiBatchTermsDocument.id);
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
@@ -3152,7 +3152,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const pretranslateTarget = `TM onayli hedef ${Date.now()}`;
     const secondPretranslateSource = "Second pretranslate source phrase.";
     const secondPretranslateTarget = `Ikinci TM hedefi ${Date.now()}`;
-    await importLocalization(
+    await projectDocumentImportController.importLocalization(
       new File(
         [`<!doctype html><html><body><p>${pretranslateSource}</p><p>${secondPretranslateSource}</p></body></html>`],
         "workflow-pretranslate.html",
@@ -3295,7 +3295,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const localAiContextBeforeSource = "Use the profile menu.";
       const localAiContextAfterSource = "Save the profile changes.";
       const localAiTmTarget = "Workflow TM context target";
-      await importLocalization(new File([`<!doctype html><html><body><p>${localAiContextBeforeSource}</p><p>${localAiGlossarySource}</p><p>${localAiContextAfterSource}</p></body></html>`], "workflow-local-ai-glossary.html", { type: "text/html" }));
+      await projectDocumentImportController.importLocalization(new File([`<!doctype html><html><body><p>${localAiContextBeforeSource}</p><p>${localAiGlossarySource}</p><p>${localAiContextAfterSource}</p></body></html>`], "workflow-local-ai-glossary.html", { type: "text/html" }));
       const localAiGlossaryDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-local-ai-glossary.html");
       localAiGlossaryTerm = await saveTerm({
         sourceTerm: localAiGlossarySourceTerm,
@@ -4317,7 +4317,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         renderProjectsView();
         await confirmDeleteProject(labelProject.id);
         await confirmDeleteFile(projectDocumentCatalogService.list()[0]);
-        confirmDuplicateImport(new File(["duplicate"], labelDocumentName, { type: "text/plain" }));
+        projectDocumentImportController.confirmDuplicate(new File(["duplicate"], labelDocumentName, { type: "text/plain" }));
         const labelUiText = [
           els.projectList.textContent,
           els.projectHomeView.textContent,
@@ -4897,8 +4897,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "schema-6 backup preserves resource Trash while project-package schema remains independent"
     );
 
-    await importLocalization(new File([JSON.stringify({ title: "Package source JSON" })], "workflow-structure.json", { type: "application/json" }));
-    await importLocalization(new File(["key,source,target\nbutton,Package source CSV,CSV hedef"], "workflow-structure.csv", { type: "text/csv" }));
+    await projectDocumentImportController.importLocalization(new File([JSON.stringify({ title: "Package source JSON" })], "workflow-structure.json", { type: "application/json" }));
+    await projectDocumentImportController.importLocalization(new File(["key,source,target\nbutton,Package source CSV,CSV hedef"], "workflow-structure.csv", { type: "text/csv" }));
     assert(
       Boolean(editorSessionStore.getProject().documents.find((item) => item.name === "workflow-structure.json")) &&
         Boolean(editorSessionStore.getProject().documents.find((item) => item.name === "workflow-structure.csv")),
@@ -5077,7 +5077,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     });
     await loadProjects(false);
     await openProject(deleteFileFixture.id);
-    await importLocalization(new File(["<!doctype html><html><body><p>Delete file after typing.</p></body></html>"], "delete-file.html", { type: "text/html" }));
+    await projectDocumentImportController.importLocalization(new File(["<!doctype html><html><body><p>Delete file after typing.</p></body></html>"], "delete-file.html", { type: "text/html" }));
     const deleteFileDocument = editorSessionStore.getProject().documents.find((item) => item.name === "delete-file.html");
     const deleteFileText = `Silinen dosya hedefi ${Date.now()}`;
     targetEditController.updateDraft(0, deleteFileText);
@@ -5858,15 +5858,15 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     await openProject(project.id);
     const documentCountBeforeBadImport = editorSessionStore.getProject().documents.length;
-    const badProjectImportOk = await runFileImportTask("Project file import", () => importProjectDocument(new File(["{ broken json"], "broken.json", { type: "application/json" })));
+    const badProjectImportOk = await runFileImportTask("Project file import", () => projectDocumentImportController.importFile(new File(["{ broken json"], "broken.json", { type: "application/json" })));
     assert(!badProjectImportOk && editorSessionStore.getProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.startsWith("Project file import failed:"), "damaged project file import reports failure without changing project documents");
-    const oversizedProjectImportOk = await runFileImportTask("Project file import", () => importProjectDocument({ name: "huge.docx", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
+    const oversizedProjectImportOk = await runFileImportTask("Project file import", () => projectDocumentImportController.importFile({ name: "huge.docx", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
     assert(!oversizedProjectImportOk && editorSessionStore.getProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "oversized project file import is rejected before parsing");
-    const oversizedDirectDocxImportOk = await runFileImportTask("Project file import", () => importDocx({ name: "huge-direct.docx", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
+    const oversizedDirectDocxImportOk = await runFileImportTask("Project file import", () => projectDocumentImportController.importDocx({ name: "huge-direct.docx", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
     assert(!oversizedDirectDocxImportOk && editorSessionStore.getProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct DOCX import helper rejects oversized files before parsing");
-    const oversizedDirectXliffImportOk = await runFileImportTask("Project file import", () => importXliff({ name: "huge-direct.xlf", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
+    const oversizedDirectXliffImportOk = await runFileImportTask("Project file import", () => projectDocumentImportController.importXliff({ name: "huge-direct.xlf", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
     assert(!oversizedDirectXliffImportOk && editorSessionStore.getProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct XLIFF import helper rejects oversized files before parsing");
-    const oversizedDirectLocalizationImportOk = await runFileImportTask("Project file import", () => importLocalization({ name: "huge-direct.html", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
+    const oversizedDirectLocalizationImportOk = await runFileImportTask("Project file import", () => projectDocumentImportController.importLocalization({ name: "huge-direct.html", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
     assert(!oversizedDirectLocalizationImportOk && editorSessionStore.getProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct localization import helper rejects oversized files before parsing");
 
     const badTmxImportOk = await runFileImportTask("TMX import", () => projectResourceTransferController.importTmx(new File(["<tmx><body>"], "broken.tmx", { type: "application/xml" })));
@@ -6107,7 +6107,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
 
     const taggedFile = new File(["<!doctype html><html><body><p>Keep <strong>this</strong> tag.</p></body></html>"], "tagged.html", { type: "text/html" });
-    await importLocalization(taggedFile);
+    await projectDocumentImportController.importLocalization(taggedFile);
     const taggedDocument = editorSessionStore.getProject().documents.find((item) => item.name === "tagged.html");
     assert(Boolean(taggedDocument), "tagged HTML fixture imported");
     applicationNavigation.selectDocument({ documentId: taggedDocument.id });
@@ -6238,7 +6238,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     }
 
     const structuredMergeFile = new File(["<!doctype html><html><body><p>First block.</p><p>Second block.</p></body></html>"], "structured-merge.html", { type: "text/html" });
-    await importLocalization(structuredMergeFile);
+    await projectDocumentImportController.importLocalization(structuredMergeFile);
     const structuredMergeDocument = editorSessionStore.getProject().documents.find((item) => item.name === "structured-merge.html");
     assert(Boolean(structuredMergeDocument), "structured merge fixture imported");
     applicationNavigation.selectDocument({ documentId: structuredMergeDocument.id });
@@ -6260,7 +6260,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
 
     const duplicateTaggedFile = new File(["<!doctype html><html><body><p><strong>One</strong> and <strong>two</strong></p></body></html>"], "duplicate-tagged.html", { type: "text/html" });
-    await importLocalization(duplicateTaggedFile);
+    await projectDocumentImportController.importLocalization(duplicateTaggedFile);
     const duplicateTaggedDocument = editorSessionStore.getProject().documents.find((item) => item.name === "duplicate-tagged.html");
     assert(Boolean(duplicateTaggedDocument), "duplicate tagged HTML fixture imported");
     applicationNavigation.selectDocument({ documentId: duplicateTaggedDocument.id });
@@ -6294,7 +6294,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     }
 
     const scopedCompleteFile = new File(["<!doctype html><html><body><p>Scoped completed segment.</p></body></html>"], "scoped-complete.html", { type: "text/html" });
-    await importLocalization(scopedCompleteFile);
+    await projectDocumentImportController.importLocalization(scopedCompleteFile);
     const scopedCompleteDocument = editorSessionStore.getProject().documents.find((item) => item.name === "scoped-complete.html");
     const scopedCompleteIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === scopedCompleteDocument?.id);
     assert(Boolean(scopedCompleteDocument) && scopedCompleteIndex >= 0, "scoped export completed fixture imported");
@@ -6303,7 +6303,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     segmentTargetStateService.touch(editorSessionStore.getSegments()[scopedCompleteIndex]);
     await saveSegment(editorSessionStore.getSegments()[scopedCompleteIndex]);
     const scopedEmptyFile = new File(["<!doctype html><html><body><p>Unselected unfinished segment.</p></body></html>"], "scoped-empty.html", { type: "text/html" });
-    await importLocalization(scopedEmptyFile);
+    await projectDocumentImportController.importLocalization(scopedEmptyFile);
     const scopedEmptyDocument = editorSessionStore.getProject().documents.find((item) => item.name === "scoped-empty.html");
     assert(Boolean(scopedEmptyDocument) && editorSessionStore.getSegments().some((segment) => segment.documentId === scopedEmptyDocument.id && !String(segment.target || "").trim()), "scoped export unfinished fixture imported");
     applicationNavigation.selectDocument({ documentId: scopedCompleteDocument.id });

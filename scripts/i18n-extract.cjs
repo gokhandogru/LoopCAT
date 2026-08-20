@@ -123,6 +123,13 @@ const termSuggestionsControllerPath = path.join(root, "src", "features", "editor
 const termFormControllerPath = path.join(root, "src", "features", "editor", "term-form-controller.js");
 const projectQaControllerPath = path.join(root, "src", "features", "quality", "project-qa-controller.js");
 const projectDomainControllerPath = path.join(root, "src", "features", "projects", "project-domain-controller.js");
+const projectDocumentImportControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "import-export",
+  "project-document-import-controller.js"
+);
 const concordanceControllerPath = path.join(root, "src", "features", "editor", "concordance-controller.js");
 const qualityPresentationServicePath = path.join(root, "src", "features", "quality", "quality-presentation-service.js");
 const qualityWorkbenchControllerPath = path.join(root, "src", "features", "quality", "quality-workbench-controller.js");
@@ -378,6 +385,11 @@ function main() {
   extractScript(messagesByText, termFormControllerPath, "src/features/editor/term-form-controller.js");
   extractScript(messagesByText, projectQaControllerPath, "src/features/quality/project-qa-controller.js");
   extractScript(messagesByText, projectDomainControllerPath, "src/features/projects/project-domain-controller.js");
+  extractScript(
+    messagesByText,
+    projectDocumentImportControllerPath,
+    "src/features/import-export/project-document-import-controller.js"
+  );
   extractScript(messagesByText, concordanceControllerPath, "src/features/editor/concordance-controller.js");
   extractScript(messagesByText, qualityPresentationServicePath, "src/features/quality/quality-presentation-service.js");
   extractScript(messagesByText, qualityWorkbenchControllerPath, "src/features/quality/quality-workbench-controller.js");
