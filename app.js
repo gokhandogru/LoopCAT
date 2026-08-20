@@ -3420,6 +3420,23 @@ const projectHomeController = appRuntime.featureFactories.createProjectHomeContr
   presentation: { renderAll },
   actions: { confirmDelete: confirmDeleteProject }
 });
+const focusModeController = appRuntime.featureFactories.createFocusModeController({
+  elements: {
+    body: document.body,
+    workspace: els.workspace,
+    toggleButton: els.focusModeBtn,
+    exitButton: els.exitFocusModeBtn
+  },
+  store: applicationStore,
+  session: { getProject: () => editorSessionStore.getProject() },
+  localization: { translate: (key) => uiLocalizationService.translate(key) },
+  menu: applicationMenuController,
+  frame: { request: (callback) => requestAnimationFrame(callback) },
+  editor: {
+    renderSegments: (options) => renderSegments(options),
+    focusActive: () => targetEditController.focusActive()
+  }
+});
 const globalKeyboardController = appRuntime.featureFactories.createGlobalKeyboardController({
   target: window,
   normalizeKey: stableLower,
@@ -3446,8 +3463,8 @@ const globalKeyboardController = appRuntime.featureFactories.createGlobalKeyboar
   },
   focus: {
     isActive: () => applicationStore.getState().interface.focusMode,
-    toggle: toggleFocusMode,
-    disable: () => setFocusMode(false)
+    toggle: focusModeController.toggle,
+    disable: () => focusModeController.set(false)
   }
 });
 
@@ -4565,7 +4582,7 @@ function refreshLocalizedUi() {
   uiI18n?.localizeStaticDom?.(document.body);
   syncAllPanelToggleStates();
   renderUiLocaleOptions();
-  renderFocusMode();
+  focusModeController.render();
   renderWorkspaceStatus();
   renderProjectStorageStatus();
   if (applicationStore.getState().navigation.view === "projects") renderProjectsView();
@@ -4835,39 +4852,6 @@ function syncPanelToggleState(button) {
 
 function syncAllPanelToggleStates() {
   document.querySelectorAll("[data-panel-toggle]").forEach(syncPanelToggleState);
-}
-
-function renderFocusMode() {
-  const active = Boolean(applicationStore.getState().interface.focusMode && applicationStore.getState().navigation.view === "editor" && editorSessionStore.getProject());
-  document.body.classList.toggle("focus-mode", active);
-  els.workspace.classList.toggle("focus-mode", active);
-  if (els.focusModeBtn) {
-    els.focusModeBtn.textContent = active ? uiLocalizationService.translate("app.focus.normalView") : uiLocalizationService.translate("app.focus.focus");
-    els.focusModeBtn.title = active ? uiLocalizationService.translate("app.focus.returnTitle") : uiLocalizationService.translate("app.focus.showOnlyTitle");
-    els.focusModeBtn.setAttribute("aria-pressed", String(active));
-  }
-  if (els.exitFocusModeBtn) {
-    els.exitFocusModeBtn.classList.toggle("hidden", !active);
-    els.exitFocusModeBtn.setAttribute("aria-hidden", String(!active));
-  }
-}
-
-function setFocusMode(enabled) {
-  applicationStore?.dispatch?.({
-    type: "interface/focus-mode-changed",
-    payload: { enabled: Boolean(enabled && editorSessionStore.getProject()) }
-  });
-  renderFocusMode();
-  applicationMenuController.closeAll();
-  if (!editorSessionStore.getProject()) return;
-  requestAnimationFrame(() => {
-    renderSegments({ preserveScroll: true });
-    if (applicationStore.getState().interface.focusMode) targetEditController.focusActive();
-  });
-}
-
-function toggleFocusMode() {
-  setFocusMode(!applicationStore.getState().interface.focusMode);
 }
 
 function renderImportBusyState() {
@@ -5449,7 +5433,7 @@ function commandList() {
     { id: "trash", label: "Open Trash", run: openTrash, enabled: Boolean(appRuntime?.trashRepository) },
     { id: "confirm", label: "Confirm segment", run: segmentConfirmationController.confirm, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "next-open", label: "Next open segment", run: segmentNavigationController.nextOpen, enabled: Boolean(editorSessionStore.getSegments().length) },
-    { id: "focus-mode", label: applicationStore.getState().interface.focusMode ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(applicationStore.getState().navigation.view === "editor" && editorSessionStore.getProject()) },
+    { id: "focus-mode", label: applicationStore.getState().interface.focusMode ? "Exit Focus view" : "Enter Focus view", run: focusModeController.toggle, enabled: Boolean(applicationStore.getState().navigation.view === "editor" && editorSessionStore.getProject()) },
     { id: "copy-source", label: "Copy source", run: targetProducerController.copySourceToTarget, enabled: Boolean(currentSegment()) },
     { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: structuralSegmentController.split, enabled: Boolean(currentSegment() && structuralSegmentController.canSplit(currentSegment())) },
     { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: structuralSegmentController.merge, enabled: Boolean(currentSegment() && structuralSegmentController.canMerge(currentSegment(), structuralSegmentController.nextForMerge(currentSegment()))) },
@@ -6068,7 +6052,7 @@ function renderEditor() {
     els.emptyState.classList.toggle("hidden", applicationStore.getState().navigation.view !== "editor" || hasProject);
     els.editorView.classList.toggle("hidden", applicationStore.getState().navigation.view !== "editor" || !hasProject);
   }
-  renderFocusMode();
+  focusModeController.render();
   if (els.inspectorToggleBtn) {
     els.inspectorToggleBtn.setAttribute("aria-expanded", String(state.inspectorOpen));
     els.inspectorToggleBtn.textContent = state.inspectorOpen ? uiLocalizationService.source("Hide inspector") : uiLocalizationService.source("Show inspector");
@@ -6731,8 +6715,7 @@ function wireEvents() {
   applicationUpdateControlsController.mount();
   uiLocaleControlsController.mount();
   projectHomeController.mount();
-  els.focusModeBtn?.addEventListener("click", toggleFocusMode);
-  els.exitFocusModeBtn?.addEventListener("click", () => setFocusMode(false));
+  focusModeController.mount();
   els.inspectorToggleBtn?.addEventListener("click", () => {
     state.inspectorOpen = !state.inspectorOpen;
     void workspaceLayoutController?.setInspectorOpen?.(state.inspectorOpen);

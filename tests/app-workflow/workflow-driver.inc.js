@@ -813,7 +813,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "project navigation labels wrap without horizontal scrolling"
     );
     assert(Boolean(els.focusModeBtn && els.exitFocusModeBtn), "focus view controls are available in the editor");
-    setFocusMode(true);
+    focusModeController.set(true);
     assert(
       applicationStore.getState().interface.focusMode &&
         document.body.classList.contains("focus-mode") &&
@@ -823,7 +823,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         Boolean(els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`)),
       "focus view switches the editor into a noise-free segment layout"
     );
-    setFocusMode(false);
+    focusModeController.set(false);
     assert(
       !applicationStore.getState().interface.focusMode &&
         !document.body.classList.contains("focus-mode") &&

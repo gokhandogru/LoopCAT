@@ -208,6 +208,7 @@ const segmentDraftApplicationServicePath = path.join(
   "editor",
   "segment-draft-application-service.js"
 );
+const focusModeControllerPath = path.join(root, "src", "features", "editor", "focus-mode-controller.js");
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const uiLocaleControlsControllerPath = path.join(root, "src", "i18n", "ui-locale-controls-controller.js");
 const resourceMutationControllerPath = path.join(
@@ -502,6 +503,7 @@ function main() {
     segmentDraftApplicationServicePath,
     "src/features/editor/segment-draft-application-service.js"
   );
+  extractScript(messagesByText, focusModeControllerPath, "src/features/editor/focus-mode-controller.js");
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(messagesByText, uiLocaleControlsControllerPath, "src/i18n/ui-locale-controls-controller.js");
   extractScript(

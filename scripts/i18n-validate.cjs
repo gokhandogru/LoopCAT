@@ -7,6 +7,7 @@ const sourcePath = path.join(i18nDir, "source.en-US.json");
 const localeDir = path.join(i18nDir, "locales");
 const indexPath = path.join(root, "index.html");
 const appPath = path.join(root, "app.js");
+const focusModeControllerPath = path.join(root, "src", "features", "editor", "focus-mode-controller.js");
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -38,7 +39,9 @@ function collectDataKeys(html) {
 
 function collectCodeKeys(js) {
   const keys = [];
-  for (const match of js.matchAll(/\b(?:t|uiT|uiLocalizationService\.translate)\(\s*["']([^"']+)["']/g)) {
+  for (const match of js.matchAll(
+    /\b(?:t|uiT|uiLocalizationService\.translate|localization\.translate)\(\s*["']([^"']+)["']/g
+  )) {
     keys.push(match[1]);
   }
   for (const match of js.matchAll(
@@ -87,7 +90,8 @@ function validate() {
 
   const referencedKeys = [
     ...collectDataKeys(fs.existsSync(indexPath) ? fs.readFileSync(indexPath, "utf8") : ""),
-    ...collectCodeKeys(fs.existsSync(appPath) ? fs.readFileSync(appPath, "utf8") : "")
+    ...collectCodeKeys(fs.existsSync(appPath) ? fs.readFileSync(appPath, "utf8") : ""),
+    ...collectCodeKeys(fs.existsSync(focusModeControllerPath) ? fs.readFileSync(focusModeControllerPath, "utf8") : "")
   ];
   referencedKeys.forEach((key) => {
     if (!Object.prototype.hasOwnProperty.call(sourceMessages, key))

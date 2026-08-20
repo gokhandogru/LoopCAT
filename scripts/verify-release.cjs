@@ -166,6 +166,7 @@ const requiredReleaseFiles = [
   "src/app/compatibility-module-registry.js",
   "src/app/install-runtime.js",
   "src/features/editor/filter-store.js",
+  "src/features/editor/focus-mode-controller.js",
   "src/features/editor/editor-session-store.js",
   "src/features/editor/editor-context-controller.js",
   "src/features/editor/segment-grid-controller.js",
@@ -291,6 +292,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-update-controls-controller.test.cjs",
   "tests/unit/application-view-controller.test.cjs",
   "tests/unit/global-keyboard-controller.test.cjs",
+  "tests/unit/focus-mode-controller.test.cjs",
   "tests/unit/editor-state.test.cjs",
   "tests/unit/editor-session-store.test.cjs",
   "tests/unit/editor-context-controller.test.cjs",
@@ -457,6 +459,8 @@ const applicationViewControllerJs = readText("src/app/application-view-controlle
 const applicationViewControllerUnitTests = readText("tests/unit/application-view-controller.test.cjs");
 const globalKeyboardControllerJs = readText("src/app/global-keyboard-controller.js");
 const globalKeyboardControllerUnitTests = readText("tests/unit/global-keyboard-controller.test.cjs");
+const focusModeControllerJs = readText("src/features/editor/focus-mode-controller.js");
+const focusModeControllerUnitTests = readText("tests/unit/focus-mode-controller.test.cjs");
 const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
 const editorSessionStoreUnitTests = readText("tests/unit/editor-session-store.test.cjs");
 const editorFilterStoreJs = readText("src/features/editor/filter-store.js");
@@ -4939,8 +4943,7 @@ for (const boundary of [
 }
 assert(
   appJs.indexOf("uiLocaleControlsController.mount()") < appJs.indexOf("projectHomeController.mount()") &&
-    appJs.indexOf("projectHomeController.mount()") <
-      appJs.indexOf('els.focusModeBtn?.addEventListener("click", toggleFocusMode)'),
+    appJs.indexOf("projectHomeController.mount()") < appJs.indexOf("focusModeController.mount()"),
   "project-home controls must mount between UI-locale and Focus-mode listeners at the existing position."
 );
 assert(
@@ -4992,6 +4995,150 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createFocusModeController } from "../features/editor/focus-mode-controller.js";',
+  "the application runtime must install the checked Focus-mode controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createFocusModeController,",
+  "the application runtime must expose the checked Focus-mode controller factory."
+);
+for (const snippet of [
+  "FocusModeController requires checked store and session boundaries.",
+  "FocusModeController requires localization, menu, animation-frame, segment-render, and target-focus boundaries.",
+  "FocusModeController requires checked body and workspace elements.",
+  "FocusModeController requires checked optional button elements.",
+  "FocusModeController requires a checked optional exit button.",
+  "store.getState().interface.focusMode",
+  'store.getState().navigation.view === "editor"',
+  "session.getProject()",
+  'elements.body.classList.toggle("focus-mode", active)',
+  'elements.workspace.classList.toggle("focus-mode", active)',
+  'localization.translate("app.focus.normalView")',
+  'localization.translate("app.focus.focus")',
+  'localization.translate("app.focus.returnTitle")',
+  'localization.translate("app.focus.showOnlyTitle")',
+  'elements.toggleButton.setAttribute("aria-pressed", String(active))',
+  'elements.exitButton.classList.toggle("hidden", !active)',
+  'elements.exitButton.setAttribute("aria-hidden", String(!active))',
+  'type: "interface/focus-mode-changed"',
+  "payload: { enabled: Boolean(enabled && session.getProject()) }",
+  "menu.closeAll()",
+  "if (!session.getProject()) return",
+  "frame.request(() =>",
+  "editor.renderSegments({ preserveScroll: true })",
+  "if (store.getState().interface.focusMode) editor.focusActive()",
+  "set(!store.getState().interface.focusMode)",
+  "const exitClickListener = () => set(false)",
+  'elements.toggleButton?.addEventListener("click", toggle)',
+  'elements.exitButton?.addEventListener("click", exitClickListener)',
+  'elements.toggleButton?.removeEventListener("click", toggle)',
+  'elements.exitButton?.removeEventListener("click", exitClickListener)',
+  "return Object.freeze({ render, set, toggle, mount, unmount })"
+]) {
+  assertIncludes(
+    focusModeControllerJs,
+    snippet,
+    `FocusModeController must retain characterized presentation, state, deferred-focus, and lifecycle policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createFocusModeController({",
+  "body: document.body",
+  "workspace: els.workspace",
+  "toggleButton: els.focusModeBtn",
+  "exitButton: els.exitFocusModeBtn",
+  "store: applicationStore",
+  "getProject: () => editorSessionStore.getProject()",
+  "translate: (key) => uiLocalizationService.translate(key)",
+  "menu: applicationMenuController",
+  "request: (callback) => requestAnimationFrame(callback)",
+  "renderSegments: (options) => renderSegments(options)",
+  "focusActive: () => targetEditController.focusActive()",
+  "toggle: focusModeController.toggle",
+  "disable: () => focusModeController.set(false)",
+  "run: focusModeController.toggle",
+  "focusModeController.render()",
+  "focusModeController.mount()"
+]) {
+  assertIncludes(appJs, boundary, `Focus-mode composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  appJs.indexOf("projectHomeController.mount()") < appJs.indexOf("focusModeController.mount()") &&
+    appJs.indexOf("focusModeController.mount()") < appJs.indexOf('els.inspectorToggleBtn?.addEventListener("click"'),
+  "Focus-mode controls must mount between project-home and inspector listeners at the existing position."
+);
+assert(
+  !appJs.includes("function renderFocusMode") &&
+    !appJs.includes("function setFocusMode") &&
+    !appJs.includes("function toggleFocusMode") &&
+    !appWorkflowDriverJs.includes("renderFocusMode") &&
+    !appWorkflowDriverJs.includes("setFocusMode") &&
+    !appWorkflowDriverJs.includes("toggleFocusMode") &&
+    !appJs.includes('els.focusModeBtn?.addEventListener("click"') &&
+    !appJs.includes('els.exitFocusModeBtn?.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('focusModeBtn?.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('exitFocusModeBtn?.addEventListener("click"'),
+  "Focus-mode helpers and listener ownership must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\bfocusModeController\.mount\b/g) || []).length === 1 &&
+    (appJs.match(/\bfocusModeController\.render\b/g) || []).length === 2 &&
+    (appJs.match(/\bfocusModeController\.toggle\b/g) || []).length === 2 &&
+    (appJs.match(/\bfocusModeController\.set\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bfocusModeController\.set\b/g) || []).length === 2,
+  "application and workflow consumers must retain exact checked Focus-mode controller calls."
+);
+for (const forbiddenOwner of [
+  "applicationStore",
+  "editorSessionStore",
+  "uiLocalizationService",
+  "applicationMenuController",
+  "requestAnimationFrame",
+  "targetEditController",
+  "els.",
+  "document.",
+  "window."
+]) {
+  assert(
+    !focusModeControllerJs.includes(forbiddenOwner),
+    `FocusModeController must use injected element, store, session, localization, menu, frame, rendering, and focus boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "FocusModeController renders active localized presentation in exact order",
+  "FocusModeController preserves inactive, non-editor, projectless, and optional-control branches",
+  "FocusModeController enables Focus mode and defers segment rendering and target focus",
+  "FocusModeController disables Focus mode with short-circuited eligibility and no deferred focus",
+  "FocusModeController preserves projectless set and live post-frame Focus state",
+  "FocusModeController preserves toggle and exact optional listener lifecycle",
+  "FocusModeController independently skips absent optional buttons",
+  "FocusModeController preserves synchronous and deferred failure timing",
+  "FocusModeController validates boundaries, elements, and immutable API"
+]) {
+  assertIncludes(
+    focusModeControllerUnitTests,
+    testName,
+    `focused Focus-mode tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/focus-mode-controller.js"',
+  "source-catalog extraction must scan the checked Focus-mode controller."
+);
+assertIncludes(
+  i18nValidateScript,
+  '"focus-mode-controller.js"',
+  "locale validation must scan explicit keys in the checked Focus-mode controller."
+);
+assertIncludes(
+  i18nValidateScript,
+  "localization\\.translate",
+  "locale validation must retain the injected localization key-reference pattern."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createApplicationMenuController } from "./application-menu-controller.js";',
   "the application runtime must install the checked application menu controller."
 );
@@ -5033,7 +5180,7 @@ for (const boundary of [
   'menus: ".menu"',
   'openMenus: ".menu[open]"',
   'buttons: "button"',
-  "applicationMenuController.closeAll()",
+  "menu: applicationMenuController",
   "applicationMenuController.mount()"
 ]) {
   assertIncludes(appJs, boundary, `application menu composition must retain the checked ${boundary} boundary.`);
@@ -5053,9 +5200,10 @@ assert(
 );
 assert(
   (appJs.match(/\bapplicationMenuController\.mount\b/g) || []).length === 1 &&
-    (appJs.match(/\bapplicationMenuController\.closeAll\b/g) || []).length === 1 &&
+    (appJs.match(/\bapplicationMenuController\.closeAll\b/g) || []).length === 0 &&
+    focusModeControllerJs.includes("menu.closeAll()") &&
     !appWorkflowDriverJs.includes("applicationMenuController"),
-  "application menu lifecycle must retain one mount and one direct Focus-mode close consumer without workflow-only consumers."
+  "application menu lifecycle must retain one mount and one injected Focus-mode close consumer without workflow-only consumers."
 );
 for (const forbiddenOwner of [
   "applicationStore",
@@ -11876,7 +12024,11 @@ assertIncludes(
   "Editor toolbar must expose a Focus view toggle for noise-free segment editing."
 );
 assertIncludes(indexHtml, `id="exitFocusModeBtn"`, "Editor must expose an always-visible way to leave Focus view.");
-assertIncludes(appJs, "function setFocusMode", "app.js must manage Focus view through explicit editor state.");
+assertIncludes(
+  focusModeControllerJs,
+  "function set(enabled)",
+  "the checked Focus-mode controller must manage Focus view through explicit editor state."
+);
 assertIncludes(appJs, "Enter Focus view", "Command palette must expose the Focus view toggle.");
 assertIncludes(
   readText("styles.css"),

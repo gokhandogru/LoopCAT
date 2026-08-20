@@ -47,6 +47,7 @@ import { createEditorContextController } from "../features/editor/editor-context
 import { createEditorSessionStore } from "../features/editor/editor-session-store.js";
 import { createFilterStore } from "../features/editor/filter-store.js";
 import { createFilterPresetController } from "../features/editor/filter-preset-controller.js";
+import { createFocusModeController } from "../features/editor/focus-mode-controller.js";
 import { createInspectorController } from "../features/editor/inspector-controller.js";
 import { createSegmentGridController } from "../features/editor/segment-grid-controller.js";
 import { createAutosaveService } from "../features/editor/autosave-service.js";
@@ -254,6 +255,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createEditorContextController,
       createFilterStore,
       createFilterPresetController,
+      createFocusModeController,
       createInspectorController,
       createDeliveryExportController,
       createProjectResourceTransferController,
