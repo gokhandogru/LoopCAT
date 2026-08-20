@@ -234,6 +234,7 @@ const segmentActionButtonsControllerPath = path.join(
 );
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const uiLocaleControlsControllerPath = path.join(root, "src", "i18n", "ui-locale-controls-controller.js");
+const uiLocaleOrchestrationControllerPath = path.join(root, "src", "i18n", "ui-locale-orchestration-controller.js");
 const resourceMutationControllerPath = path.join(
   root,
   "src",
@@ -546,6 +547,7 @@ function main() {
   );
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(messagesByText, uiLocaleControlsControllerPath, "src/i18n/ui-locale-controls-controller.js");
+  extractScript(messagesByText, uiLocaleOrchestrationControllerPath, "src/i18n/ui-locale-orchestration-controller.js");
   extractScript(
     messagesByText,
     resourceMutationControllerPath,

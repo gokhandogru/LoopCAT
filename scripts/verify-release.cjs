@@ -273,6 +273,7 @@ const requiredReleaseFiles = [
   "src/features/workspace/workspace-sync-controller.js",
   "src/i18n/language-input-service.js",
   "src/i18n/ui-locale-controls-controller.js",
+  "src/i18n/ui-locale-orchestration-controller.js",
   "src/i18n/ui-localization-service.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
@@ -381,6 +382,7 @@ const requiredReleaseFiles = [
   "tests/unit/workspace-sync-controller.test.cjs",
   "tests/unit/language-input-service.test.cjs",
   "tests/unit/ui-locale-controls-controller.test.cjs",
+  "tests/unit/ui-locale-orchestration-controller.test.cjs",
   "tests/unit/ui-localization-service.test.cjs",
   "tests/unit/resource-trash.test.cjs",
   "tests/unit/resources-controller.test.cjs",
@@ -481,6 +483,8 @@ const applicationUpdateControlsControllerUnitTests = readText(
 );
 const uiLocaleControlsControllerJs = readText("src/i18n/ui-locale-controls-controller.js");
 const uiLocaleControlsControllerUnitTests = readText("tests/unit/ui-locale-controls-controller.test.cjs");
+const uiLocaleOrchestrationControllerJs = readText("src/i18n/ui-locale-orchestration-controller.js");
+const uiLocaleOrchestrationControllerUnitTests = readText("tests/unit/ui-locale-orchestration-controller.test.cjs");
 const applicationViewControllerJs = readText("src/app/application-view-controller.js");
 const applicationViewControllerUnitTests = readText("tests/unit/application-view-controller.test.cjs");
 const globalKeyboardControllerJs = readText("src/app/global-keyboard-controller.js");
@@ -5266,9 +5270,9 @@ for (const boundary of [
   "exportButton: els.exportUiSourceBtn",
   "ensure: (locale) => appRuntime.localeLoader.ensure(locale)",
   "set: (locale) => uiI18n?.setLocale?.(locale)",
-  "refresh: refreshLocalizedUi",
-  "importCatalog: importUiLocaleFile",
-  "exportSource: exportUiSourceCatalog",
+  "refresh: uiLocaleOrchestrationController.refresh",
+  "importCatalog: uiLocaleOrchestrationController.importCatalog",
+  "exportSource: uiLocaleOrchestrationController.exportSource",
   "uiLocaleControls: uiLocaleControlsController"
 ]) {
   assertIncludes(appJs, boundary, `UI-locale control composition must retain the checked ${boundary} boundary.`);
@@ -5325,6 +5329,157 @@ assertIncludes(
   i18nExtractScript,
   '"src/i18n/ui-locale-controls-controller.js"',
   "source-catalog extraction must scan the checked UI-locale controls controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createUiLocaleOrchestrationController } from "../i18n/ui-locale-orchestration-controller.js";',
+  "the application runtime must install the checked UI-locale orchestration controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createUiLocaleOrchestrationController,",
+  "the application runtime must expose the checked UI-locale orchestration controller factory."
+);
+for (const snippet of [
+  "UiLocaleOrchestrationController requires checked localization and DOM boundaries.",
+  "UiLocaleOrchestrationController requires checked application and session boundaries.",
+  "UiLocaleOrchestrationController requires checked presentation actions.",
+  "UiLocaleOrchestrationController requires checked download, status, and clock boundaries.",
+  "UiLocaleOrchestrationController requires checked optional locale actions.",
+  "UiLocaleOrchestrationController requires a checked optional locale select.",
+  "if (!elements?.localeSelect || !locale?.availableLocales) return",
+  "const current = locale.getLocale()",
+  "...locale.availableLocales().map((catalogLocale) => {",
+  'catalogLocale.custom ? ` (${localization.source("custom")})` : ""',
+  "elements.localeSelect.value = current",
+  'application.dispatchLocale(locale?.getLocale?.() || "")',
+  "locale?.localizeStaticDom?.(dom.body)",
+  'if (application.getView() === "projects") presentation.renderProjectsView()',
+  'if (application.getView() === "resources") presentation.renderResourcesView()',
+  "if (session.getProject())",
+  'if (application.getView() === "project")',
+  "void presentation.renderProjectAnalysis()",
+  "const file = elements?.importInput?.files?.[0]",
+  "if (!file || !locale?.saveCustomLocale) return",
+  "const catalog = JSON.parse(await file.text())",
+  "const importedLocale = locale.saveCustomLocale(catalog)",
+  "locale.setLocale(importedLocale)",
+  'status.set("Interface translation imported", "saved")',
+  'status.set(error.message || "Interface translation import failed", "dirty")',
+  'if (elements?.importInput) elements.importInput.value = ""',
+  "if (!locale?.sourceCatalogJson) return",
+  "`loopcat-ui-source-${clock.now().toISOString().slice(0, 10)}.json`",
+  '"application/json"',
+  'status.set("UI source exported", "saved")',
+  "return Object.freeze({ renderOptions, refresh, importCatalog, exportSource })"
+]) {
+  assertIncludes(
+    uiLocaleOrchestrationControllerJs,
+    snippet,
+    `UiLocaleOrchestrationController must retain locale rendering, refresh, import, and export policy: ${snippet}.`
+  );
+}
+const uiLocaleRefreshOrder = [
+  "presentation.renderPanels()",
+  "renderOptions()",
+  "presentation.renderFocusMode()",
+  "presentation.renderWorkspaceStatus()",
+  "presentation.renderProjectStorageStatus()",
+  'if (application.getView() === "projects") presentation.renderProjectsView()',
+  'if (application.getView() === "resources") presentation.renderResourcesView()',
+  "if (session.getProject())",
+  "presentation.renderEditor()",
+  "presentation.renderProgress()",
+  "presentation.renderReview()",
+  "presentation.renderWorkbench()",
+  "presentation.renderRevisionHistory()",
+  "presentation.renderQaResults()",
+  "presentation.refreshEditorContext()"
+];
+const uiLocaleRefreshBody = uiLocaleOrchestrationControllerJs.slice(
+  uiLocaleOrchestrationControllerJs.indexOf("function refresh()"),
+  uiLocaleOrchestrationControllerJs.indexOf("async function importCatalog()")
+);
+for (let index = 1; index < uiLocaleRefreshOrder.length; index += 1) {
+  assert(
+    uiLocaleRefreshBody.indexOf(uiLocaleRefreshOrder[index - 1]) <
+      uiLocaleRefreshBody.indexOf(uiLocaleRefreshOrder[index]),
+    `UI-locale refresh order must retain ${uiLocaleRefreshOrder[index - 1]} before ${uiLocaleRefreshOrder[index]}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createUiLocaleOrchestrationController({",
+  "localeSelect: els.uiLocaleSelect",
+  "importInput: els.uiLocaleImportInput",
+  "locale: uiI18n",
+  "source: (value) => uiLocalizationService.source(value)",
+  "body: document.body",
+  'createOption: () => document.createElement("option")',
+  'type: "interface/locale-changed"',
+  "getView: () => applicationStore.getState().navigation.view",
+  "getProject: () => editorSessionStore.getProject()",
+  "renderPanels: () => panelToggleController.renderAll()",
+  "renderFocusMode: () => focusModeController.render()",
+  "renderProjectAnalysis: () => renderProjectAnalysis()",
+  "renderReview: () => qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false })",
+  "refreshEditorContext: () => editorContextController.refresh()",
+  "write: (filename, content, type) => download(filename, content, type)",
+  "set: (message, mode) => setSaveStatus(message, mode)",
+  "now: () => new Date()",
+  "refresh: uiLocaleOrchestrationController.refresh",
+  "importCatalog: uiLocaleOrchestrationController.importCatalog",
+  "exportSource: uiLocaleOrchestrationController.exportSource",
+  "renderLocaleOptions: uiLocaleOrchestrationController.renderOptions"
+]) {
+  assertIncludes(appJs, boundary, `UI-locale orchestration composition must retain ${boundary}.`);
+}
+for (const removedOwner of [
+  "function renderUiLocaleOptions(",
+  "function refreshLocalizedUi(",
+  "function importUiLocaleFile(",
+  "function exportUiSourceCatalog("
+]) {
+  assert(
+    !appJs.includes(removedOwner) && !appWorkflowDriverJs.includes(removedOwner),
+    `UI-locale orchestration ownership must not return through ${removedOwner}.`
+  );
+}
+for (const forbiddenOwner of [
+  "appRuntime",
+  "uiI18n",
+  "applicationStore",
+  "editorSessionStore",
+  "document.",
+  "els.",
+  "renderUiLocaleOptions",
+  "refreshLocalizedUi",
+  "importUiLocaleFile",
+  "exportUiSourceCatalog"
+]) {
+  assert(
+    !uiLocaleOrchestrationControllerJs.includes(forbiddenOwner),
+    `UiLocaleOrchestrationController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "UiLocaleOrchestrationController preserves locale-option guards, captured selection, and custom labels",
+  "UiLocaleOrchestrationController preserves no-project localized refresh order and view branches",
+  "UiLocaleOrchestrationController preserves project refresh order and unawaited analysis",
+  "UiLocaleOrchestrationController preserves custom-catalog import guards and successful sequencing",
+  "UiLocaleOrchestrationController preserves import failure status, fallback copy, and final reset",
+  "UiLocaleOrchestrationController preserves source-catalog export guard, construction, and failure timing",
+  "UiLocaleOrchestrationController validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    uiLocaleOrchestrationControllerUnitTests,
+    testName,
+    `focused UI-locale orchestration tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/i18n/ui-locale-orchestration-controller.js"',
+  "source-catalog extraction must scan the checked UI-locale orchestration controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -15807,7 +15962,7 @@ for (const boundary of [
   "if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = message",
   "initialize: () => appRuntime.localeLoader.initialize()",
   "initialize: () => uiI18n?.init?.()",
-  "renderLocaleOptions: () => renderUiLocaleOptions()",
+  "renderLocaleOptions: uiLocaleOrchestrationController.renderOptions",
   "wiring: applicationEventWiringController",
   "startAutosave: () => workspacePackageSaveController.startAutosave()",
   "restoreDirty: () => restoreWorkspaceDirtyIds()",

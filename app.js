@@ -3405,6 +3405,48 @@ const applicationUpdateControlsController =
       defer: () => offlineUpdateController?.defer?.()
     }
   });
+const uiLocaleOrchestrationController =
+  appRuntime.featureFactories.createUiLocaleOrchestrationController({
+    elements: {
+      localeSelect: els.uiLocaleSelect,
+      importInput: els.uiLocaleImportInput
+    },
+    locale: uiI18n,
+    localization: { source: (value) => uiLocalizationService.source(value) },
+    dom: {
+      body: document.body,
+      createOption: () => document.createElement("option")
+    },
+    application: {
+      dispatchLocale: (locale) =>
+        applicationStore?.dispatch?.({
+          type: "interface/locale-changed",
+          payload: { locale }
+        }),
+      getView: () => applicationStore.getState().navigation.view
+    },
+    session: { getProject: () => editorSessionStore.getProject() },
+    presentation: {
+      renderPanels: () => panelToggleController.renderAll(),
+      renderFocusMode: () => focusModeController.render(),
+      renderWorkspaceStatus: () => renderWorkspaceStatus(),
+      renderProjectStorageStatus: () => renderProjectStorageStatus(),
+      renderProjectsView: () => renderProjectsView(),
+      renderResourcesView: () => renderResourcesView(),
+      renderProjectHome: () => renderProjectHome(),
+      renderProjectAnalysis: () => renderProjectAnalysis(),
+      renderEditor: () => renderEditor(),
+      renderProgress: () => renderProgress(),
+      renderReview: () => qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false }),
+      renderWorkbench: () => qualityWorkbenchController.render(),
+      renderRevisionHistory: () => revisionHistoryPresentationService.render(),
+      renderQaResults: () => qaResultsController.render(),
+      refreshEditorContext: () => editorContextController.refresh()
+    },
+    downloads: { write: (filename, content, type) => download(filename, content, type) },
+    status: { set: (message, mode) => setSaveStatus(message, mode) },
+    clock: { now: () => new Date() }
+  });
 const uiLocaleControlsController = appRuntime.featureFactories.createUiLocaleControlsController({
   elements: {
     localeSelect: els.uiLocaleSelect,
@@ -3413,10 +3455,10 @@ const uiLocaleControlsController = appRuntime.featureFactories.createUiLocaleCon
   },
   loader: { ensure: (locale) => appRuntime.localeLoader.ensure(locale) },
   locale: { set: (locale) => uiI18n?.setLocale?.(locale) },
-  presentation: { refresh: refreshLocalizedUi },
+  presentation: { refresh: uiLocaleOrchestrationController.refresh },
   actions: {
-    importCatalog: importUiLocaleFile,
-    exportSource: exportUiSourceCatalog
+    importCatalog: uiLocaleOrchestrationController.importCatalog,
+    exportSource: uiLocaleOrchestrationController.exportSource
   }
 });
 const projectHomeController = appRuntime.featureFactories.createProjectHomeController({
@@ -3622,7 +3664,7 @@ const applicationStartupController = appRuntime.featureFactories.createApplicati
   locale: { initialize: () => appRuntime.localeLoader.initialize() },
   ui: {
     initialize: () => uiI18n?.init?.(),
-    renderLocaleOptions: () => renderUiLocaleOptions()
+    renderLocaleOptions: uiLocaleOrchestrationController.renderOptions
   },
   wiring: applicationEventWiringController,
   workspace: {
@@ -4722,69 +4764,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   logger: console
 });
 dialogLifecycleController?.mount?.();
-
-function renderUiLocaleOptions() {
-  if (!els.uiLocaleSelect || !uiI18n?.availableLocales) return;
-  const current = uiI18n.getLocale();
-  els.uiLocaleSelect.replaceChildren(...uiI18n.availableLocales().map((locale) => {
-    const option = document.createElement("option");
-    option.value = locale.locale;
-    option.textContent = `${locale.label || locale.locale}${locale.custom ? ` (${uiLocalizationService.source("custom")})` : ""}`;
-    return option;
-  }));
-  els.uiLocaleSelect.value = current;
-}
-
-function refreshLocalizedUi() {
-  applicationStore?.dispatch?.({
-    type: "interface/locale-changed",
-    payload: { locale: uiI18n?.getLocale?.() || "" }
-  });
-  uiI18n?.localizeStaticDom?.(document.body);
-  panelToggleController.renderAll();
-  renderUiLocaleOptions();
-  focusModeController.render();
-  renderWorkspaceStatus();
-  renderProjectStorageStatus();
-  if (applicationStore.getState().navigation.view === "projects") renderProjectsView();
-  if (applicationStore.getState().navigation.view === "resources") renderResourcesView();
-  if (editorSessionStore.getProject()) {
-    if (applicationStore.getState().navigation.view === "project") {
-      renderProjectHome();
-      void renderProjectAnalysis();
-    }
-    renderEditor();
-    renderProgress();
-    qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false });
-    qualityWorkbenchController.render();
-    revisionHistoryPresentationService.render();
-    qaResultsController.render();
-    editorContextController.refresh();
-  }
-}
-
-async function importUiLocaleFile() {
-  const file = els.uiLocaleImportInput?.files?.[0];
-  if (!file || !uiI18n?.saveCustomLocale) return;
-  try {
-    const catalog = JSON.parse(await file.text());
-    const locale = uiI18n.saveCustomLocale(catalog);
-    renderUiLocaleOptions();
-    uiI18n.setLocale(locale);
-    refreshLocalizedUi();
-    setSaveStatus("Interface translation imported", "saved");
-  } catch (error) {
-    setSaveStatus(error.message || "Interface translation import failed", "dirty");
-  } finally {
-    if (els.uiLocaleImportInput) els.uiLocaleImportInput.value = "";
-  }
-}
-
-function exportUiSourceCatalog() {
-  if (!uiI18n?.sourceCatalogJson) return;
-  download(`loopcat-ui-source-${new Date().toISOString().slice(0, 10)}.json`, uiI18n.sourceCatalogJson(), "application/json");
-  setSaveStatus("UI source exported", "saved");
-}
 
 function setSaveStatus(text, mode = "") {
   if (state.saveStatusTimer) {
