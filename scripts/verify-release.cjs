@@ -227,6 +227,7 @@ const requiredReleaseFiles = [
   "src/features/quality/quality-presentation-service.js",
   "src/features/quality/quality-workbench-controller.js",
   "src/features/quality/qa-results-controller.js",
+  "src/features/quality/project-qa-controller.js",
   "src/features/quality/revision-history-presentation-service.js",
   "src/features/quality/quality-decision-controller.js",
   "src/features/quality/quality-review-controller.js",
@@ -287,6 +288,7 @@ const requiredReleaseFiles = [
   "tests/unit/tm-matches-controller.test.cjs",
   "tests/unit/term-suggestions-controller.test.cjs",
   "tests/unit/term-form-controller.test.cjs",
+  "tests/unit/project-qa-controller.test.cjs",
   "tests/unit/concordance-controller.test.cjs",
   "tests/unit/segment-navigation-controller.test.cjs",
   "tests/unit/segment-draft-application-service.test.cjs",
@@ -451,6 +453,8 @@ const termSuggestionsControllerJs = readText("src/features/editor/term-suggestio
 const termSuggestionsControllerUnitTests = readText("tests/unit/term-suggestions-controller.test.cjs");
 const termFormControllerJs = readText("src/features/editor/term-form-controller.js");
 const termFormControllerUnitTests = readText("tests/unit/term-form-controller.test.cjs");
+const projectQaControllerJs = readText("src/features/quality/project-qa-controller.js");
+const projectQaControllerUnitTests = readText("tests/unit/project-qa-controller.test.cjs");
 const concordanceControllerUnitTests = readText("tests/unit/concordance-controller.test.cjs");
 const segmentNavigationControllerUnitTests = readText("tests/unit/segment-navigation-controller.test.cjs");
 const segmentDraftApplicationServiceUnitTests = readText("tests/unit/segment-draft-application-service.test.cjs");
@@ -1156,7 +1160,7 @@ for (const boundary of [
   'applicationNavigation.selectDocument({ documentId: "" })',
   "matches: segmentFilterService.matches",
   'editorFilterStore.update({ query: "", status: "all", reviewState: "", aiState: "" })',
-  "qa: { run: runProjectQa }",
+  "qa: { run: (...args) => projectQaController.run(...args) }",
   "navigation: { select: (index) => segmentNavigationController.select(index) }",
   "renderWorkbench: (viewModel) => qualityReviewController?.renderQuality?.(viewModel)",
   "focus: { target: () => targetEditController.focusActive() }",
@@ -1174,7 +1178,6 @@ for (const consumer of [
   "renderWorkbench: qualityWorkbenchController.render",
   "risk: { buildQueue: qualityWorkbenchController.buildQueue }",
   "run: qualityWorkbenchController.nextRisk, enabled: Boolean(editorSessionStore.getProject())",
-  "editorSessionStore.replaceQualityRiskQueue(qualityWorkbenchController.buildQueue(checks));",
   "editorSessionStore.replaceQualityRiskQueue(qualityWorkbenchController.buildQueue());"
 ]) {
   const source = consumer.endsWith("buildQueue());") ? appWorkflowDriverJs : appJs;
@@ -1295,7 +1298,6 @@ for (const consumer of [
   "qaCheckFixHint: qaResultsController.fixHint",
   "clearQaFilter: qaResultsController.clear",
   "renderQaResults: qaResultsController.render",
-  "qaResultsController.clear();",
   "qaResultsController.render();"
 ]) {
   const source = consumer === "qaResultsController.render();" ? `${appJs}\n${appWorkflowDriverJs}` : appJs;
@@ -1303,9 +1305,9 @@ for (const consumer of [
 }
 assert(
   (appJs.match(/\bqaResultsController\.clear\b/g) || []).length === 3 &&
-    (appJs.match(/\bqaResultsController\.render\b/g) || []).length === 5 &&
+    (appJs.match(/\bqaResultsController\.render\b/g) || []).length === 4 &&
     (appWorkflowDriverJs.match(/\bqaResultsController\.render\b/g) || []).length === 1,
-  "all report, delivery, QA-run, locale-refresh, and workflow consumers must call QaResultsController directly."
+  "all report, delivery, ProjectQaController composition, locale-refresh, and workflow consumers must call QaResultsController directly."
 );
 for (const removedHelper of ["qaSummary", "qaCheckMessage", "qaCheckFixHint", "renderQaResults"]) {
   const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
@@ -4888,6 +4890,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectQaController } from "../features/quality/project-qa-controller.js";',
+  "The application runtime must install the checked project-QA controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectQaController,",
+  "The application runtime must expose the checked project-QA factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createConcordanceController } from "../features/editor/concordance-controller.js";',
   "The application runtime must install the checked concordance controller."
 );
@@ -6044,6 +6056,133 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/term-form-controller.js"',
   "source-catalog extraction must scan the checked term-form controller."
+);
+for (const snippet of [
+  'throw new TypeError("ProjectQaController requires a Run QA button and session boundaries.")',
+  'throw new TypeError("ProjectQaController requires terminology, document, tag, and QA boundaries.")',
+  'throw new TypeError("ProjectQaController requires QA results and workbench presentation boundaries.")',
+  'throw new TypeError("ProjectQaController requires navigation, activity, status, logger, and test-hook boundaries.")',
+  "if (!session.getProject()) return null",
+  "testHooks.beforeRun()",
+  "const termRecords = await terms.list({",
+  "sourceLang: session.getProject().sourceLang",
+  "targetLang: session.getProject().targetLang",
+  "termBaseNames: terms.getNames()",
+  "const qaSegments = documents.currentSegments().map((segment) => ({",
+  "tags: tags.sourceTags(segment)",
+  "const fallback = () =>",
+  "Promise.resolve(",
+  "qa.runChecks(documents.currentSegments(), termRecords, {",
+  "missingTags: tags.missing",
+  "const checks = worker?.runQaChecks",
+  "await worker.runQaChecks({ segments: qaSegments, terms: termRecords, fallback })",
+  "await fallback()",
+  "session.replaceQaChecks(checks)",
+  "presentation.clearResults()",
+  "presentation.renderResults()",
+  "session.replaceQualityRiskQueue(presentation.buildRiskQueue(checks))",
+  "presentation.renderWorkbench()",
+  "testHooks.beforeActivity()",
+  'await activity.log("qa-run", "QA checks run", {',
+  "issueCount: checks.length",
+  "documentId: navigation.getDocumentId()",
+  'logger.warn("QA activity log failed.", activityError)',
+  '`QA found ${checks.length} issue${checks.length === 1 ? "" : "s"}`',
+  '"QA found no issues"',
+  'checks.length ? "dirty" : "saved"',
+  'status.set(error.message || "QA checks failed", "dirty")',
+  'elements.runButton.addEventListener("click", run)',
+  'elements.runButton.removeEventListener("click", run)',
+  "return Object.freeze({ mount, run, unmount })"
+]) {
+  assertIncludes(
+    projectQaControllerJs,
+    snippet,
+    `ProjectQaController must retain characterized eligibility, QA routing, cache, presentation, activity, status, failure, and lifecycle policy: ${snippet}`
+  );
+}
+assert(
+  !projectQaControllerJs.includes("window.") &&
+    !projectQaControllerJs.includes("document.") &&
+    !projectQaControllerJs.includes("editorSessionStore") &&
+    !projectQaControllerJs.includes("applicationStore") &&
+    !projectQaControllerJs.includes("listTerms") &&
+    !projectQaControllerJs.includes("projectTermBaseNames") &&
+    !projectQaControllerJs.includes("workerClient") &&
+    !projectQaControllerJs.includes("qaResultsController") &&
+    !projectQaControllerJs.includes("qualityWorkbenchController") &&
+    !projectQaControllerJs.includes("protectedTagInspectionService") &&
+    !projectQaControllerJs.includes("logProjectActivity") &&
+    !projectQaControllerJs.includes("setSaveStatus") &&
+    !projectQaControllerJs.includes("LOOPCAT_TEST_BUILD") &&
+    !projectQaControllerJs.includes("QA_RUN_FAILURE_TEST_FLAG") &&
+    !projectQaControllerJs.includes("QA_ACTIVITY_FAILURE_TEST_FLAG") &&
+    !projectQaControllerJs.includes("els."),
+  "the checked project-QA controller must use injected state, data, QA, worker, presentation, activity, status, logger, and test-hook boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectQaController({",
+  "runButton: els.runQaBtn",
+  "getProject: editorSessionStore.getProject",
+  "replaceQaChecks: editorSessionStore.replaceQaChecks",
+  "replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue",
+  "terms: { list: listTerms, getNames: projectTermBaseNames }",
+  "currentSegments: projectDocumentCatalogService.currentSegments",
+  "sourceTags: protectedTagInspectionService.sourceTags",
+  "missing: protectedTagInspectionService.missing",
+  "qa: { runChecks: runQaChecks }",
+  "worker: workerClient",
+  "clearResults: qaResultsController.clear",
+  "renderResults: qaResultsController.render",
+  "buildRiskQueue: qualityWorkbenchController.buildQueue",
+  "renderWorkbench: qualityWorkbenchController.render",
+  "getDocumentId: () => applicationStore.getState().navigation.documentId",
+  "activity: { log: logProjectActivity }",
+  "status: { set: setSaveStatus }",
+  "logger: console",
+  "beforeRun: () =>",
+  "if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[QA_RUN_FAILURE_TEST_FLAG])",
+  'throw new Error("Simulated QA run failure")',
+  "beforeActivity: () =>",
+  "if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[QA_ACTIVITY_FAILURE_TEST_FLAG])",
+  'throw new Error("Simulated QA activity log failure")',
+  "qa: { run: (...args) => projectQaController.run(...args) }"
+]) {
+  assertIncludes(appJs, boundary, `project-QA composition must inject the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/\bprojectQaController\.mount\b/g) || []).length === 1 &&
+    (appJs.match(/\bprojectQaController\.run\b/g) || []).length === 2 &&
+    (appWorkflowDriverJs.match(/\bprojectQaController\.run\b/g) || []).length === 3,
+  "the Run QA lifecycle must mount once and EditorContext, palette, and all three workflow consumers must call ProjectQaController directly."
+);
+assert(
+  !/async\s+function\s+runProjectQa\b/.test(appJs) &&
+    !/async\s+function\s+runProjectQa\b/.test(appWorkflowDriverJs) &&
+    !appJs.includes('els.runQaBtn.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('els.runQaBtn.addEventListener("click"'),
+  "runProjectQa and coordinator-owned Run QA button listeners must not return."
+);
+for (const testName of [
+  "ProjectQaController preserves the no-project guard with exact short-circuit effects",
+  "ProjectQaController preserves fallback terminology, document, tag, cache, presentation, activity, and success order",
+  "ProjectQaController preserves optional worker request shape, method receiver, and fallback closure",
+  "ProjectQaController preserves durable results and exact warnings after either activity failure",
+  "ProjectQaController preserves zero, singular, and plural result statuses",
+  "ProjectQaController preserves previous results on primary failure and completed effects on late failure",
+  "ProjectQaController owns idempotent Run QA lifecycle and direct promise results",
+  "ProjectQaController validates boundaries, preserves delegate failure timing, and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectQaControllerUnitTests,
+    testName,
+    `focused project-QA tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/quality/project-qa-controller.js"',
+  "source-catalog extraction must scan the checked project-QA controller."
 );
 for (const snippet of [
   'throw new TypeError("ConcordanceController requires overlay elements.")',

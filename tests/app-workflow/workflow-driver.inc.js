@@ -2647,7 +2647,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     editorSessionStore.replaceQaChecks([{ id: "existing-qa-fixture", type: "existing", severity: "info", segmentId: editorSessionStore.getSegments()[segmentIndex].id, label: "fixture", message: "Existing QA fixture." }]);
     qaResultsController.render();
     segmentTargetStateService.setHiddenField(editorSessionStore.getProject(), QA_RUN_FAILURE_TEST_FLAG, true);
-    const failedQaRun = await runProjectQa();
+    const failedQaRun = await projectQaController.run();
     assert(
       failedQaRun === null &&
         els.saveStatus.textContent.includes("Simulated QA run failure") &&
@@ -2656,7 +2656,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     Reflect.deleteProperty(editorSessionStore.getProject(), QA_RUN_FAILURE_TEST_FLAG);
     segmentTargetStateService.setHiddenField(editorSessionStore.getProject(), QA_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const qaWithActivityFailure = await runProjectQa();
+    const qaWithActivityFailure = await projectQaController.run();
     assert(
       Array.isArray(qaWithActivityFailure) &&
         els.saveStatus.textContent.startsWith("QA found") &&
@@ -2664,7 +2664,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "QA activity log failure still renders fresh QA results"
     );
     Reflect.deleteProperty(editorSessionStore.getProject(), QA_ACTIVITY_FAILURE_TEST_FLAG);
-    const successfulQaRun = await runProjectQa();
+    const successfulQaRun = await projectQaController.run();
     assert(Array.isArray(successfulQaRun) && els.saveStatus.textContent.startsWith("QA found"), "QA run reports visible result status");
 
     clearWorkspaceDirtyMarkers();

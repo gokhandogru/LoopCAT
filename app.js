@@ -1521,6 +1521,7 @@ const reportDataService = appRuntime.featureFactories.createReportDataService({
   timestamp: () => new Date().toISOString()
 });
 let qualityReviewController;
+let projectQaController;
 const qualityWorkbenchController = appRuntime.featureFactories.createQualityWorkbenchController({
   session: {
     getProject: editorSessionStore.getProject,
@@ -1552,7 +1553,7 @@ const qualityWorkbenchController = appRuntime.featureFactories.createQualityWork
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
     }
   },
-  qa: { run: runProjectQa },
+  qa: { run: (...args) => projectQaController.run(...args) },
   navigation: { select: (index) => segmentNavigationController.select(index) },
   presentation: {
     renderSegments,
@@ -1560,6 +1561,44 @@ const qualityWorkbenchController = appRuntime.featureFactories.createQualityWork
   },
   focus: { target: () => targetEditController.focusActive() },
   status: { set: setSaveStatus }
+});
+projectQaController = appRuntime.featureFactories.createProjectQaController({
+  elements: { runButton: els.runQaBtn },
+  session: {
+    getProject: editorSessionStore.getProject,
+    replaceQaChecks: editorSessionStore.replaceQaChecks,
+    replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue
+  },
+  terms: { list: listTerms, getNames: projectTermBaseNames },
+  documents: { currentSegments: projectDocumentCatalogService.currentSegments },
+  tags: {
+    sourceTags: protectedTagInspectionService.sourceTags,
+    missing: protectedTagInspectionService.missing
+  },
+  qa: { runChecks: runQaChecks },
+  worker: workerClient,
+  presentation: {
+    clearResults: qaResultsController.clear,
+    renderResults: qaResultsController.render,
+    buildRiskQueue: qualityWorkbenchController.buildQueue,
+    renderWorkbench: qualityWorkbenchController.render
+  },
+  navigation: { getDocumentId: () => applicationStore.getState().navigation.documentId },
+  activity: { log: logProjectActivity },
+  status: { set: setSaveStatus },
+  logger: console,
+  testHooks: {
+    beforeRun: () => {
+      if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[QA_RUN_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated QA run failure");
+      }
+    },
+    beforeActivity: () => {
+      if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[QA_ACTIVITY_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated QA activity log failure");
+      }
+    }
+  }
 });
 const reportExportController = appRuntime.featureFactories.createReportExportController({
   session: {
@@ -4906,7 +4945,7 @@ function commandList() {
     { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: structuralSegmentController.merge, enabled: Boolean(currentSegment() && structuralSegmentController.canMerge(currentSegment(), structuralSegmentController.nextForMerge(currentSegment()))) },
     { id: "save-tm", label: "Save segment to TM", run: segmentTmSaveController.saveActive, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "qa", label: "Run QA checks", run: projectQaController.run, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "quality-passport", label: "Export Quality Passport", run: reportExportController.exportQualityPassport, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "next-quality-risk", label: "Next quality risk", run: qualityWorkbenchController.nextRisk, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "concordance", label: "Open concordance", run: concordanceController.open, enabled: Boolean(editorSessionStore.getProject()) },
@@ -6182,48 +6221,6 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-async function runProjectQa() {
-  if (!editorSessionStore.getProject()) return null;
-  try {
-    if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[QA_RUN_FAILURE_TEST_FLAG]) throw new Error("Simulated QA run failure");
-    const terms = await listTerms({
-      sourceLang: editorSessionStore.getProject().sourceLang,
-      targetLang: editorSessionStore.getProject().targetLang,
-      termBaseNames: projectTermBaseNames()
-    });
-    const qaSegments = projectDocumentCatalogService.currentSegments().map((segment) => ({
-      ...segment,
-      tags: protectedTagInspectionService.sourceTags(segment)
-    }));
-    const fallback = () =>
-      Promise.resolve(
-        runQaChecks(projectDocumentCatalogService.currentSegments(), terms, {
-          missingTags: protectedTagInspectionService.missing
-        })
-      );
-    const checks = workerClient?.runQaChecks
-      ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
-      : await fallback();
-    editorSessionStore.replaceQaChecks(checks);
-    qaResultsController.clear();
-    qaResultsController.render();
-    editorSessionStore.replaceQualityRiskQueue(qualityWorkbenchController.buildQueue(checks));
-    qualityWorkbenchController.render();
-    try {
-    if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[QA_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated QA activity log failure");
-      await logProjectActivity("qa-run", "QA checks run", { issueCount: checks.length, documentId: applicationStore.getState().navigation.documentId });
-    } catch (activityError) {
-      console.warn("QA activity log failed.", activityError);
-    }
-    setSaveStatus(checks.length ? `QA found ${checks.length} issue${checks.length === 1 ? "" : "s"}` : "QA found no issues", checks.length ? "dirty" : "saved");
-    return checks;
-  } catch (error) {
-    qaResultsController.render();
-    setSaveStatus(error.message || "QA checks failed", "dirty");
-    return null;
-  }
-}
-
 async function saveProjectDomainFromForm() {
   if (!editorSessionStore.getProject()) return false;
   const previousProject = structuredClone(editorSessionStore.getProject());
@@ -7237,7 +7234,7 @@ function wireEvents() {
 
   els.saveTmBtn.addEventListener("click", segmentTmSaveController.saveActive);
   els.nextOpenBtn.addEventListener("click", segmentNavigationController.nextOpen);
-  els.runQaBtn.addEventListener("click", runProjectQa);
+  projectQaController.mount();
   document.querySelectorAll("[data-panel-toggle]").forEach((button) => {
     syncPanelToggleState(button);
     button.addEventListener("click", () => {
