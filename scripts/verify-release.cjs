@@ -171,6 +171,7 @@ const requiredReleaseFiles = [
   "src/features/editor/protected-tag-inspection-service.js",
   "src/features/editor/protected-text-replacement-service.js",
   "src/features/editor/segment-provenance-service.js",
+  "src/features/editor/segment-filter-service.js",
   "src/features/editor/structural-segment-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -260,6 +261,7 @@ const requiredReleaseFiles = [
   "tests/unit/protected-tag-inspection-service.test.cjs",
   "tests/unit/protected-text-replacement-service.test.cjs",
   "tests/unit/segment-provenance-service.test.cjs",
+  "tests/unit/segment-filter-service.test.cjs",
   "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
@@ -382,6 +384,7 @@ const targetProducerControllerJs = readText("src/features/editor/target-producer
 const protectedTagInspectionServiceJs = readText("src/features/editor/protected-tag-inspection-service.js");
 const protectedTextReplacementServiceJs = readText("src/features/editor/protected-text-replacement-service.js");
 const segmentProvenanceServiceJs = readText("src/features/editor/segment-provenance-service.js");
+const segmentFilterServiceJs = readText("src/features/editor/segment-filter-service.js");
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
@@ -392,6 +395,7 @@ const targetProducerControllerUnitTests = readText("tests/unit/target-producer-c
 const protectedTagInspectionServiceUnitTests = readText("tests/unit/protected-tag-inspection-service.test.cjs");
 const protectedTextReplacementServiceUnitTests = readText("tests/unit/protected-text-replacement-service.test.cjs");
 const segmentProvenanceServiceUnitTests = readText("tests/unit/segment-provenance-service.test.cjs");
+const segmentFilterServiceUnitTests = readText("tests/unit/segment-filter-service.test.cjs");
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
@@ -4171,6 +4175,16 @@ assertIncludes(
   "createSegmentProvenanceService,",
   "The application runtime must expose the checked segment provenance factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createSegmentFilterService } from "../features/editor/segment-filter-service.js";',
+  "The application runtime must install the checked segment filter service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentFilterService,",
+  "The application runtime must expose the checked segment filter factory."
+);
 for (const boundary of [
   "editLifecycle.finalize(segment.id)",
   "persistence.clearPending(segment, { finalizeEdit: false })",
@@ -4442,6 +4456,100 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/segment-provenance-service.js"',
   "source-catalog extraction must scan the checked segment provenance service."
+);
+for (const snippet of [
+  'let revision = 0',
+  'let cache = { key: "", indexes: [], positions: new Map() }',
+  'cache = { key: "", indexes: [], positions: new Map() }',
+  'return segment.status !== "confirmed"',
+  'if (filter === "ai-draft") return provenance.hasAiDraft(segment)',
+  'if (filter === "ai-suggestions") return provenance.hasAiSuggestions(segment)',
+  'if (filter === "ai-review-risk") return Boolean(provenance.aiRiskLevel(segment))',
+  '["high", "critical"].includes(provenance.aiRiskLevel(segment))',
+  'const pattern = new RegExp(query, filters.caseSensitive ? "" : "i")',
+  'return () => false',
+  'return normalizeCase(haystack).includes(foldedQuery)',
+  'segment.documentId !== getDocumentId()',
+  'const comments = (segment.comments || []).length + ((segment.reviewNote || "").trim() ? 1 : 0)',
+  'status === "all" || (status === "open" && isOpen(segment)) || segment.status === status',
+  'return getSegments().map((_, index) => index)',
+  '].join("\\u001f")',
+  'if (cache.key === key) return cache.indexes',
+  'const queryMatches = queryMatcher()',
+  'const positions = new Map(indexes.map((segmentIndex, position) => [segmentIndex, position]))',
+  'return cache.positions.get(index) ?? -1',
+  'return visibleIndexes()[0] ?? -1'
+]) {
+  assertIncludes(
+    segmentFilterServiceJs,
+    snippet,
+    `SegmentFilterService must retain characterized predicate/cache policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createSegmentFilterService({",
+  "app.js must compose the checked segment filter service."
+);
+for (const boundary of [
+  "getSegments: () => editorSessionStore.getSegments()",
+  "getFilters: () => editorFilterStore.getState()",
+  "getDocumentId: () => applicationStore.getState().navigation.documentId",
+  "normalizeCase: stableLower",
+  "provenance: segmentProvenanceService"
+]) {
+  assertIncludes(appJs, boundary, `segment filter composition must inject the checked ${boundary} boundary.`);
+}
+for (const method of ["invalidate", "isOpen", "matches", "allIndexes", "visibleIndexes", "visiblePosition", "firstVisible"]) {
+  assertIncludes(
+    `${appJs}\n${appWorkflowDriverJs}`,
+    `segmentFilterService.${method}`,
+    `segment filter consumers must call SegmentFilterService.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "invalidateSegmentFilterCache",
+  "isOpenSegment",
+  "segmentPassesAiFilter",
+  "segmentQueryMatcher",
+  "segmentPassesFilters",
+  "projectSegmentIndexes",
+  "segmentFilterCacheKey",
+  "filteredSegmentIndexes",
+  "filteredSegmentPosition",
+  "firstVisibleSegmentIndex"
+]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} segment filter helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const removedCacheField of ["segmentFilterRevision", "segmentFilterCache"]) {
+  assert(
+    !appJs.includes(removedCacheField) && !appWorkflowDriverJs.includes(removedCacheField),
+    `${removedCacheField} segment filter cache ownership must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "SegmentFilterService preserves empty, scoped literal, normalized, and case-sensitive query matching",
+  "SegmentFilterService preserves regex case flags, scope, and invalid-pattern containment",
+  "SegmentFilterService preserves AI filter modes and unknown-filter passthrough",
+  "SegmentFilterService preserves document, comments, review-state, open, exact-status, and query ordering",
+  "SegmentFilterService preserves project indexes, revision-keyed cache identity, filter-key refresh, and invalidation",
+  "SegmentFilterService preserves visible positions, missing fallback, first-visible fallback, and document-key refresh",
+  "SegmentFilterService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentFilterServiceUnitTests,
+    testName,
+    `focused segment filter tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-filter-service.js"',
+  "source-catalog extraction must scan the checked segment filter service."
 );
 assertIncludes(
   appBootstrapJs,
@@ -9611,19 +9719,19 @@ assertIncludes(
   "test-runner.html must give the large project fixture enough page-level time while preserving its internal performance assertions."
 );
 assertIncludes(
-  appJs,
-  "function segmentQueryMatcher",
-  "app.js must compile active segment search filters once per filter pass for large-project performance."
+  segmentFilterServiceJs,
+  "function queryMatcher",
+  "SegmentFilterService must compile active segment search filters once per filter pass for large-project performance."
 );
 assertIncludes(
-  appJs,
+  segmentFilterServiceJs,
   "positions: new Map",
-  "app.js must cache visible segment positions for large-project keyboard navigation."
+  "SegmentFilterService must cache visible segment positions for large-project keyboard navigation."
 );
 assertIncludes(
-  appJs,
-  "function filteredSegmentPosition",
-  "app.js must expose cached visible segment position lookups."
+  segmentFilterServiceJs,
+  "function visiblePosition",
+  "SegmentFilterService must expose cached visible segment position lookups."
 );
 assertIncludes(
   targetEditControllerJs,

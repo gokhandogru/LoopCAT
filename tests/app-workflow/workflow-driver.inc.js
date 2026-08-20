@@ -1208,7 +1208,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         aiReviewSaved &&
           aiReviewStored?.reviewState === "needs-review" &&
           aiReviewStored?.aiReviewRisk?.level === "medium" &&
-          filteredSegmentIndexes().includes(segmentIndex) &&
+          segmentFilterService.visibleIndexes().includes(segmentIndex) &&
           els.segmentBody.textContent.includes("Medium risk") &&
           aiReviewStored?.comments?.some((comment) =>
             comment.body.includes("AI review by Mock Review AI") &&
@@ -1307,7 +1307,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           batchReviewSummary?.skipped === 1 &&
           batchReviewSummary?.riskCounts?.high === 1 &&
           batchReviewSummary?.highestRisk === "high" &&
-          filteredSegmentIndexes().some((index) => editorSessionStore.getSegments()[index]?.id === issueSegment.id) &&
+          segmentFilterService.visibleIndexes().some((index) => editorSessionStore.getSegments()[index]?.id === issueSegment.id) &&
           els.segmentBody.textContent.includes("High risk") &&
           storedIssueSegment?.reviewState === "needs-review" &&
           storedIssueSegment?.aiReviewRisk?.level === "high" &&
@@ -3473,7 +3473,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "Local AI pretranslation uses project TM and termbase hints and saves AI initiated metadata"
       );
       assert(
-        filteredSegmentIndexes().some((index) => editorSessionStore.getSegments()[index]?.id === localAiGlossarySegment?.id) &&
+        segmentFilterService.visibleIndexes().some((index) => editorSessionStore.getSegments()[index]?.id === localAiGlossarySegment?.id) &&
           els.segmentBody.textContent.includes("AI initiated") &&
           !els.segmentBody.textContent.includes("AI draft"),
         "AI segment filter shows AI-pretranslated rows with AI initiated row badges"

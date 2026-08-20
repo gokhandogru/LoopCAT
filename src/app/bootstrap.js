@@ -48,6 +48,7 @@ import { createTargetProducerController } from "../features/editor/target-produc
 import { createProtectedTagInspectionService } from "../features/editor/protected-tag-inspection-service.js";
 import { createProtectedTextReplacementService } from "../features/editor/protected-text-replacement-service.js";
 import { createSegmentProvenanceService } from "../features/editor/segment-provenance-service.js";
+import { createSegmentFilterService } from "../features/editor/segment-filter-service.js";
 import { createTargetReplacementController } from "../features/editor/target-replacement-controller.js";
 import { createTmPretranslationController } from "../features/editor/tm-pretranslation-controller.js";
 import { createStructuralSegmentController } from "../features/editor/structural-segment-controller.js";
@@ -254,6 +255,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createProtectedTagInspectionService,
       createProtectedTextReplacementService,
       createSegmentProvenanceService,
+      createSegmentFilterService,
       createTargetReplacementController,
       createTmPretranslationController,
       createPaletteController,

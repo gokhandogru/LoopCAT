@@ -737,8 +737,6 @@ const editorFilterStore = appRuntime.featureFactories.createFilterStore();
 
 const state = {
   inspectorOpen: true,
-  segmentFilterRevision: 0,
-  segmentFilterCache: { key: "", indexes: [], positions: new Map() },
   projectAnalysisRun: 0,
   importTask: "",
   revisionHistoryFrame: 0,
@@ -1118,6 +1116,14 @@ const segmentProvenanceService = appRuntime.featureFactories.createSegmentProven
   localization: uiLocalizationService
 });
 
+const segmentFilterService = appRuntime.featureFactories.createSegmentFilterService({
+  getSegments: () => editorSessionStore.getSegments(),
+  getFilters: () => editorFilterStore.getState(),
+  getDocumentId: () => applicationStore.getState().navigation.documentId,
+  normalizeCase: stableLower,
+  provenance: segmentProvenanceService
+});
+
 const projectLanguageContextController = appRuntime.featureFactories.createProjectLanguageContextController({
   getProject: () => editorSessionStore.getProject(),
   languageInput: languageInputService,
@@ -1487,7 +1493,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
     missingTags: protectedTagInspectionService.missing,
     tagLabel: protectedTagInspectionService.displayText
   },
-  filters: { matches: segmentPassesFilters },
+  filters: { matches: segmentFilterService.matches },
   mutation: {
     confirm: applySegmentConfirmation,
     restore: restoreSegmentConfirmation,
@@ -1555,8 +1561,8 @@ targetEditController = appRuntime.featureFactories.createTargetEditController({
   activateSegment: setActiveSegment,
   confirmSegment: () => segmentConfirmationController.confirm(),
   getCommandProjectId: () => state.commandProjectId,
-  getVisibleIndexes: filteredSegmentIndexes,
-  getVisiblePosition: filteredSegmentPosition,
+  getVisibleIndexes: segmentFilterService.visibleIndexes,
+  getVisiblePosition: segmentFilterService.visiblePosition,
   normalizeKey: stableLower,
   undo: undoLastCommand,
   redo: redoLastCommand
@@ -1582,13 +1588,13 @@ const targetProducerController = appRuntime.featureFactories.createTargetProduce
     normalize: (selection, targetLength) => targetEditController.normalizeSelection(selection, targetLength),
     focus: targetEditController.focusActive
   },
-  filters: { matches: segmentPassesFilters },
+  filters: { matches: segmentFilterService.matches },
   mutation: {
     capturePatch: targetCommandPatch,
     applyTarget: setSegmentTargetAndStatus,
     touch: touchSegment,
     restorePatch: applyTargetCommandPatch,
-    invalidateFilters: invalidateSegmentFilterCache
+    invalidateFilters: segmentFilterService.invalidate
   },
   restoration: { restorePatch: restoreSegmentEditCommandPatch },
   view: {
@@ -1613,7 +1619,7 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
       regex: editorFilterStore.getState().regex,
       caseSensitive: editorFilterStore.getState().caseSensitive
     }),
-    getIndexes: (scope) => (scope === "all" ? projectSegmentIndexes() : filteredSegmentIndexes())
+    getIndexes: (scope) => (scope === "all" ? segmentFilterService.allIndexes() : segmentFilterService.visibleIndexes())
   },
   transform: { replace: protectedTextReplacementService.replace },
   commands: {
@@ -1826,7 +1832,7 @@ const aiScopeSelectionService = appRuntime.featureFactories.createAiScopeSelecti
     getDocument: projectDocumentCatalogService.currentSegments,
     getActive: currentSegment
   },
-  filters: { getVisibleIndexes: filteredSegmentIndexes }
+  filters: { getVisibleIndexes: segmentFilterService.visibleIndexes }
 });
 const externalAiConsentService = appRuntime.featureFactories.createExternalAiConsentService({
   confirm: uiLocalizationService.confirm
@@ -2006,7 +2012,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
   restoration: { restorePatches: restoreBatchTargetCommandPatches },
   selection: { getActiveSegmentId: () => currentSegment()?.id || "" },
   presentation: {
-    invalidateFilters: invalidateSegmentFilterCache,
+    invalidateFilters: segmentFilterService.invalidate,
     renderAll,
     renderSegments,
     renderProjectProgress: renderProgress,
@@ -2041,7 +2047,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
   },
   scope: {
     getVisibleSegments: () =>
-      filteredSegmentIndexes()
+      segmentFilterService.visibleIndexes()
         .map((index) => editorSessionStore.getSegments()[index])
         .filter(Boolean),
     getDocumentSegments: projectDocumentCatalogService.currentSegments,
@@ -2118,7 +2124,7 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
   selection: { getActiveSegment: currentSegment },
   scope: {
     getVisibleSegments: () =>
-      filteredSegmentIndexes()
+      segmentFilterService.visibleIndexes()
         .map((index) => editorSessionStore.getSegments()[index])
         .filter(Boolean),
     getDocumentSegments: projectDocumentCatalogService.currentSegments,
@@ -2197,7 +2203,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
   },
   scope: {
     getVisibleSegments: () =>
-      filteredSegmentIndexes()
+      segmentFilterService.visibleIndexes()
         .map((index) => editorSessionStore.getSegments()[index])
         .filter(Boolean),
     getDocumentSegments: projectDocumentCatalogService.currentSegments,
@@ -2285,7 +2291,7 @@ const aiTerminologyApplicationController =
     },
     scope: {
       getVisibleSegments: () =>
-        filteredSegmentIndexes()
+        segmentFilterService.visibleIndexes()
           .map((index) => editorSessionStore.getSegments()[index])
           .filter(Boolean),
       getDocumentSegments: projectDocumentCatalogService.currentSegments,
@@ -2362,7 +2368,7 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
   selection: { getActiveSegment: currentSegment },
   scope: {
     getVisibleSegments: () =>
-      filteredSegmentIndexes()
+      segmentFilterService.visibleIndexes()
         .map((index) => editorSessionStore.getSegments()[index])
         .filter(Boolean),
     getDocumentSegments: projectDocumentCatalogService.currentSegments,
@@ -2913,7 +2919,7 @@ const structuralSegmentController = appRuntime.featureFactories.createStructural
     discardPending: (segmentId) => autosaveService.discard(segmentId)
   },
   view: {
-    invalidateFilters: invalidateSegmentFilterCache,
+    invalidateFilters: segmentFilterService.invalidate,
     renderAll
   },
   workspace: { markDirty: markWorkspaceDirty },
@@ -2959,9 +2965,9 @@ const filterPresetController = appRuntime?.featureFactories?.createFilterPresetC
     els.segmentStatusFilter.value = preset.status;
     if (els.reviewStateFilter) els.reviewStateFilter.value = preset.reviewState;
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = preset.aiState;
-    invalidateSegmentFilterCache();
+    segmentFilterService.invalidate();
     renderSegments();
-    const first = firstVisibleSegmentIndex();
+    const first = segmentFilterService.firstVisible();
     if (first !== -1) await setActiveSegment(first);
   },
   setInspectorTab: (tab) => {
@@ -4012,11 +4018,6 @@ function toggleFocusMode() {
   setFocusMode(!applicationStore.getState().interface.focusMode);
 }
 
-function invalidateSegmentFilterCache() {
-  state.segmentFilterRevision += 1;
-  state.segmentFilterCache = { key: "", indexes: [], positions: new Map() };
-}
-
 function renderImportBusyState() {
   const busy = Boolean(state.importTask);
   importExportController?.renderBusy?.(busy);
@@ -4370,7 +4371,7 @@ function touchSegment(segment, options = {}) {
   const revision = Number(segment.revision || 0);
   segment.revision = (Number.isFinite(revision) ? revision : 0) + 1;
   segment.updatedAt = new Date().toISOString();
-  if (options.invalidateFilters !== false) invalidateSegmentFilterCache();
+  if (options.invalidateFilters !== false) segmentFilterService.invalidate();
   return segment;
 }
 
@@ -4697,117 +4698,6 @@ function projectResourceSearchText(project) {
   return [...summary.tmNames, ...summary.tbNames].join(" ");
 }
 
-function isOpenSegment(segment) {
-  return segment.status !== "confirmed";
-}
-
-function segmentPassesAiFilter(segment = {}) {
-  const filter = editorFilterStore.getState().aiState;
-  if (!filter) return true;
-  if (filter === "ai-draft") return segmentProvenanceService.hasAiDraft(segment);
-  if (filter === "ai-suggestions") return segmentProvenanceService.hasAiSuggestions(segment);
-  if (filter === "ai-review-risk") return Boolean(segmentProvenanceService.aiRiskLevel(segment));
-  if (filter === "high-ai-risk") return ["high", "critical"].includes(segmentProvenanceService.aiRiskLevel(segment));
-  return true;
-}
-
-function segmentQueryMatcher() {
-  const filters = editorFilterStore.getState();
-  const query = filters.query;
-  if (!query) return () => true;
-  const scope = filters.scope;
-  if (filters.regex) {
-    try {
-      const pattern = new RegExp(query, filters.caseSensitive ? "" : "i");
-      return (segment) => {
-        const source = segment.source || "";
-        const target = segment.target || "";
-        const haystack = scope === "source" ? source : scope === "target" ? target : `${source} ${target}`;
-        return pattern.test(haystack);
-      };
-    } catch {
-      return () => false;
-    }
-  }
-  if (filters.caseSensitive) {
-    return (segment) => {
-      const source = segment.source || "";
-      const target = segment.target || "";
-      const haystack = scope === "source" ? source : scope === "target" ? target : `${source} ${target}`;
-      return haystack.includes(query);
-    };
-  }
-  const foldedQuery = stableLower(query);
-  return (segment) => {
-    const source = segment.source || "";
-    const target = segment.target || "";
-    const haystack = scope === "source" ? source : scope === "target" ? target : `${source} ${target}`;
-    return stableLower(haystack).includes(foldedQuery);
-  };
-}
-
-function segmentPassesFilters(segment, queryMatches = segmentQueryMatcher()) {
-  const filters = editorFilterStore.getState();
-  const status = filters.status;
-  if (applicationStore.getState().navigation.documentId && segment.documentId !== applicationStore.getState().navigation.documentId) return false;
-  if (filters.reviewState) {
-    const comments = (segment.comments || []).length + ((segment.reviewNote || "").trim() ? 1 : 0);
-    if (filters.reviewState === "comments") {
-      if (!comments) return false;
-    } else if (segment.reviewState !== filters.reviewState) {
-      return false;
-    }
-  }
-  if (!segmentPassesAiFilter(segment)) return false;
-  const statusMatch =
-    status === "all" ||
-    (status === "open" && isOpenSegment(segment)) ||
-    segment.status === status;
-  if (!statusMatch) return false;
-  return queryMatches(segment);
-}
-
-function projectSegmentIndexes() {
-  return editorSessionStore.getSegments().map((_, index) => index);
-}
-
-function segmentFilterCacheKey() {
-  const filters = editorFilterStore.getState();
-  return [
-    state.segmentFilterRevision,
-    applicationStore.getState().navigation.documentId,
-    filters.query,
-    filters.scope,
-    filters.regex ? "regex" : "plain",
-    filters.caseSensitive ? "case" : "fold",
-    filters.status,
-    filters.reviewState,
-    filters.aiState
-  ].join("\u001f");
-}
-
-function filteredSegmentIndexes() {
-  const key = segmentFilterCacheKey();
-  if (state.segmentFilterCache.key === key) return state.segmentFilterCache.indexes;
-  const indexes = [];
-  const queryMatches = segmentQueryMatcher();
-  editorSessionStore.getSegments().forEach((segment, index) => {
-    if (segmentPassesFilters(segment, queryMatches)) indexes.push(index);
-  });
-  const positions = new Map(indexes.map((segmentIndex, position) => [segmentIndex, position]));
-  state.segmentFilterCache = { key, indexes, positions };
-  return indexes;
-}
-
-function filteredSegmentPosition(index) {
-  const key = segmentFilterCacheKey();
-  if (state.segmentFilterCache.key !== key) filteredSegmentIndexes();
-  return state.segmentFilterCache.positions.get(index) ?? -1;
-}
-
-function firstVisibleSegmentIndex() {
-  return filteredSegmentIndexes()[0] ?? -1;
-}
 
 function selectedEditorText() {
   const active = document.activeElement;
@@ -5260,7 +5150,7 @@ async function refreshProjectTerms({ rerender = false } = {}) {
     targetLang: editorSessionStore.getProject().targetLang,
     termBaseNames: projectTermBaseNames()
   }));
-  invalidateSegmentFilterCache();
+  segmentFilterService.invalidate();
   renderTermbaseSelect();
   if (rerender) renderSegments({ preserveScroll: true });
 }
@@ -5455,7 +5345,7 @@ async function openProjectFile(documentId) {
 }
 
 function renderAll() {
-  invalidateSegmentFilterCache();
+  segmentFilterService.invalidate();
   renderProjectList();
   renderEditor();
   renderProjectHome();
@@ -6070,7 +5960,7 @@ function segmentWindow(indexes) {
 }
 
 function renderSegments(options = {}) {
-  const indexes = filteredSegmentIndexes();
+  const indexes = segmentFilterService.visibleIndexes();
   const scrollTop = els.segmentGridWrap?.scrollTop || 0;
   if (!indexes.length) {
     verticalFeatureState.segmentGrid.resetWindow();
@@ -6171,7 +6061,7 @@ function renderProgress(options = {}) {
 }
 
 function ensureSegmentVisible(index) {
-  const position = filteredSegmentPosition(index);
+  const position = segmentFilterService.visiblePosition(index);
   if (position === -1) return;
   verticalFeatureState.segmentGrid.ensureVisible(position, renderSegments);
 }
@@ -6193,12 +6083,16 @@ async function setActiveSegment(index) {
 async function goToNextOpenSegment() {
   if (!editorSessionStore.getSegments().length) return;
   const start = Math.max(applicationStore.getState().navigation.activeIndex + 1, 0);
-  const afterCurrent = editorSessionStore.getSegments().findIndex((segment, index) => index >= start && isOpenSegment(segment));
-  const beforeCurrent = editorSessionStore.getSegments().findIndex((segment, index) => index < start && isOpenSegment(segment));
+  const afterCurrent = editorSessionStore
+    .getSegments()
+    .findIndex((segment, index) => index >= start && segmentFilterService.isOpen(segment));
+  const beforeCurrent = editorSessionStore
+    .getSegments()
+    .findIndex((segment, index) => index < start && segmentFilterService.isOpen(segment));
   const next = afterCurrent !== -1 ? afterCurrent : beforeCurrent;
   if (next === -1) return;
   await setActiveSegment(next);
-  if (!segmentPassesFilters(editorSessionStore.getSegments()[next])) {
+  if (!segmentFilterService.matches(editorSessionStore.getSegments()[next])) {
     editorFilterStore.update({ status: "all" });
     els.segmentStatusFilter.value = "all";
     renderSegments();
@@ -6208,9 +6102,9 @@ async function goToNextOpenSegment() {
 
 function applyTargetDraft({ index, segment, target }) {
   const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
-  const passedFiltersBefore = segmentPassesFilters(segment);
+  const passedFiltersBefore = segmentFilterService.matches(segment);
   setSegmentTargetAndStatus(segment, target, target.trim() ? "draft" : "empty", "edit");
-  const passedFiltersAfter = segmentPassesFilters(segment);
+  const passedFiltersAfter = segmentFilterService.matches(segment);
   const filterMembershipChanged = passedFiltersBefore !== passedFiltersAfter;
   touchSegment(segment, { invalidateFilters: filterMembershipChanged });
   if (filterMembershipChanged) {
@@ -6258,7 +6152,7 @@ async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}
     await saveSegment(segment);
     verticalFeatureState?.segmentGrid?.selectSegment(index, segment.id);
     verticalFeatureState?.inspector?.setContext({ segmentId: segment.id });
-    invalidateSegmentFilterCache();
+    segmentFilterService.invalidate();
     renderSegments({ preserveScroll: true });
     renderProgress({ previousStatus, nextStatus: segment.status });
     renderRevisionHistory();
@@ -6276,7 +6170,7 @@ async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}
     };
   } catch (error) {
     applyTargetCommandPatch(segment, currentPatch);
-    invalidateSegmentFilterCache();
+    segmentFilterService.invalidate();
     renderSegments({ preserveScroll: true });
     renderProgress();
     renderRevisionHistory();
@@ -6316,7 +6210,7 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
     const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
     const requestedIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveId);
     if (requestedIndex >= 0) applicationNavigation.selectSegment({ activeIndex: requestedIndex, segmentId: editorSessionStore.getSegments()[requestedIndex]?.id || "" });
-    invalidateSegmentFilterCache();
+    segmentFilterService.invalidate();
     markWorkspaceDirty();
     renderAll();
     await editorContextController.refresh();
@@ -6332,7 +6226,7 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
       const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === segmentId);
       if (index >= 0) applyTargetCommandPatch(editorSessionStore.getSegments()[index], patch);
     });
-    invalidateSegmentFilterCache();
+    segmentFilterService.invalidate();
     renderAll();
     throw error;
   }
@@ -6714,7 +6608,7 @@ async function goToQualityRiskItem(item) {
   const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === item?.segmentId);
   if (index === -1) return;
   const segment = editorSessionStore.getSegments()[index];
-  if (!segmentPassesFilters(segment)) {
+  if (!segmentFilterService.matches(segment)) {
     if (applicationStore.getState().navigation.documentId && segment.documentId !== applicationStore.getState().navigation.documentId) {
       applicationNavigation.selectDocument({ documentId: "" });
       els.documentFilter.value = applicationStore.getState().navigation.documentId;
@@ -8057,52 +7951,52 @@ function wireEvents() {
     applicationNavigation.selectDocument({ documentId: els.documentFilter.value });
     renderSegments();
     renderProgress();
-    const first = firstVisibleSegmentIndex();
+    const first = segmentFilterService.firstVisible();
     if (first !== -1) await setActiveSegment(first);
   });
   els.segmentSearchInput.addEventListener("input", async () => {
     editorFilterStore.update({ query: els.segmentSearchInput.value.trim() });
     renderSegments();
-    const first = firstVisibleSegmentIndex();
+    const first = segmentFilterService.firstVisible();
     if (first !== -1) await setActiveSegment(first);
   });
   els.segmentSearchScope.addEventListener("change", async () => {
     editorFilterStore.update({ scope: els.segmentSearchScope.value });
     renderSegments();
-    const first = firstVisibleSegmentIndex();
+    const first = segmentFilterService.firstVisible();
     if (first !== -1) await setActiveSegment(first);
   });
   els.segmentRegexInput.addEventListener("change", async () => {
     editorFilterStore.update({ regex: els.segmentRegexInput.checked });
     renderSegments();
-    const first = firstVisibleSegmentIndex();
+    const first = segmentFilterService.firstVisible();
     if (first !== -1) await setActiveSegment(first);
   });
   els.segmentCaseInput.addEventListener("change", async () => {
     editorFilterStore.update({ caseSensitive: els.segmentCaseInput.checked });
     renderSegments();
-    const first = firstVisibleSegmentIndex();
+    const first = segmentFilterService.firstVisible();
     if (first !== -1) await setActiveSegment(first);
   });
   els.segmentStatusFilter.addEventListener("change", async () => {
     filterPresetController?.markCustom?.();
     editorFilterStore.update({ status: els.segmentStatusFilter.value });
     renderSegments();
-    const first = firstVisibleSegmentIndex();
+    const first = segmentFilterService.firstVisible();
     if (first !== -1) await setActiveSegment(first);
   });
   els.reviewStateFilter?.addEventListener("change", async () => {
     filterPresetController?.markCustom?.();
     editorFilterStore.update({ reviewState: els.reviewStateFilter.value });
     renderSegments();
-    const first = firstVisibleSegmentIndex();
+    const first = segmentFilterService.firstVisible();
     if (first !== -1) await setActiveSegment(first);
   });
   els.aiSegmentFilter?.addEventListener("change", async () => {
     filterPresetController?.markCustom?.();
     editorFilterStore.update({ aiState: els.aiSegmentFilter.value });
     renderSegments();
-    const first = firstVisibleSegmentIndex();
+    const first = segmentFilterService.firstVisible();
     if (first !== -1) await setActiveSegment(first);
   });
 
