@@ -6672,10 +6672,8 @@ function wireEvents() {
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "attaching event listeners";
   applicationMenuController.mount();
   globalKeyboardController.mount();
-  els.segmentGridWrap.addEventListener("scroll", () => {
-    verticalFeatureState.segmentGrid.scheduleScroll(() => {
-      renderSegments({ fromScroll: true, preserveScroll: true });
-    });
+  verticalFeatureState.segmentGrid.mountScroll(() => {
+    renderSegments({ fromScroll: true, preserveScroll: true });
   });
 
   els.brandHomeLink.addEventListener("click", (event) => {

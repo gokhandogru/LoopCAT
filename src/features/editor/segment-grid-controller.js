@@ -21,6 +21,7 @@ export function createSegmentGridController({
   const scheduleFrame = normalizedFrameScheduler(requestFrame);
   let currentWindow = EMPTY_WINDOW;
   let scrollFrame = 0;
+  let scrollListener = null;
   let rowFrame = 0;
   const pendingRows = new Set();
 
@@ -49,6 +50,28 @@ export function createSegmentGridController({
       scrollFrame = 0;
       render();
     });
+    return true;
+  }
+
+  function mountScroll(render) {
+    if (
+      scrollListener ||
+      !viewport?.addEventListener ||
+      !viewport?.removeEventListener ||
+      typeof render !== "function"
+    ) {
+      return false;
+    }
+    const listener = () => scheduleScroll(render);
+    viewport.addEventListener("scroll", listener);
+    scrollListener = listener;
+    return true;
+  }
+
+  function unmountScroll() {
+    if (!scrollListener) return false;
+    viewport.removeEventListener("scroll", scrollListener);
+    scrollListener = null;
     return true;
   }
 
@@ -89,9 +112,11 @@ export function createSegmentGridController({
     ensureVisible,
     findTargetEditor,
     getWindow: () => currentWindow,
+    mountScroll,
     resetWindow,
     scheduleRowUpdate,
     scheduleScroll,
+    unmountScroll,
     selectSegment(index, segmentId) {
       return navigation.selectSegment({ activeIndex: index, segmentId });
     }

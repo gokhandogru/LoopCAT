@@ -286,6 +286,7 @@ const requiredReleaseFiles = [
   "tests/unit/editor-state.test.cjs",
   "tests/unit/editor-session-store.test.cjs",
   "tests/unit/editor-context-controller.test.cjs",
+  "tests/unit/segment-grid-controller.test.cjs",
   "tests/unit/autosave-service.test.cjs",
   "tests/unit/segment-confirmation-controller.test.cjs",
   "tests/unit/target-edit-controller.test.cjs",
@@ -441,6 +442,7 @@ const editorStateUnitTests = readText("tests/unit/editor-state.test.cjs");
 const editorContextControllerJs = readText("src/features/editor/editor-context-controller.js");
 const editorContextControllerUnitTests = readText("tests/unit/editor-context-controller.test.cjs");
 const segmentGridControllerJs = readText("src/features/editor/segment-grid-controller.js");
+const segmentGridControllerUnitTests = readText("tests/unit/segment-grid-controller.test.cjs");
 const autosaveServiceJs = readText("src/features/editor/autosave-service.js");
 const segmentConfirmationControllerJs = readText("src/features/editor/segment-confirmation-controller.js");
 const targetEditControllerJs = readText("src/features/editor/target-edit-controller.js");
@@ -3260,8 +3262,92 @@ assertIncludes(
   "navigation.selectSegment",
   "The segment grid must dispatch active-segment identity through application navigation."
 );
-for (const method of ["calculateWindow", "scheduleScroll", "scheduleRowUpdate", "ensureVisible", "findTargetEditor"]) {
+for (const method of [
+  "calculateWindow",
+  "mountScroll",
+  "scheduleScroll",
+  "scheduleRowUpdate",
+  "unmountScroll",
+  "ensureVisible",
+  "findTargetEditor"
+]) {
   assertIncludes(segmentGridControllerJs, method, `The segment grid must retain checked ${method} ownership.`);
+}
+for (const snippet of [
+  "let scrollFrame = 0",
+  "let scrollListener = null",
+  'if (scrollFrame || typeof render !== "function") return false',
+  "scrollFrame = scheduleFrame(() => {",
+  "scrollFrame = 0",
+  "render()",
+  "function mountScroll(render)",
+  "scrollListener ||",
+  "!viewport?.addEventListener ||",
+  "!viewport?.removeEventListener ||",
+  'typeof render !== "function"',
+  "const listener = () => scheduleScroll(render)",
+  'viewport.addEventListener("scroll", listener)',
+  "scrollListener = listener",
+  "function unmountScroll()",
+  "if (!scrollListener) return false",
+  'viewport.removeEventListener("scroll", scrollListener)',
+  "scrollListener = null"
+]) {
+  assertIncludes(
+    segmentGridControllerJs,
+    snippet,
+    `SegmentGridController must retain characterized scroll scheduling and listener lifecycle policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "verticalFeatureState.segmentGrid.mountScroll(() => {",
+  "renderSegments({ fromScroll: true, preserveScroll: true })"
+]) {
+  assertIncludes(appJs, boundary, `segment-grid scroll composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  appJs.indexOf("globalKeyboardController.mount()") <
+    appJs.indexOf("verticalFeatureState.segmentGrid.mountScroll(() => {"),
+  "segment-grid scroll lifecycle must mount after application-global keyboard routing at the existing listener position."
+);
+assert(
+  !appJs.includes('els.segmentGridWrap.addEventListener("scroll"') &&
+    !appJs.includes("verticalFeatureState.segmentGrid.scheduleScroll(() => {") &&
+    !appWorkflowDriverJs.includes('segmentGridWrap.addEventListener("scroll"') &&
+    !appWorkflowDriverJs.includes("verticalFeatureState.segmentGrid.scheduleScroll(() => {"),
+  "segment-grid viewport listener and scroll-scheduling ownership must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\bverticalFeatureState\.segmentGrid\.mountScroll\b/g) || []).length === 1 &&
+    !appWorkflowDriverJs.includes("segmentGrid.mountScroll"),
+  "wireEvents must retain exactly one checked segment-grid scroll mount without workflow-only consumers."
+);
+for (const forbiddenOwner of [
+  "renderSegments",
+  "verticalFeatureState",
+  "segmentGridWrap",
+  "editorSessionStore",
+  "segmentFilterService",
+  "els."
+]) {
+  assert(
+    !segmentGridControllerJs.includes(forbiddenOwner),
+    `SegmentGridController must use injected viewport, navigation, frame, and render boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "SegmentGridController owns exact scroll mount, repeated-mount, unmount, and immutable lifecycle",
+  "SegmentGridController coalesces same-frame scrolls and accepts a later frame",
+  "SegmentGridController keeps a pending scroll render alive across unmount",
+  "SegmentGridController rejects unavailable viewport lifecycle and invalid render callbacks",
+  "SegmentGridController preserves scroll listener delegate failure timing",
+  "SegmentGridController clears its frame marker before invoking the scroll render"
+]) {
+  assertIncludes(
+    segmentGridControllerUnitTests,
+    testName,
+    `focused segment-grid tests must retain characterization: ${testName}.`
+  );
 }
 assertIncludes(
   appBootstrapJs,
