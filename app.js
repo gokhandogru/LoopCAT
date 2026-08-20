@@ -6016,18 +6016,6 @@ function openReplacePanel() {
   els.replaceFindInput.focus();
 }
 
-function closeCommandPalette() {
-  paletteController?.close?.();
-}
-
-function renderCommandPalette() {
-  paletteController?.render?.();
-}
-
-function openCommandPalette() {
-  paletteController?.open?.();
-}
-
 function handleGlobalKeydown(event) {
   const key = stableLower(event.key);
   const editableTarget = event.target?.matches?.("input, textarea, [contenteditable='true']");
@@ -6046,14 +6034,14 @@ function handleGlobalKeydown(event) {
   if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "p") {
     event.preventDefault();
     event.stopPropagation();
-    openCommandPalette();
+    paletteController?.open?.();
     return;
   }
   const isK = key === "k" || event.code === "KeyK";
   if (isK && (event.ctrlKey || event.metaKey) && !event.altKey) {
     event.preventDefault();
     event.stopPropagation();
-    openCommandPalette();
+    paletteController?.open?.();
     return;
   }
   if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "f" && applicationStore.getState().navigation.view === "editor" && editorSessionStore.getProject()) {
@@ -6076,7 +6064,7 @@ function handleGlobalKeydown(event) {
   }
   if (event.key === "Escape" && !els.commandPaletteOverlay.classList.contains("hidden")) {
     event.preventDefault();
-    closeCommandPalette();
+    paletteController?.close?.();
     return;
   }
   if (event.key === "Escape" && applicationStore.getState().interface.focusMode) {
@@ -7521,7 +7509,7 @@ function wireEvents() {
       els.inspectorToggleBtn.focus();
     }
   });
-  els.commandPaletteBtn.addEventListener("click", openCommandPalette);
+  els.commandPaletteBtn.addEventListener("click", () => paletteController?.open?.());
   els.projectSearchInput.addEventListener("input", renderProjectsView);
   els.languagePairFilter.addEventListener("change", renderProjectsView);
 

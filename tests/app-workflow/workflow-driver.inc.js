@@ -768,7 +768,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "save and operation status exposes one polite atomic live region"
     );
     els.confirmBtn.focus();
-    openCommandPalette();
+    paletteController?.open?.();
     await Promise.resolve();
     const paletteFocusable = focusController?.visibleFocusableElements?.(els.commandPaletteOverlay) || [];
     const paletteLast = paletteFocusable.at(-1);
@@ -776,7 +776,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     paletteLast?.focus();
     paletteLast?.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
     assert(document.activeElement === paletteFocusable[0], "command palette contains forward Tab focus");
-    closeCommandPalette();
+    paletteController?.close?.();
     await Promise.resolve();
     assert(document.activeElement === els.confirmBtn, "command palette restores focus to its opener");
     els.brandHomeLink.click();

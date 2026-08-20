@@ -3927,6 +3927,42 @@ assertIncludes(
   "focusController.open(overlay",
   "PaletteController must contain and restore command-palette focus."
 );
+for (const directConsumer of [
+  "paletteController?.open?.()",
+  "paletteController?.close?.()",
+  'els.commandPaletteBtn.addEventListener("click", () => paletteController?.open?.())'
+]) {
+  assertIncludes(
+    appJs,
+    directConsumer,
+    `command-palette consumers must call PaletteController directly: ${directConsumer}.`
+  );
+}
+assert(
+  appJs.split("paletteController?.open?.()").length - 1 === 3,
+  "both global shortcuts and the toolbar opener must call PaletteController.open directly."
+);
+assert(
+  appJs.split("paletteController?.close?.()").length - 1 === 1,
+  "the global Escape route must call PaletteController.close directly."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  "paletteController?.open?.()",
+  "workflow characterization must open the command palette through PaletteController directly."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  "paletteController?.close?.()",
+  "workflow characterization must close the command palette through PaletteController directly."
+);
+for (const removedFacade of ["openCommandPalette", "closeCommandPalette", "renderCommandPalette"]) {
+  const directFacade = new RegExp(`function\\s+${removedFacade}\\b`);
+  assert(
+    !directFacade.test(appJs) && !directFacade.test(appWorkflowDriverJs),
+    `${removedFacade} compatibility façade must not return to app.js or the workflow driver.`
+  );
+}
 assertIncludes(
   commandBusJs,
   "recordApplied",
