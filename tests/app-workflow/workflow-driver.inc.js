@@ -327,7 +327,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     editorSessionStore.replaceProject(originalWorkflowProject);
     const originalProjectDomain = editorSessionStore.getProject().domain;
     els.projectDomainEditInput.value = "Unstored workflow domain";
-    setHiddenSegmentField(editorSessionStore.getProject(), PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getProject(), PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG, true);
     const failedDomainSave = await saveProjectDomainFromForm();
     assert(
       !failedDomainSave &&
@@ -385,7 +385,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     document.querySelector("#projectDomainInput").value = "Settings activity warning";
     if (els.saveProjectToFolderInput) els.saveProjectToFolderInput.checked = false;
-    setHiddenSegmentField(els.projectForm, PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(els.projectForm, PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG, true);
     const settingsActivityProject = await saveProjectFromDialog();
     assert(
       settingsActivityProject?.id === project.id &&
@@ -403,7 +403,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const workflowSegmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentInfo.id);
     editorSessionStore.getSegments()[workflowSegmentIndex].target = "Merhaba dunya.";
     editorSessionStore.getSegments()[workflowSegmentIndex].status = "draft";
-    touchSegment(editorSessionStore.getSegments()[workflowSegmentIndex]);
+    segmentTargetStateService.touch(editorSessionStore.getSegments()[workflowSegmentIndex]);
     await saveSegment(editorSessionStore.getSegments()[workflowSegmentIndex]);
     editorSessionStore.replaceProject(await updateProject({
       ...editorSessionStore.getProject(),
@@ -669,7 +669,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         !storedSegmentsAfterAtomicImportFailure.some((segment) => segment.documentName === "workflow-atomic-import-failure.html"),
       "file import metadata failure leaves no orphan segments"
     );
-    setHiddenSegmentField(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
     const importActivityFailureDocumentCount = editorSessionStore.getProject().documents.length;
     await importLocalization(new File(["<!doctype html><html><body><p>Import activity warning.</p></body></html>"], "workflow-import-activity-warning.html", { type: "text/html" }));
     const importActivityFailureDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-import-activity-warning.html");
@@ -706,7 +706,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       .filter((segment) => segment.documentId === docxLandingDocument.id)
       .map((segment) => ({ ...segment, target: segment.source || "DOCX landing target", status: "draft" }));
     await saveSegments(completedDocxLandingSegments);
-    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(project.id)));
+    editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
     targetEditController.updateDraft(importActivityFailureSegmentIndex, "İçe aktarma etkinlik uyarısı hedefi");
     await autosaveService.flush(project.id);
     await openProjectFile(documentInfo.id);
@@ -856,14 +856,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "target composition completion leaves one durable target edit with the caret lifecycle released"
     );
     const autosaveRetryText = `Otomatik kayit yeniden deneme hedefi ${Date.now()}`;
-    setHiddenSegmentField(editorSessionStore.getSegments()[segmentIndex], AUTOSAVE_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], AUTOSAVE_SAVE_FAILURE_TEST_FLAG, true);
     targetEditController.updateDraft(segmentIndex, autosaveRetryText);
     await waitFor(() => els.saveStatus.textContent.includes("retrying autosave") && autosaveService.has(editorSessionStore.getSegments()[segmentIndex].id), "autosave retry after transient failure");
     assert(autosaveService.has(editorSessionStore.getSegments()[segmentIndex].id), "timed autosave failure stays queued for retry");
     await waitFor(() => !autosaveService.has(editorSessionStore.getSegments()[segmentIndex].id), "autosave retry saved target");
     const autosaveRetryStored = (await getProjectSegments(project.id)).find((segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id);
     assert(autosaveRetryStored?.target === autosaveRetryText, "timed autosave retry persists target after transient failure");
-    const editTargetBefore = targetCommandPatch(editorSessionStore.getSegments()[segmentIndex]);
+    const editTargetBefore = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]);
     const editTargetSteps = [
       `Birlesik duzenleme ilk ${Date.now()}`,
       `Birlesik duzenleme ikinci ${Date.now()}`,
@@ -879,7 +879,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       !appRuntime.commands.editTargetSessions.has(editorSessionStore.getSegments()[segmentIndex].id),
       "pending-save flush finalizes the coalesced EditTarget session"
     );
-    const editTargetApplied = targetCommandPatch(editorSessionStore.getSegments()[segmentIndex]);
+    const editTargetApplied = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]);
     const editTargetUndo = await undoLastCommand();
     const editTargetStoredAfterUndo = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
@@ -889,9 +889,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         editorSessionStore.getSegments()[segmentIndex].target === editTargetBefore.target &&
         editorSessionStore.getSegments()[segmentIndex].status === editTargetBefore.status &&
         JSON.stringify(editorSessionStore.getSegments()[segmentIndex].targetHistory) === JSON.stringify(editTargetBefore.targetHistory) &&
-        JSON.stringify(targetCommandPatch(editorSessionStore.getSegments()[segmentIndex]).tmPretranslation) ===
+        JSON.stringify(segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]).tmPretranslation) ===
           JSON.stringify(editTargetBefore.tmPretranslation) &&
-        JSON.stringify(targetCommandPatch(editorSessionStore.getSegments()[segmentIndex]).aiApplication) ===
+        JSON.stringify(segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]).aiApplication) ===
           JSON.stringify(editTargetBefore.aiApplication) &&
         editTargetStoredAfterUndo?.target === editTargetBefore.target &&
         applicationStore.getState().navigation.activeIndex === segmentIndex,
@@ -911,7 +911,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         applicationStore.getState().navigation.activeIndex === segmentIndex,
       "EditTarget Redo reapplies the coalesced patch with a monotonic revision"
     );
-    const keyboardEditBefore = targetCommandPatch(editorSessionStore.getSegments()[segmentIndex]);
+    const keyboardEditBefore = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]);
     const keyboardEditTarget = `Klavye geri alma hedefi ${Date.now()}`;
     const keyboardEditTextarea = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
     keyboardEditTextarea.value = keyboardEditTarget;
@@ -970,7 +970,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     targetEditController.updateDraft(segmentIndex, targetText);
     assert(autosaveService.size() > 0, "pending save created");
     assert(editorSessionStore.getSegments()[segmentIndex].targetHistory?.some((entry) => entry.reason === "edit" && entry.toTarget === targetText), "segment edit records target revision history");
-    setHiddenSegmentField(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
     let pendingFlushError = "";
     try {
       await autosaveService.flush(project.id);
@@ -984,7 +984,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const restoreGuardBackup = await exportAllData();
     const restoreGuardText = `Geri yukleme oncesi bekleyen hedef ${Date.now()}`;
     targetEditController.updateDraft(segmentIndex, restoreGuardText);
-    setHiddenSegmentField(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
     let restoreGuardError = "";
     try {
       await restoreBackupData(restoreGuardBackup);
@@ -1002,7 +1002,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const replaceGuardPackage = await buildProjectPackage(editorSessionStore.getProject());
     const replaceGuardText = `Paket degisimi oncesi bekleyen hedef ${Date.now()}`;
     targetEditController.updateDraft(segmentIndex, replaceGuardText);
-    setHiddenSegmentField(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
     let replaceGuardError = "";
     try {
       await importProjectPackageData(replaceGuardPackage, {
@@ -1084,7 +1084,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const beforeFailedReplaceTarget = editorSessionStore.getSegments()[segmentIndex].target;
     els.replaceFindInput.value = "hedef";
     els.replaceWithInput.value = "Kaydedilemeyen";
-    setHiddenSegmentField(editorSessionStore.getSegments()[segmentIndex], REPLACE_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], REPLACE_SAVE_FAILURE_TEST_FLAG, true);
     const failedReplaceResult = await targetReplacementController.replace("visible");
     const afterFailedReplaceStored = (await getProjectSegments(project.id)).find((segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id);
     assert(
@@ -1108,7 +1108,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.reviewStateSelect.value = "needs-review";
     els.reviewNoteInput.value = "This review note must roll back.";
     els.reviewCommentInput.value = "This review comment must roll back.";
-    setHiddenSegmentField(editorSessionStore.getSegments()[segmentIndex], REVIEW_METADATA_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], REVIEW_METADATA_SAVE_FAILURE_TEST_FLAG, true);
     await reviewMetadataController.save(qualityReviewController?.readReview?.());
     const failedReviewStored = (await getProjectSegments(project.id)).find((segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id);
     assert(
@@ -1136,7 +1136,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         els.reviewCommentInput.value === "",
       "checked quality/review controller owns review submit, persistence delegation, and form refresh"
     );
-    setHiddenSegmentField(editorSessionStore.getSegments()[segmentIndex], REVIEW_STATE_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], REVIEW_STATE_SAVE_FAILURE_TEST_FLAG, true);
     await reviewStateController.setState("reviewed");
     const failedReviewStateStored = (await getProjectSegments(project.id)).find((segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id);
     assert(
@@ -1180,8 +1180,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-review-model";
-      setSegmentTargetAndStatus(editorSessionStore.getSegments()[segmentIndex], "AI review target with 42", "draft", "edit");
-      touchSegment(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.setTarget(editorSessionStore.getSegments()[segmentIndex], "AI review target with 42", "draft", "edit");
+      segmentTargetStateService.touch(editorSessionStore.getSegments()[segmentIndex]);
       autosaveService.clear(editorSessionStore.getSegments()[segmentIndex]);
       await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       aiReviewProvider.completePrompt = async (_config, request) => {
@@ -1266,11 +1266,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       issueSegment.locked = false;
       failedSegment.locked = false;
       lockedSegment.locked = true;
-      setSegmentTargetAndStatus(issueSegment, "Workflow batch QA target with number 24", "draft", "edit");
-      setSegmentTargetAndStatus(failedSegment, "Workflow batch QA target failure case", "draft", "edit");
-      setSegmentTargetAndStatus(lockedSegment, "Workflow batch QA target locked case", "draft", "edit");
+      segmentTargetStateService.setTarget(issueSegment, "Workflow batch QA target with number 24", "draft", "edit");
+      segmentTargetStateService.setTarget(failedSegment, "Workflow batch QA target failure case", "draft", "edit");
+      segmentTargetStateService.setTarget(lockedSegment, "Workflow batch QA target locked case", "draft", "edit");
       [issueSegment, failedSegment, lockedSegment].forEach((segment) => {
-        touchSegment(segment);
+        segmentTargetStateService.touch(segment);
         autosaveService.clear(segment);
       });
       await saveSegments([issueSegment, failedSegment, lockedSegment]);
@@ -1347,7 +1347,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         };
       });
       if (restoredBatchReviewSegments.length) await saveSegments(restoredBatchReviewSegments);
-      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(project.id)));
+      editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
       const restoredBatchReviewActiveIndex = Math.max(
         0,
         editorSessionStore.getSegments().findIndex((segment) => segment.id === editorSessionStore.getSegments()[segmentIndex]?.id)
@@ -1367,8 +1367,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-repair-model";
       editorSessionStore.getSegments()[segmentIndex].tags = [{ text: "<0>" }, { text: "</0>" }, { text: "{name}" }, { text: "\\n" }];
-      setSegmentTargetAndStatus(editorSessionStore.getSegments()[segmentIndex], "Open {name} with Ctrl+S.", "draft", "edit");
-      touchSegment(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.setTarget(editorSessionStore.getSegments()[segmentIndex], "Open {name} with Ctrl+S.", "draft", "edit");
+      segmentTargetStateService.touch(editorSessionStore.getSegments()[segmentIndex]);
       autosaveService.clear(editorSessionStore.getSegments()[segmentIndex]);
       await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       const aiRepairOriginalTarget = editorSessionStore.getSegments()[segmentIndex].target;
@@ -1403,11 +1403,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       Reflect.ownKeys(editorSessionStore.getSegments()[segmentIndex]).forEach((key) => delete editorSessionStore.getSegments()[segmentIndex][key]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], aiRepairSegmentSnapshot);
       editorSessionStore.getSegments()[segmentIndex].revision = Math.max(Number(aiRepairSegmentSnapshot.revision || 0), aiRepairRestoreRevision) + 1;
-      prepareSegmentHistoryState(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       autosaveService.clear(editorSessionStore.getSegments()[segmentIndex]);
       const restoredAiRepairSegment = await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], restoredAiRepairSegment);
-      prepareSegmentHistoryState(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       updateRow(segmentIndex);
     }
 
@@ -1451,14 +1451,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       repairedSegment.locked = false;
       failedSegment.locked = false;
       lockedSegment.locked = true;
-      setSegmentTargetAndStatus(repairedSegment, "Workflow batch tag repair alpha {name}.", "draft", "batch-repair-test");
-      setSegmentTargetAndStatus(failedSegment, "Workflow batch tag repair failure case {count}.", "draft", "batch-repair-test");
-      setSegmentTargetAndStatus(lockedSegment, "Workflow batch tag repair locked case {name}.", "draft", "batch-repair-test");
+      segmentTargetStateService.setTarget(repairedSegment, "Workflow batch tag repair alpha {name}.", "draft", "batch-repair-test");
+      segmentTargetStateService.setTarget(failedSegment, "Workflow batch tag repair failure case {count}.", "draft", "batch-repair-test");
+      segmentTargetStateService.setTarget(lockedSegment, "Workflow batch tag repair locked case {name}.", "draft", "batch-repair-test");
       const repairedSuggestionBaseline = (repairedSegment.aiSuggestions || []).length;
       const failedSuggestionBaseline = (failedSegment.aiSuggestions || []).length;
       const lockedSuggestionBaseline = (lockedSegment.aiSuggestions || []).length;
       [repairedSegment, failedSegment, lockedSegment].forEach((segment) => {
-        touchSegment(segment);
+        segmentTargetStateService.touch(segment);
         autosaveService.clear(segment);
       });
       const savedAiBatchRepairSegments = await saveSegments([repairedSegment, failedSegment, lockedSegment]);
@@ -1466,7 +1466,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === savedSegment.id);
         if (index === -1) return;
         Object.assign(editorSessionStore.getSegments()[index], savedSegment);
-        prepareSegmentHistoryState(editorSessionStore.getSegments()[index]);
+        segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[index]);
       });
       aiRepairProvider.completePrompt = async (_config, request) => {
         assert(
@@ -1534,7 +1534,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         };
       });
       if (restoredBatchRepairSegments.length) await saveSegments(restoredBatchRepairSegments);
-      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(project.id)));
+      editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
       const restoredBatchRepairActiveIndex = Math.max(
         0,
         editorSessionStore.getSegments().findIndex((segment) => segment.id === editorSessionStore.getSegments()[segmentIndex]?.id)
@@ -1567,8 +1567,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-variants-model";
       if (els.localAiVariantModeSelect) els.localAiVariantModeSelect.value = "concise";
-      setSegmentTargetAndStatus(editorSessionStore.getSegments()[segmentIndex], "Workflow variants baseline target", "draft", "edit");
-      touchSegment(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.setTarget(editorSessionStore.getSegments()[segmentIndex], "Workflow variants baseline target", "draft", "edit");
+      segmentTargetStateService.touch(editorSessionStore.getSegments()[segmentIndex]);
       autosaveService.clear(editorSessionStore.getSegments()[segmentIndex]);
       await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       const aiVariantsOriginalTarget = editorSessionStore.getSegments()[segmentIndex].target;
@@ -1653,9 +1653,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
             : source.includes("failure")
               ? "Workflow batch variants failure draft"
               : "Workflow batch variants locked draft";
-        setSegmentTargetAndStatus(segment, target, "draft", "batch-variants-test");
+        segmentTargetStateService.setTarget(segment, target, "draft", "batch-variants-test");
         segment.locked = source.includes("locked");
-        touchSegment(segment);
+        segmentTargetStateService.touch(segment);
         autosaveService.clear(segment);
       }
       const savedAiBatchVariantsSegments = await saveSegments(aiBatchVariantsIndexes.map(({ segment }) => segment));
@@ -1663,7 +1663,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === savedSegment.id);
         if (index === -1) return;
         Object.assign(editorSessionStore.getSegments()[index], savedSegment);
-        prepareSegmentHistoryState(editorSessionStore.getSegments()[index]);
+        segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[index]);
       });
       if (els.localAiVariantModeSelect) els.localAiVariantModeSelect.value = "concise";
       const aiBatchVariantsSummary = await aiAlternativesController.suggestBatch();
@@ -1718,11 +1718,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       Reflect.ownKeys(editorSessionStore.getSegments()[segmentIndex]).forEach((key) => delete editorSessionStore.getSegments()[segmentIndex][key]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], aiVariantsSegmentSnapshot);
       editorSessionStore.getSegments()[segmentIndex].revision = Math.max(Number(aiVariantsSegmentSnapshot.revision || 0), aiVariantsRestoreRevision) + 1;
-      prepareSegmentHistoryState(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       autosaveService.clear(editorSessionStore.getSegments()[segmentIndex]);
       const restoredAiVariantsSegment = await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], restoredAiVariantsSegment);
-      prepareSegmentHistoryState(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       renderDocumentFilter();
       renderSegments();
       const restoreAiVariantsIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === originalAiVariantsFilters.activeSegmentId);
@@ -1742,12 +1742,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const applyTermsTargetTerm = "workflow applied terminology";
       editorSessionStore.getSegments()[segmentIndex].source = `Use {name} with ${applyTermsSourceTerm}.`;
       editorSessionStore.getSegments()[segmentIndex].tags = [{ text: "{name}" }];
-      setSegmentTargetAndStatus(editorSessionStore.getSegments()[segmentIndex], "Use {name} with draft wording.", "draft", "edit");
-      touchSegment(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.setTarget(editorSessionStore.getSegments()[segmentIndex], "Use {name} with draft wording.", "draft", "edit");
+      segmentTargetStateService.touch(editorSessionStore.getSegments()[segmentIndex]);
       autosaveService.clear(editorSessionStore.getSegments()[segmentIndex]);
       const savedAiApplyTermsFixtureSegment = await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], savedAiApplyTermsFixtureSegment);
-      prepareSegmentHistoryState(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       const aiApplyTermsOriginalTarget = editorSessionStore.getSegments()[segmentIndex].target;
       const aiApplyTermsOriginalSuggestionCount = (editorSessionStore.getSegments()[segmentIndex].aiSuggestions || []).length;
       aiApplyTermsTerm = await saveTerm({
@@ -1791,11 +1791,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       Reflect.ownKeys(editorSessionStore.getSegments()[segmentIndex]).forEach((key) => delete editorSessionStore.getSegments()[segmentIndex][key]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], aiApplyTermsSegmentSnapshot);
       editorSessionStore.getSegments()[segmentIndex].revision = Math.max(Number(aiApplyTermsSegmentSnapshot.revision || 0), Number(aiApplyTermsRestoreRevision || 0)) + 1;
-      prepareSegmentHistoryState(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       autosaveService.clear(editorSessionStore.getSegments()[segmentIndex]);
       const restoredAiApplyTermsSegment = await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], restoredAiApplyTermsSegment);
-      prepareSegmentHistoryState(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       updateRow(segmentIndex);
     }
 
@@ -1844,9 +1844,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       suggestedSegment.locked = false;
       failedSegment.locked = false;
       lockedSegment.locked = true;
-      setSegmentTargetAndStatus(suggestedSegment, "Use old term in the workflow batch apply terminology segment.", "draft", "batch-apply-terms-test");
-      setSegmentTargetAndStatus(failedSegment, "Use old term in the workflow batch apply terminology failure case.", "draft", "batch-apply-terms-test");
-      setSegmentTargetAndStatus(lockedSegment, "Use old term in the workflow batch apply terminology locked case.", "draft", "batch-apply-terms-test");
+      segmentTargetStateService.setTarget(suggestedSegment, "Use old term in the workflow batch apply terminology segment.", "draft", "batch-apply-terms-test");
+      segmentTargetStateService.setTarget(failedSegment, "Use old term in the workflow batch apply terminology failure case.", "draft", "batch-apply-terms-test");
+      segmentTargetStateService.setTarget(lockedSegment, "Use old term in the workflow batch apply terminology locked case.", "draft", "batch-apply-terms-test");
       const suggestedOriginalTarget = suggestedSegment.target;
       const failedOriginalTarget = failedSegment.target;
       const lockedOriginalTarget = lockedSegment.target;
@@ -1854,7 +1854,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const failedSuggestionBaseline = (failedSegment.aiSuggestions || []).length;
       const lockedSuggestionBaseline = (lockedSegment.aiSuggestions || []).length;
       [suggestedSegment, failedSegment, lockedSegment].forEach((segment) => {
-        touchSegment(segment);
+        segmentTargetStateService.touch(segment);
         autosaveService.clear(segment);
       });
       const savedAiBatchApplyTermsSegments = await saveSegments([suggestedSegment, failedSegment, lockedSegment]);
@@ -1862,7 +1862,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === savedSegment.id);
         if (index === -1) return;
         Object.assign(editorSessionStore.getSegments()[index], savedSegment);
-        prepareSegmentHistoryState(editorSessionStore.getSegments()[index]);
+        segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[index]);
       });
       aiBatchApplyTermsSavedTerms.push(await saveTerm({
         sourceTerm: batchApplySourceTerm,
@@ -1937,7 +1937,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         };
       });
       if (restoredBatchApplyTermsSegments.length) await saveSegments(restoredBatchApplyTermsSegments);
-      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(project.id)));
+      editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
       const restoredBatchApplyTermsActiveIndex = Math.max(
         0,
         editorSessionStore.getSegments().findIndex((segment) => segment.id === editorSessionStore.getSegments()[segmentIndex]?.id)
@@ -1982,12 +1982,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const polishTargetTerm = "workflow polish target term";
       editorSessionStore.getSegments()[segmentIndex].source = `Open {name} with ${polishSourceTerm}.`;
       editorSessionStore.getSegments()[segmentIndex].tags = [{ text: "{name}" }];
-      setSegmentTargetAndStatus(editorSessionStore.getSegments()[segmentIndex], "Open {name} with verbose workflow wording.", "draft", "edit");
-      touchSegment(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.setTarget(editorSessionStore.getSegments()[segmentIndex], "Open {name} with verbose workflow wording.", "draft", "edit");
+      segmentTargetStateService.touch(editorSessionStore.getSegments()[segmentIndex]);
       autosaveService.clear(editorSessionStore.getSegments()[segmentIndex]);
       const savedAiPolishFixtureSegment = await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], savedAiPolishFixtureSegment);
-      prepareSegmentHistoryState(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       const aiPolishOriginalTarget = editorSessionStore.getSegments()[segmentIndex].target;
       const aiPolishOriginalSuggestionCount = (editorSessionStore.getSegments()[segmentIndex].aiSuggestions || []).length;
       aiPolishTerm = await saveTerm({
@@ -2072,9 +2072,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         .map((segment, index) => ({ segment, index }))
         .filter(({ segment }) => segment.documentId === aiBatchPolishDocument.id);
       for (const { segment } of aiBatchPolishIndexes) {
-        setSegmentTargetAndStatus(segment, segment.source.includes("alpha") ? "Workflow batch polish alpha draft" : "Workflow batch polish beta draft", "draft", "batch-polish-test");
+        segmentTargetStateService.setTarget(segment, segment.source.includes("alpha") ? "Workflow batch polish alpha draft" : "Workflow batch polish beta draft", "draft", "batch-polish-test");
         segment.locked = false;
-        touchSegment(segment);
+        segmentTargetStateService.touch(segment);
         autosaveService.clear(segment);
       }
       const savedAiBatchPolishSegments = await saveSegments(aiBatchPolishIndexes.map(({ segment }) => segment));
@@ -2082,7 +2082,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === savedSegment.id);
         if (index === -1) return;
         Object.assign(editorSessionStore.getSegments()[index], savedSegment);
-        prepareSegmentHistoryState(editorSessionStore.getSegments()[index]);
+        segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[index]);
       });
       const aiBatchPolishSummary = await aiDraftEditingController.polishBatch();
       const aiBatchPolishStored = await getProjectSegments(project.id);
@@ -2118,11 +2118,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       Reflect.ownKeys(editorSessionStore.getSegments()[segmentIndex]).forEach((key) => delete editorSessionStore.getSegments()[segmentIndex][key]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], aiPolishSegmentSnapshot);
       editorSessionStore.getSegments()[segmentIndex].revision = Math.max(Number(aiPolishSegmentSnapshot.revision || 0), aiPolishRestoreRevision) + 1;
-      prepareSegmentHistoryState(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       autosaveService.clear(editorSessionStore.getSegments()[segmentIndex]);
       const restoredAiPolishSegment = await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], restoredAiPolishSegment);
-      prepareSegmentHistoryState(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       renderDocumentFilter();
       renderSegments();
       if (Number.isInteger(originalAiPolishFilters.activeIndex) && originalAiPolishFilters.activeIndex >= 0) await setActiveSegment(originalAiPolishFilters.activeIndex);
@@ -2153,12 +2153,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const adaptTargetTerm = "workflow adapted term";
       editorSessionStore.getSegments()[segmentIndex].source = `Open {name} with ${adaptSourceTerm} before deployment.`;
       editorSessionStore.getSegments()[segmentIndex].tags = [{ text: "{name}" }];
-      setSegmentTargetAndStatus(editorSessionStore.getSegments()[segmentIndex], "Open {name} with a long workflow adaptation draft before deployment.", "draft", "edit");
-      touchSegment(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.setTarget(editorSessionStore.getSegments()[segmentIndex], "Open {name} with a long workflow adaptation draft before deployment.", "draft", "edit");
+      segmentTargetStateService.touch(editorSessionStore.getSegments()[segmentIndex]);
       autosaveService.clear(editorSessionStore.getSegments()[segmentIndex]);
       const savedAiAdaptFixtureSegment = await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], savedAiAdaptFixtureSegment);
-      prepareSegmentHistoryState(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       const aiAdaptOriginalTarget = editorSessionStore.getSegments()[segmentIndex].target;
       const aiAdaptOriginalSuggestionCount = (editorSessionStore.getSegments()[segmentIndex].aiSuggestions || []).length;
       aiAdaptTerm = await saveTerm({
@@ -2221,11 +2221,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       Reflect.ownKeys(editorSessionStore.getSegments()[segmentIndex]).forEach((key) => delete editorSessionStore.getSegments()[segmentIndex][key]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], aiAdaptSegmentSnapshot);
       editorSessionStore.getSegments()[segmentIndex].revision = Math.max(Number(aiAdaptSegmentSnapshot.revision || 0), aiAdaptRestoreRevision) + 1;
-      prepareSegmentHistoryState(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       autosaveService.clear(editorSessionStore.getSegments()[segmentIndex]);
       const restoredAiAdaptSegment = await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], restoredAiAdaptSegment);
-      prepareSegmentHistoryState(editorSessionStore.getSegments()[segmentIndex]);
+      segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       updateRow(segmentIndex);
     }
 
@@ -2281,9 +2281,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
             : source.includes("failure")
               ? "Workflow batch adapt failure verbose draft"
               : "Workflow batch adapt locked verbose draft";
-        setSegmentTargetAndStatus(segment, target, "draft", "batch-adapt-test");
+        segmentTargetStateService.setTarget(segment, target, "draft", "batch-adapt-test");
         segment.locked = source.includes("locked");
-        touchSegment(segment);
+        segmentTargetStateService.touch(segment);
         autosaveService.clear(segment);
       }
       const savedAiBatchAdaptSegments = await saveSegments(aiBatchAdaptIndexes.map(({ segment }) => segment));
@@ -2291,7 +2291,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === savedSegment.id);
         if (index === -1) return;
         Object.assign(editorSessionStore.getSegments()[index], savedSegment);
-        prepareSegmentHistoryState(editorSessionStore.getSegments()[index]);
+        segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[index]);
       });
       aiBatchAdaptProvider.completePrompt = async (_config, request) => {
         assert(
@@ -2375,7 +2375,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         aiSettings: defaultAiSettings(aiBatchAdaptProjectSettingsSnapshot)
       }));
       editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((item) => (item.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : item)));
-      editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(project.id)));
+      editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
       renderDocumentFilter();
       renderSegments();
       const restoreBatchAdaptIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === originalAiBatchAdaptFilters.activeSegmentId);
@@ -2527,7 +2527,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       suggestedTarget: "Unsaved AI suggestion target",
       explanation: ["Must roll back when suggestion save fails."]
     };
-    setHiddenSegmentField(editorSessionStore.getSegments()[segmentIndex], AI_APPEND_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], AI_APPEND_SAVE_FAILURE_TEST_FLAG, true);
     const failedAiSuggestionSave = await aiSuggestionPersistenceController.append(editorSessionStore.getSegments()[segmentIndex], failedAiSuggestion, "ai-test-suggestion", "AI suggestion created");
     const failedAiSuggestionStored = (await getProjectSegments(project.id)).find((segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id);
     assert(
@@ -2600,7 +2600,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       suggestedTarget: "AI suggestion saved while activity log fails",
       explanation: ["Activity log failure warning fixture."]
     };
-    setHiddenSegmentField(editorSessionStore.getSegments()[segmentIndex], AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG, true);
     const aiSuggestionActivityWarning = await aiSuggestionPersistenceController.append(editorSessionStore.getSegments()[segmentIndex], activityWarningAiSuggestion, "ai-test-suggestion", "AI suggestion created");
     const aiSuggestionActivityWarningStored = (await getProjectSegments(project.id)).find((segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id);
     assert(
@@ -2614,7 +2614,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     Reflect.deleteProperty(editorSessionStore.getSegments()[segmentIndex], AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG);
     const aiApplyTargetBeforeFailure = editorSessionStore.getSegments()[segmentIndex].target;
     const aiApplyHistoryBeforeFailure = editorSessionStore.getSegments()[segmentIndex].targetHistory?.length || 0;
-    setHiddenSegmentField(editorSessionStore.getSegments()[segmentIndex], AI_APPLY_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], AI_APPLY_SAVE_FAILURE_TEST_FLAG, true);
     const failedAiApply = await aiSuggestionApplicationController.apply(savedAiSuggestion.id);
     const failedAiApplyStored = (await getProjectSegments(project.id)).find((segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id);
     assert(
@@ -2625,7 +2625,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         failedAiApplyStored?.target === aiApplyTargetBeforeFailure,
       "AI suggestion apply failure restores visible and persisted target text"
     );
-    setHiddenSegmentField(editorSessionStore.getSegments()[segmentIndex], AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], AI_SUGGESTION_ACTIVITY_FAILURE_TEST_FLAG, true);
     const aiApplyActivityWarning = await aiSuggestionApplicationController.apply(activityWarningAiSuggestion.id);
     const aiApplyActivityWarningStored = (await getProjectSegments(project.id)).find((segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id);
     assert(
@@ -2646,7 +2646,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     editorSessionStore.replaceQaChecks([{ id: "existing-qa-fixture", type: "existing", severity: "info", segmentId: editorSessionStore.getSegments()[segmentIndex].id, label: "fixture", message: "Existing QA fixture." }]);
     renderQaResults();
-    setHiddenSegmentField(editorSessionStore.getProject(), QA_RUN_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getProject(), QA_RUN_FAILURE_TEST_FLAG, true);
     const failedQaRun = await runProjectQa();
     assert(
       failedQaRun === null &&
@@ -2655,7 +2655,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "QA run failure reports visible status and preserves previous QA results"
     );
     Reflect.deleteProperty(editorSessionStore.getProject(), QA_RUN_FAILURE_TEST_FLAG);
-    setHiddenSegmentField(editorSessionStore.getProject(), QA_ACTIVITY_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getProject(), QA_ACTIVITY_FAILURE_TEST_FLAG, true);
     const qaWithActivityFailure = await runProjectQa();
     assert(
       Array.isArray(qaWithActivityFailure) &&
@@ -2692,7 +2692,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.aiStyleGuideInput.value = "";
       els.aiEnabledInput.checked = true;
       els.aiSendSourceInput.checked = true;
-      setHiddenSegmentField(editorSessionStore.getProject(), AI_SETTINGS_SAVE_FAILURE_TEST_FLAG, true);
+      segmentTargetStateService.setHiddenField(editorSessionStore.getProject(), AI_SETTINGS_SAVE_FAILURE_TEST_FLAG, true);
       const failedAiSettingsSave = await aiSettingsPersistenceController.save();
       assert(
         !failedAiSettingsSave &&
@@ -2703,7 +2703,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       Reflect.deleteProperty(editorSessionStore.getProject(), AI_SETTINGS_SAVE_FAILURE_TEST_FLAG);
       localStorage.setItem(OPENAI_KEY_STORAGE, "sk-existing-openai-key");
-      setHiddenSegmentField(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG, true);
+      segmentTargetStateService.setHiddenField(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG, true);
       const failedOpenAiKeyStorageSave = await aiSettingsPersistenceController.save();
       const storedProjectAfterKeyStorageFailure = (await listProjects()).find((item) => item.id === editorSessionStore.getProject().id);
       assert(
@@ -2816,7 +2816,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       els.aiModelInput.value = "test-model-activity-warning";
       els.openAiApiKeyInput.value = "sk-ai-settings-activity-warning-key";
-      setHiddenSegmentField(editorSessionStore.getProject(), AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG, true);
+      segmentTargetStateService.setHiddenField(editorSessionStore.getProject(), AI_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG, true);
       const aiSettingsActivityWarning = await aiSettingsPersistenceController.save();
       const storedProjectAfterAiSettingsActivityWarning = (await listProjects()).find((item) => item.id === editorSessionStore.getProject().id);
       assert(
@@ -2941,7 +2941,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.aiModelInput.value = "model-that-must-not-save";
       els.openAiApiKeyInput.value = "sk-openai-setup-failure-key";
       els.rememberOpenAiKeyInput.checked = true;
-      setHiddenSegmentField(editorSessionStore.getProject(), AI_SETTINGS_SAVE_FAILURE_TEST_FLAG, true);
+      segmentTargetStateService.setHiddenField(editorSessionStore.getProject(), AI_SETTINGS_SAVE_FAILURE_TEST_FLAG, true);
       await aiOpenAiSuggestionController.create();
       assert(
         !storedOpenAiKey() &&
@@ -2955,7 +2955,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.aiModelInput.value = "model-key-storage-failure";
       els.openAiApiKeyInput.value = "sk-openai-key-storage-failure";
       els.rememberOpenAiKeyInput.checked = true;
-      setHiddenSegmentField(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG, true);
+      segmentTargetStateService.setHiddenField(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG, true);
       await aiOpenAiSuggestionController.create();
       const storedProjectAfterOpenAiKeyFailure = (await listProjects()).find((item) => item.id === editorSessionStore.getProject().id);
       assert(
@@ -3010,7 +3010,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       renderEditor();
     }
     await setActiveSegment(segmentIndex);
-    const producerBeforeTyping = targetCommandPatch(editorSessionStore.getSegments()[segmentIndex]);
+    const producerBeforeTyping = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]);
     const producerPendingTyping = `Pending typing before copy ${Date.now()}`;
     targetEditController.updateDraft(segmentIndex, producerPendingTyping);
     assert(
@@ -3019,7 +3019,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     clearWorkspaceDirtyMarkers();
     const copySourceCommand = await targetProducerController.copySourceToTarget();
-    const copiedSourcePatch = targetCommandPatch(editorSessionStore.getSegments()[segmentIndex]);
+    const copiedSourcePatch = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]);
     assert(
       copySourceCommand?.receipt?.commandId === "copy-source-to-target" &&
         copySourceCommand.receipt.provenance?.producer === "copy-source" &&
@@ -3060,7 +3060,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     clearWorkspaceDirtyMarkers();
     await setActiveSegment(segmentIndex);
-    const beforeTmInsert = targetCommandPatch(editorSessionStore.getSegments()[segmentIndex]);
+    const beforeTmInsert = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]);
     const tmInsertedTarget = `TM inserted target ${Date.now()}`;
     const tmInsertCommand = await targetProducerController.insertTmTarget(tmInsertedTarget, { channel: "match", resourceId: "workflow-tm-match" });
     assert(
@@ -3141,7 +3141,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     await setActiveSegment(segmentIndex);
     let confirmRollbackSegment = editorSessionStore.getSegments()[segmentIndex];
-    setHiddenSegmentField(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG, true);
     const failedDirectTmSave = await saveActiveSegmentToTm();
     assert(!failedDirectTmSave && els.saveStatus.textContent.includes("Simulated TM save failure"), "direct TM save failure reports visible status");
     Reflect.deleteProperty(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG);
@@ -3212,7 +3212,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         (await canceledPretranslation) === null && document.activeElement === els.segmentToolsMenuSummary,
         "TM threshold cancellation restores focus to the visible Segment tools control"
       );
-      setHiddenSegmentField(pretranslateSegment, PRETRANSLATE_SAVE_FAILURE_TEST_FLAG, true);
+      segmentTargetStateService.setHiddenField(pretranslateSegment, PRETRANSLATE_SAVE_FAILURE_TEST_FLAG, true);
       await runTmPretranslationFromDialog();
       const failedPretranslationSegments = (await getProjectSegments(project.id)).filter(
         (segment) => segment.documentId === pretranslateDocument.id
@@ -3417,7 +3417,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           model: config.model || "workflow-glossary-pretranslate-model"
         };
       };
-      const localAiPretranslationBefore = targetCommandPatch(editorSessionStore.getSegments()[localAiGlossarySegmentIndex]);
+      const localAiPretranslationBefore = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[localAiGlossarySegmentIndex]);
       const localAiPretranslationCommand = await aiPretranslationController.pretranslate();
       let localAiGlossarySegment = editorSessionStore.getSegments().find(
         (segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource
@@ -3495,10 +3495,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       editorFilterStore.update({ aiState: originalLocalAiGlossaryAiFilter });
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalLocalAiGlossaryAiFilter;
       renderSegments();
-      setSegmentTargetAndStatus(localAiGlossarySegment, "", "draft", "ai-cancel-fixture");
+      segmentTargetStateService.setTarget(localAiGlossarySegment, "", "draft", "ai-cancel-fixture");
       Reflect.deleteProperty(localAiGlossarySegment, "aiPretranslation");
       localAiGlossarySegment.reviewState = "";
-      touchSegment(localAiGlossarySegment);
+      segmentTargetStateService.touch(localAiGlossarySegment);
       await saveSegment(localAiGlossarySegment);
       localAiGlossaryProvider.translateSegment = async (config) => {
         state.localAi.abortController?.abort();
@@ -3542,8 +3542,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const previousHostedOllamaKeyFieldValue = els.localAiApiKeyInput?.value || "";
       const previousHostedOllamaRememberValue = Boolean(els.rememberLocalAiKeyInput?.checked);
       try {
-        setSegmentTargetAndStatus(localAiGlossarySegment, "", "draft", "local-ai-cloud-confirm-fixture");
-        touchSegment(localAiGlossarySegment);
+        segmentTargetStateService.setTarget(localAiGlossarySegment, "", "draft", "local-ai-cloud-confirm-fixture");
+        segmentTargetStateService.touch(localAiGlossarySegment);
         await saveSegment(localAiGlossarySegment);
         await setActiveSegment(localAiGlossarySegmentIndex);
         els.localAiCloudPresetBtn?.click();
@@ -3611,8 +3611,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         );
         const hostedOllamaSegmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === localAiGlossarySegment.id);
         const hostedOllamaSegment = editorSessionStore.getSegments()[hostedOllamaSegmentIndex];
-        setSegmentTargetAndStatus(hostedOllamaSegment, "", "draft", "hosted-ollama-confirm-fixture");
-        touchSegment(hostedOllamaSegment);
+        segmentTargetStateService.setTarget(hostedOllamaSegment, "", "draft", "hosted-ollama-confirm-fixture");
+        segmentTargetStateService.touch(hostedOllamaSegment);
         await saveSegment(hostedOllamaSegment);
         await setActiveSegment(hostedOllamaSegmentIndex);
         els.localAiCloudPresetBtn?.click();
@@ -3774,7 +3774,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await setActiveSegment(segmentIndex);
     confirmRollbackSegment = editorSessionStore.getSegments()[segmentIndex];
 
-    setSegmentTargetAndStatus(confirmRollbackSegment, "Confirm reviewed AI target", "draft", "confirm-ai-reviewed-fixture");
+    segmentTargetStateService.setTarget(confirmRollbackSegment, "Confirm reviewed AI target", "draft", "confirm-ai-reviewed-fixture");
     confirmRollbackSegment.reviewState = "needs-review";
     confirmRollbackSegment.aiPretranslation = {
       provider: "Mock AI",
@@ -3783,7 +3783,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       status: "AI initiated",
       createdAt: new Date().toISOString()
     };
-    touchSegment(confirmRollbackSegment);
+    segmentTargetStateService.touch(confirmRollbackSegment);
     await saveSegment(confirmRollbackSegment);
     const originalConfirmReviewedFilters = {
       segmentStatusFilter: editorFilterStore.getState().status,
@@ -3842,11 +3842,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await setActiveSegment(segmentIndex);
     confirmRollbackSegment = editorSessionStore.getSegments()[segmentIndex];
 
-    setSegmentTargetAndStatus(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm rollback target", "draft", "confirm-rollback-fixture");
-    touchSegment(confirmRollbackSegment);
+    segmentTargetStateService.setTarget(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm rollback target", "draft", "confirm-rollback-fixture");
+    segmentTargetStateService.touch(confirmRollbackSegment);
     await saveSegment(confirmRollbackSegment);
     const rollbackHistoryCount = confirmRollbackSegment.targetHistory?.length || 0;
-    setHiddenSegmentField(confirmRollbackSegment, CONFIRM_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(confirmRollbackSegment, CONFIRM_FAILURE_TEST_FLAG, true);
     await segmentConfirmationController.confirm();
     assert(
       els.saveStatus.textContent.includes("Simulated confirm save failure") &&
@@ -3855,11 +3855,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         !Object.prototype.hasOwnProperty.call(editorSessionStore.getSegments()[segmentIndex], CONFIRM_FAILURE_TEST_FLAG),
       "confirm segment failure restores draft state and reports visible status"
     );
-    setSegmentTargetAndStatus(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm persisted rollback target", "draft", "confirm-persisted-rollback-fixture");
-    touchSegment(confirmRollbackSegment);
+    segmentTargetStateService.setTarget(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm persisted rollback target", "draft", "confirm-persisted-rollback-fixture");
+    segmentTargetStateService.touch(confirmRollbackSegment);
     await saveSegment(confirmRollbackSegment);
     const persistedRollbackHistoryCount = confirmRollbackSegment.targetHistory?.length || 0;
-    setHiddenSegmentField(confirmRollbackSegment, CONFIRM_POST_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(confirmRollbackSegment, CONFIRM_POST_SAVE_FAILURE_TEST_FLAG, true);
     await segmentConfirmationController.confirm();
     const persistedAfterConfirmFailure = (await getProjectSegments(project.id)).find((segment) => segment.id === confirmRollbackSegment.id);
     assert(
@@ -3870,10 +3870,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         !Object.prototype.hasOwnProperty.call(editorSessionStore.getSegments()[segmentIndex], CONFIRM_POST_SAVE_FAILURE_TEST_FLAG),
       "confirm segment post-save failure restores persisted draft state"
     );
-    setSegmentTargetAndStatus(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm TM warning target", "draft", "confirm-tm-warning-fixture");
-    touchSegment(confirmRollbackSegment);
+    segmentTargetStateService.setTarget(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm TM warning target", "draft", "confirm-tm-warning-fixture");
+    segmentTargetStateService.touch(confirmRollbackSegment);
     await saveSegment(confirmRollbackSegment);
-    setHiddenSegmentField(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG, true);
     await segmentConfirmationController.confirm();
     const persistedAfterConfirmTmFailure = (await getProjectSegments(project.id)).find((segment) => segment.id === confirmRollbackSegment.id);
     assert(
@@ -3886,10 +3886,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     Reflect.deleteProperty(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG);
     await setActiveSegment(segmentIndex);
     confirmRollbackSegment = editorSessionStore.getSegments()[segmentIndex];
-    setSegmentTargetAndStatus(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm activity target", "draft", "confirm-activity-fixture");
-    touchSegment(confirmRollbackSegment);
+    segmentTargetStateService.setTarget(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm activity target", "draft", "confirm-activity-fixture");
+    segmentTargetStateService.touch(confirmRollbackSegment);
     await saveSegment(confirmRollbackSegment);
-    setHiddenSegmentField(confirmRollbackSegment, CONFIRM_ACTIVITY_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(confirmRollbackSegment, CONFIRM_ACTIVITY_FAILURE_TEST_FLAG, true);
     await segmentConfirmationController.confirm();
     const persistedAfterConfirmActivityFailure = (await getProjectSegments(project.id)).find((segment) => segment.id === confirmRollbackSegment.id);
     assert(
@@ -4442,7 +4442,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "standalone TBX resource export redacts credential-looking termbase notes"
       );
       const targetTxtDownloadCountBeforeActivityFailure = statusDownloads.filter((item) => item.type === "text/plain").length;
-      setHiddenSegmentField(editorSessionStore.getProject(), EXPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
+      segmentTargetStateService.setHiddenField(editorSessionStore.getProject(), EXPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
       await deliveryExportController.exportTargetText();
       assert(
         els.saveStatus.textContent.includes("Target TXT exported") &&
@@ -4560,7 +4560,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const editableTmEntry = editableResourceState.tmEntries.find((entry) => entry.id === resourceTmEntry.id);
     const editableTerm = editableResourceState.terms.find((term) => term.id === resourceTerm.id);
     assert(Boolean(editableTmEntry && editableTerm), "resource row edit fixtures are visible in resource state");
-    setHiddenSegmentField(editableTmEntry, RESOURCE_TM_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editableTmEntry, RESOURCE_TM_SAVE_FAILURE_TEST_FLAG, true);
     const failedResourceTmSave = await resourceMutationController.saveTmEntry(editableTmEntry, {
       source: resourceTmEntry.source,
       target: "Unsaved TM resource target"
@@ -4585,7 +4585,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         state.workspaceDirtyProjectIds.has(project.id),
       "TM resource row save persists entry and marks linked project dirty"
     );
-    setHiddenSegmentField(editableTmEntry, RESOURCE_TM_DELETE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editableTmEntry, RESOURCE_TM_DELETE_FAILURE_TEST_FLAG, true);
     const failedResourceTmDelete = await resourceMutationController.deleteTmEntry(editableTmEntry);
     const failedDeletedTm = (await listTmEntries()).find((entry) => entry.id === resourceTmEntry.id);
     assert(
@@ -4631,7 +4631,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         ),
       "TM resource row Redo returns the entry to Trash with a fresh recovery token"
     );
-    setHiddenSegmentField(editableTerm, RESOURCE_TERM_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editableTerm, RESOURCE_TERM_SAVE_FAILURE_TEST_FLAG, true);
     const failedResourceTermSave = await resourceMutationController.saveTerm(editableTerm, {
       sourceTerm: resourceTerm.sourceTerm,
       targetTerm: "unsaved-resource-term-target",
@@ -4662,7 +4662,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         state.workspaceDirtyProjectIds.has(project.id),
       "term resource row save persists term and marks linked project dirty"
     );
-    setHiddenSegmentField(editableTerm, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editableTerm, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG, true);
     const failedResourceTermDelete = await resourceMutationController.deleteTerm(editableTerm);
     const failedDeletedTerm = (await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
     assert(
@@ -4928,7 +4928,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const packageExportActivityCountBeforeFailure = editorSessionStore.getActivityEvents().filter((event) => event.type === "export" && event.summary === "Project package exported").length;
       const packageFlushFailureText = `Paket dis aktarimi oncesi bekleyen hata ${Date.now()}`;
       targetEditController.updateDraft(segmentIndex, packageFlushFailureText);
-      setHiddenSegmentField(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
+      segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
       const packageDownloadCountBeforeFlushFailure = packageDownloads.length;
       await exportProjectPackage();
       assert(
@@ -4999,7 +4999,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.newTmNameInput.value = "Workflow TM";
     els.newTermBaseNameInput.value = "Workflow TB";
     if (els.saveProjectToFolderInput) els.saveProjectToFolderInput.checked = false;
-    setHiddenSegmentField(els.projectForm, CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(els.projectForm, CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG, true);
     const createActivityProject = await saveProjectFromDialog();
     assert(
       createActivityProject?.id &&
@@ -5035,7 +5035,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     window.confirm = () => true;
     try {
       const deleteProjectListEntry = editorSessionStore.getProjects().find((item) => item.id === deleteProjectFixture.id);
-      setHiddenSegmentField(deleteProjectListEntry, PROJECT_DELETE_FAILURE_TEST_FLAG, true);
+      segmentTargetStateService.setHiddenField(deleteProjectListEntry, PROJECT_DELETE_FAILURE_TEST_FLAG, true);
       const failedProjectDelete = await confirmDeleteProject(deleteProjectFixture.id);
       const failedProjectDeleteSegments = await getProjectSegments(deleteProjectFixture.id);
       assert(
@@ -5084,7 +5084,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(autosaveService.size() > 0, "pending save exists before file delete");
     window.confirm = () => true;
     try {
-      setHiddenSegmentField(deleteFileDocument, FILE_DELETE_FAILURE_TEST_FLAG, true);
+      segmentTargetStateService.setHiddenField(deleteFileDocument, FILE_DELETE_FAILURE_TEST_FLAG, true);
       const failedFileDelete = await confirmDeleteFile(deleteFileDocument);
       const failedFileDeleteSegments = await getProjectSegments(deleteFileFixture.id);
       assert(
@@ -5095,7 +5095,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "file delete failure reports visible status without deleting file segments"
       );
       Reflect.deleteProperty(deleteFileDocument, FILE_DELETE_FAILURE_TEST_FLAG);
-      setHiddenSegmentField(deleteFileDocument, FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG, true);
+      segmentTargetStateService.setHiddenField(deleteFileDocument, FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG, true);
       const successfulFileDelete = await confirmDeleteFile(deleteFileDocument);
       const fileTrashEntry = (await appRuntime.trashRepository.list()).find(
         (entry) => entry.entityType === "document" && entry.entityId === deleteFileDocument.id
@@ -5275,8 +5275,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           !state.workspaceDirtyProjectIds.has(project.id),
         "background workspace autosave flushes pending active segment edits before saving package"
       );
-      setSegmentTargetAndStatus(pendingWorkspaceAutosaveSegment, pendingWorkspaceAutosavePreviousTarget, pendingWorkspaceAutosavePreviousStatus, "test-restore");
-      touchSegment(pendingWorkspaceAutosaveSegment);
+      segmentTargetStateService.setTarget(pendingWorkspaceAutosaveSegment, pendingWorkspaceAutosavePreviousTarget, pendingWorkspaceAutosavePreviousStatus, "test-restore");
+      segmentTargetStateService.touch(pendingWorkspaceAutosaveSegment);
       await saveSegment(pendingWorkspaceAutosaveSegment);
     } finally {
       workspaceStorage.saveProjectPackage = originalPendingWorkspaceAutosaveSave;
@@ -5305,7 +5305,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     };
     workspaceStorage.getStatus = async () => ({ ...state.workspaceStatus, projectCount: workspaceSaveActivityPackages.length });
     try {
-      setHiddenSegmentField(state, WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG, true);
+      segmentTargetStateService.setHiddenField(state, WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG, true);
       await saveCurrentProjectPackageToWorkspace();
       assert(
         workspaceSaveActivityPackages.some((pkg) => pkg.project.id === project.id) &&
@@ -5554,7 +5554,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.sourceTermInput.value = "unsaved sidebar term";
     els.targetTermInput.value = "kaydedilmeyen yan panel terimi";
     els.termNotesInput.value = "This term must stay in the form when saving fails";
-    setHiddenSegmentField(els.termForm, TERM_FORM_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(els.termForm, TERM_FORM_SAVE_FAILURE_TEST_FLAG, true);
     const failedTermFormSave = await saveTermFromForm();
     const failedSidebarTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] });
     assert(
@@ -5574,7 +5574,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await waitFor(() => Array.from(els.termSuggestions.querySelectorAll(".term-card")).some((card) => card.textContent.includes("Hello")), "term suggestion card");
     const helloTermForDeleteFailure = (await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] })).find((term) => term.sourceTerm === "Hello");
     assert(Boolean(helloTermForDeleteFailure), "term suggestion delete failure fixture exists");
-    setHiddenSegmentField(helloTermForDeleteFailure, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(helloTermForDeleteFailure, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG, true);
     const failedSuggestionDelete = await resourceMutationController.deleteTerm(helloTermForDeleteFailure, { refreshResourceView: false, refreshSuggestions: true });
     assert(
       !failedSuggestionDelete &&
@@ -5816,7 +5816,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     collisionPackage.resources.tmEntries = [{ ...collisionTm, target: "Incoming TM target" }];
     collisionPackage.resources.terms = [{ ...collisionTerm, targetTerm: "incoming term" }];
     collisionPackage.activityEvents = [{ ...collisionActivity, projectId: project.id, summary: "Incoming activity" }];
-    setHiddenSegmentField(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
     const copyImport = await importProjectPackageData(collisionPackage, {
       sourceName: "collision-copy.loopcat.json",
       replaceExisting: false,
@@ -5892,7 +5892,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     });
     editorSessionStore.replaceProject(await updateProject({ ...editorSessionStore.getProject(), documents: [...(editorSessionStore.getProject().documents || []), structuralDocument] }));
     editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((item) => (item.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : item)));
-    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(project.id)));
+    editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
     await openProjectFile(structuralDocument.id);
     const structuralSegmentsBefore = editorSessionStore.getSegments().filter((segment) => segment.documentId === structuralDocument.id);
     assert(structuralSegmentsBefore.length === 3, "plain structural edit fixture has three segments");
@@ -5903,7 +5903,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await setActiveSegment(splitIndex);
     let splitTextarea = els.segmentBody.querySelector(`tr[data-index="${splitIndex}"] textarea`);
     splitTextarea?.setSelectionRange(24, 24);
-    setHiddenSegmentField(editorSessionStore.getSegments()[splitIndex], SPLIT_SAVE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[splitIndex], SPLIT_SAVE_FAILURE_TEST_FLAG, true);
     await structuralSegmentController.split();
     let splitFailureStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
     assert(
@@ -5982,7 +5982,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "SplitSegment Redo recreates the stable segment, order, targets, monotonic revisions, persistence, and focus"
     );
 
-    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(project.id)));
+    editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
     await openProjectFile(structuralDocument.id);
     let mergeCandidates = editorSessionStore.getSegments()
       .map((segment, index) => ({ segment, index }))
@@ -5992,7 +5992,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const mergeFailureSources = mergeCandidates.map((item) => item.segment.source);
     const mergeFailureTargets = mergeCandidates.map((item) => item.segment.target);
     await setActiveSegment(mergeCandidates[0].index);
-    setHiddenSegmentField(editorSessionStore.getSegments()[mergeCandidates[0].index], MERGE_POST_DELETE_FAILURE_TEST_FLAG, true);
+    segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[mergeCandidates[0].index], MERGE_POST_DELETE_FAILURE_TEST_FLAG, true);
     const failedMergeCommand = await structuralSegmentController.merge();
     const mergeFailureVisible = editorSessionStore.getSegments().filter((segment) => segment.documentId === structuralDocument.id);
     const mergeFailureStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
@@ -6015,7 +6015,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         editorSessionStore.getSegments().every((item, index) => item.index === index),
       "MergeSegment transaction failure leaves no missing, duplicate, reordered, or partially persisted segment"
     );
-    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(project.id)));
+    editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
     await openProjectFile(structuralDocument.id);
     mergeCandidates = editorSessionStore.getSegments()
       .map((segment, index) => ({ segment, index }))
@@ -6120,11 +6120,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     let taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
     taggedTextarea?.focus();
     taggedTextarea?.setSelectionRange(0, 0);
-    const beforeProtectedTagInsert = targetCommandPatch(editorSessionStore.getSegments()[taggedIndex]);
+    const beforeProtectedTagInsert = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[taggedIndex]);
     clearWorkspaceDirtyMarkers();
     const protectedTagCommand = await targetProducerController.insertProtectedTag("<strong>");
     await autosaveService.flush(project.id);
-    const protectedTagApplied = targetCommandPatch(editorSessionStore.getSegments()[taggedIndex]);
+    const protectedTagApplied = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[taggedIndex]);
     taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
     assert(
       protectedTagCommand?.receipt?.commandId === "insert-protected-tag" &&
@@ -6173,7 +6173,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(editorSessionStore.getSegments().length === beforeBlockedSplitCount && els.saveStatus.textContent.includes("Split is unavailable"), "split is blocked for structure-preserving localization segments");
     editorSessionStore.getSegments()[taggedIndex].target = "Etiketi eksik hedef.";
     editorSessionStore.getSegments()[taggedIndex].status = "draft";
-    touchSegment(editorSessionStore.getSegments()[taggedIndex]);
+    segmentTargetStateService.touch(editorSessionStore.getSegments()[taggedIndex]);
     await saveSegment(editorSessionStore.getSegments()[taggedIndex]);
     const deliveryDownloads = [];
     const originalDeliveryCreateObjectUrl = URL.createObjectURL.bind(URL);
@@ -6199,37 +6199,37 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("protected placeholders")), "delivery export blocks missing protected tags");
       editorSessionStore.getSegments()[taggedIndex].target = "Bu <strong>etiketi</strong></strong> koru.";
       editorSessionStore.getSegments()[taggedIndex].status = "draft";
-      touchSegment(editorSessionStore.getSegments()[taggedIndex]);
+      segmentTargetStateService.touch(editorSessionStore.getSegments()[taggedIndex]);
       await saveSegment(editorSessionStore.getSegments()[taggedIndex]);
       await deliveryExportController.exportLocalization();
       assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("unbalanced inline markup")), "delivery export blocks unbalanced inline markup");
       editorSessionStore.getSegments()[taggedIndex].target = 'Bu <strong>etiketi</strong> koru. <img src="x" onerror="alert(1)">';
       editorSessionStore.getSegments()[taggedIndex].status = "draft";
-      touchSegment(editorSessionStore.getSegments()[taggedIndex]);
+      segmentTargetStateService.touch(editorSessionStore.getSegments()[taggedIndex]);
       await saveSegment(editorSessionStore.getSegments()[taggedIndex]);
       await deliveryExportController.exportLocalization();
       assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("unsafe HTML markup")), "HTML delivery export blocks unsafe target markup");
       editorSessionStore.getSegments()[taggedIndex].target = 'Bu <strong>etiketi</strong> koru. <span style="background:url(javascript:alert(1))">stil</span>';
-      touchSegment(editorSessionStore.getSegments()[taggedIndex]);
+      segmentTargetStateService.touch(editorSessionStore.getSegments()[taggedIndex]);
       await saveSegment(editorSessionStore.getSegments()[taggedIndex]);
       await deliveryExportController.exportLocalization();
       assert(!deliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("unsafe HTML markup")), "HTML delivery export blocks scriptable style markup");
       editorSessionStore.getSegments()[taggedIndex].target = "Bu <strong>etiketi</strong> koru.";
       editorSessionStore.getSegments()[taggedIndex].status = "draft";
-      touchSegment(editorSessionStore.getSegments()[taggedIndex]);
+      segmentTargetStateService.touch(editorSessionStore.getSegments()[taggedIndex]);
       await saveSegment(editorSessionStore.getSegments()[taggedIndex]);
       await deliveryExportController.exportLocalization();
       assert(deliveryDownloads.some((item) => item.type === "text/html"), "delivery export runs after protected tags are restored");
       const beforeXmlInvalidDownloadCount = deliveryDownloads.length;
       editorSessionStore.getSegments()[taggedIndex].target = `Bu <strong>etiketi</strong> koru.${String.fromCharCode(0x0b)}`;
-      touchSegment(editorSessionStore.getSegments()[taggedIndex]);
+      segmentTargetStateService.touch(editorSessionStore.getSegments()[taggedIndex]);
       await saveSegment(editorSessionStore.getSegments()[taggedIndex]);
       await deliveryExportController.exportBilingualDocx();
       assert(deliveryDownloads.length === beforeXmlInvalidDownloadCount && els.saveStatus.textContent.includes("Bilingual DOCX blocked"), "bilingual DOCX export blocks XML-invalid target characters");
       await deliveryExportController.exportXliff12();
       assert(deliveryDownloads.length === beforeXmlInvalidDownloadCount && state.lastValidationReport?.risky?.some((item) => item.includes("XML-invalid characters")), "XLIFF export blocks XML-invalid target characters");
       editorSessionStore.getSegments()[taggedIndex].target = "Bu <strong>etiketi</strong> koru.";
-      touchSegment(editorSessionStore.getSegments()[taggedIndex]);
+      segmentTargetStateService.touch(editorSessionStore.getSegments()[taggedIndex]);
       await saveSegment(editorSessionStore.getSegments()[taggedIndex]);
     } finally {
       URL.createObjectURL = originalDeliveryCreateObjectUrl;
@@ -6267,7 +6267,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const duplicateTaggedIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === duplicateTaggedDocument.id);
     editorSessionStore.getSegments()[duplicateTaggedIndex].target = "<strong>Bir</strong> ve iki";
     editorSessionStore.getSegments()[duplicateTaggedIndex].status = "draft";
-    touchSegment(editorSessionStore.getSegments()[duplicateTaggedIndex]);
+    segmentTargetStateService.touch(editorSessionStore.getSegments()[duplicateTaggedIndex]);
     await saveSegment(editorSessionStore.getSegments()[duplicateTaggedIndex]);
     const duplicateDeliveryDownloads = [];
     const originalDuplicateCreateObjectUrl = URL.createObjectURL.bind(URL);
@@ -6283,7 +6283,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await deliveryExportController.exportLocalization();
       assert(!duplicateDeliveryDownloads.length && state.lastValidationReport?.risky?.some((item) => item.includes("protected placeholders")), "delivery export blocks incomplete duplicate protected tags");
       editorSessionStore.getSegments()[duplicateTaggedIndex].target = "<strong>Bir</strong> ve <strong>iki</strong>";
-      touchSegment(editorSessionStore.getSegments()[duplicateTaggedIndex]);
+      segmentTargetStateService.touch(editorSessionStore.getSegments()[duplicateTaggedIndex]);
       await saveSegment(editorSessionStore.getSegments()[duplicateTaggedIndex]);
       await deliveryExportController.exportLocalization();
       assert(duplicateDeliveryDownloads.some((item) => item.type === "text/html"), "delivery export runs after duplicate protected tags are restored");
@@ -6300,7 +6300,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(Boolean(scopedCompleteDocument) && scopedCompleteIndex >= 0, "scoped export completed fixture imported");
     editorSessionStore.getSegments()[scopedCompleteIndex].target = "Yalnizca secili dosya hedefi.";
     editorSessionStore.getSegments()[scopedCompleteIndex].status = "draft";
-    touchSegment(editorSessionStore.getSegments()[scopedCompleteIndex]);
+    segmentTargetStateService.touch(editorSessionStore.getSegments()[scopedCompleteIndex]);
     await saveSegment(editorSessionStore.getSegments()[scopedCompleteIndex]);
     const scopedEmptyFile = new File(["<!doctype html><html><body><p>Unselected unfinished segment.</p></body></html>"], "scoped-empty.html", { type: "text/html" });
     await importLocalization(scopedEmptyFile);
@@ -6415,8 +6415,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const activityCountBeforeDeliveryExport = (await listActivityEvents(project.id)).length;
       const untranslatedForDelivery = editorSessionStore.getSegments().filter((segment) => !String(segment.target || "").trim());
       untranslatedForDelivery.forEach((segment) => {
-        setSegmentTargetAndStatus(segment, segment.source || "Completed target", "draft", "delivery-test-complete");
-        touchSegment(segment);
+        segmentTargetStateService.setTarget(segment, segment.source || "Completed target", "draft", "delivery-test-complete");
+        segmentTargetStateService.touch(segment);
       });
       if (untranslatedForDelivery.length) await saveSegments(editorSessionStore.getSegments());
       applicationNavigation.selectDocument({ documentId: "" });

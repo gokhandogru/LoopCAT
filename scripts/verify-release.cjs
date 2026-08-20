@@ -173,6 +173,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-provenance-service.js",
   "src/features/editor/segment-filter-service.js",
   "src/features/editor/segment-progress-service.js",
+  "src/features/editor/segment-target-state-service.js",
   "src/features/editor/structural-segment-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -264,6 +265,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-provenance-service.test.cjs",
   "tests/unit/segment-filter-service.test.cjs",
   "tests/unit/segment-progress-service.test.cjs",
+  "tests/unit/segment-target-state-service.test.cjs",
   "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
@@ -388,6 +390,7 @@ const protectedTextReplacementServiceJs = readText("src/features/editor/protecte
 const segmentProvenanceServiceJs = readText("src/features/editor/segment-provenance-service.js");
 const segmentFilterServiceJs = readText("src/features/editor/segment-filter-service.js");
 const segmentProgressServiceJs = readText("src/features/editor/segment-progress-service.js");
+const segmentTargetStateServiceJs = readText("src/features/editor/segment-target-state-service.js");
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
@@ -400,6 +403,7 @@ const protectedTextReplacementServiceUnitTests = readText("tests/unit/protected-
 const segmentProvenanceServiceUnitTests = readText("tests/unit/segment-provenance-service.test.cjs");
 const segmentFilterServiceUnitTests = readText("tests/unit/segment-filter-service.test.cjs");
 const segmentProgressServiceUnitTests = readText("tests/unit/segment-progress-service.test.cjs");
+const segmentTargetStateServiceUnitTests = readText("tests/unit/segment-target-state-service.test.cjs");
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
@@ -4199,6 +4203,16 @@ assertIncludes(
   "createSegmentProgressService,",
   "The application runtime must expose the checked segment progress factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createSegmentTargetStateService } from "../features/editor/segment-target-state-service.js";',
+  "The application runtime must install the checked segment target-state service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentTargetStateService,",
+  "The application runtime must expose the checked segment target-state factory."
+);
 for (const boundary of [
   "editLifecycle.finalize(segment.id)",
   "persistence.clearPending(segment, { finalizeEdit: false })",
@@ -4645,6 +4659,120 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/segment-progress-service.js"',
   "source-catalog extraction must scan the checked segment progress service."
+);
+for (const snippet of [
+  "const SEGMENT_HISTORY_LIMIT = 25",
+  "const SEGMENT_TYPING_HISTORY_WINDOW_MS = 30000",
+  "Object.defineProperty(record, field",
+  "writable: true",
+  "configurable: true",
+  "enumerable: false",
+  'Object.prototype.hasOwnProperty.call(segment, "__historyTarget")',
+  'setHiddenField(segment, "__historyStatus", segment.status || "empty")',
+  "(segments || []).forEach(prepareHistory)",
+  'const toTarget = String(nextTarget || "")',
+  'const toStatus = nextStatus || (toTarget.trim() ? "draft" : "empty")',
+  "if (fromTarget === toTarget && fromStatus === toStatus) return",
+  'reason === "edit"',
+  "nowMs() - Date.parse(last.updatedAt || last.createdAt || 0) <= SEGMENT_TYPING_HISTORY_WINDOW_MS",
+  'id: createId("target-history")',
+  "revisionBefore: Number(segment.revision || 0)",
+  "segment.targetHistory = history.slice(-SEGMENT_HISTORY_LIMIT)",
+  'if (reason !== "pretranslate") delete segment.tmPretranslation',
+  "const present = Object.prototype.hasOwnProperty.call(segment, field)",
+  "return { present, value: present ? clone(segment[field]) : null }",
+  "targetHistory: clone(Array.isArray(segment?.targetHistory) ? segment.targetHistory : [])",
+  'tmPretranslation: optionalField(segment, "tmPretranslation")',
+  "if (patch?.present) segment[field] = clone(patch.value)",
+  "else Reflect.deleteProperty(segment, field)",
+  'segment.status = patch?.status || (segment.target.trim() ? "draft" : "empty")',
+  "segment.updatedAt = patch?.updatedAt || nowIso()",
+  'setHiddenField(segment, "__historyTarget", segment.target)',
+  "segment.revision = (Number.isFinite(revision) ? revision : 0) + 1",
+  "if (options.invalidateFilters !== false) invalidateFilters()",
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    segmentTargetStateServiceJs,
+    snippet,
+    `SegmentTargetStateService must retain characterized mutation/patch policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createSegmentTargetStateService({",
+  "app.js must compose the checked segment target-state service."
+);
+for (const boundary of [
+  "getSegments: () => editorSessionStore.getSegments()",
+  "createId: makeId",
+  "nowIso: () => new Date().toISOString()",
+  "nowMs: () => Date.now()",
+  "clone: structuredClone",
+  "invalidateFilters: segmentFilterService.invalidate"
+]) {
+  assertIncludes(appJs, boundary, `segment target-state composition must inject the checked ${boundary} boundary.`);
+}
+for (const method of [
+  "setHiddenField",
+  "prepareHistory",
+  "prepareHistories",
+  "recordHistory",
+  "setTarget",
+  "capturePatch",
+  "applyPatch",
+  "touch"
+]) {
+  assertIncludes(
+    `${appJs}\n${appWorkflowDriverJs}`,
+    `segmentTargetStateService.${method}`,
+    `segment target-state consumers must call SegmentTargetStateService.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "setHiddenSegmentField",
+  "prepareSegmentHistoryState",
+  "prepareSegmentHistoryStates",
+  "recordSegmentTargetHistory",
+  "setSegmentTargetAndStatus",
+  "targetCommandOptionalField",
+  "targetCommandPatch",
+  "applyTargetCommandOptionalField",
+  "applyTargetCommandPatch",
+  "touchSegment"
+]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} segment target-state helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const removedConstant of ["SEGMENT_HISTORY_LIMIT", "SEGMENT_TYPING_HISTORY_WINDOW_MS"]) {
+  assert(
+    !appJs.includes(removedConstant) && !appWorkflowDriverJs.includes(removedConstant),
+    `${removedConstant} segment target-state policy must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "SegmentTargetStateService preserves hidden-field descriptors and absent-record no-op",
+  "SegmentTargetStateService preserves history preparation, defaults, collection identity, and injected collection fallback",
+  "SegmentTargetStateService preserves history no-op, append metadata, target normalization, and TM clearing policy",
+  "SegmentTargetStateService preserves edit coalescing window, non-edit separation, and 25-entry cap",
+  "SegmentTargetStateService captures deep patches with exact optional-field presence",
+  "SegmentTargetStateService applies patch fallbacks, clones optionals, deletes absent fields, and resets history baselines",
+  "SegmentTargetStateService preserves monotonic touch revisions, timestamps, invalidation, and suppression",
+  "SegmentTargetStateService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentTargetStateServiceUnitTests,
+    testName,
+    `focused segment target-state tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-target-state-service.js"',
+  "source-catalog extraction must scan the checked segment target-state service."
 );
 assertIncludes(
   appBootstrapJs,

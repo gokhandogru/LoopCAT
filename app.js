@@ -135,8 +135,6 @@ const BACKUP_REMINDER_ACTIVITY_SINCE_EXPORT = 10;
 const BACKUP_REMINDER_DISMISS_HOURS = 24;
 const STORAGE_LOW_SPACE_BYTES = 250 * 1024 * 1024;
 const STORAGE_HIGH_USAGE_RATIO = 0.9;
-const SEGMENT_HISTORY_LIMIT = 25;
-const SEGMENT_TYPING_HISTORY_WINDOW_MS = 30000;
 const XLIFF_DOCUMENT_TYPES = new Set(["xlf", "xliff", "sdlxliff"]);
 const LOCALIZATION_EXPORT_TYPES = new Set([
   "docm", "dotx", "dotm", "xlsx", "xlsm", "xltx", "xltm", "pptx", "pptm", "ppsx", "ppsm", "potx", "potm",
@@ -1130,6 +1128,15 @@ const segmentProgressService = appRuntime.featureFactories.createSegmentProgress
   replaceCachedSummary: (summary) => editorSessionStore.replaceProgressSummary(summary)
 });
 
+const segmentTargetStateService = appRuntime.featureFactories.createSegmentTargetStateService({
+  getSegments: () => editorSessionStore.getSegments(),
+  createId: makeId,
+  nowIso: () => new Date().toISOString(),
+  nowMs: () => Date.now(),
+  clone: structuredClone,
+  invalidateFilters: segmentFilterService.invalidate
+});
+
 const projectLanguageContextController = appRuntime.featureFactories.createProjectLanguageContextController({
   getProject: () => editorSessionStore.getProject(),
   languageInput: languageInputService,
@@ -1561,7 +1568,7 @@ targetEditController = appRuntime.featureFactories.createTargetEditController({
     ensureVisible: ensureSegmentVisible,
     findEditor: (index) => verticalFeatureState.segmentGrid.findTargetEditor(els.segmentBody, index)
   },
-  createPatch: targetCommandPatch,
+  createPatch: segmentTargetStateService.capturePatch,
   restorePatch: restoreSegmentEditCommandPatch,
   applyDraft: applyTargetDraft,
   activateSegment: setActiveSegment,
@@ -1596,10 +1603,10 @@ const targetProducerController = appRuntime.featureFactories.createTargetProduce
   },
   filters: { matches: segmentFilterService.matches },
   mutation: {
-    capturePatch: targetCommandPatch,
-    applyTarget: setSegmentTargetAndStatus,
-    touch: touchSegment,
-    restorePatch: applyTargetCommandPatch,
+    capturePatch: segmentTargetStateService.capturePatch,
+    applyTarget: segmentTargetStateService.setTarget,
+    touch: segmentTargetStateService.touch,
+    restorePatch: segmentTargetStateService.applyPatch,
     invalidateFilters: segmentFilterService.invalidate
   },
   restoration: { restorePatch: restoreSegmentEditCommandPatch },
@@ -1639,13 +1646,13 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
     save: saveSegments
   },
   mutation: {
-    applyTarget: setSegmentTargetAndStatus,
-    touch: touchSegment,
+    applyTarget: segmentTargetStateService.setTarget,
+    touch: segmentTargetStateService.touch,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
     },
-    prepareHistory: prepareSegmentHistoryState,
+    prepareHistory: segmentTargetStateService.prepareHistory,
     hasTagIssue: protectedTagInspectionService.hasIssue
   },
   restoration: { restoreSnapshots: restoreSegmentCommandSnapshots },
@@ -1704,14 +1711,14 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
     save: saveSegments
   },
   mutation: {
-    capturePatch: targetCommandPatch,
-    applyTarget: setSegmentTargetAndStatus,
-    touch: touchSegment,
+    capturePatch: segmentTargetStateService.capturePatch,
+    applyTarget: segmentTargetStateService.setTarget,
+    touch: segmentTargetStateService.touch,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
     },
-    prepareHistory: prepareSegmentHistoryState
+    prepareHistory: segmentTargetStateService.prepareHistory
   },
   restoration: { restorePatches: restoreBatchTargetCommandPatches },
   selection: {
@@ -2002,18 +2009,18 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
     load: getProjectSegments
   },
   mutation: {
-    capturePatch: targetCommandPatch,
-    applyPatch: applyTargetCommandPatch,
+    capturePatch: segmentTargetStateService.capturePatch,
+    applyPatch: segmentTargetStateService.applyPatch,
     clearPending: autosaveService.clear,
     recordHistory: (segment) =>
-      recordSegmentTargetHistory(segment, segment.target, segment.status, "ai-pretranslate"),
-    touch: touchSegment,
+      segmentTargetStateService.recordHistory(segment, segment.target, segment.status, "ai-pretranslate"),
+    touch: segmentTargetStateService.touch,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
     },
-    prepareHistory: prepareSegmentHistoryState,
-    prepareHistories: prepareSegmentHistoryStates
+    prepareHistory: segmentTargetStateService.prepareHistory,
+    prepareHistories: segmentTargetStateService.prepareHistories
   },
   restoration: { restorePatches: restoreBatchTargetCommandPatches },
   selection: { getActiveSegmentId: () => currentSegment()?.id || "" },
@@ -2089,14 +2096,14 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
     load: getProjectSegments
   },
   mutation: {
-    touch: touchSegment,
+    touch: segmentTargetStateService.touch,
     clearPending: autosaveService.clear,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
     },
-    prepareHistory: prepareSegmentHistoryState,
-    prepareHistories: prepareSegmentHistoryStates
+    prepareHistory: segmentTargetStateService.prepareHistory,
+    prepareHistories: segmentTargetStateService.prepareHistories
   },
   presentation: {
     renderCommandCentre: aiProviderFormController.renderCommandCentre,
@@ -2172,14 +2179,14 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
     load: getProjectSegments
   },
   mutation: {
-    touch: touchSegment,
+    touch: segmentTargetStateService.touch,
     clearPending: autosaveService.clear,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
     },
-    prepareHistory: prepareSegmentHistoryState,
-    prepareHistories: prepareSegmentHistoryStates
+    prepareHistory: segmentTargetStateService.prepareHistory,
+    prepareHistories: segmentTargetStateService.prepareHistories
   },
   presentation: {
     renderCommandCentre: aiProviderFormController.renderCommandCentre,
@@ -2255,14 +2262,14 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
     load: getProjectSegments
   },
   mutation: {
-    touch: touchSegment,
+    touch: segmentTargetStateService.touch,
     clearPending: autosaveService.clear,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
     },
-    prepareHistory: prepareSegmentHistoryState,
-    prepareHistories: prepareSegmentHistoryStates
+    prepareHistory: segmentTargetStateService.prepareHistory,
+    prepareHistories: segmentTargetStateService.prepareHistories
   },
   presentation: {
     renderCommandCentre: aiProviderFormController.renderCommandCentre,
@@ -2338,14 +2345,14 @@ const aiTerminologyApplicationController =
       load: getProjectSegments
     },
     mutation: {
-      touch: touchSegment,
+      touch: segmentTargetStateService.touch,
       clearPending: autosaveService.clear,
       restore: (segment, snapshot) => {
         Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
         Object.assign(segment, snapshot);
       },
-      prepareHistory: prepareSegmentHistoryState,
-      prepareHistories: prepareSegmentHistoryStates
+      prepareHistory: segmentTargetStateService.prepareHistory,
+      prepareHistories: segmentTargetStateService.prepareHistories
     },
     presentation: {
       renderCommandCentre: aiProviderFormController.renderCommandCentre,
@@ -2423,14 +2430,14 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
     load: getProjectSegments
   },
   mutation: {
-    touch: touchSegment,
+    touch: segmentTargetStateService.touch,
     clearPending: autosaveService.clear,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
     },
-    prepareHistory: prepareSegmentHistoryState,
-    prepareHistories: prepareSegmentHistoryStates
+    prepareHistory: segmentTargetStateService.prepareHistory,
+    prepareHistories: segmentTargetStateService.prepareHistories
   },
   presentation: {
     renderCommandCentre: aiProviderFormController.renderCommandCentre,
@@ -2580,13 +2587,13 @@ const aiSuggestionApplicationController =
       goToNextOpen: goToNextOpenSegment
     },
     mutation: {
-      applyTarget: setSegmentTargetAndStatus,
-      touch: touchSegment,
+      applyTarget: segmentTargetStateService.setTarget,
+      touch: segmentTargetStateService.touch,
       restoreInPlace: (segment, snapshot) => {
         Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
         Object.assign(segment, snapshot);
       },
-      prepareHistory: prepareSegmentHistoryState,
+      prepareHistory: segmentTargetStateService.prepareHistory,
       prepareRestoreSnapshot: prepareCommandRestoreSegmentSnapshot
     },
     persistence: {
@@ -2631,12 +2638,12 @@ const aiSuggestionApplicationController =
 const aiSuggestionPersistenceController =
   appRuntime.featureFactories.createAiSuggestionPersistenceController({
     mutation: {
-      touch: touchSegment,
+      touch: segmentTargetStateService.touch,
       restoreInPlace: (segment, snapshot) => {
         Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
         Object.assign(segment, snapshot);
       },
-      prepareHistory: prepareSegmentHistoryState
+      prepareHistory: segmentTargetStateService.prepareHistory
     },
     persistence: {
       clearPending: autosaveService.clear,
@@ -2913,10 +2920,10 @@ const structuralSegmentController = appRuntime.featureFactories.createStructural
     focusTarget: targetEditController.focusActive
   },
   mutation: {
-    applyTarget: setSegmentTargetAndStatus,
-    touch: touchSegment,
+    applyTarget: segmentTargetStateService.setTarget,
+    touch: segmentTargetStateService.touch,
     detectTags: detectProtectedTags,
-    prepareHistoryStates: prepareSegmentHistoryStates,
+    prepareHistoryStates: segmentTargetStateService.prepareHistories,
     prepareRestoreSnapshot: prepareCommandRestoreSegmentSnapshot
   },
   persistence: {
@@ -3569,12 +3576,12 @@ const reviewMetadataController = appRuntime.featureFactories.createReviewMetadat
   editorSessionStore,
   selection: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex },
   mutation: {
-    touch: touchSegment,
+    touch: segmentTargetStateService.touch,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
     },
-    prepareHistory: prepareSegmentHistoryState
+    prepareHistory: segmentTargetStateService.prepareHistory
   },
   persistence: {
     clearPending: autosaveService.clear,
@@ -3611,12 +3618,12 @@ const qualityDecisionController = appRuntime.featureFactories.createQualityDecis
   editorSessionStore,
   selection: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex },
   mutation: {
-    touch: touchSegment,
+    touch: segmentTargetStateService.touch,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
     },
-    prepareHistory: prepareSegmentHistoryState
+    prepareHistory: segmentTargetStateService.prepareHistory
   },
   persistence: {
     clearPending: autosaveService.clear,
@@ -3659,12 +3666,12 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
     toggle: (segment, reviewState) => {
       segment.reviewState = segment.reviewState === reviewState ? "" : reviewState;
     },
-    touch: touchSegment,
+    touch: segmentTargetStateService.touch,
     restore: (segment, snapshot) => {
       Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
       Object.assign(segment, snapshot);
     },
-    prepareHistory: prepareSegmentHistoryState
+    prepareHistory: segmentTargetStateService.prepareHistory
   },
   persistence: {
     clearPending: autosaveService.clear,
@@ -3833,7 +3840,7 @@ async function undoLastCommand() {
   await loadProjects(false);
   if (editorSessionStore.getProject()?.id === projectId) {
     editorSessionStore.replaceProject(editorSessionStore.getProjects().find((project) => project.id === projectId) || editorSessionStore.getProject());
-    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(projectId)));
+    editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(projectId)));
     const requestedIndex = requestedActiveSegmentId
       ? editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveSegmentId)
       : -1;
@@ -3872,14 +3879,14 @@ async function redoLastCommand() {
   await loadProjects(false);
   if (result.receipt.commandId === "delete-document" && editorSessionStore.getProject()?.id === projectId) {
     editorSessionStore.replaceProject(editorSessionStore.getProjects().find((project) => project.id === projectId) || editorSessionStore.getProject());
-    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(projectId)));
+    editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(projectId)));
     const nextIndex = editorSessionStore.getSegments().length
       ? Math.max(0, Math.min(applicationStore.getState().navigation.activeIndex, editorSessionStore.getSegments().length - 1))
       : -1;
     applicationNavigation.selectSegment({ activeIndex: nextIndex, segmentId: editorSessionStore.getSegments()[nextIndex]?.id || "" });
     renderAll();
   } else if (editorSessionStore.getProject()?.id === projectId && requestedActiveSegmentId) {
-    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(projectId)));
+    editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(projectId)));
     const requestedIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveSegmentId);
     if (requestedIndex >= 0) applicationNavigation.selectSegment({ activeIndex: requestedIndex, segmentId: editorSessionStore.getSegments()[requestedIndex]?.id || "" });
     renderAll();
@@ -4241,130 +4248,6 @@ function escapeRegExp(value) {
 
 function currentSegment() {
   return editorSessionStore.getSegments()[applicationStore.getState().navigation.activeIndex] || null;
-}
-
-function setHiddenSegmentField(segment, field, value) {
-  if (!segment) return;
-  Object.defineProperty(segment, field, {
-    value,
-    writable: true,
-    configurable: true,
-    enumerable: false
-  });
-}
-
-function prepareSegmentHistoryState(segment) {
-  if (!segment) return segment;
-  segment.targetHistory = Array.isArray(segment.targetHistory) ? segment.targetHistory : [];
-  if (!Object.prototype.hasOwnProperty.call(segment, "__historyTarget")) {
-    setHiddenSegmentField(segment, "__historyTarget", segment.target || "");
-  }
-  if (!Object.prototype.hasOwnProperty.call(segment, "__historyStatus")) {
-    setHiddenSegmentField(segment, "__historyStatus", segment.status || "empty");
-  }
-  return segment;
-}
-
-function prepareSegmentHistoryStates(segments = editorSessionStore.getSegments()) {
-  (segments || []).forEach(prepareSegmentHistoryState);
-  return segments;
-}
-
-function recordSegmentTargetHistory(segment, nextTarget, nextStatus, reason = "edit") {
-  prepareSegmentHistoryState(segment);
-  const fromTarget = segment.__historyTarget || "";
-  const fromStatus = segment.__historyStatus || "empty";
-  const toTarget = String(nextTarget || "");
-  const toStatus = nextStatus || (toTarget.trim() ? "draft" : "empty");
-  if (fromTarget === toTarget && fromStatus === toStatus) return;
-
-  const now = new Date().toISOString();
-  const history = Array.isArray(segment.targetHistory) ? [...segment.targetHistory] : [];
-  const last = history[history.length - 1];
-  const canCoalesceTyping = reason === "edit" &&
-    last?.reason === "edit" &&
-    last.toTarget === fromTarget &&
-    last.toStatus === fromStatus &&
-    Date.now() - Date.parse(last.updatedAt || last.createdAt || 0) <= SEGMENT_TYPING_HISTORY_WINDOW_MS;
-
-  if (canCoalesceTyping) {
-    last.toTarget = toTarget;
-    last.toStatus = toStatus;
-    last.updatedAt = now;
-  } else {
-    history.push({
-      id: makeId("target-history"),
-      reason,
-      fromTarget,
-      toTarget,
-      fromStatus,
-      toStatus,
-      revisionBefore: Number(segment.revision || 0),
-      createdAt: now,
-      updatedAt: now
-    });
-  }
-  segment.targetHistory = history.slice(-SEGMENT_HISTORY_LIMIT);
-  segment.__historyTarget = toTarget;
-  segment.__historyStatus = toStatus;
-}
-
-function setSegmentTargetAndStatus(segment, target, status, reason = "edit") {
-  if (!segment) return;
-  const nextTarget = String(target || "");
-  const nextStatus = status || (nextTarget.trim() ? "draft" : "empty");
-  recordSegmentTargetHistory(segment, nextTarget, nextStatus, reason);
-  segment.target = nextTarget;
-  segment.status = nextStatus;
-  if (reason !== "pretranslate") delete segment.tmPretranslation;
-}
-
-function targetCommandOptionalField(segment, field) {
-  const present = Object.prototype.hasOwnProperty.call(segment, field);
-  return { present, value: present ? structuredClone(segment[field]) : null };
-}
-
-function targetCommandPatch(segment) {
-  return {
-    target: String(segment?.target || ""),
-    status: segment?.status || "empty",
-    targetHistory: structuredClone(Array.isArray(segment?.targetHistory) ? segment.targetHistory : []),
-    revision: Number(segment?.revision || 0),
-    updatedAt: segment?.updatedAt || "",
-    tmPretranslation: targetCommandOptionalField(segment, "tmPretranslation"),
-    aiPretranslation: targetCommandOptionalField(segment, "aiPretranslation"),
-    reviewState: targetCommandOptionalField(segment, "reviewState"),
-    aiApplication: targetCommandOptionalField(segment, "aiApplication")
-  };
-}
-
-function applyTargetCommandOptionalField(segment, field, patch) {
-  if (patch?.present) segment[field] = structuredClone(patch.value);
-  else Reflect.deleteProperty(segment, field);
-}
-
-function applyTargetCommandPatch(segment, patch) {
-  segment.target = String(patch?.target || "");
-  segment.status = patch?.status || (segment.target.trim() ? "draft" : "empty");
-  segment.targetHistory = structuredClone(Array.isArray(patch?.targetHistory) ? patch.targetHistory : []);
-  segment.revision = Number(patch?.revision || 0);
-  segment.updatedAt = patch?.updatedAt || new Date().toISOString();
-  applyTargetCommandOptionalField(segment, "tmPretranslation", patch?.tmPretranslation);
-  applyTargetCommandOptionalField(segment, "aiPretranslation", patch?.aiPretranslation);
-  applyTargetCommandOptionalField(segment, "reviewState", patch?.reviewState);
-  applyTargetCommandOptionalField(segment, "aiApplication", patch?.aiApplication);
-  setHiddenSegmentField(segment, "__historyTarget", segment.target);
-  setHiddenSegmentField(segment, "__historyStatus", segment.status);
-  return segment;
-}
-
-function touchSegment(segment, options = {}) {
-  if (!segment) return segment;
-  const revision = Number(segment.revision || 0);
-  segment.revision = (Number.isFinite(revision) ? revision : 0) + 1;
-  segment.updatedAt = new Date().toISOString();
-  if (options.invalidateFilters !== false) segmentFilterService.invalidate();
-  return segment;
 }
 
 function fileSafeName(value) {
@@ -5298,7 +5181,7 @@ async function openProject(projectId) {
   await autosaveService.flush();
   editorSessionStore.replaceProject(editorSessionStore.getProjects().find((project) => project.id === projectId) || null);
   state.commandProjectId = editorSessionStore.getProject()?.id || projectId || "";
-  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(editorSessionStore.getProject() ? await getProjectSegments(projectId) : []));
+  editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(editorSessionStore.getProject() ? await getProjectSegments(projectId) : []));
   editorSessionStore.replaceActivityEvents(editorSessionStore.getProject() ? await listActivityEvents(projectId) : []);
   await refreshProjectTerms();
   const activeIndex = editorSessionStore.getSegments().length ? 0 : -1;
@@ -5651,7 +5534,7 @@ async function confirmDeleteFile(documentInfo) {
     state.commandProjectId = editorSessionStore.getProject().id;
     editorSessionStore.replaceProject(commandResult.result.project);
     editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
-    editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(editorSessionStore.getProject().id)));
+    editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(editorSessionStore.getProject().id)));
     applicationNavigation.selectDocument({ documentId: "" });
     const activeIndex = editorSessionStore.getSegments().length ? 0 : -1;
     applicationNavigation.selectSegment({
@@ -6052,10 +5935,10 @@ async function goToNextOpenSegment() {
 function applyTargetDraft({ index, segment, target }) {
   const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
   const passedFiltersBefore = segmentFilterService.matches(segment);
-  setSegmentTargetAndStatus(segment, target, target.trim() ? "draft" : "empty", "edit");
+  segmentTargetStateService.setTarget(segment, target, target.trim() ? "draft" : "empty", "edit");
   const passedFiltersAfter = segmentFilterService.matches(segment);
   const filterMembershipChanged = passedFiltersBefore !== passedFiltersAfter;
-  touchSegment(segment, { invalidateFilters: filterMembershipChanged });
+  segmentTargetStateService.touch(segment, { invalidateFilters: filterMembershipChanged });
   if (filterMembershipChanged) {
     renderSegments({ preserveScroll: true });
   } else if (passedFiltersAfter) {
@@ -6066,7 +5949,7 @@ function applyTargetDraft({ index, segment, target }) {
   renderProgress({ previousStatus, nextStatus: segment.status });
   scheduleRevisionHistoryRender();
   markWorkspaceDirty();
-  return { segment, patch: targetCommandPatch(segment) };
+  return { segment, patch: segmentTargetStateService.capturePatch(segment) };
 }
 
 function openReplacePanel() {
@@ -6075,7 +5958,7 @@ function openReplacePanel() {
 }
 
 function prepareCommandRestoreSegmentSnapshot(snapshot, current) {
-  const restored = prepareSegmentHistoryState(structuredClone(snapshot));
+  const restored = segmentTargetStateService.prepareHistory(structuredClone(snapshot));
   const currentRevision = Number(current?.revision || 0);
   const snapshotRevision = Number(restored.revision || 0);
   restored.revision = Math.max(
@@ -6090,13 +5973,13 @@ async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}
   const index = editorSessionStore.getSegments().findIndex((item) => item.id === segmentId);
   if (index < 0) throw new Error("The affected segment is no longer available.");
   const segment = editorSessionStore.getSegments()[index];
-  const currentPatch = targetCommandPatch(segment);
+  const currentPatch = segmentTargetStateService.capturePatch(segment);
   const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
   try {
     const restoredPatch = structuredClone(nextPatch);
     restoredPatch.revision = Math.max(Number(currentPatch.revision || 0), Number(restoredPatch.revision || 0)) + 1;
     restoredPatch.updatedAt = new Date().toISOString();
-    applyTargetCommandPatch(segment, restoredPatch);
+    segmentTargetStateService.applyPatch(segment, restoredPatch);
     autosaveService.clear(segment);
     await saveSegment(segment);
     verticalFeatureState?.segmentGrid?.selectSegment(index, segment.id);
@@ -6118,7 +6001,7 @@ async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}
       selection
     };
   } catch (error) {
-    applyTargetCommandPatch(segment, currentPatch);
+    segmentTargetStateService.applyPatch(segment, currentPatch);
     segmentFilterService.invalidate();
     renderSegments({ preserveScroll: true });
     renderProgress();
@@ -6137,7 +6020,7 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
   const indexes = segmentIds.map((segmentId) => {
     const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === segmentId);
     if (index < 0) throw new Error("An affected pretranslation segment is no longer available.");
-    currentById.set(segmentId, targetCommandPatch(editorSessionStore.getSegments()[index]));
+    currentById.set(segmentId, segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[index]));
     return index;
   });
   const previousActiveId = currentSegment()?.id || "";
@@ -6151,7 +6034,7 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
         Number(restoredPatch.revision || 0)
       ) + 1;
       restoredPatch.updatedAt = new Date().toISOString();
-      applyTargetCommandPatch(segment, restoredPatch);
+      segmentTargetStateService.applyPatch(segment, restoredPatch);
       autosaveService.clear(segment);
       return segment;
     });
@@ -6165,7 +6048,7 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
     await editorContextController.refresh();
     targetEditController.focusActive();
     return {
-      patches: restored.map((segment) => targetCommandPatch(segment)),
+      patches: restored.map((segment) => segmentTargetStateService.capturePatch(segment)),
       activeSegmentId: currentSegment()?.id || restored[0]?.id || "",
       affectedCount: restored.length,
       focusTarget: true
@@ -6173,7 +6056,7 @@ async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
   } catch (error) {
     currentById.forEach((patch, segmentId) => {
       const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === segmentId);
-      if (index >= 0) applyTargetCommandPatch(editorSessionStore.getSegments()[index], patch);
+      if (index >= 0) segmentTargetStateService.applyPatch(editorSessionStore.getSegments()[index], patch);
     });
     segmentFilterService.invalidate();
     renderAll();
@@ -6214,7 +6097,7 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
   } catch (error) {
     for (const [segmentId, snapshot] of currentById) {
       const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === segmentId);
-      if (index >= 0) editorSessionStore.replaceSegmentAt(index, prepareSegmentHistoryState(snapshot));
+      if (index >= 0) editorSessionStore.replaceSegmentAt(index, segmentTargetStateService.prepareHistory(snapshot));
     }
     renderAll();
     throw error;
@@ -6222,10 +6105,10 @@ async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
 }
 
 function applySegmentConfirmation(segment) {
-  recordSegmentTargetHistory(segment, segment.target, "confirmed", "confirm");
+  segmentTargetStateService.recordHistory(segment, segment.target, "confirmed", "confirm");
   segment.status = "confirmed";
   if (segment.reviewState === "needs-review") segment.reviewState = "";
-  touchSegment(segment);
+  segmentTargetStateService.touch(segment);
 }
 
 function restoreSegmentConfirmation(segment, snapshot) {
@@ -6259,7 +6142,7 @@ async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = 
       activeSegmentId: currentSegment()?.id || restored.id
     };
   } catch (error) {
-    editorSessionStore.replaceSegmentAt(index, prepareSegmentHistoryState(currentSnapshot));
+    editorSessionStore.replaceSegmentAt(index, segmentTargetStateService.prepareHistory(currentSnapshot));
     renderAll();
     throw error;
   }
@@ -6917,7 +6800,7 @@ async function importDocx(file) {
   );
   await reportImportProgress("Refreshing project view", file);
   editorSessionStore.replaceProject(importResult.project);
-  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(editorSessionStore.getProject().id)));
+  editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(editorSessionStore.getProject().id)));
   editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
   await refreshProjectSummaries();
   const activeIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
@@ -6951,7 +6834,7 @@ async function importLocalization(file) {
   );
   await reportImportProgress("Refreshing project view", file);
   editorSessionStore.replaceProject(importResult.project);
-  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(editorSessionStore.getProject().id)));
+  editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(editorSessionStore.getProject().id)));
   editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
   await refreshProjectSummaries();
   const activeIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
@@ -6985,7 +6868,7 @@ async function importXliff(file) {
   );
   await reportImportProgress("Refreshing project view", file);
   editorSessionStore.replaceProject(importResult.project);
-  editorSessionStore.replaceSegments(prepareSegmentHistoryStates(await getProjectSegments(editorSessionStore.getProject().id)));
+  editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(editorSessionStore.getProject().id)));
   editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
   await refreshProjectSummaries();
   const activeIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
