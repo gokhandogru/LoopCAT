@@ -3306,6 +3306,17 @@ segmentNavigationController = appRuntime.featureFactories.createSegmentNavigatio
   focus: { target: targetEditController.focusActive },
   statusFilter: els.segmentStatusFilter
 });
+const segmentActionButtonsController =
+  appRuntime.featureFactories.createSegmentActionButtonsController({
+    elements: {
+      saveTmButton: els.saveTmBtn,
+      nextOpenButton: els.nextOpenBtn
+    },
+    actions: {
+      saveToTm: segmentTmSaveController.saveActive,
+      nextOpen: segmentNavigationController.nextOpen
+    }
+  });
 
 const filterPresetController = appRuntime?.featureFactories?.createFilterPresetController?.({
   select: els.filterPresetSelect,
@@ -6740,9 +6751,7 @@ function wireEvents() {
   inspectorToggleController.mount();
   paletteController?.mountTrigger?.();
   projectFilterControlsController.mount();
-
-  els.saveTmBtn.addEventListener("click", segmentTmSaveController.saveActive);
-  els.nextOpenBtn.addEventListener("click", segmentNavigationController.nextOpen);
+  segmentActionButtonsController.mount();
   projectQaController.mount();
   document.querySelectorAll("[data-panel-toggle]").forEach((button) => {
     syncPanelToggleState(button);

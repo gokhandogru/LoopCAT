@@ -168,6 +168,7 @@ const requiredReleaseFiles = [
   "src/features/editor/filter-store.js",
   "src/features/editor/focus-mode-controller.js",
   "src/features/editor/inspector-toggle-controller.js",
+  "src/features/editor/segment-action-buttons-controller.js",
   "src/features/editor/editor-session-store.js",
   "src/features/editor/editor-context-controller.js",
   "src/features/editor/segment-grid-controller.js",
@@ -297,6 +298,7 @@ const requiredReleaseFiles = [
   "tests/unit/global-keyboard-controller.test.cjs",
   "tests/unit/focus-mode-controller.test.cjs",
   "tests/unit/inspector-toggle-controller.test.cjs",
+  "tests/unit/segment-action-buttons-controller.test.cjs",
   "tests/unit/palette-controller-trigger.test.cjs",
   "tests/unit/editor-state.test.cjs",
   "tests/unit/editor-session-store.test.cjs",
@@ -469,6 +471,10 @@ const focusModeControllerJs = readText("src/features/editor/focus-mode-controlle
 const focusModeControllerUnitTests = readText("tests/unit/focus-mode-controller.test.cjs");
 const inspectorToggleControllerJs = readText("src/features/editor/inspector-toggle-controller.js");
 const inspectorToggleControllerUnitTests = readText("tests/unit/inspector-toggle-controller.test.cjs");
+const segmentActionButtonsControllerJs = readText("src/features/editor/segment-action-buttons-controller.js");
+const segmentActionButtonsControllerUnitTests = readText(
+  "tests/unit/segment-action-buttons-controller.test.cjs"
+);
 const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
 const editorSessionStoreUnitTests = readText("tests/unit/editor-session-store.test.cjs");
 const editorFilterStoreJs = readText("src/features/editor/filter-store.js");
@@ -4718,8 +4724,7 @@ for (const boundary of [
 }
 assert(
   appJs.indexOf("paletteController?.mountTrigger?.()") < appJs.indexOf("projectFilterControlsController.mount()") &&
-    appJs.indexOf("projectFilterControlsController.mount()") <
-      appJs.indexOf('els.saveTmBtn.addEventListener("click"'),
+    appJs.indexOf("projectFilterControlsController.mount()") < appJs.indexOf("segmentActionButtonsController.mount()"),
   "project-filter controls must mount between command-palette and segment-action listeners at the existing position."
 );
 assert(
@@ -4752,6 +4757,84 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/projects/project-filter-controls-controller.js"',
   "source-catalog extraction must scan the checked project-filter controls controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createSegmentActionButtonsController } from "../features/editor/segment-action-buttons-controller.js";',
+  "the application runtime must install the checked segment-action buttons controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentActionButtonsController,",
+  "the application runtime must expose the checked segment-action buttons controller factory."
+);
+for (const snippet of [
+  "SegmentActionButtonsController requires a checked Save to TM button.",
+  "SegmentActionButtonsController requires a checked Next open button.",
+  "SegmentActionButtonsController requires checked segment actions.",
+  "const saveTmListener = actions.saveToTm",
+  "const nextOpenListener = actions.nextOpen",
+  'saveTmButton.addEventListener("click", saveTmListener)',
+  'nextOpenButton.addEventListener("click", nextOpenListener)',
+  'saveTmButton.removeEventListener("click", saveTmListener)',
+  'nextOpenButton.removeEventListener("click", nextOpenListener)',
+  "return Object.freeze({ mount, unmount })"
+]) {
+  assertIncludes(
+    segmentActionButtonsControllerJs,
+    snippet,
+    `SegmentActionButtonsController must retain exact direct-listener lifecycle policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createSegmentActionButtonsController({",
+  "saveTmButton: els.saveTmBtn",
+  "nextOpenButton: els.nextOpenBtn",
+  "saveToTm: segmentTmSaveController.saveActive",
+  "nextOpen: segmentNavigationController.nextOpen",
+  "segmentActionButtonsController.mount()"
+]) {
+  assertIncludes(appJs, boundary, `segment-action composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  appJs.indexOf("projectFilterControlsController.mount()") < appJs.indexOf("segmentActionButtonsController.mount()") &&
+    appJs.indexOf("segmentActionButtonsController.mount()") < appJs.indexOf("projectQaController.mount()"),
+  "segment-action buttons must mount between project-filter and project-QA controls at the existing position."
+);
+assert(
+  !appJs.includes('els.saveTmBtn.addEventListener("click"') &&
+    !appJs.includes('els.nextOpenBtn.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes("segmentActionButtonsController"),
+  "segment-action button listener ownership must not return to app.js or the workflow driver."
+);
+for (const forbiddenOwner of [
+  "document.",
+  "els.",
+  "segmentTmSaveController",
+  "segmentNavigationController"
+]) {
+  assert(
+    !segmentActionButtonsControllerJs.includes(forbiddenOwner),
+    `SegmentActionButtonsController must use injected elements and actions rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "SegmentActionButtonsController owns exact ordered listener lifecycle and immutable API",
+  "SegmentActionButtonsController preserves browser event, receiver, and result passthrough",
+  "SegmentActionButtonsController preserves promise fulfillment and rejection identity",
+  "SegmentActionButtonsController preserves action and listener failure timing",
+  "SegmentActionButtonsController validates required elements and actions"
+]) {
+  assertIncludes(
+    segmentActionButtonsControllerUnitTests,
+    testName,
+    `focused segment-action buttons tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-action-buttons-controller.js"',
+  "source-catalog extraction must scan the checked segment-action buttons controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -9154,7 +9237,6 @@ for (const lateBoundConsumer of [
 }
 for (const directConsumer of [
   "run: segmentNavigationController.nextOpen",
-  'els.nextOpenBtn.addEventListener("click", segmentNavigationController.nextOpen)',
   "segmentNavigationController.select(rowIndex)",
   'row.addEventListener("click", () => segmentNavigationController.select(index))',
   "navigation: { select: (index) => segmentNavigationController.select(index) }",
