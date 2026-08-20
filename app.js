@@ -3335,6 +3335,7 @@ const paletteController = appRuntime?.featureFactories?.createPaletteController?
   input: els.commandPaletteInput,
   results: els.commandPaletteResults,
   closeButton: els.closeCommandPaletteBtn,
+  triggerButton: els.commandPaletteBtn,
   appShell: document.querySelector(".app-shell"),
   getCommands: commandList,
   translate: uiLocalizationService.source,
@@ -6734,7 +6735,7 @@ function wireEvents() {
   projectHomeController.mount();
   focusModeController.mount();
   inspectorToggleController.mount();
-  els.commandPaletteBtn.addEventListener("click", () => paletteController?.open?.());
+  paletteController?.mountTrigger?.();
   els.projectSearchInput.addEventListener("input", renderProjectsView);
   els.languagePairFilter.addEventListener("change", renderProjectsView);
 

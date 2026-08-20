@@ -7,6 +7,7 @@ export function createPaletteController({
   input,
   results,
   closeButton,
+  triggerButton,
   appShell,
   getCommands,
   translate = (value) => value,
@@ -17,12 +18,16 @@ export function createPaletteController({
   if (!overlay || !input || !results || typeof getCommands !== "function") {
     throw new TypeError("PaletteController requires its overlay, input, results, and command source.");
   }
+  if (triggerButton && (!triggerButton.addEventListener || !triggerButton.removeEventListener)) {
+    throw new TypeError("PaletteController requires a checked optional trigger button.");
+  }
 
   let recentCommandIds = [];
   let activeIndex = 0;
   let visibleCommands = [];
   let returnTarget = null;
   let initialized = false;
+  let triggerMounted = false;
 
   function isOpen() {
     return !overlay.classList.contains("hidden");
@@ -154,6 +159,22 @@ export function createPaletteController({
     else input.focus();
   }
 
+  const triggerClickListener = () => open();
+
+  function mountTrigger() {
+    if (triggerMounted) return false;
+    triggerButton?.addEventListener("click", triggerClickListener);
+    triggerMounted = true;
+    return true;
+  }
+
+  function unmountTrigger() {
+    if (!triggerMounted) return false;
+    triggerButton?.removeEventListener("click", triggerClickListener);
+    triggerMounted = false;
+    return true;
+  }
+
   function handleInputKeydown(event) {
     if (!visibleCommands.length && event.key !== "Escape") return;
     if (event.key === "ArrowDown") activeIndex = (activeIndex + 1) % visibleCommands.length;
@@ -190,5 +211,5 @@ export function createPaletteController({
     }
   }
 
-  return Object.freeze({ close, initialize, isOpen, open, render });
+  return Object.freeze({ close, initialize, isOpen, mountTrigger, open, render, unmountTrigger });
 }

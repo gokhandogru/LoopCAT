@@ -188,6 +188,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-navigation-controller.js",
   "src/features/editor/segment-draft-application-service.js",
   "src/features/editor/structural-segment-controller.js",
+  "src/features/palette/palette-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
   "src/ai/providers/gemini-provider-adapter.js",
@@ -295,6 +296,7 @@ const requiredReleaseFiles = [
   "tests/unit/global-keyboard-controller.test.cjs",
   "tests/unit/focus-mode-controller.test.cjs",
   "tests/unit/inspector-toggle-controller.test.cjs",
+  "tests/unit/palette-controller-trigger.test.cjs",
   "tests/unit/editor-state.test.cjs",
   "tests/unit/editor-session-store.test.cjs",
   "tests/unit/editor-context-controller.test.cjs",
@@ -714,6 +716,7 @@ const resourceTrashUnitTests = readText("tests/unit/resource-trash.test.cjs");
 const trashCommandsJs = readText("src/commands/trash-commands.js");
 const trashRepositoryJs = readText("src/data/trash-repository.js");
 const paletteControllerJs = readText("src/features/palette/palette-controller.js");
+const paletteControllerTriggerUnitTests = readText("tests/unit/palette-controller-trigger.test.cjs");
 const updateControllerJs = readText("src/features/update/update-controller.js");
 const safeHtmlJs = readText("src/security/safe-html.js");
 const storageJs = readText("storage.js");
@@ -4587,10 +4590,36 @@ assertIncludes(
   "focusController.open(overlay",
   "PaletteController must contain and restore command-palette focus."
 );
-assertIncludes(
-  appJs,
-  'els.commandPaletteBtn.addEventListener("click", () => paletteController?.open?.())',
-  "the command-palette toolbar opener must call PaletteController directly."
+for (const snippet of [
+  "PaletteController requires a checked optional trigger button.",
+  "const triggerClickListener = () => open()",
+  'triggerButton?.addEventListener("click", triggerClickListener)',
+  'triggerButton?.removeEventListener("click", triggerClickListener)',
+  "return Object.freeze({ close, initialize, isOpen, mountTrigger, open, render, unmountTrigger })"
+]) {
+  assertIncludes(
+    paletteControllerJs,
+    snippet,
+    `PaletteController must retain checked toolbar-trigger listener ownership: ${snippet}.`
+  );
+}
+for (const boundary of ["triggerButton: els.commandPaletteBtn", "paletteController?.mountTrigger?.()"]) {
+  assertIncludes(appJs, boundary, `command-palette composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  appJs.indexOf("inspectorToggleController.mount()") < appJs.indexOf("paletteController?.mountTrigger?.()") &&
+    appJs.indexOf("paletteController?.mountTrigger?.()") <
+      appJs.indexOf('els.projectSearchInput.addEventListener("input"'),
+  "command-palette trigger must mount between inspector-toggle and project-filter listeners at the existing position."
+);
+assert(
+  !appJs.includes('els.commandPaletteBtn.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('commandPaletteBtn.addEventListener("click"'),
+  "command-palette toolbar-listener ownership must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\bpaletteController\?\.mountTrigger\?\.\(\)/g) || []).length === 1,
+  "wireEvents must retain exactly one optional command-palette trigger mount."
 );
 for (const directConsumer of ["palette?.open?.()", "palette?.close?.()"]) {
   assertIncludes(
@@ -4600,8 +4629,8 @@ for (const directConsumer of ["palette?.open?.()", "palette?.close?.()"]) {
   );
 }
 assert(
-  appJs.split("paletteController?.open?.()").length - 1 === 1,
-  "only the toolbar opener should remain as an app.js PaletteController.open consumer."
+  !appJs.includes("paletteController?.open?.()"),
+  "app.js must not regain direct PaletteController.open invocation after trigger ownership moves into the controller."
 );
 assert(
   globalKeyboardControllerJs.split("palette?.open?.()").length - 1 === 2 &&
@@ -4623,6 +4652,20 @@ for (const removedFacade of ["openCommandPalette", "closeCommandPalette", "rende
   assert(
     !directFacade.test(appJs) && !directFacade.test(appWorkflowDriverJs),
     `${removedFacade} compatibility façade must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "PaletteController trigger opens through the existing palette behavior and ignores the native event",
+  "PaletteController trigger preserves the already-open no-op branch",
+  "PaletteController owns exact idempotent trigger listener lifecycle independently of initialization",
+  "PaletteController independently skips an absent optional trigger",
+  "PaletteController trigger preserves listener and synchronous open failure timing",
+  "PaletteController validates the checked optional trigger boundary"
+]) {
+  assertIncludes(
+    paletteControllerTriggerUnitTests,
+    testName,
+    `focused command-palette trigger tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
@@ -5186,8 +5229,7 @@ for (const boundary of [
 }
 assert(
   appJs.indexOf("focusModeController.mount()") < appJs.indexOf("inspectorToggleController.mount()") &&
-    appJs.indexOf("inspectorToggleController.mount()") <
-      appJs.indexOf('els.commandPaletteBtn.addEventListener("click"'),
+    appJs.indexOf("inspectorToggleController.mount()") < appJs.indexOf("paletteController?.mountTrigger?.()"),
   "inspector-toggle controls must mount between Focus-mode and command-palette listeners at the existing position."
 );
 assert(
