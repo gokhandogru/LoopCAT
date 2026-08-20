@@ -225,6 +225,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-document-catalog-service.js",
   "src/features/import-export/text-encoding-input-service.js",
   "src/features/import-export/project-document-import-controller.js",
+  "src/features/import-export/file-import-service.js",
   "src/features/import-export/project-package-portability-service.js",
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-presentation-service.js",
@@ -294,6 +295,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-qa-controller.test.cjs",
   "tests/unit/project-domain-controller.test.cjs",
   "tests/unit/project-document-import-controller.test.cjs",
+  "tests/unit/file-import-service.test.cjs",
   "tests/unit/project-package-portability-service.test.cjs",
   "tests/unit/concordance-controller.test.cjs",
   "tests/unit/segment-navigation-controller.test.cjs",
@@ -465,6 +467,8 @@ const projectDomainControllerJs = readText("src/features/projects/project-domain
 const projectDomainControllerUnitTests = readText("tests/unit/project-domain-controller.test.cjs");
 const projectDocumentImportControllerJs = readText("src/features/import-export/project-document-import-controller.js");
 const projectDocumentImportControllerUnitTests = readText("tests/unit/project-document-import-controller.test.cjs");
+const fileImportServiceJs = readText("src/features/import-export/file-import-service.js");
+const fileImportServiceUnitTests = readText("tests/unit/file-import-service.test.cjs");
 const projectPackagePortabilityServiceJs = readText(
   "src/features/import-export/project-package-portability-service.js"
 );
@@ -1932,10 +1936,10 @@ assertIncludes(
   "app.js must compose the checked project-resource transfer controller."
 );
 for (const boundary of [
-  "assertSize: (file, label) => assertFileSize(file, label, MAX_RESOURCE_IMPORT_BYTES)",
-  "readText: readImportTextFile",
+  "assertSize: (file, label) => fileImportService.assertSize(file, label, MAX_RESOURCE_IMPORT_BYTES)",
+  "readText: fileImportService.readText",
   "reportProgress: reportImportProgress",
-  "progressDetail: importProgressDetail",
+  "progressDetail: fileImportService.progressDetail",
   "yieldToUi",
   "parseTmx: parseTmxAsync",
   "parseTbx: parseTbxAsync",
@@ -2499,11 +2503,7 @@ for (const boundary of [
 ]) {
   assertIncludes(appJs, boundary, `text-encoding input composition must inject the ${boundary} boundary.`);
 }
-for (const consumer of [
-  "encodingApi.decodeTextFile(file, textEncodingInputService.decodingOptions())",
-  "options = textEncodingInputService.decodingOptions()",
-  "textEncodingInputService.renderOptions()"
-]) {
+for (const consumer of ["textEncodingInputService.renderOptions()"]) {
   assertIncludes(appJs, consumer, `text-encoding input consumers must call the checked service directly: ${consumer}`);
 }
 for (const consumer of [
@@ -2735,10 +2735,10 @@ for (const boundary of [
   "tbSourceLanguageInput: els.tbResourceSourceLangInput",
   "tbTargetLanguageInput: els.tbResourceTargetLangInput",
   "normalizeLanguageInput: languageInputService.normalizeElement",
-  "assertSize: (file, label) => assertFileSize(file, label, MAX_RESOURCE_IMPORT_BYTES)",
-  "readText: readImportTextFile",
+  "assertSize: (file, label) => fileImportService.assertSize(file, label, MAX_RESOURCE_IMPORT_BYTES)",
+  "readText: fileImportService.readText",
   "reportProgress: reportImportProgress",
-  "progressDetail: importProgressDetail",
+  "progressDetail: fileImportService.progressDetail",
   "parseTmx: parseTmxAsync",
   "parseTbx: parseTbxAsync",
   "repositories: { importTmEntries, importTerms }",
@@ -4956,6 +4956,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createFileImportService } from "../features/import-export/file-import-service.js";',
+  "The application runtime must install the checked file-import service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createFileImportService,",
+  "The application runtime must expose the checked file-import factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createProjectPackagePortabilityService } from "../features/import-export/project-package-portability-service.js";',
   "The application runtime must install the checked project-package portability service."
 );
@@ -6357,6 +6367,123 @@ assertIncludes(
   "source-catalog extraction must scan the checked project-domain controller."
 );
 for (const snippet of [
+  "FileImportService requires encoding, limit, task, text, presentation, status, and durability boundaries.",
+  "ok: false",
+  "errors: [message]",
+  "warnings: []",
+  "preserved: []",
+  "simplified: []",
+  "skipped: []",
+  "risky: []",
+  "if (file?.size > maxBytes)",
+  "Math.round(maxBytes / 1024 / 1024)",
+  "if (file?.size > limits.portableJsonBytes)",
+  "throw new Error(`${label} is too large. Choose a LoopCAT JSON file under 50 MB.`)",
+  "await encoding.api.decodeTextFile(file, encoding.decodingOptions())",
+  "{ text: await file.text() }",
+  "return JSON.parse(decoded.text)",
+  "throw new Error(`${label} is not valid JSON.`)",
+  "async function readText(file, decodingOptions = encoding.decodingOptions())",
+  "return (await encoding.api.decodeTextFile(file, decodingOptions)).text",
+  "const totalCount = Math.max(0, Number(total || 0))",
+  "const doneCount = Math.max(0, Number(done || 0))",
+  "Math.min(100, Math.floor((doneCount / totalCount) * 100))",
+  'return `${label} failed: ${error?.message || "The selected file could not be imported."}`',
+  "if (task.get())",
+  "task.set(label)",
+  "presentation.renderBusy()",
+  "status.set(`${label} started...`)",
+  "const result = await action()",
+  "return result !== false && result !== null",
+  "presentation.renderValidation(errorReport(message))",
+  'task.set("")',
+  "await durability.refresh({ request: false })",
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    fileImportServiceJs,
+    snippet,
+    `FileImportService must retain characterized report, size, decoding, JSON, progress, failure, task, and cleanup policy: ${snippet}`
+  );
+}
+assert(
+  !fileImportServiceJs.includes("encodingApi") &&
+    !fileImportServiceJs.includes("textEncodingInputService") &&
+    !fileImportServiceJs.includes("MAX_PORTABLE_JSON_BYTES") &&
+    !fileImportServiceJs.includes("state.importTask") &&
+    !fileImportServiceJs.includes("setSaveStatus") &&
+    !fileImportServiceJs.includes("renderImportBusyState") &&
+    !fileImportServiceJs.includes("renderValidationReport") &&
+    !fileImportServiceJs.includes("refreshStorageDurability") &&
+    !fileImportServiceJs.includes("stableLower"),
+  "the checked file-import service must use injected encoding, limit, task, text, presentation, status, and durability boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createFileImportService({",
+  "api: encodingApi",
+  "decodingOptions: textEncodingInputService.decodingOptions",
+  "limits: { portableJsonBytes: MAX_PORTABLE_JSON_BYTES }",
+  "get: () => state.importTask",
+  "state.importTask = value",
+  "text: { lower: stableLower }",
+  "renderBusy: renderImportBusyState",
+  "renderValidation: renderValidationReport",
+  "status: { set: setSaveStatus }",
+  "durability: { refresh: refreshStorageDurability }"
+]) {
+  assertIncludes(appJs, boundary, `file-import composition must inject the checked ${boundary} boundary.`);
+}
+for (const removedHelper of [
+  "portableFileErrorReport",
+  "assertFileSize",
+  "parseJsonFile",
+  "readImportTextFile",
+  "importProgressDetail",
+  "fileImportFailureMessage",
+  "runFileImportTask"
+]) {
+  assert(
+    !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  (appJs.match(/\bfileImportService\.assertSize\b/g) || []).length === 3 &&
+    (appJs.match(/\bfileImportService\.readText\b/g) || []).length === 2 &&
+    (appJs.match(/\bfileImportService\.progressDetail\b/g) || []).length === 2 &&
+    (appJs.match(/\bfileImportService\.errorReport\b/g) || []).length === 3 &&
+    (appJs.match(/\bfileImportService\.parseJson\b/g) || []).length === 2 &&
+    (appJs.match(/\bfileImportService\.runTask\b/g) || []).length === 3 &&
+    (appWorkflowDriverJs.match(/\bfileImportService\.readText\b/g) || []).length === 2 &&
+    (appWorkflowDriverJs.match(/\bfileImportService\.errorReport\b/g) || []).length === 4 &&
+    (appWorkflowDriverJs.match(/\bfileImportService\.runTask\b/g) || []).length === 15,
+  "all application and workflow portable-file and import-task consumers must call FileImportService directly."
+);
+for (const testName of [
+  "FileImportService returns fresh exact portable validation reports",
+  "FileImportService preserves optional-file and strict size boundaries with rounded MB copy",
+  "FileImportService parses encoded JSON and rejects oversize before decoding",
+  "FileImportService preserves fallback JSON reads and masks read, decode, and parse failures",
+  "FileImportService preserves default decoding-option timing and text branches",
+  "FileImportService preserves progress numeric edges and failure-message fallback",
+  "FileImportService blocks overlap with two state reads and no lifecycle mutation",
+  "FileImportService preserves fulfilled result normalization and exact lifecycle order",
+  "FileImportService contains action failures and preserves cleanup override behavior",
+  "FileImportService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    fileImportServiceUnitTests,
+    testName,
+    `focused file-import tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/import-export/file-import-service.js"',
+  "source-catalog extraction must scan the checked file-import service."
+);
+for (const snippet of [
   "ProjectDocumentImportController requires checked session, catalog, file, format, repository, history, progress, ID, summary, navigation, activity, workspace, status, presentation, text, and confirmation boundaries.",
   'files.assertSize(file, "Project file", files.maxBytes)',
   'await progress.report("Reading DOCX package", file)',
@@ -6407,7 +6534,7 @@ for (const boundary of [
   "session: editorSessionStore",
   "list: projectDocumentCatalogService.list",
   "manifest: projectDocumentManifest",
-  "assertSize: assertFileSize",
+  "assertSize: fileImportService.assertSize",
   "maxBytes: MAX_PROJECT_IMPORT_BYTES",
   "extractDocx: extractDocxSegments",
   "parseLocalization: parseLocalizationFile",
@@ -12828,7 +12955,7 @@ assertIncludes(
 assertIncludes(appJs, "function renderImportBusyState", "app.js must keep a visible import busy-state guard.");
 assertIncludes(
   functionBody(appJs, "const importExportController", "const projectDialogController"),
-  "runImportTask: runFileImportTask",
+  "runImportTask: fileImportService.runTask",
   "app.js must inject the shared import busy-state guard into the checked import/export controller."
 );
 assertIncludes(
@@ -12863,7 +12990,7 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "const recoveryWorkspaceController", "const projectDialogController"),
-  'runFileImportTask("Workspace sync"',
+  'fileImportService.runTask("Workspace sync"',
   "the checked recovery/workspace controller must receive workspace sync through the import busy-state guard."
 );
 assertIncludes(

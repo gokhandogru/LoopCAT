@@ -98,7 +98,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     renderWorkspaceStatus();
     let finishLongImport = null;
     const longImportFile = { name: "large-import.docx", size: 12 * 1024 * 1024 };
-    const longImportTask = runFileImportTask("Project file import", () => new Promise((resolve) => {
+    const longImportTask = fileImportService.runTask("Project file import", () => new Promise((resolve) => {
       setImportProgress("Reading large project file", longImportFile);
       finishLongImport = resolve;
     }));
@@ -119,12 +119,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "active import progress reports phase, file name, and file size"
     );
     let overlappingImportRan = false;
-    const overlappingImportResult = await runFileImportTask("TMX import", () => {
+    const overlappingImportResult = await fileImportService.runTask("TMX import", () => {
       overlappingImportRan = true;
     });
     assert(!overlappingImportResult && !overlappingImportRan && els.saveStatus.textContent.includes("still running"), "overlapping import task is blocked before it mutates project data");
     let overlappingWorkspaceSyncRan = false;
-    const overlappingWorkspaceSyncResult = await runFileImportTask("Workspace sync", () => {
+    const overlappingWorkspaceSyncResult = await fileImportService.runTask("Workspace sync", () => {
       overlappingWorkspaceSyncRan = true;
     });
     assert(!overlappingWorkspaceSyncResult && !overlappingWorkspaceSyncRan && els.saveStatus.textContent.includes("still running"), "overlapping workspace sync is blocked before it reads package data");
@@ -511,7 +511,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
   </body>
 </tmx>`;
     const windows1254TmxEntries = parseTmx(
-      await readImportTextFile(new File([encodingApi.encodeText(windows1254TmxText, "windows-1254").content], "workflow-windows-1254.tmx", { type: "application/xml" })),
+      await fileImportService.readText(new File([encodingApi.encodeText(windows1254TmxText, "windows-1254").content], "workflow-windows-1254.tmx", { type: "application/xml" })),
       { sourceLang: "en", targetLang: "tr", tmName: "Encoding TM", projectName: "Encoding test" }
     );
     assert(windows1254TmxEntries[0]?.target === "I\u015f\u0131k \u00e7\u0131kt\u0131", "TMX import decodes Windows-1254 translation memory text");
@@ -528,7 +528,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
   </text>
 </tbx>`;
     const windows1254TbxTerms = parseTbx(
-      await readImportTextFile(new File([encodingApi.encodeText(windows1254TbxText, "windows-1254").content], "workflow-windows-1254.tbx", { type: "application/xml" })),
+      await fileImportService.readText(new File([encodingApi.encodeText(windows1254TbxText, "windows-1254").content], "workflow-windows-1254.tbx", { type: "application/xml" })),
       { sourceLang: "en", targetLang: "tr", termBaseName: "Encoding TB" }
     );
     assert(
@@ -550,7 +550,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     </tu>
   </body>
 </tmx>`;
-    const regionalLocaleTmxOk = await runFileImportTask("TMX import", () => projectResourceTransferController.importTmx(new File([regionalLocaleTmx], "workflow-regional.tmx", { type: "application/xml" })));
+    const regionalLocaleTmxOk = await fileImportService.runTask("TMX import", () => projectResourceTransferController.importTmx(new File([regionalLocaleTmx], "workflow-regional.tmx", { type: "application/xml" })));
     const importedRegionalTmEntries = await listTmEntries({ sourceLang: "en", targetLang: "tr", tmNames: [mainTmName()] });
     assert(
       regionalLocaleTmxOk &&
@@ -577,7 +577,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     </body>
   </text>
 </tbx>`;
-    const regionalLocaleTbxOk = await runFileImportTask("TBX import", () => projectResourceTransferController.importTbx(new File([regionalLocaleTbx], "workflow-regional.tbx", { type: "application/xml" })));
+    const regionalLocaleTbxOk = await fileImportService.runTask("TBX import", () => projectResourceTransferController.importTbx(new File([regionalLocaleTbx], "workflow-regional.tbx", { type: "application/xml" })));
     const importedRegionalTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: projectTermBaseNames() });
     assert(
       regionalLocaleTbxOk &&
@@ -5596,7 +5596,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await restoreBackupFile(new File(["{not valid json"], "broken-backup.json", { type: "application/json" }));
     } catch (error) {
       malformedBackupRejected = error.message === "Backup file is not valid JSON.";
-      renderValidationReport(portableFileErrorReport(error.message));
+      renderValidationReport(fileImportService.errorReport(error.message));
       setSaveStatus(error.message, "dirty");
     }
     assert(malformedBackupRejected && state.lastValidationReport?.errors?.[0] === "Backup file is not valid JSON.", "malformed backup JSON fails with validation report");
@@ -5609,7 +5609,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await restoreBackupFile(new File([new Blob([new Uint8Array(MAX_PORTABLE_JSON_BYTES + 1)])], "huge-backup.json", { type: "application/json" }));
     } catch (error) {
       oversizedBackupRejected = error.message.includes("too large");
-      renderValidationReport(portableFileErrorReport(error.message));
+      renderValidationReport(fileImportService.errorReport(error.message));
       setSaveStatus(error.message, "dirty");
     }
     assert(oversizedBackupRejected && state.lastValidationReport?.errors?.[0]?.includes("too large"), "oversized backup JSON fails before restore");
@@ -5619,7 +5619,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await importProjectPackage(new File(["{broken package"], "broken.loopcat.json", { type: "application/json" }));
     } catch (error) {
       malformedPackageRejected = error.message === "Project package is not valid JSON.";
-      renderValidationReport(portableFileErrorReport(error.message));
+      renderValidationReport(fileImportService.errorReport(error.message));
       setSaveStatus(error.message, "dirty");
     }
     assert(malformedPackageRejected && state.lastValidationReport?.errors?.[0] === "Project package is not valid JSON.", "malformed project package JSON fails with validation report");
@@ -5629,7 +5629,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await importProjectPackage(new File([new Blob([new Uint8Array(MAX_PORTABLE_JSON_BYTES + 1)])], "huge.loopcat.json", { type: "application/json" }));
     } catch (error) {
       oversizedPackageRejected = error.message.includes("too large");
-      renderValidationReport(portableFileErrorReport(error.message));
+      renderValidationReport(fileImportService.errorReport(error.message));
       setSaveStatus(error.message, "dirty");
     }
     assert(oversizedPackageRejected && state.lastValidationReport?.errors?.[0]?.includes("too large"), "oversized project package JSON fails before import");
@@ -5858,26 +5858,26 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     await openProject(project.id);
     const documentCountBeforeBadImport = editorSessionStore.getProject().documents.length;
-    const badProjectImportOk = await runFileImportTask("Project file import", () => projectDocumentImportController.importFile(new File(["{ broken json"], "broken.json", { type: "application/json" })));
+    const badProjectImportOk = await fileImportService.runTask("Project file import", () => projectDocumentImportController.importFile(new File(["{ broken json"], "broken.json", { type: "application/json" })));
     assert(!badProjectImportOk && editorSessionStore.getProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.startsWith("Project file import failed:"), "damaged project file import reports failure without changing project documents");
-    const oversizedProjectImportOk = await runFileImportTask("Project file import", () => projectDocumentImportController.importFile({ name: "huge.docx", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
+    const oversizedProjectImportOk = await fileImportService.runTask("Project file import", () => projectDocumentImportController.importFile({ name: "huge.docx", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
     assert(!oversizedProjectImportOk && editorSessionStore.getProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "oversized project file import is rejected before parsing");
-    const oversizedDirectDocxImportOk = await runFileImportTask("Project file import", () => projectDocumentImportController.importDocx({ name: "huge-direct.docx", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
+    const oversizedDirectDocxImportOk = await fileImportService.runTask("Project file import", () => projectDocumentImportController.importDocx({ name: "huge-direct.docx", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
     assert(!oversizedDirectDocxImportOk && editorSessionStore.getProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct DOCX import helper rejects oversized files before parsing");
-    const oversizedDirectXliffImportOk = await runFileImportTask("Project file import", () => projectDocumentImportController.importXliff({ name: "huge-direct.xlf", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
+    const oversizedDirectXliffImportOk = await fileImportService.runTask("Project file import", () => projectDocumentImportController.importXliff({ name: "huge-direct.xlf", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
     assert(!oversizedDirectXliffImportOk && editorSessionStore.getProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct XLIFF import helper rejects oversized files before parsing");
-    const oversizedDirectLocalizationImportOk = await runFileImportTask("Project file import", () => projectDocumentImportController.importLocalization({ name: "huge-direct.html", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
+    const oversizedDirectLocalizationImportOk = await fileImportService.runTask("Project file import", () => projectDocumentImportController.importLocalization({ name: "huge-direct.html", size: MAX_PROJECT_IMPORT_BYTES + 1 }));
     assert(!oversizedDirectLocalizationImportOk && editorSessionStore.getProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.includes("Project file is too large"), "direct localization import helper rejects oversized files before parsing");
 
-    const badTmxImportOk = await runFileImportTask("TMX import", () => projectResourceTransferController.importTmx(new File(["<tmx><body>"], "broken.tmx", { type: "application/xml" })));
+    const badTmxImportOk = await fileImportService.runTask("TMX import", () => projectResourceTransferController.importTmx(new File(["<tmx><body>"], "broken.tmx", { type: "application/xml" })));
     assert(!badTmxImportOk && state.lastValidationReport?.errors?.[0]?.includes("TMX import failed"), "damaged TMX import reports failure through validation panel");
-    const oversizedTmxImportOk = await runFileImportTask("TMX import", () => projectResourceTransferController.importTmx({ name: "huge.tmx", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
+    const oversizedTmxImportOk = await fileImportService.runTask("TMX import", () => projectResourceTransferController.importTmx({ name: "huge.tmx", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
     assert(!oversizedTmxImportOk && state.lastValidationReport?.errors?.[0]?.includes("TMX file is too large"), "oversized TMX import is rejected before parsing");
-    const oversizedTbxImportOk = await runFileImportTask("TBX import", () => projectResourceTransferController.importTbx({ name: "huge.tbx", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
+    const oversizedTbxImportOk = await fileImportService.runTask("TBX import", () => projectResourceTransferController.importTbx({ name: "huge.tbx", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
     assert(!oversizedTbxImportOk && state.lastValidationReport?.errors?.[0]?.includes("TBX file is too large"), "oversized TBX import is rejected before parsing");
-    const badTermListImportOk = await runFileImportTask("Term list import", () => projectResourceTransferController.importTermList(new File(["only-source"], "broken.csv", { type: "text/csv" })));
+    const badTermListImportOk = await fileImportService.runTask("Term list import", () => projectResourceTransferController.importTermList(new File(["only-source"], "broken.csv", { type: "text/csv" })));
     assert(!badTermListImportOk && state.lastValidationReport?.errors?.[0]?.includes("Term list import failed"), "damaged term list import reports failure through validation panel");
-    const oversizedTermListImportOk = await runFileImportTask("Term list import", () => projectResourceTransferController.importTermList({ name: "huge.csv", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
+    const oversizedTermListImportOk = await fileImportService.runTask("Term list import", () => projectResourceTransferController.importTermList({ name: "huge.csv", size: MAX_RESOURCE_IMPORT_BYTES + 1 }));
     assert(!oversizedTermListImportOk && state.lastValidationReport?.errors?.[0]?.includes("Term list file is too large"), "oversized term list import is rejected before parsing");
 
     const structuralDocument = { id: makeId("document"), name: "workflow-structural.txt", type: "text" };

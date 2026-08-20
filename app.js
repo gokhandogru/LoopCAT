@@ -1131,6 +1131,27 @@ const textEncodingInputService = appRuntime.featureFactories.createTextEncodingI
   replaceSafeHtml
 });
 
+const fileImportService = appRuntime.featureFactories.createFileImportService({
+  encoding: {
+    api: encodingApi,
+    decodingOptions: textEncodingInputService.decodingOptions
+  },
+  limits: { portableJsonBytes: MAX_PORTABLE_JSON_BYTES },
+  task: {
+    get: () => state.importTask,
+    set: (value) => {
+      state.importTask = value;
+    }
+  },
+  text: { lower: stableLower },
+  presentation: {
+    renderBusy: renderImportBusyState,
+    renderValidation: renderValidationReport
+  },
+  status: { set: setSaveStatus },
+  durability: { refresh: refreshStorageDurability }
+});
+
 const protectedTagInspectionService = appRuntime.featureFactories.createProtectedTagInspectionService({
   detectTags: detectProtectedTags
 });
@@ -1701,10 +1722,10 @@ const projectResourceTransferController =
   appRuntime.featureFactories.createProjectResourceTransferController({
     session: { getProject: editorSessionStore.getProject },
     files: {
-      assertSize: (file, label) => assertFileSize(file, label, MAX_RESOURCE_IMPORT_BYTES),
-      readText: readImportTextFile,
+      assertSize: (file, label) => fileImportService.assertSize(file, label, MAX_RESOURCE_IMPORT_BYTES),
+      readText: fileImportService.readText,
       reportProgress: reportImportProgress,
-      progressDetail: importProgressDetail,
+      progressDetail: fileImportService.progressDetail,
       yieldToUi
     },
     parsers: {
@@ -3484,7 +3505,7 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
   safeText: displaySafeText,
   chooseWorkspace: chooseWorkspaceFolder,
   saveProject: saveCurrentProjectPackageToWorkspace,
-  syncWorkspace: () => runFileImportTask("Workspace sync", () => syncWorkspaceFromFolder()),
+  syncWorkspace: () => fileImportService.runTask("Workspace sync", () => syncWorkspaceFromFolder()),
   exportWorkspaceBackup: exportWorkspaceBackupToFolder,
   repairWorkspace: repairWorkspaceLinks,
   saveRecovery: saveWorkspaceRecoveryPackages,
@@ -3525,7 +3546,7 @@ const projectDocumentImportController =
       manifest: projectDocumentManifest
     },
     files: {
-      assertSize: assertFileSize,
+      assertSize: fileImportService.assertSize,
       maxBytes: MAX_PROJECT_IMPORT_BYTES
     },
     formats: {
@@ -3591,7 +3612,7 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
     resourceTermListImportInput: els.resourceTermListImportInput
   },
   hasProject: () => Boolean(editorSessionStore.getProject()),
-  runImportTask: runFileImportTask,
+  runImportTask: fileImportService.runTask,
   importProjectFile: projectDocumentImportController.importFile,
   importProjectPackage: async (file) => {
     await autosaveService.flush();
@@ -3756,10 +3777,10 @@ const resourceLibraryImportController =
       normalizeLanguageInput: languageInputService.normalizeElement
     },
     files: {
-      assertSize: (file, label) => assertFileSize(file, label, MAX_RESOURCE_IMPORT_BYTES),
-      readText: readImportTextFile,
+      assertSize: (file, label) => fileImportService.assertSize(file, label, MAX_RESOURCE_IMPORT_BYTES),
+      readText: fileImportService.readText,
       reportProgress: reportImportProgress,
-      progressDetail: importProgressDetail,
+      progressDetail: fileImportService.progressDetail,
       yieldToUi
     },
     parsers: {
@@ -3881,7 +3902,7 @@ const resourcesController = appRuntime?.featureFactories?.createResourcesControl
   render: resourcesPresentationService.render,
   keyForItem: (item, type) => resourceCatalogService.key(item, type === "tm" ? "tmName" : "termBaseName"),
   normalizeLanguageInput: languageInputService.normalizeElement,
-  runImportTask: runFileImportTask,
+  runImportTask: fileImportService.runTask,
   importTm: resourceLibraryImportController.importTmx,
   importTb: resourceLibraryImportController.importTbx,
   importTermList: resourceLibraryImportController.importTermList,
@@ -6292,70 +6313,6 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-function portableFileErrorReport(message) {
-  return { ok: false, errors: [message], warnings: [], preserved: [], simplified: [], skipped: [], risky: [] };
-}
-
-function assertFileSize(file, label, maxBytes) {
-  if (file?.size > maxBytes) {
-    throw new Error(`${label} is too large. Choose a file under ${Math.round(maxBytes / 1024 / 1024)} MB.`);
-  }
-}
-
-async function parseJsonFile(file, label) {
-  if (file?.size > MAX_PORTABLE_JSON_BYTES) {
-    throw new Error(`${label} is too large. Choose a LoopCAT JSON file under 50 MB.`);
-  }
-  try {
-    const decoded = encodingApi
-      ? await encodingApi.decodeTextFile(file, textEncodingInputService.decodingOptions())
-      : { text: await file.text() };
-    return JSON.parse(decoded.text);
-  } catch {
-    throw new Error(`${label} is not valid JSON.`);
-  }
-}
-
-async function readImportTextFile(file, options = textEncodingInputService.decodingOptions()) {
-  if (encodingApi) return (await encodingApi.decodeTextFile(file, options)).text;
-  return file.text();
-}
-
-function importProgressDetail(done, total, unitLabel) {
-  const totalCount = Math.max(0, Number(total || 0));
-  const doneCount = Math.max(0, Number(done || 0));
-  const percent = totalCount ? Math.min(100, Math.floor((doneCount / totalCount) * 100)) : 100;
-  const countText = totalCount ? `${doneCount}/${totalCount}` : `${doneCount}`;
-  return `${percent}% - ${countText} ${unitLabel}`;
-}
-
-function fileImportFailureMessage(error, label) {
-  return `${label} failed: ${error?.message || "The selected file could not be imported."}`;
-}
-
-async function runFileImportTask(label, action) {
-  if (state.importTask) {
-    setSaveStatus(`${state.importTask} is still running. Wait for it to finish before starting ${stableLower(label)}.`, "dirty");
-    return false;
-  }
-  state.importTask = label;
-  renderImportBusyState();
-  setSaveStatus(`${label} started...`);
-  try {
-    const result = await action();
-    return result !== false && result !== null;
-  } catch (error) {
-    const message = fileImportFailureMessage(error, label);
-    renderValidationReport(portableFileErrorReport(message));
-    setSaveStatus(message, "dirty");
-    return false;
-  } finally {
-    state.importTask = "";
-    renderImportBusyState();
-    await refreshStorageDurability({ request: false });
-  }
-}
-
 async function buildProjectPackage(project = editorSessionStore.getProject(), segmentRecords = null, options = {}) {
   if (!project) return null;
   await autosaveService.flush(project.id);
@@ -6466,7 +6423,7 @@ async function exportBrowserBackup() {
     return true;
   } catch (error) {
     const message = error.message || "Backup export failed.";
-    renderValidationReport(error.validation || portableFileErrorReport(message));
+    renderValidationReport(error.validation || fileImportService.errorReport(message));
     setSaveStatus(message, "dirty");
     return false;
   }
@@ -6474,7 +6431,7 @@ async function exportBrowserBackup() {
 
 function reportProjectPackageExportFailure(error, pkg = null) {
   const message = error?.message || "Project package export failed";
-  renderValidationReport(error?.validation || pkg?.validation || portableFileErrorReport(message));
+  renderValidationReport(error?.validation || pkg?.validation || fileImportService.errorReport(message));
   setSaveStatus(message, "dirty");
 }
 
@@ -6615,7 +6572,7 @@ async function importProjectPackageData(pkg, options = {}) {
 
 async function importProjectPackage(file) {
   await reportImportProgress("Reading project package", file);
-  const pkg = await parseJsonFile(file, "Project package");
+  const pkg = await fileImportService.parseJson(file, "Project package");
   return importProjectPackageData(pkg, { sourceName: file.name });
 }
 
@@ -6671,7 +6628,7 @@ async function restoreBackupData(backup) {
 
 async function restoreBackupFile(file) {
   await reportImportProgress("Reading backup file", file);
-  return restoreBackupData(await parseJsonFile(file, "Backup file"));
+  return restoreBackupData(await fileImportService.parseJson(file, "Backup file"));
 }
 
 async function chooseWorkspaceFolder() {
@@ -6966,7 +6923,7 @@ async function exportWorkspaceBackupToFolder() {
     setSaveStatus(`Workspace backup saved: ${ref.path}${manifestWarning}`, ref.manifestSaved === false || reportCount(validation) ? "dirty" : "saved");
   } catch (error) {
     const message = error.message || "Workspace backup failed.";
-    renderValidationReport(error.validation || portableFileErrorReport(message));
+    renderValidationReport(error.validation || fileImportService.errorReport(message));
     setSaveStatus(message, "dirty");
     throw error;
   }
