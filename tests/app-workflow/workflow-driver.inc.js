@@ -3142,10 +3142,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await setActiveSegment(segmentIndex);
     let confirmRollbackSegment = editorSessionStore.getSegments()[segmentIndex];
     segmentTargetStateService.setHiddenField(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG, true);
-    const failedDirectTmSave = await saveActiveSegmentToTm();
+    const failedDirectTmSave = await segmentTmSaveController.saveActive();
     assert(!failedDirectTmSave && els.saveStatus.textContent.includes("Simulated TM save failure"), "direct TM save failure reports visible status");
     Reflect.deleteProperty(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG);
-    const successfulDirectTmSave = await saveActiveSegmentToTm();
+    const successfulDirectTmSave = await segmentTmSaveController.saveActive();
     assert(successfulDirectTmSave && els.saveStatus.textContent === "Segment saved to TM", "direct TM save reports visible success");
 
     const pretranslateSource = "Pretranslate source phrase.";

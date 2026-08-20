@@ -176,6 +176,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-target-state-service.js",
   "src/features/editor/segment-command-restoration-controller.js",
   "src/features/editor/segment-confirmation-state-service.js",
+  "src/features/editor/segment-tm-save-controller.js",
   "src/features/editor/structural-segment-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -270,6 +271,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-target-state-service.test.cjs",
   "tests/unit/segment-command-restoration-controller.test.cjs",
   "tests/unit/segment-confirmation-state-service.test.cjs",
+  "tests/unit/segment-tm-save-controller.test.cjs",
   "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
@@ -401,6 +403,7 @@ const segmentCommandRestorationControllerJs = readText(
 const segmentConfirmationStateServiceJs = readText(
   "src/features/editor/segment-confirmation-state-service.js"
 );
+const segmentTmSaveControllerJs = readText("src/features/editor/segment-tm-save-controller.js");
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
@@ -420,6 +423,7 @@ const segmentCommandRestorationControllerUnitTests = readText(
 const segmentConfirmationStateServiceUnitTests = readText(
   "tests/unit/segment-confirmation-state-service.test.cjs"
 );
+const segmentTmSaveControllerUnitTests = readText("tests/unit/segment-tm-save-controller.test.cjs");
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
@@ -4249,6 +4253,16 @@ assertIncludes(
   "createSegmentConfirmationStateService,",
   "The application runtime must expose the checked segment confirmation-state factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createSegmentTmSaveController } from "../features/editor/segment-tm-save-controller.js";',
+  "The application runtime must install the checked direct segment-TM-save controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentTmSaveController,",
+  "The application runtime must expose the checked direct segment-TM-save factory."
+);
 for (const boundary of [
   "editLifecycle.finalize(segment.id)",
   "persistence.clearPending(segment, { finalizeEdit: false })",
@@ -4990,6 +5004,95 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/segment-confirmation-state-service.js"',
   "source-catalog extraction must scan the checked segment confirmation-state service."
+);
+for (const snippet of [
+  'throw new TypeError("SegmentTmSaveController requires session and selection boundaries.")',
+  'throw new TypeError("SegmentTmSaveController requires translation-memory boundaries.")',
+  "const beforeSave =",
+  "async function save(segment, project = session.getProject())",
+  "if (!segment || !project || !segment.source.trim() || !segment.target.trim()) return null",
+  "beforeSave(segment)",
+  "const entry = await tm.saveEntry({",
+  "source: segment.source",
+  "target: segment.target",
+  "sourceLang: project.sourceLang",
+  "targetLang: project.targetLang",
+  "projectName: project.name",
+  "tmName: tm.mainName(project)",
+  "workspace.markDirty(project.id)",
+  "const { reportStatus = true } = saveOptions || {}",
+  "const segment = selection.getActiveSegment()",
+  "if (!segment || !session.getProject() || !segment.source.trim() || !segment.target.trim()) return null",
+  "const entry = await save(segment, session.getProject())",
+  "await tm.refreshMatches()",
+  'if (reportStatus) status.set("Segment saved to TM", "saved")',
+  "if (!reportStatus) throw error",
+  'status.set(error.message || "Save to TM failed", "dirty")',
+  "return Object.freeze({ save, saveActive })"
+]) {
+  assertIncludes(
+    segmentTmSaveControllerJs,
+    snippet,
+    `SegmentTmSaveController must retain characterized direct-save orchestration: ${snippet}`
+  );
+}
+assert(
+  !segmentTmSaveControllerJs.includes("LOOPCAT_TEST_BUILD") &&
+    !segmentTmSaveControllerJs.includes("SAVE_TM_FAILURE_TEST_FLAG"),
+  "the checked direct segment-TM-save controller must not contain app test-build policy."
+);
+assertIncludes(
+  appJs,
+  "createSegmentTmSaveController({",
+  "app.js must compose the checked direct segment-TM-save controller."
+);
+for (const boundary of [
+  "session: { getProject: editorSessionStore.getProject }",
+  "selection: { getActiveSegment: currentSegment }",
+  "tm: { saveEntry: saveTmEntry, mainName: mainTmName, refreshMatches: refreshTmMatches }",
+  "workspace: { markDirty: markWorkspaceDirty }",
+  "status: { set: setSaveStatus }",
+  "if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG])"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `direct segment-TM-save composition must inject the checked ${boundary} boundary.`
+  );
+}
+for (const method of ["save", "saveActive"]) {
+  assertIncludes(
+    `${appJs}\n${appWorkflowDriverJs}`,
+    `segmentTmSaveController.${method}`,
+    `direct TM consumers must call SegmentTmSaveController.${method} directly.`
+  );
+}
+for (const removedHelper of ["saveSegmentToTm", "saveActiveSegmentToTm"]) {
+  const directHelper = new RegExp(`async\\s+function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} direct TM-save helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "SegmentTmSaveController returns null before effects for missing or blank segment inputs",
+  "SegmentTmSaveController preserves the exact TM payload, repository result, default project, and dirtiness",
+  "SegmentTmSaveController saves the active segment, refreshes matches, and reports success by default",
+  "SegmentTmSaveController preserves active eligibility and status suppression",
+  "SegmentTmSaveController reports primary and post-save refresh failures without throwing",
+  "SegmentTmSaveController propagates silent failures and runs the pre-save hook before the repository",
+  "SegmentTmSaveController validates collaborators and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentTmSaveControllerUnitTests,
+    testName,
+    `focused direct segment-TM-save tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-tm-save-controller.js"',
+  "source-catalog extraction must scan the checked direct segment-TM-save controller."
 );
 assertIncludes(
   appBootstrapJs,

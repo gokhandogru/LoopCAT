@@ -53,6 +53,7 @@ import { createSegmentProgressService } from "../features/editor/segment-progres
 import { createSegmentTargetStateService } from "../features/editor/segment-target-state-service.js";
 import { createSegmentCommandRestorationController } from "../features/editor/segment-command-restoration-controller.js";
 import { createSegmentConfirmationStateService } from "../features/editor/segment-confirmation-state-service.js";
+import { createSegmentTmSaveController } from "../features/editor/segment-tm-save-controller.js";
 import { createTargetReplacementController } from "../features/editor/target-replacement-controller.js";
 import { createTmPretranslationController } from "../features/editor/tm-pretranslation-controller.js";
 import { createStructuralSegmentController } from "../features/editor/structural-segment-controller.js";
@@ -264,6 +265,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createSegmentTargetStateService,
       createSegmentCommandRestorationController,
       createSegmentConfirmationStateService,
+      createSegmentTmSaveController,
       createTargetReplacementController,
       createTmPretranslationController,
       createPaletteController,

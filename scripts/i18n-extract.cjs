@@ -117,6 +117,13 @@ const segmentConfirmationStateServicePath = path.join(
   "editor",
   "segment-confirmation-state-service.js"
 );
+const segmentTmSaveControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "editor",
+  "segment-tm-save-controller.js"
+);
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const resourceMutationControllerPath = path.join(
   root,
@@ -341,6 +348,7 @@ function main() {
     segmentConfirmationStateServicePath,
     "src/features/editor/segment-confirmation-state-service.js"
   );
+  extractScript(messagesByText, segmentTmSaveControllerPath, "src/features/editor/segment-tm-save-controller.js");
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(
     messagesByText,

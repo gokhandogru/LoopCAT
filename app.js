@@ -1143,6 +1143,21 @@ const segmentConfirmationStateService =
     now: () => new Date().toISOString()
   });
 
+const segmentTmSaveController = appRuntime.featureFactories.createSegmentTmSaveController({
+  session: { getProject: editorSessionStore.getProject },
+  selection: { getActiveSegment: currentSegment },
+  tm: { saveEntry: saveTmEntry, mainName: mainTmName, refreshMatches: refreshTmMatches },
+  workspace: { markDirty: markWorkspaceDirty },
+  status: { set: setSaveStatus },
+  testHooks: {
+    beforeSave: (segment) => {
+      if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated TM save failure");
+      }
+    }
+  }
+});
+
 const projectLanguageContextController = appRuntime.featureFactories.createProjectLanguageContextController({
   getProject: () => editorSessionStore.getProject(),
   languageInput: languageInputService,
@@ -1549,7 +1564,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
   persistence: {
     clearPending: autosaveService.clear,
     save: saveSegment,
-    saveToTm: saveSegmentToTm,
+    saveToTm: segmentTmSaveController.save,
     logActivity: (segment, project) =>
       logProjectActivity(
         "confirm-segment",
@@ -4649,7 +4664,7 @@ function commandList() {
     { id: "copy-source", label: "Copy source", run: targetProducerController.copySourceToTarget, enabled: Boolean(currentSegment()) },
     { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: structuralSegmentController.split, enabled: Boolean(currentSegment() && structuralSegmentController.canSplit(currentSegment())) },
     { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: structuralSegmentController.merge, enabled: Boolean(currentSegment() && structuralSegmentController.canMerge(currentSegment(), structuralSegmentController.nextForMerge(currentSegment()))) },
-    { id: "save-tm", label: "Save segment to TM", run: saveActiveSegmentToTm, enabled: Boolean(currentSegment()?.target?.trim()) },
+    { id: "save-tm", label: "Save segment to TM", run: segmentTmSaveController.saveActive, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(editorSessionStore.getProject()) },
     { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "quality-passport", label: "Export Quality Passport", run: reportExportController.exportQualityPassport, enabled: Boolean(editorSessionStore.getProject()) },
@@ -5990,37 +6005,6 @@ function applyTargetDraft({ index, segment, target }) {
 function openReplacePanel() {
   els.replaceMenu.open = true;
   els.replaceFindInput.focus();
-}
-
-async function saveSegmentToTm(segment, project = editorSessionStore.getProject()) {
-  if (!segment || !project || !segment.source.trim() || !segment.target.trim()) return null;
-      if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG]) throw new Error("Simulated TM save failure");
-  const entry = await saveTmEntry({
-    source: segment.source,
-    target: segment.target,
-    sourceLang: project.sourceLang,
-    targetLang: project.targetLang,
-    projectName: project.name,
-    tmName: mainTmName(project)
-  });
-  markWorkspaceDirty(project.id);
-  return entry;
-}
-
-async function saveActiveSegmentToTm(options = {}) {
-  const { reportStatus = true } = options || {};
-  const segment = currentSegment();
-  if (!segment || !editorSessionStore.getProject() || !segment.source.trim() || !segment.target.trim()) return null;
-  try {
-    const entry = await saveSegmentToTm(segment, editorSessionStore.getProject());
-    await refreshTmMatches();
-    if (reportStatus) setSaveStatus("Segment saved to TM", "saved");
-    return entry;
-  } catch (error) {
-    if (!reportStatus) throw error;
-    setSaveStatus(error.message || "Save to TM failed", "dirty");
-    return null;
-  }
 }
 
 function selectedConcordanceKeyword() {
@@ -7606,7 +7590,7 @@ function wireEvents() {
   els.projectSearchInput.addEventListener("input", renderProjectsView);
   els.languagePairFilter.addEventListener("change", renderProjectsView);
 
-  els.saveTmBtn.addEventListener("click", saveActiveSegmentToTm);
+  els.saveTmBtn.addEventListener("click", segmentTmSaveController.saveActive);
   els.nextOpenBtn.addEventListener("click", goToNextOpenSegment);
   els.runQaBtn.addEventListener("click", runProjectQa);
   document.querySelectorAll("[data-panel-toggle]").forEach((button) => {
