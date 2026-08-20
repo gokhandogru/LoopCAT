@@ -4,6 +4,7 @@ import { createApplicationCommandButtonsController } from "./application-command
 import { createApplicationEventWiringController } from "./application-event-wiring-controller.js";
 import { createApplicationMenuController } from "./application-menu-controller.js";
 import { createApplicationPersistenceLifecycleController } from "./application-persistence-lifecycle-controller.js";
+import { createApplicationStartupController } from "./application-startup-controller.js";
 import { createApplicationUpdateControlsController } from "./application-update-controls-controller.js";
 import { createApplicationViewController } from "./application-view-controller.js";
 import { createNavigationController } from "./navigation-controller.js";
@@ -337,6 +338,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createApplicationEventWiringController,
       createApplicationMenuController,
       createApplicationPersistenceLifecycleController,
+      createApplicationStartupController,
       createApplicationUpdateControlsController,
       createApplicationViewController,
       createGlobalKeyboardController,

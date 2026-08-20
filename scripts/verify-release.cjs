@@ -161,6 +161,7 @@ const requiredReleaseFiles = [
   "src/app/application-event-wiring-controller.js",
   "src/app/application-menu-controller.js",
   "src/app/application-persistence-lifecycle-controller.js",
+  "src/app/application-startup-controller.js",
   "src/app/application-update-controls-controller.js",
   "src/app/application-view-controller.js",
   "src/app/global-keyboard-controller.js",
@@ -299,6 +300,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-event-wiring-controller.test.cjs",
   "tests/unit/application-menu-controller.test.cjs",
   "tests/unit/application-persistence-lifecycle-controller.test.cjs",
+  "tests/unit/application-startup-controller.test.cjs",
   "tests/unit/application-update-controls-controller.test.cjs",
   "tests/unit/application-view-controller.test.cjs",
   "tests/unit/global-keyboard-controller.test.cjs",
@@ -471,6 +473,8 @@ const applicationPersistenceLifecycleControllerJs = readText("src/app/applicatio
 const applicationPersistenceLifecycleControllerUnitTests = readText(
   "tests/unit/application-persistence-lifecycle-controller.test.cjs"
 );
+const applicationStartupControllerJs = readText("src/app/application-startup-controller.js");
+const applicationStartupControllerUnitTests = readText("tests/unit/application-startup-controller.test.cjs");
 const applicationUpdateControlsControllerJs = readText("src/app/application-update-controls-controller.js");
 const applicationUpdateControlsControllerUnitTests = readText(
   "tests/unit/application-update-controls-controller.test.cjs"
@@ -15703,7 +15707,7 @@ for (const boundary of [
   "termForm: termFormController",
   "projectDomain: projectDomainController",
   "applicationPersistence: applicationPersistenceLifecycleController",
-  "applicationEventWiringController.wire()"
+  "wiring: applicationEventWiringController"
 ]) {
   assertIncludes(appJs, boundary, `event-wiring composition must retain ${boundary}.`);
 }
@@ -15738,6 +15742,135 @@ for (const testName of [
     applicationEventWiringControllerUnitTests,
     testName,
     `focused event-wiring tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createApplicationStartupController } from "./application-startup-controller.js";',
+  "the application runtime must install the checked startup controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationStartupController,",
+  "the application runtime must expose the checked startup controller factory."
+);
+for (const snippet of [
+  "ApplicationStartupController requires checked progress reporters.",
+  "ApplicationStartupController requires checked locale, UI, and wiring actions.",
+  "ApplicationStartupController requires checked workspace actions.",
+  "ApplicationStartupController requires a checked optional workspace reconnect action.",
+  "ApplicationStartupController requires checked durability and project actions.",
+  "ApplicationStartupController requires checked optional preference controllers.",
+  "ApplicationStartupController requires checked workflow, offline, and error actions.",
+  'reporting.checkpoint("loading active interface locale")',
+  "await locale.initialize()",
+  'reporting.checkpoint("initializing UI and event wiring")',
+  "ui.initialize()",
+  'reporting.checkpoint("rendering UI locale options")',
+  "ui.renderLocaleOptions()",
+  'reporting.checkpoint("binding local AI drawer")',
+  'reporting.checkpoint("wiring UI events")',
+  "wiring.wire()",
+  'reporting.checkpoint("starting workspace autosave")',
+  "workspace.startAutosave()",
+  'reporting.checkpoint("starting application bootstrap")',
+  'reporting.progress("startup: restoring workspace state")',
+  "workspace.restoreDirty()",
+  'reporting.progress("startup: checking storage durability")',
+  "await durability.refresh()",
+  "if (workspace.reconnect)",
+  'reporting.progress("startup: reconnecting workspace")',
+  "workspace.assignStatus(await workspace.reconnect())",
+  "workspace.renderStatus()",
+  'reporting.progress("startup: loading projects")',
+  "await projects.load(false)",
+  'reporting.progress("startup: loading interface preferences")',
+  "preferences?.theme?.initialize?.({ freshProfile: projects.count() === 0 })",
+  "preferences?.layout?.initialize?.()",
+  'reporting.progress("startup: starting workflow characterization")',
+  "await workflow.run()",
+  "offline.register()",
+  "return run().catch((error) => {",
+  "errors.log(error)",
+  'errors.setStatus(error.message || "Startup error", "dirty")',
+  "return Object.freeze({ start })"
+]) {
+  assertIncludes(
+    applicationStartupControllerJs,
+    snippet,
+    `ApplicationStartupController must retain startup sequencing and failure policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationStartupController({",
+  "if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = message",
+  "if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = message",
+  "initialize: () => appRuntime.localeLoader.initialize()",
+  "initialize: () => uiI18n?.init?.()",
+  "renderLocaleOptions: () => renderUiLocaleOptions()",
+  "wiring: applicationEventWiringController",
+  "startAutosave: () => workspacePackageSaveController.startAutosave()",
+  "restoreDirty: () => restoreWorkspaceDirtyIds()",
+  "reconnect: workspaceStorage ? () => workspaceStorage.reconnectSavedWorkspace() : null",
+  "state.workspaceStatus = workspaceStatus",
+  "renderStatus: () => renderWorkspaceStatus()",
+  "refresh: () => refreshStorageDurability()",
+  "load: (restoreSelection) => loadProjects(restoreSelection)",
+  "count: () => editorSessionStore.getProjects().length",
+  "theme: themeController",
+  "layout: workspaceLayoutController",
+  "run: () => (LOOPCAT_TEST_BUILD ? runAppWorkflowTest() : undefined)",
+  "register: () => registerOfflineAppShell()",
+  "log: (error) => console.error(error)",
+  "setStatus: (message, mode) => setSaveStatus(message, mode)",
+  "applicationStartupController.start()"
+]) {
+  assertIncludes(appJs, boundary, `startup composition must retain ${boundary}.`);
+}
+const startupTail = appJs.slice(appJs.indexOf("/* LOOPCAT_TEST_WORKFLOW_DRIVER */"));
+assert(
+  !startupTail.includes("(async () => {") &&
+    !startupTail.includes("appRuntime.localeLoader.initialize()") &&
+    !startupTail.includes("workspacePackageSaveController.startAutosave()") &&
+    !startupTail.includes("restoreWorkspaceDirtyIds()") &&
+    !startupTail.includes("refreshStorageDurability()") &&
+    !startupTail.includes("workspaceStorage.reconnectSavedWorkspace()") &&
+    !startupTail.includes("loadProjects(false)") &&
+    !startupTail.includes("Promise.all([") &&
+    !startupTail.includes("registerOfflineAppShell()") &&
+    startupTail.includes("applicationStartupController.start()"),
+  "top-level startup sequencing must remain owned only by ApplicationStartupController."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "LOOPCAT_TEST_BUILD",
+  "window.",
+  "state.",
+  "workspaceStorage",
+  "editorSessionStore",
+  "themeController",
+  "workspaceLayoutController",
+  "runAppWorkflowTest",
+  "registerOfflineAppShell",
+  "console."
+]) {
+  assert(
+    !applicationStartupControllerJs.includes(forbiddenOwner),
+    `ApplicationStartupController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationStartupController preserves exact successful startup order and immutable API",
+  "ApplicationStartupController preserves awaited boundaries and concurrent preference initialization",
+  "ApplicationStartupController preserves absent workspace and optional preference branches",
+  "ApplicationStartupController stops and reports every primary startup failure",
+  "ApplicationStartupController preserves fallback copy and error-handler failure timing",
+  "ApplicationStartupController validates all required and optional boundaries"
+]) {
+  assertIncludes(
+    applicationStartupControllerUnitTests,
+    testName,
+    `focused startup tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(

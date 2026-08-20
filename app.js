@@ -3610,6 +3610,46 @@ const applicationEventWiringController =
       applicationPersistence: applicationPersistenceLifecycleController
     }
   });
+const applicationStartupController = appRuntime.featureFactories.createApplicationStartupController({
+  reporting: {
+    checkpoint: (message) => {
+      if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = message;
+    },
+    progress: (message) => {
+      if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = message;
+    }
+  },
+  locale: { initialize: () => appRuntime.localeLoader.initialize() },
+  ui: {
+    initialize: () => uiI18n?.init?.(),
+    renderLocaleOptions: () => renderUiLocaleOptions()
+  },
+  wiring: applicationEventWiringController,
+  workspace: {
+    startAutosave: () => workspacePackageSaveController.startAutosave(),
+    restoreDirty: () => restoreWorkspaceDirtyIds(),
+    reconnect: workspaceStorage ? () => workspaceStorage.reconnectSavedWorkspace() : null,
+    assignStatus: (workspaceStatus) => {
+      state.workspaceStatus = workspaceStatus;
+    },
+    renderStatus: () => renderWorkspaceStatus()
+  },
+  durability: { refresh: () => refreshStorageDurability() },
+  projects: {
+    load: (restoreSelection) => loadProjects(restoreSelection),
+    count: () => editorSessionStore.getProjects().length
+  },
+  preferences: {
+    theme: themeController,
+    layout: workspaceLayoutController
+  },
+  workflow: { run: () => (LOOPCAT_TEST_BUILD ? runAppWorkflowTest() : undefined) },
+  offline: { register: () => registerOfflineAppShell() },
+  errors: {
+    log: (error) => console.error(error),
+    setStatus: (message, mode) => setSaveStatus(message, mode)
+  }
+});
 
 const diagnosticsService = appRuntime?.featureFactories?.createDiagnosticsService?.({
   platform: appRuntime.platform,
@@ -6791,40 +6831,5 @@ function renderProgress(options = {}) {
 
 /* LOOPCAT_TEST_WORKFLOW_DRIVER */
 
-(async () => {
-  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "loading active interface locale";
-  await appRuntime.localeLoader.initialize();
-  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "initializing UI and event wiring";
-  uiI18n?.init?.();
-  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "rendering UI locale options";
-  renderUiLocaleOptions();
-  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "binding local AI drawer";
-  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "wiring UI events";
-  applicationEventWiringController.wire();
-  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "starting workspace autosave";
-  workspacePackageSaveController.startAutosave();
-  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "starting application bootstrap";
-  if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: restoring workspace state";
-  restoreWorkspaceDirtyIds();
-  if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: checking storage durability";
-  await refreshStorageDurability();
-  if (workspaceStorage) {
-    if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: reconnecting workspace";
-    state.workspaceStatus = await workspaceStorage.reconnectSavedWorkspace();
-    renderWorkspaceStatus();
-  }
-  if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: loading projects";
-  await loadProjects(false);
-  if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: loading interface preferences";
-  await Promise.all([
-    themeController?.initialize?.({ freshProfile: editorSessionStore.getProjects().length === 0 }),
-    workspaceLayoutController?.initialize?.()
-  ]);
-  if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: starting workflow characterization";
-  await runAppWorkflowTest();
-  registerOfflineAppShell();
-})().catch((error) => {
-  console.error(error);
-  setSaveStatus(error.message || "Startup error", "dirty");
-});
+applicationStartupController.start();
 })();
