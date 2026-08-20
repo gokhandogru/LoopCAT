@@ -1422,6 +1422,47 @@ const reportDataService = appRuntime.featureFactories.createReportDataService({
   redactSensitiveText,
   timestamp: () => new Date().toISOString()
 });
+let qualityReviewController;
+const qualityWorkbenchController = appRuntime.featureFactories.createQualityWorkbenchController({
+  session: {
+    getProject: editorSessionStore.getProject,
+    getSegments: editorSessionStore.getSegments,
+    getQaChecks: editorSessionStore.getQaChecks,
+    getQualityRiskQueue: editorSessionStore.getQualityRiskQueue,
+    replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue
+  },
+  scope: { currentSegments: projectDocumentCatalogService.currentSegments },
+  selection: {
+    getSegment: currentSegment,
+    getActiveIndex: () => applicationStore.getState().navigation.activeIndex
+  },
+  quality: { buildRiskQueue, scoreSegment },
+  documents: {
+    getSelectedId: () => applicationStore.getState().navigation.documentId,
+    clearSelection: () => {
+      applicationNavigation.selectDocument({ documentId: "" });
+      els.documentFilter.value = applicationStore.getState().navigation.documentId;
+    }
+  },
+  filters: {
+    matches: segmentFilterService.matches,
+    reset: () => {
+      editorFilterStore.update({ query: "", status: "all", reviewState: "", aiState: "" });
+      els.segmentSearchInput.value = "";
+      els.segmentStatusFilter.value = "all";
+      if (els.reviewStateFilter) els.reviewStateFilter.value = "";
+      if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
+    }
+  },
+  qa: { run: runProjectQa },
+  navigation: { select: (index) => segmentNavigationController.select(index) },
+  presentation: {
+    renderSegments,
+    renderWorkbench: (viewModel) => qualityReviewController?.renderQuality?.(viewModel)
+  },
+  focus: { target: () => targetEditController.focusActive() },
+  status: { set: setSaveStatus }
+});
 const reportExportController = appRuntime.featureFactories.createReportExportController({
   session: {
     getProject: editorSessionStore.getProject,
@@ -1440,7 +1481,7 @@ const reportExportController = appRuntime.featureFactories.createReportExportCon
   download,
   presentation: {
     renderQaResults,
-    renderQualityWorkbench,
+    renderQualityWorkbench: qualityWorkbenchController.render,
     renderValidationReport
   },
   validation: { reportCount },
@@ -3060,7 +3101,7 @@ const editorContextController = appRuntime?.featureFactories?.createEditorContex
     qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false }),
   renderHistory: () => renderRevisionHistory(),
   renderAi: aiSuggestionListController.render,
-  renderQuality: () => renderQualityWorkbench(),
+  renderQuality: qualityWorkbenchController.render,
   refreshMatches: () => refreshTmMatches(),
   refreshTerms: () => refreshTerms()
 });
@@ -3652,7 +3693,7 @@ const resourcesController = appRuntime?.featureFactories?.createResourcesControl
   onError: (error) => setSaveStatus(error?.message || "Resource action failed.", "dirty")
 });
 resourcesController?.mount?.();
-const qualityReviewController = appRuntime?.featureFactories?.createQualityReviewController?.({
+qualityReviewController = appRuntime?.featureFactories?.createQualityReviewController?.({
   elements: {
     reviewForm: els.reviewForm,
     reviewStateSelect: els.reviewStateSelect,
@@ -3689,10 +3730,10 @@ const qualityReviewController = appRuntime?.featureFactories?.createQualityRevie
   saveReview: (values) => reviewMetadataController.save(values),
   saveProfile: (values) => qualityProfileController.save(values),
   saveDecision: (values) => qualityDecisionController.save(values),
-  refreshRisks: refreshQualityRiskQueue,
-  nextRisk: goToNextQualityRisk,
+  refreshRisks: qualityWorkbenchController.refresh,
+  nextRisk: qualityWorkbenchController.nextRisk,
   exportPassport: reportExportController.exportQualityPassport,
-  openRisk: goToQualityRiskItem,
+  openRisk: qualityWorkbenchController.openRisk,
   scheduleFrame: requestAnimationFrame,
   onError: (error) => setSaveStatus(error?.message || "Quality or review action failed.", "dirty")
 });
@@ -3701,7 +3742,7 @@ const qualityProfileController = appRuntime.featureFactories.createQualityProfil
   editorSessionStore,
   profile: {
     normalize: defaultQualityProfile,
-    buildRiskQueue: currentQualityRiskQueue
+    buildRiskQueue: qualityWorkbenchController.buildQueue
   },
   persistence: {
     saveProject: updateProject,
@@ -3722,7 +3763,7 @@ const qualityProfileController = appRuntime.featureFactories.createQualityProfil
         "Quality profile save"
       )
   },
-  presentation: { renderWorkbench: renderQualityWorkbench },
+  presentation: { renderWorkbench: qualityWorkbenchController.render },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: setSaveStatus }
 });
@@ -3783,7 +3824,7 @@ const qualityDecisionController = appRuntime.featureFactories.createQualityDecis
     clearPending: autosaveService.clear,
     save: saveSegment
   },
-  risk: { buildQueue: currentQualityRiskQueue },
+  risk: { buildQueue: qualityWorkbenchController.buildQueue },
   activity: {
     log: (segment, _project, { category, severity }) =>
       logOptionalProjectActivity(
@@ -3797,7 +3838,7 @@ const qualityDecisionController = appRuntime.featureFactories.createQualityDecis
     clearNote: () => qualityReviewController?.clearDecisionNote?.(),
     renderReview: (options = {}) =>
       qualityReviewController?.renderReview?.({ segment: currentSegment(), force: Boolean(options.force) }),
-    renderWorkbench: renderQualityWorkbench,
+    renderWorkbench: qualityWorkbenchController.render,
     updateRow
   },
   workspace: { markDirty: markWorkspaceDirty },
@@ -3896,7 +3937,7 @@ function refreshLocalizedUi() {
     renderEditor();
     renderProgress();
     qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false });
-    renderQualityWorkbench();
+    qualityWorkbenchController.render();
     renderRevisionHistory();
     renderQaResults();
     editorContextController.refresh();
@@ -4773,7 +4814,7 @@ function commandList() {
     { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(editorSessionStore.getProject()) },
     { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "quality-passport", label: "Export Quality Passport", run: reportExportController.exportQualityPassport, enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "next-quality-risk", label: "Next quality risk", run: goToNextQualityRisk, enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "next-quality-risk", label: "Next quality risk", run: qualityWorkbenchController.nextRisk, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "concordance", label: "Open concordance", run: concordanceController.open, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "replace-target", label: "Find and replace target text", run: targetReplacementController.open, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "preset-translate", label: "Use Translate filter preset", group: "Filters", keywords: ["open", "segments", "matches"], run: () => filterPresetController?.applyPreset?.("translate"), enabled: Boolean(editorSessionStore.getProject()) },
@@ -5436,7 +5477,7 @@ function renderEditor() {
     storageText: `OpenAI key: ${aiCredentialStorageService.openAiStorageLabel()}. API keys stay in this browser and are never exported with project packages.`
   });
   aiProviderFormController.renderCommandCentre();
-  renderQualityWorkbench();
+  qualityWorkbenchController.render();
   renderTermbaseSelect();
 }
 
@@ -6047,108 +6088,6 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-function qualityQaBySegment(qaChecks = editorSessionStore.getQaChecks()) {
-  const map = new Map();
-  (qaChecks || []).forEach((check) => {
-    const segmentId = check?.segmentId || "";
-    if (!segmentId) return;
-    if (!map.has(segmentId)) map.set(segmentId, []);
-    map.get(segmentId).push(check);
-  });
-  return map;
-}
-
-function currentQualityRiskQueue(qaChecks = editorSessionStore.getQaChecks()) {
-  if (!editorSessionStore.getProject()) return null;
-  return buildRiskQueue({
-    project: editorSessionStore.getProject(),
-    segments: projectDocumentCatalogService.currentSegments(),
-    qaChecks,
-    profile: editorSessionStore.getProject().qualityProfile
-  });
-}
-
-function activeQualityEvidence(queue = null) {
-  const segment = currentSegment();
-  if (!editorSessionStore.getProject() || !segment) return null;
-  const queuedItem = (queue?.items || []).find((item) => item.segmentId === segment.id);
-  if (queuedItem) return queuedItem;
-  return scoreSegment(segment, applicationStore.getState().navigation.activeIndex, {
-    profile: editorSessionStore.getProject().qualityProfile,
-    qaBySegment: qualityQaBySegment()
-  });
-}
-
-function renderQualityWorkbench() {
-  const storedQueue = editorSessionStore.getQualityRiskQueue();
-  const queue = editorSessionStore.getProject()
-    ? storedQueue?.projectId === editorSessionStore.getProject().id
-      ? storedQueue
-      : currentQualityRiskQueue()
-    : null;
-  if (editorSessionStore.getProject()) editorSessionStore.replaceQualityRiskQueue(queue);
-  qualityReviewController?.renderQuality?.({
-    project: editorSessionStore.getProject(),
-    segment: currentSegment(),
-    activeIndex: applicationStore.getState().navigation.activeIndex,
-    profile: editorSessionStore.getProject()?.qualityProfile,
-    queue,
-    evidence: activeQualityEvidence(queue)
-  });
-}
-
-async function refreshQualityRiskQueue() {
-  if (!editorSessionStore.getProject()) return null;
-  const checks = await runProjectQa();
-  if (!checks) return null;
-  editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue(checks));
-  renderQualityWorkbench();
-  return editorSessionStore.getQualityRiskQueue();
-}
-
-async function goToQualityRiskItem(item) {
-  const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === item?.segmentId);
-  if (index === -1) return;
-  const segment = editorSessionStore.getSegments()[index];
-  if (!segmentFilterService.matches(segment)) {
-    if (applicationStore.getState().navigation.documentId && segment.documentId !== applicationStore.getState().navigation.documentId) {
-      applicationNavigation.selectDocument({ documentId: "" });
-      els.documentFilter.value = applicationStore.getState().navigation.documentId;
-    }
-    editorFilterStore.update({ query: "", status: "all", reviewState: "", aiState: "" });
-    els.segmentSearchInput.value = "";
-    els.segmentStatusFilter.value = "all";
-    if (els.reviewStateFilter) els.reviewStateFilter.value = "";
-    if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
-    renderSegments();
-  }
-  await segmentNavigationController.select(index);
-  renderSegments();
-  targetEditController.focusActive();
-}
-
-async function goToNextQualityRisk() {
-  if (!editorSessionStore.getProject()) return;
-  const storedQueue = editorSessionStore.getQualityRiskQueue();
-  if (!storedQueue || storedQueue.projectId !== editorSessionStore.getProject().id) {
-    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
-  }
-  const queue = editorSessionStore.getQualityRiskQueue();
-  if (!queue?.items?.length) {
-    setSaveStatus("No quality risks in this scope", "saved");
-    return;
-  }
-  const indexedItems = queue.items
-    .map((item) => ({
-      ...item,
-      globalIndex: editorSessionStore.getSegments().findIndex((segment) => segment.id === item.segmentId)
-    }))
-    .filter((item) => item.globalIndex !== -1)
-    .sort((a, b) => a.globalIndex - b.globalIndex);
-  const afterActive = indexedItems.find((item) => item.globalIndex > applicationStore.getState().navigation.activeIndex);
-  await goToQualityRiskItem(afterActive || indexedItems[0] || queue.items[0]);
-}
-
 function revisionReasonLabel(reason) {
   const label = {
     edit: "Edit",
@@ -6404,8 +6343,8 @@ async function runProjectQa() {
     editorSessionStore.replaceQaChecks(checks);
     state.qaFilter = "";
     renderQaResults();
-    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue(checks));
-    renderQualityWorkbench();
+    editorSessionStore.replaceQualityRiskQueue(qualityWorkbenchController.buildQueue(checks));
+    qualityWorkbenchController.render();
     try {
     if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[QA_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated QA activity log failure");
       await logProjectActivity("qa-run", "QA checks run", { issueCount: checks.length, documentId: applicationStore.getState().navigation.documentId });

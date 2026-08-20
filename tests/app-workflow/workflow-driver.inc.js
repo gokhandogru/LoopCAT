@@ -3934,8 +3934,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         editorSessionStore.getProject().qualityProfile.terminologyStrictness === "strict",
       "checked quality/review controller owns profile submit while domain persistence keeps the review contract"
     );
-    editorSessionStore.replaceQualityRiskQueue(currentQualityRiskQueue());
-    renderQualityWorkbench();
+    editorSessionStore.replaceQualityRiskQueue(qualityWorkbenchController.buildQueue());
+    qualityWorkbenchController.render();
     assert(
       els.qualitySummary.textContent.includes("risk items") &&
         els.qualityRiskList.textContent.length > 0 &&

@@ -225,6 +225,7 @@ const requiredReleaseFiles = [
   "src/features/import-export/text-encoding-input-service.js",
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-presentation-service.js",
+  "src/features/quality/quality-workbench-controller.js",
   "src/features/quality/quality-decision-controller.js",
   "src/features/quality/quality-review-controller.js",
   "src/features/quality/review-metadata-controller.js",
@@ -303,6 +304,7 @@ const requiredReleaseFiles = [
   "tests/unit/text-encoding-input-service.test.cjs",
   "tests/unit/quality-profile-controller.test.cjs",
   "tests/unit/quality-presentation-service.test.cjs",
+  "tests/unit/quality-workbench-controller.test.cjs",
   "tests/unit/quality-decision-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
   "tests/unit/review-metadata-controller.test.cjs",
@@ -443,6 +445,8 @@ const qualityProfileControllerJs = readText("src/features/quality/quality-profil
 const qualityProfileControllerUnitTests = readText("tests/unit/quality-profile-controller.test.cjs");
 const qualityPresentationServiceJs = readText("src/features/quality/quality-presentation-service.js");
 const qualityPresentationServiceUnitTests = readText("tests/unit/quality-presentation-service.test.cjs");
+const qualityWorkbenchControllerJs = readText("src/features/quality/quality-workbench-controller.js");
+const qualityWorkbenchControllerUnitTests = readText("tests/unit/quality-workbench-controller.test.cjs");
 const qualityDecisionControllerJs = readText("src/features/quality/quality-decision-controller.js");
 const qualityDecisionControllerUnitTests = readText("tests/unit/quality-decision-controller.test.cjs");
 const reviewMetadataControllerJs = readText("src/features/quality/review-metadata-controller.js");
@@ -1073,6 +1077,137 @@ assertIncludes(
   '"src/features/quality/quality-presentation-service.js"',
   "source-catalog extraction must scan the checked quality-presentation service."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createQualityWorkbenchController } from "../features/quality/quality-workbench-controller.js";',
+  "the application runtime must install the checked quality-workbench controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createQualityWorkbenchController,",
+  "the application runtime must expose the checked quality-workbench controller factory."
+);
+for (const snippet of [
+  'const segmentId = check?.segmentId || "";',
+  "if (!segmentId) return;",
+  "segments: scope.currentSegments()",
+  "qaChecks",
+  "profile: session.getProject().qualityProfile",
+  "const queuedItem = (queue?.items || []).find((item) => item.segmentId === segment.id);",
+  "if (queuedItem) return queuedItem;",
+  "quality.scoreSegment(segment, selection.getActiveIndex()",
+  "storedQueue?.projectId === session.getProject().id",
+  "session.replaceQualityRiskQueue(queue);",
+  "const checks = await qa.run();",
+  "session.replaceQualityRiskQueue(buildQueue(checks));",
+  "if (!filters.matches(segment))",
+  "documents.clearSelection();",
+  "filters.reset();",
+  "await navigation.select(index);",
+  "focus.target();",
+  'status.set("No quality risks in this scope", "saved");',
+  "globalIndex: session.getSegments().findIndex",
+  ".filter((item) => item.globalIndex !== -1)",
+  ".sort((a, b) => a.globalIndex - b.globalIndex)",
+  "const afterActive = indexedItems.find",
+  "await openRisk(afterActive || indexedItems[0] || queue.items[0]);",
+  "return Object.freeze({ buildQueue, evidence, nextRisk, openRisk, qaBySegment, refresh, render });"
+]) {
+  assertIncludes(
+    qualityWorkbenchControllerJs,
+    snippet,
+    `QualityWorkbenchController must retain characterized queue, evidence, refresh, and navigation policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createQualityWorkbenchController({",
+  "getProject: editorSessionStore.getProject",
+  "getSegments: editorSessionStore.getSegments",
+  "getQaChecks: editorSessionStore.getQaChecks",
+  "getQualityRiskQueue: editorSessionStore.getQualityRiskQueue",
+  "replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue",
+  "currentSegments: projectDocumentCatalogService.currentSegments",
+  "getSegment: currentSegment",
+  "getActiveIndex: () => applicationStore.getState().navigation.activeIndex",
+  "quality: { buildRiskQueue, scoreSegment }",
+  "getSelectedId: () => applicationStore.getState().navigation.documentId",
+  'applicationNavigation.selectDocument({ documentId: "" })',
+  "matches: segmentFilterService.matches",
+  'editorFilterStore.update({ query: "", status: "all", reviewState: "", aiState: "" })',
+  "qa: { run: runProjectQa }",
+  "navigation: { select: (index) => segmentNavigationController.select(index) }",
+  "renderWorkbench: (viewModel) => qualityReviewController?.renderQuality?.(viewModel)",
+  "focus: { target: () => targetEditController.focusActive() }",
+  "status: { set: setSaveStatus }"
+]) {
+  assertIncludes(appJs, boundary, `quality-workbench composition must inject the checked ${boundary} boundary.`);
+}
+for (const consumer of [
+  "renderQualityWorkbench: qualityWorkbenchController.render",
+  "renderQuality: qualityWorkbenchController.render",
+  "refreshRisks: qualityWorkbenchController.refresh",
+  "nextRisk: qualityWorkbenchController.nextRisk",
+  "openRisk: qualityWorkbenchController.openRisk",
+  "buildRiskQueue: qualityWorkbenchController.buildQueue",
+  "renderWorkbench: qualityWorkbenchController.render",
+  "risk: { buildQueue: qualityWorkbenchController.buildQueue }",
+  "run: qualityWorkbenchController.nextRisk, enabled: Boolean(editorSessionStore.getProject())",
+  "editorSessionStore.replaceQualityRiskQueue(qualityWorkbenchController.buildQueue(checks));",
+  "editorSessionStore.replaceQualityRiskQueue(qualityWorkbenchController.buildQueue());"
+]) {
+  const source = consumer.endsWith("buildQueue());") ? appWorkflowDriverJs : appJs;
+  assertIncludes(
+    source,
+    consumer,
+    `quality-workbench consumers must call the checked controller directly: ${consumer}.`
+  );
+}
+for (const removedHelper of [
+  "qualityQaBySegment",
+  "currentQualityRiskQueue",
+  "activeQualityEvidence",
+  "renderQualityWorkbench",
+  "refreshQualityRiskQueue",
+  "goToQualityRiskItem",
+  "goToNextQualityRisk"
+]) {
+  const directHelper = new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} quality-workbench orchestration must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  !qualityWorkbenchControllerJs.includes("editorSessionStore") &&
+    !qualityWorkbenchControllerJs.includes("applicationStore") &&
+    !qualityWorkbenchControllerJs.includes("qualityReviewController") &&
+    !qualityWorkbenchControllerJs.includes("segmentFilterService") &&
+    !qualityWorkbenchControllerJs.includes("segmentNavigationController") &&
+    !qualityWorkbenchControllerJs.includes("targetEditController") &&
+    !qualityWorkbenchControllerJs.includes("els."),
+  "QualityWorkbenchController must use only its injected boundaries."
+);
+for (const testName of [
+  "QualityWorkbenchController groups QA checks and builds the exact current-scope risk queue",
+  "QualityWorkbenchController preserves queued evidence precedence and score fallback inputs",
+  "QualityWorkbenchController preserves cache validation, replacement timing, and workbench view model",
+  "QualityWorkbenchController refresh preserves project and QA early returns, replacement, rendering, and result",
+  "QualityWorkbenchController opens visible risks after awaited selection, rerender, and focus",
+  "QualityWorkbenchController restores hidden risk scope before selection and preserves document policy",
+  "QualityWorkbenchController next risk preserves cache rebuild, after-active order, wraparound, and empty status",
+  "QualityWorkbenchController validates boundaries, propagates failures, and exposes an immutable API"
+]) {
+  assertIncludes(
+    qualityWorkbenchControllerUnitTests,
+    testName,
+    `focused quality-workbench tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/quality/quality-workbench-controller.js"',
+  "source-catalog extraction must scan the checked quality-workbench controller."
+);
 for (const removedFacade of ["reportLocale", "reportDir", "reportText", "reportHtml"]) {
   assert(
     !new RegExp(`\\b${removedFacade}\\b`).test(appJs) &&
@@ -1331,7 +1466,7 @@ for (const boundary of [
   "fileSafeName",
   "download",
   "renderQaResults",
-  "renderQualityWorkbench",
+  "renderQualityWorkbench: qualityWorkbenchController.render",
   "renderValidationReport",
   "validation: { reportCount }",
   "logOptionalProject: logOptionalProjectActivity",
@@ -3778,10 +3913,8 @@ assert(
   "the migrated quality/review family must not retain superseded static listeners in app.js."
 );
 assert(
-  !functionBody(appJs, "function renderQualityWorkbench", "async function refreshQualityRiskQueue").includes(
-    "createElement"
-  ),
-  "quality/review DOM construction must live in the checked controller rather than app.js."
+  !qualityWorkbenchControllerJs.includes("createElement") && !qualityWorkbenchControllerJs.includes("innerHTML"),
+  "quality/review DOM construction must remain in QualityReviewController rather than QualityWorkbenchController."
 );
 for (const directSaveAdapter of [
   "saveReview: (values) => reviewMetadataController.save(values)",
