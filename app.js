@@ -3393,6 +3393,20 @@ const applicationUpdateControlsController =
       defer: () => offlineUpdateController?.defer?.()
     }
   });
+const uiLocaleControlsController = appRuntime.featureFactories.createUiLocaleControlsController({
+  elements: {
+    localeSelect: els.uiLocaleSelect,
+    importInput: els.uiLocaleImportInput,
+    exportButton: els.exportUiSourceBtn
+  },
+  loader: { ensure: (locale) => appRuntime.localeLoader.ensure(locale) },
+  locale: { set: (locale) => uiI18n?.setLocale?.(locale) },
+  presentation: { refresh: refreshLocalizedUi },
+  actions: {
+    importCatalog: importUiLocaleFile,
+    exportSource: exportUiSourceCatalog
+  }
+});
 const globalKeyboardController = appRuntime.featureFactories.createGlobalKeyboardController({
   target: window,
   normalizeKey: stableLower,
@@ -6709,13 +6723,7 @@ function wireEvents() {
   applicationViewController.mount();
   applicationCommandButtonsController.mount();
   applicationUpdateControlsController.mount();
-  els.uiLocaleSelect?.addEventListener("change", async () => {
-    await appRuntime.localeLoader.ensure(els.uiLocaleSelect.value);
-    uiI18n?.setLocale?.(els.uiLocaleSelect.value);
-    refreshLocalizedUi();
-  });
-  els.uiLocaleImportInput?.addEventListener("change", importUiLocaleFile);
-  els.exportUiSourceBtn?.addEventListener("click", exportUiSourceCatalog);
+  uiLocaleControlsController.mount();
   els.projectFilesBtn.addEventListener("click", showProjectHome);
   els.projectHomeDeleteBtn.addEventListener("click", () => confirmDeleteProject());
   els.focusModeBtn?.addEventListener("click", toggleFocusMode);

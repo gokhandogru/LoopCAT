@@ -165,6 +165,7 @@ import { createReportPresentationService } from "../reports/report-presentation-
 import { createLocaleLoader } from "../i18n/locale-loader.js";
 import { createUiLocalizationService } from "../i18n/ui-localization-service.js";
 import { createLanguageInputService } from "../i18n/language-input-service.js";
+import { createUiLocaleControlsController } from "../i18n/ui-locale-controls-controller.js";
 
 export function createApplicationRuntime({ browserWindow, compatibilityModules, desktopBridge }) {
   const store = createAppStore();
@@ -272,6 +273,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createReportExportController,
       createReportPresentationService,
       createLanguageInputService,
+      createUiLocaleControlsController,
       createUiLocalizationService,
       createProjectDialogController,
       createProjectDialogSaveController,

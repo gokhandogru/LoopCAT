@@ -208,6 +208,7 @@ const segmentDraftApplicationServicePath = path.join(
   "segment-draft-application-service.js"
 );
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
+const uiLocaleControlsControllerPath = path.join(root, "src", "i18n", "ui-locale-controls-controller.js");
 const resourceMutationControllerPath = path.join(
   root,
   "src",
@@ -500,6 +501,7 @@ function main() {
     "src/features/editor/segment-draft-application-service.js"
   );
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
+  extractScript(messagesByText, uiLocaleControlsControllerPath, "src/i18n/ui-locale-controls-controller.js");
   extractScript(
     messagesByText,
     resourceMutationControllerPath,

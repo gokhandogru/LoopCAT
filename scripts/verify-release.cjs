@@ -261,6 +261,7 @@ const requiredReleaseFiles = [
   "src/features/workspace/workspace-package-save-controller.js",
   "src/features/workspace/workspace-sync-controller.js",
   "src/i18n/language-input-service.js",
+  "src/i18n/ui-locale-controls-controller.js",
   "src/i18n/ui-localization-service.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
   "tests/unit/ai-administration-controller.test.cjs",
@@ -357,6 +358,7 @@ const requiredReleaseFiles = [
   "tests/unit/workspace-package-save-controller.test.cjs",
   "tests/unit/workspace-sync-controller.test.cjs",
   "tests/unit/language-input-service.test.cjs",
+  "tests/unit/ui-locale-controls-controller.test.cjs",
   "tests/unit/ui-localization-service.test.cjs",
   "tests/unit/resource-trash.test.cjs",
   "tests/unit/resources-controller.test.cjs",
@@ -447,6 +449,8 @@ const applicationUpdateControlsControllerJs = readText("src/app/application-upda
 const applicationUpdateControlsControllerUnitTests = readText(
   "tests/unit/application-update-controls-controller.test.cjs"
 );
+const uiLocaleControlsControllerJs = readText("src/i18n/ui-locale-controls-controller.js");
+const uiLocaleControlsControllerUnitTests = readText("tests/unit/ui-locale-controls-controller.test.cjs");
 const applicationViewControllerJs = readText("src/app/application-view-controller.js");
 const applicationViewControllerUnitTests = readText("tests/unit/application-view-controller.test.cjs");
 const globalKeyboardControllerJs = readText("src/app/global-keyboard-controller.js");
@@ -4747,8 +4751,7 @@ for (const boundary of [
 assert(
   appJs.indexOf("applicationCommandButtonsController.mount()") <
     appJs.indexOf("applicationUpdateControlsController.mount()") &&
-    appJs.indexOf("applicationUpdateControlsController.mount()") <
-      appJs.indexOf('els.uiLocaleSelect?.addEventListener("change"'),
+    appJs.indexOf("applicationUpdateControlsController.mount()") < appJs.indexOf("uiLocaleControlsController.mount()"),
   "application update-control lifecycle must mount between command-button and locale listeners at the existing position."
 );
 assert(
@@ -4789,6 +4792,103 @@ for (const testName of [
     `focused application update-control tests must retain characterization: ${testName}.`
   );
 }
+assertIncludes(
+  appBootstrapJs,
+  'import { createUiLocaleControlsController } from "../i18n/ui-locale-controls-controller.js";',
+  "the application runtime must install the checked UI-locale controls controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createUiLocaleControlsController,",
+  "the application runtime must expose the checked UI-locale controls controller factory."
+);
+for (const snippet of [
+  "UiLocaleControlsController requires loader, locale, presentation, import, and export boundaries.",
+  "UiLocaleControlsController requires checked optional control elements.",
+  "const localeSelect = elements?.localeSelect",
+  "await loader.ensure(localeSelect.value)",
+  "locale.set(localeSelect.value)",
+  "presentation.refresh()",
+  'localeSelect?.addEventListener("change", localeChangeListener)',
+  'elements?.importInput?.addEventListener("change", actions.importCatalog)',
+  'elements?.exportButton?.addEventListener("click", actions.exportSource)',
+  'localeSelect?.removeEventListener("change", localeChangeListener)',
+  'elements?.importInput?.removeEventListener("change", actions.importCatalog)',
+  'elements?.exportButton?.removeEventListener("click", actions.exportSource)',
+  "return Object.freeze({ mount, unmount })"
+]) {
+  assertIncludes(
+    uiLocaleControlsControllerJs,
+    snippet,
+    `UiLocaleControlsController must retain characterized locale timing, direct-action, and lifecycle policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createUiLocaleControlsController({",
+  "localeSelect: els.uiLocaleSelect",
+  "importInput: els.uiLocaleImportInput",
+  "exportButton: els.exportUiSourceBtn",
+  "ensure: (locale) => appRuntime.localeLoader.ensure(locale)",
+  "set: (locale) => uiI18n?.setLocale?.(locale)",
+  "refresh: refreshLocalizedUi",
+  "importCatalog: importUiLocaleFile",
+  "exportSource: exportUiSourceCatalog",
+  "uiLocaleControlsController.mount()"
+]) {
+  assertIncludes(appJs, boundary, `UI-locale control composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  appJs.indexOf("applicationUpdateControlsController.mount()") < appJs.indexOf("uiLocaleControlsController.mount()") &&
+    appJs.indexOf("uiLocaleControlsController.mount()") <
+      appJs.indexOf('els.projectFilesBtn.addEventListener("click", showProjectHome)'),
+  "UI-locale controls must mount between update controls and project-home listeners at the existing position."
+);
+assert(
+  !appJs.includes('els.uiLocaleSelect?.addEventListener("change"') &&
+    !appJs.includes('els.uiLocaleImportInput?.addEventListener("change"') &&
+    !appJs.includes('els.exportUiSourceBtn?.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('uiLocaleSelect?.addEventListener("change"') &&
+    !appWorkflowDriverJs.includes('uiLocaleImportInput?.addEventListener("change"') &&
+    !appWorkflowDriverJs.includes('exportUiSourceBtn?.addEventListener("click"'),
+  "UI-locale select, import, and export listener ownership must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\buiLocaleControlsController\.mount\b/g) || []).length === 1 &&
+    !appWorkflowDriverJs.includes("uiLocaleControlsController"),
+  "wireEvents must retain exactly one UI-locale controls mount without workflow-only consumers."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "uiI18n",
+  "refreshLocalizedUi",
+  "importUiLocaleFile",
+  "exportUiSourceCatalog",
+  "els."
+]) {
+  assert(
+    !uiLocaleControlsControllerJs.includes(forbiddenOwner),
+    `UiLocaleControlsController must use injected element, locale, presentation, and action boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "UiLocaleControlsController preserves initial load and post-await live locale value sequencing",
+  "UiLocaleControlsController preserves direct import and export event/result passthrough",
+  "UiLocaleControlsController owns exact idempotent listener lifecycle and immutable API",
+  "UiLocaleControlsController independently skips absent optional controls",
+  "UiLocaleControlsController preserves loader, locale, refresh, action, and listener failure timing",
+  "UiLocaleControlsController validates boundaries and present optional controls"
+]) {
+  assertIncludes(
+    uiLocaleControlsControllerUnitTests,
+    testName,
+    `focused UI-locale controls tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/i18n/ui-locale-controls-controller.js"',
+  "source-catalog extraction must scan the checked UI-locale controls controller."
+);
 assertIncludes(
   appBootstrapJs,
   'import { createApplicationMenuController } from "./application-menu-controller.js";',
