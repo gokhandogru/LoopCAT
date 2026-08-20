@@ -3476,6 +3476,7 @@ dialogLifecycleController?.register?.({
 });
 let projectExportController;
 let workspacePackageSaveController;
+let workspaceSyncController;
 const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecoveryWorkspaceController?.({
   elements: {
     menu: els.workspaceMenu,
@@ -3507,7 +3508,7 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
   safeText: displaySafeText,
   chooseWorkspace: (...args) => workspacePackageSaveController.chooseFolder(...args),
   saveProject: (...args) => workspacePackageSaveController.saveCurrent(...args),
-  syncWorkspace: () => fileImportService.runTask("Workspace sync", () => syncWorkspaceFromFolder()),
+  syncWorkspace: () => fileImportService.runTask("Workspace sync", () => workspaceSyncController.sync()),
   exportWorkspaceBackup: exportWorkspaceBackupToFolder,
   repairWorkspace: repairWorkspaceLinks,
   saveRecovery: (...args) => workspacePackageSaveController.saveRecovery(...args),
@@ -3725,6 +3726,37 @@ const projectImportRestoreController =
     },
     text: { safe: displaySafeText }
   });
+workspaceSyncController = appRuntime.featureFactories.createWorkspaceSyncController({
+  connection: {
+    isConnected: () => Boolean(workspaceStorage && state.workspaceStatus?.connected)
+  },
+  autosave: { flush: autosaveService.flush },
+  packages: {
+    list: () => workspaceStorage.listProjectPackages(),
+    read: (reference) => workspaceStorage.readProjectPackage(reference)
+  },
+  dirty: { has: (projectId) => state.workspaceDirtyProjectIds.has(projectId) },
+  imports: { importProjectPackageData: projectImportRestoreController.importProjectPackageData },
+  validation: { count: reportCount },
+  text: { redact: redactSensitiveText },
+  session: editorSessionStore,
+  navigation: {
+    openProjects: applicationNavigation.openProjects,
+    clearSelection: applicationNavigation.clearSelection
+  },
+  projects: { load: loadProjects },
+  workspace: {
+    getStatus: () => workspaceStorage.getStatus(),
+    setStatus: (workspaceStatus) => {
+      state.workspaceStatus = workspaceStatus;
+    }
+  },
+  presentation: {
+    renderWorkspaceStatus,
+    renderValidation: renderValidationReport
+  },
+  status: { set: setSaveStatus }
+});
 const projectDocumentImportController =
   appRuntime.featureFactories.createProjectDocumentImportController({
     session: editorSessionStore,
@@ -6568,66 +6600,6 @@ function renderProgress(options = {}) {
   els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
   els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
-}
-
-async function syncWorkspaceFromFolder() {
-  if (!workspaceStorage || !state.workspaceStatus?.connected) return;
-  await autosaveService.flush();
-  const refs = await workspaceStorage.listProjectPackages();
-  const imported = [];
-  const warnings = [];
-  const addWorkspaceSyncWarning = (message) => {
-    const redacted = redactSensitiveText(message || "").trim();
-    if (redacted) warnings.push(redacted);
-  };
-  for (const ref of refs) {
-    if (ref.id && state.workspaceDirtyProjectIds.has(ref.id)) {
-      addWorkspaceSyncWarning(`${ref.name || ref.id}: local package has unsaved folder changes; save it before syncing from the workspace folder.`);
-      continue;
-    }
-    try {
-      const pkg = await workspaceStorage.readProjectPackage(ref);
-      const packageProjectId = pkg?.project?.id;
-      if (packageProjectId && state.workspaceDirtyProjectIds.has(packageProjectId)) {
-        addWorkspaceSyncWarning(`${ref.name || packageProjectId}: local package has unsaved folder changes; save it before syncing from the workspace folder.`);
-        continue;
-      }
-      const result = await projectImportRestoreController.importProjectPackageData(pkg, {
-        sourceName: ref.packagePath,
-        replaceExisting: true,
-        open: false,
-        sourceIsWorkspace: true,
-        suppressAlert: true
-      });
-      if (result) {
-        const importedName = result.pkg.project.name || result.pkg.project.id;
-        imported.push(importedName);
-        const noteCount = reportCount(result.validation);
-        if (noteCount) addWorkspaceSyncWarning(`${importedName}: imported with ${noteCount} validation note${noteCount === 1 ? "" : "s"}.`);
-      }
-      else addWorkspaceSyncWarning(`${ref.name || ref.id}: package failed validation and was skipped.`);
-    } catch (error) {
-      addWorkspaceSyncWarning(`${ref.name || ref.id}: ${error.message}`);
-    }
-  }
-  editorSessionStore.replaceProject(null);
-  editorSessionStore.replaceSegments([]);
-  applicationNavigation.openProjects();
-  applicationNavigation.clearSelection();
-  await loadProjects(false);
-  state.workspaceStatus = await workspaceStorage.getStatus();
-  const finalWarnings = Array.from(new Set([...(state.workspaceStatus.warnings || []), ...warnings].map((warning) => redactSensitiveText(warning || "").trim()).filter(Boolean)));
-  renderWorkspaceStatus();
-  renderValidationReport({
-    ok: finalWarnings.length === 0,
-    errors: [],
-    warnings: finalWarnings,
-    preserved: [`${imported.length} project package${imported.length === 1 ? "" : "s"} synced from the workspace folder.`],
-    simplified: [],
-    skipped: [],
-    risky: []
-  });
-  setSaveStatus(finalWarnings.length ? "Workspace sync completed with warnings" : "Workspace synced", finalWarnings.length ? "dirty" : "saved");
 }
 
 async function exportWorkspaceBackupToFolder() {

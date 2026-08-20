@@ -253,6 +253,7 @@ const requiredReleaseFiles = [
   "src/features/import-export/import-export-controller.js",
   "src/features/workspace/recovery-workspace-controller.js",
   "src/features/workspace/workspace-package-save-controller.js",
+  "src/features/workspace/workspace-sync-controller.js",
   "src/i18n/language-input-service.js",
   "src/i18n/ui-localization-service.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
@@ -341,6 +342,7 @@ const requiredReleaseFiles = [
   "tests/unit/import-export-controller.test.cjs",
   "tests/unit/recovery-workspace-controller.test.cjs",
   "tests/unit/workspace-package-save-controller.test.cjs",
+  "tests/unit/workspace-sync-controller.test.cjs",
   "tests/unit/language-input-service.test.cjs",
   "tests/unit/ui-localization-service.test.cjs",
   "tests/unit/resource-trash.test.cjs",
@@ -640,6 +642,8 @@ const recoveryWorkspaceControllerJs = readText("src/features/workspace/recovery-
 const recoveryWorkspaceControllerUnitTests = readText("tests/unit/recovery-workspace-controller.test.cjs");
 const workspacePackageSaveControllerJs = readText("src/features/workspace/workspace-package-save-controller.js");
 const workspacePackageSaveControllerUnitTests = readText("tests/unit/workspace-package-save-controller.test.cjs");
+const workspaceSyncControllerJs = readText("src/features/workspace/workspace-sync-controller.js");
+const workspaceSyncControllerUnitTests = readText("tests/unit/workspace-sync-controller.test.cjs");
 const importExportControllerJs = readText("src/features/import-export/import-export-controller.js");
 const importExportControllerUnitTests = readText("tests/unit/import-export-controller.test.cjs");
 const deliveryExportControllerJs = readText("src/features/import-export/delivery-export-controller.js");
@@ -5036,6 +5040,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createWorkspaceSyncController } from "../features/workspace/workspace-sync-controller.js";',
+  "The application runtime must install the checked workspace-sync controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createWorkspaceSyncController,",
+  "The application runtime must expose the checked workspace-sync controller factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createProjectPackagePortabilityService } from "../features/import-export/project-package-portability-service.js";',
   "The application runtime must install the checked project-package portability service."
 );
@@ -7144,6 +7158,124 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/import-export/project-import-restore-controller.js"',
   "source-catalog extraction must scan the checked project-import/restore controller."
+);
+for (const snippet of [
+  "WorkspaceSyncController requires connection, autosave, package, dirty, import, validation, text, session, navigation, project, workspace, presentation, and status boundaries.",
+  "async function sync()",
+  "if (!connection.isConnected()) return",
+  "await autosave.flush()",
+  "const references = await packages.list()",
+  "const addWarning = (message) =>",
+  'const redacted = text.redact(message || "").trim()',
+  "if (reference.id && dirty.has(reference.id))",
+  "local package has unsaved folder changes; save it before syncing from the workspace folder.",
+  "const pkg = await packages.read(reference)",
+  "const packageProjectId = pkg?.project?.id",
+  "if (packageProjectId && dirty.has(packageProjectId))",
+  "const result = await imports.importProjectPackageData(pkg, {",
+  "sourceName: reference.packagePath",
+  "replaceExisting: true",
+  "open: false",
+  "sourceIsWorkspace: true",
+  "suppressAlert: true",
+  "const importedName = result.pkg.project.name || result.pkg.project.id",
+  "const noteCount = validation.count(result.validation)",
+  'imported with ${noteCount} validation note${noteCount === 1 ? "" : "s"}.',
+  "package failed validation and was skipped.",
+  "${reference.name || reference.id}: ${error.message}",
+  "session.replaceProject(null)",
+  "session.replaceSegments([])",
+  "navigation.openProjects()",
+  "navigation.clearSelection()",
+  "await projects.load(false)",
+  "const workspaceStatus = await workspace.getStatus()",
+  "workspace.setStatus(workspaceStatus)",
+  "[...(workspaceStatus.warnings || []), ...warnings]",
+  "presentation.renderWorkspaceStatus()",
+  "presentation.renderValidation({",
+  "ok: finalWarnings.length === 0",
+  '${imported.length} project package${imported.length === 1 ? "" : "s"} synced from the workspace folder.',
+  'finalWarnings.length ? "Workspace sync completed with warnings" : "Workspace synced"',
+  'finalWarnings.length ? "dirty" : "saved"',
+  "return Object.freeze({ sync })"
+]) {
+  assertIncludes(
+    workspaceSyncControllerJs,
+    snippet,
+    `WorkspaceSyncController must retain characterized connection, package iteration, import, warning, reset, and presentation policy: ${snippet}`
+  );
+}
+assert(
+  !workspaceSyncControllerJs.includes("workspaceStorage") &&
+    !workspaceSyncControllerJs.includes("state.") &&
+    !workspaceSyncControllerJs.includes("autosaveService") &&
+    !workspaceSyncControllerJs.includes("projectImportRestoreController") &&
+    !workspaceSyncControllerJs.includes("reportCount") &&
+    !workspaceSyncControllerJs.includes("redactSensitiveText") &&
+    !workspaceSyncControllerJs.includes("editorSessionStore") &&
+    !workspaceSyncControllerJs.includes("applicationNavigation") &&
+    !workspaceSyncControllerJs.includes("loadProjects") &&
+    !workspaceSyncControllerJs.includes("renderValidationReport") &&
+    !workspaceSyncControllerJs.includes("setSaveStatus") &&
+    !workspaceSyncControllerJs.includes("fileImportService") &&
+    !workspaceSyncControllerJs.includes("recoveryWorkspaceController") &&
+    !workspaceSyncControllerJs.includes("els."),
+  "the checked workspace-sync controller must use only its injected connection, autosave, package, dirty, import, validation, text, session, navigation, project, workspace, presentation, and status boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createWorkspaceSyncController({",
+  "isConnected: () => Boolean(workspaceStorage && state.workspaceStatus?.connected)",
+  "autosave: { flush: autosaveService.flush }",
+  "list: () => workspaceStorage.listProjectPackages()",
+  "read: (reference) => workspaceStorage.readProjectPackage(reference)",
+  "dirty: { has: (projectId) => state.workspaceDirtyProjectIds.has(projectId) }",
+  "imports: { importProjectPackageData: projectImportRestoreController.importProjectPackageData }",
+  "validation: { count: reportCount }",
+  "text: { redact: redactSensitiveText }",
+  "session: editorSessionStore",
+  "openProjects: applicationNavigation.openProjects",
+  "clearSelection: applicationNavigation.clearSelection",
+  "projects: { load: loadProjects }",
+  "getStatus: () => workspaceStorage.getStatus()",
+  "state.workspaceStatus = workspaceStatus",
+  "renderValidation: renderValidationReport",
+  "status: { set: setSaveStatus }",
+  'syncWorkspace: () => fileImportService.runTask("Workspace sync", () => workspaceSyncController.sync())'
+]) {
+  assertIncludes(appJs, boundary, `workspace-sync composition must inject the checked ${boundary} boundary.`);
+}
+assert(
+  !/async\s+function\s+syncWorkspaceFromFolder\b/.test(appJs) &&
+    !/async\s+function\s+syncWorkspaceFromFolder\b/.test(appWorkflowDriverJs),
+  "syncWorkspaceFromFolder must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\bworkspaceSyncController\.sync\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bworkspaceSyncController\.sync\b/g) || []).length === 4,
+  "RecoveryWorkspaceController and every workflow workspace-sync consumer must call WorkspaceSyncController directly."
+);
+for (const testName of [
+  "WorkspaceSyncController preserves the disconnected no-op before autosave",
+  "WorkspaceSyncController synchronizes packages sequentially with exact import and completion effects",
+  "WorkspaceSyncController skips dirty reference identities before reading packages",
+  "WorkspaceSyncController skips dirty package project identities after reading",
+  "WorkspaceSyncController preserves validation-note grammar and invalid-package warnings",
+  "WorkspaceSyncController contains package failures and redacts and deduplicates final warnings",
+  "WorkspaceSyncController preserves blank-warning suppression and a clean zero-package result",
+  "WorkspaceSyncController propagates primary failures before post-loop effects",
+  "WorkspaceSyncController preserves completed reset effects before a late project-load failure",
+  "WorkspaceSyncController validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    workspaceSyncControllerUnitTests,
+    testName,
+    `focused workspace-sync tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/workspace/workspace-sync-controller.js"',
+  "source-catalog extraction must scan the checked workspace-sync controller."
 );
 for (const snippet of [
   "WorkspacePackageSaveController requires storage, session, autosave, build, project, activity, workspace, validation, presentation, status, preference, timer, test, and logger boundaries.",

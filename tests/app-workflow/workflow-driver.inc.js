@@ -5653,7 +5653,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     });
     state.workspaceStatus = { supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 1, resourceCount: 0, backupCount: 0 };
     try {
-      await syncWorkspaceFromFolder();
+      await workspaceSyncController.sync();
       assert(state.lastValidationReport?.warnings?.some((item) => item.includes("failed validation and was skipped")) && els.saveStatus.textContent === "Workspace sync completed with warnings", "workspace sync reports skipped invalid packages");
       assert(state.lastValidationReport?.warnings?.some((item) => item.includes("Skipped unreadable workspace package in Damaged")), "workspace sync reports unreadable workspace packages");
       const workspaceSyncWarningText = JSON.stringify(state.lastValidationReport?.warnings || []);
@@ -5687,7 +5687,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     });
     state.workspaceStatus = { supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 1, resourceCount: 0, backupCount: 0 };
     try {
-      await syncWorkspaceFromFolder();
+      await workspaceSyncController.sync();
       const workspaceSyncErrorWarningText = JSON.stringify(state.lastValidationReport?.warnings || []);
       assert(
         workspaceSyncErrorWarningText.includes("[redacted secret]") &&
@@ -5728,7 +5728,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     workspaceStorage.readProjectPackage = async () => workspaceWarningPackage;
     state.workspaceStatus = { supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 1, resourceCount: 0, backupCount: 0 };
     try {
-      await syncWorkspaceFromFolder();
+      await workspaceSyncController.sync();
       assert(
         state.lastValidationReport?.warnings?.some((item) => item.includes("imported with") && item.includes("validation note")) &&
           els.saveStatus.textContent === "Workspace sync completed with warnings",
@@ -5756,7 +5756,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     clearWorkspaceDirtyMarkers();
     markWorkspaceDirty(project.id);
     try {
-      await syncWorkspaceFromFolder();
+      await workspaceSyncController.sync();
       assert(
         dirtySyncReadCount === 0 &&
           state.workspaceDirtyProjectIds.has(project.id) &&

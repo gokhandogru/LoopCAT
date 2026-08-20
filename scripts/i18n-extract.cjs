@@ -160,6 +160,7 @@ const workspacePackageSaveControllerPath = path.join(
   "workspace",
   "workspace-package-save-controller.js"
 );
+const workspaceSyncControllerPath = path.join(root, "src", "features", "workspace", "workspace-sync-controller.js");
 const projectPackagePortabilityServicePath = path.join(
   root,
   "src",
@@ -449,6 +450,7 @@ function main() {
     workspacePackageSaveControllerPath,
     "src/features/workspace/workspace-package-save-controller.js"
   );
+  extractScript(messagesByText, workspaceSyncControllerPath, "src/features/workspace/workspace-sync-controller.js");
   extractScript(
     messagesByText,
     projectPackagePortabilityServicePath,
