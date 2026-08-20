@@ -874,7 +874,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "pending-save flush finalizes the coalesced EditTarget session"
     );
     const editTargetApplied = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]);
-    const editTargetUndo = await undoLastCommand();
+    const editTargetUndo = await applicationCommandHistoryController.undo();
     const editTargetStoredAfterUndo = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
     );
@@ -892,7 +892,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "one coalesced EditTarget Undo restores target state, history, provenance, persistence, and selection"
     );
     const editTargetUndoRevision = Number(editorSessionStore.getSegments()[segmentIndex].revision || 0);
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     const editTargetStoredAfterRedo = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
     );
@@ -1048,7 +1048,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(replaceResult.replacementCount === 1 && editorSessionStore.getSegments()[segmentIndex].target.startsWith("AnÄ±nda"), "visible target replace updates matching segment");
     const replacedSegments = await getProjectSegments(project.id);
     assert(replacedSegments.some((segment) => segment.target.startsWith("AnÄ±nda")), "target replace saves immediately");
-    const undoReplaceCommand = await undoLastCommand();
+    const undoReplaceCommand = await applicationCommandHistoryController.undo();
     const undoReplaceStored = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
     );
@@ -1065,7 +1065,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         commandId: undoReplaceCommand?.receipt?.commandId || "none"
       })})`
     );
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     const redoReplaceStored = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
     );
@@ -1146,7 +1146,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         savedReviewStateStored?.reviewState === "reviewed",
       "quick review state saves selected review state"
     );
-    await undoLastCommand();
+    await applicationCommandHistoryController.undo();
     const undoneReviewStateStored = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
     );
@@ -1156,7 +1156,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         undoneReviewStateStored?.reviewState === "needs-review",
       "Undo restores quick review state and active segment"
     );
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     const redoneReviewStateStored = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
     );
@@ -3022,7 +3022,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         state.workspaceDirtyProjectIds.has(project.id),
       "copy source finalizes pending typing, records a redacted command, and marks the workspace dirty"
     );
-    const undoCopySource = await undoLastCommand();
+    const undoCopySource = await applicationCommandHistoryController.undo();
     const storedAfterUndoCopy = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
     );
@@ -3032,15 +3032,15 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         storedAfterUndoCopy?.target === producerPendingTyping,
       "first Undo after copy source restores the pending typed target and persistence"
     );
-    const undoProducerTyping = await undoLastCommand();
+    const undoProducerTyping = await applicationCommandHistoryController.undo();
     assert(
       undoProducerTyping?.receipt?.commandId === "edit-target" &&
         editorSessionStore.getSegments()[segmentIndex].target === producerBeforeTyping.target,
       "second Undo after copy source restores the state before pending typing"
     );
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     const copyRedoRevisionBefore = Number(editorSessionStore.getSegments()[segmentIndex].revision || 0);
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     const storedAfterRedoCopy = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
     );
@@ -3071,7 +3071,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       ),
       "TM target insertion records target revision history"
     );
-    const undoTmInsert = await undoLastCommand();
+    const undoTmInsert = await applicationCommandHistoryController.undo();
     const tmUndoRevision = Number(editorSessionStore.getSegments()[segmentIndex].revision || 0);
     const storedAfterTmUndo = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
@@ -3082,7 +3082,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         storedAfterTmUndo?.target === beforeTmInsert.target,
       "TM target Undo restores target state and persistence"
     );
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     const storedAfterTmRedo = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
     );
@@ -3097,14 +3097,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       channel: "concordance",
       resourceId: "workflow-concordance-entry"
     });
-    const undoConcordance = await undoLastCommand();
+    const undoConcordance = await applicationCommandHistoryController.undo();
     assert(
       concordanceCommand?.receipt?.provenance?.channel === "concordance" &&
         undoConcordance?.receipt?.commandId === "insert-tm-target" &&
         editorSessionStore.getSegments()[segmentIndex].target === tmInsertedTarget,
       "concordance insertion uses the same reversible target command with distinct provenance"
     );
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     await saveTerm({
       sourceTerm: "Hello",
       targetTerm: "forbidden-report-term",
@@ -3238,7 +3238,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         ),
       "TM pretranslation saves one redacted atomic command for every matched target"
     );
-    const undoTmPretranslation = await undoLastCommand();
+    const undoTmPretranslation = await applicationCommandHistoryController.undo();
     const tmPretranslationUndoRevisions = editorSessionStore.getSegments()
       .filter((segment) => segment.documentId === pretranslateDocument.id)
       .map((segment) => Number(segment.revision || 0));
@@ -3253,7 +3253,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         storedAfterTmPretranslationUndo.every((segment) => !segment.target && !segment.tmPretranslation),
       "TM pretranslation Undo restores every target, history provenance, persistence, and selection"
     );
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     const storedAfterTmPretranslationRedo = (await getProjectSegments(project.id)).filter(
       (segment) => segment.documentId === pretranslateDocument.id
     );
@@ -3427,7 +3427,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           localAiGlossarySegment?.targetHistory?.some((entry) => entry.reason === "ai-pretranslate"),
         "Local AI pretranslation records redacted provider provenance and target history"
       );
-      const undoLocalAiPretranslation = await undoLastCommand();
+      const undoLocalAiPretranslation = await applicationCommandHistoryController.undo();
       const localAiPretranslationUndoRevision = Number(editorSessionStore.getSegments()[localAiGlossarySegmentIndex].revision || 0);
       const storedAfterLocalAiPretranslationUndo = (await getProjectSegments(project.id)).find(
         (segment) => segment.id === localAiGlossarySegment?.id
@@ -3442,7 +3442,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           !storedAfterLocalAiPretranslationUndo?.aiPretranslation,
         "Local AI pretranslation Undo restores target, history, AI provenance, review state, and persistence"
       );
-      const redoLocalAiPretranslation = await redoLastCommand();
+      const redoLocalAiPretranslation = await applicationCommandHistoryController.redo();
       localAiGlossarySegment = editorSessionStore.getSegments().find(
         (segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource
       );
@@ -3508,7 +3508,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         (segment) => segment.id === localAiGlossarySegment.id
       );
       const midBatchCancellationStatus = els.saveStatus.textContent;
-      const cancellationStackUndo = await undoLastCommand();
+      const cancellationStackUndo = await applicationCommandHistoryController.undo();
       assert(
         canceledLocalAiPretranslation === null &&
           storedAfterMidBatchCancellation?.target === "" &&
@@ -3804,7 +3804,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         !confirmedReviewedAiRow?.textContent.includes("AI draft"),
       "confirming reviewed AI-pretranslated segment clears needs-review and shows AI initiated"
     );
-    await undoLastCommand();
+    await applicationCommandHistoryController.undo();
     const undoneConfirmedSegment = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === confirmedReviewedAiSegment.id
     );
@@ -3816,7 +3816,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         applicationStore.getState().navigation.activeIndex === segmentIndex,
       "Undo restores confirmed segment status, review state, persistence, and selection"
     );
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     const redoneConfirmedSegment = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === confirmedReviewedAiSegment.id
     );
@@ -4602,7 +4602,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         els.saveStatus.textContent.includes("Undo is available"),
       "TM resource row delete moves the exact entry to persistent Trash and marks linked project dirty"
     );
-    await undoLastCommand();
+    await applicationCommandHistoryController.undo();
     const restoredTmCandidates = await getTmMatchCandidates({
       source: resourceTmEntry.source,
       sourceLang: editorSessionStore.getProject().sourceLang,
@@ -4617,7 +4617,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         !(await appRuntime.trashRepository.list()).some((entry) => entry.id === tmEntryTrash.id),
       "TM resource row Undo restores exact content, rebuildable search indexes, and removes its Trash token"
     );
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     assert(
       !(await listTmEntries()).some((entry) => entry.id === resourceTmEntry.id) &&
         (await appRuntime.trashRepository.list()).some(
@@ -4679,7 +4679,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         els.saveStatus.textContent.includes("Undo is available"),
       "term resource row delete moves the exact term to persistent Trash and marks linked project dirty"
     );
-    await undoLastCommand();
+    await applicationCommandHistoryController.undo();
     const restoredResourceTerm = (
       await listTerms({
         sourceLang: editorSessionStore.getProject().sourceLang,
@@ -4700,7 +4700,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         !(await appRuntime.trashRepository.list()).some((entry) => entry.id === termEntryTrash.id),
       "term resource row Undo restores exact metadata, rebuildable search indexes, and removes its Trash token"
     );
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     assert(
       !(await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang })).some(
         (term) => term.id === resourceTerm.id
@@ -4803,13 +4803,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         bulkTmTrash?.payload?.records?.length === 2,
       "TM whole resource deletion moves every entry to one persistent Trash item"
     );
-    await undoLastCommand();
+    await applicationCommandHistoryController.undo();
     assert(
       (await listTmEntries()).filter((entry) => entry.tmName === bulkTmName).length === 2 &&
         !(await appRuntime.trashRepository.list()).some((entry) => entry.id === bulkTmTrash.id),
       "TM whole resource Undo atomically restores every entry"
     );
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     const redoneBulkTmTrash = (await appRuntime.trashRepository.list()).find(
       (entry) => entry.entityType === "translation-memory" && entry.resourceName === bulkTmName
     );
@@ -4860,14 +4860,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         bulkTbTrash?.payload?.records?.length === 2,
       "termbase whole resource deletion moves every term to one persistent Trash item"
     );
-    await undoLastCommand();
+    await applicationCommandHistoryController.undo();
     assert(
       (await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang })).filter(
         (term) => term.termBaseName === bulkTbName
       ).length === 2 && !(await appRuntime.trashRepository.list()).some((entry) => entry.id === bulkTbTrash.id),
       "termbase whole resource Undo atomically restores every term"
     );
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     assert(
       !(await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang })).some(
         (term) => term.termBaseName === bulkTbName
@@ -5045,13 +5045,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         (entry) => entry.entityType === "project" && entry.projectId === deleteProjectFixture.id
       );
       assert(successfulProjectDelete && projectTrashEntry, "project delete moves records to persistent Trash after recovered failure");
-      await undoLastCommand();
+      await applicationCommandHistoryController.undo();
       assert(
         Boolean(await getAllByIndex("segments", "projectId", deleteProjectFixture.id).then((segments) => segments.length)) &&
           editorSessionStore.getProjects().some((item) => item.id === deleteProjectFixture.id),
         "Undo restores a trashed project and its segments"
       );
-      await redoLastCommand();
+      await applicationCommandHistoryController.redo();
       assert(
         !editorSessionStore.getProjects().some((item) => item.id === deleteProjectFixture.id),
         "Redo returns a restored project to Trash"
@@ -5102,13 +5102,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "file delete activity log failure reports warning while preserving the file in Trash"
       );
       Reflect.deleteProperty(deleteFileDocument, FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG);
-      await undoLastCommand();
+      await applicationCommandHistoryController.undo();
       assert(
         editorSessionStore.getProject().documents.some((item) => item.id === deleteFileDocument.id) &&
           (await getProjectSegments(deleteFileFixture.id)).some((segment) => segment.documentId === deleteFileDocument.id),
         "Undo restores a trashed file and its segments"
       );
-      await redoLastCommand();
+      await applicationCommandHistoryController.redo();
       assert(
         !editorSessionStore.getProject().documents.some((item) => item.id === deleteFileDocument.id),
         "Redo returns a restored file to Trash"
@@ -5922,7 +5922,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "segment split saves one redacted structural command with contiguous order and stable focus"
     );
 
-    await undoLastCommand();
+    await applicationCommandHistoryController.undo();
     const splitUndoVisible = editorSessionStore.getSegments().filter((segment) => segment.documentId === structuralDocument.id);
     const splitUndoStored = (await getProjectSegments(project.id)).filter(
       (segment) => segment.documentId === structuralDocument.id
@@ -5943,7 +5943,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     const splitUndoOriginalRevision = Number(splitUndoOriginal?.revision || 0);
 
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     const splitRedoVisible = editorSessionStore.getSegments().filter((segment) => segment.documentId === structuralDocument.id);
     const splitRedoStored = (await getProjectSegments(project.id)).filter(
       (segment) => segment.documentId === structuralDocument.id
@@ -6038,7 +6038,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "MergeSegment persists one redacted atomic command with contiguous order, history, and focus"
     );
 
-    const mergeUndoResult = await undoLastCommand();
+    const mergeUndoResult = await applicationCommandHistoryController.undo();
     const mergeUndoVisible = editorSessionStore.getSegments().filter((segment) => segment.documentId === structuralDocument.id);
     const mergeUndoStored = (await getProjectSegments(project.id)).filter(
       (segment) => segment.documentId === structuralDocument.id
@@ -6066,7 +6066,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "MergeSegment Undo atomically restores both stable segment IDs, order, history, persistence, and focus"
     );
 
-    const mergeRedoResult = await redoLastCommand();
+    const mergeRedoResult = await applicationCommandHistoryController.redo();
     const mergeRedoVisible = editorSessionStore.getSegments().filter((segment) => segment.documentId === structuralDocument.id);
     const mergeRedoStored = (await getProjectSegments(project.id)).filter(
       (segment) => segment.documentId === structuralDocument.id
@@ -6121,7 +6121,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         state.workspaceDirtyProjectIds.has(project.id),
       "protected-tag insertion records one redacted command, history, caret placement, and workspace dirtiness"
     );
-    const undoProtectedTag = await undoLastCommand();
+    const undoProtectedTag = await applicationCommandHistoryController.undo();
     const protectedTagUndoRevision = Number(editorSessionStore.getSegments()[taggedIndex].revision || 0);
     const storedAfterProtectedTagUndo = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[taggedIndex].id
@@ -6137,7 +6137,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         taggedTextarea?.selectionEnd === 0,
       "protected-tag Undo restores target state, persistence, selection, and the original caret"
     );
-    await redoLastCommand();
+    await applicationCommandHistoryController.redo();
     const storedAfterProtectedTagRedo = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[taggedIndex].id
     );

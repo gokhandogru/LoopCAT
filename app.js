@@ -1121,6 +1121,53 @@ const applicationSaveStatusController =
       clear: (timer) => clearTimeout(timer)
     }
   });
+const applicationCommandHistoryController =
+  appRuntime.featureFactories.createApplicationCommandHistoryController({
+    controls: { undo: els.undoBtn, redo: els.redoBtn },
+    context: {
+      getProjectId: () => state.commandProjectId || editorSessionStore.getProject()?.id || null,
+      getView: () => applicationStore.getState().navigation.view
+    },
+    commands: {
+      canUndo: (projectId) => appRuntime?.commands?.bus?.canUndo?.(projectId),
+      canRedo: (projectId) => appRuntime?.commands?.bus?.canRedo?.(projectId),
+      undo: (projectId) => appRuntime?.commands?.bus?.undo?.(projectId),
+      redo: (projectId) => appRuntime?.commands?.bus?.redo?.(projectId)
+    },
+    edits: {
+      finalizeProject: (projectId) => targetEditController.finalizeProject(projectId),
+      finalizeAll: () => targetEditController.finalizeAll(),
+      focusActive: (selection) => targetEditController.focusActive(selection)
+    },
+    session: editorSessionStore,
+    projects: {
+      load: (selectFirst) => loadProjects(selectFirst),
+      open: (projectId) => openProject(projectId),
+      readSegments: (projectId) => getProjectSegments(projectId),
+      prepareHistories: (segments) => segmentTargetStateService.prepareHistories(segments)
+    },
+    navigation: {
+      getActiveIndex: () => applicationStore.getState().navigation.activeIndex,
+      selectSegment: (selection) => applicationNavigation.selectSegment(selection),
+      clearSelection: () => applicationNavigation.clearSelection(),
+      showProjects: () => applicationViewController.show("projects")
+    },
+    resources: {
+      markLinkedDirty: (type, name, sourceLang, targetLang) =>
+        markProjectsUsingResourceDirty(type, name, sourceLang, targetLang),
+      refreshResources: () => refreshResources(),
+      refreshTerms: (options) => refreshProjectTerms(options),
+      refreshSuggestions: () => termSuggestionsController.refresh(),
+      refreshEditorContext: () => editorContextController.refresh()
+    },
+    trash: {
+      isOpen: () => Boolean(els.trashDialog?.open),
+      renderList: () => renderTrashList(),
+      renderSummary: () => refreshTrashSummary()
+    },
+    presentation: { renderAll: () => renderAll() },
+    status: { set: applicationSaveStatusController.set }
+  });
 
 const revisionHistoryPresentationService =
   appRuntime.featureFactories.createRevisionHistoryPresentationService({
@@ -1790,7 +1837,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
   commands: {
     bus: appRuntime.commands.bus,
     create: appRuntime.commands.createConfirmSegmentCommand,
-    changed: renderUndoControls
+    changed: applicationCommandHistoryController.render
   },
   selection: {
     getActiveIndex: () => applicationStore.getState().navigation.activeIndex,
@@ -1873,7 +1920,7 @@ targetEditController = appRuntime.featureFactories.createTargetEditController({
   commandBus: appRuntime.commands.bus,
   editTargetSessions: appRuntime.commands.editTargetSessions,
   persistence: { debounce: autosaveService.debounce },
-  status: { commandsChanged: renderUndoControls },
+  status: { commandsChanged: applicationCommandHistoryController.render },
   selection: {
     getActiveIndex: () => applicationStore.getState().navigation.activeIndex,
     ensureVisible: (...args) => segmentNavigationController.ensureVisible(...args),
@@ -1888,8 +1935,8 @@ targetEditController = appRuntime.featureFactories.createTargetEditController({
   getVisibleIndexes: segmentFilterService.visibleIndexes,
   getVisiblePosition: segmentFilterService.visiblePosition,
   normalizeKey: stableLower,
-  undo: undoLastCommand,
-  redo: redoLastCommand
+  undo: applicationCommandHistoryController.undo,
+  redo: applicationCommandHistoryController.redo
 });
 const targetProducerController = appRuntime.featureFactories.createTargetProducerController({
   copySourceElement: els.copySourceBtn,
@@ -1899,7 +1946,7 @@ const targetProducerController = appRuntime.featureFactories.createTargetProduce
     createCopySource: appRuntime.commands.createCopySourceToTargetCommand,
     createTmTarget: appRuntime.commands.createInsertTmTargetCommand,
     createProtectedTag: appRuntime.commands.createInsertProtectedTagCommand,
-    changed: renderUndoControls
+    changed: applicationCommandHistoryController.render
   },
   editLifecycle: { finalize: targetEditController.finalize },
   persistence: {
@@ -1975,7 +2022,7 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
   commands: {
     bus: appRuntime.commands.bus,
     create: appRuntime.commands.createReplaceTargetsCommand,
-    changed: renderUndoControls
+    changed: applicationCommandHistoryController.render
   },
   persistence: {
     flush: autosaveService.flush,
@@ -2041,7 +2088,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
   commands: {
     bus: appRuntime.commands.bus,
     create: appRuntime.commands.createTmPretranslationCommand,
-    changed: renderUndoControls
+    changed: applicationCommandHistoryController.render
   },
   persistence: {
     flush: autosaveService.flush,
@@ -2338,7 +2385,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
   commands: {
     bus: appRuntime.commands.bus,
     create: appRuntime.commands.createAiPretranslationCommand,
-    changed: renderUndoControls
+    changed: applicationCommandHistoryController.render
   },
   persistence: {
     flush: autosaveService.flush,
@@ -2917,7 +2964,7 @@ const aiSuggestionApplicationController =
     commands: {
       bus: appRuntime.commands.bus,
       create: appRuntime.commands.createApplyAiSuggestionCommand,
-      changed: renderUndoControls
+      changed: applicationCommandHistoryController.render
     },
     selection: {
       getActiveIndex: () => applicationStore.getState().navigation.activeIndex,
@@ -3244,7 +3291,7 @@ const structuralSegmentController = appRuntime.featureFactories.createStructural
     setProjectId: (projectId) => {
       state.commandProjectId = projectId;
     },
-    changed: renderUndoControls
+    changed: applicationCommandHistoryController.render
   },
   selection: {
     getActiveIndex: () => applicationStore.getState().navigation.activeIndex,
@@ -3416,8 +3463,8 @@ const applicationCommandButtonsController =
     },
     actions: {
       emptyTrash: emptyTrashPermanently,
-      undo: undoLastCommand,
-      redo: redoLastCommand
+      undo: applicationCommandHistoryController.undo,
+      redo: applicationCommandHistoryController.redo
     }
   });
 const applicationUpdateControlsController =
@@ -3532,8 +3579,8 @@ const globalKeyboardController = appRuntime.featureFactories.createGlobalKeyboar
     getProjectId: () => state.commandProjectId || editorSessionStore.getProject()?.id || null,
     canUndo: (projectId) => Boolean(appRuntime?.commands?.bus?.canUndo?.(projectId)),
     canRedo: (projectId) => Boolean(appRuntime?.commands?.bus?.canRedo?.(projectId)),
-    undo: undoLastCommand,
-    redo: redoLastCommand
+    undo: applicationCommandHistoryController.undo,
+    redo: applicationCommandHistoryController.redo
   },
   context: {
     getView: () => applicationStore.getState().navigation.view,
@@ -4501,10 +4548,10 @@ const resourceMutationController = appRuntime.featureFactories.createResourceMut
     }
   },
   trash: {
-    entryFromCommandResult: resourceTrashEntryFromCommandResult,
-    synchronize: synchronizeResourceTrashChange
+    entryFromCommandResult: applicationCommandHistoryController.entryFromCommandResult,
+    synchronize: applicationCommandHistoryController.synchronize
   },
-  presentation: { renderUndo: renderUndoControls },
+  presentation: { renderUndo: applicationCommandHistoryController.render },
   status: { set: applicationSaveStatusController.set },
   testHooks: {
     beforeSaveTm: (entry) => {
@@ -4753,7 +4800,7 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   commands: {
     bus: appRuntime.commands.bus,
     create: appRuntime.commands.createChangeReviewStateCommand,
-    changed: renderUndoControls
+    changed: applicationCommandHistoryController.render
   },
   selection: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex },
   mutation: {
@@ -4803,112 +4850,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
 });
 dialogLifecycleController?.mount?.();
 
-function renderUndoControls() {
-  const projectId = state.commandProjectId || editorSessionStore.getProject()?.id || null;
-  if (els.undoBtn) els.undoBtn.disabled = !appRuntime?.commands?.bus?.canUndo?.(projectId);
-  if (els.redoBtn) els.redoBtn.disabled = !appRuntime?.commands?.bus?.canRedo?.(projectId);
-}
-
-function isResourceTrashEntry(entry) {
-  return Boolean(
-    entry && ["tm-entry", "term", "translation-memory", "termbase"].includes(entry.entityType)
-  );
-}
-
-function resourceTrashEntryFromCommandResult(commandResult) {
-  const value = commandResult?.result;
-  if (isResourceTrashEntry(value)) return value;
-  return isResourceTrashEntry(value?.entry) ? value.entry : null;
-}
-
-async function synchronizeResourceTrashChange(entry, { refreshSuggestions = false } = {}) {
-  if (!isResourceTrashEntry(entry)) return false;
-  const linkType = entry.resourceType === "tm" ? "tm" : "termbase";
-  markProjectsUsingResourceDirty(linkType, entry.resourceName, entry.sourceLang, entry.targetLang);
-  await refreshResources();
-  if (entry.resourceType === "tb") {
-    await refreshProjectTerms({ rerender: applicationStore.getState().navigation.view === "editor" });
-    if (refreshSuggestions || applicationStore.getState().navigation.view === "editor") {
-      await termSuggestionsController.refresh();
-    }
-  } else if (applicationStore.getState().navigation.view === "editor") {
-    await editorContextController.refresh();
-  }
-  if (els.trashDialog?.open) await renderTrashList();
-  else await refreshTrashSummary();
-  return true;
-}
-
-async function undoLastCommand() {
-  const projectId = state.commandProjectId || editorSessionStore.getProject()?.id || null;
-  if (projectId) targetEditController.finalizeProject(projectId);
-  else targetEditController.finalizeAll();
-  const result = await appRuntime?.commands?.bus?.undo?.(projectId);
-  if (!result) return false;
-  const requestedActiveSegmentId = result.result?.activeSegmentId || "";
-  await loadProjects(false);
-  if (editorSessionStore.getProject()?.id === projectId) {
-    editorSessionStore.replaceProject(editorSessionStore.getProjects().find((project) => project.id === projectId) || editorSessionStore.getProject());
-    editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(projectId)));
-    const requestedIndex = requestedActiveSegmentId
-      ? editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveSegmentId)
-      : -1;
-    const nextIndex = editorSessionStore.getSegments().length
-      ? requestedIndex >= 0
-        ? requestedIndex
-        : Math.max(0, Math.min(applicationStore.getState().navigation.activeIndex, editorSessionStore.getSegments().length - 1))
-      : -1;
-    applicationNavigation.selectSegment({ activeIndex: nextIndex, segmentId: editorSessionStore.getSegments()[nextIndex]?.id || "" });
-    renderAll();
-  } else if (!editorSessionStore.getProject() && projectId && editorSessionStore.getProjects().some((project) => project.id === projectId)) {
-    await openProject(projectId);
-  }
-  await synchronizeResourceTrashChange(resourceTrashEntryFromCommandResult(result));
-  applicationSaveStatusController.set(result.receipt.undoLabel, "saved");
-  renderUndoControls();
-  if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
-    targetEditController.focusActive(result.result?.selection || null);
-  }
-  return result;
-}
-
-async function redoLastCommand() {
-  const projectId = state.commandProjectId || editorSessionStore.getProject()?.id || null;
-  if (projectId) targetEditController.finalizeProject(projectId);
-  else targetEditController.finalizeAll();
-  const result = await appRuntime?.commands?.bus?.redo?.(projectId);
-  if (!result) return false;
-  const requestedActiveSegmentId = result.result?.activeSegmentId || "";
-  if (result.receipt.commandId === "delete-project" && editorSessionStore.getProject()?.id === projectId) {
-    editorSessionStore.replaceProject(null);
-    editorSessionStore.replaceSegments([]);
-    applicationViewController.show("projects");
-    applicationNavigation.clearSelection();
-  }
-  await loadProjects(false);
-  if (result.receipt.commandId === "delete-document" && editorSessionStore.getProject()?.id === projectId) {
-    editorSessionStore.replaceProject(editorSessionStore.getProjects().find((project) => project.id === projectId) || editorSessionStore.getProject());
-    editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(projectId)));
-    const nextIndex = editorSessionStore.getSegments().length
-      ? Math.max(0, Math.min(applicationStore.getState().navigation.activeIndex, editorSessionStore.getSegments().length - 1))
-      : -1;
-    applicationNavigation.selectSegment({ activeIndex: nextIndex, segmentId: editorSessionStore.getSegments()[nextIndex]?.id || "" });
-    renderAll();
-  } else if (editorSessionStore.getProject()?.id === projectId && requestedActiveSegmentId) {
-    editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(projectId)));
-    const requestedIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveSegmentId);
-    if (requestedIndex >= 0) applicationNavigation.selectSegment({ activeIndex: requestedIndex, segmentId: editorSessionStore.getSegments()[requestedIndex]?.id || "" });
-    renderAll();
-  }
-  await synchronizeResourceTrashChange(resourceTrashEntryFromCommandResult(result));
-  applicationSaveStatusController.set(result.receipt.undoLabel.replace(/^Undo\s+/i, "Redid "), "saved");
-  renderUndoControls();
-  if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
-    targetEditController.focusActive(result.result?.selection || null);
-  }
-  return result;
-}
-
 async function refreshTrashSummary() {
   if (!els.trashBtn || !appRuntime?.trashRepository) return [];
   const entries = await appRuntime.trashRepository.list();
@@ -4921,10 +4862,10 @@ async function restoreTrashEntry(entryId) {
   try {
     const entry = await appRuntime.trashRepository.restore(entryId);
     await loadProjects(false);
-    await synchronizeResourceTrashChange(entry, { refreshSuggestions: true });
+    await applicationCommandHistoryController.synchronize(entry, { refreshSuggestions: true });
     await renderTrashList();
     applicationSaveStatusController.set(`${entry.label || "Item"} restored from Trash`, "saved");
-    renderUndoControls();
+    applicationCommandHistoryController.render();
     return true;
   } catch (error) {
     applicationSaveStatusController.set(
@@ -5573,8 +5514,8 @@ function segmentStatusLabel(status) {
 function commandList() {
   const commandProjectId = state.commandProjectId || editorSessionStore.getProject()?.id || null;
   const commands = [
-    { id: "undo", label: "Undo last action", run: undoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canUndo?.(commandProjectId)) },
-    { id: "redo", label: "Redo last action", run: redoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canRedo?.(commandProjectId)) },
+    { id: "undo", label: "Undo last action", run: applicationCommandHistoryController.undo, enabled: Boolean(appRuntime?.commands?.bus?.canUndo?.(commandProjectId)) },
+    { id: "redo", label: "Redo last action", run: applicationCommandHistoryController.redo, enabled: Boolean(appRuntime?.commands?.bus?.canRedo?.(commandProjectId)) },
     { id: "trash", label: "Open Trash", run: openTrash, enabled: Boolean(appRuntime?.trashRepository) },
     { id: "confirm", label: "Confirm segment", run: segmentConfirmationController.confirm, enabled: Boolean(currentSegment()?.target?.trim()) },
     { id: "next-open", label: "Next open segment", run: segmentNavigationController.nextOpen, enabled: Boolean(editorSessionStore.getSegments().length) },
@@ -6446,7 +6387,7 @@ async function confirmDeleteProject(projectId = editorSessionStore.getProject()?
     }
     await loadProjects(false);
     applicationSaveStatusController.set("Project moved to Trash. Undo is available.", "saved");
-    renderUndoControls();
+    applicationCommandHistoryController.render();
     return true;
   } catch (error) {
     applicationSaveStatusController.set(error.message || "Project delete failed", "dirty");
@@ -6493,7 +6434,7 @@ async function confirmDeleteFile(documentInfo) {
       fileDeleteActivityFailed ? "File moved to Trash; activity log failed" : "File moved to Trash. Undo is available.",
       "saved"
     );
-    renderUndoControls();
+    applicationCommandHistoryController.render();
     return true;
   } catch (error) {
     applicationSaveStatusController.set(error.message || "File delete failed", "dirty");

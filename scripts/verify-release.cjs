@@ -158,6 +158,7 @@ const requiredReleaseFiles = [
   "src/app/bootstrap.js",
   "src/app/app-store.js",
   "src/app/application-command-buttons-controller.js",
+  "src/app/application-command-history-controller.js",
   "src/app/application-event-wiring-controller.js",
   "src/app/application-menu-controller.js",
   "src/app/application-persistence-lifecycle-controller.js",
@@ -299,6 +300,7 @@ const requiredReleaseFiles = [
   "tests/unit/compatibility-module-registry.test.cjs",
   "tests/unit/app-store.test.cjs",
   "tests/unit/application-command-buttons-controller.test.cjs",
+  "tests/unit/application-command-history-controller.test.cjs",
   "tests/unit/application-event-wiring-controller.test.cjs",
   "tests/unit/application-menu-controller.test.cjs",
   "tests/unit/application-persistence-lifecycle-controller.test.cjs",
@@ -468,6 +470,10 @@ const installRuntimeJs = readText("src/app/install-runtime.js");
 const applicationCommandButtonsControllerJs = readText("src/app/application-command-buttons-controller.js");
 const applicationCommandButtonsControllerUnitTests = readText(
   "tests/unit/application-command-buttons-controller.test.cjs"
+);
+const applicationCommandHistoryControllerJs = readText("src/app/application-command-history-controller.js");
+const applicationCommandHistoryControllerUnitTests = readText(
+  "tests/unit/application-command-history-controller.test.cjs"
 );
 const applicationEventWiringControllerJs = readText("src/app/application-event-wiring-controller.js");
 const applicationEventWiringControllerUnitTests = readText("tests/unit/application-event-wiring-controller.test.cjs");
@@ -2936,9 +2942,9 @@ for (const boundary of [
   "execute: (...args) => appRuntime.commands.bus.execute(...args)",
   "createDeleteEntry: appRuntime.commands.createDeleteResourceEntryCommand",
   "createDeleteResource: appRuntime.commands.createDeleteResourceCommand",
-  "entryFromCommandResult: resourceTrashEntryFromCommandResult",
-  "synchronize: synchronizeResourceTrashChange",
-  "renderUndo: renderUndoControls",
+  "entryFromCommandResult: applicationCommandHistoryController.entryFromCommandResult",
+  "synchronize: applicationCommandHistoryController.synchronize",
+  "renderUndo: applicationCommandHistoryController.render",
   "beforeSaveTm: (entry)",
   "beforeSaveTerm: (term)",
   "beforeDeleteTm: (entry)",
@@ -5090,8 +5096,8 @@ for (const boundary of [
   "undoButton: els.undoBtn",
   "redoButton: els.redoBtn",
   "emptyTrash: emptyTrashPermanently",
-  "undo: undoLastCommand",
-  "redo: redoLastCommand",
+  "undo: applicationCommandHistoryController.undo",
+  "redo: applicationCommandHistoryController.redo",
   "commandButtons: applicationCommandButtonsController"
 ]) {
   assertIncludes(
@@ -5146,6 +5152,161 @@ for (const testName of [
     applicationCommandButtonsControllerUnitTests,
     testName,
     `focused application command-button tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createApplicationCommandHistoryController } from "./application-command-history-controller.js";',
+  "the application runtime must install the checked application command-history controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationCommandHistoryController,",
+  "the application runtime must expose the checked application command-history controller factory."
+);
+for (const snippet of [
+  'const RESOURCE_TRASH_ENTITY_TYPES = new Set(["tm-entry", "term", "translation-memory", "termbase"])',
+  "ApplicationCommandHistoryController requires checked context boundaries.",
+  "ApplicationCommandHistoryController requires checked command boundaries.",
+  "ApplicationCommandHistoryController requires checked edit boundaries.",
+  "ApplicationCommandHistoryController requires checked session boundaries.",
+  "ApplicationCommandHistoryController requires checked project boundaries.",
+  "ApplicationCommandHistoryController requires checked navigation boundaries.",
+  "ApplicationCommandHistoryController requires checked resource boundaries.",
+  "ApplicationCommandHistoryController requires checked Trash boundaries.",
+  "ApplicationCommandHistoryController requires checked presentation and status boundaries.",
+  "controls.undo.disabled = !commands.canUndo(projectId)",
+  "controls.redo.disabled = !commands.canRedo(projectId)",
+  "return isResourceEntry(value?.entry) ? value.entry : null",
+  'const linkType = entry.resourceType === "tm" ? "tm" : "termbase"',
+  "resources.markLinkedDirty(linkType, entry.resourceName, entry.sourceLang, entry.targetLang)",
+  "await resources.refreshResources()",
+  'await resources.refreshTerms({ rerender: context.getView() === "editor" })',
+  'refreshSuggestions || context.getView() === "editor"',
+  "await resources.refreshEditorContext()",
+  "if (trash.isOpen()) await trash.renderList()",
+  "else await trash.renderSummary()",
+  "if (projectId) edits.finalizeProject(projectId)",
+  "else edits.finalizeAll()",
+  "const result = await commands.undo(projectId)",
+  "const result = await commands.redo(projectId)",
+  "if (!result) return false",
+  "await projects.load(false)",
+  "projects.prepareHistories(await projects.readSegments(projectId))",
+  'result.receipt.commandId === "delete-project"',
+  'result.receipt.commandId === "delete-document"',
+  "await projects.open(projectId)",
+  "await synchronize(entryFromCommandResult(result))",
+  'status.set(result.receipt.undoLabel, "saved")',
+  'status.set(result.receipt.undoLabel.replace(/^Undo\\s+/i, "Redid "), "saved")',
+  'result.receipt.commandId === "edit-target"',
+  "edits.focusActive(result.result?.selection || null)",
+  "return Object.freeze({ render, entryFromCommandResult, synchronize, undo, redo })"
+]) {
+  assertIncludes(
+    applicationCommandHistoryControllerJs,
+    snippet,
+    `ApplicationCommandHistoryController must retain characterized command, restoration, resource, and presentation policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationCommandHistoryController({",
+  "controls: { undo: els.undoBtn, redo: els.redoBtn }",
+  "getProjectId: () => state.commandProjectId || editorSessionStore.getProject()?.id || null",
+  "getView: () => applicationStore.getState().navigation.view",
+  "canUndo: (projectId) => appRuntime?.commands?.bus?.canUndo?.(projectId)",
+  "canRedo: (projectId) => appRuntime?.commands?.bus?.canRedo?.(projectId)",
+  "undo: (projectId) => appRuntime?.commands?.bus?.undo?.(projectId)",
+  "redo: (projectId) => appRuntime?.commands?.bus?.redo?.(projectId)",
+  "finalizeProject: (projectId) => targetEditController.finalizeProject(projectId)",
+  "finalizeAll: () => targetEditController.finalizeAll()",
+  "focusActive: (selection) => targetEditController.focusActive(selection)",
+  "session: editorSessionStore",
+  "load: (selectFirst) => loadProjects(selectFirst)",
+  "open: (projectId) => openProject(projectId)",
+  "readSegments: (projectId) => getProjectSegments(projectId)",
+  "prepareHistories: (segments) => segmentTargetStateService.prepareHistories(segments)",
+  "getActiveIndex: () => applicationStore.getState().navigation.activeIndex",
+  "selectSegment: (selection) => applicationNavigation.selectSegment(selection)",
+  "clearSelection: () => applicationNavigation.clearSelection()",
+  'showProjects: () => applicationViewController.show("projects")',
+  "markProjectsUsingResourceDirty(type, name, sourceLang, targetLang)",
+  "refreshResources: () => refreshResources()",
+  "refreshTerms: (options) => refreshProjectTerms(options)",
+  "refreshSuggestions: () => termSuggestionsController.refresh()",
+  "refreshEditorContext: () => editorContextController.refresh()",
+  "isOpen: () => Boolean(els.trashDialog?.open)",
+  "renderList: () => renderTrashList()",
+  "renderSummary: () => refreshTrashSummary()",
+  "presentation: { renderAll: () => renderAll() }",
+  "status: { set: applicationSaveStatusController.set }"
+]) {
+  assertIncludes(appJs, boundary, `command-history composition must inject the checked ${boundary} boundary.`);
+}
+for (const removedHelper of [
+  "renderUndoControls",
+  "isResourceTrashEntry",
+  "resourceTrashEntryFromCommandResult",
+  "synchronizeResourceTrashChange",
+  "undoLastCommand",
+  "redoLastCommand"
+]) {
+  assert(
+    !appJs.includes(removedHelper) && !appWorkflowDriverJs.includes(removedHelper),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+for (const method of ["undo", "redo"]) {
+  assert(
+    appJs.includes(`applicationCommandHistoryController.${method}`) &&
+      appWorkflowDriverJs.includes(`applicationCommandHistoryController.${method}`),
+    `application and workflow ${method} consumers must call ApplicationCommandHistoryController directly.`
+  );
+}
+for (const method of ["render", "entryFromCommandResult", "synchronize"]) {
+  assertIncludes(
+    appJs,
+    `applicationCommandHistoryController.${method}`,
+    `application ${method} consumers must call ApplicationCommandHistoryController directly.`
+  );
+}
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "applicationStore",
+  "targetEditController",
+  "segmentTargetStateService",
+  "applicationNavigation",
+  "applicationViewController",
+  "termSuggestionsController",
+  "editorContextController",
+  "applicationSaveStatusController",
+  "els.",
+  "document.",
+  "window."
+]) {
+  assert(
+    !applicationCommandHistoryControllerJs.includes(forbiddenOwner),
+    `ApplicationCommandHistoryController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationCommandHistoryController preserves command-control presentation and immutable API",
+  "ApplicationCommandHistoryController normalizes resource results and preserves invalid synchronization no-op",
+  "ApplicationCommandHistoryController preserves TM and termbase resource refresh branches",
+  "ApplicationCommandHistoryController preserves project or all-edit finalization and no-result guards",
+  "ApplicationCommandHistoryController restores the active project on Undo before status, controls, and focus",
+  "ApplicationCommandHistoryController reopens a restored project and preserves Undo common effects",
+  "ApplicationCommandHistoryController preserves Redo delete-project and requested-segment branches",
+  "ApplicationCommandHistoryController preserves Redo deleted-document restoration and bounded selection",
+  "ApplicationCommandHistoryController preserves Undo fallback selection for missing and empty segment sets",
+  "ApplicationCommandHistoryController preserves synchronous and awaited resource failure timing",
+  "ApplicationCommandHistoryController validates every injected owner and propagates awaited failures"
+]) {
+  assertIncludes(
+    applicationCommandHistoryControllerUnitTests,
+    testName,
+    `focused command-history tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
