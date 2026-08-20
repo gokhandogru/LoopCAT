@@ -253,6 +253,7 @@ const requiredReleaseFiles = [
   "src/features/import-export/import-export-controller.js",
   "src/features/workspace/recovery-workspace-controller.js",
   "src/features/workspace/workspace-backup-export-controller.js",
+  "src/features/workspace/workspace-health-repair-controller.js",
   "src/features/workspace/workspace-package-save-controller.js",
   "src/features/workspace/workspace-sync-controller.js",
   "src/i18n/language-input-service.js",
@@ -343,6 +344,7 @@ const requiredReleaseFiles = [
   "tests/unit/import-export-controller.test.cjs",
   "tests/unit/recovery-workspace-controller.test.cjs",
   "tests/unit/workspace-backup-export-controller.test.cjs",
+  "tests/unit/workspace-health-repair-controller.test.cjs",
   "tests/unit/workspace-package-save-controller.test.cjs",
   "tests/unit/workspace-sync-controller.test.cjs",
   "tests/unit/language-input-service.test.cjs",
@@ -644,6 +646,8 @@ const recoveryWorkspaceControllerJs = readText("src/features/workspace/recovery-
 const recoveryWorkspaceControllerUnitTests = readText("tests/unit/recovery-workspace-controller.test.cjs");
 const workspaceBackupExportControllerJs = readText("src/features/workspace/workspace-backup-export-controller.js");
 const workspaceBackupExportControllerUnitTests = readText("tests/unit/workspace-backup-export-controller.test.cjs");
+const workspaceHealthRepairControllerJs = readText("src/features/workspace/workspace-health-repair-controller.js");
+const workspaceHealthRepairControllerUnitTests = readText("tests/unit/workspace-health-repair-controller.test.cjs");
 const workspacePackageSaveControllerJs = readText("src/features/workspace/workspace-package-save-controller.js");
 const workspacePackageSaveControllerUnitTests = readText("tests/unit/workspace-package-save-controller.test.cjs");
 const workspaceSyncControllerJs = readText("src/features/workspace/workspace-sync-controller.js");
@@ -5054,6 +5058,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createWorkspaceHealthRepairController } from "../features/workspace/workspace-health-repair-controller.js";',
+  "The application runtime must install the checked workspace health-repair controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createWorkspaceHealthRepairController,",
+  "The application runtime must expose the checked workspace health-repair controller factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createWorkspaceSyncController } from "../features/workspace/workspace-sync-controller.js";',
   "The application runtime must install the checked workspace-sync controller."
 );
@@ -7173,6 +7187,97 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/import-export/project-import-restore-controller.js"',
   "source-catalog extraction must scan the checked project-import/restore controller."
+);
+for (const snippet of [
+  "WorkspaceHealthRepairController requires connection, storage, workspace, resource, session, dirty, presentation, and status boundaries.",
+  "async function repair()",
+  "if (!connection.isConnected()) return",
+  "const repairResult = await storage.repairManifest()",
+  "const workspaceStatus = await storage.getStatus()",
+  "workspace.setStatus(workspaceStatus)",
+  "const [tmEntries, terms] = await Promise.all([resources.listTmEntries(), resources.listTerms()])",
+  "const report = await storage.buildHealthReport({",
+  "projects: session.getProjects()",
+  "tmEntries,",
+  "terms,",
+  "dirtyProjectIds: dirty.ids()",
+  "report.preserved.unshift(",
+  '${repairResult.recoveredProjectCount} project package${repairResult.recoveredProjectCount === 1 ? "" : "s"} verified in the workspace folder.',
+  "presentation.renderValidation(report)",
+  "presentation.renderWorkspaceStatus()",
+  'report.ok ? "Workspace health checked" : "Workspace needs attention"',
+  'report.ok ? "saved" : "dirty"',
+  "return Object.freeze({ repair })"
+]) {
+  assertIncludes(
+    workspaceHealthRepairControllerJs,
+    snippet,
+    `WorkspaceHealthRepairController must retain characterized guard, manifest repair, status refresh, concurrent resource lookup, health input, report mutation, presentation, and status policy: ${snippet}`
+  );
+}
+assert(
+  !workspaceHealthRepairControllerJs.includes("workspaceStorage") &&
+    !workspaceHealthRepairControllerJs.includes("state.") &&
+    !workspaceHealthRepairControllerJs.includes("repairWorkspaceManifest") &&
+    !workspaceHealthRepairControllerJs.includes('getAll("terms")') &&
+    !workspaceHealthRepairControllerJs.includes("editorSessionStore") &&
+    !workspaceHealthRepairControllerJs.includes("workspaceDirtyIds") &&
+    !workspaceHealthRepairControllerJs.includes("renderValidationReport") &&
+    !workspaceHealthRepairControllerJs.includes("setSaveStatus") &&
+    !workspaceHealthRepairControllerJs.includes("recoveryWorkspaceController") &&
+    !workspaceHealthRepairControllerJs.includes("els."),
+  "the checked workspace health-repair controller must use only its injected connection, storage, workspace, resource, session, dirty, presentation, and status boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createWorkspaceHealthRepairController({",
+  "isConnected: () => Boolean(workspaceStorage && state.workspaceStatus?.connected)",
+  "repairManifest: () => workspaceStorage.repairWorkspaceManifest()",
+  "getStatus: () => workspaceStorage.getStatus()",
+  "buildHealthReport: (input) => workspaceStorage.buildHealthReport(input)",
+  "state.workspaceStatus = workspaceStatus",
+  "listTmEntries,",
+  'listTerms: () => getAll("terms")',
+  "session: editorSessionStore",
+  "dirty: { ids: workspaceDirtyIds }",
+  "renderValidation: renderValidationReport",
+  "status: { set: setSaveStatus }",
+  "repairWorkspace: (...args) => workspaceHealthRepairController.repair(...args)"
+]) {
+  assertIncludes(appJs, boundary, `workspace health-repair composition must inject the checked ${boundary} boundary.`);
+}
+assert(
+  !/async\s+function\s+repairWorkspaceLinks\b/.test(appJs) &&
+    !/async\s+function\s+repairWorkspaceLinks\b/.test(appWorkflowDriverJs),
+  "repairWorkspaceLinks must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\bworkspaceHealthRepairController\.repair\b/g) || []).length === 1 &&
+    !appWorkflowDriverJs.includes("workspaceHealthRepairController.repair"),
+  "RecoveryWorkspaceController must call WorkspaceHealthRepairController directly without adding a workflow-only consumer."
+);
+for (const testName of [
+  "WorkspaceHealthRepairController preserves the disconnected no-op before manifest repair",
+  "WorkspaceHealthRepairController preserves exact healthy repair and presentation sequencing",
+  "WorkspaceHealthRepairController starts both resource reads before awaiting either",
+  "WorkspaceHealthRepairController preserves zero and singular recovered-package grammar",
+  "WorkspaceHealthRepairController preserves plural copy and unhealthy status",
+  "WorkspaceHealthRepairController propagates primary repair failure before later effects",
+  "WorkspaceHealthRepairController preserves completed repair before workspace-status failure",
+  "WorkspaceHealthRepairController starts both resource reads and propagates either rejection",
+  "WorkspaceHealthRepairController preserves resource reads and input reads before health-report failure",
+  "WorkspaceHealthRepairController preserves render and status failure timing",
+  "WorkspaceHealthRepairController validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    workspaceHealthRepairControllerUnitTests,
+    testName,
+    `focused workspace health-repair tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/workspace/workspace-health-repair-controller.js"',
+  "source-catalog extraction must scan the checked workspace health-repair controller."
 );
 for (const snippet of [
   "WorkspaceBackupExportController requires connection, build, storage, workspace, validation, presentation, and status boundaries.",

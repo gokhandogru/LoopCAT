@@ -3478,6 +3478,7 @@ let projectExportController;
 let workspacePackageSaveController;
 let workspaceSyncController;
 let workspaceBackupExportController;
+let workspaceHealthRepairController;
 const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecoveryWorkspaceController?.({
   elements: {
     menu: els.workspaceMenu,
@@ -3511,7 +3512,7 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
   saveProject: (...args) => workspacePackageSaveController.saveCurrent(...args),
   syncWorkspace: () => fileImportService.runTask("Workspace sync", () => workspaceSyncController.sync()),
   exportWorkspaceBackup: (...args) => workspaceBackupExportController.exportBackup(...args),
-  repairWorkspace: repairWorkspaceLinks,
+  repairWorkspace: (...args) => workspaceHealthRepairController.repair(...args),
   saveRecovery: (...args) => workspacePackageSaveController.saveRecovery(...args),
   exportRecoveryCopy: (...args) => projectExportController.exportProjectPackage(...args),
   dismissBackupReminder: () => dismissBackupReminder(),
@@ -3600,6 +3601,33 @@ workspaceBackupExportController =
     presentation: {
       renderWorkspaceStatus,
       renderValidation: renderValidationReport
+    },
+    status: { set: setSaveStatus }
+  });
+workspaceHealthRepairController =
+  appRuntime.featureFactories.createWorkspaceHealthRepairController({
+    connection: {
+      isConnected: () => Boolean(workspaceStorage && state.workspaceStatus?.connected)
+    },
+    storage: {
+      repairManifest: () => workspaceStorage.repairWorkspaceManifest(),
+      getStatus: () => workspaceStorage.getStatus(),
+      buildHealthReport: (input) => workspaceStorage.buildHealthReport(input)
+    },
+    workspace: {
+      setStatus: (workspaceStatus) => {
+        state.workspaceStatus = workspaceStatus;
+      }
+    },
+    resources: {
+      listTmEntries,
+      listTerms: () => getAll("terms")
+    },
+    session: editorSessionStore,
+    dirty: { ids: workspaceDirtyIds },
+    presentation: {
+      renderValidation: renderValidationReport,
+      renderWorkspaceStatus
     },
     status: { set: setSaveStatus }
   });
@@ -6626,23 +6654,6 @@ function renderProgress(options = {}) {
   els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
   els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
-}
-
-async function repairWorkspaceLinks() {
-  if (!workspaceStorage || !state.workspaceStatus?.connected) return;
-  const repair = await workspaceStorage.repairWorkspaceManifest();
-  state.workspaceStatus = await workspaceStorage.getStatus();
-  const [tmEntries, terms] = await Promise.all([listTmEntries(), getAll("terms")]);
-  const report = await workspaceStorage.buildHealthReport({
-    projects: editorSessionStore.getProjects(),
-    tmEntries,
-    terms,
-    dirtyProjectIds: workspaceDirtyIds()
-  });
-  report.preserved.unshift(`${repair.recoveredProjectCount} project package${repair.recoveredProjectCount === 1 ? "" : "s"} verified in the workspace folder.`);
-  renderValidationReport(report);
-  renderWorkspaceStatus();
-  setSaveStatus(report.ok ? "Workspace health checked" : "Workspace needs attention", report.ok ? "saved" : "dirty");
 }
 
 function wireEvents() {

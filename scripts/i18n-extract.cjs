@@ -160,6 +160,13 @@ const workspaceBackupExportControllerPath = path.join(
   "workspace",
   "workspace-backup-export-controller.js"
 );
+const workspaceHealthRepairControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "workspace",
+  "workspace-health-repair-controller.js"
+);
 const workspacePackageSaveControllerPath = path.join(
   root,
   "src",
@@ -348,6 +355,11 @@ function main() {
     messagesByText,
     workspaceBackupExportControllerPath,
     "src/features/workspace/workspace-backup-export-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    workspaceHealthRepairControllerPath,
+    "src/features/workspace/workspace-health-repair-controller.js"
   );
   extractScript(
     messagesByText,
