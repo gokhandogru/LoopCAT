@@ -3421,6 +3421,14 @@ const projectHomeController = appRuntime.featureFactories.createProjectHomeContr
   presentation: { renderAll },
   actions: { confirmDelete: confirmDeleteProject }
 });
+const projectFilterControlsController =
+  appRuntime.featureFactories.createProjectFilterControlsController({
+    elements: {
+      searchInput: els.projectSearchInput,
+      languagePairFilter: els.languagePairFilter
+    },
+    presentation: { render: renderProjectsView }
+  });
 const focusModeController = appRuntime.featureFactories.createFocusModeController({
   elements: {
     body: document.body,
@@ -6275,12 +6283,7 @@ function projectEmptyState({ hasProjects }) {
     heading.textContent = uiLocalizationService.source("No matching projects");
     message.textContent = uiLocalizationService.source("Clear the search and language filters to see every local project.");
     action.textContent = uiLocalizationService.source("Clear filters");
-    action.addEventListener("click", () => {
-      els.projectSearchInput.value = "";
-      els.languagePairFilter.value = "";
-      renderProjectsView();
-      els.projectSearchInput.focus();
-    });
+    action.addEventListener("click", projectFilterControlsController.clear);
   } else {
     heading.textContent = uiLocalizationService.source("Start your first translation");
     message.textContent = uiLocalizationService.source("Choose New project above, or bring in an existing LoopCAT project package.");
@@ -6736,8 +6739,7 @@ function wireEvents() {
   focusModeController.mount();
   inspectorToggleController.mount();
   paletteController?.mountTrigger?.();
-  els.projectSearchInput.addEventListener("input", renderProjectsView);
-  els.languagePairFilter.addEventListener("change", renderProjectsView);
+  projectFilterControlsController.mount();
 
   els.saveTmBtn.addEventListener("click", segmentTmSaveController.saveActive);
   els.nextOpenBtn.addEventListener("click", segmentNavigationController.nextOpen);

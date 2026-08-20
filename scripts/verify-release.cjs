@@ -226,6 +226,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-dialog-controller.js",
   "src/features/projects/project-dialog-save-controller.js",
   "src/features/projects/project-domain-controller.js",
+  "src/features/projects/project-filter-controls-controller.js",
   "src/features/projects/project-home-controller.js",
   "src/features/projects/project-resource-selection-controller.js",
   "src/features/projects/project-language-pair-shortcuts-controller.js",
@@ -320,6 +321,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-qa-controller.test.cjs",
   "tests/unit/project-domain-controller.test.cjs",
   "tests/unit/project-dialog-save-controller.test.cjs",
+  "tests/unit/project-filter-controls-controller.test.cjs",
   "tests/unit/project-home-controller.test.cjs",
   "tests/unit/project-document-import-controller.test.cjs",
   "tests/unit/file-import-service.test.cjs",
@@ -521,6 +523,12 @@ const projectDomainControllerJs = readText("src/features/projects/project-domain
 const projectDomainControllerUnitTests = readText("tests/unit/project-domain-controller.test.cjs");
 const projectDialogSaveControllerJs = readText("src/features/projects/project-dialog-save-controller.js");
 const projectDialogSaveControllerUnitTests = readText("tests/unit/project-dialog-save-controller.test.cjs");
+const projectFilterControlsControllerJs = readText(
+  "src/features/projects/project-filter-controls-controller.js"
+);
+const projectFilterControlsControllerUnitTests = readText(
+  "tests/unit/project-filter-controls-controller.test.cjs"
+);
 const projectHomeControllerJs = readText("src/features/projects/project-home-controller.js");
 const projectHomeControllerUnitTests = readText("tests/unit/project-home-controller.test.cjs");
 const projectDocumentImportControllerJs = readText("src/features/import-export/project-document-import-controller.js");
@@ -4608,8 +4616,7 @@ for (const boundary of ["triggerButton: els.commandPaletteBtn", "paletteControll
 }
 assert(
   appJs.indexOf("inspectorToggleController.mount()") < appJs.indexOf("paletteController?.mountTrigger?.()") &&
-    appJs.indexOf("paletteController?.mountTrigger?.()") <
-      appJs.indexOf('els.projectSearchInput.addEventListener("input"'),
+    appJs.indexOf("paletteController?.mountTrigger?.()") < appJs.indexOf("projectFilterControlsController.mount()"),
   "command-palette trigger must mount between inspector-toggle and project-filter listeners at the existing position."
 );
 assert(
@@ -4668,6 +4675,84 @@ for (const testName of [
     `focused command-palette trigger tests must retain characterization: ${testName}.`
   );
 }
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectFilterControlsController } from "../features/projects/project-filter-controls-controller.js";',
+  "the application runtime must install the checked project-filter controls controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectFilterControlsController,",
+  "the application runtime must expose the checked project-filter controls controller factory."
+);
+for (const snippet of [
+  "ProjectFilterControlsController requires a checked search input.",
+  "ProjectFilterControlsController requires a checked language-pair filter.",
+  "ProjectFilterControlsController requires a Projects-view presentation boundary.",
+  "const renderListener = presentation.render",
+  'searchInput.addEventListener("input", renderListener)',
+  'languagePairFilter.addEventListener("change", renderListener)',
+  'searchInput.removeEventListener("input", renderListener)',
+  'languagePairFilter.removeEventListener("change", renderListener)',
+  'searchInput.value = ""',
+  'languagePairFilter.value = ""',
+  "presentation.render()",
+  "searchInput.focus()",
+  "return Object.freeze({ clear, mount, unmount })"
+]) {
+  assertIncludes(
+    projectFilterControlsControllerJs,
+    snippet,
+    `ProjectFilterControlsController must retain characterized filter listener and clear policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectFilterControlsController({",
+  "searchInput: els.projectSearchInput",
+  "languagePairFilter: els.languagePairFilter",
+  "presentation: { render: renderProjectsView }",
+  'action.addEventListener("click", projectFilterControlsController.clear)',
+  "projectFilterControlsController.mount()"
+]) {
+  assertIncludes(appJs, boundary, `project-filter composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  appJs.indexOf("paletteController?.mountTrigger?.()") < appJs.indexOf("projectFilterControlsController.mount()") &&
+    appJs.indexOf("projectFilterControlsController.mount()") <
+      appJs.indexOf('els.saveTmBtn.addEventListener("click"'),
+  "project-filter controls must mount between command-palette and segment-action listeners at the existing position."
+);
+assert(
+  !appJs.includes('els.projectSearchInput.addEventListener("input"') &&
+    !appJs.includes('els.languagePairFilter.addEventListener("change"') &&
+    !appWorkflowDriverJs.includes("projectFilterControlsController"),
+  "project-filter listener ownership must not return to app.js or the workflow driver."
+);
+for (const forbiddenOwner of ["document.", "els.", "renderProjectsView", "editorSessionStore"]) {
+  assert(
+    !projectFilterControlsControllerJs.includes(forbiddenOwner),
+    `ProjectFilterControlsController must use injected element and presentation boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectFilterControlsController binds both native render events to the exact injected callback",
+  "ProjectFilterControlsController clears, renders, and focuses in exact order while ignoring the click event",
+  "ProjectFilterControlsController owns exact idempotent listener lifecycle and immutable API",
+  "ProjectFilterControlsController preserves every clear failure boundary",
+  "ProjectFilterControlsController preserves listener failure timing and retry state",
+  "ProjectFilterControlsController validates required elements and presentation"
+]) {
+  assertIncludes(
+    projectFilterControlsControllerUnitTests,
+    testName,
+    `focused project-filter controls tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/project-filter-controls-controller.js"',
+  "source-catalog extraction must scan the checked project-filter controls controller."
+);
 assertIncludes(
   appBootstrapJs,
   'import { createApplicationCommandButtonsController } from "./application-command-buttons-controller.js";',

@@ -123,6 +123,13 @@ const termSuggestionsControllerPath = path.join(root, "src", "features", "editor
 const termFormControllerPath = path.join(root, "src", "features", "editor", "term-form-controller.js");
 const projectQaControllerPath = path.join(root, "src", "features", "quality", "project-qa-controller.js");
 const projectDomainControllerPath = path.join(root, "src", "features", "projects", "project-domain-controller.js");
+const projectFilterControlsControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "projects",
+  "project-filter-controls-controller.js"
+);
 const projectHomeControllerPath = path.join(root, "src", "features", "projects", "project-home-controller.js");
 const projectDialogSaveControllerPath = path.join(
   root,
@@ -451,6 +458,11 @@ function main() {
   extractScript(messagesByText, termFormControllerPath, "src/features/editor/term-form-controller.js");
   extractScript(messagesByText, projectQaControllerPath, "src/features/quality/project-qa-controller.js");
   extractScript(messagesByText, projectDomainControllerPath, "src/features/projects/project-domain-controller.js");
+  extractScript(
+    messagesByText,
+    projectFilterControlsControllerPath,
+    "src/features/projects/project-filter-controls-controller.js"
+  );
   extractScript(messagesByText, projectHomeControllerPath, "src/features/projects/project-home-controller.js");
   extractScript(
     messagesByText,
