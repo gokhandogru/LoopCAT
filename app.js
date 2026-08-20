@@ -3576,6 +3576,40 @@ const applicationPersistenceLifecycleController =
     },
     logger: { warn: (error) => console.warn(error) }
   });
+const applicationEventWiringController =
+  appRuntime.featureFactories.createApplicationEventWiringController({
+    checkpoint: (message) => {
+      if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = message;
+    },
+    initialization: {
+      renderLanguageDatalists: () => languageInputService.renderDatalists(),
+      renderTextEncodingOptions: () => textEncodingInputService.renderOptions()
+    },
+    segmentGrid: {
+      mountScroll: (listener) => verticalFeatureState.segmentGrid.mountScroll(listener),
+      renderSegments: (options) => renderSegments(options)
+    },
+    lifecycles: {
+      applicationMenu: applicationMenuController,
+      globalKeyboard: globalKeyboardController,
+      applicationView: applicationViewController,
+      commandButtons: applicationCommandButtonsController,
+      updateControls: applicationUpdateControlsController,
+      uiLocaleControls: uiLocaleControlsController,
+      projectHome: projectHomeController,
+      focusMode: focusModeController,
+      inspectorToggle: inspectorToggleController,
+      palette: paletteController,
+      projectFilterControls: projectFilterControlsController,
+      segmentActionButtons: segmentActionButtonsController,
+      projectQa: projectQaController,
+      panelToggle: panelToggleController,
+      editorFilterControls: editorFilterControlsController,
+      termForm: termFormController,
+      projectDomain: projectDomainController,
+      applicationPersistence: applicationPersistenceLifecycleController
+    }
+  });
 
 const diagnosticsService = appRuntime?.featureFactories?.createDiagnosticsService?.({
   platform: appRuntime.platform,
@@ -6755,37 +6789,6 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-function wireEvents() {
-  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "rendering language datalists";
-  languageInputService.renderDatalists();
-  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "rendering text encodings";
-  textEncodingInputService.renderOptions();
-  if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "attaching event listeners";
-  applicationMenuController.mount();
-  globalKeyboardController.mount();
-  verticalFeatureState.segmentGrid.mountScroll(() => {
-    renderSegments({ fromScroll: true, preserveScroll: true });
-  });
-
-  applicationViewController.mount();
-  applicationCommandButtonsController.mount();
-  applicationUpdateControlsController.mount();
-  uiLocaleControlsController.mount();
-  projectHomeController.mount();
-  focusModeController.mount();
-  inspectorToggleController.mount();
-  paletteController?.mountTrigger?.();
-  projectFilterControlsController.mount();
-  segmentActionButtonsController.mount();
-  projectQaController.mount();
-  panelToggleController.mount();
-  editorFilterControlsController.mount();
-
-  termFormController.mount();
-  projectDomainController.mount();
-  applicationPersistenceLifecycleController.mount();
-}
-
 /* LOOPCAT_TEST_WORKFLOW_DRIVER */
 
 (async () => {
@@ -6797,7 +6800,7 @@ function wireEvents() {
   renderUiLocaleOptions();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "binding local AI drawer";
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "wiring UI events";
-  wireEvents();
+  applicationEventWiringController.wire();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "starting workspace autosave";
   workspacePackageSaveController.startAutosave();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "starting application bootstrap";

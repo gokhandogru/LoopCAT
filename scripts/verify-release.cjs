@@ -158,6 +158,7 @@ const requiredReleaseFiles = [
   "src/app/bootstrap.js",
   "src/app/app-store.js",
   "src/app/application-command-buttons-controller.js",
+  "src/app/application-event-wiring-controller.js",
   "src/app/application-menu-controller.js",
   "src/app/application-persistence-lifecycle-controller.js",
   "src/app/application-update-controls-controller.js",
@@ -295,6 +296,7 @@ const requiredReleaseFiles = [
   "tests/unit/compatibility-module-registry.test.cjs",
   "tests/unit/app-store.test.cjs",
   "tests/unit/application-command-buttons-controller.test.cjs",
+  "tests/unit/application-event-wiring-controller.test.cjs",
   "tests/unit/application-menu-controller.test.cjs",
   "tests/unit/application-persistence-lifecycle-controller.test.cjs",
   "tests/unit/application-update-controls-controller.test.cjs",
@@ -461,6 +463,8 @@ const applicationCommandButtonsControllerJs = readText("src/app/application-comm
 const applicationCommandButtonsControllerUnitTests = readText(
   "tests/unit/application-command-buttons-controller.test.cjs"
 );
+const applicationEventWiringControllerJs = readText("src/app/application-event-wiring-controller.js");
+const applicationEventWiringControllerUnitTests = readText("tests/unit/application-event-wiring-controller.test.cjs");
 const applicationMenuControllerJs = readText("src/app/application-menu-controller.js");
 const applicationMenuControllerUnitTests = readText("tests/unit/application-menu-controller.test.cjs");
 const applicationPersistenceLifecycleControllerJs = readText("src/app/application-persistence-lifecycle-controller.js");
@@ -3357,14 +3361,14 @@ for (const snippet of [
   );
 }
 for (const boundary of [
-  "verticalFeatureState.segmentGrid.mountScroll(() => {",
-  "renderSegments({ fromScroll: true, preserveScroll: true })"
+  "mountScroll: (listener) => verticalFeatureState.segmentGrid.mountScroll(listener)",
+  "renderSegments: (options) => renderSegments(options)"
 ]) {
   assertIncludes(appJs, boundary, `segment-grid scroll composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  appJs.indexOf("globalKeyboardController.mount()") <
-    appJs.indexOf("verticalFeatureState.segmentGrid.mountScroll(() => {"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.globalKeyboard.mount()") <
+    applicationEventWiringControllerJs.indexOf("segmentGrid.mountScroll(scrollListener)"),
   "segment-grid scroll lifecycle must mount after application-global keyboard routing at the existing listener position."
 );
 assert(
@@ -4629,12 +4633,14 @@ for (const snippet of [
     `PaletteController must retain checked toolbar-trigger listener ownership: ${snippet}.`
   );
 }
-for (const boundary of ["triggerButton: els.commandPaletteBtn", "paletteController?.mountTrigger?.()"]) {
+for (const boundary of ["triggerButton: els.commandPaletteBtn", "palette: paletteController"]) {
   assertIncludes(appJs, boundary, `command-palette composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  appJs.indexOf("inspectorToggleController.mount()") < appJs.indexOf("paletteController?.mountTrigger?.()") &&
-    appJs.indexOf("paletteController?.mountTrigger?.()") < appJs.indexOf("projectFilterControlsController.mount()"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.inspectorToggle.mount()") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.palette?.mountTrigger?.()") &&
+    applicationEventWiringControllerJs.indexOf("lifecycles.palette?.mountTrigger?.()") <
+      applicationEventWiringControllerJs.indexOf("lifecycles.projectFilterControls.mount()"),
   "command-palette trigger must mount between inspector-toggle and project-filter listeners at the existing position."
 );
 assert(
@@ -4643,8 +4649,8 @@ assert(
   "command-palette toolbar-listener ownership must not return to app.js or the workflow driver."
 );
 assert(
-  (appJs.match(/\bpaletteController\?\.mountTrigger\?\.\(\)/g) || []).length === 1,
-  "wireEvents must retain exactly one optional command-palette trigger mount."
+  (applicationEventWiringControllerJs.match(/\blifecycles\.palette\?\.mountTrigger\?\.\(\)/g) || []).length === 1,
+  "ApplicationEventWiringController must retain exactly one optional command-palette trigger mount."
 );
 for (const directConsumer of ["palette?.open?.()", "palette?.close?.()"]) {
   assertIncludes(
@@ -4730,13 +4736,15 @@ for (const boundary of [
   "languagePairFilter: els.languagePairFilter",
   "presentation: { render: renderProjectsView }",
   'action.addEventListener("click", projectFilterControlsController.clear)',
-  "projectFilterControlsController.mount()"
+  "projectFilterControls: projectFilterControlsController"
 ]) {
   assertIncludes(appJs, boundary, `project-filter composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  appJs.indexOf("paletteController?.mountTrigger?.()") < appJs.indexOf("projectFilterControlsController.mount()") &&
-    appJs.indexOf("projectFilterControlsController.mount()") < appJs.indexOf("segmentActionButtonsController.mount()"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.palette?.mountTrigger?.()") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.projectFilterControls.mount()") &&
+    applicationEventWiringControllerJs.indexOf("lifecycles.projectFilterControls.mount()") <
+      applicationEventWiringControllerJs.indexOf("lifecycles.segmentActionButtons.mount()"),
   "project-filter controls must mount between command-palette and segment-action listeners at the existing position."
 );
 assert(
@@ -4804,13 +4812,15 @@ for (const boundary of [
   "nextOpenButton: els.nextOpenBtn",
   "saveToTm: segmentTmSaveController.saveActive",
   "nextOpen: segmentNavigationController.nextOpen",
-  "segmentActionButtonsController.mount()"
+  "segmentActionButtons: segmentActionButtonsController"
 ]) {
   assertIncludes(appJs, boundary, `segment-action composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  appJs.indexOf("projectFilterControlsController.mount()") < appJs.indexOf("segmentActionButtonsController.mount()") &&
-    appJs.indexOf("segmentActionButtonsController.mount()") < appJs.indexOf("projectQaController.mount()"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.projectFilterControls.mount()") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.segmentActionButtons.mount()") &&
+    applicationEventWiringControllerJs.indexOf("lifecycles.segmentActionButtons.mount()") <
+      applicationEventWiringControllerJs.indexOf("lifecycles.projectQa.mount()"),
   "segment-action buttons must mount between project-filter and project-QA controls at the existing position."
 );
 assert(
@@ -4880,13 +4890,15 @@ for (const boundary of [
   "workspaceLayoutController?.setInspectorOpen?.(inspectorOpen)",
   "verticalFeatureState?.inspector?.setContext(context)",
   "panelToggleController.renderAll()",
-  "panelToggleController.mount()"
+  "panelToggle: panelToggleController"
 ]) {
   assertIncludes(appJs, boundary, `panel-toggle composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  appJs.indexOf("projectQaController.mount()") < appJs.indexOf("panelToggleController.mount()") &&
-    appJs.indexOf("panelToggleController.mount()") < appJs.indexOf("editorFilterControlsController.mount()"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.projectQa.mount()") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.panelToggle.mount()") &&
+    applicationEventWiringControllerJs.indexOf("lifecycles.panelToggle.mount()") <
+      applicationEventWiringControllerJs.indexOf("lifecycles.editorFilterControls.mount()"),
   "panel toggles must mount between project-QA and document-filter listeners at the existing position."
 );
 for (const removedOwner of ["function syncPanelToggleState", "function syncAllPanelToggleStates"]) {
@@ -4973,13 +4985,15 @@ for (const boundary of [
   "firstVisible: segmentFilterService.firstVisible",
   "preset: { markCustom: () => filterPresetController?.markCustom?.() }",
   "selection: { select: (index) => segmentNavigationController.select(index) }",
-  "editorFilterControlsController.mount()"
+  "editorFilterControls: editorFilterControlsController"
 ]) {
   assertIncludes(appJs, boundary, `editor-filter composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  appJs.indexOf("panelToggleController.mount()") < appJs.indexOf("editorFilterControlsController.mount()") &&
-    appJs.indexOf("editorFilterControlsController.mount()") < appJs.indexOf("termFormController.mount()"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.panelToggle.mount()") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.editorFilterControls.mount()") &&
+    applicationEventWiringControllerJs.indexOf("lifecycles.editorFilterControls.mount()") <
+      applicationEventWiringControllerJs.indexOf("lifecycles.termForm.mount()"),
   "editor-filter controls must mount between panel-toggle and term-form listeners at the existing position."
 );
 for (const removedListener of [
@@ -5066,7 +5080,7 @@ for (const boundary of [
   "emptyTrash: emptyTrashPermanently",
   "undo: undoLastCommand",
   "redo: redoLastCommand",
-  "applicationCommandButtonsController.mount()"
+  "commandButtons: applicationCommandButtonsController"
 ]) {
   assertIncludes(
     appJs,
@@ -5075,9 +5089,10 @@ for (const boundary of [
   );
 }
 assert(
-  appJs.indexOf("applicationViewController.mount()") < appJs.indexOf("applicationCommandButtonsController.mount()") &&
-    appJs.indexOf("applicationCommandButtonsController.mount()") <
-      appJs.indexOf("applicationUpdateControlsController.mount()"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.applicationView.mount()") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.commandButtons.mount()") &&
+    applicationEventWiringControllerJs.indexOf("lifecycles.commandButtons.mount()") <
+      applicationEventWiringControllerJs.indexOf("lifecycles.updateControls.mount()"),
   "application command-button lifecycle must mount between application-view and offline-update listeners at the existing position."
 );
 assert(
@@ -5090,9 +5105,9 @@ assert(
   "Empty Trash, Undo, and Redo button listener ownership must not return to app.js or the workflow driver."
 );
 assert(
-  (appJs.match(/\bapplicationCommandButtonsController\.mount\b/g) || []).length === 1 &&
+  (applicationEventWiringControllerJs.match(/\blifecycles\.commandButtons\.mount\b/g) || []).length === 1 &&
     !appWorkflowDriverJs.includes("applicationCommandButtonsController"),
-  "wireEvents must retain exactly one application command-button mount without workflow-only consumers."
+  "ApplicationEventWiringController must retain exactly one application command-button mount without workflow-only consumers."
 );
 for (const forbiddenOwner of [
   "emptyTrashPermanently",
@@ -5156,7 +5171,7 @@ for (const boundary of [
   "deferButton: els.deferUpdateBtn",
   "activate: () => offlineUpdateController?.activate?.()",
   "defer: () => offlineUpdateController?.defer?.()",
-  "applicationUpdateControlsController.mount()"
+  "updateControls: applicationUpdateControlsController"
 ]) {
   assertIncludes(
     appJs,
@@ -5165,9 +5180,10 @@ for (const boundary of [
   );
 }
 assert(
-  appJs.indexOf("applicationCommandButtonsController.mount()") <
-    appJs.indexOf("applicationUpdateControlsController.mount()") &&
-    appJs.indexOf("applicationUpdateControlsController.mount()") < appJs.indexOf("uiLocaleControlsController.mount()"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.commandButtons.mount()") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.updateControls.mount()") &&
+    applicationEventWiringControllerJs.indexOf("lifecycles.updateControls.mount()") <
+      applicationEventWiringControllerJs.indexOf("lifecycles.uiLocaleControls.mount()"),
   "application update-control lifecycle must mount between command-button and locale listeners at the existing position."
 );
 assert(
@@ -5178,9 +5194,9 @@ assert(
   "Reload and Defer update listener ownership must not return to app.js or the workflow driver."
 );
 assert(
-  (appJs.match(/\bapplicationUpdateControlsController\.mount\b/g) || []).length === 1 &&
+  (applicationEventWiringControllerJs.match(/\blifecycles\.updateControls\.mount\b/g) || []).length === 1 &&
     !appWorkflowDriverJs.includes("applicationUpdateControlsController"),
-  "wireEvents must retain exactly one application update-control mount without workflow-only consumers."
+  "ApplicationEventWiringController must retain exactly one application update-control mount without workflow-only consumers."
 );
 for (const forbiddenOwner of [
   "offlineUpdateController",
@@ -5249,13 +5265,15 @@ for (const boundary of [
   "refresh: refreshLocalizedUi",
   "importCatalog: importUiLocaleFile",
   "exportSource: exportUiSourceCatalog",
-  "uiLocaleControlsController.mount()"
+  "uiLocaleControls: uiLocaleControlsController"
 ]) {
   assertIncludes(appJs, boundary, `UI-locale control composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  appJs.indexOf("applicationUpdateControlsController.mount()") < appJs.indexOf("uiLocaleControlsController.mount()") &&
-    appJs.indexOf("uiLocaleControlsController.mount()") < appJs.indexOf("projectHomeController.mount()"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.updateControls.mount()") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.uiLocaleControls.mount()") &&
+    applicationEventWiringControllerJs.indexOf("lifecycles.uiLocaleControls.mount()") <
+      applicationEventWiringControllerJs.indexOf("lifecycles.projectHome.mount()"),
   "UI-locale controls must mount between update controls and project-home listeners at the existing position."
 );
 assert(
@@ -5268,9 +5286,9 @@ assert(
   "UI-locale select, import, and export listener ownership must not return to app.js or the workflow driver."
 );
 assert(
-  (appJs.match(/\buiLocaleControlsController\.mount\b/g) || []).length === 1 &&
+  (applicationEventWiringControllerJs.match(/\blifecycles\.uiLocaleControls\.mount\b/g) || []).length === 1 &&
     !appWorkflowDriverJs.includes("uiLocaleControlsController"),
-  "wireEvents must retain exactly one UI-locale controls mount without workflow-only consumers."
+  "ApplicationEventWiringController must retain exactly one UI-locale controls mount without workflow-only consumers."
 );
 for (const forbiddenOwner of [
   "appRuntime",
@@ -5344,14 +5362,16 @@ for (const boundary of [
   "navigation: applicationNavigation",
   "renderAll",
   "confirmDelete: confirmDeleteProject",
-  "projectHomeController.mount()",
+  "projectHome: projectHomeController",
   "projectHomeController.show()"
 ]) {
   assertIncludes(appJs, boundary, `project-home composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  appJs.indexOf("uiLocaleControlsController.mount()") < appJs.indexOf("projectHomeController.mount()") &&
-    appJs.indexOf("projectHomeController.mount()") < appJs.indexOf("focusModeController.mount()"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.uiLocaleControls.mount()") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.projectHome.mount()") &&
+    applicationEventWiringControllerJs.indexOf("lifecycles.projectHome.mount()") <
+      applicationEventWiringControllerJs.indexOf("lifecycles.focusMode.mount()"),
   "project-home controls must mount between UI-locale and Focus-mode listeners at the existing position."
 );
 assert(
@@ -5364,10 +5384,10 @@ assert(
   "project-home navigation facade and listener ownership must not return to app.js or the workflow driver."
 );
 assert(
-  (appJs.match(/\bprojectHomeController\.mount\b/g) || []).length === 1 &&
+  (applicationEventWiringControllerJs.match(/\blifecycles\.projectHome\.mount\b/g) || []).length === 1 &&
     (appJs.match(/\bprojectHomeController\.show\b/g) || []).length === 1 &&
     (appWorkflowDriverJs.match(/\bprojectHomeController\.show\b/g) || []).length === 1,
-  "wireEvents and direct application/workflow consumers must retain checked project-home controller calls."
+  "ApplicationEventWiringController and direct application/workflow consumers must retain checked project-home controller calls."
 );
 for (const forbiddenOwner of [
   "appRuntime",
@@ -5467,13 +5487,15 @@ for (const boundary of [
   "disable: () => focusModeController.set(false)",
   "run: focusModeController.toggle",
   "focusModeController.render()",
-  "focusModeController.mount()"
+  "focusMode: focusModeController"
 ]) {
   assertIncludes(appJs, boundary, `Focus-mode composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  appJs.indexOf("projectHomeController.mount()") < appJs.indexOf("focusModeController.mount()") &&
-    appJs.indexOf("focusModeController.mount()") < appJs.indexOf("inspectorToggleController.mount()"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.projectHome.mount()") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.focusMode.mount()") &&
+    applicationEventWiringControllerJs.indexOf("lifecycles.focusMode.mount()") <
+      applicationEventWiringControllerJs.indexOf("lifecycles.inspectorToggle.mount()"),
   "Focus-mode controls must mount between project-home and inspector listeners at the existing position."
 );
 assert(
@@ -5490,7 +5512,7 @@ assert(
   "Focus-mode helpers and listener ownership must not return to app.js or the workflow driver."
 );
 assert(
-  (appJs.match(/\bfocusModeController\.mount\b/g) || []).length === 1 &&
+  (applicationEventWiringControllerJs.match(/\blifecycles\.focusMode\.mount\b/g) || []).length === 1 &&
     (appJs.match(/\bfocusModeController\.render\b/g) || []).length === 2 &&
     (appJs.match(/\bfocusModeController\.toggle\b/g) || []).length === 2 &&
     (appJs.match(/\bfocusModeController\.set\b/g) || []).length === 1 &&
@@ -5584,13 +5606,15 @@ for (const boundary of [
   "renderEditor",
   "request: (callback) => requestAnimationFrame(callback)",
   `document.querySelector("[data-inspector-tab][aria-selected='true']")`,
-  "inspectorToggleController.mount()"
+  "inspectorToggle: inspectorToggleController"
 ]) {
   assertIncludes(appJs, boundary, `inspector-toggle composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  appJs.indexOf("focusModeController.mount()") < appJs.indexOf("inspectorToggleController.mount()") &&
-    appJs.indexOf("inspectorToggleController.mount()") < appJs.indexOf("paletteController?.mountTrigger?.()"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.focusMode.mount()") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.inspectorToggle.mount()") &&
+    applicationEventWiringControllerJs.indexOf("lifecycles.inspectorToggle.mount()") <
+      applicationEventWiringControllerJs.indexOf("lifecycles.palette?.mountTrigger?.()"),
   "inspector-toggle controls must mount between Focus-mode and command-palette listeners at the existing position."
 );
 assert(
@@ -5599,9 +5623,9 @@ assert(
   "inspector-toggle listener ownership must not return to app.js or the workflow driver."
 );
 assert(
-  (appJs.match(/\binspectorToggleController\.mount\b/g) || []).length === 1 &&
+  (applicationEventWiringControllerJs.match(/\blifecycles\.inspectorToggle\.mount\b/g) || []).length === 1 &&
     !appWorkflowDriverJs.includes("inspectorToggleController"),
-  "wireEvents must retain exactly one inspector-toggle mount without workflow-only consumers."
+  "ApplicationEventWiringController must retain exactly one inspector-toggle mount without workflow-only consumers."
 );
 for (const forbiddenOwner of [
   "state.inspectorOpen",
@@ -5680,12 +5704,13 @@ for (const boundary of [
   'openMenus: ".menu[open]"',
   'buttons: "button"',
   "menu: applicationMenuController",
-  "applicationMenuController.mount()"
+  "applicationMenu: applicationMenuController"
 ]) {
   assertIncludes(appJs, boundary, `application menu composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  appJs.indexOf("applicationMenuController.mount()") < appJs.indexOf("globalKeyboardController.mount()"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.applicationMenu.mount()") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.globalKeyboard.mount()"),
   "application menu lifecycle must mount before application-global keyboard routing at the existing listener position."
 );
 assert(
@@ -5698,7 +5723,7 @@ assert(
   "shared application menu selection and listener lifecycle must not return to app.js or the workflow driver."
 );
 assert(
-  (appJs.match(/\bapplicationMenuController\.mount\b/g) || []).length === 1 &&
+  (applicationEventWiringControllerJs.match(/\blifecycles\.applicationMenu\.mount\b/g) || []).length === 1 &&
     (appJs.match(/\bapplicationMenuController\.closeAll\b/g) || []).length === 0 &&
     focusModeControllerJs.includes("menu.closeAll()") &&
     !appWorkflowDriverJs.includes("applicationMenuController"),
@@ -5778,7 +5803,7 @@ for (const boundary of [
   "resources: refreshResources",
   'navigate: () => applicationViewController.show("resources")',
   'applicationViewController.show("projects")',
-  "applicationViewController.mount()"
+  "applicationView: applicationViewController"
 ]) {
   assertIncludes(appJs, boundary, `application view composition must retain the checked ${boundary} boundary.`);
 }
@@ -5788,9 +5813,10 @@ assertIncludes(
   "workflow characterization must navigate to the Editor through ApplicationViewController directly."
 );
 assert(
-  appJs.indexOf("verticalFeatureState.segmentGrid.mountScroll(() => {") <
-    appJs.indexOf("applicationViewController.mount()") &&
-    appJs.indexOf("applicationViewController.mount()") < appJs.indexOf("applicationCommandButtonsController.mount()"),
+  applicationEventWiringControllerJs.indexOf("segmentGrid.mountScroll(scrollListener)") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.applicationView.mount()") &&
+    applicationEventWiringControllerJs.indexOf("lifecycles.applicationView.mount()") <
+      applicationEventWiringControllerJs.indexOf("lifecycles.commandButtons.mount()"),
   "application view lifecycle must mount between segment-grid scrolling and the following command listeners at the existing position."
 );
 assert(
@@ -5805,7 +5831,7 @@ assert(
 );
 assert(
   (appJs.match(/\bapplicationViewController\.show\b/g) || []).length === 2 &&
-    (appJs.match(/\bapplicationViewController\.mount\b/g) || []).length === 1 &&
+    (applicationEventWiringControllerJs.match(/\blifecycles\.applicationView\.mount\b/g) || []).length === 1 &&
     (appWorkflowDriverJs.match(/\bapplicationViewController\.show\b/g) || []).length === 1,
   "all two application and one workflow view consumers must call ApplicationViewController directly with one lifecycle mount."
 );
@@ -5882,7 +5908,7 @@ for (const boundary of [
   "open: paletteController?.open",
   "close: paletteController?.close",
   'isOpen: () => !els.concordanceOverlay.classList.contains("hidden")',
-  "globalKeyboardController.mount()"
+  "globalKeyboard: globalKeyboardController"
 ]) {
   assertIncludes(appJs, boundary, `global keyboard composition must inject the checked ${boundary} boundary.`);
 }
@@ -7548,7 +7574,7 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `term-form composition must inject the checked ${boundary} boundary.`);
 }
 assert(
-  (appJs.match(/\btermFormController\.mount\b/g) || []).length === 1 &&
+  (applicationEventWiringControllerJs.match(/\blifecycles\.termForm\.mount\b/g) || []).length === 1 &&
     (appJs.match(/\btermFormController\.save\b/g) || []).length === 0 &&
     (appWorkflowDriverJs.match(/\btermFormController\.save\b/g) || []).length === 2,
   "the form lifecycle must mount once and both workflow consumers must call TermFormController directly."
@@ -7675,7 +7701,7 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `project-QA composition must inject the checked ${boundary} boundary.`);
 }
 assert(
-  (appJs.match(/\bprojectQaController\.mount\b/g) || []).length === 1 &&
+  (applicationEventWiringControllerJs.match(/\blifecycles\.projectQa\.mount\b/g) || []).length === 1 &&
     (appJs.match(/\bprojectQaController\.run\b/g) || []).length === 2 &&
     (appWorkflowDriverJs.match(/\bprojectQaController\.run\b/g) || []).length === 3,
   "the Run QA lifecycle must mount once and EditorContext, palette, and all three workflow consumers must call ProjectQaController directly."
@@ -7779,7 +7805,7 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `project-domain composition must inject the checked ${boundary} boundary.`);
 }
 assert(
-  (appJs.match(/\bprojectDomainController\.mount\b/g) || []).length === 1 &&
+  (applicationEventWiringControllerJs.match(/\blifecycles\.projectDomain\.mount\b/g) || []).length === 1 &&
     (appJs.match(/\bprojectDomainController\.save\b/g) || []).length === 0 &&
     (appWorkflowDriverJs.match(/\bprojectDomainController\.save\b/g) || []).length === 2,
   "the project-domain lifecycle must mount once and both workflow consumers must call ProjectDomainController directly."
@@ -15536,12 +15562,13 @@ for (const boundary of [
   "hasUnsaved: hasUnsavedWorkspacePackages",
   "workspacePackageSaveController.autosaveDirty()",
   "logger: { warn: (error) => console.warn(error) }",
-  "applicationPersistenceLifecycleController.mount()"
+  "applicationPersistence: applicationPersistenceLifecycleController"
 ]) {
   assertIncludes(appJs, boundary, `persistence-lifecycle composition must retain ${boundary}.`);
 }
 assert(
-  appJs.indexOf("projectDomainController.mount()") < appJs.indexOf("applicationPersistenceLifecycleController.mount()"),
+  applicationEventWiringControllerJs.indexOf("lifecycles.projectDomain.mount()") <
+    applicationEventWiringControllerJs.indexOf("lifecycles.applicationPersistence.mount()"),
   "persistence lifecycle must mount after project-domain controls at the former listener position."
 );
 for (const removedOwner of [
@@ -15582,6 +15609,135 @@ for (const testName of [
     applicationPersistenceLifecycleControllerUnitTests,
     testName,
     `focused persistence-lifecycle tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createApplicationEventWiringController } from "./application-event-wiring-controller.js";',
+  "the application runtime must install the checked event-wiring controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationEventWiringController,",
+  "the application runtime must expose the checked event-wiring controller factory."
+);
+for (const snippet of [
+  "ApplicationEventWiringController requires a checkpoint reporter.",
+  "ApplicationEventWiringController requires checked UI initializers.",
+  "ApplicationEventWiringController requires checked segment-grid boundaries.",
+  "ApplicationEventWiringController requires checked feature lifecycles.",
+  "ApplicationEventWiringController requires a checked optional palette lifecycle.",
+  'checkpoint("rendering language datalists")',
+  "initialization.renderLanguageDatalists()",
+  'checkpoint("rendering text encodings")',
+  "initialization.renderTextEncodingOptions()",
+  'checkpoint("attaching event listeners")',
+  "segmentGrid.mountScroll(scrollListener)",
+  "segmentGrid.renderSegments({ fromScroll: true, preserveScroll: true })",
+  "lifecycles.palette?.mountTrigger?.()",
+  "return Object.freeze({ wire })"
+]) {
+  assertIncludes(
+    applicationEventWiringControllerJs,
+    snippet,
+    `ApplicationEventWiringController must retain startup wiring policy: ${snippet}.`
+  );
+}
+const eventWiringOrder = [
+  "lifecycles.applicationMenu.mount()",
+  "lifecycles.globalKeyboard.mount()",
+  "segmentGrid.mountScroll(scrollListener)",
+  "lifecycles.applicationView.mount()",
+  "lifecycles.commandButtons.mount()",
+  "lifecycles.updateControls.mount()",
+  "lifecycles.uiLocaleControls.mount()",
+  "lifecycles.projectHome.mount()",
+  "lifecycles.focusMode.mount()",
+  "lifecycles.inspectorToggle.mount()",
+  "lifecycles.palette?.mountTrigger?.()",
+  "lifecycles.projectFilterControls.mount()",
+  "lifecycles.segmentActionButtons.mount()",
+  "lifecycles.projectQa.mount()",
+  "lifecycles.panelToggle.mount()",
+  "lifecycles.editorFilterControls.mount()",
+  "lifecycles.termForm.mount()",
+  "lifecycles.projectDomain.mount()",
+  "lifecycles.applicationPersistence.mount()"
+];
+for (let index = 0; index < eventWiringOrder.length; index += 1) {
+  assertIncludes(
+    applicationEventWiringControllerJs,
+    eventWiringOrder[index],
+    `ApplicationEventWiringController must retain ordered lifecycle call: ${eventWiringOrder[index]}.`
+  );
+  if (index > 0) {
+    assert(
+      applicationEventWiringControllerJs.indexOf(eventWiringOrder[index - 1]) <
+        applicationEventWiringControllerJs.indexOf(eventWiringOrder[index]),
+      `ApplicationEventWiringController must preserve ${eventWiringOrder[index - 1]} before ${eventWiringOrder[index]}.`
+    );
+  }
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationEventWiringController({",
+  "if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = message",
+  "renderLanguageDatalists: () => languageInputService.renderDatalists()",
+  "renderTextEncodingOptions: () => textEncodingInputService.renderOptions()",
+  "mountScroll: (listener) => verticalFeatureState.segmentGrid.mountScroll(listener)",
+  "renderSegments: (options) => renderSegments(options)",
+  "applicationMenu: applicationMenuController",
+  "globalKeyboard: globalKeyboardController",
+  "applicationView: applicationViewController",
+  "commandButtons: applicationCommandButtonsController",
+  "updateControls: applicationUpdateControlsController",
+  "uiLocaleControls: uiLocaleControlsController",
+  "projectHome: projectHomeController",
+  "focusMode: focusModeController",
+  "inspectorToggle: inspectorToggleController",
+  "palette: paletteController",
+  "projectFilterControls: projectFilterControlsController",
+  "segmentActionButtons: segmentActionButtonsController",
+  "projectQa: projectQaController",
+  "panelToggle: panelToggleController",
+  "editorFilterControls: editorFilterControlsController",
+  "termForm: termFormController",
+  "projectDomain: projectDomainController",
+  "applicationPersistence: applicationPersistenceLifecycleController",
+  "applicationEventWiringController.wire()"
+]) {
+  assertIncludes(appJs, boundary, `event-wiring composition must retain ${boundary}.`);
+}
+assert(
+  !/function\s+wireEvents\b/.test(appJs) &&
+    !/function\s+wireEvents\b/.test(appWorkflowDriverJs) &&
+    !appWorkflowDriverJs.includes("applicationEventWiringController"),
+  "wireEvents and workflow-only event-wiring ownership must not return."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "LOOPCAT_TEST_BUILD",
+  "window.",
+  "document.",
+  "languageInputService",
+  "textEncodingInputService",
+  "verticalFeatureState"
+]) {
+  assert(
+    !applicationEventWiringControllerJs.includes(forbiddenOwner),
+    `ApplicationEventWiringController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationEventWiringController preserves exact initializer and lifecycle order",
+  "ApplicationEventWiringController preserves scroll rendering and result suppression",
+  "ApplicationEventWiringController preserves repeat wiring and optional palette behavior",
+  "ApplicationEventWiringController preserves synchronous failure timing",
+  "ApplicationEventWiringController validates initializers, grid, lifecycles, and palette"
+]) {
+  assertIncludes(
+    applicationEventWiringControllerUnitTests,
+    testName,
+    `focused event-wiring tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
