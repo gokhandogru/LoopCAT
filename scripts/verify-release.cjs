@@ -174,6 +174,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-filter-service.js",
   "src/features/editor/segment-progress-service.js",
   "src/features/editor/segment-target-state-service.js",
+  "src/features/editor/segment-command-restoration-controller.js",
   "src/features/editor/structural-segment-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -266,6 +267,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-filter-service.test.cjs",
   "tests/unit/segment-progress-service.test.cjs",
   "tests/unit/segment-target-state-service.test.cjs",
+  "tests/unit/segment-command-restoration-controller.test.cjs",
   "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
@@ -391,6 +393,9 @@ const segmentProvenanceServiceJs = readText("src/features/editor/segment-provena
 const segmentFilterServiceJs = readText("src/features/editor/segment-filter-service.js");
 const segmentProgressServiceJs = readText("src/features/editor/segment-progress-service.js");
 const segmentTargetStateServiceJs = readText("src/features/editor/segment-target-state-service.js");
+const segmentCommandRestorationControllerJs = readText(
+  "src/features/editor/segment-command-restoration-controller.js"
+);
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
@@ -404,6 +409,9 @@ const segmentProvenanceServiceUnitTests = readText("tests/unit/segment-provenanc
 const segmentFilterServiceUnitTests = readText("tests/unit/segment-filter-service.test.cjs");
 const segmentProgressServiceUnitTests = readText("tests/unit/segment-progress-service.test.cjs");
 const segmentTargetStateServiceUnitTests = readText("tests/unit/segment-target-state-service.test.cjs");
+const segmentCommandRestorationControllerUnitTests = readText(
+  "tests/unit/segment-command-restoration-controller.test.cjs"
+);
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
@@ -3918,7 +3926,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "restoreSegmentEditCommandPatch",
+  "segmentCommandRestorationController.restorePatch",
   "app.js must restore coalesced target patches through the persistent command boundary."
 );
 assertIncludes(
@@ -4023,9 +4031,9 @@ assertIncludes(
   "app.js must delegate target textarea event wiring to TargetEditController."
 );
 assertIncludes(
-  appJs,
-  "targetEditController.normalizeSelection(options.selection, segment.target.length)",
-  "target restoration must normalize caret selection directly through TargetEditController."
+  segmentCommandRestorationControllerJs,
+  "selection.normalize(restoreOptions.selection, segment.target.length)",
+  "the checked restoration controller must preserve target caret normalization."
 );
 assert(
   !appJs.includes("function normalizedTargetSelection"),
@@ -4212,6 +4220,16 @@ assertIncludes(
   appBootstrapJs,
   "createSegmentTargetStateService,",
   "The application runtime must expose the checked segment target-state factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createSegmentCommandRestorationController } from "../features/editor/segment-command-restoration-controller.js";',
+  "The application runtime must install the checked segment command-restoration controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentCommandRestorationController,",
+  "The application runtime must expose the checked segment command-restoration factory."
 );
 for (const boundary of [
   "editLifecycle.finalize(segment.id)",
@@ -4773,6 +4791,118 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/segment-target-state-service.js"',
   "source-catalog extraction must scan the checked segment target-state service."
+);
+for (const snippet of [
+  'throw new Error("The affected segment is no longer available.")',
+  'throw new Error("Batch target restoration requires matching segment IDs and patches.")',
+  'throw new Error("An affected pretranslation segment is no longer available.")',
+  "const restored = targetState.prepareHistory(clone(snapshot))",
+  "Number.isFinite(currentRevision) ? currentRevision : 0",
+  "Number.isFinite(snapshotRevision) ? snapshotRevision : 0",
+  "const currentPatch = targetState.capturePatch(segment)",
+  'const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty")',
+  "Math.max(Number(currentPatch.revision || 0), Number(restoredPatch.revision || 0)) + 1",
+  "restoredPatch.updatedAt = now()",
+  "targetState.applyPatch(segment, restoredPatch)",
+  "autosave.clear(segment)",
+  "await persistence.save(segment)",
+  "selection.selectGrid(index, segment.id)",
+  "selection.inspect(segment.id)",
+  "filters.invalidate()",
+  "presentation.renderSegments({ preserveScroll: true })",
+  "presentation.renderProgress({ previousStatus, nextStatus: segment.status })",
+  "await presentation.refreshContext()",
+  "workspace.markDirty()",
+  "selection.normalize(restoreOptions.selection, segment.target.length)",
+  "targetState.applyPatch(segment, currentPatch)",
+  "const currentById = new Map()",
+  "await persistence.saveMany(restored)",
+  "restoreOptions.activeSegmentId || previousActiveId || restored[0]?.id || \"\"",
+  "selection.select(requestedIndex, editorSessionStore.getSegments()[requestedIndex]?.id || \"\")",
+  "patches: restored.map((segment) => targetState.capturePatch(segment))",
+  "affectedCount: restored.length",
+  "editorSessionStore.replaceSegmentAt(indexes[offset], next)",
+  "snapshots: restored.map((segment) => clone(segment))",
+  "editorSessionStore.replaceSegmentAt(index, targetState.prepareHistory(currentSnapshot))",
+  "if (restoreOptions.navigateNext) await selection.navigateNext()",
+  "return Object.freeze({ prepareSnapshot, restorePatch, restorePatches, restoreSnapshot, restoreSnapshots })"
+]) {
+  assertIncludes(
+    segmentCommandRestorationControllerJs,
+    snippet,
+    `SegmentCommandRestorationController must retain characterized restoration orchestration: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createSegmentCommandRestorationController({",
+  "app.js must compose the checked segment command-restoration controller."
+);
+for (const boundary of [
+  "targetState: segmentTargetStateService",
+  "autosave: { clear: autosaveService.clear }",
+  "persistence: { save: saveSegment, saveMany: saveSegments }",
+  "getActiveSegment: currentSegment",
+  "applicationNavigation.selectSegment({ activeIndex: index, segmentId })",
+  "verticalFeatureState?.segmentGrid?.selectSegment(index, segmentId)",
+  "verticalFeatureState?.inspector?.setContext({ segmentId })",
+  "targetEditController.normalizeSelection(...args)",
+  "targetEditController.focusActive(...args)",
+  "navigateNext: goToNextOpenSegment",
+  "filters: { invalidate: segmentFilterService.invalidate }",
+  "renderHistory: renderRevisionHistory",
+  "refreshContext: () => editorContextController.refresh()",
+  "workspace: { markDirty: markWorkspaceDirty }",
+  "clone: structuredClone",
+  "now: () => new Date().toISOString()"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `segment command-restoration composition must inject the checked ${boundary} boundary.`
+  );
+}
+for (const method of ["prepareSnapshot", "restorePatch", "restorePatches", "restoreSnapshot", "restoreSnapshots"]) {
+  assertIncludes(
+    appJs,
+    `segmentCommandRestorationController.${method}`,
+    `restoration consumers must call SegmentCommandRestorationController.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "prepareCommandRestoreSegmentSnapshot",
+  "restoreSegmentEditCommandPatch",
+  "restoreBatchTargetCommandPatches",
+  "restoreSegmentCommandSnapshots",
+  "restoreSegmentCommandSnapshot"
+]) {
+  const directHelper = new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} command-restoration helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "SegmentCommandRestorationController prepares isolated snapshots with finite monotonic revisions",
+  "SegmentCommandRestorationController restores one target patch with exact selection and presentation recovery",
+  "SegmentCommandRestorationController rejects a missing patch segment and restores the exact patch after failure",
+  "SegmentCommandRestorationController validates and restores matching target-patch batches",
+  "SegmentCommandRestorationController rolls back every target patch after batch persistence failure",
+  "SegmentCommandRestorationController restores full snapshot batches with active-segment fallback",
+  "SegmentCommandRestorationController rejects unknown snapshots and rolls back full snapshot batches",
+  "SegmentCommandRestorationController restores one full snapshot with navigation and exact failure recovery",
+  "SegmentCommandRestorationController validates collaborators and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentCommandRestorationControllerUnitTests,
+    testName,
+    `focused segment command-restoration tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-command-restoration-controller.js"',
+  "source-catalog extraction must scan the checked segment command-restoration controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -6851,7 +6981,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "restoreBatchTargetCommandPatches",
+  "segmentCommandRestorationController.restorePatches",
   "batch pretranslation Undo/Redo must share the persistent target-patch restoration boundary."
 );
 assertIncludes(

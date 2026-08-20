@@ -1349,6 +1349,34 @@ const autosaveService = appRuntime.featureFactories.createAutosaveService({
     }
   }
 });
+const segmentCommandRestorationController =
+  appRuntime.featureFactories.createSegmentCommandRestorationController({
+    editorSessionStore,
+    targetState: segmentTargetStateService,
+    autosave: { clear: autosaveService.clear },
+    persistence: { save: saveSegment, saveMany: saveSegments },
+    selection: {
+      getActiveSegment: currentSegment,
+      select: (index, segmentId) =>
+        applicationNavigation.selectSegment({ activeIndex: index, segmentId }),
+      selectGrid: (index, segmentId) => verticalFeatureState?.segmentGrid?.selectSegment(index, segmentId),
+      inspect: (segmentId) => verticalFeatureState?.inspector?.setContext({ segmentId }),
+      normalize: (...args) => targetEditController.normalizeSelection(...args),
+      focus: (...args) => targetEditController.focusActive(...args),
+      navigateNext: goToNextOpenSegment
+    },
+    filters: { invalidate: segmentFilterService.invalidate },
+    presentation: {
+      renderSegments,
+      renderProgress,
+      renderHistory: renderRevisionHistory,
+      renderAll,
+      refreshContext: () => editorContextController.refresh()
+    },
+    workspace: { markDirty: markWorkspaceDirty },
+    clone: structuredClone,
+    now: () => new Date().toISOString()
+  });
 const reportDataService = appRuntime.featureFactories.createReportDataService({
   session: {
     getProject: editorSessionStore.getProject,
@@ -1526,7 +1554,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
   },
   restoration: {
     restoreCommand: (segmentId, snapshot, options) =>
-      restoreSegmentCommandSnapshot(segmentId, snapshot, options)
+      segmentCommandRestorationController.restoreSnapshot(segmentId, snapshot, options)
   },
   view: {
     updateRow,
@@ -1569,7 +1597,7 @@ targetEditController = appRuntime.featureFactories.createTargetEditController({
     findEditor: (index) => verticalFeatureState.segmentGrid.findTargetEditor(els.segmentBody, index)
   },
   createPatch: segmentTargetStateService.capturePatch,
-  restorePatch: restoreSegmentEditCommandPatch,
+  restorePatch: segmentCommandRestorationController.restorePatch,
   applyDraft: applyTargetDraft,
   activateSegment: setActiveSegment,
   confirmSegment: () => segmentConfirmationController.confirm(),
@@ -1609,7 +1637,7 @@ const targetProducerController = appRuntime.featureFactories.createTargetProduce
     restorePatch: segmentTargetStateService.applyPatch,
     invalidateFilters: segmentFilterService.invalidate
   },
-  restoration: { restorePatch: restoreSegmentEditCommandPatch },
+  restoration: { restorePatch: segmentCommandRestorationController.restorePatch },
   view: {
     renderSegments,
     renderProgress,
@@ -1655,7 +1683,7 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
     prepareHistory: segmentTargetStateService.prepareHistory,
     hasTagIssue: protectedTagInspectionService.hasIssue
   },
-  restoration: { restoreSnapshots: restoreSegmentCommandSnapshots },
+  restoration: { restoreSnapshots: segmentCommandRestorationController.restoreSnapshots },
   selection: {
     getActiveSegmentId: () => currentSegment()?.id || "",
     focusTarget: targetEditController.focusActive
@@ -1720,7 +1748,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
     },
     prepareHistory: segmentTargetStateService.prepareHistory
   },
-  restoration: { restorePatches: restoreBatchTargetCommandPatches },
+  restoration: { restorePatches: segmentCommandRestorationController.restorePatches },
   selection: {
     getActiveSegmentId: () => currentSegment()?.id || "",
     focusTarget: targetEditController.focusActive
@@ -2022,7 +2050,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
     prepareHistory: segmentTargetStateService.prepareHistory,
     prepareHistories: segmentTargetStateService.prepareHistories
   },
-  restoration: { restorePatches: restoreBatchTargetCommandPatches },
+  restoration: { restorePatches: segmentCommandRestorationController.restorePatches },
   selection: { getActiveSegmentId: () => currentSegment()?.id || "" },
   presentation: {
     invalidateFilters: segmentFilterService.invalidate,
@@ -2594,7 +2622,7 @@ const aiSuggestionApplicationController =
         Object.assign(segment, snapshot);
       },
       prepareHistory: segmentTargetStateService.prepareHistory,
-      prepareRestoreSnapshot: prepareCommandRestoreSegmentSnapshot
+      prepareRestoreSnapshot: segmentCommandRestorationController.prepareSnapshot
     },
     persistence: {
       flush: autosaveService.flush,
@@ -2924,7 +2952,7 @@ const structuralSegmentController = appRuntime.featureFactories.createStructural
     touch: segmentTargetStateService.touch,
     detectTags: detectProtectedTags,
     prepareHistoryStates: segmentTargetStateService.prepareHistories,
-    prepareRestoreSnapshot: prepareCommandRestoreSegmentSnapshot
+    prepareRestoreSnapshot: segmentCommandRestorationController.prepareSnapshot
   },
   persistence: {
     flush: autosaveService.flush,
@@ -3678,7 +3706,8 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
     save: saveSegment
   },
   restoration: {
-    restoreCommand: (segmentId, snapshot) => restoreSegmentCommandSnapshot(segmentId, snapshot)
+    restoreCommand: (segmentId, snapshot) =>
+      segmentCommandRestorationController.restoreSnapshot(segmentId, snapshot)
   },
   activity: {
     log: (segment, _project, summary) =>
@@ -5957,153 +5986,6 @@ function openReplacePanel() {
   els.replaceFindInput.focus();
 }
 
-function prepareCommandRestoreSegmentSnapshot(snapshot, current) {
-  const restored = segmentTargetStateService.prepareHistory(structuredClone(snapshot));
-  const currentRevision = Number(current?.revision || 0);
-  const snapshotRevision = Number(restored.revision || 0);
-  restored.revision = Math.max(
-    Number.isFinite(currentRevision) ? currentRevision : 0,
-    Number.isFinite(snapshotRevision) ? snapshotRevision : 0
-  ) + 1;
-  restored.updatedAt = new Date().toISOString();
-  return restored;
-}
-
-async function restoreSegmentEditCommandPatch(segmentId, nextPatch, options = {}) {
-  const index = editorSessionStore.getSegments().findIndex((item) => item.id === segmentId);
-  if (index < 0) throw new Error("The affected segment is no longer available.");
-  const segment = editorSessionStore.getSegments()[index];
-  const currentPatch = segmentTargetStateService.capturePatch(segment);
-  const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
-  try {
-    const restoredPatch = structuredClone(nextPatch);
-    restoredPatch.revision = Math.max(Number(currentPatch.revision || 0), Number(restoredPatch.revision || 0)) + 1;
-    restoredPatch.updatedAt = new Date().toISOString();
-    segmentTargetStateService.applyPatch(segment, restoredPatch);
-    autosaveService.clear(segment);
-    await saveSegment(segment);
-    verticalFeatureState?.segmentGrid?.selectSegment(index, segment.id);
-    verticalFeatureState?.inspector?.setContext({ segmentId: segment.id });
-    segmentFilterService.invalidate();
-    renderSegments({ preserveScroll: true });
-    renderProgress({ previousStatus, nextStatus: segment.status });
-    renderRevisionHistory();
-    await editorContextController.refresh();
-    markWorkspaceDirty();
-    const selection = options.selection
-      ? targetEditController.normalizeSelection(options.selection, segment.target.length)
-      : null;
-    targetEditController.focusActive(selection);
-    return {
-      recoveryToken: segmentId,
-      activeSegmentId: segment.id,
-      focusTarget: Boolean(options.focusTarget || selection),
-      selection
-    };
-  } catch (error) {
-    segmentTargetStateService.applyPatch(segment, currentPatch);
-    segmentFilterService.invalidate();
-    renderSegments({ preserveScroll: true });
-    renderProgress();
-    renderRevisionHistory();
-    throw error;
-  }
-}
-
-async function restoreBatchTargetCommandPatches(nextPatches, options = {}) {
-  const segmentIds = Array.isArray(options.segmentIds) ? options.segmentIds : [];
-  const patches = Array.isArray(nextPatches) ? nextPatches : [];
-  if (!segmentIds.length || segmentIds.length !== patches.length) {
-    throw new Error("Batch target restoration requires matching segment IDs and patches.");
-  }
-  const currentById = new Map();
-  const indexes = segmentIds.map((segmentId) => {
-    const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === segmentId);
-    if (index < 0) throw new Error("An affected pretranslation segment is no longer available.");
-    currentById.set(segmentId, segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[index]));
-    return index;
-  });
-  const previousActiveId = currentSegment()?.id || "";
-  try {
-    const restored = patches.map((patch, offset) => {
-      const segment = editorSessionStore.getSegments()[indexes[offset]];
-      const currentPatch = currentById.get(segment.id);
-      const restoredPatch = structuredClone(patch);
-      restoredPatch.revision = Math.max(
-        Number(currentPatch?.revision || 0),
-        Number(restoredPatch.revision || 0)
-      ) + 1;
-      restoredPatch.updatedAt = new Date().toISOString();
-      segmentTargetStateService.applyPatch(segment, restoredPatch);
-      autosaveService.clear(segment);
-      return segment;
-    });
-    await saveSegments(restored);
-    const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
-    const requestedIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveId);
-    if (requestedIndex >= 0) applicationNavigation.selectSegment({ activeIndex: requestedIndex, segmentId: editorSessionStore.getSegments()[requestedIndex]?.id || "" });
-    segmentFilterService.invalidate();
-    markWorkspaceDirty();
-    renderAll();
-    await editorContextController.refresh();
-    targetEditController.focusActive();
-    return {
-      patches: restored.map((segment) => segmentTargetStateService.capturePatch(segment)),
-      activeSegmentId: currentSegment()?.id || restored[0]?.id || "",
-      affectedCount: restored.length,
-      focusTarget: true
-    };
-  } catch (error) {
-    currentById.forEach((patch, segmentId) => {
-      const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === segmentId);
-      if (index >= 0) segmentTargetStateService.applyPatch(editorSessionStore.getSegments()[index], patch);
-    });
-    segmentFilterService.invalidate();
-    renderAll();
-    throw error;
-  }
-}
-
-async function restoreSegmentCommandSnapshots(nextSnapshots, options = {}) {
-  const snapshots = Array.isArray(nextSnapshots) ? nextSnapshots : [];
-  const currentById = new Map();
-  const indexes = [];
-  for (const snapshot of snapshots) {
-    const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === snapshot?.id);
-    if (index < 0) throw new Error("An affected segment is no longer available.");
-    indexes.push(index);
-    currentById.set(snapshot.id, structuredClone(editorSessionStore.getSegments()[index]));
-  }
-  const previousActiveId = currentSegment()?.id || "";
-  try {
-    const restored = snapshots.map((snapshot, offset) => {
-      const next = prepareCommandRestoreSegmentSnapshot(snapshot, currentById.get(snapshot.id));
-      editorSessionStore.replaceSegmentAt(indexes[offset], next);
-      autosaveService.clear(next);
-      return next;
-    });
-    await saveSegments(restored);
-    const requestedActiveId = options.activeSegmentId || previousActiveId || restored[0]?.id || "";
-    const requestedIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === requestedActiveId);
-    if (requestedIndex >= 0) applicationNavigation.selectSegment({ activeIndex: requestedIndex, segmentId: editorSessionStore.getSegments()[requestedIndex]?.id || "" });
-    markWorkspaceDirty();
-    renderAll();
-    await editorContextController.refresh();
-    targetEditController.focusActive();
-    return {
-      snapshots: restored.map((segment) => structuredClone(segment)),
-      activeSegmentId: currentSegment()?.id || restored[0]?.id || ""
-    };
-  } catch (error) {
-    for (const [segmentId, snapshot] of currentById) {
-      const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === segmentId);
-      if (index >= 0) editorSessionStore.replaceSegmentAt(index, segmentTargetStateService.prepareHistory(snapshot));
-    }
-    renderAll();
-    throw error;
-  }
-}
-
 function applySegmentConfirmation(segment) {
   segmentTargetStateService.recordHistory(segment, segment.target, "confirmed", "confirm");
   segment.status = "confirmed";
@@ -6119,33 +6001,6 @@ function restoreSegmentConfirmation(segment, snapshot) {
 function preparePersistedConfirmationRollback(segment, savedConfirmedRevision) {
   segment.revision = Math.max(Number(segment.revision || 0), Number(savedConfirmedRevision || 0)) + 1;
   segment.updatedAt = new Date().toISOString();
-}
-
-async function restoreSegmentCommandSnapshot(segmentId, nextSnapshot, options = {}) {
-  const index = editorSessionStore.getSegments().findIndex((item) => item.id === segmentId);
-  if (index < 0) throw new Error("The affected segment is no longer available.");
-  const currentSnapshot = structuredClone(editorSessionStore.getSegments()[index]);
-  try {
-    const restored = prepareCommandRestoreSegmentSnapshot(nextSnapshot, currentSnapshot);
-    editorSessionStore.replaceSegmentAt(index, restored);
-    autosaveService.clear(restored);
-    await saveSegment(restored);
-    verticalFeatureState?.segmentGrid?.selectSegment(index, restored.id);
-    verticalFeatureState?.inspector?.setContext({ segmentId: restored.id });
-    markWorkspaceDirty();
-    renderAll();
-    await editorContextController.refresh();
-    if (options.navigateNext) await goToNextOpenSegment();
-    else targetEditController.focusActive();
-    return {
-      snapshot: structuredClone(restored),
-      activeSegmentId: currentSegment()?.id || restored.id
-    };
-  } catch (error) {
-    editorSessionStore.replaceSegmentAt(index, segmentTargetStateService.prepareHistory(currentSnapshot));
-    renderAll();
-    throw error;
-  }
 }
 
 async function saveSegmentToTm(segment, project = editorSessionStore.getProject()) {
