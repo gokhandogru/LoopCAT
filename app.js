@@ -1174,10 +1174,30 @@ const segmentConfirmationStateService =
     now: () => new Date().toISOString()
   });
 
+const tmMatchesController = appRuntime.featureFactories.createTmMatchesController({
+  root: els.tmMatches,
+  session: {
+    getProject: editorSessionStore.getProject,
+    getActiveSegment: currentSegment
+  },
+  tm: {
+    getNames: projectTmNames,
+    findMatches: findProjectTmMatches
+  },
+  localization: uiLocalizationService,
+  text: { escapeHtml },
+  safeHtml: { replace: replaceSafeHtml },
+  target: { insert: (...args) => targetProducerController.insertTmTarget(...args) },
+  dom: {
+    createElement: (tagName) => document.createElement(tagName),
+    createFragment: () => document.createDocumentFragment()
+  }
+});
+
 const segmentTmSaveController = appRuntime.featureFactories.createSegmentTmSaveController({
   session: { getProject: editorSessionStore.getProject },
   selection: { getActiveSegment: currentSegment },
-  tm: { saveEntry: saveTmEntry, mainName: mainTmName, refreshMatches: refreshTmMatches },
+  tm: { saveEntry: saveTmEntry, mainName: mainTmName, refreshMatches: tmMatchesController.refresh },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: setSaveStatus },
   testHooks: {
@@ -1591,7 +1611,7 @@ const projectResourceTransferController =
       markProjectsUsingDirty: markProjectsUsingResourceDirty
     },
     refresh: {
-      tmMatches: refreshTmMatches,
+      tmMatches: tmMatchesController.refresh,
       projectTerms: refreshProjectTerms,
       terms: refreshTerms
     },
@@ -3123,7 +3143,7 @@ const editorContextController = appRuntime?.featureFactories?.createEditorContex
   renderHistory: revisionHistoryPresentationService.render,
   renderAi: aiSuggestionListController.render,
   renderQuality: qualityWorkbenchController.render,
-  refreshMatches: () => refreshTmMatches(),
+  refreshMatches: tmMatchesController.refresh,
   refreshTerms: () => refreshTerms()
 });
 
@@ -6107,49 +6127,6 @@ function renderProgress(options = {}) {
   els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
   els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
-}
-
-async function refreshTmMatches() {
-  const segment = currentSegment();
-  if (!segment || !editorSessionStore.getProject()) {
-    els.tmMatches.textContent = uiLocalizationService.source("No active segment.");
-    els.tmMatches.classList.add("muted");
-    return;
-  }
-  const segmentId = segment.id;
-  const projectId = editorSessionStore.getProject().id;
-  const matches = await findProjectTmMatches({
-    source: segment.source,
-    sourceLang: editorSessionStore.getProject().sourceLang,
-    targetLang: editorSessionStore.getProject().targetLang,
-    tmNames: projectTmNames()
-  });
-  if (editorSessionStore.getProject()?.id !== projectId || currentSegment()?.id !== segmentId) return;
-  els.tmMatches.classList.toggle("muted", !matches.length);
-  if (!matches.length) {
-    els.tmMatches.textContent = uiLocalizationService.source("No TM matches.");
-    return;
-  }
-  const fragment = document.createDocumentFragment();
-  matches.forEach((match) => {
-    const card = document.createElement("article");
-    card.className = "match-card";
-    replaceSafeHtml(card, `<header><strong>${uiLocalizationService.labelHtml("matchPercent", { score: match.score })}</strong><span>${escapeHtml(match.tmName || "")}</span></header>
-      <p>${escapeHtml(match.source)}</p>
-      <p><strong>${escapeHtml(match.target)}</strong></p>
-      ${match.projectName ? `<p class="muted">${escapeHtml(match.projectName)}</p>` : ""}`);
-    const button = document.createElement("button");
-    button.textContent = uiLocalizationService.label("insert");
-    button.addEventListener("click", () =>
-      targetProducerController.insertTmTarget(match.target, {
-        channel: "match",
-        resourceId: match.id || ""
-      })
-    );
-    card.append(button);
-    fragment.append(card);
-  });
-  els.tmMatches.replaceChildren(fragment);
 }
 
 async function refreshTerms() {

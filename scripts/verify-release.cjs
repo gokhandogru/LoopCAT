@@ -232,6 +232,7 @@ const requiredReleaseFiles = [
   "src/features/quality/quality-review-controller.js",
   "src/features/quality/review-metadata-controller.js",
   "src/features/quality/review-state-controller.js",
+  "src/features/editor/tm-matches-controller.js",
   "src/features/editor/target-replacement-controller.js",
   "src/features/editor/tm-pretranslation-controller.js",
   "src/features/resources/resources-controller.js",
@@ -281,6 +282,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-command-restoration-controller.test.cjs",
   "tests/unit/segment-confirmation-state-service.test.cjs",
   "tests/unit/segment-tm-save-controller.test.cjs",
+  "tests/unit/tm-matches-controller.test.cjs",
   "tests/unit/concordance-controller.test.cjs",
   "tests/unit/segment-navigation-controller.test.cjs",
   "tests/unit/segment-draft-application-service.test.cjs",
@@ -439,6 +441,8 @@ const segmentCommandRestorationControllerUnitTests = readText(
 );
 const segmentConfirmationStateServiceUnitTests = readText("tests/unit/segment-confirmation-state-service.test.cjs");
 const segmentTmSaveControllerUnitTests = readText("tests/unit/segment-tm-save-controller.test.cjs");
+const tmMatchesControllerJs = readText("src/features/editor/tm-matches-controller.js");
+const tmMatchesControllerUnitTests = readText("tests/unit/tm-matches-controller.test.cjs");
 const concordanceControllerUnitTests = readText("tests/unit/concordance-controller.test.cjs");
 const segmentNavigationControllerUnitTests = readText("tests/unit/segment-navigation-controller.test.cjs");
 const segmentDraftApplicationServiceUnitTests = readText("tests/unit/segment-draft-application-service.test.cjs");
@@ -1902,7 +1906,7 @@ for (const boundary of [
   "repositories: { importTmEntries, importTerms, getAllByIndex, listTerms }",
   "selectedTermBaseName: () => els.termBaseSelect.value || primaryTermBaseName()",
   "markProjectsUsingDirty: markProjectsUsingResourceDirty",
-  "tmMatches: refreshTmMatches",
+  "tmMatches: tmMatchesController.refresh",
   "projectTerms: refreshProjectTerms",
   "terms: refreshTerms",
   "builders: { buildTmx, buildTbx }",
@@ -4846,6 +4850,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createTmMatchesController } from "../features/editor/tm-matches-controller.js";',
+  "The application runtime must install the checked TM-matches controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createTmMatchesController,",
+  "The application runtime must expose the checked TM-matches factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createConcordanceController } from "../features/editor/concordance-controller.js";',
   "The application runtime must install the checked concordance controller."
 );
@@ -5657,7 +5671,7 @@ assertIncludes(
 for (const boundary of [
   "session: { getProject: editorSessionStore.getProject }",
   "selection: { getActiveSegment: currentSegment }",
-  "tm: { saveEntry: saveTmEntry, mainName: mainTmName, refreshMatches: refreshTmMatches }",
+  "tm: { saveEntry: saveTmEntry, mainName: mainTmName, refreshMatches: tmMatchesController.refresh }",
   "workspace: { markDirty: markWorkspaceDirty }",
   "status: { set: setSaveStatus }",
   "if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG])"
@@ -5697,6 +5711,107 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/segment-tm-save-controller.js"',
   "source-catalog extraction must scan the checked direct segment-TM-save controller."
+);
+for (const snippet of [
+  'throw new TypeError("TmMatchesController requires a results root and session boundaries.")',
+  'throw new TypeError("TmMatchesController requires TM selection and lookup boundaries.")',
+  'throw new TypeError("TmMatchesController requires presentation and target-insertion boundaries.")',
+  'throw new TypeError("TmMatchesController requires browser DOM boundaries.")',
+  "const segment = session.getActiveSegment()",
+  "if (!segment || !session.getProject())",
+  'root.textContent = localization.source("No active segment.")',
+  'root.classList.add("muted")',
+  "const segmentId = segment.id",
+  "const projectId = session.getProject().id",
+  "const matches = await tm.findMatches({",
+  "source: segment.source",
+  "sourceLang: session.getProject().sourceLang",
+  "targetLang: session.getProject().targetLang",
+  "tmNames: tm.getNames()",
+  "session.getProject()?.id !== projectId || session.getActiveSegment()?.id !== segmentId",
+  'root.classList.toggle("muted", !matches.length)',
+  'root.textContent = localization.source("No TM matches.")',
+  'card.className = "match-card"',
+  'localization.labelHtml("matchPercent", { score: match.score })',
+  'text.escapeHtml(match.tmName || "")',
+  'match.projectName ? `<p class="muted">${text.escapeHtml(match.projectName)}</p>` : ""',
+  'button.textContent = localization.label("insert")',
+  "target.insert(match.target, {",
+  'channel: "match"',
+  'resourceId: match.id || ""',
+  "root.replaceChildren(fragment)",
+  "return Object.freeze({ refresh })"
+]) {
+  assertIncludes(
+    tmMatchesControllerJs,
+    snippet,
+    `TmMatchesController must retain characterized lookup, stale-result, presentation, and insertion policy: ${snippet}`
+  );
+}
+assert(
+  !tmMatchesControllerJs.includes("window.") &&
+    !tmMatchesControllerJs.includes("document.") &&
+    !tmMatchesControllerJs.includes("editorSessionStore") &&
+    !tmMatchesControllerJs.includes("targetProducerController") &&
+    !tmMatchesControllerJs.includes("findProjectTmMatches") &&
+    !tmMatchesControllerJs.includes("projectTmNames") &&
+    !tmMatchesControllerJs.includes("button.type"),
+  "the checked TM-matches controller must use injected boundaries and preserve the omitted button type."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createTmMatchesController({",
+  "root: els.tmMatches",
+  "getProject: editorSessionStore.getProject",
+  "getActiveSegment: currentSegment",
+  "getNames: projectTmNames",
+  "findMatches: findProjectTmMatches",
+  "localization: uiLocalizationService",
+  "text: { escapeHtml }",
+  "safeHtml: { replace: replaceSafeHtml }",
+  "target: { insert: (...args) => targetProducerController.insertTmTarget(...args) }",
+  "createElement: (tagName) => document.createElement(tagName)",
+  "createFragment: () => document.createDocumentFragment()"
+]) {
+  assertIncludes(appJs, boundary, `TM-matches composition must inject the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/\btmMatchesController\.refresh\b/g) || []).length === 3,
+  "editor context, direct segment-TM save, and current-project TM import must call TmMatchesController directly."
+);
+assert(
+  !/async\s+function\s+refreshTmMatches\b/.test(appJs) &&
+    !/async\s+function\s+refreshTmMatches\b/.test(appWorkflowDriverJs),
+  "refreshTmMatches must not return to app.js or the workflow driver."
+);
+for (const removedOwnership of [
+  "els.tmMatches.textContent",
+  "els.tmMatches.classList",
+  "els.tmMatches.replaceChildren"
+]) {
+  assert(
+    !appJs.includes(removedOwnership) && !appWorkflowDriverJs.includes(removedOwnership),
+    `TM-match result ownership must not return to the coordinator: ${removedOwnership}.`
+  );
+}
+for (const testName of [
+  "TmMatchesController preserves active-segment and project guards with the localized muted state",
+  "TmMatchesController preserves exact lookup inputs, context reads, and the empty-match presentation",
+  "TmMatchesController preserves stale project and segment result suppression",
+  "TmMatchesController preserves lookup rejection timing before presentation effects",
+  "TmMatchesController preserves ordered safe match cards, fallbacks, and one fragment replacement",
+  "TmMatchesController preserves synchronous target insertion provenance, ID fallback, and failures",
+  "TmMatchesController validates boundaries, propagates rendering failures, and exposes an immutable API"
+]) {
+  assertIncludes(
+    tmMatchesControllerUnitTests,
+    testName,
+    `focused TM-matches tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/tm-matches-controller.js"',
+  "source-catalog extraction must scan the checked TM-matches controller."
 );
 for (const snippet of [
   'throw new TypeError("ConcordanceController requires overlay elements.")',
@@ -11377,9 +11492,9 @@ assertIncludes(
   "QaResultsController cards must render in one DOM replacement."
 );
 assertIncludes(
-  appJs,
-  "els.tmMatches.replaceChildren(fragment)",
-  "app.js TM match cards must render in one DOM replacement."
+  tmMatchesControllerJs,
+  "root.replaceChildren(fragment)",
+  "TmMatchesController cards must render in one DOM replacement."
 );
 assertIncludes(
   appJs,
