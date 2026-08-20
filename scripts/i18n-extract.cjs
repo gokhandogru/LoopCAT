@@ -126,6 +126,13 @@ const segmentNavigationControllerPath = path.join(
   "editor",
   "segment-navigation-controller.js"
 );
+const segmentDraftApplicationServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "editor",
+  "segment-draft-application-service.js"
+);
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const resourceMutationControllerPath = path.join(
   root,
@@ -356,6 +363,11 @@ function main() {
     messagesByText,
     segmentNavigationControllerPath,
     "src/features/editor/segment-navigation-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    segmentDraftApplicationServicePath,
+    "src/features/editor/segment-draft-application-service.js"
   );
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(

@@ -1607,6 +1607,22 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
   logger: console
 });
 segmentConfirmationController.mount();
+const segmentDraftApplicationService = appRuntime.featureFactories.createSegmentDraftApplicationService({
+  targetState: {
+    setTarget: segmentTargetStateService.setTarget,
+    touch: segmentTargetStateService.touch,
+    capturePatch: segmentTargetStateService.capturePatch
+  },
+  filters: { matches: segmentFilterService.matches },
+  presentation: {
+    renderSegments,
+    scheduleRowUpdate,
+    cancelRowUpdate: (index) => verticalFeatureState.segmentGrid.cancelRowUpdate(index),
+    renderProgress,
+    scheduleHistory: scheduleRevisionHistoryRender
+  },
+  workspace: { markDirty: markWorkspaceDirty }
+});
 targetEditController = appRuntime.featureFactories.createTargetEditController({
   editorSessionStore,
   commandBus: appRuntime.commands.bus,
@@ -1620,7 +1636,7 @@ targetEditController = appRuntime.featureFactories.createTargetEditController({
   },
   createPatch: segmentTargetStateService.capturePatch,
   restorePatch: segmentCommandRestorationController.restorePatch,
-  applyDraft: applyTargetDraft,
+  applyDraft: segmentDraftApplicationService.apply,
   activateSegment: (...args) => segmentNavigationController.select(...args),
   confirmSegment: () => segmentConfirmationController.confirm(),
   getCommandProjectId: () => state.commandProjectId,
@@ -5993,26 +6009,6 @@ function renderProgress(options = {}) {
   els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
   els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
-}
-
-function applyTargetDraft({ index, segment, target }) {
-  const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
-  const passedFiltersBefore = segmentFilterService.matches(segment);
-  segmentTargetStateService.setTarget(segment, target, target.trim() ? "draft" : "empty", "edit");
-  const passedFiltersAfter = segmentFilterService.matches(segment);
-  const filterMembershipChanged = passedFiltersBefore !== passedFiltersAfter;
-  segmentTargetStateService.touch(segment, { invalidateFilters: filterMembershipChanged });
-  if (filterMembershipChanged) {
-    renderSegments({ preserveScroll: true });
-  } else if (passedFiltersAfter) {
-    scheduleRowUpdate(index);
-  } else {
-    verticalFeatureState.segmentGrid.cancelRowUpdate(index);
-  }
-  renderProgress({ previousStatus, nextStatus: segment.status });
-  scheduleRevisionHistoryRender();
-  markWorkspaceDirty();
-  return { segment, patch: segmentTargetStateService.capturePatch(segment) };
 }
 
 function openReplacePanel() {

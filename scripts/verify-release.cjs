@@ -179,6 +179,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-tm-save-controller.js",
   "src/features/editor/concordance-controller.js",
   "src/features/editor/segment-navigation-controller.js",
+  "src/features/editor/segment-draft-application-service.js",
   "src/features/editor/structural-segment-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -276,6 +277,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-tm-save-controller.test.cjs",
   "tests/unit/concordance-controller.test.cjs",
   "tests/unit/segment-navigation-controller.test.cjs",
+  "tests/unit/segment-draft-application-service.test.cjs",
   "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
@@ -406,6 +408,7 @@ const segmentConfirmationStateServiceJs = readText("src/features/editor/segment-
 const segmentTmSaveControllerJs = readText("src/features/editor/segment-tm-save-controller.js");
 const concordanceControllerJs = readText("src/features/editor/concordance-controller.js");
 const segmentNavigationControllerJs = readText("src/features/editor/segment-navigation-controller.js");
+const segmentDraftApplicationServiceJs = readText("src/features/editor/segment-draft-application-service.js");
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
@@ -426,6 +429,7 @@ const segmentConfirmationStateServiceUnitTests = readText("tests/unit/segment-co
 const segmentTmSaveControllerUnitTests = readText("tests/unit/segment-tm-save-controller.test.cjs");
 const concordanceControllerUnitTests = readText("tests/unit/concordance-controller.test.cjs");
 const segmentNavigationControllerUnitTests = readText("tests/unit/segment-navigation-controller.test.cjs");
+const segmentDraftApplicationServiceUnitTests = readText("tests/unit/segment-draft-application-service.test.cjs");
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
@@ -4285,6 +4289,16 @@ assertIncludes(
   "createSegmentNavigationController,",
   "The application runtime must expose the checked segment-navigation factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createSegmentDraftApplicationService } from "../features/editor/segment-draft-application-service.js";',
+  "The application runtime must install the checked segment-draft application service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentDraftApplicationService,",
+  "The application runtime must expose the checked segment-draft application factory."
+);
 for (const boundary of [
   "editLifecycle.finalize(segment.id)",
   "persistence.clearPending(segment, { finalizeEdit: false })",
@@ -5367,6 +5381,96 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/segment-navigation-controller.js"',
   "source-catalog extraction must scan the checked segment-navigation controller."
+);
+for (const snippet of [
+  'throw new TypeError("SegmentDraftApplicationService requires target-state boundaries.")',
+  'throw new TypeError("SegmentDraftApplicationService requires filter boundaries.")',
+  'throw new TypeError("SegmentDraftApplicationService requires presentation and workspace boundaries.")',
+  'const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty")',
+  "const passedFiltersBefore = filters.matches(segment)",
+  'targetState.setTarget(segment, target, target.trim() ? "draft" : "empty", "edit")',
+  "const passedFiltersAfter = filters.matches(segment)",
+  "const filterMembershipChanged = passedFiltersBefore !== passedFiltersAfter",
+  "targetState.touch(segment, { invalidateFilters: filterMembershipChanged })",
+  "if (filterMembershipChanged)",
+  "presentation.renderSegments({ preserveScroll: true })",
+  "else if (passedFiltersAfter)",
+  "presentation.scheduleRowUpdate(index)",
+  "presentation.cancelRowUpdate(index)",
+  "presentation.renderProgress({ previousStatus, nextStatus: segment.status })",
+  "presentation.scheduleHistory()",
+  "workspace.markDirty()",
+  "return { segment, patch: targetState.capturePatch(segment) }",
+  "return Object.freeze({ apply })"
+]) {
+  assertIncludes(
+    segmentDraftApplicationServiceJs,
+    snippet,
+    `SegmentDraftApplicationService must retain characterized target-input policy: ${snippet}`
+  );
+}
+assert(
+  !segmentDraftApplicationServiceJs.includes("segmentTargetStateService") &&
+    !segmentDraftApplicationServiceJs.includes("segmentFilterService") &&
+    !segmentDraftApplicationServiceJs.includes("verticalFeatureState") &&
+    !segmentDraftApplicationServiceJs.includes("markWorkspaceDirty"),
+  "the checked segment-draft application service must depend only on injected mutation and effect boundaries."
+);
+assertIncludes(
+  appJs,
+  "createSegmentDraftApplicationService({",
+  "app.js must compose the checked segment-draft application service."
+);
+for (const boundary of [
+  "setTarget: segmentTargetStateService.setTarget",
+  "touch: segmentTargetStateService.touch",
+  "capturePatch: segmentTargetStateService.capturePatch",
+  "filters: { matches: segmentFilterService.matches }",
+  "scheduleRowUpdate,",
+  "cancelRowUpdate: (index) => verticalFeatureState.segmentGrid.cancelRowUpdate(index)",
+  "renderProgress,",
+  "scheduleHistory: scheduleRevisionHistoryRender",
+  "workspace: { markDirty: markWorkspaceDirty }",
+  "applyDraft: segmentDraftApplicationService.apply"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `segment-draft application composition must inject the checked ${boundary} boundary.`
+  );
+}
+for (const removedHelper of ["applyTargetDraft"]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} segment-draft helper must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  !appJs.includes("const passedFiltersBefore = segmentFilterService.matches(segment)") &&
+    !appJs.includes(
+      'segmentTargetStateService.setTarget(segment, target, target.trim() ? "draft" : "empty", "edit")'
+    ) &&
+    !appJs.includes("filterMembershipChanged = passedFiltersBefore !== passedFiltersAfter"),
+  "app.js must not regain target-input filter-membership or mutation policy."
+);
+for (const testName of [
+  "SegmentDraftApplicationService preserves explicit status, matching-row scheduling, effects, and patch return",
+  "SegmentDraftApplicationService derives draft fallback and rerenders with preserved scroll after membership change",
+  "SegmentDraftApplicationService derives empty fallback and cancels a still-hidden row update",
+  "SegmentDraftApplicationService propagates target mutation failure before downstream effects",
+  "SegmentDraftApplicationService validates collaborators and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentDraftApplicationServiceUnitTests,
+    testName,
+    `focused segment-draft application tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-draft-application-service.js"',
+  "source-catalog extraction must scan the checked segment-draft application service."
 );
 assertIncludes(
   appBootstrapJs,
