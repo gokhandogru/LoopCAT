@@ -120,6 +120,7 @@ const segmentConfirmationStateServicePath = path.join(
 const segmentTmSaveControllerPath = path.join(root, "src", "features", "editor", "segment-tm-save-controller.js");
 const tmMatchesControllerPath = path.join(root, "src", "features", "editor", "tm-matches-controller.js");
 const termSuggestionsControllerPath = path.join(root, "src", "features", "editor", "term-suggestions-controller.js");
+const termFormControllerPath = path.join(root, "src", "features", "editor", "term-form-controller.js");
 const concordanceControllerPath = path.join(root, "src", "features", "editor", "concordance-controller.js");
 const qualityPresentationServicePath = path.join(root, "src", "features", "quality", "quality-presentation-service.js");
 const qualityWorkbenchControllerPath = path.join(root, "src", "features", "quality", "quality-workbench-controller.js");
@@ -372,6 +373,7 @@ function main() {
   extractScript(messagesByText, segmentTmSaveControllerPath, "src/features/editor/segment-tm-save-controller.js");
   extractScript(messagesByText, tmMatchesControllerPath, "src/features/editor/tm-matches-controller.js");
   extractScript(messagesByText, termSuggestionsControllerPath, "src/features/editor/term-suggestions-controller.js");
+  extractScript(messagesByText, termFormControllerPath, "src/features/editor/term-form-controller.js");
   extractScript(messagesByText, concordanceControllerPath, "src/features/editor/concordance-controller.js");
   extractScript(messagesByText, qualityPresentationServicePath, "src/features/quality/quality-presentation-service.js");
   extractScript(messagesByText, qualityWorkbenchControllerPath, "src/features/quality/quality-workbench-controller.js");

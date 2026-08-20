@@ -1214,6 +1214,37 @@ const termSuggestionsController = appRuntime.featureFactories.createTermSuggesti
   }
 });
 
+const termFormController = appRuntime.featureFactories.createTermFormController({
+  elements: {
+    form: els.termForm,
+    source: els.sourceTermInput,
+    target: els.targetTermInput,
+    notes: els.termNotesInput,
+    termbase: els.termBaseSelect,
+    forbidden: els.termForbiddenInput
+  },
+  session: { getProject: editorSessionStore.getProject },
+  resources: {
+    primaryName: primaryTermBaseName,
+    markProjectsUsingDirty: markProjectsUsingResourceDirty
+  },
+  repository: { save: saveTerm },
+  presentation: {
+    renderTermbaseSelect,
+    refreshProjectTerms: (options) => refreshProjectTerms(options),
+    refreshSuggestions: termSuggestionsController.refresh
+  },
+  status: { set: setSaveStatus },
+  logger: console,
+  testHooks: {
+    beforeSave: () => {
+      if (LOOPCAT_TEST_BUILD && els.termForm[TERM_FORM_SAVE_FAILURE_TEST_FLAG]) {
+        throw new Error("Simulated term form save failure");
+      }
+    }
+  }
+});
+
 const segmentTmSaveController = appRuntime.featureFactories.createSegmentTmSaveController({
   session: { getProject: editorSessionStore.getProject },
   selection: { getActiveSegment: currentSegment },
@@ -6151,37 +6182,6 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-async function saveTermFromForm() {
-  if (!editorSessionStore.getProject() || !els.sourceTermInput.value.trim() || !els.targetTermInput.value.trim()) return null;
-  const termBaseName = els.termBaseSelect.value || primaryTermBaseName();
-  try {
-    if (LOOPCAT_TEST_BUILD && els.termForm[TERM_FORM_SAVE_FAILURE_TEST_FLAG]) throw new Error("Simulated term form save failure");
-    const term = await saveTerm({
-      sourceTerm: els.sourceTermInput.value,
-      targetTerm: els.targetTermInput.value,
-      notes: els.termNotesInput.value,
-      sourceLang: editorSessionStore.getProject().sourceLang,
-      targetLang: editorSessionStore.getProject().targetLang,
-      termBaseName,
-      isForbidden: els.termForbiddenInput?.checked
-    });
-    markProjectsUsingResourceDirty("termbase", termBaseName, editorSessionStore.getProject().sourceLang, editorSessionStore.getProject().targetLang);
-    els.termForm.reset();
-    renderTermbaseSelect();
-    try {
-      await refreshProjectTerms({ rerender: true });
-      await termSuggestionsController.refresh();
-    } catch (refreshError) {
-      console.warn("Term refresh failed after save.", refreshError);
-    }
-    setSaveStatus("Term saved", "saved");
-    return term;
-  } catch (error) {
-    setSaveStatus(error.message || "Term save failed", "dirty");
-    return null;
-  }
-}
-
 async function runProjectQa() {
   if (!editorSessionStore.getProject()) return null;
   try {
@@ -7305,10 +7305,7 @@ function wireEvents() {
     if (first !== -1) await segmentNavigationController.select(first);
   });
 
-  els.termForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await saveTermFromForm();
-  });
+  termFormController.mount();
 
   els.domainForm.addEventListener("submit", async (event) => {
     event.preventDefault();

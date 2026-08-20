@@ -57,6 +57,7 @@ import { createSegmentConfirmationStateService } from "../features/editor/segmen
 import { createSegmentTmSaveController } from "../features/editor/segment-tm-save-controller.js";
 import { createTmMatchesController } from "../features/editor/tm-matches-controller.js";
 import { createTermSuggestionsController } from "../features/editor/term-suggestions-controller.js";
+import { createTermFormController } from "../features/editor/term-form-controller.js";
 import { createConcordanceController } from "../features/editor/concordance-controller.js";
 import { createSegmentNavigationController } from "../features/editor/segment-navigation-controller.js";
 import { createSegmentDraftApplicationService } from "../features/editor/segment-draft-application-service.js";
@@ -282,6 +283,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createSegmentTmSaveController,
       createTmMatchesController,
       createTermSuggestionsController,
+      createTermFormController,
       createConcordanceController,
       createGlobalKeyboardController,
       createSegmentNavigationController,

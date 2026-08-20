@@ -5555,7 +5555,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.targetTermInput.value = "kaydedilmeyen yan panel terimi";
     els.termNotesInput.value = "This term must stay in the form when saving fails";
     segmentTargetStateService.setHiddenField(els.termForm, TERM_FORM_SAVE_FAILURE_TEST_FLAG, true);
-    const failedTermFormSave = await saveTermFromForm();
+    const failedTermFormSave = await termFormController.save();
     const failedSidebarTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] });
     assert(
       !failedTermFormSave &&
@@ -5569,7 +5569,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.targetTermInput.value = "Merhaba";
     els.termNotesInput.value = "Suggestion dirty regression";
     clearWorkspaceDirtyMarkers();
-    const savedTermFromForm = await saveTermFromForm();
+    const savedTermFromForm = await termFormController.save();
     assert(savedTermFromForm && state.workspaceDirtyProjectIds.has(project.id), "term form save marks linked project package dirty");
     await waitFor(() => Array.from(els.termSuggestions.querySelectorAll(".term-card")).some((card) => card.textContent.includes("Hello")), "term suggestion card");
     const helloTermForDeleteFailure = (await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] })).find((term) => term.sourceTerm === "Hello");

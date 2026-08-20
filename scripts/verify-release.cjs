@@ -234,6 +234,7 @@ const requiredReleaseFiles = [
   "src/features/quality/review-state-controller.js",
   "src/features/editor/tm-matches-controller.js",
   "src/features/editor/term-suggestions-controller.js",
+  "src/features/editor/term-form-controller.js",
   "src/features/editor/target-replacement-controller.js",
   "src/features/editor/tm-pretranslation-controller.js",
   "src/features/resources/resources-controller.js",
@@ -285,6 +286,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-tm-save-controller.test.cjs",
   "tests/unit/tm-matches-controller.test.cjs",
   "tests/unit/term-suggestions-controller.test.cjs",
+  "tests/unit/term-form-controller.test.cjs",
   "tests/unit/concordance-controller.test.cjs",
   "tests/unit/segment-navigation-controller.test.cjs",
   "tests/unit/segment-draft-application-service.test.cjs",
@@ -447,6 +449,8 @@ const tmMatchesControllerJs = readText("src/features/editor/tm-matches-controlle
 const tmMatchesControllerUnitTests = readText("tests/unit/tm-matches-controller.test.cjs");
 const termSuggestionsControllerJs = readText("src/features/editor/term-suggestions-controller.js");
 const termSuggestionsControllerUnitTests = readText("tests/unit/term-suggestions-controller.test.cjs");
+const termFormControllerJs = readText("src/features/editor/term-form-controller.js");
+const termFormControllerUnitTests = readText("tests/unit/term-form-controller.test.cjs");
 const concordanceControllerUnitTests = readText("tests/unit/concordance-controller.test.cjs");
 const segmentNavigationControllerUnitTests = readText("tests/unit/segment-navigation-controller.test.cjs");
 const segmentDraftApplicationServiceUnitTests = readText("tests/unit/segment-draft-application-service.test.cjs");
@@ -4874,6 +4878,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createTermFormController } from "../features/editor/term-form-controller.js";',
+  "The application runtime must install the checked term-form controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createTermFormController,",
+  "The application runtime must expose the checked term-form factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createConcordanceController } from "../features/editor/concordance-controller.js";',
   "The application runtime must install the checked concordance controller."
 );
@@ -5927,6 +5941,109 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/term-suggestions-controller.js"',
   "source-catalog extraction must scan the checked term-suggestions controller."
+);
+for (const snippet of [
+  'throw new TypeError("TermFormController requires form elements and a project session boundary.")',
+  'throw new TypeError("TermFormController requires termbase resource and repository boundaries.")',
+  'throw new TypeError("TermFormController requires presentation, status, logger, and test-hook boundaries.")',
+  "if (!session.getProject() || !elements.source.value.trim() || !elements.target.value.trim()) return null",
+  "const termBaseName = elements.termbase.value || resources.primaryName()",
+  "testHooks.beforeSave()",
+  "const term = await repository.save({",
+  "sourceTerm: elements.source.value",
+  "targetTerm: elements.target.value",
+  "notes: elements.notes.value",
+  "sourceLang: session.getProject().sourceLang",
+  "targetLang: session.getProject().targetLang",
+  "termBaseName,",
+  "isForbidden: elements.forbidden?.checked",
+  "resources.markProjectsUsingDirty(",
+  '"termbase",',
+  "elements.form.reset()",
+  "presentation.renderTermbaseSelect()",
+  "await presentation.refreshProjectTerms({ rerender: true })",
+  "await presentation.refreshSuggestions()",
+  'logger.warn("Term refresh failed after save.", refreshError)',
+  'status.set("Term saved", "saved")',
+  'status.set(error.message || "Term save failed", "dirty")',
+  "event.preventDefault()",
+  "await save()",
+  'elements.form.addEventListener("submit", handleSubmit)',
+  'elements.form.removeEventListener("submit", handleSubmit)',
+  "return Object.freeze({ mount, save, unmount })"
+]) {
+  assertIncludes(
+    termFormControllerJs,
+    snippet,
+    `TermFormController must retain characterized eligibility, payload, effects, refresh, failure, and lifecycle policy: ${snippet}`
+  );
+}
+assert(
+  !termFormControllerJs.includes("window.") &&
+    !termFormControllerJs.includes("document.") &&
+    !termFormControllerJs.includes("editorSessionStore") &&
+    !termFormControllerJs.includes("saveTermFromForm") &&
+    !termFormControllerJs.includes("TERM_FORM_SAVE_FAILURE_TEST_FLAG") &&
+    !termFormControllerJs.includes("LOOPCAT_TEST_BUILD") &&
+    !termFormControllerJs.includes("els."),
+  "the checked term-form controller must use injected application, repository, presentation, status, logger, and test-hook boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createTermFormController({",
+  "form: els.termForm",
+  "source: els.sourceTermInput",
+  "target: els.targetTermInput",
+  "notes: els.termNotesInput",
+  "termbase: els.termBaseSelect",
+  "forbidden: els.termForbiddenInput",
+  "getProject: editorSessionStore.getProject",
+  "primaryName: primaryTermBaseName",
+  "markProjectsUsingDirty: markProjectsUsingResourceDirty",
+  "repository: { save: saveTerm }",
+  "renderTermbaseSelect,",
+  "refreshProjectTerms: (options) => refreshProjectTerms(options)",
+  "refreshSuggestions: termSuggestionsController.refresh",
+  "status: { set: setSaveStatus }",
+  "logger: console",
+  "beforeSave: () =>",
+  "if (LOOPCAT_TEST_BUILD && els.termForm[TERM_FORM_SAVE_FAILURE_TEST_FLAG])",
+  'throw new Error("Simulated term form save failure")'
+]) {
+  assertIncludes(appJs, boundary, `term-form composition must inject the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/\btermFormController\.mount\b/g) || []).length === 1 &&
+    (appJs.match(/\btermFormController\.save\b/g) || []).length === 0 &&
+    (appWorkflowDriverJs.match(/\btermFormController\.save\b/g) || []).length === 2,
+  "the form lifecycle must mount once and both workflow consumers must call TermFormController directly."
+);
+assert(
+  !/async\s+function\s+saveTermFromForm\b/.test(appJs) &&
+    !/async\s+function\s+saveTermFromForm\b/.test(appWorkflowDriverJs) &&
+    !appJs.includes('els.termForm.addEventListener("submit"') &&
+    !appWorkflowDriverJs.includes('els.termForm.addEventListener("submit"'),
+  "saveTermFromForm and coordinator-owned term-form submit listeners must not return."
+);
+for (const testName of [
+  "TermFormController preserves project and required-field early returns with exact short-circuit effects",
+  "TermFormController preserves selected-termbase payload, project reads, effects, and success order",
+  "TermFormController preserves primary-termbase fallback and absent forbidden input",
+  "TermFormController preserves durable success and exact warning after either refresh failure",
+  "TermFormController preserves pre-save and repository failure containment without clearing form values",
+  "TermFormController preserves completed effects and outer containment for downstream failures",
+  "TermFormController owns idempotent submit lifecycle and awaits save without returning its result",
+  "TermFormController validates boundaries, preserves status failures, and exposes an immutable API"
+]) {
+  assertIncludes(
+    termFormControllerUnitTests,
+    testName,
+    `focused term-form tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/term-form-controller.js"',
+  "source-catalog extraction must scan the checked term-form controller."
 );
 for (const snippet of [
   'throw new TypeError("ConcordanceController requires overlay elements.")',
