@@ -2462,7 +2462,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         await deleteTerms(aiExtractedTermIds);
         markProjectsUsingResourceDirty("termbase", "Workflow TB", editorSessionStore.getProject().sourceLang, editorSessionStore.getProject().targetLang);
         await refreshProjectTerms({ rerender: true });
-        await refreshTerms();
+        await termSuggestionsController.refresh();
       }
     }
 

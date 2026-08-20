@@ -1194,6 +1194,26 @@ const tmMatchesController = appRuntime.featureFactories.createTmMatchesControlle
   }
 });
 
+const termSuggestionsController = appRuntime.featureFactories.createTermSuggestionsController({
+  root: els.termSuggestions,
+  session: {
+    getProject: editorSessionStore.getProject,
+    getActiveSegment: currentSegment
+  },
+  terms: {
+    getNames: projectTermBaseNames,
+    find: findTerms
+  },
+  localization: uiLocalizationService,
+  text: { escapeHtml },
+  safeHtml: { replace: replaceSafeHtml },
+  mutation: { deleteTerm: (...args) => resourceMutationController.deleteTerm(...args) },
+  dom: {
+    createElement: (tagName) => document.createElement(tagName),
+    createFragment: () => document.createDocumentFragment()
+  }
+});
+
 const segmentTmSaveController = appRuntime.featureFactories.createSegmentTmSaveController({
   session: { getProject: editorSessionStore.getProject },
   selection: { getActiveSegment: currentSegment },
@@ -1613,7 +1633,7 @@ const projectResourceTransferController =
     refresh: {
       tmMatches: tmMatchesController.refresh,
       projectTerms: refreshProjectTerms,
-      terms: refreshTerms
+      terms: termSuggestionsController.refresh
     },
     builders: { buildTmx, buildTbx },
     fileSafeName,
@@ -2680,7 +2700,7 @@ const aiTerminologyExtractionController =
       renderAiProgress: aiProviderFormController.renderProgress,
       renderOutput: aiProviderFormController.renderOutput,
       refreshProjectTerms: () => refreshProjectTerms({ rerender: true }),
-      refreshTerms
+      refreshTerms: termSuggestionsController.refresh
     },
     activity: {
       logActive: (details) =>
@@ -3144,7 +3164,7 @@ const editorContextController = appRuntime?.featureFactories?.createEditorContex
   renderAi: aiSuggestionListController.render,
   renderQuality: qualityWorkbenchController.render,
   refreshMatches: tmMatchesController.refresh,
-  refreshTerms: () => refreshTerms()
+  refreshTerms: termSuggestionsController.refresh
 });
 
 segmentNavigationController = appRuntime.featureFactories.createSegmentNavigationController({
@@ -4058,7 +4078,9 @@ async function synchronizeResourceTrashChange(entry, { refreshSuggestions = fals
   await refreshResources();
   if (entry.resourceType === "tb") {
     await refreshProjectTerms({ rerender: applicationStore.getState().navigation.view === "editor" });
-    if (refreshSuggestions || applicationStore.getState().navigation.view === "editor") await refreshTerms();
+    if (refreshSuggestions || applicationStore.getState().navigation.view === "editor") {
+      await termSuggestionsController.refresh();
+    }
   } else if (applicationStore.getState().navigation.view === "editor") {
     await editorContextController.refresh();
   }
@@ -6129,47 +6151,6 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-async function refreshTerms() {
-  const segment = currentSegment();
-  if (!segment || !editorSessionStore.getProject()) {
-    els.termSuggestions.textContent = uiLocalizationService.source("No active segment.");
-    els.termSuggestions.classList.add("muted");
-    return;
-  }
-  const segmentId = segment.id;
-  const projectId = editorSessionStore.getProject().id;
-  const suggestions = await findTerms({
-    source: segment.source,
-    sourceLang: editorSessionStore.getProject().sourceLang,
-    targetLang: editorSessionStore.getProject().targetLang,
-    termBaseNames: projectTermBaseNames()
-  });
-  if (editorSessionStore.getProject()?.id !== projectId || currentSegment()?.id !== segmentId) return;
-  els.termSuggestions.classList.toggle("muted", !suggestions.length);
-  if (!suggestions.length) {
-    els.termSuggestions.textContent = uiLocalizationService.source("No terms found in this segment.");
-    return;
-  }
-  const fragment = document.createDocumentFragment();
-  suggestions.forEach((term) => {
-    const card = document.createElement("article");
-    card.className = `term-card${term.isForbidden ? " forbidden-term-card" : ""}`;
-    replaceSafeHtml(card, `<header><strong>${escapeHtml(term.sourceTerm)}</strong><span>${escapeHtml(term.targetTerm)}</span><span>${uiLocalizationService.labelHtml(term.isForbidden ? "forbidden" : "approved")}</span><span>${escapeHtml(term.termBaseName || "")}</span></header>
-      ${term.notes ? `<p>${escapeHtml(term.notes)}</p>` : ""}`);
-    const button = document.createElement("button");
-    button.textContent = uiLocalizationService.source("Delete");
-    button.addEventListener("click", async () => {
-      await resourceMutationController.deleteTerm(term, {
-        refreshResourceView: false,
-        refreshSuggestions: true
-      });
-    });
-    card.append(button);
-    fragment.append(card);
-  });
-  els.termSuggestions.replaceChildren(fragment);
-}
-
 async function saveTermFromForm() {
   if (!editorSessionStore.getProject() || !els.sourceTermInput.value.trim() || !els.targetTermInput.value.trim()) return null;
   const termBaseName = els.termBaseSelect.value || primaryTermBaseName();
@@ -6189,7 +6170,7 @@ async function saveTermFromForm() {
     renderTermbaseSelect();
     try {
       await refreshProjectTerms({ rerender: true });
-      await refreshTerms();
+      await termSuggestionsController.refresh();
     } catch (refreshError) {
       console.warn("Term refresh failed after save.", refreshError);
     }

@@ -233,6 +233,7 @@ const requiredReleaseFiles = [
   "src/features/quality/review-metadata-controller.js",
   "src/features/quality/review-state-controller.js",
   "src/features/editor/tm-matches-controller.js",
+  "src/features/editor/term-suggestions-controller.js",
   "src/features/editor/target-replacement-controller.js",
   "src/features/editor/tm-pretranslation-controller.js",
   "src/features/resources/resources-controller.js",
@@ -283,6 +284,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-confirmation-state-service.test.cjs",
   "tests/unit/segment-tm-save-controller.test.cjs",
   "tests/unit/tm-matches-controller.test.cjs",
+  "tests/unit/term-suggestions-controller.test.cjs",
   "tests/unit/concordance-controller.test.cjs",
   "tests/unit/segment-navigation-controller.test.cjs",
   "tests/unit/segment-draft-application-service.test.cjs",
@@ -443,6 +445,8 @@ const segmentConfirmationStateServiceUnitTests = readText("tests/unit/segment-co
 const segmentTmSaveControllerUnitTests = readText("tests/unit/segment-tm-save-controller.test.cjs");
 const tmMatchesControllerJs = readText("src/features/editor/tm-matches-controller.js");
 const tmMatchesControllerUnitTests = readText("tests/unit/tm-matches-controller.test.cjs");
+const termSuggestionsControllerJs = readText("src/features/editor/term-suggestions-controller.js");
+const termSuggestionsControllerUnitTests = readText("tests/unit/term-suggestions-controller.test.cjs");
 const concordanceControllerUnitTests = readText("tests/unit/concordance-controller.test.cjs");
 const segmentNavigationControllerUnitTests = readText("tests/unit/segment-navigation-controller.test.cjs");
 const segmentDraftApplicationServiceUnitTests = readText("tests/unit/segment-draft-application-service.test.cjs");
@@ -1908,7 +1912,7 @@ for (const boundary of [
   "markProjectsUsingDirty: markProjectsUsingResourceDirty",
   "tmMatches: tmMatchesController.refresh",
   "projectTerms: refreshProjectTerms",
-  "terms: refreshTerms",
+  "terms: termSuggestionsController.refresh",
   "builders: { buildTmx, buildTbx }",
   "logOptionalProject: logOptionalProjectActivity",
   "set: setSaveStatus"
@@ -4860,6 +4864,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createTermSuggestionsController } from "../features/editor/term-suggestions-controller.js";',
+  "The application runtime must install the checked term-suggestions controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createTermSuggestionsController,",
+  "The application runtime must expose the checked term-suggestions factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createConcordanceController } from "../features/editor/concordance-controller.js";',
   "The application runtime must install the checked concordance controller."
 );
@@ -5812,6 +5826,107 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/tm-matches-controller.js"',
   "source-catalog extraction must scan the checked TM-matches controller."
+);
+for (const snippet of [
+  'throw new TypeError("TermSuggestionsController requires a results root and session boundaries.")',
+  'throw new TypeError("TermSuggestionsController requires termbase selection and lookup boundaries.")',
+  'throw new TypeError("TermSuggestionsController requires presentation and mutation boundaries.")',
+  'throw new TypeError("TermSuggestionsController requires browser DOM boundaries.")',
+  "const segment = session.getActiveSegment()",
+  "if (!segment || !session.getProject())",
+  'root.textContent = localization.source("No active segment.")',
+  'root.classList.add("muted")',
+  "const segmentId = segment.id",
+  "const projectId = session.getProject().id",
+  "const suggestions = await terms.find({",
+  "source: segment.source",
+  "sourceLang: session.getProject().sourceLang",
+  "targetLang: session.getProject().targetLang",
+  "termBaseNames: terms.getNames()",
+  "session.getProject()?.id !== projectId || session.getActiveSegment()?.id !== segmentId",
+  'root.classList.toggle("muted", !suggestions.length)',
+  'root.textContent = localization.source("No terms found in this segment.")',
+  'card.className = `term-card${term.isForbidden ? " forbidden-term-card" : ""}`',
+  'localization.labelHtml(term.isForbidden ? "forbidden" : "approved")',
+  'text.escapeHtml(term.termBaseName || "")',
+  'term.notes ? `<p>${text.escapeHtml(term.notes)}</p>` : ""',
+  'button.textContent = localization.source("Delete")',
+  "await mutation.deleteTerm(term, {",
+  "refreshResourceView: false",
+  "refreshSuggestions: true",
+  "root.replaceChildren(fragment)",
+  "return Object.freeze({ refresh })"
+]) {
+  assertIncludes(
+    termSuggestionsControllerJs,
+    snippet,
+    `TermSuggestionsController must retain characterized lookup, stale-result, presentation, and deletion policy: ${snippet}`
+  );
+}
+assert(
+  !termSuggestionsControllerJs.includes("window.") &&
+    !termSuggestionsControllerJs.includes("document.") &&
+    !termSuggestionsControllerJs.includes("editorSessionStore") &&
+    !termSuggestionsControllerJs.includes("resourceMutationController") &&
+    !termSuggestionsControllerJs.includes("findTerms") &&
+    !termSuggestionsControllerJs.includes("projectTermBaseNames") &&
+    !termSuggestionsControllerJs.includes("button.type"),
+  "the checked term-suggestions controller must use injected boundaries and preserve the omitted button type."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createTermSuggestionsController({",
+  "root: els.termSuggestions",
+  "getProject: editorSessionStore.getProject",
+  "getActiveSegment: currentSegment",
+  "getNames: projectTermBaseNames",
+  "find: findTerms",
+  "localization: uiLocalizationService",
+  "text: { escapeHtml }",
+  "safeHtml: { replace: replaceSafeHtml }",
+  "mutation: { deleteTerm: (...args) => resourceMutationController.deleteTerm(...args) }",
+  "createElement: (tagName) => document.createElement(tagName)",
+  "createFragment: () => document.createDocumentFragment()"
+]) {
+  assertIncludes(appJs, boundary, `term-suggestions composition must inject the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/\btermSuggestionsController\.refresh\b/g) || []).length === 5 &&
+    (appWorkflowDriverJs.match(/\btermSuggestionsController\.refresh\b/g) || []).length === 1,
+  "project transfer, AI extraction, editor context, Trash, term save, and workflow consumers must call TermSuggestionsController directly."
+);
+assert(
+  !/async\s+function\s+refreshTerms\b/.test(appJs) && !/async\s+function\s+refreshTerms\b/.test(appWorkflowDriverJs),
+  "refreshTerms must not return to app.js or the workflow driver."
+);
+for (const removedOwnership of [
+  "els.termSuggestions.textContent",
+  "els.termSuggestions.classList",
+  "els.termSuggestions.replaceChildren"
+]) {
+  assert(
+    !appJs.includes(removedOwnership) && !appWorkflowDriverJs.includes(removedOwnership),
+    `term-suggestion result ownership must not return to the coordinator: ${removedOwnership}.`
+  );
+}
+for (const testName of [
+  "TermSuggestionsController preserves active-segment and project guards with the localized muted state",
+  "TermSuggestionsController preserves exact lookup inputs, context reads, and the empty-suggestion presentation",
+  "TermSuggestionsController preserves stale project and segment result suppression",
+  "TermSuggestionsController preserves lookup rejection timing before presentation effects",
+  "TermSuggestionsController preserves ordered approved and forbidden safe cards with one replacement",
+  "TermSuggestionsController preserves awaited deletion identity, options, undefined fulfillment, and rejection",
+  "TermSuggestionsController validates boundaries, propagates rendering failures, and exposes an immutable API"
+]) {
+  assertIncludes(
+    termSuggestionsControllerUnitTests,
+    testName,
+    `focused term-suggestions tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/term-suggestions-controller.js"',
+  "source-catalog extraction must scan the checked term-suggestions controller."
 );
 for (const snippet of [
   'throw new TypeError("ConcordanceController requires overlay elements.")',
@@ -11497,9 +11612,9 @@ assertIncludes(
   "TmMatchesController cards must render in one DOM replacement."
 );
 assertIncludes(
-  appJs,
-  "els.termSuggestions.replaceChildren(fragment)",
-  "app.js term suggestion cards must render in one DOM replacement."
+  termSuggestionsControllerJs,
+  "root.replaceChildren(fragment)",
+  "TermSuggestionsController cards must render in one DOM replacement."
 );
 assertIncludes(appJs, "projectAnalysisRun", "app.js must guard async project analysis renders against stale updates.");
 assertIncludes(
