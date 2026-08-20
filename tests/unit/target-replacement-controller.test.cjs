@@ -34,14 +34,32 @@ function createHarness(createTargetReplacementController, overrides = {}) {
   const visibleButton = fakeButton();
   const allButton = fakeButton();
   const calls = [];
-  const findInput = { value: "Hello", focus: () => calls.push(["focusFind"]) };
+  const menu = overrides.missingMenu
+    ? undefined
+    : {
+        _open: false,
+        get open() {
+          return this._open;
+        },
+        set open(value) {
+          calls.push(["openPanel", value]);
+          this._open = value;
+        }
+      };
+  const findInput = {
+    value: "Hello",
+    focus: () => {
+      calls.push(["focusFind"]);
+      if (overrides.focusError) throw overrides.focusError;
+    }
+  };
   const replacementInput = { value: "Hi" };
   const statuses = [];
   const warnings = [];
   let createdOptions = null;
 
   const controller = createTargetReplacementController({
-    elements: { findInput, replacementInput, visibleButton, allButton },
+    elements: { menu, findInput, replacementInput, visibleButton, allButton },
     editorSessionStore: {
       getProject: () => (overrides.noProject ? null : project),
       getSegments: () => segments
@@ -148,6 +166,7 @@ function createHarness(createTargetReplacementController, overrides = {}) {
     controller,
     findInput,
     getCreatedOptions: () => createdOptions,
+    menu,
     replacementInput,
     segments,
     statuses,
@@ -155,6 +174,27 @@ function createHarness(createTargetReplacementController, overrides = {}) {
     warnings
   };
 }
+
+test("target replacement panel opens before focus and exposes a checked immutable API", async () => {
+  const { createTargetReplacementController } = await loadFactory();
+  const harness = createHarness(createTargetReplacementController);
+
+  assert.equal(harness.controller.open(), undefined);
+  assert.equal(harness.menu.open, true);
+  assert.deepEqual(harness.calls.slice(0, 2), [["openPanel", true], ["focusFind"]]);
+  assert.equal(Object.isFrozen(harness.controller), true);
+
+  const focusError = new Error("focus unavailable");
+  const failing = createHarness(createTargetReplacementController, { focusError });
+  assert.throws(() => failing.controller.open(), focusError);
+  assert.equal(failing.menu.open, true);
+  assert.deepEqual(failing.calls.slice(0, 2), [["openPanel", true], ["focusFind"]]);
+
+  assert.throws(
+    () => createHarness(createTargetReplacementController, { missingMenu: true }),
+    /requires replacement inputs and action buttons/
+  );
+});
 
 test("target replacement owns visible/all button lifecycle and sequences one atomic ReplaceTargets command", async () => {
   const { createTargetReplacementController } = await loadFactory();

@@ -1712,6 +1712,7 @@ const concordanceController = appRuntime.featureFactories.createConcordanceContr
 concordanceController.mount();
 const targetReplacementController = appRuntime.featureFactories.createTargetReplacementController({
   elements: {
+    menu: els.replaceMenu,
     findInput: els.replaceFindInput,
     replacementInput: els.replaceWithInput,
     visibleButton: els.replaceVisibleBtn,
@@ -4739,7 +4740,7 @@ function commandList() {
     { id: "quality-passport", label: "Export Quality Passport", run: reportExportController.exportQualityPassport, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "next-quality-risk", label: "Next quality risk", run: goToNextQualityRisk, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "concordance", label: "Open concordance", run: concordanceController.open, enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "replace-target", label: "Find and replace target text", run: openReplacePanel, enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "replace-target", label: "Find and replace target text", run: targetReplacementController.open, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "preset-translate", label: "Use Translate filter preset", group: "Filters", keywords: ["open", "segments", "matches"], run: () => filterPresetController?.applyPreset?.("translate"), enabled: Boolean(editorSessionStore.getProject()) },
     { id: "preset-review", label: "Use Review filter preset", group: "Filters", keywords: ["needs review", "comments"], run: () => filterPresetController?.applyPreset?.("review"), enabled: Boolean(editorSessionStore.getProject()) },
     { id: "preset-qa-fixes", label: "Use QA fixes filter preset", group: "Filters", keywords: ["quality", "blocked", "fixes"], run: () => filterPresetController?.applyPreset?.("qa-fixes"), enabled: Boolean(editorSessionStore.getProject()) },
@@ -6009,11 +6010,6 @@ function renderProgress(options = {}) {
   els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
   els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
-}
-
-function openReplacePanel() {
-  els.replaceMenu.open = true;
-  els.replaceFindInput.focus();
 }
 
 function handleGlobalKeydown(event) {

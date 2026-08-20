@@ -5514,6 +5514,8 @@ assertIncludes(
   "The application runtime must expose the checked target-replacement controller boundary."
 );
 for (const boundary of [
+  "elements.menu.open = true",
+  "elements.findInput.focus()",
   "const findText = elements.findInput.value",
   "const indexes = filters.getIndexes(scope)",
   'transform.replace(segment.target || "", findText, replacement, replaceOptions)',
@@ -5537,17 +5539,30 @@ assertIncludes(
   "app.js must delegate replacement button lifecycle to TargetReplacementController."
 );
 assertIncludes(
+  appJs,
+  "menu: els.replaceMenu",
+  "app.js must inject the replacement panel into TargetReplacementController."
+);
+assertIncludes(
+  appJs,
+  "run: targetReplacementController.open",
+  "the command-palette replacement action must call TargetReplacementController directly."
+);
+assertIncludes(
   appWorkflowDriverJs,
   'targetReplacementController.replace("visible")',
   "workflow characterization must call TargetReplacementController directly."
 );
 assert(
   !appJs.includes("async function replaceTargetText") &&
+    !appJs.includes("function openReplacePanel") &&
+    !appJs.includes("run: openReplacePanel") &&
     !appJs.includes('els.replaceVisibleBtn.addEventListener("click"') &&
     !appJs.includes('els.replaceAllBtn.addEventListener("click"'),
   "app.js must not regain target-replacement input, event, mutation, command, persistence, activity, presentation, or rollback orchestration."
 );
 for (const testName of [
+  "target replacement panel opens before focus and exposes a checked immutable API",
   "target replacement owns visible/all button lifecycle and sequences one atomic ReplaceTargets command",
   "project-wide replacement preserves counts, filter options, and tag-QA warning status",
   "primary target replacement persistence failure restores exact snapshots, presentation, history, and focus",

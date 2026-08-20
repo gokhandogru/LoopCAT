@@ -5,7 +5,7 @@
  * EditorSessionStore and all domain mutations stay behind injected boundaries.
  *
  * @param {{
- *   elements: { findInput: any, replacementInput: any, visibleButton: any, allButton: any },
+ *   elements: { menu: any, findInput: any, replacementInput: any, visibleButton: any, allButton: any },
  *   editorSessionStore: { getProject: () => any, getSegments: () => any[] },
  *   filters: { getOptions: () => { regex: boolean, caseSensitive: boolean }, getIndexes: (scope: string) => number[] },
  *   transform: { replace: (target: string, findText: string, replacement: string, options: object) => { text: string, count: number } },
@@ -35,6 +35,8 @@ export function createTargetReplacementController(options) {
   const activity = options?.activity;
   const status = options?.status;
   if (
+    !elements?.menu ||
+    !("open" in elements.menu) ||
     !elements?.findInput?.focus ||
     !elements?.visibleButton?.addEventListener ||
     !elements?.visibleButton?.removeEventListener ||
@@ -200,6 +202,11 @@ export function createTargetReplacementController(options) {
   const handleVisible = () => void replace("visible");
   const handleAll = () => void replace("all");
 
+  function open() {
+    elements.menu.open = true;
+    elements.findInput.focus();
+  }
+
   function mount() {
     if (mounted) return false;
     elements.visibleButton.addEventListener("click", handleVisible);
@@ -216,5 +223,5 @@ export function createTargetReplacementController(options) {
     return true;
   }
 
-  return Object.freeze({ mount, replace, unmount });
+  return Object.freeze({ mount, open, replace, unmount });
 }
