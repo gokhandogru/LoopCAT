@@ -138,12 +138,13 @@ const projectExportBuildServicePath = path.join(
   "import-export",
   "project-export-build-service.js"
 );
-const projectExportControllerPath = path.join(
+const projectExportControllerPath = path.join(root, "src", "features", "import-export", "project-export-controller.js");
+const projectImportRestoreControllerPath = path.join(
   root,
   "src",
   "features",
   "import-export",
-  "project-export-controller.js"
+  "project-import-restore-controller.js"
 );
 const projectPackagePortabilityServicePath = path.join(
   root,
@@ -418,10 +419,11 @@ function main() {
     projectExportBuildServicePath,
     "src/features/import-export/project-export-build-service.js"
   );
+  extractScript(messagesByText, projectExportControllerPath, "src/features/import-export/project-export-controller.js");
   extractScript(
     messagesByText,
-    projectExportControllerPath,
-    "src/features/import-export/project-export-controller.js"
+    projectImportRestoreControllerPath,
+    "src/features/import-export/project-import-restore-controller.js"
   );
   extractScript(
     messagesByText,

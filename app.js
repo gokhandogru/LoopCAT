@@ -3609,6 +3609,58 @@ projectExportController = appRuntime.featureFactories.createProjectExportControl
   },
   logger: console
 });
+const projectImportRestoreController =
+  appRuntime.featureFactories.createProjectImportRestoreController({
+    files: {
+      progress: reportImportProgress,
+      parseJson: fileImportService.parseJson
+    },
+    portability: projectPackagePortabilityService,
+    backup: { validate: validateBackupFile },
+    session: editorSessionStore,
+    autosave: { flush: autosaveService.flush },
+    persistence: {
+      importProjectPackageRecords,
+      importAllData
+    },
+    indexes: {
+      rebuildTm: rebuildAllTmIndexes,
+      rebuildTerms: rebuildAllTermIndexes
+    },
+    activity: {
+      logForProject: logOptionalActivityForProject,
+      appendWarning: appendActivityWarning
+    },
+    navigation: {
+      openProjects: applicationNavigation.openProjects,
+      clearSelection: applicationNavigation.clearSelection
+    },
+    projects: {
+      load: loadProjects,
+      open: openProject
+    },
+    workspace: {
+      isConnected: () => Boolean(state.workspaceStatus?.connected),
+      clearDirty: clearWorkspaceDirty,
+      markDirty: markWorkspaceDirty,
+      clearDirtyMarkers: clearWorkspaceDirtyMarkers,
+      markProjectsDirty: markWorkspaceProjectsDirty
+    },
+    validation: {
+      count: reportCount,
+      alertText: validationAlertText
+    },
+    presentation: {
+      renderValidation: renderValidationReport,
+      renderWorkspaceStatus
+    },
+    status: { set: setSaveStatus, mode: exportStatusMode },
+    localization: {
+      alert: uiLocalizationService.alert,
+      confirm: uiLocalizationService.confirm
+    },
+    text: { safe: displaySafeText }
+  });
 const projectDocumentImportController =
   appRuntime.featureFactories.createProjectDocumentImportController({
     session: editorSessionStore,
@@ -3687,11 +3739,11 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
   importProjectFile: projectDocumentImportController.importFile,
   importProjectPackage: async (file) => {
     await autosaveService.flush();
-    return importProjectPackage(file);
+    return projectImportRestoreController.importProjectPackage(file);
   },
   restoreBackup: async (file) => {
     await autosaveService.flush();
-    return restoreBackupFile(file);
+    return projectImportRestoreController.restoreBackupFile(file);
   },
   importTmx: projectResourceTransferController.importTmx,
   importTbx: projectResourceTransferController.importTbx,
@@ -6384,128 +6436,6 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-async function importProjectPackageData(pkg, options = {}) {
-  const sourceName = options.sourceName || "project package";
-  await reportImportProgress("Validating project package", { name: sourceName });
-  const validation = projectPackagePortabilityService.validate(pkg);
-  if (!validation.ok) {
-    if (!options.suppressAlert) uiLocalizationService.alert(validationAlertText(validation, "Project package import failed validation"));
-    renderValidationReport(validation);
-    setSaveStatus("Project package import failed validation", "dirty");
-    return null;
-  }
-  const existing = editorSessionStore.getProjects().find((project) => project.id === pkg.project.id);
-  let importAsCopy = false;
-  if (existing) {
-    const replace = options.replaceExisting ?? uiLocalizationService.confirm(`A project named "${displaySafeText(existing.name)}" already exists. Replace it with this package?`);
-    if (!replace) {
-      importAsCopy = options.importAsCopy ?? uiLocalizationService.confirm("Keep the existing project and import this package as a separate copy?");
-      if (!importAsCopy) return null;
-    }
-  }
-  const replaceProjectId = existing && !importAsCopy ? existing.id : "";
-  if (replaceProjectId) await autosaveService.flush(replaceProjectId);
-  const prepared = await projectPackagePortabilityService.prepare(pkg, {
-    replaceProjectId,
-    importAsCopy
-  });
-  await reportImportProgress("Saving project package records", { name: sourceName }, `${(prepared.segments || []).length} segment${(prepared.segments || []).length === 1 ? "" : "s"}`);
-  const importReport = importAsCopy
-    ? {
-      ...validation,
-      preserved: [...validation.preserved, `Imported as a separate project copy named "${displaySafeText(prepared.project.name)}".`]
-    }
-    : validation;
-  await importProjectPackageRecords({
-    project: prepared.project,
-    segments: prepared.segments || [],
-    tmEntries: prepared.resources?.tmEntries || [],
-    terms: prepared.resources?.terms || [],
-    activityEvents: prepared.activityEvents || [],
-    replaceProjectId
-  });
-  await reportImportProgress("Rebuilding resource indexes", { name: sourceName });
-  await rebuildAllTmIndexes();
-  await rebuildAllTermIndexes();
-  await reportImportProgress("Refreshing projects", { name: sourceName });
-  const activityResult = await logOptionalActivityForProject(prepared.project.id, "import", "Project package imported", { fileName: sourceName, warningCount: reportCount(importReport), importAsCopy }, "Project package import");
-  const activityLogged = activityResult.ok;
-  editorSessionStore.replaceProject(null);
-  editorSessionStore.replaceSegments([]);
-  applicationNavigation.openProjects();
-  applicationNavigation.clearSelection();
-  await loadProjects(false);
-  if (options.open !== false) await openProject(prepared.project.id);
-  renderValidationReport(importReport);
-  const warningCount = reportCount(importReport);
-  const successMessage = warningCount ? `Imported with ${warningCount} validation note${warningCount === 1 ? "" : "s"}` : "Project package imported";
-  setSaveStatus(appendActivityWarning(successMessage, activityLogged), exportStatusMode(warningCount ? "dirty" : "saved", activityLogged));
-  if (options.sourceIsWorkspace) clearWorkspaceDirty(prepared.project.id);
-  else if (state.workspaceStatus?.connected) markWorkspaceDirty(prepared.project.id);
-  return { pkg: prepared, validation: importReport };
-}
-
-async function importProjectPackage(file) {
-  await reportImportProgress("Reading project package", file);
-  const pkg = await fileImportService.parseJson(file, "Project package");
-  return importProjectPackageData(pkg, { sourceName: file.name });
-}
-
-async function restoreBackupData(backup) {
-  await reportImportProgress("Validating backup");
-  const backupReport = validateBackupFile(backup);
-  if (!backupReport.ok) {
-    renderValidationReport(backupReport);
-    setSaveStatus("Backup restore failed validation", "dirty");
-    return null;
-  }
-  await autosaveService.flush();
-  await reportImportProgress("Restoring backup stores", null, `${(backup.projects || []).length} project${(backup.projects || []).length === 1 ? "" : "s"}`);
-  await importAllData(backup);
-  await reportImportProgress("Rebuilding resource indexes");
-  await rebuildAllTmIndexes();
-  await rebuildAllTermIndexes();
-  await reportImportProgress("Refreshing projects");
-  editorSessionStore.replaceProject(null);
-  editorSessionStore.replaceSegments([]);
-  applicationNavigation.openProjects();
-  applicationNavigation.clearSelection();
-  await loadProjects(false);
-  const restoredProjectIds = editorSessionStore.getProjects().map((project) => project.id).filter(Boolean);
-  if (state.workspaceStatus?.connected) {
-    clearWorkspaceDirtyMarkers();
-    markWorkspaceProjectsDirty(restoredProjectIds);
-    renderWorkspaceStatus();
-  }
-  const restoreReport = {
-    ok: true,
-    errors: [],
-    warnings: backupReport.warnings,
-    preserved: [
-      ...backupReport.preserved,
-      `${(backup.projects || []).length} project${(backup.projects || []).length === 1 ? "" : "s"} restored.`,
-      `${(backup.segments || []).length} segment${(backup.segments || []).length === 1 ? "" : "s"} restored.`
-    ],
-    simplified: [],
-    skipped: [],
-    risky: [
-      ...backupReport.risky,
-      ...(state.workspaceStatus?.connected && restoredProjectIds.length
-        ? [`${restoredProjectIds.length} restored project package${restoredProjectIds.length === 1 ? "" : "s"} must be saved to the workspace folder.`]
-        : [])
-    ]
-  };
-  renderValidationReport(restoreReport);
-  const restoreNotes = reportCount(restoreReport);
-  setSaveStatus(restoreNotes ? `Backup restored with ${restoreNotes} validation note${restoreNotes === 1 ? "" : "s"}` : "Backup restored", restoreNotes ? "dirty" : "saved");
-  return { backup, report: restoreReport };
-}
-
-async function restoreBackupFile(file) {
-  await reportImportProgress("Reading backup file", file);
-  return restoreBackupData(await fileImportService.parseJson(file, "Backup file"));
-}
-
 async function chooseWorkspaceFolder() {
   if (!workspaceStorage?.isSupported()) {
     setSaveStatus("Folder storage is unavailable in this browser", "dirty");
@@ -6748,7 +6678,7 @@ async function syncWorkspaceFromFolder() {
         addWorkspaceSyncWarning(`${ref.name || packageProjectId}: local package has unsaved folder changes; save it before syncing from the workspace folder.`);
         continue;
       }
-      const result = await importProjectPackageData(pkg, {
+      const result = await projectImportRestoreController.importProjectPackageData(pkg, {
         sourceName: ref.packagePath,
         replaceExisting: true,
         open: false,

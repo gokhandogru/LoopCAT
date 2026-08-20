@@ -987,7 +987,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
     let restoreGuardError = "";
     try {
-      await restoreBackupData(restoreGuardBackup);
+      await projectImportRestoreController.restoreBackupData(restoreGuardBackup);
     } catch (error) {
       restoreGuardError = error.message || String(error);
     }
@@ -1005,7 +1005,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
     let replaceGuardError = "";
     try {
-      await importProjectPackageData(replaceGuardPackage, {
+      await projectImportRestoreController.importProjectPackageData(replaceGuardPackage, {
         replaceExisting: true,
         sourceName: "pending-flush-replace-guard.loopcat.json",
         suppressAlert: true,
@@ -4273,7 +4273,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
             createdAt: new Date().toISOString()
           }
         ];
-        const alertLeakImport = await importProjectPackageData(alertLeakPackage, {
+        const alertLeakImport = await projectImportRestoreController.importProjectPackageData(alertLeakPackage, {
           sourceName: "Bearer validation-alert-source-token-that-must-not-appear.loopcat.json"
         });
         const validationAlertText = validationAlerts.join("\n");
@@ -5455,7 +5455,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     const restoreDirtyBackup = await exportAllData();
     clearWorkspaceDirtyMarkers();
-    const restoreDirtyResult = await restoreBackupData(restoreDirtyBackup);
+    const restoreDirtyResult = await projectImportRestoreController.restoreBackupData(restoreDirtyBackup);
     assert(restoreDirtyResult && restoreDirtyBackup.projects.every((item) => state.workspaceDirtyProjectIds.has(item.id)) && state.lastValidationReport?.risky?.some((item) => item.includes("must be saved to the workspace folder")), "manual backup restore marks connected workspace packages dirty");
 
     clearWorkspaceDirtyMarkers();
@@ -5593,7 +5593,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     let malformedBackupRejected = false;
     try {
-      await restoreBackupFile(new File(["{not valid json"], "broken-backup.json", { type: "application/json" }));
+      await projectImportRestoreController.restoreBackupFile(new File(["{not valid json"], "broken-backup.json", { type: "application/json" }));
     } catch (error) {
       malformedBackupRejected = error.message === "Backup file is not valid JSON.";
       renderValidationReport(fileImportService.errorReport(error.message));
@@ -5601,12 +5601,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     }
     assert(malformedBackupRejected && state.lastValidationReport?.errors?.[0] === "Backup file is not valid JSON.", "malformed backup JSON fails with validation report");
 
-    const invalidBackupResult = await restoreBackupData({ app: "LoopCAT", schemaVersion: storageConstants.BACKUP_SCHEMA_VERSION, projects: {}, segments: [], tmEntries: [], terms: [], activityEvents: [], trashEntries: [] });
+    const invalidBackupResult = await projectImportRestoreController.restoreBackupData({ app: "LoopCAT", schemaVersion: storageConstants.BACKUP_SCHEMA_VERSION, projects: {}, segments: [], tmEntries: [], terms: [], activityEvents: [], trashEntries: [] });
     assert(!invalidBackupResult && state.lastValidationReport?.errors?.some((error) => error.includes("Projects must be an array")), "invalid backup shape is rejected without restore");
 
     let oversizedBackupRejected = false;
     try {
-      await restoreBackupFile(new File([new Blob([new Uint8Array(MAX_PORTABLE_JSON_BYTES + 1)])], "huge-backup.json", { type: "application/json" }));
+      await projectImportRestoreController.restoreBackupFile(new File([new Blob([new Uint8Array(MAX_PORTABLE_JSON_BYTES + 1)])], "huge-backup.json", { type: "application/json" }));
     } catch (error) {
       oversizedBackupRejected = error.message.includes("too large");
       renderValidationReport(fileImportService.errorReport(error.message));
@@ -5616,7 +5616,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     let malformedPackageRejected = false;
     try {
-      await importProjectPackage(new File(["{broken package"], "broken.loopcat.json", { type: "application/json" }));
+      await projectImportRestoreController.importProjectPackage(new File(["{broken package"], "broken.loopcat.json", { type: "application/json" }));
     } catch (error) {
       malformedPackageRejected = error.message === "Project package is not valid JSON.";
       renderValidationReport(fileImportService.errorReport(error.message));
@@ -5626,7 +5626,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     let oversizedPackageRejected = false;
     try {
-      await importProjectPackage(new File([new Blob([new Uint8Array(MAX_PORTABLE_JSON_BYTES + 1)])], "huge.loopcat.json", { type: "application/json" }));
+      await projectImportRestoreController.importProjectPackage(new File([new Blob([new Uint8Array(MAX_PORTABLE_JSON_BYTES + 1)])], "huge.loopcat.json", { type: "application/json" }));
     } catch (error) {
       oversizedPackageRejected = error.message.includes("too large");
       renderValidationReport(fileImportService.errorReport(error.message));
@@ -5634,7 +5634,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     }
     assert(oversizedPackageRejected && state.lastValidationReport?.errors?.[0]?.includes("too large"), "oversized project package JSON fails before import");
 
-    const invalidPackageShapeResult = await importProjectPackageData({ app: "LoopCAT", type: "project-package", version: 1 }, {
+    const invalidPackageShapeResult = await projectImportRestoreController.importProjectPackageData({ app: "LoopCAT", type: "project-package", version: 1 }, {
       sourceName: "invalid-shape.loopcat.json",
       suppressAlert: true
     });
@@ -5817,7 +5817,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     collisionPackage.resources.terms = [{ ...collisionTerm, targetTerm: "incoming term" }];
     collisionPackage.activityEvents = [{ ...collisionActivity, projectId: project.id, summary: "Incoming activity" }];
     segmentTargetStateService.setHiddenField(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const copyImport = await importProjectPackageData(collisionPackage, {
+    const copyImport = await projectImportRestoreController.importProjectPackageData(collisionPackage, {
       sourceName: "collision-copy.loopcat.json",
       replaceExisting: false,
       importAsCopy: true,
@@ -5841,7 +5841,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(termsAfterCopy.some((term) => term.id === collisionTerm.id && term.targetTerm === collisionTerm.targetTerm) && termsAfterCopy.some((term) => term.id !== collisionTerm.id && term.targetTerm === "incoming term"), "project package import remaps colliding termbase ids");
     const activityAfterCopy = await getAll("activityEvents");
     assert(activityAfterCopy.some((event) => event.id === collisionActivity.id && event.summary === collisionActivity.summary && event.projectId === secondProject.id) && activityAfterCopy.some((event) => event.id !== collisionActivity.id && event.summary === "Incoming activity" && event.projectId === copyImport.pkg.project.id), "project package import remaps colliding activity event ids");
-    const successfulCopyImport = await importProjectPackageData(collisionPackage, {
+    const successfulCopyImport = await projectImportRestoreController.importProjectPackageData(collisionPackage, {
       sourceName: "collision-copy-success.loopcat.json",
       replaceExisting: false,
       importAsCopy: true,

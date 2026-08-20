@@ -228,6 +228,7 @@ const requiredReleaseFiles = [
   "src/features/import-export/file-import-service.js",
   "src/features/import-export/project-export-build-service.js",
   "src/features/import-export/project-export-controller.js",
+  "src/features/import-export/project-import-restore-controller.js",
   "src/features/import-export/project-package-portability-service.js",
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-presentation-service.js",
@@ -300,6 +301,7 @@ const requiredReleaseFiles = [
   "tests/unit/file-import-service.test.cjs",
   "tests/unit/project-export-build-service.test.cjs",
   "tests/unit/project-export-controller.test.cjs",
+  "tests/unit/project-import-restore-controller.test.cjs",
   "tests/unit/project-package-portability-service.test.cjs",
   "tests/unit/concordance-controller.test.cjs",
   "tests/unit/segment-navigation-controller.test.cjs",
@@ -477,6 +479,8 @@ const projectExportBuildServiceJs = readText("src/features/import-export/project
 const projectExportBuildServiceUnitTests = readText("tests/unit/project-export-build-service.test.cjs");
 const projectExportControllerJs = readText("src/features/import-export/project-export-controller.js");
 const projectExportControllerUnitTests = readText("tests/unit/project-export-controller.test.cjs");
+const projectImportRestoreControllerJs = readText("src/features/import-export/project-import-restore-controller.js");
+const projectImportRestoreControllerUnitTests = readText("tests/unit/project-import-restore-controller.test.cjs");
 const projectPackagePortabilityServiceJs = readText(
   "src/features/import-export/project-package-portability-service.js"
 );
@@ -4994,6 +4998,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectImportRestoreController } from "../features/import-export/project-import-restore-controller.js";',
+  "The application runtime must install the checked project-import/restore controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectImportRestoreController,",
+  "The application runtime must expose the checked project-import/restore controller factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createProjectPackagePortabilityService } from "../features/import-export/project-package-portability-service.js";',
   "The application runtime must install the checked project-package portability service."
 );
@@ -6481,7 +6495,7 @@ assert(
     (appJs.match(/\bfileImportService\.readText\b/g) || []).length === 2 &&
     (appJs.match(/\bfileImportService\.progressDetail\b/g) || []).length === 2 &&
     (appJs.match(/\bfileImportService\.errorReport\b/g) || []).length === 2 &&
-    (appJs.match(/\bfileImportService\.parseJson\b/g) || []).length === 2 &&
+    (appJs.match(/\bfileImportService\.parseJson\b/g) || []).length === 1 &&
     (appJs.match(/\bfileImportService\.runTask\b/g) || []).length === 3 &&
     (appWorkflowDriverJs.match(/\bfileImportService\.readText\b/g) || []).length === 2 &&
     (appWorkflowDriverJs.match(/\bfileImportService\.errorReport\b/g) || []).length === 4 &&
@@ -6648,7 +6662,7 @@ for (const snippet of [
   "ProjectExportController requires build, session, persistence, activity, file, validation, presentation, workspace, status, clock, test, and logger boundaries.",
   "async function exportBrowserBackup()",
   "await build.buildBackupExport()",
-  '`loopcat-backup-${clock.now().slice(0, 10)}.json`',
+  "`loopcat-backup-${clock.now().slice(0, 10)}.json`",
   "JSON.stringify(backup, null, 2)",
   '"application/json"',
   "presentation.renderValidation(backupValidation)",
@@ -6658,12 +6672,12 @@ for (const snippet of [
   "error.validation || validation.errorReport(message)",
   "return false",
   "function reportProjectPackageExportFailure(error, pkg = null)",
-  'error?.validation || pkg?.validation || validation.errorReport(message)',
+  "error?.validation || pkg?.validation || validation.errorReport(message)",
   "if (!session.getProject()) return",
   'files.safeName(session.getProject().name || "project")',
   "previewPackage = await build.buildProjectPackage()",
   'build.assertValidProjectPackageForWrite(previewPackage, "export project package")',
-  'id: `export-${clock.nowMs()}`',
+  "id: `export-${clock.nowMs()}`",
   'type: "project-package"',
   "createdAt: clock.now()",
   ".slice(-25)",
@@ -6672,7 +6686,7 @@ for (const snippet of [
   "build.buildProjectPackage(pendingProject, null, {",
   "activityEvents: pendingActivityEvent ? [pendingActivityEvent] : []",
   "const finalWarnings = validation.count(pkg.validation)",
-  "files.download(filename, JSON.stringify(pkg, null, 2), \"application/json\")",
+  'files.download(filename, JSON.stringify(pkg, null, 2), "application/json")',
   "session.replaceProject(await persistence.updateProject(pendingProject))",
   "project.id === session.getProject().id ? session.getProject() : project",
   'logger.warn("Project package export history update failed.", error)',
@@ -6734,13 +6748,13 @@ for (const boundary of [
   "exportProjectPackage: projectExportController.exportProjectPackage",
   "exportBackup: projectExportController.exportBrowserBackup"
 ]) {
-  assertIncludes(appJs, boundary, `project-export controller composition must inject the checked ${boundary} boundary.`);
+  assertIncludes(
+    appJs,
+    boundary,
+    `project-export controller composition must inject the checked ${boundary} boundary.`
+  );
 }
-for (const removedHelper of [
-  "exportBrowserBackup",
-  "reportProjectPackageExportFailure",
-  "exportProjectPackage"
-]) {
+for (const removedHelper of ["exportBrowserBackup", "reportProjectPackageExportFailure", "exportProjectPackage"]) {
   assert(
     !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appJs) &&
       !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
@@ -6775,6 +6789,167 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/import-export/project-export-controller.js"',
   "source-catalog extraction must scan the checked project-export controller."
+);
+for (const snippet of [
+  "ProjectImportRestoreController requires file, portability, backup, session, autosave, persistence, index, activity, navigation, project, workspace, validation, presentation, status, localization, and text boundaries.",
+  "async function importProjectPackageData(pkg, importOptions = {})",
+  'const sourceName = importOptions.sourceName || "project package"',
+  'await files.progress("Validating project package", { name: sourceName })',
+  "const packageValidation = portability.validate(pkg)",
+  "if (!importOptions.suppressAlert)",
+  'validation.alertText(packageValidation, "Project package import failed validation")',
+  'status.set("Project package import failed validation", "dirty")',
+  "const existing = session.getProjects().find((project) => project.id === pkg.project.id)",
+  "importOptions.replaceExisting ??",
+  'localization.confirm("Keep the existing project and import this package as a separate copy?")',
+  'const replaceProjectId = existing && !importAsCopy ? existing.id : ""',
+  "if (replaceProjectId) await autosave.flush(replaceProjectId)",
+  "const prepared = await portability.prepare(pkg, {",
+  '"Saving project package records"',
+  '`Imported as a separate project copy named "${text.safe(prepared.project.name)}".`',
+  "await persistence.importProjectPackageRecords({",
+  "tmEntries: prepared.resources?.tmEntries || []",
+  "activityEvents: prepared.activityEvents || []",
+  "await indexes.rebuildTm()",
+  "await indexes.rebuildTerms()",
+  '"Project package imported"',
+  "warningCount: validation.count(importReport)",
+  "session.replaceProject(null)",
+  "session.replaceSegments([])",
+  "navigation.openProjects()",
+  "navigation.clearSelection()",
+  "await projects.load(false)",
+  "if (importOptions.open !== false) await projects.open(prepared.project.id)",
+  "activity.appendWarning(successMessage, activityLogged)",
+  'status.mode(warningCount ? "dirty" : "saved", activityLogged)',
+  "if (importOptions.sourceIsWorkspace) workspace.clearDirty(prepared.project.id)",
+  "else if (workspace.isConnected()) workspace.markDirty(prepared.project.id)",
+  'await files.progress("Reading project package", file)',
+  'files.parseJson(file, "Project package")',
+  "async function restoreBackupData(backupRecord)",
+  'await files.progress("Validating backup")',
+  "const backupReport = backup.validate(backupRecord)",
+  'status.set("Backup restore failed validation", "dirty")',
+  "await autosave.flush()",
+  '"Restoring backup stores"',
+  "await persistence.importAllData(backupRecord)",
+  "workspace.clearDirtyMarkers()",
+  "workspace.markProjectsDirty(restoredProjectIds)",
+  "presentation.renderWorkspaceStatus()",
+  "const restoreReport = {",
+  '"Backup restored"',
+  'await files.progress("Reading backup file", file)',
+  'files.parseJson(file, "Backup file")',
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    projectImportRestoreControllerJs,
+    snippet,
+    `ProjectImportRestoreController must retain characterized package-import and backup-restore policy: ${snippet}`
+  );
+}
+assert(
+  !projectImportRestoreControllerJs.includes("editorSessionStore") &&
+    !projectImportRestoreControllerJs.includes("reportImportProgress") &&
+    !projectImportRestoreControllerJs.includes("fileImportService") &&
+    !projectImportRestoreControllerJs.includes("projectPackagePortabilityService") &&
+    !projectImportRestoreControllerJs.includes("validateBackupFile") &&
+    !projectImportRestoreControllerJs.includes("autosaveService") &&
+    !projectImportRestoreControllerJs.includes("rebuildAllTmIndexes") &&
+    !projectImportRestoreControllerJs.includes("rebuildAllTermIndexes") &&
+    !projectImportRestoreControllerJs.includes("logOptionalActivityForProject") &&
+    !projectImportRestoreControllerJs.includes("applicationNavigation") &&
+    !projectImportRestoreControllerJs.includes("loadProjects") &&
+    !/\bopenProject\b/.test(projectImportRestoreControllerJs) &&
+    !projectImportRestoreControllerJs.includes("state.workspaceStatus") &&
+    !projectImportRestoreControllerJs.includes("clearWorkspaceDirty") &&
+    !projectImportRestoreControllerJs.includes("markWorkspaceDirty") &&
+    !projectImportRestoreControllerJs.includes("validationAlertText") &&
+    !projectImportRestoreControllerJs.includes("renderValidationReport") &&
+    !projectImportRestoreControllerJs.includes("setSaveStatus") &&
+    !projectImportRestoreControllerJs.includes("exportStatusMode") &&
+    !projectImportRestoreControllerJs.includes("uiLocalizationService") &&
+    !projectImportRestoreControllerJs.includes("displaySafeText"),
+  "the checked project-import/restore controller must use only its injected file, portability, backup, session, autosave, persistence, index, activity, navigation, project, workspace, validation, presentation, status, localization, and text boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectImportRestoreController({",
+  "progress: reportImportProgress",
+  "parseJson: fileImportService.parseJson",
+  "portability: projectPackagePortabilityService",
+  "backup: { validate: validateBackupFile }",
+  "session: editorSessionStore",
+  "autosave: { flush: autosaveService.flush }",
+  "importProjectPackageRecords,",
+  "importAllData",
+  "rebuildTm: rebuildAllTmIndexes",
+  "rebuildTerms: rebuildAllTermIndexes",
+  "logForProject: logOptionalActivityForProject",
+  "appendWarning: appendActivityWarning",
+  "openProjects: applicationNavigation.openProjects",
+  "clearSelection: applicationNavigation.clearSelection",
+  "load: loadProjects",
+  "open: openProject",
+  "clearDirty: clearWorkspaceDirty",
+  "markDirty: markWorkspaceDirty",
+  "clearDirtyMarkers: clearWorkspaceDirtyMarkers",
+  "markProjectsDirty: markWorkspaceProjectsDirty",
+  "alertText: validationAlertText",
+  "renderValidation: renderValidationReport",
+  "renderWorkspaceStatus",
+  "status: { set: setSaveStatus, mode: exportStatusMode }",
+  "alert: uiLocalizationService.alert",
+  "confirm: uiLocalizationService.confirm",
+  "text: { safe: displaySafeText }"
+]) {
+  assertIncludes(appJs, boundary, `project-import/restore composition must inject the checked ${boundary} boundary.`);
+}
+for (const removedHelper of [
+  "importProjectPackageData",
+  "importProjectPackage",
+  "restoreBackupData",
+  "restoreBackupFile"
+]) {
+  assert(
+    !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  (appJs.match(/\bprojectImportRestoreController\.importProjectPackageData\b/g) || []).length === 1 &&
+    (appJs.match(/\bprojectImportRestoreController\.importProjectPackage\b/g) || []).length === 1 &&
+    !appJs.includes("projectImportRestoreController.restoreBackupData") &&
+    (appJs.match(/\bprojectImportRestoreController\.restoreBackupFile\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bprojectImportRestoreController\.importProjectPackageData\b/g) || []).length === 5 &&
+    (appWorkflowDriverJs.match(/\bprojectImportRestoreController\.importProjectPackage\b/g) || []).length === 2 &&
+    (appWorkflowDriverJs.match(/\bprojectImportRestoreController\.restoreBackupData\b/g) || []).length === 3 &&
+    (appWorkflowDriverJs.match(/\bprojectImportRestoreController\.restoreBackupFile\b/g) || []).length === 2,
+  "ImportExportController, workspace sync, and all workflow package-import/backup-restore consumers must call ProjectImportRestoreController directly."
+);
+for (const testName of [
+  "ProjectImportRestoreController rejects invalid packages with exact alert and suppression behavior",
+  "ProjectImportRestoreController preserves replace and copy confirmation cancellation",
+  "ProjectImportRestoreController replaces an existing project with exact import and refresh sequencing",
+  "ProjectImportRestoreController imports a copy with preserved note and connected-workspace dirtiness",
+  "ProjectImportRestoreController preserves workspace-source and open-false outcomes",
+  "ProjectImportRestoreController project and backup file adapters preserve progress, parsing, and returns",
+  "ProjectImportRestoreController rejects invalid backups before flush or store replacement",
+  "ProjectImportRestoreController restores disconnected backups with exact report and sequencing",
+  "ProjectImportRestoreController restores connected backups and marks every restored project package dirty",
+  "ProjectImportRestoreController preserves primary failure timing without late import effects",
+  "ProjectImportRestoreController validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectImportRestoreControllerUnitTests,
+    testName,
+    `focused project-import/restore tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/import-export/project-import-restore-controller.js"',
+  "source-catalog extraction must scan the checked project-import/restore controller."
 );
 for (const snippet of [
   "ProjectDocumentImportController requires checked session, catalog, file, format, repository, history, progress, ID, summary, navigation, activity, workspace, status, presentation, text, and confirmation boundaries.",
@@ -6968,9 +7143,9 @@ for (const removedHelper of [
   );
 }
 assert(
-  (appJs.match(/\bprojectPackagePortabilityService\.validate\b/g) || []).length === 2 &&
+  (appJs.match(/\bprojectPackagePortabilityService\.validate\b/g) || []).length === 1 &&
     (appJs.match(/\bprojectPackagePortabilityService\.hasOriginalLocalizationStructure\b/g) || []).length === 1 &&
-    (appJs.match(/\bprojectPackagePortabilityService\.prepare\b/g) || []).length === 1 &&
+    !appJs.includes("projectPackagePortabilityService.prepare") &&
     !appWorkflowDriverJs.includes("projectPackagePortabilityService."),
   "all package validation, preserved-structure, and import-preparation consumers must call ProjectPackagePortabilityService directly."
 );
@@ -12998,9 +13173,9 @@ assertIncludes(
   "app.js must sanitize project-package validation alert text before display."
 );
 assertIncludes(
-  appJs,
-  "uiLocalizationService.alert(validationAlertText(validation",
-  "app.js project-package validation alerts must use sanitized validation text."
+  projectImportRestoreControllerJs,
+  "localization.alert(validation.alertText(packageValidation",
+  "ProjectImportRestoreController project-package validation alerts must use sanitized validation text."
 );
 assertIncludes(
   functionBody(appJs, "function download", "function escapeHtml"),
@@ -13178,14 +13353,22 @@ assertIncludes(
   "app workflow test must verify transient background autosave failures retry and persist the target text."
 );
 assertIncludes(
-  functionBody(appJs, "async function restoreBackupData", "async function restoreBackupFile"),
-  "await autosaveService.flush()",
-  "app.js backup restore must flush pending target edits before replacing local stores."
+  functionBody(
+    projectImportRestoreControllerJs,
+    "async function restoreBackupData",
+    "async function restoreBackupFile"
+  ),
+  "await autosave.flush()",
+  "ProjectImportRestoreController backup restore must flush pending target edits before replacing local stores."
 );
 assertIncludes(
-  functionBody(appJs, "async function importProjectPackageData", "async function importProjectPackage(file)"),
-  "await autosaveService.flush(replaceProjectId)",
-  "app.js same-project package replacement must flush pending target edits before replacing project records."
+  functionBody(
+    projectImportRestoreControllerJs,
+    "async function importProjectPackageData",
+    "async function importProjectPackage(file)"
+  ),
+  "await autosave.flush(replaceProjectId)",
+  "ProjectImportRestoreController same-project package replacement must flush pending target edits before replacing project records."
 );
 assertIncludes(
   appJs,
