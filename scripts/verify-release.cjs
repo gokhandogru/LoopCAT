@@ -159,6 +159,7 @@ const requiredReleaseFiles = [
   "src/app/app-store.js",
   "src/app/application-command-buttons-controller.js",
   "src/app/application-menu-controller.js",
+  "src/app/application-update-controls-controller.js",
   "src/app/application-view-controller.js",
   "src/app/global-keyboard-controller.js",
   "src/app/navigation-controller.js",
@@ -285,6 +286,7 @@ const requiredReleaseFiles = [
   "tests/unit/app-store.test.cjs",
   "tests/unit/application-command-buttons-controller.test.cjs",
   "tests/unit/application-menu-controller.test.cjs",
+  "tests/unit/application-update-controls-controller.test.cjs",
   "tests/unit/application-view-controller.test.cjs",
   "tests/unit/global-keyboard-controller.test.cjs",
   "tests/unit/editor-state.test.cjs",
@@ -441,6 +443,10 @@ const applicationCommandButtonsControllerUnitTests = readText(
 );
 const applicationMenuControllerJs = readText("src/app/application-menu-controller.js");
 const applicationMenuControllerUnitTests = readText("tests/unit/application-menu-controller.test.cjs");
+const applicationUpdateControlsControllerJs = readText("src/app/application-update-controls-controller.js");
+const applicationUpdateControlsControllerUnitTests = readText(
+  "tests/unit/application-update-controls-controller.test.cjs"
+);
 const applicationViewControllerJs = readText("src/app/application-view-controller.js");
 const applicationViewControllerUnitTests = readText("tests/unit/application-view-controller.test.cjs");
 const globalKeyboardControllerJs = readText("src/app/global-keyboard-controller.js");
@@ -4651,7 +4657,7 @@ for (const boundary of [
 assert(
   appJs.indexOf("applicationViewController.mount()") < appJs.indexOf("applicationCommandButtonsController.mount()") &&
     appJs.indexOf("applicationCommandButtonsController.mount()") <
-      appJs.indexOf('els.reloadUpdateBtn?.addEventListener("click"'),
+      appJs.indexOf("applicationUpdateControlsController.mount()"),
   "application command-button lifecycle must mount between application-view and offline-update listeners at the existing position."
 );
 assert(
@@ -4693,6 +4699,94 @@ for (const testName of [
     applicationCommandButtonsControllerUnitTests,
     testName,
     `focused application command-button tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createApplicationUpdateControlsController } from "./application-update-controls-controller.js";',
+  "the application runtime must install the checked application update-controls controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationUpdateControlsController,",
+  "the application runtime must expose the checked application update-controls controller factory."
+);
+for (const snippet of [
+  "ApplicationUpdateControlsController requires activate and defer actions.",
+  "ApplicationUpdateControlsController requires checked optional button elements.",
+  "elements?.reloadButton",
+  "elements?.deferButton",
+  "void actions.activate()",
+  "const deferClickListener = () => actions.defer()",
+  'elements?.reloadButton?.addEventListener("click", reloadClickListener)',
+  'elements?.deferButton?.addEventListener("click", deferClickListener)',
+  'elements?.reloadButton?.removeEventListener("click", reloadClickListener)',
+  'elements?.deferButton?.removeEventListener("click", deferClickListener)',
+  "return Object.freeze({ mount, unmount })"
+]) {
+  assertIncludes(
+    applicationUpdateControlsControllerJs,
+    snippet,
+    `ApplicationUpdateControlsController must retain characterized optional, late-bound, and return policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationUpdateControlsController({",
+  "reloadButton: els.reloadUpdateBtn",
+  "deferButton: els.deferUpdateBtn",
+  "activate: () => offlineUpdateController?.activate?.()",
+  "defer: () => offlineUpdateController?.defer?.()",
+  "applicationUpdateControlsController.mount()"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `application update-control composition must retain the checked ${boundary} boundary.`
+  );
+}
+assert(
+  appJs.indexOf("applicationCommandButtonsController.mount()") <
+    appJs.indexOf("applicationUpdateControlsController.mount()") &&
+    appJs.indexOf("applicationUpdateControlsController.mount()") <
+      appJs.indexOf('els.uiLocaleSelect?.addEventListener("change"'),
+  "application update-control lifecycle must mount between command-button and locale listeners at the existing position."
+);
+assert(
+  !appJs.includes('els.reloadUpdateBtn?.addEventListener("click"') &&
+    !appJs.includes('els.deferUpdateBtn?.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('reloadUpdateBtn?.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('deferUpdateBtn?.addEventListener("click"'),
+  "Reload and Defer update listener ownership must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\bapplicationUpdateControlsController\.mount\b/g) || []).length === 1 &&
+    !appWorkflowDriverJs.includes("applicationUpdateControlsController"),
+  "wireEvents must retain exactly one application update-control mount without workflow-only consumers."
+);
+for (const forbiddenOwner of [
+  "offlineUpdateController",
+  "serviceWorker",
+  "waitingWorker",
+  "location.reload",
+  "renderOfflineUpdateState",
+  "els."
+]) {
+  assert(
+    !applicationUpdateControlsControllerJs.includes(forbiddenOwner),
+    `ApplicationUpdateControlsController must use injected optional element and late-bound action boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationUpdateControlsController owns exact mount, unmount, identity, and immutable lifecycle",
+  "ApplicationUpdateControlsController preserves pre-controller no-ops and late controller replacement",
+  "ApplicationUpdateControlsController independently skips absent optional buttons",
+  "ApplicationUpdateControlsController preserves action and listener failure timing",
+  "ApplicationUpdateControlsController validates actions and present optional elements"
+]) {
+  assertIncludes(
+    applicationUpdateControlsControllerUnitTests,
+    testName,
+    `focused application update-control tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(

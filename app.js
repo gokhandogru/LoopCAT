@@ -3382,6 +3382,17 @@ const applicationCommandButtonsController =
       redo: redoLastCommand
     }
   });
+const applicationUpdateControlsController =
+  appRuntime.featureFactories.createApplicationUpdateControlsController({
+    elements: {
+      reloadButton: els.reloadUpdateBtn,
+      deferButton: els.deferUpdateBtn
+    },
+    actions: {
+      activate: () => offlineUpdateController?.activate?.(),
+      defer: () => offlineUpdateController?.defer?.()
+    }
+  });
 const globalKeyboardController = appRuntime.featureFactories.createGlobalKeyboardController({
   target: window,
   normalizeKey: stableLower,
@@ -6697,8 +6708,7 @@ function wireEvents() {
 
   applicationViewController.mount();
   applicationCommandButtonsController.mount();
-  els.reloadUpdateBtn?.addEventListener("click", () => void offlineUpdateController?.activate?.());
-  els.deferUpdateBtn?.addEventListener("click", () => offlineUpdateController?.defer?.());
+  applicationUpdateControlsController.mount();
   els.uiLocaleSelect?.addEventListener("change", async () => {
     await appRuntime.localeLoader.ensure(els.uiLocaleSelect.value);
     uiI18n?.setLocale?.(els.uiLocaleSelect.value);
