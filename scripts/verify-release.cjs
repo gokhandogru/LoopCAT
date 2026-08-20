@@ -160,6 +160,7 @@ const requiredReleaseFiles = [
   "src/app/application-command-buttons-controller.js",
   "src/app/application-command-history-controller.js",
   "src/app/application-event-wiring-controller.js",
+  "src/app/application-import-progress-controller.js",
   "src/app/application-menu-controller.js",
   "src/app/application-persistence-lifecycle-controller.js",
   "src/app/application-save-status-controller.js",
@@ -303,6 +304,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-command-buttons-controller.test.cjs",
   "tests/unit/application-command-history-controller.test.cjs",
   "tests/unit/application-event-wiring-controller.test.cjs",
+  "tests/unit/application-import-progress-controller.test.cjs",
   "tests/unit/application-menu-controller.test.cjs",
   "tests/unit/application-persistence-lifecycle-controller.test.cjs",
   "tests/unit/application-save-status-controller.test.cjs",
@@ -479,6 +481,10 @@ const applicationCommandHistoryControllerUnitTests = readText(
 );
 const applicationEventWiringControllerJs = readText("src/app/application-event-wiring-controller.js");
 const applicationEventWiringControllerUnitTests = readText("tests/unit/application-event-wiring-controller.test.cjs");
+const applicationImportProgressControllerJs = readText("src/app/application-import-progress-controller.js");
+const applicationImportProgressControllerUnitTests = readText(
+  "tests/unit/application-import-progress-controller.test.cjs"
+);
 const applicationMenuControllerJs = readText("src/app/application-menu-controller.js");
 const applicationMenuControllerUnitTests = readText("tests/unit/application-menu-controller.test.cjs");
 const applicationPersistenceLifecycleControllerJs = readText("src/app/application-persistence-lifecycle-controller.js");
@@ -2059,9 +2065,9 @@ assertIncludes(
 for (const boundary of [
   "assertSize: (file, label) => fileImportService.assertSize(file, label, MAX_RESOURCE_IMPORT_BYTES)",
   "readText: fileImportService.readText",
-  "reportProgress: reportImportProgress",
+  "reportProgress: applicationImportProgressController.reportProgress",
   "progressDetail: fileImportService.progressDetail",
-  "yieldToUi",
+  "yieldToUi: applicationImportProgressController.yieldToUi",
   "parseTmx: parseTmxAsync",
   "parseTbx: parseTbxAsync",
   "parseTermList",
@@ -2858,8 +2864,9 @@ for (const boundary of [
   "normalizeLanguageInput: languageInputService.normalizeElement",
   "assertSize: (file, label) => fileImportService.assertSize(file, label, MAX_RESOURCE_IMPORT_BYTES)",
   "readText: fileImportService.readText",
-  "reportProgress: reportImportProgress",
+  "reportProgress: applicationImportProgressController.reportProgress",
   "progressDetail: fileImportService.progressDetail",
+  "yieldToUi: applicationImportProgressController.yieldToUi",
   "parseTmx: parseTmxAsync",
   "parseTbx: parseTbxAsync",
   "repositories: { importTmEntries, importTerms }",
@@ -8531,7 +8538,7 @@ for (const boundary of [
   "get: () => state.importTask",
   "state.importTask = value",
   "text: { lower: stableLower }",
-  "renderBusy: renderImportBusyState",
+  "renderBusy: applicationImportProgressController.renderBusy",
   "renderValidation: renderValidationReport",
   "status: { set: applicationSaveStatusController.set }",
   "durability: { refresh: refreshStorageDurability }"
@@ -8938,7 +8945,7 @@ assert(
 );
 for (const boundary of [
   "appRuntime.featureFactories.createProjectImportRestoreController({",
-  "progress: reportImportProgress",
+  "progress: applicationImportProgressController.reportProgress",
   "parseJson: fileImportService.parseJson",
   "portability: projectPackagePortabilityService",
   "backup: { validate: validateBackupFile }",
@@ -9548,7 +9555,7 @@ for (const boundary of [
   "isXliffType: (extension) => XLIFF_DOCUMENT_TYPES.has(extension)",
   "append: appendProjectSegmentsAndUpdateProject",
   "histories: { prepare: segmentTargetStateService.prepareHistories }",
-  "progress: { report: reportImportProgress }",
+  "progress: { report: applicationImportProgressController.reportProgress }",
   "navigation: { selectDocument: applicationNavigation.selectDocument }",
   "log: logOptionalProjectActivity",
   "appendWarning: appendActivityWarning",
@@ -15968,7 +15975,11 @@ assertIncludes(
   "DOCX import selects newly imported document",
   "app workflow test must verify DOCX import lands the user on the newly imported file."
 );
-assertIncludes(appJs, "function renderImportBusyState", "app.js must keep a visible import busy-state guard.");
+assertIncludes(
+  appJs,
+  "renderBusy: applicationImportProgressController.renderBusy",
+  "FileImportService must retain the checked application import busy-state boundary."
+);
 assertIncludes(
   functionBody(appJs, "const importExportController", "const projectDialogController"),
   "runImportTask: fileImportService.runTask",
@@ -16456,15 +16467,123 @@ assertIncludes(
   "app workflow test must verify workspace sync cannot overlap with active imports."
 );
 assertIncludes(
-  functionBody(appJs, "function renderImportBusyState()", "function stableLower"),
-  "importExportController?.renderBusy",
-  "app.js must delegate shared import-control busy state to the checked import/export controller."
+  appBootstrapJs,
+  'import { createApplicationImportProgressController } from "./application-import-progress-controller.js";',
+  "the application runtime must install the checked application import-progress controller."
 );
 assertIncludes(
-  functionBody(appJs, "function renderImportBusyState()", "function stableLower"),
-  "recoveryWorkspaceController?.renderBusy",
-  "app.js must delegate workspace-sync busy state while import or restore tasks are active."
+  appBootstrapJs,
+  "createApplicationImportProgressController,",
+  "the application runtime must expose the checked application import-progress controller factory."
 );
+for (const snippet of [
+  "ApplicationImportProgressController requires checked live context boundaries.",
+  "ApplicationImportProgressController requires checked busy-presentation boundaries.",
+  "ApplicationImportProgressController requires a checked status boundary.",
+  "ApplicationImportProgressController requires checked scheduler boundaries.",
+  "const busy = Boolean(context.getTask())",
+  "presentation.renderImportBusy(busy)",
+  "presentation.renderRecoveryBusy({ busy, status: context.getWorkspaceStatus() || {} })",
+  "const size = Number(bytes || 0)",
+  'const units = ["B", "KB", "MB", "GB"]',
+  "while (value >= 1024 && unitIndex < units.length - 1)",
+  "const digits = value >= 10 || unitIndex === 0 ? 0 : 1",
+  'const task = context.getTask() || "Import"',
+  'const fileName = file?.name ? ` - ${file.name}` : ""',
+  'const fileSize = file?.size ? ` (${formatFileSize(file.size)})` : ""',
+  'const suffix = detail ? ` - ${detail}` : ""',
+  "status.set(`${task}: ${phase}${fileName}${fileSize}${suffix}`)",
+  "let settled = false",
+  "if (settled) return",
+  "if (schedulers.hasFrame())",
+  "schedulers.frame(finish)",
+  "schedulers.timer(finish, 50)",
+  "setProgress(phase, file, detail)",
+  "await yieldToUi()",
+  "return Object.freeze({ renderBusy, formatFileSize, setProgress, yieldToUi, reportProgress })"
+]) {
+  assertIncludes(
+    applicationImportProgressControllerJs,
+    snippet,
+    `ApplicationImportProgressController must retain characterized busy, size, progress, and yield policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationImportProgressController({",
+  "getTask: () => state.importTask",
+  "getWorkspaceStatus: () => state.workspaceStatus",
+  "renderImportBusy: (busy) => importExportController?.renderBusy?.(busy)",
+  "renderRecoveryBusy: (viewModel) => recoveryWorkspaceController?.renderBusy?.(viewModel)",
+  "status: { set: applicationSaveStatusController.set }",
+  'hasFrame: () => typeof requestAnimationFrame === "function"',
+  "frame: (callback) => requestAnimationFrame(callback)",
+  "timer: (callback, delay) => setTimeout(callback, delay)",
+  "renderBusy: applicationImportProgressController.renderBusy",
+  "reportProgress: applicationImportProgressController.reportProgress",
+  "progress: applicationImportProgressController.reportProgress",
+  "progress: { report: applicationImportProgressController.reportProgress }",
+  "yieldToUi: applicationImportProgressController.yieldToUi",
+  "applicationImportProgressController.formatFileSize(bytes)"
+]) {
+  assertIncludes(appJs, boundary, `application import-progress composition and consumers must retain ${boundary}.`);
+}
+for (const workflowConsumer of [
+  'applicationImportProgressController.setProgress("Reading large project file", longImportFile)',
+  "applicationImportProgressController.formatFileSize(longImportFile.size)",
+  "applicationImportProgressController.yieldToUi()"
+]) {
+  assertIncludes(
+    appWorkflowDriverJs,
+    workflowConsumer,
+    `workflow import-progress consumers must remain direct: ${workflowConsumer}.`
+  );
+}
+for (const removedHelper of [
+  "renderImportBusyState",
+  "formatFileSize",
+  "setImportProgress",
+  "yieldToUi",
+  "reportImportProgress"
+]) {
+  assert(
+    !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return as a coordinator or workflow helper.`
+  );
+}
+for (const forbiddenOwner of [
+  "appRuntime",
+  "state.",
+  "importExportController",
+  "recoveryWorkspaceController",
+  "applicationSaveStatusController",
+  "requestAnimationFrame",
+  "setTimeout",
+  "window.",
+  "document."
+]) {
+  assert(
+    !applicationImportProgressControllerJs.includes(forbiddenOwner),
+    `ApplicationImportProgressController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationImportProgressController preserves live busy presentation and immutable API",
+  "ApplicationImportProgressController preserves every file-size numeric edge and unit",
+  "ApplicationImportProgressController preserves every progress fragment and live task fallback",
+  "ApplicationImportProgressController schedules frame and timer and settles only once",
+  "ApplicationImportProgressController preserves absent and live frame scheduling",
+  "ApplicationImportProgressController preserves synchronous callback and unconditional timer scheduling",
+  "ApplicationImportProgressController reports status before awaiting the UI yield",
+  "ApplicationImportProgressController preserves busy, status, and scheduler failure timing",
+  "ApplicationImportProgressController validates every injected owner"
+]) {
+  assertIncludes(
+    applicationImportProgressControllerUnitTests,
+    testName,
+    `focused application import-progress tests must retain characterization: ${testName}.`
+  );
+}
 assertIncludes(
   functionBody(appJs, "const recoveryWorkspaceController", "const projectDialogController"),
   'fileImportService.runTask("Workspace sync"',
@@ -16482,43 +16601,17 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "function setImportProgress",
-  "app.js must expose a shared import progress helper for long-running imports."
-);
-assertIncludes(
-  appJs,
-  "async function reportImportProgress",
-  "app.js must yield after import progress updates before heavy import phases."
-);
-assertIncludes(
-  appJs,
-  "function yieldToUi",
-  "app.js must provide a UI-yield helper for long-running import phase updates."
-);
-assertIncludes(
-  appJs,
-  "requestAnimationFrame",
-  "app.js import progress must yield through requestAnimationFrame when available."
-);
-assertIncludes(
-  appJs,
-  "setTimeout(finish, 50)",
-  "app.js import progress yield must have a timeout fallback for throttled background windows."
-);
-assertIncludes(appJs, "formatFileSize", "app.js import progress must include human-readable file sizes.");
-assertIncludes(
-  appJs,
   "async function refreshStorageDurability",
   "app.js must check browser storage persistence and quota for long offline projects."
 );
 assertIncludes(appJs, "navigator.storage", "app.js must use the browser storage API when available.");
 assertIncludes(
-  functionBody(appJs, "async function refreshStorageDurability", "function setImportProgress"),
+  functionBody(appJs, "async function refreshStorageDurability", "function stableLower"),
   "storageApi.persist()",
   "app.js must request persistent browser storage when supported."
 );
 assertIncludes(
-  functionBody(appJs, "async function refreshStorageDurability", "function setImportProgress"),
+  functionBody(appJs, "async function refreshStorageDurability", "function stableLower"),
   "storageApi.estimate()",
   "app.js must estimate local storage usage for recoverability warnings."
 );

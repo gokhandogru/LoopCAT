@@ -3,6 +3,7 @@ import { createApplicationEvents } from "./events.js";
 import { createApplicationCommandButtonsController } from "./application-command-buttons-controller.js";
 import { createApplicationCommandHistoryController } from "./application-command-history-controller.js";
 import { createApplicationEventWiringController } from "./application-event-wiring-controller.js";
+import { createApplicationImportProgressController } from "./application-import-progress-controller.js";
 import { createApplicationMenuController } from "./application-menu-controller.js";
 import { createApplicationPersistenceLifecycleController } from "./application-persistence-lifecycle-controller.js";
 import { createApplicationSaveStatusController } from "./application-save-status-controller.js";
@@ -342,6 +343,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createApplicationCommandButtonsController,
       createApplicationCommandHistoryController,
       createApplicationEventWiringController,
+      createApplicationImportProgressController,
       createApplicationMenuController,
       createApplicationPersistenceLifecycleController,
       createApplicationSaveStatusController,

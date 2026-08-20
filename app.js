@@ -1193,6 +1193,23 @@ const applicationTrashController = appRuntime.featureFactories.createApplication
   },
   status: { set: applicationSaveStatusController.set }
 });
+const applicationImportProgressController =
+  appRuntime.featureFactories.createApplicationImportProgressController({
+    context: {
+      getTask: () => state.importTask,
+      getWorkspaceStatus: () => state.workspaceStatus
+    },
+    presentation: {
+      renderImportBusy: (busy) => importExportController?.renderBusy?.(busy),
+      renderRecoveryBusy: (viewModel) => recoveryWorkspaceController?.renderBusy?.(viewModel)
+    },
+    status: { set: applicationSaveStatusController.set },
+    schedulers: {
+      hasFrame: () => typeof requestAnimationFrame === "function",
+      frame: (callback) => requestAnimationFrame(callback),
+      timer: (callback, delay) => setTimeout(callback, delay)
+    }
+  });
 
 const revisionHistoryPresentationService =
   appRuntime.featureFactories.createRevisionHistoryPresentationService({
@@ -1243,7 +1260,7 @@ const fileImportService = appRuntime.featureFactories.createFileImportService({
   },
   text: { lower: stableLower },
   presentation: {
-    renderBusy: renderImportBusyState,
+    renderBusy: applicationImportProgressController.renderBusy,
     renderValidation: renderValidationReport
   },
   status: { set: applicationSaveStatusController.set },
@@ -1822,9 +1839,9 @@ const projectResourceTransferController =
     files: {
       assertSize: (file, label) => fileImportService.assertSize(file, label, MAX_RESOURCE_IMPORT_BYTES),
       readText: fileImportService.readText,
-      reportProgress: reportImportProgress,
+      reportProgress: applicationImportProgressController.reportProgress,
       progressDetail: fileImportService.progressDetail,
-      yieldToUi
+      yieldToUi: applicationImportProgressController.yieldToUi
     },
     parsers: {
       parseTmx: parseTmxAsync,
@@ -2135,7 +2152,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
     focusTarget: targetEditController.focusActive
   },
   presentation: {
-    yieldToUi,
+    yieldToUi: applicationImportProgressController.yieldToUi,
     renderSegments,
     renderProgress,
     renderHistory: revisionHistoryPresentationService.render,
@@ -4124,7 +4141,7 @@ workspacePackageSaveController =
 const projectImportRestoreController =
   appRuntime.featureFactories.createProjectImportRestoreController({
     files: {
-      progress: reportImportProgress,
+      progress: applicationImportProgressController.reportProgress,
       parseJson: fileImportService.parseJson
     },
     portability: projectPackagePortabilityService,
@@ -4227,7 +4244,7 @@ const projectDocumentImportController =
       getProjectSegments
     },
     histories: { prepare: segmentTargetStateService.prepareHistories },
-    progress: { report: reportImportProgress },
+    progress: { report: applicationImportProgressController.reportProgress },
     ids: { next: () => (crypto.randomUUID ? crypto.randomUUID() : Date.now()) },
     summaries: { refresh: refreshProjectSummaries },
     navigation: { selectDocument: applicationNavigation.selectDocument },
@@ -4526,9 +4543,9 @@ const resourceLibraryImportController =
     files: {
       assertSize: (file, label) => fileImportService.assertSize(file, label, MAX_RESOURCE_IMPORT_BYTES),
       readText: fileImportService.readText,
-      reportProgress: reportImportProgress,
+      reportProgress: applicationImportProgressController.reportProgress,
       progressDetail: fileImportService.progressDetail,
-      yieldToUi
+      yieldToUi: applicationImportProgressController.yieldToUi
     },
     parsers: {
       parseTmx: parseTmxAsync,
@@ -4875,28 +4892,8 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
 });
 dialogLifecycleController?.mount?.();
 
-function renderImportBusyState() {
-  const busy = Boolean(state.importTask);
-  importExportController?.renderBusy?.(busy);
-  recoveryWorkspaceController?.renderBusy?.({ busy, status: state.workspaceStatus || {} });
-}
-
-function formatFileSize(bytes) {
-  const size = Number(bytes || 0);
-  if (!Number.isFinite(size) || size <= 0) return "";
-  const units = ["B", "KB", "MB", "GB"];
-  let value = size;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  const digits = value >= 10 || unitIndex === 0 ? 0 : 1;
-  return `${value.toFixed(digits)} ${units[unitIndex]}`;
-}
-
 function formatStorageSize(bytes) {
-  return formatFileSize(bytes) || "0 B";
+  return applicationImportProgressController.formatFileSize(bytes) || "0 B";
 }
 
 function storageDurabilityWarnings(info = state.storageDurability) {
@@ -4969,34 +4966,6 @@ async function refreshStorageDurability(options = {}) {
   state.storageDurability = next;
   renderWorkspaceStatus();
   return next;
-}
-
-function setImportProgress(phase, file = null, detail = "") {
-  const task = state.importTask || "Import";
-  const fileName = file?.name ? ` - ${file.name}` : "";
-  const fileSize = file?.size ? ` (${formatFileSize(file.size)})` : "";
-  const suffix = detail ? ` - ${detail}` : "";
-  applicationSaveStatusController.set(`${task}: ${phase}${fileName}${fileSize}${suffix}`);
-}
-
-function yieldToUi() {
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-    if (typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(finish);
-    }
-    setTimeout(finish, 50);
-  });
-}
-
-async function reportImportProgress(phase, file = null, detail = "") {
-  setImportProgress(phase, file, detail);
-  await yieldToUi();
 }
 
 function stableLower(value) {

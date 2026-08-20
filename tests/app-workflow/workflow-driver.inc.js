@@ -99,7 +99,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     let finishLongImport = null;
     const longImportFile = { name: "large-import.docx", size: 12 * 1024 * 1024 };
     const longImportTask = fileImportService.runTask("Project file import", () => new Promise((resolve) => {
-      setImportProgress("Reading large project file", longImportFile);
+      applicationImportProgressController.setProgress("Reading large project file", longImportFile);
       finishLongImport = resolve;
     }));
     assert(
@@ -115,7 +115,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(
       els.saveStatus.textContent.includes("Project file import: Reading large project file") &&
         els.saveStatus.textContent.includes("large-import.docx") &&
-        els.saveStatus.textContent.includes(formatFileSize(longImportFile.size)),
+        els.saveStatus.textContent.includes(applicationImportProgressController.formatFileSize(longImportFile.size)),
       "active import progress reports phase, file name, and file size"
     );
     let overlappingImportRan = false;
@@ -346,7 +346,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     opusCatHelpController.setVisible(true);
     els.localAiOpusCatHelpBtn.focus();
     els.localAiOpusCatHelpBtn.click();
-    await yieldToUi();
+    await applicationImportProgressController.yieldToUi();
     assert(
       els.opusCatHelpDialog.open &&
         document.activeElement === els.closeOpusCatHelpBtn &&
@@ -354,7 +354,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "OPUS-CAT help opens through the shared lifecycle with initial focus above Project settings"
     );
     els.closeOpusCatHelpBtn.click();
-    await yieldToUi();
+    await applicationImportProgressController.yieldToUi();
     assert(
       !els.opusCatHelpDialog.open &&
         els.projectDialog.open &&
@@ -3185,7 +3185,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const runTmPretranslationFromDialog = async () => {
       els.segmentToolsMenuSummary.focus();
       const pending = tmPretranslationController.pretranslate();
-      await yieldToUi();
+      await applicationImportProgressController.yieldToUi();
       assert(
         els.tmPretranslateDialog.open &&
           document.activeElement === els.tmPretranslateThresholdInput &&
@@ -3200,7 +3200,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     try {
       els.segmentToolsMenuSummary.focus();
       const canceledPretranslation = tmPretranslationController.pretranslate();
-      await yieldToUi();
+      await applicationImportProgressController.yieldToUi();
       els.tmPretranslateDialog.close("cancel");
       assert(
         (await canceledPretranslation) === null && document.activeElement === els.segmentToolsMenuSummary,
@@ -4500,13 +4500,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     });
     await refreshResources();
     els.resourcesViewBtn.click();
-    await yieldToUi();
+    await applicationImportProgressController.yieldToUi();
     const workflowTmCard = Array.from(els.tmResourceDashboard.querySelectorAll(".resource-card")).find((card) =>
       card.textContent.includes(mainTmName())
     );
     const workflowTmOpenButton = workflowTmCard?.querySelector('[data-resource-action="open"]');
     workflowTmOpenButton?.click();
-    await yieldToUi();
+    await applicationImportProgressController.yieldToUi();
     const resourceOpenFocusState = {
       view: applicationStore.getState().navigation.view,
       detailHidden: els.tmResourceDetail.classList.contains("hidden"),
@@ -4523,7 +4523,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       `checked Resources controller owns navigation, dashboard open intent, detail rendering, and initial focus (${JSON.stringify(resourceOpenFocusState)})`
     );
     els.tmResourceDetail.querySelector('[data-resource-action="close-detail"]').click();
-    await yieldToUi();
+    await applicationImportProgressController.yieldToUi();
     const resourceCloseFocusState = {
       detailHidden: els.tmResourceDetail.classList.contains("hidden"),
       activeAction: document.activeElement?.dataset?.resourceAction || "",
@@ -4541,7 +4541,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     els.tmResourceTab.focus();
     els.tmResourceTab.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
-    await yieldToUi();
+    await applicationImportProgressController.yieldToUi();
     assert(
       els.tbResourceTab.getAttribute("aria-selected") === "true" &&
         document.activeElement === els.tbResourceTab &&
@@ -4549,7 +4549,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "Resources tabs expose one keyboard-operated tab state and matching panel"
     );
     applicationViewController.show("editor");
-    await yieldToUi();
+    await applicationImportProgressController.yieldToUi();
     const editableResourceState = resourcesController.getState();
     const editableTmEntry = editableResourceState.tmEntries.find((entry) => entry.id === resourceTmEntry.id);
     const editableTerm = editableResourceState.terms.find((term) => term.id === resourceTerm.id);
