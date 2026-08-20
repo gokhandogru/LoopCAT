@@ -3508,6 +3508,15 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
   }
 });
 recoveryWorkspaceController?.mount?.();
+const projectPackagePortabilityService =
+  appRuntime.featureFactories.createProjectPackagePortabilityService({
+    validation: { validate: validatePackage },
+    storage: { getAll },
+    records: { sanitize: sanitizePortableValue },
+    ids: { make: makeId },
+    projects: { getAll: editorSessionStore.getProjects },
+    clock: { now: () => new Date().toISOString() }
+  });
 const projectDocumentImportController =
   appRuntime.featureFactories.createProjectDocumentImportController({
     session: editorSessionStore,
@@ -6283,97 +6292,6 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-function validateProjectPackage(pkg) {
-  return validatePackage(pkg);
-}
-
-function hasOriginalLocalizationStructure(structure) {
-  return Boolean(
-    structure?.source ||
-      structure?.sourceLines ||
-      structure?.sourceJson !== undefined ||
-      structure?.rows ||
-      structure?.packageBase64
-  );
-}
-
-function clonePortableRecord(record) {
-  return sanitizePortableValue(record || {});
-}
-
-function importedCopyName(name) {
-  const base = `${String(name || "Imported project").trim() || "Imported project"} (copy)`;
-  const usedNames = new Set(editorSessionStore.getProjects().map((project) => project.name).filter(Boolean));
-  if (!usedNames.has(base)) return base;
-  let counter = 2;
-  while (usedNames.has(`${base} ${counter}`)) counter += 1;
-  return `${base} ${counter}`;
-}
-
-function storeIds(records, ignoredProjectId = "") {
-  return new Set((records || [])
-    .filter((record) => !ignoredProjectId || record.projectId !== ignoredProjectId)
-    .map((record) => record.id)
-    .filter(Boolean));
-}
-
-function remapRecordId(record, prefix, existingIds, reservedIds, forceNewId = false) {
-  const next = clonePortableRecord(record);
-  const currentId = String(next.id || "");
-  if (forceNewId || !currentId || existingIds.has(currentId) || reservedIds.has(currentId)) {
-    next.id = makeId(prefix);
-  }
-  reservedIds.add(next.id);
-  return next;
-}
-
-async function prepareProjectPackageImport(pkg, { replaceProjectId = "", importAsCopy = false } = {}) {
-  const [existingSegments, existingActivityEvents, existingTmEntries, existingTerms] = await Promise.all([
-    getAll("segments"),
-    getAll("activityEvents"),
-    getAll("tmEntries"),
-    getAll("terms")
-  ]);
-  const project = clonePortableRecord(pkg.project);
-  if (importAsCopy) {
-    project.id = makeId("project");
-    project.name = importedCopyName(project.name);
-    project.createdAt = new Date().toISOString();
-    project.updatedAt = project.createdAt;
-    project.exportHistory = [];
-  }
-
-  const segmentIds = storeIds(existingSegments, replaceProjectId);
-  const activityIds = storeIds(existingActivityEvents, replaceProjectId);
-  const tmIds = storeIds(existingTmEntries);
-  const termIds = storeIds(existingTerms);
-  const reservedSegmentIds = new Set();
-  const reservedActivityIds = new Set();
-  const reservedTmIds = new Set();
-  const reservedTermIds = new Set();
-  const segments = (pkg.segments || []).map((segment) => ({
-    ...remapRecordId(segment, "segment", segmentIds, reservedSegmentIds, importAsCopy),
-    projectId: project.id
-  }));
-  const activityEvents = (pkg.activityEvents || []).map((event) => ({
-    ...remapRecordId(event, "activity", activityIds, reservedActivityIds, importAsCopy),
-    projectId: project.id
-  }));
-  const tmEntries = (pkg.resources?.tmEntries || []).map((entry) => remapRecordId(entry, "tm", tmIds, reservedTmIds));
-  const terms = (pkg.resources?.terms || []).map((term) => remapRecordId(term, "term", termIds, reservedTermIds));
-  return {
-    ...pkg,
-    project,
-    segments,
-    resources: {
-      ...(pkg.resources || {}),
-      tmEntries,
-      terms
-    },
-    activityEvents
-  };
-}
-
 function portableFileErrorReport(message) {
   return { ok: false, errors: [message], warnings: [], preserved: [], simplified: [], skipped: [], risky: [] };
 }
@@ -6488,7 +6406,10 @@ async function buildProjectPackage(project = editorSessionStore.getProject(), se
     sourceAssets: sanitizePortableValue(projectDocumentManifest(project).map((documentInfo) => {
       const docxStructure = project.docxStructures?.[documentInfo.id] || (documentInfo.type === "docx" ? project.docxStructure : null);
       const localizationStructure = project.localizationStructures?.[documentInfo.id];
-      const originalAvailable = Boolean(docxStructure?.docxPackageBase64 || hasOriginalLocalizationStructure(localizationStructure));
+      const originalAvailable = Boolean(
+        docxStructure?.docxPackageBase64 ||
+          projectPackagePortabilityService.hasOriginalLocalizationStructure(localizationStructure)
+      );
       return {
         id: documentInfo.id,
         name: documentInfo.name,
@@ -6499,12 +6420,12 @@ async function buildProjectPackage(project = editorSessionStore.getProject(), se
     }), "sourceAssets", [], portableContext),
     activityEvents: sanitizePortableValue([...(activityEvents || []), ...(options.activityEvents || [])], "", [], portableContext)
   };
-  const validation = validateProjectPackage(pkg);
+  const validation = projectPackagePortabilityService.validate(pkg);
   return { ...pkg, validation, validationReports: { package: validation } };
 }
 
 function assertValidProjectPackageForWrite(pkg, actionLabel) {
-  const validation = pkg?.validation || validateProjectPackage(pkg);
+  const validation = pkg?.validation || projectPackagePortabilityService.validate(pkg);
   if (validation.ok) return validation;
   const error = new Error(`Cannot ${actionLabel}: ${reportSummary(validation)}`);
   error.validation = validation;
@@ -6634,7 +6555,7 @@ async function exportProjectPackage() {
 async function importProjectPackageData(pkg, options = {}) {
   const sourceName = options.sourceName || "project package";
   await reportImportProgress("Validating project package", { name: sourceName });
-  const validation = validateProjectPackage(pkg);
+  const validation = projectPackagePortabilityService.validate(pkg);
   if (!validation.ok) {
     if (!options.suppressAlert) uiLocalizationService.alert(validationAlertText(validation, "Project package import failed validation"));
     renderValidationReport(validation);
@@ -6652,7 +6573,7 @@ async function importProjectPackageData(pkg, options = {}) {
   }
   const replaceProjectId = existing && !importAsCopy ? existing.id : "";
   if (replaceProjectId) await autosaveService.flush(replaceProjectId);
-  const prepared = await prepareProjectPackageImport(pkg, {
+  const prepared = await projectPackagePortabilityService.prepare(pkg, {
     replaceProjectId,
     importAsCopy
   });

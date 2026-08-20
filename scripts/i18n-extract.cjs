@@ -130,6 +130,13 @@ const projectDocumentImportControllerPath = path.join(
   "import-export",
   "project-document-import-controller.js"
 );
+const projectPackagePortabilityServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "import-export",
+  "project-package-portability-service.js"
+);
 const concordanceControllerPath = path.join(root, "src", "features", "editor", "concordance-controller.js");
 const qualityPresentationServicePath = path.join(root, "src", "features", "quality", "quality-presentation-service.js");
 const qualityWorkbenchControllerPath = path.join(root, "src", "features", "quality", "quality-workbench-controller.js");
@@ -389,6 +396,11 @@ function main() {
     messagesByText,
     projectDocumentImportControllerPath,
     "src/features/import-export/project-document-import-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    projectPackagePortabilityServicePath,
+    "src/features/import-export/project-package-portability-service.js"
   );
   extractScript(messagesByText, concordanceControllerPath, "src/features/editor/concordance-controller.js");
   extractScript(messagesByText, qualityPresentationServicePath, "src/features/quality/quality-presentation-service.js");

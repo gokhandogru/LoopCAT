@@ -225,6 +225,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-document-catalog-service.js",
   "src/features/import-export/text-encoding-input-service.js",
   "src/features/import-export/project-document-import-controller.js",
+  "src/features/import-export/project-package-portability-service.js",
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-presentation-service.js",
   "src/features/quality/quality-workbench-controller.js",
@@ -293,6 +294,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-qa-controller.test.cjs",
   "tests/unit/project-domain-controller.test.cjs",
   "tests/unit/project-document-import-controller.test.cjs",
+  "tests/unit/project-package-portability-service.test.cjs",
   "tests/unit/concordance-controller.test.cjs",
   "tests/unit/segment-navigation-controller.test.cjs",
   "tests/unit/segment-draft-application-service.test.cjs",
@@ -463,6 +465,10 @@ const projectDomainControllerJs = readText("src/features/projects/project-domain
 const projectDomainControllerUnitTests = readText("tests/unit/project-domain-controller.test.cjs");
 const projectDocumentImportControllerJs = readText("src/features/import-export/project-document-import-controller.js");
 const projectDocumentImportControllerUnitTests = readText("tests/unit/project-document-import-controller.test.cjs");
+const projectPackagePortabilityServiceJs = readText(
+  "src/features/import-export/project-package-portability-service.js"
+);
+const projectPackagePortabilityServiceUnitTests = readText("tests/unit/project-package-portability-service.test.cjs");
 const concordanceControllerUnitTests = readText("tests/unit/concordance-controller.test.cjs");
 const segmentNavigationControllerUnitTests = readText("tests/unit/segment-navigation-controller.test.cjs");
 const segmentDraftApplicationServiceUnitTests = readText("tests/unit/segment-draft-application-service.test.cjs");
@@ -4950,6 +4956,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectPackagePortabilityService } from "../features/import-export/project-package-portability-service.js";',
+  "The application runtime must install the checked project-package portability service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectPackagePortabilityService,",
+  "The application runtime must expose the checked project-package portability factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createConcordanceController } from "../features/editor/concordance-controller.js";',
   "The application runtime must install the checked concordance controller."
 );
@@ -6457,6 +6473,108 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/import-export/project-document-import-controller.js"',
   "source-catalog extraction must scan the checked project-document import controller."
+);
+for (const snippet of [
+  "ProjectPackagePortabilityService requires validation, storage, record, ID, project, and clock boundaries.",
+  "return validation.validate(pkg)",
+  "structure?.sourceJson !== undefined",
+  "structure?.packageBase64",
+  "return records.sanitize(record || {})",
+  'String(name || "Imported project").trim() || "Imported project"',
+  "const usedNames = new Set(",
+  ".map((project) => project.name)",
+  ".filter((record) => !ignoredProjectId || record.projectId !== ignoredProjectId)",
+  "if (forceNewId || !currentId || existingIds.has(currentId) || reservedIds.has(currentId))",
+  "reservedIds.add(next.id)",
+  'storage.getAll("segments")',
+  'storage.getAll("activityEvents")',
+  'storage.getAll("tmEntries")',
+  'storage.getAll("terms")',
+  'project.id = ids.make("project")',
+  "project.name = importedCopyName(project.name)",
+  "project.createdAt = clock.now()",
+  "project.updatedAt = project.createdAt",
+  "project.exportHistory = []",
+  '...remapRecordId(segment, "segment", segmentIds, reservedSegmentIds, importAsCopy)',
+  '...remapRecordId(event, "activity", activityIds, reservedActivityIds, importAsCopy)',
+  'remapRecordId(entry, "tm", tmIds, reservedTmIds)',
+  'remapRecordId(term, "term", termIds, reservedTermIds)',
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    projectPackagePortabilityServiceJs,
+    snippet,
+    `ProjectPackagePortabilityService must retain characterized validation, structure, clone, naming, identity, and preparation policy: ${snippet}`
+  );
+}
+assert(
+  !projectPackagePortabilityServiceJs.includes("editorSessionStore") &&
+    !projectPackagePortabilityServiceJs.includes("validatePackage") &&
+    !projectPackagePortabilityServiceJs.includes("sanitizePortableValue") &&
+    !projectPackagePortabilityServiceJs.includes("makeId") &&
+    !projectPackagePortabilityServiceJs.includes("new Date") &&
+    !projectPackagePortabilityServiceJs.includes("localStorage") &&
+    !projectPackagePortabilityServiceJs.includes("indexedDB"),
+  "the checked project-package portability service must use injected validation, storage, record, ID, project, and clock boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectPackagePortabilityService({",
+  "validation: { validate: validatePackage }",
+  "storage: { getAll }",
+  "records: { sanitize: sanitizePortableValue }",
+  "ids: { make: makeId }",
+  "projects: { getAll: editorSessionStore.getProjects }",
+  "clock: { now: () => new Date().toISOString() }"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `project-package portability composition must inject the checked ${boundary} boundary.`
+  );
+}
+for (const removedHelper of [
+  "validateProjectPackage",
+  "hasOriginalLocalizationStructure",
+  "clonePortableRecord",
+  "importedCopyName",
+  "storeIds",
+  "remapRecordId",
+  "prepareProjectPackageImport"
+]) {
+  assert(
+    !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  (appJs.match(/\bprojectPackagePortabilityService\.validate\b/g) || []).length === 3 &&
+    (appJs.match(/\bprojectPackagePortabilityService\.hasOriginalLocalizationStructure\b/g) || []).length === 1 &&
+    (appJs.match(/\bprojectPackagePortabilityService\.prepare\b/g) || []).length === 1 &&
+    !appWorkflowDriverJs.includes("projectPackagePortabilityService."),
+  "all package validation, preserved-structure, and import-preparation consumers must call ProjectPackagePortabilityService directly."
+);
+for (const testName of [
+  "ProjectPackagePortabilityService delegates validation and preserves delegate failures",
+  "ProjectPackagePortabilityService preserves every original localization structure branch",
+  "ProjectPackagePortabilityService preserves portable clone fallbacks and sanitization timing",
+  "ProjectPackagePortabilityService preserves copy-name fallback and case-sensitive collision numbering",
+  "ProjectPackagePortabilityService preserves store-ID filtering and identity types",
+  "ProjectPackagePortabilityService remaps blank, existing, reserved, and forced IDs",
+  "ProjectPackagePortabilityService prepares replacement imports with exact collision scopes",
+  "ProjectPackagePortabilityService prepares copies with one shared timestamp and forced project records",
+  "ProjectPackagePortabilityService preserves empty defaults, failure timing, and immutable API"
+]) {
+  assertIncludes(
+    projectPackagePortabilityServiceUnitTests,
+    testName,
+    `focused project-package portability tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/import-export/project-package-portability-service.js"',
+  "source-catalog extraction must scan the checked project-package portability service."
 );
 for (const snippet of [
   'throw new TypeError("ConcordanceController requires overlay elements.")',
