@@ -1,5 +1,6 @@
 import { createAppStore } from "./app-store.js";
 import { createApplicationEvents } from "./events.js";
+import { createApplicationMenuController } from "./application-menu-controller.js";
 import { createNavigationController } from "./navigation-controller.js";
 import { createGlobalKeyboardController } from "./global-keyboard-controller.js";
 import { createProjectRepository } from "../data/project-repository.js";
@@ -311,6 +312,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createTermSuggestionsController,
       createTermFormController,
       createConcordanceController,
+      createApplicationMenuController,
       createGlobalKeyboardController,
       createSegmentNavigationController,
       createSegmentDraftApplicationService,

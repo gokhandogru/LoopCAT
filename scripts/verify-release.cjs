@@ -157,6 +157,7 @@ const requiredReleaseFiles = [
   "src/entry/test.js",
   "src/app/bootstrap.js",
   "src/app/app-store.js",
+  "src/app/application-menu-controller.js",
   "src/app/global-keyboard-controller.js",
   "src/app/navigation-controller.js",
   "src/app/compatibility-module-registry.js",
@@ -280,6 +281,7 @@ const requiredReleaseFiles = [
   "tests/unit/cohere-provider-adapter.test.cjs",
   "tests/unit/compatibility-module-registry.test.cjs",
   "tests/unit/app-store.test.cjs",
+  "tests/unit/application-menu-controller.test.cjs",
   "tests/unit/global-keyboard-controller.test.cjs",
   "tests/unit/editor-state.test.cjs",
   "tests/unit/editor-session-store.test.cjs",
@@ -428,6 +430,8 @@ const i18nValidateScript = readText("scripts/i18n-validate.cjs");
 const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-registry.js");
 const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-module-registry.test.cjs");
 const installRuntimeJs = readText("src/app/install-runtime.js");
+const applicationMenuControllerJs = readText("src/app/application-menu-controller.js");
+const applicationMenuControllerUnitTests = readText("tests/unit/application-menu-controller.test.cjs");
 const globalKeyboardControllerJs = readText("src/app/global-keyboard-controller.js");
 const globalKeyboardControllerUnitTests = readText("tests/unit/global-keyboard-controller.test.cjs");
 const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
@@ -4501,6 +4505,100 @@ for (const removedFacade of ["openCommandPalette", "closeCommandPalette", "rende
   assert(
     !directFacade.test(appJs) && !directFacade.test(appWorkflowDriverJs),
     `${removedFacade} compatibility façade must not return to app.js or the workflow driver.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createApplicationMenuController } from "./application-menu-controller.js";',
+  "the application runtime must install the checked application menu controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationMenuController,",
+  "the application runtime must expose the checked application menu controller factory."
+);
+for (const snippet of [
+  "ApplicationMenuController requires a document root and menu selector policy.",
+  "function closeOpenMenus(except = null)",
+  "documentRoot.querySelectorAll(selectors.openMenus).forEach((menu) => {",
+  'if (menu !== except) menu.removeAttribute("open")',
+  "if (mounted) return false",
+  "documentRoot.querySelectorAll(selectors.menus).forEach((menu) => {",
+  "if (!menu.open) return",
+  "closeOpenMenus(menu)",
+  'if (event.target.closest(selectors.buttons)) menu.removeAttribute("open")',
+  'menu.addEventListener("toggle", toggleListener)',
+  'menu.addEventListener("click", clickListener)',
+  "if (event.target.closest(selectors.menus)) return",
+  'documentRoot.addEventListener("click", documentClickListener)',
+  "function closeAll()",
+  "if (!mounted) return false",
+  'menu.removeEventListener("toggle", toggleListener)',
+  'menu.removeEventListener("click", clickListener)',
+  'documentRoot.removeEventListener("click", documentClickListener)',
+  "return Object.freeze({ closeAll, mount, unmount })"
+]) {
+  assertIncludes(
+    applicationMenuControllerJs,
+    snippet,
+    `ApplicationMenuController must retain characterized selection, close, and listener lifecycle policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationMenuController({",
+  "documentRoot: document",
+  'menus: ".menu"',
+  'openMenus: ".menu[open]"',
+  'buttons: "button"',
+  "applicationMenuController.closeAll()",
+  "applicationMenuController.mount()"
+]) {
+  assertIncludes(appJs, boundary, `application menu composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  appJs.indexOf("applicationMenuController.mount()") < appJs.indexOf("globalKeyboardController.mount()"),
+  "application menu lifecycle must mount before application-global keyboard routing at the existing listener position."
+);
+assert(
+  !appJs.includes('document.querySelectorAll(".menu")') &&
+    !appJs.includes('document.querySelectorAll(".menu[open]")') &&
+    !appJs.includes('menu.addEventListener("toggle"') &&
+    !appWorkflowDriverJs.includes('document.querySelectorAll(".menu")') &&
+    !appWorkflowDriverJs.includes('document.querySelectorAll(".menu[open]")') &&
+    !appWorkflowDriverJs.includes('menu.addEventListener("toggle"'),
+  "shared application menu selection and listener lifecycle must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\bapplicationMenuController\.mount\b/g) || []).length === 1 &&
+    (appJs.match(/\bapplicationMenuController\.closeAll\b/g) || []).length === 1 &&
+    !appWorkflowDriverJs.includes("applicationMenuController"),
+  "application menu lifecycle must retain one mount and one direct Focus-mode close consumer without workflow-only consumers."
+);
+for (const forbiddenOwner of [
+  "applicationStore",
+  "editorSessionStore",
+  "globalKeyboardController",
+  "recoveryWorkspaceController",
+  "workspaceStorage",
+  "els."
+]) {
+  assert(
+    !applicationMenuControllerJs.includes(forbiddenOwner),
+    `ApplicationMenuController must use injected document and selector boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationMenuController owns exact mount, repeated-mount, unmount, and immutable lifecycle",
+  "ApplicationMenuController preserves closed-toggle no-op and exclusive open behavior",
+  "ApplicationMenuController closes a containing menu only for button clicks",
+  "ApplicationMenuController preserves inside-click no-op plus live outside and direct closing",
+  "ApplicationMenuController preserves selector and listener delegate failure timing",
+  "ApplicationMenuController validates every boundary and selector"
+]) {
+  assertIncludes(
+    applicationMenuControllerUnitTests,
+    testName,
+    `focused application menu tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(

@@ -3345,6 +3345,14 @@ const paletteController = appRuntime?.featureFactories?.createPaletteController?
 if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "initializing palette controller";
 void paletteController?.initialize?.();
 
+const applicationMenuController = appRuntime.featureFactories.createApplicationMenuController({
+  documentRoot: document,
+  selectors: {
+    menus: ".menu",
+    openMenus: ".menu[open]",
+    buttons: "button"
+  }
+});
 const globalKeyboardController = appRuntime.featureFactories.createGlobalKeyboardController({
   target: window,
   normalizeKey: stableLower,
@@ -4783,7 +4791,7 @@ function setFocusMode(enabled) {
     payload: { enabled: Boolean(enabled && editorSessionStore.getProject()) }
   });
   renderFocusMode();
-  document.querySelectorAll(".menu[open]").forEach((menu) => menu.removeAttribute("open"));
+  applicationMenuController.closeAll();
   if (!editorSessionStore.getProject()) return;
   requestAnimationFrame(() => {
     renderSegments({ preserveScroll: true });
@@ -6662,21 +6670,7 @@ function wireEvents() {
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "rendering text encodings";
   textEncodingInputService.renderOptions();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "attaching event listeners";
-  document.querySelectorAll(".menu").forEach((menu) => {
-    menu.addEventListener("toggle", () => {
-      if (!menu.open) return;
-      document.querySelectorAll(".menu[open]").forEach((other) => {
-        if (other !== menu) other.removeAttribute("open");
-      });
-    });
-    menu.addEventListener("click", (event) => {
-      if (event.target.closest("button")) menu.removeAttribute("open");
-    });
-  });
-  document.addEventListener("click", (event) => {
-    if (event.target.closest(".menu")) return;
-    document.querySelectorAll(".menu[open]").forEach((menu) => menu.removeAttribute("open"));
-  });
+  applicationMenuController.mount();
   globalKeyboardController.mount();
   els.segmentGridWrap.addEventListener("scroll", () => {
     verticalFeatureState.segmentGrid.scheduleScroll(() => {
