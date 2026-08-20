@@ -3126,6 +3126,37 @@ const paletteController = appRuntime?.featureFactories?.createPaletteController?
 if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "initializing palette controller";
 void paletteController?.initialize?.();
 
+const globalKeyboardController = appRuntime.featureFactories.createGlobalKeyboardController({
+  target: window,
+  normalizeKey: stableLower,
+  commands: {
+    getProjectId: () => state.commandProjectId || editorSessionStore.getProject()?.id || null,
+    canUndo: (projectId) => Boolean(appRuntime?.commands?.bus?.canUndo?.(projectId)),
+    canRedo: (projectId) => Boolean(appRuntime?.commands?.bus?.canRedo?.(projectId)),
+    undo: undoLastCommand,
+    redo: redoLastCommand
+  },
+  context: {
+    getView: () => applicationStore.getState().navigation.view,
+    hasProject: () => Boolean(editorSessionStore.getProject())
+  },
+  palette: {
+    isOpen: () => !els.commandPaletteOverlay.classList.contains("hidden"),
+    open: paletteController?.open,
+    close: paletteController?.close
+  },
+  concordance: {
+    isOpen: () => !els.concordanceOverlay.classList.contains("hidden"),
+    open: concordanceController.open,
+    close: concordanceController.close
+  },
+  focus: {
+    isActive: () => applicationStore.getState().interface.focusMode,
+    toggle: toggleFocusMode,
+    disable: () => setFocusMode(false)
+  }
+});
+
 const themeController = appRuntime?.featureFactories?.createThemeController?.({
   documentRoot: document.documentElement,
   themeColorMeta: document.querySelector('meta[name="theme-color"]'),
@@ -6012,63 +6043,6 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-function handleGlobalKeydown(event) {
-  const key = stableLower(event.key);
-  const editableTarget = event.target?.matches?.("input, textarea, [contenteditable='true']");
-  if ((event.ctrlKey || event.metaKey) && key === "z" && !editableTarget) {
-    const projectId = state.commandProjectId || editorSessionStore.getProject()?.id || null;
-    const canRun = event.shiftKey
-      ? appRuntime?.commands?.bus?.canRedo?.(projectId)
-      : appRuntime?.commands?.bus?.canUndo?.(projectId);
-    if (canRun) {
-      event.preventDefault();
-      event.stopPropagation();
-      void (event.shiftKey ? redoLastCommand() : undoLastCommand());
-      return;
-    }
-  }
-  if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "p") {
-    event.preventDefault();
-    event.stopPropagation();
-    paletteController?.open?.();
-    return;
-  }
-  const isK = key === "k" || event.code === "KeyK";
-  if (isK && (event.ctrlKey || event.metaKey) && !event.altKey) {
-    event.preventDefault();
-    event.stopPropagation();
-    paletteController?.open?.();
-    return;
-  }
-  if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "f" && applicationStore.getState().navigation.view === "editor" && editorSessionStore.getProject()) {
-    event.preventDefault();
-    event.stopPropagation();
-    toggleFocusMode();
-    return;
-  }
-  const concordanceShortcut = isK && (event.ctrlKey || event.metaKey) && event.altKey;
-  if (concordanceShortcut && applicationStore.getState().navigation.view === "editor") {
-    event.preventDefault();
-    event.stopPropagation();
-    concordanceController.open();
-    return;
-  }
-  if (event.key === "Escape" && !els.concordanceOverlay.classList.contains("hidden")) {
-    event.preventDefault();
-    concordanceController.close();
-    return;
-  }
-  if (event.key === "Escape" && !els.commandPaletteOverlay.classList.contains("hidden")) {
-    event.preventDefault();
-    paletteController?.close?.();
-    return;
-  }
-  if (event.key === "Escape" && applicationStore.getState().interface.focusMode) {
-    event.preventDefault();
-    setFocusMode(false);
-  }
-}
-
 function qualityLabel(value) {
   const label = {
     "student-review": "Student review",
@@ -7467,7 +7441,7 @@ function wireEvents() {
     if (event.target.closest(".menu")) return;
     document.querySelectorAll(".menu[open]").forEach((menu) => menu.removeAttribute("open"));
   });
-  window.addEventListener("keydown", handleGlobalKeydown, true);
+  globalKeyboardController.mount();
   els.segmentGridWrap.addEventListener("scroll", () => {
     verticalFeatureState.segmentGrid.scheduleScroll(() => {
       renderSegments({ fromScroll: true, preserveScroll: true });

@@ -1,6 +1,7 @@
 import { createAppStore } from "./app-store.js";
 import { createApplicationEvents } from "./events.js";
 import { createNavigationController } from "./navigation-controller.js";
+import { createGlobalKeyboardController } from "./global-keyboard-controller.js";
 import { createProjectRepository } from "../data/project-repository.js";
 import { createPreferencesRepository } from "../data/preferences-repository.js";
 import { createStorageRepository } from "../data/storage-repository.js";
@@ -270,6 +271,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createSegmentConfirmationStateService,
       createSegmentTmSaveController,
       createConcordanceController,
+      createGlobalKeyboardController,
       createSegmentNavigationController,
       createSegmentDraftApplicationService,
       createTargetReplacementController,

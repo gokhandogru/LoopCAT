@@ -157,6 +157,7 @@ const requiredReleaseFiles = [
   "src/entry/test.js",
   "src/app/bootstrap.js",
   "src/app/app-store.js",
+  "src/app/global-keyboard-controller.js",
   "src/app/navigation-controller.js",
   "src/app/compatibility-module-registry.js",
   "src/app/install-runtime.js",
@@ -259,6 +260,7 @@ const requiredReleaseFiles = [
   "tests/unit/cohere-provider-adapter.test.cjs",
   "tests/unit/compatibility-module-registry.test.cjs",
   "tests/unit/app-store.test.cjs",
+  "tests/unit/global-keyboard-controller.test.cjs",
   "tests/unit/editor-state.test.cjs",
   "tests/unit/editor-session-store.test.cjs",
   "tests/unit/editor-context-controller.test.cjs",
@@ -386,6 +388,8 @@ const i18nValidateScript = readText("scripts/i18n-validate.cjs");
 const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-registry.js");
 const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-module-registry.test.cjs");
 const installRuntimeJs = readText("src/app/install-runtime.js");
+const globalKeyboardControllerJs = readText("src/app/global-keyboard-controller.js");
+const globalKeyboardControllerUnitTests = readText("tests/unit/global-keyboard-controller.test.cjs");
 const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
 const editorSessionStoreUnitTests = readText("tests/unit/editor-session-store.test.cjs");
 const editorFilterStoreJs = readText("src/features/editor/filter-store.js");
@@ -3927,24 +3931,26 @@ assertIncludes(
   "focusController.open(overlay",
   "PaletteController must contain and restore command-palette focus."
 );
-for (const directConsumer of [
-  "paletteController?.open?.()",
-  "paletteController?.close?.()",
-  'els.commandPaletteBtn.addEventListener("click", () => paletteController?.open?.())'
-]) {
+assertIncludes(
+  appJs,
+  'els.commandPaletteBtn.addEventListener("click", () => paletteController?.open?.())',
+  "the command-palette toolbar opener must call PaletteController directly."
+);
+for (const directConsumer of ["palette?.open?.()", "palette?.close?.()"]) {
   assertIncludes(
-    appJs,
+    globalKeyboardControllerJs,
     directConsumer,
-    `command-palette consumers must call PaletteController directly: ${directConsumer}.`
+    `global keyboard routing must call the optional PaletteController boundary directly: ${directConsumer}.`
   );
 }
 assert(
-  appJs.split("paletteController?.open?.()").length - 1 === 3,
-  "both global shortcuts and the toolbar opener must call PaletteController.open directly."
+  appJs.split("paletteController?.open?.()").length - 1 === 1,
+  "only the toolbar opener should remain as an app.js PaletteController.open consumer."
 );
 assert(
-  appJs.split("paletteController?.close?.()").length - 1 === 1,
-  "the global Escape route must call PaletteController.close directly."
+  globalKeyboardControllerJs.split("palette?.open?.()").length - 1 === 2 &&
+    globalKeyboardControllerJs.split("palette?.close?.()").length - 1 === 1,
+  "both global open shortcuts and the Escape route must call the optional PaletteController boundary directly."
 );
 assertIncludes(
   appWorkflowDriverJs,
@@ -3961,6 +3967,87 @@ for (const removedFacade of ["openCommandPalette", "closeCommandPalette", "rende
   assert(
     !directFacade.test(appJs) && !directFacade.test(appWorkflowDriverJs),
     `${removedFacade} compatibility façade must not return to app.js or the workflow driver.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createGlobalKeyboardController } from "./global-keyboard-controller.js";',
+  "the application runtime must install the checked global keyboard controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createGlobalKeyboardController,",
+  "the application runtime must expose the checked global keyboard controller factory."
+);
+for (const boundary of [
+  'target.addEventListener("keydown", handleKeydown, true)',
+  'target.removeEventListener("keydown", handleKeydown, true)',
+  "event.target?.matches?.(\"input, textarea, [contenteditable='true']\")",
+  "const projectId = commands.getProjectId()",
+  "event.shiftKey ? commands.canRedo(projectId) : commands.canUndo(projectId)",
+  "void (event.shiftKey ? commands.redo() : commands.undo())",
+  'event.shiftKey && key === "p"',
+  'const isK = key === "k" || event.code === "KeyK"',
+  'context.getView() === "editor" &&',
+  "context.hasProject()",
+  "const concordanceShortcut = isK && (event.ctrlKey || event.metaKey) && event.altKey",
+  'event.key === "Escape" && concordance.isOpen()',
+  'event.key === "Escape" && palette?.isOpen?.()',
+  'event.key === "Escape" && focus.isActive()'
+]) {
+  assertIncludes(
+    globalKeyboardControllerJs,
+    boundary,
+    `GlobalKeyboardController must retain characterized listener and routing policy: ${boundary}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createGlobalKeyboardController({",
+  "target: window",
+  "normalizeKey: stableLower",
+  "getProjectId: () => state.commandProjectId || editorSessionStore.getProject()?.id || null",
+  "canUndo: (projectId) => Boolean(appRuntime?.commands?.bus?.canUndo?.(projectId))",
+  "canRedo: (projectId) => Boolean(appRuntime?.commands?.bus?.canRedo?.(projectId))",
+  'isOpen: () => !els.commandPaletteOverlay.classList.contains("hidden")',
+  "open: paletteController?.open",
+  "close: paletteController?.close",
+  'isOpen: () => !els.concordanceOverlay.classList.contains("hidden")',
+  "globalKeyboardController.mount()"
+]) {
+  assertIncludes(appJs, boundary, `global keyboard composition must inject the checked ${boundary} boundary.`);
+}
+assert(
+  !appJs.includes("function handleGlobalKeydown") &&
+    !appJs.includes('window.addEventListener("keydown"') &&
+    !appWorkflowDriverJs.includes("handleGlobalKeydown"),
+  "application-global keyboard listener lifecycle and routing must not return to app.js or the workflow driver."
+);
+for (const forbiddenOwner of [
+  "applicationStore",
+  "editorSessionStore",
+  "paletteController",
+  "concordanceController",
+  "undoLastCommand",
+  "redoLastCommand",
+  "setFocusMode"
+]) {
+  assert(
+    !globalKeyboardControllerJs.includes(forbiddenOwner),
+    `GlobalKeyboardController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "GlobalKeyboardController owns capture listener lifecycle and exposes a checked immutable API",
+  "global Undo and Redo preserve editable exclusion, capability checks, project identity, and event effects",
+  "palette shortcuts preserve modifier overlap, KeyK fallback, optional startup behavior, and event order",
+  "Focus-mode shortcut preserves editor and project eligibility",
+  "concordance shortcut preserves editor qualification, Alt priority, KeyK fallback, and synchronous failures",
+  "Escape preserves concordance, palette, and Focus-mode priority without stopping propagation"
+]) {
+  assertIncludes(
+    globalKeyboardControllerUnitTests,
+    testName,
+    `focused global keyboard tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
@@ -5237,13 +5324,15 @@ for (const boundary of [
 ]) {
   assertIncludes(appJs, boundary, `concordance composition must inject the checked ${boundary} boundary.`);
 }
-for (const directConsumer of [
-  "concordanceController.mount()",
-  "run: concordanceController.open",
-  "concordanceController.open()",
-  "concordanceController.close()"
-]) {
+for (const directConsumer of ["concordanceController.mount()", "run: concordanceController.open"]) {
   assertIncludes(appJs, directConsumer, `concordance consumers must call the controller directly: ${directConsumer}.`);
+}
+for (const directConsumer of ["concordance.open()", "concordance.close()"]) {
+  assertIncludes(
+    globalKeyboardControllerJs,
+    directConsumer,
+    `global keyboard consumers must call the injected ConcordanceController boundary directly: ${directConsumer}.`
+  );
 }
 for (const removedHelper of [
   "selectedConcordanceKeyword",
