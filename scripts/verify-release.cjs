@@ -251,6 +251,7 @@ const requiredReleaseFiles = [
   "src/features/resources/tm-pretranslation-dialog-controller.js",
   "src/features/import-export/import-export-controller.js",
   "src/features/workspace/recovery-workspace-controller.js",
+  "src/features/workspace/workspace-package-save-controller.js",
   "src/i18n/language-input-service.js",
   "src/i18n/ui-localization-service.js",
   "tests/unit/dialog-intent-controllers.test.cjs",
@@ -337,6 +338,7 @@ const requiredReleaseFiles = [
   "tests/unit/review-state-controller.test.cjs",
   "tests/unit/import-export-controller.test.cjs",
   "tests/unit/recovery-workspace-controller.test.cjs",
+  "tests/unit/workspace-package-save-controller.test.cjs",
   "tests/unit/language-input-service.test.cjs",
   "tests/unit/ui-localization-service.test.cjs",
   "tests/unit/resource-trash.test.cjs",
@@ -632,6 +634,8 @@ const qualityReviewControllerJs = readText("src/features/quality/quality-review-
 const qualityReviewControllerUnitTests = readText("tests/unit/quality-review-controller.test.cjs");
 const recoveryWorkspaceControllerJs = readText("src/features/workspace/recovery-workspace-controller.js");
 const recoveryWorkspaceControllerUnitTests = readText("tests/unit/recovery-workspace-controller.test.cjs");
+const workspacePackageSaveControllerJs = readText("src/features/workspace/workspace-package-save-controller.js");
+const workspacePackageSaveControllerUnitTests = readText("tests/unit/workspace-package-save-controller.test.cjs");
 const importExportControllerJs = readText("src/features/import-export/import-export-controller.js");
 const importExportControllerUnitTests = readText("tests/unit/import-export-controller.test.cjs");
 const deliveryExportControllerJs = readText("src/features/import-export/delivery-export-controller.js");
@@ -5008,6 +5012,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createWorkspacePackageSaveController } from "../features/workspace/workspace-package-save-controller.js";',
+  "The application runtime must install the checked workspace package-save controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createWorkspacePackageSaveController,",
+  "The application runtime must expose the checked workspace package-save controller factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createProjectPackagePortabilityService } from "../features/import-export/project-package-portability-service.js";',
   "The application runtime must install the checked project-package portability service."
 );
@@ -6628,8 +6642,8 @@ for (const removedHelper of [
   );
 }
 assert(
-  (appJs.match(/\bprojectExportBuildService\.buildProjectPackage\b/g) || []).length === 2 &&
-    (appJs.match(/\bprojectExportBuildService\.assertValidProjectPackageForWrite\b/g) || []).length === 2 &&
+  !appJs.includes("projectExportBuildService.buildProjectPackage") &&
+    !appJs.includes("projectExportBuildService.assertValidProjectPackageForWrite") &&
     (appJs.match(/\bprojectExportBuildService\.buildBackupExport\b/g) || []).length === 1 &&
     !appJs.includes("projectExportBuildService.assertValidBackupForWrite") &&
     (appWorkflowDriverJs.match(/\bprojectExportBuildService\.buildProjectPackage\b/g) || []).length === 4 &&
@@ -6950,6 +6964,185 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/import-export/project-import-restore-controller.js"',
   "source-catalog extraction must scan the checked project-import/restore controller."
+);
+for (const snippet of [
+  "WorkspacePackageSaveController requires storage, session, autosave, build, project, activity, workspace, validation, presentation, status, preference, timer, test, and logger boundaries.",
+  "async function chooseFolder()",
+  "if (!storage.isSupported())",
+  'status.set("Folder storage is unavailable in this browser", "dirty")',
+  'storage.chooseFolder({ startIn: "documents" })',
+  "const missingPackageCount = await workspace.markMissingLocalDirty()",
+  '"Workspace folder connected"',
+  "async function saveById(projectId, saveOptions = {})",
+  "projects.knownById(projectId) || (await projects.list()).find((item) => item.id === projectId)",
+  'throw new Error("Project package could not be found.")',
+  "await autosave.flush(projectId)",
+  "build.buildProjectPackage(project, null, saveOptions)",
+  'build.assertValidProjectPackageForWrite(pkg, "save project package to workspace")',
+  "await storage.saveProjectPackage(pkg)",
+  "if (session.getProject()?.id === projectId) workspace.setStatus(await storage.getStatus())",
+  "workspace.clearDirty(projectId)",
+  "workspace.markDirty(projectId)",
+  "async function saveCurrent()",
+  "if (!session.getProject()) return",
+  "await autosave.flush()",
+  "if (!workspace.isConnected()) await chooseFolder()",
+  "const previewPackage = await build.buildProjectPackage(session.getProject())",
+  "const shouldSimulateActivityFailure = test.shouldFailActivity()",
+  'activity.draft(session.getProject(), "workspace-save", "Project package saved to workspace folder")',
+  "activityEvents: pendingActivityEvent ? [pendingActivityEvent] : []",
+  'throw new Error("Simulated workspace save activity failure")',
+  'await activity.bulkPut("activityEvents", [pendingActivityEvent])',
+  "session.replaceActivityEvents(await activity.list(session.getProject().id))",
+  "presentation.renderBackupReminder()",
+  'logger.warn("Workspace save activity log failed.", activityError)',
+  "workspace.setStatus(await storage.getStatus())",
+  "presentation.renderValidation(pkg.validation)",
+  'result.validationReportSaved === false ? "; validation report sidecar failed" : ""',
+  "validation.count(pkg.validation)",
+  "async function autosaveDirty()",
+  "if (workspace.isAutosaving()) return",
+  "if (!workspace.isConnected() || !workspace.hasDirty()) return",
+  "workspace.setAutosaving(true)",
+  "const dirtyIds = workspace.dirtyIds()",
+  "await saveById(projectId)",
+  '"Background workspace save failed"',
+  "workspace.setAutosaving(false)",
+  "async function saveRecovery()",
+  "if (!workspace.recoveryIds().length) return",
+  'status.set("Saving recovered workspace packages...")',
+  "await autosaveDirty()",
+  "presentation.renderRecovery()",
+  "function startAutosave()",
+  "if (workspace.getAutosaveTimer()) timers.clear(workspace.getAutosaveTimer())",
+  "workspace.setAutosaveTimer(timers.set(autosaveDirty, 5 * 60 * 1000))",
+  "async function maybeSaveFromSettings(shouldSaveToFolder = preferences.saveToFolder())",
+  "if (!shouldSaveToFolder || !session.getProject()) return false",
+  'if (error.name === "AbortError")',
+  'status.set("Project kept in browser cache", "saved")',
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    workspacePackageSaveControllerJs,
+    snippet,
+    `WorkspacePackageSaveController must retain characterized connection, package-save, background, recovery, timer, and settings policy: ${snippet}`
+  );
+}
+assert(
+  !workspacePackageSaveControllerJs.includes("workspaceStorage") &&
+    !workspacePackageSaveControllerJs.includes("editorSessionStore") &&
+    !workspacePackageSaveControllerJs.includes("autosaveService") &&
+    !workspacePackageSaveControllerJs.includes("projectExportBuildService") &&
+    !/\bknownProjectById\b/.test(workspacePackageSaveControllerJs) &&
+    !/\blistProjects\b/.test(workspacePackageSaveControllerJs) &&
+    !workspacePackageSaveControllerJs.includes("draftProjectActivityEvent") &&
+    !workspacePackageSaveControllerJs.includes("markLocalProjectsMissingFromWorkspaceDirty") &&
+    !workspacePackageSaveControllerJs.includes("clearWorkspaceDirty") &&
+    !workspacePackageSaveControllerJs.includes("markWorkspaceDirty") &&
+    !workspacePackageSaveControllerJs.includes("workspaceDirtyIds") &&
+    !workspacePackageSaveControllerJs.includes("workspaceRecoveryProjectIds") &&
+    !workspacePackageSaveControllerJs.includes("state.workspace") &&
+    !workspacePackageSaveControllerJs.includes("setSaveStatus") &&
+    !workspacePackageSaveControllerJs.includes("els.") &&
+    !workspacePackageSaveControllerJs.includes("LOOPCAT_TEST_BUILD") &&
+    !workspacePackageSaveControllerJs.includes("WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG") &&
+    !workspacePackageSaveControllerJs.includes("console") &&
+    !workspacePackageSaveControllerJs.includes("setInterval") &&
+    !workspacePackageSaveControllerJs.includes("clearInterval"),
+  "the checked workspace package-save controller must use only its injected storage, session, autosave, build, project, activity, workspace, validation, presentation, status, preference, timer, test, and logger boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createWorkspacePackageSaveController({",
+  "isSupported: () => Boolean(workspaceStorage?.isSupported())",
+  "chooseFolder: (options) => workspaceStorage.chooseWorkspaceFolder(options)",
+  "getStatus: () => workspaceStorage.getStatus()",
+  "saveProjectPackage: (pkg) => workspaceStorage.saveProjectPackage(pkg)",
+  "getProject: editorSessionStore.getProject",
+  "replaceActivityEvents: editorSessionStore.replaceActivityEvents",
+  "autosave: { flush: autosaveService.flush }",
+  "build: projectExportBuildService",
+  "knownById: knownProjectById",
+  "list: listProjects",
+  "draft: draftProjectActivityEvent",
+  "bulkPut,",
+  "list: listActivityEvents",
+  "markMissingLocalDirty: markLocalProjectsMissingFromWorkspaceDirty",
+  "clearDirty: clearWorkspaceDirty",
+  "markDirty: markWorkspaceDirty",
+  "hasDirty: () => Boolean(state.workspaceDirtyProjectIds.size)",
+  "dirtyIds: workspaceDirtyIds",
+  "recoveryIds: workspaceRecoveryProjectIds",
+  "renderValidation: renderValidationReport",
+  "renderBackupReminder,",
+  "renderRecovery: renderWorkspaceRecoveryPanel",
+  "status: { set: setSaveStatus }",
+  "saveToFolder: () => Boolean(els.saveProjectToFolderInput?.checked)",
+  "clear: (timer) => clearInterval(timer)",
+  "set: (callback, delayMs) => setInterval(callback, delayMs)",
+  "Boolean(LOOPCAT_TEST_BUILD && state[WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG])",
+  "logger: console",
+  "chooseWorkspace: (...args) => workspacePackageSaveController.chooseFolder(...args)",
+  "saveProject: (...args) => workspacePackageSaveController.saveCurrent(...args)",
+  "saveRecovery: (...args) => workspacePackageSaveController.saveRecovery(...args)",
+  "chooseWorkspace: workspacePackageSaveController.chooseFolder"
+]) {
+  assertIncludes(appJs, boundary, `workspace package-save composition must inject the checked ${boundary} boundary.`);
+}
+for (const removedHelper of [
+  "chooseWorkspaceFolder",
+  "saveCurrentProjectPackageToWorkspace",
+  "saveProjectPackageToWorkspaceById",
+  "autosaveDirtyWorkspacePackages",
+  "saveWorkspaceRecoveryPackages",
+  "startWorkspaceAutosave",
+  "maybeSaveProjectPackageFromSettings"
+]) {
+  assert(
+    !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  (appJs.match(/\bworkspacePackageSaveController\.chooseFolder\b/g) || []).length === 3 &&
+    (appJs.match(/\bworkspacePackageSaveController\.saveCurrent\b/g) || []).length === 1 &&
+    !appJs.includes("workspacePackageSaveController.saveById") &&
+    (appJs.match(/\bworkspacePackageSaveController\.autosaveDirty\b/g) || []).length === 2 &&
+    (appJs.match(/\bworkspacePackageSaveController\.saveRecovery\b/g) || []).length === 2 &&
+    (appJs.match(/\bworkspacePackageSaveController\.startAutosave\b/g) || []).length === 1 &&
+    (appJs.match(/\bworkspacePackageSaveController\.maybeSaveFromSettings\b/g) || []).length === 2 &&
+    (appWorkflowDriverJs.match(/\bworkspacePackageSaveController\.chooseFolder\b/g) || []).length === 2 &&
+    (appWorkflowDriverJs.match(/\bworkspacePackageSaveController\.saveCurrent\b/g) || []).length === 2 &&
+    (appWorkflowDriverJs.match(/\bworkspacePackageSaveController\.saveById\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bworkspacePackageSaveController\.autosaveDirty\b/g) || []).length === 3 &&
+    !appWorkflowDriverJs.includes("workspacePackageSaveController.saveRecovery") &&
+    !appWorkflowDriverJs.includes("workspacePackageSaveController.startAutosave") &&
+    !appWorkflowDriverJs.includes("workspacePackageSaveController.maybeSaveFromSettings"),
+  "recovery, project-settings, timer, application, and workflow workspace package-save consumers must call WorkspacePackageSaveController directly."
+);
+for (const testName of [
+  "WorkspacePackageSaveController preserves unsupported and connected folder-selection outcomes",
+  "WorkspacePackageSaveController preserves singular folder-selection grammar and delegate failures",
+  "WorkspacePackageSaveController saves known and repository-fallback projects with exact active status policy",
+  "WorkspacePackageSaveController preserves missing-project and failed-save dirty timing",
+  "WorkspacePackageSaveController completes manual current save with exact two-pass activity sequencing",
+  "WorkspacePackageSaveController preserves manual save connection, sidecar, and activity-warning branches",
+  "WorkspacePackageSaveController preserves simulated activity failure without drafting an event",
+  "WorkspacePackageSaveController background autosave preserves guards, ordering, continuation, and cleanup",
+  "WorkspacePackageSaveController contains outer background failures and releases busy state",
+  "WorkspacePackageSaveController preserves recovery and settings opt-in outcomes",
+  "WorkspacePackageSaveController replaces its timer and exposes an immutable checked API"
+]) {
+  assertIncludes(
+    workspacePackageSaveControllerUnitTests,
+    testName,
+    `focused workspace package-save tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/workspace/workspace-package-save-controller.js"',
+  "source-catalog extraction must scan the checked workspace package-save controller."
 );
 for (const snippet of [
   "ProjectDocumentImportController requires checked session, catalog, file, format, repository, history, progress, ID, summary, navigation, activity, workspace, status, presentation, text, and confirmation boundaries.",
@@ -10008,9 +10201,9 @@ assertIncludes(
   "workspace-storage-test.html must verify validation-report sidecar failures still commit the durable package and manifest."
 );
 assertIncludes(
-  appJs,
+  workspacePackageSaveControllerJs,
   "validation report sidecar failed",
-  "app.js must surface non-blocking workspace validation sidecar write failures in the save status."
+  "WorkspacePackageSaveController must surface non-blocking workspace validation sidecar write failures in the save status."
 );
 assertIncludes(
   workspaceStorageJs,
@@ -14955,9 +15148,9 @@ assertIncludes(
   "app workflow test must verify connecting a folder does not block sync for local projects already present in the workspace manifest."
 );
 assertIncludes(
-  appJs,
-  "await autosaveService.flush(projectId)",
-  "app.js must flush queued active segment saves before writing workspace project packages."
+  workspacePackageSaveControllerJs,
+  "await autosave.flush(projectId)",
+  "WorkspacePackageSaveController must flush queued active segment saves before writing workspace project packages."
 );
 assertIncludes(
   appJs,

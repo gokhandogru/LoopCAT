@@ -3475,6 +3475,7 @@ dialogLifecycleController?.register?.({
   beforeOpen: renderTrashList
 });
 let projectExportController;
+let workspacePackageSaveController;
 const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecoveryWorkspaceController?.({
   elements: {
     menu: els.workspaceMenu,
@@ -3504,12 +3505,12 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
   label: uiLocalizationService.label,
   formatDateTime,
   safeText: displaySafeText,
-  chooseWorkspace: chooseWorkspaceFolder,
-  saveProject: saveCurrentProjectPackageToWorkspace,
+  chooseWorkspace: (...args) => workspacePackageSaveController.chooseFolder(...args),
+  saveProject: (...args) => workspacePackageSaveController.saveCurrent(...args),
   syncWorkspace: () => fileImportService.runTask("Workspace sync", () => syncWorkspaceFromFolder()),
   exportWorkspaceBackup: exportWorkspaceBackupToFolder,
   repairWorkspace: repairWorkspaceLinks,
-  saveRecovery: saveWorkspaceRecoveryPackages,
+  saveRecovery: (...args) => workspacePackageSaveController.saveRecovery(...args),
   exportRecoveryCopy: (...args) => projectExportController.exportProjectPackage(...args),
   dismissBackupReminder: () => dismissBackupReminder(),
   scheduleFrame: requestAnimationFrame,
@@ -3609,6 +3610,69 @@ projectExportController = appRuntime.featureFactories.createProjectExportControl
   },
   logger: console
 });
+workspacePackageSaveController =
+  appRuntime.featureFactories.createWorkspacePackageSaveController({
+    storage: {
+      isSupported: () => Boolean(workspaceStorage?.isSupported()),
+      chooseFolder: (options) => workspaceStorage.chooseWorkspaceFolder(options),
+      getStatus: () => workspaceStorage.getStatus(),
+      saveProjectPackage: (pkg) => workspaceStorage.saveProjectPackage(pkg)
+    },
+    session: {
+      getProject: editorSessionStore.getProject,
+      replaceActivityEvents: editorSessionStore.replaceActivityEvents
+    },
+    autosave: { flush: autosaveService.flush },
+    build: projectExportBuildService,
+    projects: {
+      knownById: knownProjectById,
+      list: listProjects
+    },
+    activity: {
+      draft: draftProjectActivityEvent,
+      bulkPut,
+      list: listActivityEvents
+    },
+    workspace: {
+      isConnected: () => Boolean(state.workspaceStatus?.connected),
+      setStatus: (status) => {
+        state.workspaceStatus = status;
+      },
+      markMissingLocalDirty: markLocalProjectsMissingFromWorkspaceDirty,
+      clearDirty: clearWorkspaceDirty,
+      markDirty: markWorkspaceDirty,
+      hasDirty: () => Boolean(state.workspaceDirtyProjectIds.size),
+      dirtyIds: workspaceDirtyIds,
+      recoveryIds: workspaceRecoveryProjectIds,
+      isAutosaving: () => Boolean(state.workspaceAutosaving),
+      setAutosaving: (value) => {
+        state.workspaceAutosaving = value;
+      },
+      getAutosaveTimer: () => state.workspaceAutosaveTimer,
+      setAutosaveTimer: (timer) => {
+        state.workspaceAutosaveTimer = timer;
+      }
+    },
+    validation: { count: reportCount },
+    presentation: {
+      renderWorkspaceStatus,
+      renderValidation: renderValidationReport,
+      renderBackupReminder,
+      renderRecovery: renderWorkspaceRecoveryPanel
+    },
+    status: { set: setSaveStatus },
+    preferences: {
+      saveToFolder: () => Boolean(els.saveProjectToFolderInput?.checked)
+    },
+    timers: {
+      clear: (timer) => clearInterval(timer),
+      set: (callback, delayMs) => setInterval(callback, delayMs)
+    },
+    test: {
+      shouldFailActivity: () => Boolean(LOOPCAT_TEST_BUILD && state[WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG])
+    },
+    logger: console
+  });
 const projectImportRestoreController =
   appRuntime.featureFactories.createProjectImportRestoreController({
     files: {
@@ -3859,7 +3923,7 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
   renderResourcePickers: projectResourceSelectionController.render,
   renderFrequentPairs: projectLanguagePairShortcutsController.render,
   save: saveProjectFromDialog,
-  chooseWorkspace: chooseWorkspaceFolder,
+  chooseWorkspace: workspacePackageSaveController.chooseFolder,
   workspaceSupported: () => Boolean(workspaceStorage?.isSupported()),
   translate: uiLocalizationService.source,
   scheduleFrame: requestAnimationFrame,
@@ -4928,7 +4992,7 @@ function registerOfflineAppShell() {
     beforeActivate: async () => {
       await autosaveService.flush();
       if (state.workspaceStatus?.connected && state.workspaceDirtyProjectIds.size) {
-        await saveWorkspaceRecoveryPackages();
+        await workspacePackageSaveController.saveRecovery();
       }
     },
     onStateChange: renderOfflineUpdateState,
@@ -6436,135 +6500,6 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-async function chooseWorkspaceFolder() {
-  if (!workspaceStorage?.isSupported()) {
-    setSaveStatus("Folder storage is unavailable in this browser", "dirty");
-    return;
-  }
-  state.workspaceStatus = await workspaceStorage.chooseWorkspaceFolder({ startIn: "documents" });
-  const missingPackageCount = await markLocalProjectsMissingFromWorkspaceDirty();
-  renderWorkspaceStatus();
-  setSaveStatus(
-    missingPackageCount
-      ? `Workspace folder connected; ${missingPackageCount} local project package${missingPackageCount === 1 ? "" : "s"} need${missingPackageCount === 1 ? "s" : ""} to be saved`
-      : "Workspace folder connected",
-    missingPackageCount ? "dirty" : "saved"
-  );
-}
-
-async function saveCurrentProjectPackageToWorkspace() {
-  if (!editorSessionStore.getProject()) return;
-  await autosaveService.flush();
-  if (!state.workspaceStatus?.connected) await chooseWorkspaceFolder();
-  if (!state.workspaceStatus?.connected) return;
-  const previewPackage = await projectExportBuildService.buildProjectPackage(editorSessionStore.getProject());
-  projectExportBuildService.assertValidProjectPackageForWrite(previewPackage, "save project package to workspace");
-  const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && state[WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG]);
-  const pendingActivityEvent = shouldSimulateActivityFailure
-    ? null
-    : draftProjectActivityEvent(editorSessionStore.getProject(), "workspace-save", "Project package saved to workspace folder");
-  const { pkg, result } = await saveProjectPackageToWorkspaceById(editorSessionStore.getProject().id, {
-    activityEvents: pendingActivityEvent ? [pendingActivityEvent] : []
-  });
-  let activityLogged = true;
-  try {
-    if (shouldSimulateActivityFailure) throw new Error("Simulated workspace save activity failure");
-    if (pendingActivityEvent) {
-      await bulkPut("activityEvents", [pendingActivityEvent]);
-      editorSessionStore.replaceActivityEvents(await listActivityEvents(editorSessionStore.getProject().id));
-    }
-    renderBackupReminder();
-  } catch (activityError) {
-    activityLogged = false;
-    console.warn("Workspace save activity log failed.", activityError);
-  }
-  if (!activityLogged) markWorkspaceDirty(editorSessionStore.getProject().id);
-  state.workspaceStatus = await workspaceStorage.getStatus();
-  renderValidationReport(pkg.validation);
-  const validationReportWarning = result.validationReportSaved === false ? "; validation report sidecar failed" : "";
-  setSaveStatus(
-    activityLogged ? `Saved to ${result.packagePath}${validationReportWarning}` : `Saved to ${result.packagePath}; activity log failed${validationReportWarning}`,
-    !activityLogged || result.validationReportSaved === false || reportCount(pkg.validation) ? "dirty" : "saved"
-  );
-}
-
-async function saveProjectPackageToWorkspaceById(projectId, options = {}) {
-  const project = knownProjectById(projectId) || (await listProjects()).find((item) => item.id === projectId);
-  if (!project) throw new Error("Project package could not be found.");
-  try {
-    await autosaveService.flush(projectId);
-    const pkg = await projectExportBuildService.buildProjectPackage(project, null, options);
-    projectExportBuildService.assertValidProjectPackageForWrite(pkg, "save project package to workspace");
-    const result = await workspaceStorage.saveProjectPackage(pkg);
-    if (editorSessionStore.getProject()?.id === projectId) {
-      state.workspaceStatus = await workspaceStorage.getStatus();
-    }
-    clearWorkspaceDirty(projectId);
-    return { pkg, result };
-  } catch (error) {
-    markWorkspaceDirty(projectId);
-    throw error;
-  }
-}
-
-async function autosaveDirtyWorkspacePackages() {
-  if (state.workspaceAutosaving) return;
-  if (!state.workspaceStatus?.connected || !state.workspaceDirtyProjectIds.size) return;
-  state.workspaceAutosaving = true;
-  try {
-    const dirtyIds = workspaceDirtyIds();
-    const failures = [];
-    for (const projectId of dirtyIds) {
-      try {
-        await saveProjectPackageToWorkspaceById(projectId);
-      } catch (error) {
-        console.warn(error);
-        failures.push(error);
-      }
-    }
-    state.workspaceStatus = await workspaceStorage.getStatus();
-    if (failures.length) {
-      setSaveStatus(`${failures.length} background workspace save${failures.length === 1 ? "" : "s"} failed; other dirty packages were still attempted.`, "dirty");
-    }
-  } catch (error) {
-    console.warn(error);
-    setSaveStatus(error.message || "Background workspace save failed", "dirty");
-  } finally {
-    state.workspaceAutosaving = false;
-  }
-}
-
-async function saveWorkspaceRecoveryPackages() {
-  if (!workspaceRecoveryProjectIds().length) return;
-  if (!state.workspaceStatus?.connected) await chooseWorkspaceFolder();
-  if (!state.workspaceStatus?.connected) return;
-  setSaveStatus("Saving recovered workspace packages...");
-  await autosaveDirtyWorkspacePackages();
-  renderWorkspaceRecoveryPanel();
-}
-
-function startWorkspaceAutosave() {
-  if (state.workspaceAutosaveTimer) clearInterval(state.workspaceAutosaveTimer);
-  state.workspaceAutosaveTimer = setInterval(autosaveDirtyWorkspacePackages, 5 * 60 * 1000);
-}
-
-async function maybeSaveProjectPackageFromSettings(shouldSaveToFolder = Boolean(els.saveProjectToFolderInput?.checked)) {
-  if (!shouldSaveToFolder || !editorSessionStore.getProject()) return false;
-  if (!workspaceStorage?.isSupported()) return false;
-  try {
-    if (!state.workspaceStatus?.connected) await chooseWorkspaceFolder();
-    if (!state.workspaceStatus?.connected) return false;
-    await saveCurrentProjectPackageToWorkspace();
-    return true;
-  } catch (error) {
-    if (error.name === "AbortError") {
-      setSaveStatus("Project kept in browser cache", "saved");
-      return false;
-    }
-    throw error;
-  }
-}
-
 async function saveProjectFromDialog() {
   if (els.projectForm?.checkValidity && !els.projectForm.checkValidity()) {
     els.projectForm.reportValidity?.();
@@ -6576,7 +6511,7 @@ async function saveProjectFromDialog() {
   const shouldSaveToFolder = Boolean(els.saveProjectToFolderInput?.checked);
   if (shouldSaveToFolder && workspaceStorage?.isSupported() && !state.workspaceStatus?.connected) {
     try {
-      await chooseWorkspaceFolder();
+      await workspacePackageSaveController.chooseFolder();
     } catch (error) {
       if (error.name !== "AbortError") throw error;
       els.saveProjectToFolderInput.checked = false;
@@ -6614,7 +6549,7 @@ async function saveProjectFromDialog() {
       console.warn("Project settings activity log failed.", activityError);
       markWorkspaceDirty();
     }
-    const savedToFolder = await maybeSaveProjectPackageFromSettings(shouldSaveToFolder);
+    const savedToFolder = await workspacePackageSaveController.maybeSaveFromSettings(shouldSaveToFolder);
     if (!savedToFolder) {
       setSaveStatus(
         activityLogged ? "Project settings saved" : "Project settings saved; activity log failed",
@@ -6649,7 +6584,7 @@ async function saveProjectFromDialog() {
   markWorkspaceDirty(project.id);
   await loadProjects(false);
   await openProject(project.id);
-  const savedToFolder = await maybeSaveProjectPackageFromSettings(shouldSaveToFolder);
+  const savedToFolder = await workspacePackageSaveController.maybeSaveFromSettings(shouldSaveToFolder);
   if (!savedToFolder) {
     setSaveStatus(activityLogged ? "Project created" : "Project created; activity log failed", activityLogged ? "saved" : "dirty");
   }
@@ -6891,13 +6826,13 @@ function wireEvents() {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "hidden" || !shouldWarnBeforeUnload()) return;
     autosaveService.flush()
-      .then(() => autosaveDirtyWorkspacePackages())
+      .then(() => workspacePackageSaveController.autosaveDirty())
       .catch((error) => console.warn(error));
   });
   window.addEventListener("pagehide", () => {
     if (!shouldWarnBeforeUnload()) return;
     autosaveService.flush()
-      .then(() => autosaveDirtyWorkspacePackages())
+      .then(() => workspacePackageSaveController.autosaveDirty())
       .catch((error) => console.warn(error));
   });
 }
@@ -6915,7 +6850,7 @@ function wireEvents() {
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "wiring UI events";
   wireEvents();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "starting workspace autosave";
-  startWorkspaceAutosave();
+  workspacePackageSaveController.startAutosave();
   if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "starting application bootstrap";
   if (LOOPCAT_TEST_BUILD) window.__loopcatAppWorkflowProgress = "startup: restoring workspace state";
   restoreWorkspaceDirtyIds();

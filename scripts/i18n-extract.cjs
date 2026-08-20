@@ -146,6 +146,13 @@ const projectImportRestoreControllerPath = path.join(
   "import-export",
   "project-import-restore-controller.js"
 );
+const workspacePackageSaveControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "workspace",
+  "workspace-package-save-controller.js"
+);
 const projectPackagePortabilityServicePath = path.join(
   root,
   "src",
@@ -424,6 +431,11 @@ function main() {
     messagesByText,
     projectImportRestoreControllerPath,
     "src/features/import-export/project-import-restore-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    workspacePackageSaveControllerPath,
+    "src/features/workspace/workspace-package-save-controller.js"
   );
   extractScript(
     messagesByText,

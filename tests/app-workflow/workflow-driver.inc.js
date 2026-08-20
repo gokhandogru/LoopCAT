@@ -5147,7 +5147,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       clearWorkspaceDirtyMarkers();
       workspaceStorage.chooseWorkspaceFolder = async () => ({ supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 1, resourceCount: 0, backupCount: 0 });
       workspaceStorage.listProjectPackages = async () => [{ id: "other-project", name: "Other Project", packagePath: "projects/other/project.loopcat.json" }];
-      await chooseWorkspaceFolder();
+      await workspacePackageSaveController.chooseFolder();
       assert(
         state.workspaceDirtyProjectIds.has(project.id) &&
           els.workspaceMenuSummary.textContent.includes("unsaved") &&
@@ -5157,7 +5157,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       clearWorkspaceDirtyMarkers();
       workspaceStorage.listProjectPackages = async () => [{ id: project.id, name: project.name, packagePath: `projects/${project.id}/project.loopcat.json` }];
-      await chooseWorkspaceFolder();
+      await workspacePackageSaveController.chooseFolder();
       assert(
         !state.workspaceDirtyProjectIds.has(project.id),
         "workspace folder connection keeps local projects clean when the folder already has their package"
@@ -5236,7 +5236,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await waitFor(() => !state.workspaceDirtyProjectIds.has(project.id), "workspace recovery panel save");
       assert(els.workspaceRecoveryPanel.classList.contains("hidden"), "workspace recovery panel hides after saved packages are written");
       markWorkspaceDirty(project.id);
-      await autosaveDirtyWorkspacePackages();
+      await workspacePackageSaveController.autosaveDirty();
     } finally {
       workspaceStorage.saveProjectPackage = originalSaveProjectPackage;
       workspaceStorage.getStatus = originalGetWorkspaceStatus;
@@ -5263,7 +5263,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const pendingWorkspaceAutosaveText = `workspace autosave pending target ${Date.now()}`;
       targetEditController.updateDraft(pendingWorkspaceAutosaveIndex, pendingWorkspaceAutosaveText);
       assert(autosaveService.has(pendingWorkspaceAutosaveSegment.id), "pending active workspace autosave save created");
-      await autosaveDirtyWorkspacePackages();
+      await workspacePackageSaveController.autosaveDirty();
       const storedPendingWorkspaceAutosaveSegment = (await getProjectSegments(project.id)).find((segment) => segment.id === pendingWorkspaceAutosaveSegment.id);
       assert(
         pendingWorkspaceAutosavePackages.some((pkg) =>
@@ -5306,7 +5306,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     workspaceStorage.getStatus = async () => ({ ...state.workspaceStatus, projectCount: workspaceSaveActivityPackages.length });
     try {
       segmentTargetStateService.setHiddenField(state, WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG, true);
-      await saveCurrentProjectPackageToWorkspace();
+      await workspacePackageSaveController.saveCurrent();
       assert(
         workspaceSaveActivityPackages.some((pkg) => pkg.project.id === project.id) &&
           els.saveStatus.textContent.includes("activity log failed") &&
@@ -5331,7 +5331,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     try {
       let workspaceWriteFailureRejected = false;
       try {
-        await saveCurrentProjectPackageToWorkspace();
+        await workspacePackageSaveController.saveCurrent();
       } catch (error) {
         workspaceWriteFailureRejected = error.message.includes("Simulated workspace package write failure");
       }
@@ -5371,7 +5371,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     try {
       let invalidWorkspaceSaveRejected = false;
       try {
-        await saveProjectPackageToWorkspaceById(invalidWorkspaceProject.id);
+        await workspacePackageSaveController.saveById(invalidWorkspaceProject.id);
       } catch (error) {
         invalidWorkspaceSaveRejected = error.validation?.errors?.some((item) => item.includes("Project QA settings")) && error.message.includes("Cannot save project package");
       }
@@ -5389,7 +5389,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         originalConsoleWarn(...args);
       };
       try {
-        await autosaveDirtyWorkspacePackages();
+        await workspacePackageSaveController.autosaveDirty();
       } finally {
         console.warn = originalConsoleWarn;
       }
