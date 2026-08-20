@@ -1668,6 +1668,31 @@ const targetProducerController = appRuntime.featureFactories.createTargetProduce
   status: { set: setSaveStatus }
 });
 targetProducerController.mount();
+const concordanceController = appRuntime.featureFactories.createConcordanceController({
+  elements: {
+    overlay: els.concordanceOverlay,
+    closeButton: els.closeConcordanceBtn,
+    meta: els.concordanceMeta,
+    results: els.concordanceResults
+  },
+  session: { getProject: editorSessionStore.getProject },
+  navigation: { getView: () => applicationStore.getState().navigation.view },
+  tm: { listEntries: listTmEntries, getNames: projectTmNames },
+  resources: { summary: projectResourceSummary },
+  languages: { display: projectLanguageContextController.display },
+  localization: uiLocalizationService,
+  text: { normalizeCase: stableLower, escapeHtml, escapeRegExp },
+  safeHtml: { replace: replaceSafeHtml },
+  target: { insert: targetProducerController.insertTmTarget },
+  status: { set: setSaveStatus },
+  dom: {
+    getSelection: () => window.getSelection(),
+    getActiveElement: () => document.activeElement,
+    createElement: (tagName) => document.createElement(tagName),
+    createFragment: () => document.createDocumentFragment()
+  }
+});
+concordanceController.mount();
 const targetReplacementController = appRuntime.featureFactories.createTargetReplacementController({
   elements: {
     findInput: els.replaceFindInput,
@@ -4669,7 +4694,7 @@ function commandList() {
     { id: "qa", label: "Run QA checks", run: runProjectQa, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "quality-passport", label: "Export Quality Passport", run: reportExportController.exportQualityPassport, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "next-quality-risk", label: "Next quality risk", run: goToNextQualityRisk, enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "concordance", label: "Open concordance", run: openConcordanceSearch, enabled: Boolean(editorSessionStore.getProject()) },
+    { id: "concordance", label: "Open concordance", run: concordanceController.open, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "replace-target", label: "Find and replace target text", run: openReplacePanel, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "preset-translate", label: "Use Translate filter preset", group: "Filters", keywords: ["open", "segments", "matches"], run: () => filterPresetController?.applyPreset?.("translate"), enabled: Boolean(editorSessionStore.getProject()) },
     { id: "preset-review", label: "Use Review filter preset", group: "Filters", keywords: ["needs review", "comments"], run: () => filterPresetController?.applyPreset?.("review"), enabled: Boolean(editorSessionStore.getProject()) },
@@ -6007,29 +6032,6 @@ function openReplacePanel() {
   els.replaceFindInput.focus();
 }
 
-function selectedConcordanceKeyword() {
-  const selection = window.getSelection()?.toString().trim();
-  if (selection) return selection.replace(/\s+/g, " ");
-  const active = document.activeElement;
-  if (active?.tagName === "TEXTAREA" || active?.tagName === "INPUT") {
-    const value = active.value || "";
-    const selected = value.slice(active.selectionStart || 0, active.selectionEnd || 0).trim();
-    if (selected) return selected.replace(/\s+/g, " ");
-  }
-  return "";
-}
-
-function highlightKeyword(text, keyword) {
-  const escaped = escapeHtml(text);
-  const pattern = new RegExp(escapeRegExp(escapeHtml(keyword)), "gi");
-  return escaped.replace(pattern, (match) => `<mark>${match}</mark>`);
-}
-
-function closeConcordance() {
-  els.concordanceOverlay.classList.add("hidden");
-  els.concordanceResults.replaceChildren();
-}
-
 function closeCommandPalette() {
   paletteController?.close?.();
 }
@@ -6080,12 +6082,12 @@ function handleGlobalKeydown(event) {
   if (concordanceShortcut && applicationStore.getState().navigation.view === "editor") {
     event.preventDefault();
     event.stopPropagation();
-    openConcordanceSearch();
+    concordanceController.open();
     return;
   }
   if (event.key === "Escape" && !els.concordanceOverlay.classList.contains("hidden")) {
     event.preventDefault();
-    closeConcordance();
+    concordanceController.close();
     return;
   }
   if (event.key === "Escape" && !els.commandPaletteOverlay.classList.contains("hidden")) {
@@ -6097,57 +6099,6 @@ function handleGlobalKeydown(event) {
     event.preventDefault();
     setFocusMode(false);
   }
-}
-
-async function openConcordanceSearch() {
-  if (applicationStore.getState().navigation.view !== "editor" || !editorSessionStore.getProject()) return;
-  const keyword = selectedConcordanceKeyword();
-  if (!keyword) {
-    setSaveStatus("Select a source word, then press Ctrl+K or Alt+K.", "dirty");
-    return;
-  }
-  const query = stableLower(keyword);
-  const entries = await listTmEntries();
-  const tmNames = new Set(projectTmNames());
-  const results = entries
-    .filter((entry) => entry.sourceLang === editorSessionStore.getProject().sourceLang && entry.targetLang === editorSessionStore.getProject().targetLang)
-    .filter((entry) => tmNames.has(entry.tmName))
-    .filter((entry) => stableLower(entry.source).includes(query))
-    .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
-  els.concordanceMeta.textContent = uiLocalizationService.label("concordanceResultSummary", {
-    keyword,
-    resource: projectResourceSummary().tmLabel,
-    pair: projectLanguageContextController.display(),
-    count: results.length
-  });
-  if (!results.length) {
-    replaceSafeHtml(els.concordanceResults, `<div class="muted">${uiLocalizationService.sourceHtml("No TM units contain this keyword.")}</div>`);
-  } else {
-    const fragment = document.createDocumentFragment();
-    results.forEach((entry) => {
-      const card = document.createElement("article");
-      card.className = "concordance-card";
-      replaceSafeHtml(card, `
-        <p class="concordance-source">${highlightKeyword(entry.source, keyword)}</p>
-        <p class="concordance-target">${highlightKeyword(entry.target, keyword)}</p>
-        <footer><span>${escapeHtml(entry.projectName || entry.tmName || "")}</span></footer>
-      `);
-      const insertButton = document.createElement("button");
-      insertButton.type = "button";
-      insertButton.textContent = uiLocalizationService.source("Insert target");
-      insertButton.addEventListener("click", () => {
-        targetProducerController.insertTmTarget(entry.target, {
-          channel: "concordance",
-          resourceId: entry.id || ""
-        });
-        closeConcordance();
-      });
-      card.querySelector("footer").append(insertButton);
-      fragment.append(card);
-    });
-    els.concordanceResults.replaceChildren(fragment);
-  }
-  els.concordanceOverlay.classList.remove("hidden");
 }
 
 function qualityLabel(value) {
@@ -7672,11 +7623,6 @@ function wireEvents() {
   els.projectDomainEditInput.addEventListener("input", () => {
     const current = editorSessionStore.getProject()?.domain || "";
     els.domainForm.classList.toggle("clean", els.projectDomainEditInput.value.trim() === current);
-  });
-
-  els.closeConcordanceBtn.addEventListener("click", closeConcordance);
-  els.concordanceOverlay.addEventListener("click", (event) => {
-    if (event.target === els.concordanceOverlay) closeConcordance();
   });
 
   window.addEventListener("beforeunload", handleBeforeUnload);

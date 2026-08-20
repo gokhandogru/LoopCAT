@@ -177,6 +177,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-command-restoration-controller.js",
   "src/features/editor/segment-confirmation-state-service.js",
   "src/features/editor/segment-tm-save-controller.js",
+  "src/features/editor/concordance-controller.js",
   "src/features/editor/structural-segment-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -272,6 +273,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-command-restoration-controller.test.cjs",
   "tests/unit/segment-confirmation-state-service.test.cjs",
   "tests/unit/segment-tm-save-controller.test.cjs",
+  "tests/unit/concordance-controller.test.cjs",
   "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
@@ -397,13 +399,10 @@ const segmentProvenanceServiceJs = readText("src/features/editor/segment-provena
 const segmentFilterServiceJs = readText("src/features/editor/segment-filter-service.js");
 const segmentProgressServiceJs = readText("src/features/editor/segment-progress-service.js");
 const segmentTargetStateServiceJs = readText("src/features/editor/segment-target-state-service.js");
-const segmentCommandRestorationControllerJs = readText(
-  "src/features/editor/segment-command-restoration-controller.js"
-);
-const segmentConfirmationStateServiceJs = readText(
-  "src/features/editor/segment-confirmation-state-service.js"
-);
+const segmentCommandRestorationControllerJs = readText("src/features/editor/segment-command-restoration-controller.js");
+const segmentConfirmationStateServiceJs = readText("src/features/editor/segment-confirmation-state-service.js");
 const segmentTmSaveControllerJs = readText("src/features/editor/segment-tm-save-controller.js");
+const concordanceControllerJs = readText("src/features/editor/concordance-controller.js");
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
@@ -420,10 +419,9 @@ const segmentTargetStateServiceUnitTests = readText("tests/unit/segment-target-s
 const segmentCommandRestorationControllerUnitTests = readText(
   "tests/unit/segment-command-restoration-controller.test.cjs"
 );
-const segmentConfirmationStateServiceUnitTests = readText(
-  "tests/unit/segment-confirmation-state-service.test.cjs"
-);
+const segmentConfirmationStateServiceUnitTests = readText("tests/unit/segment-confirmation-state-service.test.cjs");
 const segmentTmSaveControllerUnitTests = readText("tests/unit/segment-tm-save-controller.test.cjs");
+const concordanceControllerUnitTests = readText("tests/unit/concordance-controller.test.cjs");
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
@@ -4263,6 +4261,16 @@ assertIncludes(
   "createSegmentTmSaveController,",
   "The application runtime must expose the checked direct segment-TM-save factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createConcordanceController } from "../features/editor/concordance-controller.js";',
+  "The application runtime must install the checked concordance controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createConcordanceController,",
+  "The application runtime must expose the checked concordance-controller factory."
+);
 for (const boundary of [
   "editLifecycle.finalize(segment.id)",
   "persistence.clearPending(segment, { finalizeEdit: false })",
@@ -4287,8 +4295,8 @@ assertIncludes(
   "the command palette must route Copy Source directly to TargetProducerController."
 );
 assert(
-  appJs.split("targetProducerController.insertTmTarget(").length - 1 === 2,
-  "TM-match and concordance UI must route directly to TargetProducerController."
+  appJs.split("targetProducerController.insertTmTarget(").length - 1 === 1,
+  "TM-match UI must route directly to TargetProducerController while concordance injects its target boundary."
 );
 assert(
   appJs.split("targetProducerController.insertProtectedTag(").length - 1 === 3,
@@ -4536,7 +4544,7 @@ assertIncludes(
   "source-catalog extraction must scan the checked segment provenance service."
 );
 for (const snippet of [
-  'let revision = 0',
+  "let revision = 0",
   'let cache = { key: "", indexes: [], positions: new Map() }',
   'cache = { key: "", indexes: [], positions: new Map() }',
   'return segment.status !== "confirmed"',
@@ -4545,18 +4553,18 @@ for (const snippet of [
   'if (filter === "ai-review-risk") return Boolean(provenance.aiRiskLevel(segment))',
   '["high", "critical"].includes(provenance.aiRiskLevel(segment))',
   'const pattern = new RegExp(query, filters.caseSensitive ? "" : "i")',
-  'return () => false',
-  'return normalizeCase(haystack).includes(foldedQuery)',
-  'segment.documentId !== getDocumentId()',
+  "return () => false",
+  "return normalizeCase(haystack).includes(foldedQuery)",
+  "segment.documentId !== getDocumentId()",
   'const comments = (segment.comments || []).length + ((segment.reviewNote || "").trim() ? 1 : 0)',
   'status === "all" || (status === "open" && isOpen(segment)) || segment.status === status',
-  'return getSegments().map((_, index) => index)',
+  "return getSegments().map((_, index) => index)",
   '].join("\\u001f")',
-  'if (cache.key === key) return cache.indexes',
-  'const queryMatches = queryMatcher()',
-  'const positions = new Map(indexes.map((segmentIndex, position) => [segmentIndex, position]))',
-  'return cache.positions.get(index) ?? -1',
-  'return visibleIndexes()[0] ?? -1'
+  "if (cache.key === key) return cache.indexes",
+  "const queryMatches = queryMatcher()",
+  "const positions = new Map(indexes.map((segmentIndex, position) => [segmentIndex, position]))",
+  "return cache.positions.get(index) ?? -1",
+  "return visibleIndexes()[0] ?? -1"
 ]) {
   assertIncludes(
     segmentFilterServiceJs,
@@ -4564,11 +4572,7 @@ for (const snippet of [
     `SegmentFilterService must retain characterized predicate/cache policy: ${snippet}`
   );
 }
-assertIncludes(
-  appJs,
-  "createSegmentFilterService({",
-  "app.js must compose the checked segment filter service."
-);
+assertIncludes(appJs, "createSegmentFilterService({", "app.js must compose the checked segment filter service.");
 for (const boundary of [
   "getSegments: () => editorSessionStore.getSegments()",
   "getFilters: () => editorFilterStore.getState()",
@@ -4578,7 +4582,15 @@ for (const boundary of [
 ]) {
   assertIncludes(appJs, boundary, `segment filter composition must inject the checked ${boundary} boundary.`);
 }
-for (const method of ["invalidate", "isOpen", "matches", "allIndexes", "visibleIndexes", "visiblePosition", "firstVisible"]) {
+for (const method of [
+  "invalidate",
+  "isOpen",
+  "matches",
+  "allIndexes",
+  "visibleIndexes",
+  "visiblePosition",
+  "firstVisible"
+]) {
   assertIncludes(
     `${appJs}\n${appWorkflowDriverJs}`,
     `segmentFilterService.${method}`,
@@ -4657,11 +4669,7 @@ for (const snippet of [
     `SegmentProgressService must retain characterized word/progress policy: ${snippet}`
   );
 }
-assertIncludes(
-  appJs,
-  "createSegmentProgressService({",
-  "app.js must compose the checked segment progress service."
-);
+assertIncludes(appJs, "createSegmentProgressService({", "app.js must compose the checked segment progress service.");
 for (const boundary of [
   "getSegments: () => editorSessionStore.getSegments()",
   'getProjectId: () => editorSessionStore.getProject()?.id || ""',
@@ -4849,8 +4857,8 @@ for (const snippet of [
   "targetState.applyPatch(segment, currentPatch)",
   "const currentById = new Map()",
   "await persistence.saveMany(restored)",
-  "restoreOptions.activeSegmentId || previousActiveId || restored[0]?.id || \"\"",
-  "selection.select(requestedIndex, editorSessionStore.getSegments()[requestedIndex]?.id || \"\")",
+  'restoreOptions.activeSegmentId || previousActiveId || restored[0]?.id || ""',
+  'selection.select(requestedIndex, editorSessionStore.getSegments()[requestedIndex]?.id || "")',
   "patches: restored.map((segment) => targetState.capturePatch(segment))",
   "affectedCount: restored.length",
   "editorSessionStore.replaceSegmentAt(indexes[offset], next)",
@@ -4959,10 +4967,7 @@ assertIncludes(
   "createSegmentConfirmationStateService({",
   "app.js must compose the checked segment confirmation-state service."
 );
-for (const boundary of [
-  "targetState: segmentTargetStateService",
-  "now: () => new Date().toISOString()"
-]) {
+for (const boundary of ["targetState: segmentTargetStateService", "now: () => new Date().toISOString()"]) {
   assertIncludes(
     appJs,
     boundary,
@@ -5054,11 +5059,7 @@ for (const boundary of [
   "status: { set: setSaveStatus }",
   "if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG])"
 ]) {
-  assertIncludes(
-    appJs,
-    boundary,
-    `direct segment-TM-save composition must inject the checked ${boundary} boundary.`
-  );
+  assertIncludes(appJs, boundary, `direct segment-TM-save composition must inject the checked ${boundary} boundary.`);
 }
 for (const method of ["save", "saveActive"]) {
   assertIncludes(
@@ -5093,6 +5094,132 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/segment-tm-save-controller.js"',
   "source-catalog extraction must scan the checked direct segment-TM-save controller."
+);
+for (const snippet of [
+  'throw new TypeError("ConcordanceController requires overlay elements.")',
+  'throw new TypeError("ConcordanceController requires session, TM, resource, and language boundaries.")',
+  'throw new TypeError("ConcordanceController requires presentation and target-insertion boundaries.")',
+  'throw new TypeError("ConcordanceController requires browser DOM boundaries.")',
+  "const selection = dom.getSelection()?.toString().trim()",
+  'if (selection) return selection.replace(/\\s+/g, " ")',
+  'if (active?.tagName === "TEXTAREA" || active?.tagName === "INPUT")',
+  "value.slice(active.selectionStart || 0, active.selectionEnd || 0).trim()",
+  "const escaped = text.escapeHtml(textValue)",
+  'new RegExp(text.escapeRegExp(text.escapeHtml(keyword)), "gi")',
+  'if (navigation.getView() !== "editor" || !session.getProject()) return',
+  'status.set("Select a source word, then press Ctrl+K or Alt+K.", "dirty")',
+  "const query = text.normalizeCase(keyword)",
+  "const entries = await tm.listEntries()",
+  "const tmNames = new Set(tm.getNames())",
+  "entry.sourceLang === session.getProject().sourceLang",
+  "entry.targetLang === session.getProject().targetLang",
+  ".filter((entry) => tmNames.has(entry.tmName))",
+  ".filter((entry) => text.normalizeCase(entry.source).includes(query))",
+  "new Date(right.updatedAt || right.createdAt || 0).getTime()",
+  "new Date(left.updatedAt || left.createdAt || 0).getTime()",
+  'localization.label("concordanceResultSummary", {',
+  'localization.sourceHtml("No TM units contain this keyword.")',
+  'card.className = "concordance-card"',
+  "highlight(entry.source, keyword)",
+  "highlight(entry.target, keyword)",
+  'text.escapeHtml(entry.projectName || entry.tmName || "")',
+  'insertButton.textContent = localization.source("Insert target")',
+  "target.insert(entry.target, {",
+  'channel: "concordance"',
+  'resourceId: entry.id || ""',
+  "elements.results.replaceChildren(fragment)",
+  'elements.overlay.classList.remove("hidden")',
+  'elements.overlay.classList.add("hidden")',
+  "elements.results.replaceChildren()",
+  'elements.closeButton.addEventListener("click", handleClose)',
+  'elements.overlay.addEventListener("click", handleOverlayClick)',
+  "if (event.target === elements.overlay) close()",
+  "return Object.freeze({ close, highlight, mount, open, selectedKeyword, unmount })"
+]) {
+  assertIncludes(
+    concordanceControllerJs,
+    snippet,
+    `ConcordanceController must retain characterized concordance policy: ${snippet}`
+  );
+}
+assert(
+  !concordanceControllerJs.includes("window.") &&
+    !concordanceControllerJs.includes("document.") &&
+    !concordanceControllerJs.includes("targetProducerController") &&
+    !concordanceControllerJs.includes("listTmEntries") &&
+    !concordanceControllerJs.includes("projectTmNames"),
+  "the checked concordance controller must depend only on injected browser, TM, and target boundaries."
+);
+assertIncludes(appJs, "createConcordanceController({", "app.js must compose the checked concordance controller.");
+for (const boundary of [
+  "overlay: els.concordanceOverlay",
+  "closeButton: els.closeConcordanceBtn",
+  "meta: els.concordanceMeta",
+  "results: els.concordanceResults",
+  "session: { getProject: editorSessionStore.getProject }",
+  "navigation: { getView: () => applicationStore.getState().navigation.view }",
+  "tm: { listEntries: listTmEntries, getNames: projectTmNames }",
+  "resources: { summary: projectResourceSummary }",
+  "languages: { display: projectLanguageContextController.display }",
+  "localization: uiLocalizationService",
+  "text: { normalizeCase: stableLower, escapeHtml, escapeRegExp }",
+  "safeHtml: { replace: replaceSafeHtml }",
+  "target: { insert: targetProducerController.insertTmTarget }",
+  "status: { set: setSaveStatus }",
+  "getSelection: () => window.getSelection()",
+  "getActiveElement: () => document.activeElement",
+  "createElement: (tagName) => document.createElement(tagName)",
+  "createFragment: () => document.createDocumentFragment()"
+]) {
+  assertIncludes(appJs, boundary, `concordance composition must inject the checked ${boundary} boundary.`);
+}
+for (const directConsumer of [
+  "concordanceController.mount()",
+  "run: concordanceController.open",
+  "concordanceController.open()",
+  "concordanceController.close()"
+]) {
+  assertIncludes(appJs, directConsumer, `concordance consumers must call the controller directly: ${directConsumer}.`);
+}
+for (const removedHelper of [
+  "selectedConcordanceKeyword",
+  "highlightKeyword",
+  "closeConcordance",
+  "openConcordanceSearch"
+]) {
+  const directHelper = new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} concordance helper must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  !appJs.includes('els.closeConcordanceBtn.addEventListener("click"') &&
+    !appJs.includes('els.concordanceOverlay.addEventListener("click"') &&
+    !appJs.includes("els.concordanceResults.replaceChildren") &&
+    !appJs.includes('className = "concordance-card"'),
+  "app.js must not regain concordance listener or result-presentation ownership."
+);
+for (const testName of [
+  "ConcordanceController preserves global selection precedence, input fallback, whitespace collapse, and empty fallback",
+  "ConcordanceController escapes before case-insensitive repeated highlighting",
+  "ConcordanceController owns idempotent close-button and backdrop lifecycle with result clearing",
+  "ConcordanceController preserves editor/project guards and exact empty-keyword status",
+  "ConcordanceController filters linked language-pair results, sorts newest first, renders safely, inserts, and closes",
+  "ConcordanceController renders the localized safe empty state and opens the overlay",
+  "ConcordanceController propagates repository failure before changing overlay visibility",
+  "ConcordanceController validates collaborators and exposes an immutable API"
+]) {
+  assertIncludes(
+    concordanceControllerUnitTests,
+    testName,
+    `focused concordance tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/concordance-controller.js"',
+  "source-catalog extraction must scan the checked concordance controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -10397,9 +10524,9 @@ assertIncludes(
   "PaletteController results must render in one DOM replacement."
 );
 assertIncludes(
-  appJs,
-  "els.concordanceResults.replaceChildren(fragment)",
-  "app.js concordance results must render in one DOM replacement."
+  concordanceControllerJs,
+  "elements.results.replaceChildren(fragment)",
+  "ConcordanceController results must render in one DOM replacement."
 );
 assertIncludes(
   appJs,
