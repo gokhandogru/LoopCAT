@@ -153,6 +153,13 @@ const projectImportRestoreControllerPath = path.join(
   "import-export",
   "project-import-restore-controller.js"
 );
+const workspaceBackupExportControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "workspace",
+  "workspace-backup-export-controller.js"
+);
 const workspacePackageSaveControllerPath = path.join(
   root,
   "src",
@@ -337,6 +344,11 @@ function main() {
   extractHtml(messagesByText);
   extractScript(messagesByText, appPath, "app.js");
   extractScript(messagesByText, qaPath, "qa.js");
+  extractScript(
+    messagesByText,
+    workspaceBackupExportControllerPath,
+    "src/features/workspace/workspace-backup-export-controller.js"
+  );
   extractScript(
     messagesByText,
     deliveryExportControllerPath,

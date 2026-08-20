@@ -252,6 +252,7 @@ const requiredReleaseFiles = [
   "src/features/resources/tm-pretranslation-dialog-controller.js",
   "src/features/import-export/import-export-controller.js",
   "src/features/workspace/recovery-workspace-controller.js",
+  "src/features/workspace/workspace-backup-export-controller.js",
   "src/features/workspace/workspace-package-save-controller.js",
   "src/features/workspace/workspace-sync-controller.js",
   "src/i18n/language-input-service.js",
@@ -341,6 +342,7 @@ const requiredReleaseFiles = [
   "tests/unit/review-state-controller.test.cjs",
   "tests/unit/import-export-controller.test.cjs",
   "tests/unit/recovery-workspace-controller.test.cjs",
+  "tests/unit/workspace-backup-export-controller.test.cjs",
   "tests/unit/workspace-package-save-controller.test.cjs",
   "tests/unit/workspace-sync-controller.test.cjs",
   "tests/unit/language-input-service.test.cjs",
@@ -640,6 +642,8 @@ const qualityReviewControllerJs = readText("src/features/quality/quality-review-
 const qualityReviewControllerUnitTests = readText("tests/unit/quality-review-controller.test.cjs");
 const recoveryWorkspaceControllerJs = readText("src/features/workspace/recovery-workspace-controller.js");
 const recoveryWorkspaceControllerUnitTests = readText("tests/unit/recovery-workspace-controller.test.cjs");
+const workspaceBackupExportControllerJs = readText("src/features/workspace/workspace-backup-export-controller.js");
+const workspaceBackupExportControllerUnitTests = readText("tests/unit/workspace-backup-export-controller.test.cjs");
 const workspacePackageSaveControllerJs = readText("src/features/workspace/workspace-package-save-controller.js");
 const workspacePackageSaveControllerUnitTests = readText("tests/unit/workspace-package-save-controller.test.cjs");
 const workspaceSyncControllerJs = readText("src/features/workspace/workspace-sync-controller.js");
@@ -5040,6 +5044,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createWorkspaceBackupExportController } from "../features/workspace/workspace-backup-export-controller.js";',
+  "The application runtime must install the checked workspace backup-export controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createWorkspaceBackupExportController,",
+  "The application runtime must expose the checked workspace backup-export controller factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createWorkspaceSyncController } from "../features/workspace/workspace-sync-controller.js";',
   "The application runtime must install the checked workspace-sync controller."
 );
@@ -6838,7 +6852,8 @@ for (const removedHelper of [
 assert(
   !appJs.includes("projectExportBuildService.buildProjectPackage") &&
     !appJs.includes("projectExportBuildService.assertValidProjectPackageForWrite") &&
-    (appJs.match(/\bprojectExportBuildService\.buildBackupExport\b/g) || []).length === 1 &&
+    !appJs.includes("projectExportBuildService.buildBackupExport") &&
+    (workspaceBackupExportControllerJs.match(/\bbuild\.buildBackupExport\b/g) || []).length === 1 &&
     !appJs.includes("projectExportBuildService.assertValidBackupForWrite") &&
     (appWorkflowDriverJs.match(/\bprojectExportBuildService\.buildProjectPackage\b/g) || []).length === 4 &&
     (appWorkflowDriverJs.match(/\bprojectExportBuildService\.assertValidBackupForWrite\b/g) || []).length === 1,
@@ -7158,6 +7173,91 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/import-export/project-import-restore-controller.js"',
   "source-catalog extraction must scan the checked project-import/restore controller."
+);
+for (const snippet of [
+  "WorkspaceBackupExportController requires connection, build, storage, workspace, validation, presentation, and status boundaries.",
+  "async function exportBackup()",
+  "if (!connection.isConnected()) return",
+  "const { backup, validation: validationReport } = await build.buildBackupExport()",
+  "const reference = await storage.exportFullBackup(backup)",
+  "const workspaceStatus = await storage.getStatus()",
+  "workspace.setStatus(workspaceStatus)",
+  "presentation.renderWorkspaceStatus()",
+  "presentation.renderValidation(validationReport)",
+  'const manifestWarning = reference.manifestSaved === false ? "; manifest update failed" : ""',
+  "Workspace backup saved: ${reference.path}${manifestWarning}",
+  'reference.manifestSaved === false || validation.count(validationReport) ? "dirty" : "saved"',
+  'const message = error.message || "Workspace backup failed."',
+  "presentation.renderValidation(error.validation || validation.errorReport(message))",
+  'status.set(message, "dirty")',
+  "throw error",
+  "return Object.freeze({ exportBackup })"
+]) {
+  assertIncludes(
+    workspaceBackupExportControllerJs,
+    snippet,
+    `WorkspaceBackupExportController must retain characterized guard, build, write, refresh, validation, status, failure-report, and rethrow policy: ${snippet}`
+  );
+}
+assert(
+  !workspaceBackupExportControllerJs.includes("workspaceStorage") &&
+    !workspaceBackupExportControllerJs.includes("state.") &&
+    !workspaceBackupExportControllerJs.includes("projectExportBuildService") &&
+    !workspaceBackupExportControllerJs.includes("reportCount") &&
+    !workspaceBackupExportControllerJs.includes("fileImportService") &&
+    !workspaceBackupExportControllerJs.includes("renderValidationReport") &&
+    !workspaceBackupExportControllerJs.includes("setSaveStatus") &&
+    !workspaceBackupExportControllerJs.includes("recoveryWorkspaceController") &&
+    !workspaceBackupExportControllerJs.includes("els."),
+  "the checked workspace backup-export controller must use only its injected connection, build, storage, workspace, validation, presentation, and status boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createWorkspaceBackupExportController({",
+  "isConnected: () => Boolean(workspaceStorage && state.workspaceStatus?.connected)",
+  "build: projectExportBuildService",
+  "exportFullBackup: (backup) => workspaceStorage.exportFullBackup(backup)",
+  "getStatus: () => workspaceStorage.getStatus()",
+  "state.workspaceStatus = workspaceStatus",
+  "count: reportCount",
+  "errorReport: fileImportService.errorReport",
+  "renderValidation: renderValidationReport",
+  "status: { set: setSaveStatus }",
+  "exportWorkspaceBackup: (...args) => workspaceBackupExportController.exportBackup(...args)"
+]) {
+  assertIncludes(appJs, boundary, `workspace backup-export composition must inject the checked ${boundary} boundary.`);
+}
+assert(
+  !/async\s+function\s+exportWorkspaceBackupToFolder\b/.test(appJs) &&
+    !/async\s+function\s+exportWorkspaceBackupToFolder\b/.test(appWorkflowDriverJs),
+  "exportWorkspaceBackupToFolder must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\bworkspaceBackupExportController\.exportBackup\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bworkspaceBackupExportController\.exportBackup\b/g) || []).length === 1,
+  "RecoveryWorkspaceController and the workflow workspace backup-export consumer must call WorkspaceBackupExportController directly."
+);
+for (const testName of [
+  "WorkspaceBackupExportController preserves the disconnected no-op before backup construction",
+  "WorkspaceBackupExportController exports a clean backup with exact refresh and presentation order",
+  "WorkspaceBackupExportController preserves manifest-warning suffix and validation-count short circuit",
+  "WorkspaceBackupExportController marks a manifest-success backup dirty for validation notes",
+  "WorkspaceBackupExportController preserves attached validation on primary build failure",
+  "WorkspaceBackupExportController generates a fallback report and fallback message for write failure",
+  "WorkspaceBackupExportController preserves durable write before a late workspace-refresh failure",
+  "WorkspaceBackupExportController contains late rendering and validation-count failures with exact rethrow",
+  "WorkspaceBackupExportController preserves first status failure recovery and original error identity",
+  "WorkspaceBackupExportController validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    workspaceBackupExportControllerUnitTests,
+    testName,
+    `focused workspace backup-export tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/workspace/workspace-backup-export-controller.js"',
+  "source-catalog extraction must scan the checked workspace backup-export controller."
 );
 for (const snippet of [
   "WorkspaceSyncController requires connection, autosave, package, dirty, import, validation, text, session, navigation, project, workspace, presentation, and status boundaries.",
@@ -10553,9 +10653,9 @@ assertIncludes(
   "workspace-storage-test.html must verify recovered workspace writes do not keep stale write errors visible."
 );
 assertIncludes(
-  appJs,
+  workspaceBackupExportControllerJs,
   "manifest update failed",
-  "app.js must surface non-blocking workspace backup manifest update failures in the save status."
+  "WorkspaceBackupExportController must surface non-blocking workspace backup manifest update failures in the save status."
 );
 assertIncludes(
   workspaceStorageTest,

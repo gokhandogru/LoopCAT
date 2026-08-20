@@ -3477,6 +3477,7 @@ dialogLifecycleController?.register?.({
 let projectExportController;
 let workspacePackageSaveController;
 let workspaceSyncController;
+let workspaceBackupExportController;
 const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecoveryWorkspaceController?.({
   elements: {
     menu: els.workspaceMenu,
@@ -3509,7 +3510,7 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
   chooseWorkspace: (...args) => workspacePackageSaveController.chooseFolder(...args),
   saveProject: (...args) => workspacePackageSaveController.saveCurrent(...args),
   syncWorkspace: () => fileImportService.runTask("Workspace sync", () => workspaceSyncController.sync()),
-  exportWorkspaceBackup: exportWorkspaceBackupToFolder,
+  exportWorkspaceBackup: (...args) => workspaceBackupExportController.exportBackup(...args),
   repairWorkspace: repairWorkspaceLinks,
   saveRecovery: (...args) => workspacePackageSaveController.saveRecovery(...args),
   exportRecoveryCopy: (...args) => projectExportController.exportProjectPackage(...args),
@@ -3576,6 +3577,31 @@ const projectExportBuildService =
       projectPackageSchemaVersion: storageConstants.PROJECT_PACKAGE_SCHEMA_VERSION
     },
     clock: { now: () => new Date().toISOString() }
+  });
+workspaceBackupExportController =
+  appRuntime.featureFactories.createWorkspaceBackupExportController({
+    connection: {
+      isConnected: () => Boolean(workspaceStorage && state.workspaceStatus?.connected)
+    },
+    build: projectExportBuildService,
+    storage: {
+      exportFullBackup: (backup) => workspaceStorage.exportFullBackup(backup),
+      getStatus: () => workspaceStorage.getStatus()
+    },
+    workspace: {
+      setStatus: (workspaceStatus) => {
+        state.workspaceStatus = workspaceStatus;
+      }
+    },
+    validation: {
+      count: reportCount,
+      errorReport: fileImportService.errorReport
+    },
+    presentation: {
+      renderWorkspaceStatus,
+      renderValidation: renderValidationReport
+    },
+    status: { set: setSaveStatus }
   });
 projectExportController = appRuntime.featureFactories.createProjectExportController({
   build: projectExportBuildService,
@@ -6600,24 +6626,6 @@ function renderProgress(options = {}) {
   els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
   els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
-}
-
-async function exportWorkspaceBackupToFolder() {
-  if (!workspaceStorage || !state.workspaceStatus?.connected) return;
-  try {
-    const { backup, validation } = await projectExportBuildService.buildBackupExport();
-    const ref = await workspaceStorage.exportFullBackup(backup);
-    state.workspaceStatus = await workspaceStorage.getStatus();
-    renderWorkspaceStatus();
-    renderValidationReport(validation);
-    const manifestWarning = ref.manifestSaved === false ? "; manifest update failed" : "";
-    setSaveStatus(`Workspace backup saved: ${ref.path}${manifestWarning}`, ref.manifestSaved === false || reportCount(validation) ? "dirty" : "saved");
-  } catch (error) {
-    const message = error.message || "Workspace backup failed.";
-    renderValidationReport(error.validation || fileImportService.errorReport(message));
-    setSaveStatus(message, "dirty");
-    throw error;
-  }
 }
 
 async function repairWorkspaceLinks() {

@@ -137,6 +137,7 @@ import { createProjectImportRestoreController } from "../features/import-export/
 import { createProjectPackagePortabilityService } from "../features/import-export/project-package-portability-service.js";
 import { createTextEncodingInputService } from "../features/import-export/text-encoding-input-service.js";
 import { createWorkspacePackageSaveController } from "../features/workspace/workspace-package-save-controller.js";
+import { createWorkspaceBackupExportController } from "../features/workspace/workspace-backup-export-controller.js";
 import { createWorkspaceSyncController } from "../features/workspace/workspace-sync-controller.js";
 import {
   asTrustedHtml,
@@ -258,6 +259,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createProjectPackagePortabilityService,
       createTextEncodingInputService,
       createWorkspacePackageSaveController,
+      createWorkspaceBackupExportController,
       createWorkspaceSyncController,
       createReportDataService,
       createReportDocumentCompositionService,

@@ -5435,7 +5435,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     try {
       let invalidWorkspaceBackupRejected = false;
       try {
-        await exportWorkspaceBackupToFolder();
+        await workspaceBackupExportController.exportBackup();
       } catch (error) {
         invalidWorkspaceBackupRejected = error.validation?.errors?.some((item) => item.includes("document manifest must be an array")) && error.message.includes("Cannot export backup");
       }
