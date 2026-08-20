@@ -536,7 +536,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         windows1254TbxTerms[0]?.notes === "\u00c7al\u0131\u015fma notu",
       "TBX import decodes Windows-1254 termbase text"
     );
-    await setActiveSegment(workflowSegmentIndex);
+    await segmentNavigationController.select(workflowSegmentIndex);
     const regionalLocaleTmx = `<?xml version="1.0" encoding="UTF-8"?>
 <tmx version="1.4">
   <body>
@@ -1102,7 +1102,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "case-insensitive target replace is stable under Turkish locale casing"
     );
 
-    await setActiveSegment(segmentIndex);
+    await segmentNavigationController.select(segmentIndex);
     assert(Boolean(els.reviewForm && els.reviewStateFilter), "review panel and review filter are available in the editor");
     const reviewBaseline = structuredClone(editorSessionStore.getSegments()[segmentIndex]);
     els.reviewStateSelect.value = "needs-review";
@@ -1726,7 +1726,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       renderDocumentFilter();
       renderSegments();
       const restoreAiVariantsIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === originalAiVariantsFilters.activeSegmentId);
-      if (restoreAiVariantsIndex >= 0) await setActiveSegment(restoreAiVariantsIndex);
+      if (restoreAiVariantsIndex >= 0) await segmentNavigationController.select(restoreAiVariantsIndex);
       updateRow(segmentIndex);
     }
 
@@ -2125,7 +2125,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       renderDocumentFilter();
       renderSegments();
-      if (Number.isInteger(originalAiPolishFilters.activeIndex) && originalAiPolishFilters.activeIndex >= 0) await setActiveSegment(originalAiPolishFilters.activeIndex);
+      if (Number.isInteger(originalAiPolishFilters.activeIndex) && originalAiPolishFilters.activeIndex >= 0) await segmentNavigationController.select(originalAiPolishFilters.activeIndex);
       updateRow(segmentIndex);
     }
 
@@ -2379,7 +2379,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       renderDocumentFilter();
       renderSegments();
       const restoreBatchAdaptIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === originalAiBatchAdaptFilters.activeSegmentId);
-      if (restoreBatchAdaptIndex >= 0) await setActiveSegment(restoreBatchAdaptIndex);
+      if (restoreBatchAdaptIndex >= 0) await segmentNavigationController.select(restoreBatchAdaptIndex);
     }
 
     const aiTermsProvider = aiProviderService.get("ollama");
@@ -2457,7 +2457,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       applicationNavigation.selectDocument({ documentId: originalAiTermsDocumentFilter });
       renderDocumentFilter();
       renderSegments();
-      if (Number.isInteger(originalAiTermsActiveIndex) && originalAiTermsActiveIndex >= 0) await setActiveSegment(originalAiTermsActiveIndex);
+      if (Number.isInteger(originalAiTermsActiveIndex) && originalAiTermsActiveIndex >= 0) await segmentNavigationController.select(originalAiTermsActiveIndex);
       if (aiExtractedTermIds.length) {
         await deleteTerms(aiExtractedTermIds);
         markProjectsUsingResourceDirty("termbase", "Workflow TB", editorSessionStore.getProject().sourceLang, editorSessionStore.getProject().targetLang);
@@ -2668,7 +2668,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(Array.isArray(successfulQaRun) && els.saveStatus.textContent.startsWith("QA found"), "QA run reports visible result status");
 
     clearWorkspaceDirtyMarkers();
-    await setActiveSegment(segmentIndex);
+    await segmentNavigationController.select(segmentIndex);
     const originalWindowConfirm = window.confirm;
     const originalFetch = window.fetch;
     const originalStorageSetItem = Storage.prototype.setItem;
@@ -3009,7 +3009,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((item) => (item.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : item)));
       renderEditor();
     }
-    await setActiveSegment(segmentIndex);
+    await segmentNavigationController.select(segmentIndex);
     const producerBeforeTyping = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]);
     const producerPendingTyping = `Pending typing before copy ${Date.now()}`;
     targetEditController.updateDraft(segmentIndex, producerPendingTyping);
@@ -3059,7 +3059,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
 
     clearWorkspaceDirtyMarkers();
-    await setActiveSegment(segmentIndex);
+    await segmentNavigationController.select(segmentIndex);
     const beforeTmInsert = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]);
     const tmInsertedTarget = `TM inserted target ${Date.now()}`;
     const tmInsertCommand = await targetProducerController.insertTmTarget(tmInsertedTarget, { channel: "match", resourceId: "workflow-tm-match" });
@@ -3139,7 +3139,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         emptyTargetDeliveryReport.exportSummary.sourceFallbackCount === 1,
       "delivery export gate permits empty target source fallback"
     );
-    await setActiveSegment(segmentIndex);
+    await segmentNavigationController.select(segmentIndex);
     let confirmRollbackSegment = editorSessionStore.getSegments()[segmentIndex];
     segmentTargetStateService.setHiddenField(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG, true);
     const failedDirectTmSave = await segmentTmSaveController.saveActive();
@@ -3315,7 +3315,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       });
       await openProjectFile(localAiGlossaryDocument.id);
       const localAiGlossarySegmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource);
-      await setActiveSegment(localAiGlossarySegmentIndex);
+      await segmentNavigationController.select(localAiGlossarySegmentIndex);
       if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-glossary-pretranslate-model";
@@ -3545,7 +3545,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         segmentTargetStateService.setTarget(localAiGlossarySegment, "", "draft", "local-ai-cloud-confirm-fixture");
         segmentTargetStateService.touch(localAiGlossarySegment);
         await saveSegment(localAiGlossarySegment);
-        await setActiveSegment(localAiGlossarySegmentIndex);
+        await segmentNavigationController.select(localAiGlossarySegmentIndex);
         els.localAiCloudPresetBtn?.click();
         assert(
           els.localAiPresetSelect?.value === "ollama-cloud" &&
@@ -3614,7 +3614,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         segmentTargetStateService.setTarget(hostedOllamaSegment, "", "draft", "hosted-ollama-confirm-fixture");
         segmentTargetStateService.touch(hostedOllamaSegment);
         await saveSegment(hostedOllamaSegment);
-        await setActiveSegment(hostedOllamaSegmentIndex);
+        await segmentNavigationController.select(hostedOllamaSegmentIndex);
         els.localAiCloudPresetBtn?.click();
         if (els.localAiModeSelect) els.localAiModeSelect.value = "selected";
         if (els.localAiOverwriteInput) els.localAiOverwriteInput.checked = false;
@@ -3771,7 +3771,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       renderLocalAiProviderControls(localAiSettingsFromForm());
     }
     await openProjectFile(documentInfo.id);
-    await setActiveSegment(segmentIndex);
+    await segmentNavigationController.select(segmentIndex);
     confirmRollbackSegment = editorSessionStore.getSegments()[segmentIndex];
 
     segmentTargetStateService.setTarget(confirmRollbackSegment, "Confirm reviewed AI target", "draft", "confirm-ai-reviewed-fixture");
@@ -3795,7 +3795,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     if (els.reviewStateFilter) els.reviewStateFilter.value = "";
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
     await segmentConfirmationController.confirm();
-    await setActiveSegment(segmentIndex);
+    await segmentNavigationController.select(segmentIndex);
     renderSegments();
     const confirmedReviewedAiSegment = editorSessionStore.getSegments()[segmentIndex];
     const persistedConfirmedReviewedAiSegment = (await getProjectSegments(project.id)).find((segment) => segment.id === confirmedReviewedAiSegment.id);
@@ -3839,7 +3839,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     if (els.segmentStatusFilter) els.segmentStatusFilter.value = originalConfirmReviewedFilters.segmentStatusFilter;
     if (els.reviewStateFilter) els.reviewStateFilter.value = originalConfirmReviewedFilters.reviewStateFilter;
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalConfirmReviewedFilters.aiSegmentFilter;
-    await setActiveSegment(segmentIndex);
+    await segmentNavigationController.select(segmentIndex);
     confirmRollbackSegment = editorSessionStore.getSegments()[segmentIndex];
 
     segmentTargetStateService.setTarget(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm rollback target", "draft", "confirm-rollback-fixture");
@@ -3884,7 +3884,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "confirm TM save failure keeps segment confirmed and reports warning"
     );
     Reflect.deleteProperty(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG);
-    await setActiveSegment(segmentIndex);
+    await segmentNavigationController.select(segmentIndex);
     confirmRollbackSegment = editorSessionStore.getSegments()[segmentIndex];
     segmentTargetStateService.setTarget(confirmRollbackSegment, confirmRollbackSegment.target || "Confirm activity target", "draft", "confirm-activity-fixture");
     segmentTargetStateService.touch(confirmRollbackSegment);
@@ -5548,7 +5548,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await openProjectFile(documentInfo.id);
     const termSuggestionSegmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentInfo.id && (segment.source || segment.text || "").includes("Hello"));
     assert(termSuggestionSegmentIndex >= 0, "term suggestion regression has source segment");
-    await setActiveSegment(termSuggestionSegmentIndex);
+    await segmentNavigationController.select(termSuggestionSegmentIndex);
     renderTermbaseSelect();
     els.termBaseSelect.value = "Workflow TB";
     els.sourceTermInput.value = "unsaved sidebar term";
@@ -5900,7 +5900,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const structuralSplitOriginalTarget = structuralSegmentsBefore[0].target;
     const structuralSegmentIdsBeforeSplit = new Set(structuralSegmentsBefore.map((segment) => segment.id));
     let splitIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === structuralSegmentsBefore[0].id);
-    await setActiveSegment(splitIndex);
+    await segmentNavigationController.select(splitIndex);
     let splitTextarea = els.segmentBody.querySelector(`tr[data-index="${splitIndex}"] textarea`);
     splitTextarea?.setSelectionRange(24, 24);
     segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[splitIndex], SPLIT_SAVE_FAILURE_TEST_FLAG, true);
@@ -5914,7 +5914,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "split save failure restores visible and persisted segment list"
     );
     splitIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === structuralDocument.id);
-    await setActiveSegment(splitIndex);
+    await segmentNavigationController.select(splitIndex);
     splitTextarea = els.segmentBody.querySelector(`tr[data-index="${splitIndex}"] textarea`);
     splitTextarea?.setSelectionRange(24, 24);
     const splitCommandResult = await structuralSegmentController.split();
@@ -5991,7 +5991,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const mergeFailureIds = mergeCandidates.map((item) => item.segment.id);
     const mergeFailureSources = mergeCandidates.map((item) => item.segment.source);
     const mergeFailureTargets = mergeCandidates.map((item) => item.segment.target);
-    await setActiveSegment(mergeCandidates[0].index);
+    await segmentNavigationController.select(mergeCandidates[0].index);
     segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[mergeCandidates[0].index], MERGE_POST_DELETE_FAILURE_TEST_FLAG, true);
     const failedMergeCommand = await structuralSegmentController.merge();
     const mergeFailureVisible = editorSessionStore.getSegments().filter((segment) => segment.documentId === structuralDocument.id);
@@ -6025,7 +6025,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const mergeSecondBefore = structuredClone(mergeCandidates[1].segment);
     const expectedMergedSource = `${mergeFirstBefore.source} ${mergeSecondBefore.source}`.trim();
     const expectedMergedTarget = `${mergeFirstBefore.target || ""} ${mergeSecondBefore.target || ""}`.trim();
-    await setActiveSegment(mergeCandidates[0].index);
+    await segmentNavigationController.select(mergeCandidates[0].index);
     const mergeCommandResult = await structuralSegmentController.merge();
     const mergeAppliedVisible = editorSessionStore.getSegments().filter((segment) => segment.documentId === structuralDocument.id);
     const mergeSuccessStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
@@ -6116,7 +6116,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const taggedRow = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"]`);
     const sourceChipLabels = Array.from(taggedRow?.querySelectorAll(".source-cell .tag-chip") || []).map((chip) => chip.textContent);
     assert(sourceChipLabels.includes("<b>") && sourceChipLabels.includes("</b>") && !sourceChipLabels.includes("<strong>"), "editor displays semantic inline tag labels for HTML formatting");
-    await setActiveSegment(taggedIndex);
+    await segmentNavigationController.select(taggedIndex);
     let taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
     taggedTextarea?.focus();
     taggedTextarea?.setSelectionRange(0, 0);
@@ -6248,7 +6248,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       .filter((item) => item.segment.documentId === structuredMergeDocument.id)
       .map((item) => item.index);
     assert(structuredMergeIndexes.length === 2, "structured merge fixture has two segments");
-    await setActiveSegment(structuredMergeIndexes[0]);
+    await segmentNavigationController.select(structuredMergeIndexes[0]);
     const beforeBlockedMergeCount = editorSessionStore.getSegments().length;
     await structuralSegmentController.merge();
     const afterBlockedMergeSegments = editorSessionStore.getSegments().filter((segment) => segment.documentId === structuredMergeDocument.id);

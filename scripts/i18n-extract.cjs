@@ -119,6 +119,13 @@ const segmentConfirmationStateServicePath = path.join(
 );
 const segmentTmSaveControllerPath = path.join(root, "src", "features", "editor", "segment-tm-save-controller.js");
 const concordanceControllerPath = path.join(root, "src", "features", "editor", "concordance-controller.js");
+const segmentNavigationControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "editor",
+  "segment-navigation-controller.js"
+);
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const resourceMutationControllerPath = path.join(
   root,
@@ -345,6 +352,11 @@ function main() {
   );
   extractScript(messagesByText, segmentTmSaveControllerPath, "src/features/editor/segment-tm-save-controller.js");
   extractScript(messagesByText, concordanceControllerPath, "src/features/editor/concordance-controller.js");
+  extractScript(
+    messagesByText,
+    segmentNavigationControllerPath,
+    "src/features/editor/segment-navigation-controller.js"
+  );
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(
     messagesByText,

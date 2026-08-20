@@ -178,6 +178,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-confirmation-state-service.js",
   "src/features/editor/segment-tm-save-controller.js",
   "src/features/editor/concordance-controller.js",
+  "src/features/editor/segment-navigation-controller.js",
   "src/features/editor/structural-segment-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -274,6 +275,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-confirmation-state-service.test.cjs",
   "tests/unit/segment-tm-save-controller.test.cjs",
   "tests/unit/concordance-controller.test.cjs",
+  "tests/unit/segment-navigation-controller.test.cjs",
   "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
@@ -403,6 +405,7 @@ const segmentCommandRestorationControllerJs = readText("src/features/editor/segm
 const segmentConfirmationStateServiceJs = readText("src/features/editor/segment-confirmation-state-service.js");
 const segmentTmSaveControllerJs = readText("src/features/editor/segment-tm-save-controller.js");
 const concordanceControllerJs = readText("src/features/editor/concordance-controller.js");
+const segmentNavigationControllerJs = readText("src/features/editor/segment-navigation-controller.js");
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
@@ -422,6 +425,7 @@ const segmentCommandRestorationControllerUnitTests = readText(
 const segmentConfirmationStateServiceUnitTests = readText("tests/unit/segment-confirmation-state-service.test.cjs");
 const segmentTmSaveControllerUnitTests = readText("tests/unit/segment-tm-save-controller.test.cjs");
 const concordanceControllerUnitTests = readText("tests/unit/concordance-controller.test.cjs");
+const segmentNavigationControllerUnitTests = readText("tests/unit/segment-navigation-controller.test.cjs");
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
@@ -3987,9 +3991,9 @@ assertIncludes(
   "the command palette must route confirmation directly to SegmentConfirmationController."
 );
 assertIncludes(
-  appJs,
-  "segmentConfirmationController.renderBusy()",
-  "active-segment changes must render confirmation busy state directly through SegmentConfirmationController."
+  segmentNavigationControllerJs,
+  "confirmation.renderBusy()",
+  "active-segment changes must render confirmation busy state through the injected SegmentConfirmationController boundary."
 );
 assertIncludes(
   appWorkflowDriverJs,
@@ -4270,6 +4274,16 @@ assertIncludes(
   appBootstrapJs,
   "createConcordanceController,",
   "The application runtime must expose the checked concordance-controller factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createSegmentNavigationController } from "../features/editor/segment-navigation-controller.js";',
+  "The application runtime must install the checked segment-navigation controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentNavigationController,",
+  "The application runtime must expose the checked segment-navigation factory."
 );
 for (const boundary of [
   "editLifecycle.finalize(segment.id)",
@@ -4888,7 +4902,7 @@ for (const boundary of [
   "verticalFeatureState?.inspector?.setContext({ segmentId })",
   "targetEditController.normalizeSelection(...args)",
   "targetEditController.focusActive(...args)",
-  "navigateNext: goToNextOpenSegment",
+  "navigateNext: (...args) => segmentNavigationController.nextOpen(...args)",
   "filters: { invalidate: segmentFilterService.invalidate }",
   "renderHistory: renderRevisionHistory",
   "refreshContext: () => editorContextController.refresh()",
@@ -5220,6 +5234,139 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/concordance-controller.js"',
   "source-catalog extraction must scan the checked concordance controller."
+);
+for (const snippet of [
+  'throw new TypeError("SegmentNavigationController requires session and navigation boundaries.")',
+  'throw new TypeError("SegmentNavigationController requires grid, inspector, and confirmation boundaries.")',
+  'throw new TypeError("SegmentNavigationController requires filter boundaries.")',
+  'throw new TypeError("SegmentNavigationController requires presentation, context, and focus boundaries.")',
+  "const position = filters.visiblePosition(index)",
+  "if (position === -1) return",
+  "grid.ensureVisible(position, presentation.renderSegments)",
+  "if (index < 0 || index >= session.getSegments().length) return",
+  "if (index === navigation.getActiveIndex()) return",
+  "const oldIndex = navigation.getActiveIndex()",
+  'const segmentId = session.getSegments()[index]?.id || ""',
+  "grid.select(index, segmentId)",
+  "inspector.setContext({ segmentId })",
+  "confirmation.renderBusy()",
+  "ensureVisible(index)",
+  "presentation.updateRow(oldIndex)",
+  "presentation.updateRow(index)",
+  "presentation.renderPrompt()",
+  "await context.refresh()",
+  "if (!session.getSegments().length) return",
+  "const start = Math.max(navigation.getActiveIndex() + 1, 0)",
+  "index >= start && filters.isOpen(segment)",
+  "index < start && filters.isOpen(segment)",
+  "const next = afterCurrent !== -1 ? afterCurrent : beforeCurrent",
+  "if (next === -1) return",
+  "await select(next)",
+  "if (!filters.matches(session.getSegments()[next]))",
+  "filters.resetStatus()",
+  'statusFilter.value = "all"',
+  "presentation.renderSegments()",
+  "focus.target()",
+  "return Object.freeze({ ensureVisible, nextOpen, select })"
+]) {
+  assertIncludes(
+    segmentNavigationControllerJs,
+    snippet,
+    `SegmentNavigationController must retain characterized selection/navigation policy: ${snippet}`
+  );
+}
+assert(
+  !segmentNavigationControllerJs.includes("applicationStore") &&
+    !segmentNavigationControllerJs.includes("editorSessionStore") &&
+    !segmentNavigationControllerJs.includes("segmentFilterService") &&
+    !segmentNavigationControllerJs.includes("targetEditController") &&
+    !segmentNavigationControllerJs.includes("verticalFeatureState"),
+  "the checked segment-navigation controller must depend only on injected state and effect boundaries."
+);
+assertIncludes(
+  appJs,
+  "createSegmentNavigationController({",
+  "app.js must compose the checked segment-navigation controller."
+);
+for (const boundary of [
+  "session: { getSegments: editorSessionStore.getSegments }",
+  "navigation: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex }",
+  "select: (index, segmentId) => verticalFeatureState?.segmentGrid?.selectSegment(index, segmentId)",
+  "ensureVisible: (position, render) => verticalFeatureState.segmentGrid.ensureVisible(position, render)",
+  "setContext: (context) => verticalFeatureState?.inspector?.setContext(context)",
+  "confirmation: { renderBusy: segmentConfirmationController.renderBusy }",
+  "visiblePosition: segmentFilterService.visiblePosition",
+  "isOpen: segmentFilterService.isOpen",
+  "matches: segmentFilterService.matches",
+  'resetStatus: () => editorFilterStore.update({ status: "all" })',
+  "renderPrompt: aiPromptPreviewController.render",
+  "context: { refresh: editorContextController.refresh }",
+  "focus: { target: targetEditController.focusActive }",
+  "statusFilter: els.segmentStatusFilter"
+]) {
+  assertIncludes(appJs, boundary, `segment-navigation composition must inject the checked ${boundary} boundary.`);
+}
+for (const lateBoundConsumer of [
+  "navigateNext: (...args) => segmentNavigationController.nextOpen(...args)",
+  "goToNextOpen: (...args) => segmentNavigationController.nextOpen(...args)",
+  "ensureVisible: (...args) => segmentNavigationController.ensureVisible(...args)",
+  "activateSegment: (...args) => segmentNavigationController.select(...args)"
+]) {
+  assertIncludes(
+    appJs,
+    lateBoundConsumer,
+    `early controller composition must retain late-bound segment navigation: ${lateBoundConsumer}.`
+  );
+}
+for (const directConsumer of [
+  "run: segmentNavigationController.nextOpen",
+  'els.nextOpenBtn.addEventListener("click", segmentNavigationController.nextOpen)',
+  "segmentNavigationController.select(rowIndex)",
+  'row.addEventListener("click", () => segmentNavigationController.select(index))',
+  "await segmentNavigationController.select(index)",
+  "await segmentNavigationController.select(first)"
+]) {
+  assertIncludes(
+    appJs,
+    directConsumer,
+    `application navigation consumers must call SegmentNavigationController directly: ${directConsumer}.`
+  );
+}
+assert(
+  appJs.split("segmentNavigationController.select(").length - 1 === 15,
+  "all fifteen application selection consumers must call SegmentNavigationController directly."
+);
+assert(
+  appWorkflowDriverJs.split("segmentNavigationController.select(").length - 1 === 24,
+  "all twenty-four workflow selection consumers must call SegmentNavigationController directly."
+);
+for (const removedHelper of ["ensureSegmentVisible", "setActiveSegment", "goToNextOpenSegment"]) {
+  const directHelper = new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} segment-navigation helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "SegmentNavigationController ensures only visible positions and preserves the render callback",
+  "SegmentNavigationController selection is inert for negative, out-of-range, and active indexes",
+  "SegmentNavigationController preserves valid selection and contextual refresh order",
+  "SegmentNavigationController propagates context failure after preserving preceding selection effects",
+  "SegmentNavigationController next-open prefers later candidates and focuses without resetting matching filters",
+  "SegmentNavigationController next-open wraps, resets a hiding status filter, rerenders, and focuses",
+  "SegmentNavigationController next-open is inert for empty and fully confirmed collections",
+  "SegmentNavigationController validates collaborators and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentNavigationControllerUnitTests,
+    testName,
+    `focused segment-navigation tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-navigation-controller.js"',
+  "source-catalog extraction must scan the checked segment-navigation controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -5870,7 +6017,7 @@ for (const consumer of [
   "createRequest: aiPromptPreviewController.createRequest",
   "getModeLabel: aiPromptPreviewController.getModeLabel",
   "getContextLabels: aiPromptPreviewController.getContextLabels",
-  "aiPromptPreviewController.render();"
+  "renderPrompt: aiPromptPreviewController.render"
 ]) {
   assertIncludes(
     appJs,

@@ -1343,6 +1343,7 @@ const verticalFeatureState = (() => {
 verticalFeatureState?.inspector?.mount?.();
 
 let targetEditController = null;
+let segmentNavigationController = null;
 const autosaveService = appRuntime.featureFactories.createAutosaveService({
   editorSessionStore,
   repository: {
@@ -1384,7 +1385,7 @@ const segmentCommandRestorationController =
       inspect: (segmentId) => verticalFeatureState?.inspector?.setContext({ segmentId }),
       normalize: (...args) => targetEditController.normalizeSelection(...args),
       focus: (...args) => targetEditController.focusActive(...args),
-      navigateNext: goToNextOpenSegment
+      navigateNext: (...args) => segmentNavigationController.nextOpen(...args)
     },
     filters: { invalidate: segmentFilterService.invalidate },
     presentation: {
@@ -1549,7 +1550,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
   selection: {
     getActiveIndex: () => applicationStore.getState().navigation.activeIndex,
     focusTarget: (...args) => targetEditController.focusActive(...args),
-    goToNextOpen: goToNextOpenSegment
+    goToNextOpen: (...args) => segmentNavigationController.nextOpen(...args)
   },
   validation: {
     missingTags: protectedTagInspectionService.missing,
@@ -1614,13 +1615,13 @@ targetEditController = appRuntime.featureFactories.createTargetEditController({
   status: { commandsChanged: renderUndoControls },
   selection: {
     getActiveIndex: () => applicationStore.getState().navigation.activeIndex,
-    ensureVisible: ensureSegmentVisible,
+    ensureVisible: (...args) => segmentNavigationController.ensureVisible(...args),
     findEditor: (index) => verticalFeatureState.segmentGrid.findTargetEditor(els.segmentBody, index)
   },
   createPatch: segmentTargetStateService.capturePatch,
   restorePatch: segmentCommandRestorationController.restorePatch,
   applyDraft: applyTargetDraft,
-  activateSegment: setActiveSegment,
+  activateSegment: (...args) => segmentNavigationController.select(...args),
   confirmSegment: () => segmentConfirmationController.confirm(),
   getCommandProjectId: () => state.commandProjectId,
   getVisibleIndexes: segmentFilterService.visibleIndexes,
@@ -2658,7 +2659,7 @@ const aiSuggestionApplicationController =
     },
     selection: {
       getActiveIndex: () => applicationStore.getState().navigation.activeIndex,
-      goToNextOpen: goToNextOpenSegment
+      goToNextOpen: (...args) => segmentNavigationController.nextOpen(...args)
     },
     mutation: {
       applyTarget: segmentTargetStateService.setTarget,
@@ -3043,6 +3044,33 @@ const editorContextController = appRuntime?.featureFactories?.createEditorContex
   refreshTerms: () => refreshTerms()
 });
 
+segmentNavigationController = appRuntime.featureFactories.createSegmentNavigationController({
+  session: { getSegments: editorSessionStore.getSegments },
+  navigation: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex },
+  grid: {
+    select: (index, segmentId) => verticalFeatureState?.segmentGrid?.selectSegment(index, segmentId),
+    ensureVisible: (position, render) => verticalFeatureState.segmentGrid.ensureVisible(position, render)
+  },
+  inspector: {
+    setContext: (context) => verticalFeatureState?.inspector?.setContext(context)
+  },
+  confirmation: { renderBusy: segmentConfirmationController.renderBusy },
+  filters: {
+    visiblePosition: segmentFilterService.visiblePosition,
+    isOpen: segmentFilterService.isOpen,
+    matches: segmentFilterService.matches,
+    resetStatus: () => editorFilterStore.update({ status: "all" })
+  },
+  presentation: {
+    renderSegments,
+    updateRow,
+    renderPrompt: aiPromptPreviewController.render
+  },
+  context: { refresh: editorContextController.refresh },
+  focus: { target: targetEditController.focusActive },
+  statusFilter: els.segmentStatusFilter
+});
+
 const filterPresetController = appRuntime?.featureFactories?.createFilterPresetController?.({
   select: els.filterPresetSelect,
   preferencesRepository: appRuntime.preferencesRepository,
@@ -3055,7 +3083,7 @@ const filterPresetController = appRuntime?.featureFactories?.createFilterPresetC
     segmentFilterService.invalidate();
     renderSegments();
     const first = segmentFilterService.firstVisible();
-    if (first !== -1) await setActiveSegment(first);
+    if (first !== -1) await segmentNavigationController.select(first);
   },
   setInspectorTab: (tab) => {
     state.inspectorOpen = true;
@@ -4684,7 +4712,7 @@ function commandList() {
     { id: "redo", label: "Redo last action", run: redoLastCommand, enabled: Boolean(appRuntime?.commands?.bus?.canRedo?.(commandProjectId)) },
     { id: "trash", label: "Open Trash", run: openTrash, enabled: Boolean(appRuntime?.trashRepository) },
     { id: "confirm", label: "Confirm segment", run: segmentConfirmationController.confirm, enabled: Boolean(currentSegment()?.target?.trim()) },
-    { id: "next-open", label: "Next open segment", run: goToNextOpenSegment, enabled: Boolean(editorSessionStore.getSegments().length) },
+    { id: "next-open", label: "Next open segment", run: segmentNavigationController.nextOpen, enabled: Boolean(editorSessionStore.getSegments().length) },
     { id: "focus-mode", label: applicationStore.getState().interface.focusMode ? "Exit Focus view" : "Enter Focus view", run: toggleFocusMode, enabled: Boolean(applicationStore.getState().navigation.view === "editor" && editorSessionStore.getProject()) },
     { id: "copy-source", label: "Copy source", run: targetProducerController.copySourceToTarget, enabled: Boolean(currentSegment()) },
     { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: structuralSegmentController.split, enabled: Boolean(currentSegment() && structuralSegmentController.canSplit(currentSegment())) },
@@ -5688,7 +5716,7 @@ function appendTextWithTags(container, text, tags, options = {}) {
       chip.addEventListener("click", (event) => {
         event.stopPropagation();
         const rowIndex = Number(container.closest("tr")?.dataset.index);
-        const ready = Number.isInteger(rowIndex) ? setActiveSegment(rowIndex) : Promise.resolve();
+        const ready = Number.isInteger(rowIndex) ? segmentNavigationController.select(rowIndex) : Promise.resolve();
         ready.then(() => targetProducerController.insertProtectedTag(tag.text));
       });
     }
@@ -5733,7 +5761,7 @@ function appendTextWithSourceMarkup(container, segment) {
       chip.addEventListener("click", (event) => {
         event.stopPropagation();
         const rowIndex = Number(container.closest("tr")?.dataset.index);
-        const ready = Number.isInteger(rowIndex) ? setActiveSegment(rowIndex) : Promise.resolve();
+        const ready = Number.isInteger(rowIndex) ? segmentNavigationController.select(rowIndex) : Promise.resolve();
         ready.then(() => targetProducerController.insertProtectedTag(marker.tag.text));
       });
       container.append(chip);
@@ -5821,7 +5849,7 @@ function renderSegmentRow(index) {
   renderTargetTagPreview(row, segment);
   renderStatusCell(row, segment);
   renderTagTray(row, segment);
-  row.addEventListener("click", () => setActiveSegment(index));
+  row.addEventListener("click", () => segmentNavigationController.select(index));
   return row;
 }
 
@@ -5965,46 +5993,6 @@ function renderProgress(options = {}) {
   els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
   els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
-}
-
-function ensureSegmentVisible(index) {
-  const position = segmentFilterService.visiblePosition(index);
-  if (position === -1) return;
-  verticalFeatureState.segmentGrid.ensureVisible(position, renderSegments);
-}
-
-async function setActiveSegment(index) {
-  if (index < 0 || index >= editorSessionStore.getSegments().length) return;
-  if (index === applicationStore.getState().navigation.activeIndex) return;
-  const oldIndex = applicationStore.getState().navigation.activeIndex;
-  verticalFeatureState?.segmentGrid?.selectSegment(index, editorSessionStore.getSegments()[index]?.id || "");
-  verticalFeatureState?.inspector?.setContext({ segmentId: editorSessionStore.getSegments()[index]?.id || "" });
-  segmentConfirmationController.renderBusy();
-  ensureSegmentVisible(index);
-  updateRow(oldIndex);
-  updateRow(index);
-  aiPromptPreviewController.render();
-  await editorContextController.refresh();
-}
-
-async function goToNextOpenSegment() {
-  if (!editorSessionStore.getSegments().length) return;
-  const start = Math.max(applicationStore.getState().navigation.activeIndex + 1, 0);
-  const afterCurrent = editorSessionStore
-    .getSegments()
-    .findIndex((segment, index) => index >= start && segmentFilterService.isOpen(segment));
-  const beforeCurrent = editorSessionStore
-    .getSegments()
-    .findIndex((segment, index) => index < start && segmentFilterService.isOpen(segment));
-  const next = afterCurrent !== -1 ? afterCurrent : beforeCurrent;
-  if (next === -1) return;
-  await setActiveSegment(next);
-  if (!segmentFilterService.matches(editorSessionStore.getSegments()[next])) {
-    editorFilterStore.update({ status: "all" });
-    els.segmentStatusFilter.value = "all";
-    renderSegments();
-  }
-  targetEditController.focusActive();
 }
 
 function applyTargetDraft({ index, segment, target }) {
@@ -6231,7 +6219,7 @@ async function goToQualityRiskItem(item) {
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
     renderSegments();
   }
-  await setActiveSegment(index);
+  await segmentNavigationController.select(index);
   renderSegments();
   targetEditController.focusActive();
 }
@@ -6362,7 +6350,7 @@ function renderQaResults() {
     button.addEventListener("click", async () => {
       const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === check.segmentId);
       if (index !== -1) {
-        await setActiveSegment(index);
+        await segmentNavigationController.select(index);
         renderSegments();
         targetEditController.focusActive();
       }
@@ -7542,7 +7530,7 @@ function wireEvents() {
   els.languagePairFilter.addEventListener("change", renderProjectsView);
 
   els.saveTmBtn.addEventListener("click", segmentTmSaveController.saveActive);
-  els.nextOpenBtn.addEventListener("click", goToNextOpenSegment);
+  els.nextOpenBtn.addEventListener("click", segmentNavigationController.nextOpen);
   els.runQaBtn.addEventListener("click", runProjectQa);
   document.querySelectorAll("[data-panel-toggle]").forEach((button) => {
     syncPanelToggleState(button);
@@ -7563,52 +7551,52 @@ function wireEvents() {
     renderSegments();
     renderProgress();
     const first = segmentFilterService.firstVisible();
-    if (first !== -1) await setActiveSegment(first);
+    if (first !== -1) await segmentNavigationController.select(first);
   });
   els.segmentSearchInput.addEventListener("input", async () => {
     editorFilterStore.update({ query: els.segmentSearchInput.value.trim() });
     renderSegments();
     const first = segmentFilterService.firstVisible();
-    if (first !== -1) await setActiveSegment(first);
+    if (first !== -1) await segmentNavigationController.select(first);
   });
   els.segmentSearchScope.addEventListener("change", async () => {
     editorFilterStore.update({ scope: els.segmentSearchScope.value });
     renderSegments();
     const first = segmentFilterService.firstVisible();
-    if (first !== -1) await setActiveSegment(first);
+    if (first !== -1) await segmentNavigationController.select(first);
   });
   els.segmentRegexInput.addEventListener("change", async () => {
     editorFilterStore.update({ regex: els.segmentRegexInput.checked });
     renderSegments();
     const first = segmentFilterService.firstVisible();
-    if (first !== -1) await setActiveSegment(first);
+    if (first !== -1) await segmentNavigationController.select(first);
   });
   els.segmentCaseInput.addEventListener("change", async () => {
     editorFilterStore.update({ caseSensitive: els.segmentCaseInput.checked });
     renderSegments();
     const first = segmentFilterService.firstVisible();
-    if (first !== -1) await setActiveSegment(first);
+    if (first !== -1) await segmentNavigationController.select(first);
   });
   els.segmentStatusFilter.addEventListener("change", async () => {
     filterPresetController?.markCustom?.();
     editorFilterStore.update({ status: els.segmentStatusFilter.value });
     renderSegments();
     const first = segmentFilterService.firstVisible();
-    if (first !== -1) await setActiveSegment(first);
+    if (first !== -1) await segmentNavigationController.select(first);
   });
   els.reviewStateFilter?.addEventListener("change", async () => {
     filterPresetController?.markCustom?.();
     editorFilterStore.update({ reviewState: els.reviewStateFilter.value });
     renderSegments();
     const first = segmentFilterService.firstVisible();
-    if (first !== -1) await setActiveSegment(first);
+    if (first !== -1) await segmentNavigationController.select(first);
   });
   els.aiSegmentFilter?.addEventListener("change", async () => {
     filterPresetController?.markCustom?.();
     editorFilterStore.update({ aiState: els.aiSegmentFilter.value });
     renderSegments();
     const first = segmentFilterService.firstVisible();
-    if (first !== -1) await setActiveSegment(first);
+    if (first !== -1) await segmentNavigationController.select(first);
   });
 
   els.termForm.addEventListener("submit", async (event) => {
