@@ -101,6 +101,7 @@ const protectedTextReplacementServicePath = path.join(
 );
 const segmentProvenanceServicePath = path.join(root, "src", "features", "editor", "segment-provenance-service.js");
 const segmentFilterServicePath = path.join(root, "src", "features", "editor", "segment-filter-service.js");
+const segmentProgressServicePath = path.join(root, "src", "features", "editor", "segment-progress-service.js");
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const resourceMutationControllerPath = path.join(
   root,
@@ -313,6 +314,7 @@ function main() {
   );
   extractScript(messagesByText, segmentProvenanceServicePath, "src/features/editor/segment-provenance-service.js");
   extractScript(messagesByText, segmentFilterServicePath, "src/features/editor/segment-filter-service.js");
+  extractScript(messagesByText, segmentProgressServicePath, "src/features/editor/segment-progress-service.js");
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(
     messagesByText,

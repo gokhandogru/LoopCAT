@@ -732,7 +732,6 @@ const PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG = Symbol("project-settings-act
 const CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG = Symbol("create-project-activity-failure-test");
 const WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG = Symbol("workspace-save-activity-failure-test");
 const RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS = new Set();
-const segmentSourceWordCounts = new WeakMap();
 const editorFilterStore = appRuntime.featureFactories.createFilterStore();
 
 const state = {
@@ -1124,6 +1123,13 @@ const segmentFilterService = appRuntime.featureFactories.createSegmentFilterServ
   provenance: segmentProvenanceService
 });
 
+const segmentProgressService = appRuntime.featureFactories.createSegmentProgressService({
+  getSegments: () => editorSessionStore.getSegments(),
+  getProjectId: () => editorSessionStore.getProject()?.id || "",
+  getCachedSummary: () => editorSessionStore.getProgressSummary(),
+  replaceCachedSummary: (summary) => editorSessionStore.replaceProgressSummary(summary)
+});
+
 const projectLanguageContextController = appRuntime.featureFactories.createProjectLanguageContextController({
   getProject: () => editorSessionStore.getProject(),
   languageInput: languageInputService,
@@ -1142,7 +1148,7 @@ const projectDocumentCatalogService = appRuntime.featureFactories.createProjectD
 const projectDocumentStatisticsService = appRuntime.featureFactories.createProjectDocumentStatisticsService({
   getDocuments: projectDocumentCatalogService.list,
   getSegments: () => editorSessionStore.getSegments(),
-  sourceWordCount
+  sourceWordCount: segmentProgressService.sourceWordCount
 });
 
 const aiContextController = appRuntime?.featureFactories?.createAiContextController?.({
@@ -4233,20 +4239,6 @@ function escapeRegExp(value) {
   return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function wordCount(text) {
-  return (text || "").trim().split(/\s+/).filter(Boolean).length;
-}
-
-function sourceWordCount(segment) {
-  if (!segment || typeof segment !== "object") return 0;
-  const source = segment.source || "";
-  const cached = segmentSourceWordCounts.get(segment);
-  if (cached?.source === source) return cached.count;
-  const count = wordCount(source);
-  segmentSourceWordCounts.set(segment, { source, count });
-  return count;
-}
-
 function currentSegment() {
   return editorSessionStore.getSegments()[applicationStore.getState().navigation.activeIndex] || null;
 }
@@ -5036,20 +5028,6 @@ function renderProjectStorageStatus() {
   recoveryWorkspaceController?.renderProjectStorage?.({ status: state.workspaceStatus || {} });
 }
 
-function projectProgress(segments) {
-  const total = segments.length;
-  let confirmed = 0;
-  let draft = 0;
-  let words = 0;
-  for (const segment of segments) {
-    if (segment.status === "confirmed") confirmed += 1;
-    if (segment.status === "draft") draft += 1;
-    words += sourceWordCount(segment);
-  }
-  const percent = total ? Math.round((confirmed / total) * 100) : 0;
-  return { total, confirmed, draft, words, percent };
-}
-
 function projectSummaryRevision(projectId) {
   return editorSessionStore.getProjectSummaryRevision(projectId);
 }
@@ -5059,7 +5037,7 @@ function markProjectSummaryDirty(projectId) {
 }
 
 function projectSummaryRecord(project, segments, summaryRevision = projectSummaryRevision(project.id)) {
-  const progress = projectProgress(segments);
+  const progress = segmentProgressService.projectProgress(segments);
   const projectSearchText = stableLower(`${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`);
   return {
     ...project,
@@ -6022,37 +6000,8 @@ function scheduleRevisionHistoryRender() {
   });
 }
 
-function calculateProgressSummary() {
-  const total = editorSessionStore.getSegments().length;
-  let confirmed = 0;
-  let words = 0;
-  for (const segment of editorSessionStore.getSegments()) {
-    if (segment.status === "confirmed") confirmed += 1;
-    words += sourceWordCount(segment);
-  }
-  return { projectId: editorSessionStore.getProject()?.id || "", total, confirmed, words };
-}
-
 function renderProgress(options = {}) {
-  const previousStatus = options.previousStatus;
-  const nextStatus = options.nextStatus;
-  const cached = editorSessionStore.getProgressSummary();
-  const canApplyStatusDelta =
-    cached &&
-    cached.projectId === (editorSessionStore.getProject()?.id || "") &&
-    cached.total === editorSessionStore.getSegments().length &&
-    previousStatus !== undefined &&
-    nextStatus !== undefined;
-  let summary;
-  if (canApplyStatusDelta) {
-    let confirmed = cached.confirmed;
-    if (previousStatus === "confirmed" && nextStatus !== "confirmed") confirmed -= 1;
-    if (previousStatus !== "confirmed" && nextStatus === "confirmed") confirmed += 1;
-    summary = { ...cached, confirmed: Math.max(0, Math.min(cached.total, confirmed)) };
-  } else {
-    summary = calculateProgressSummary();
-  }
-  editorSessionStore.replaceProgressSummary(summary);
+  const summary = segmentProgressService.refresh(options);
   const { total, confirmed, words } = summary;
   const open = total - confirmed;
   els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });

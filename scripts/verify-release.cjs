@@ -172,6 +172,7 @@ const requiredReleaseFiles = [
   "src/features/editor/protected-text-replacement-service.js",
   "src/features/editor/segment-provenance-service.js",
   "src/features/editor/segment-filter-service.js",
+  "src/features/editor/segment-progress-service.js",
   "src/features/editor/structural-segment-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -262,6 +263,7 @@ const requiredReleaseFiles = [
   "tests/unit/protected-text-replacement-service.test.cjs",
   "tests/unit/segment-provenance-service.test.cjs",
   "tests/unit/segment-filter-service.test.cjs",
+  "tests/unit/segment-progress-service.test.cjs",
   "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
@@ -385,6 +387,7 @@ const protectedTagInspectionServiceJs = readText("src/features/editor/protected-
 const protectedTextReplacementServiceJs = readText("src/features/editor/protected-text-replacement-service.js");
 const segmentProvenanceServiceJs = readText("src/features/editor/segment-provenance-service.js");
 const segmentFilterServiceJs = readText("src/features/editor/segment-filter-service.js");
+const segmentProgressServiceJs = readText("src/features/editor/segment-progress-service.js");
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
@@ -396,6 +399,7 @@ const protectedTagInspectionServiceUnitTests = readText("tests/unit/protected-ta
 const protectedTextReplacementServiceUnitTests = readText("tests/unit/protected-text-replacement-service.test.cjs");
 const segmentProvenanceServiceUnitTests = readText("tests/unit/segment-provenance-service.test.cjs");
 const segmentFilterServiceUnitTests = readText("tests/unit/segment-filter-service.test.cjs");
+const segmentProgressServiceUnitTests = readText("tests/unit/segment-progress-service.test.cjs");
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
@@ -1811,7 +1815,7 @@ assertIncludes(
 for (const boundary of [
   "getDocuments: projectDocumentCatalogService.list",
   "getSegments: () => editorSessionStore.getSegments()",
-  "sourceWordCount"
+  "sourceWordCount: segmentProgressService.sourceWordCount"
 ]) {
   assertIncludes(appJs, boundary, `project document-statistics composition must inject the ${boundary} boundary.`);
 }
@@ -4185,6 +4189,16 @@ assertIncludes(
   "createSegmentFilterService,",
   "The application runtime must expose the checked segment filter factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createSegmentProgressService } from "../features/editor/segment-progress-service.js";',
+  "The application runtime must install the checked segment progress service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentProgressService,",
+  "The application runtime must expose the checked segment progress factory."
+);
 for (const boundary of [
   "editLifecycle.finalize(segment.id)",
   "persistence.clearPending(segment, { finalizeEdit: false })",
@@ -4550,6 +4564,87 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/segment-filter-service.js"',
   "source-catalog extraction must scan the checked segment filter service."
+);
+for (const snippet of [
+  "const sourceWordCounts = new WeakMap()",
+  'return (text || "").trim().split(/\\s+/).filter(Boolean).length',
+  'if (!segment || typeof segment !== "object") return 0',
+  "if (cached?.source === source) return cached.count",
+  "sourceWordCounts.set(segment, { source, count })",
+  "for (const segment of segments)",
+  'if (segment.status === "confirmed") confirmed += 1',
+  'if (segment.status === "draft") draft += 1',
+  "Math.round((confirmed / total) * 100)",
+  "return { total, confirmed, draft, words, percent }",
+  "for (const segment of getSegments())",
+  'return { projectId: getProjectId() || "", total, confirmed, words }',
+  'cached.projectId === (getProjectId() || "")',
+  "cached.total === getSegments().length",
+  "previousStatus !== undefined",
+  'if (previousStatus === "confirmed" && nextStatus !== "confirmed") confirmed -= 1',
+  'if (previousStatus !== "confirmed" && nextStatus === "confirmed") confirmed += 1',
+  "Math.max(0, Math.min(cached.total, confirmed))",
+  "replaceCachedSummary(summary)",
+  "return Object.freeze({ wordCount, sourceWordCount, projectProgress, activeSummary, refresh })"
+]) {
+  assertIncludes(
+    segmentProgressServiceJs,
+    snippet,
+    `SegmentProgressService must retain characterized word/progress policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createSegmentProgressService({",
+  "app.js must compose the checked segment progress service."
+);
+for (const boundary of [
+  "getSegments: () => editorSessionStore.getSegments()",
+  'getProjectId: () => editorSessionStore.getProject()?.id || ""',
+  "getCachedSummary: () => editorSessionStore.getProgressSummary()",
+  "replaceCachedSummary: (summary) => editorSessionStore.replaceProgressSummary(summary)"
+]) {
+  assertIncludes(appJs, boundary, `segment progress composition must inject the checked ${boundary} boundary.`);
+}
+for (const consumer of [
+  "sourceWordCount: segmentProgressService.sourceWordCount",
+  "segmentProgressService.projectProgress(segments)",
+  "segmentProgressService.refresh(options)"
+]) {
+  assertIncludes(appJs, consumer, `segment progress consumers must call the checked service directly: ${consumer}.`);
+}
+for (const removedHelper of ["wordCount", "sourceWordCount", "projectProgress", "calculateProgressSummary"]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} segment progress helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const removedCoordinatorPolicy of ["segmentSourceWordCounts", "canApplyStatusDelta"]) {
+  assert(
+    !appJs.includes(removedCoordinatorPolicy) && !appWorkflowDriverJs.includes(removedCoordinatorPolicy),
+    `${removedCoordinatorPolicy} segment progress policy must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "SegmentProgressService preserves whitespace word counts and non-record source fallbacks",
+  "SegmentProgressService preserves source-identity caching and refreshes after source mutation",
+  "SegmentProgressService preserves project totals, status counts, words, rounding, and input records",
+  "SegmentProgressService preserves the exact active summary shape and empty project identity fallback",
+  "SegmentProgressService refresh falls back for absent or invalid cached summaries and replaces the cache",
+  "SegmentProgressService preserves incremental confirmed deltas, extra cache fields, and clamps",
+  "SegmentProgressService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentProgressServiceUnitTests,
+    testName,
+    `focused segment progress tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-progress-service.js"',
+  "source-catalog extraction must scan the checked segment progress service."
 );
 assertIncludes(
   appBootstrapJs,
@@ -9739,19 +9834,19 @@ assertIncludes(
   "TargetEditController must use the cached visible segment position during keyboard navigation."
 );
 assertIncludes(
-  appJs,
-  "const segmentSourceWordCounts = new WeakMap",
-  "app.js must cache per-segment source word counts outside persisted project data."
+  segmentProgressServiceJs,
+  "const sourceWordCounts = new WeakMap",
+  "SegmentProgressService must cache per-segment source word counts outside persisted project data."
 );
 assertIncludes(
-  appJs,
+  segmentProgressServiceJs,
   "function sourceWordCount",
-  "app.js must reuse cached source word counts during progress rendering."
+  "SegmentProgressService must reuse cached source word counts during progress calculation."
 );
 assertIncludes(
-  appJs,
-  "for (const segment of editorSessionStore.getSegments())",
-  "app.js must render project progress with one segment pass."
+  segmentProgressServiceJs,
+  "for (const segment of getSegments())",
+  "SegmentProgressService must calculate active project progress with one segment pass."
 );
 assertIncludes(
   projectDocumentStatisticsServiceJs,
@@ -9799,9 +9894,9 @@ assertIncludes(
   "app.js language-pair filter options must render in one DOM replacement."
 );
 assertIncludes(
-  appJs,
+  segmentProgressServiceJs,
   "for (const segment of segments)",
-  "app.js project progress must avoid repeated status filter passes."
+  "SegmentProgressService project progress must avoid repeated status filter passes."
 );
 assertIncludes(
   appJs,
