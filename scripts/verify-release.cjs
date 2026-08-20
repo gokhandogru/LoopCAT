@@ -175,6 +175,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-progress-service.js",
   "src/features/editor/segment-target-state-service.js",
   "src/features/editor/segment-command-restoration-controller.js",
+  "src/features/editor/segment-confirmation-state-service.js",
   "src/features/editor/structural-segment-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -268,6 +269,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-progress-service.test.cjs",
   "tests/unit/segment-target-state-service.test.cjs",
   "tests/unit/segment-command-restoration-controller.test.cjs",
+  "tests/unit/segment-confirmation-state-service.test.cjs",
   "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
@@ -396,6 +398,9 @@ const segmentTargetStateServiceJs = readText("src/features/editor/segment-target
 const segmentCommandRestorationControllerJs = readText(
   "src/features/editor/segment-command-restoration-controller.js"
 );
+const segmentConfirmationStateServiceJs = readText(
+  "src/features/editor/segment-confirmation-state-service.js"
+);
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
@@ -411,6 +416,9 @@ const segmentProgressServiceUnitTests = readText("tests/unit/segment-progress-se
 const segmentTargetStateServiceUnitTests = readText("tests/unit/segment-target-state-service.test.cjs");
 const segmentCommandRestorationControllerUnitTests = readText(
   "tests/unit/segment-command-restoration-controller.test.cjs"
+);
+const segmentConfirmationStateServiceUnitTests = readText(
+  "tests/unit/segment-confirmation-state-service.test.cjs"
 );
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
@@ -4231,6 +4239,16 @@ assertIncludes(
   "createSegmentCommandRestorationController,",
   "The application runtime must expose the checked segment command-restoration factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createSegmentConfirmationStateService } from "../features/editor/segment-confirmation-state-service.js";',
+  "The application runtime must install the checked segment confirmation-state service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentConfirmationStateService,",
+  "The application runtime must expose the checked segment confirmation-state factory."
+);
 for (const boundary of [
   "editLifecycle.finalize(segment.id)",
   "persistence.clearPending(segment, { finalizeEdit: false })",
@@ -4903,6 +4921,75 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/segment-command-restoration-controller.js"',
   "source-catalog extraction must scan the checked segment command-restoration controller."
+);
+for (const snippet of [
+  'throw new TypeError("SegmentConfirmationStateService requires target-state and clock boundaries.")',
+  'targetState.recordHistory(segment, segment.target, "confirmed", "confirm")',
+  'segment.status = "confirmed"',
+  'if (segment.reviewState === "needs-review") segment.reviewState = ""',
+  "targetState.touch(segment)",
+  "Reflect.ownKeys(segment).forEach((key) => delete segment[key])",
+  "Object.assign(segment, snapshot)",
+  "segment.revision = Math.max(Number(segment.revision || 0), Number(savedConfirmedRevision || 0)) + 1",
+  "segment.updatedAt = now()",
+  "return Object.freeze({ confirm, preparePersistedRollback, restore })"
+]) {
+  assertIncludes(
+    segmentConfirmationStateServiceJs,
+    snippet,
+    `SegmentConfirmationStateService must retain characterized confirmation-state policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createSegmentConfirmationStateService({",
+  "app.js must compose the checked segment confirmation-state service."
+);
+for (const boundary of [
+  "targetState: segmentTargetStateService",
+  "now: () => new Date().toISOString()"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `segment confirmation-state composition must inject the checked ${boundary} boundary.`
+  );
+}
+for (const method of ["confirm", "restore", "preparePersistedRollback"]) {
+  assertIncludes(
+    appJs,
+    `segmentConfirmationStateService.${method}`,
+    `confirmation consumers must call SegmentConfirmationStateService.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "applySegmentConfirmation",
+  "restoreSegmentConfirmation",
+  "preparePersistedConfirmationRollback"
+]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} confirmation-state helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const testName of [
+  "SegmentConfirmationStateService records confirmation history, preserves target, clears needs-review, and touches",
+  "SegmentConfirmationStateService preserves unrelated review state and the original nullish-segment failure",
+  "SegmentConfirmationStateService restores snapshots in place with exact own-key assignment semantics",
+  "SegmentConfirmationStateService preserves persisted rollback coercion, monotonic revision, and timestamp",
+  "SegmentConfirmationStateService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentConfirmationStateServiceUnitTests,
+    testName,
+    `focused segment confirmation-state tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-confirmation-state-service.js"',
+  "source-catalog extraction must scan the checked segment confirmation-state service."
 );
 assertIncludes(
   appBootstrapJs,

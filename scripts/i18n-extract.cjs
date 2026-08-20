@@ -110,6 +110,13 @@ const segmentCommandRestorationControllerPath = path.join(
   "editor",
   "segment-command-restoration-controller.js"
 );
+const segmentConfirmationStateServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "editor",
+  "segment-confirmation-state-service.js"
+);
 const languageInputServicePath = path.join(root, "src", "i18n", "language-input-service.js");
 const resourceMutationControllerPath = path.join(
   root,
@@ -328,6 +335,11 @@ function main() {
     messagesByText,
     segmentCommandRestorationControllerPath,
     "src/features/editor/segment-command-restoration-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    segmentConfirmationStateServicePath,
+    "src/features/editor/segment-confirmation-state-service.js"
   );
   extractScript(messagesByText, languageInputServicePath, "src/i18n/language-input-service.js");
   extractScript(

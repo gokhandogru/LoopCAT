@@ -1137,6 +1137,12 @@ const segmentTargetStateService = appRuntime.featureFactories.createSegmentTarge
   invalidateFilters: segmentFilterService.invalidate
 });
 
+const segmentConfirmationStateService =
+  appRuntime.featureFactories.createSegmentConfirmationStateService({
+    targetState: segmentTargetStateService,
+    now: () => new Date().toISOString()
+  });
+
 const projectLanguageContextController = appRuntime.featureFactories.createProjectLanguageContextController({
   getProject: () => editorSessionStore.getProject(),
   languageInput: languageInputService,
@@ -1536,9 +1542,9 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
   },
   filters: { matches: segmentFilterService.matches },
   mutation: {
-    confirm: applySegmentConfirmation,
-    restore: restoreSegmentConfirmation,
-    preparePersistedRollback: preparePersistedConfirmationRollback
+    confirm: segmentConfirmationStateService.confirm,
+    restore: segmentConfirmationStateService.restore,
+    preparePersistedRollback: segmentConfirmationStateService.preparePersistedRollback
   },
   persistence: {
     clearPending: autosaveService.clear,
@@ -5984,23 +5990,6 @@ function applyTargetDraft({ index, segment, target }) {
 function openReplacePanel() {
   els.replaceMenu.open = true;
   els.replaceFindInput.focus();
-}
-
-function applySegmentConfirmation(segment) {
-  segmentTargetStateService.recordHistory(segment, segment.target, "confirmed", "confirm");
-  segment.status = "confirmed";
-  if (segment.reviewState === "needs-review") segment.reviewState = "";
-  segmentTargetStateService.touch(segment);
-}
-
-function restoreSegmentConfirmation(segment, snapshot) {
-  Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
-  Object.assign(segment, snapshot);
-}
-
-function preparePersistedConfirmationRollback(segment, savedConfirmedRevision) {
-  segment.revision = Math.max(Number(segment.revision || 0), Number(savedConfirmedRevision || 0)) + 1;
-  segment.updatedAt = new Date().toISOString();
 }
 
 async function saveSegmentToTm(segment, project = editorSessionStore.getProject()) {
