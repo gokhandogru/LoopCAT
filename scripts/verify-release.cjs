@@ -158,6 +158,7 @@ const requiredReleaseFiles = [
   "src/app/bootstrap.js",
   "src/app/app-store.js",
   "src/app/application-menu-controller.js",
+  "src/app/application-view-controller.js",
   "src/app/global-keyboard-controller.js",
   "src/app/navigation-controller.js",
   "src/app/compatibility-module-registry.js",
@@ -282,6 +283,7 @@ const requiredReleaseFiles = [
   "tests/unit/compatibility-module-registry.test.cjs",
   "tests/unit/app-store.test.cjs",
   "tests/unit/application-menu-controller.test.cjs",
+  "tests/unit/application-view-controller.test.cjs",
   "tests/unit/global-keyboard-controller.test.cjs",
   "tests/unit/editor-state.test.cjs",
   "tests/unit/editor-session-store.test.cjs",
@@ -433,6 +435,8 @@ const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-
 const installRuntimeJs = readText("src/app/install-runtime.js");
 const applicationMenuControllerJs = readText("src/app/application-menu-controller.js");
 const applicationMenuControllerUnitTests = readText("tests/unit/application-menu-controller.test.cjs");
+const applicationViewControllerJs = readText("src/app/application-view-controller.js");
+const applicationViewControllerUnitTests = readText("tests/unit/application-view-controller.test.cjs");
 const globalKeyboardControllerJs = readText("src/app/global-keyboard-controller.js");
 const globalKeyboardControllerUnitTests = readText("tests/unit/global-keyboard-controller.test.cjs");
 const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
@@ -3104,8 +3108,8 @@ assertIncludes(
   "application consumers must select documents through NavigationController directly."
 );
 assertIncludes(
-  appJs,
-  'applicationNavigation?.openEditor?.({ ...applicationStore.getState().navigation, view: "editor" })',
+  applicationViewControllerJs,
+  'navigation.openEditor({ ...context.getNavigation(), view: "editor" })',
   "view routing must pass the current navigation snapshot directly to NavigationController."
 );
 const renderEditorBody = functionBody(appJs, "function renderEditor()", "function renderTermbaseSelect()");
@@ -4685,6 +4689,115 @@ for (const testName of [
     applicationMenuControllerUnitTests,
     testName,
     `focused application menu tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createApplicationViewController } from "./application-view-controller.js";',
+  "the application runtime must install the checked application view controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationViewController,",
+  "the application runtime must expose the checked application view controller factory."
+);
+for (const snippet of [
+  "ApplicationViewController requires navigation elements, navigation, context, presentation, and refresh boundaries.",
+  "function show(view)",
+  'if (view === "projects") navigation.openProjects()',
+  'else if (view === "resources") navigation.openResources()',
+  'else if (view === "project") {',
+  "navigation.openProject(context.getProjectId(), context.getNavigation().activeIndex)",
+  'navigation.openEditor({ ...context.getNavigation(), view: "editor" })',
+  "presentation.renderEditor()",
+  'if (view === "projects") refresh.projects()',
+  'if (view === "resources") refresh.resources()',
+  "event.preventDefault()",
+  'show("projects")',
+  'elements.brandHomeLink.addEventListener("click", brandClickListener)',
+  'elements.projectsButton.addEventListener("click", projectsClickListener)',
+  'elements.brandHomeLink.removeEventListener("click", brandClickListener)',
+  'elements.projectsButton.removeEventListener("click", projectsClickListener)',
+  "return Object.freeze({ mount, show, unmount })"
+]) {
+  assertIncludes(
+    applicationViewControllerJs,
+    snippet,
+    `ApplicationViewController must retain characterized route, render, refresh, and listener policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationViewController({",
+  "brandHomeLink: els.brandHomeLink",
+  "projectsButton: els.projectsViewBtn",
+  "navigation: applicationNavigation",
+  "getProjectId: () => editorSessionStore.getProject()?.id || null",
+  "getNavigation: () => applicationStore.getState().navigation",
+  "presentation: { renderEditor }",
+  "projects: refreshProjectSummaries",
+  "resources: refreshResources",
+  'navigate: () => applicationViewController.show("resources")',
+  'applicationViewController.show("projects")',
+  "applicationViewController.mount()"
+]) {
+  assertIncludes(appJs, boundary, `application view composition must retain the checked ${boundary} boundary.`);
+}
+assertIncludes(
+  appWorkflowDriverJs,
+  'applicationViewController.show("editor")',
+  "workflow characterization must navigate to the Editor through ApplicationViewController directly."
+);
+assert(
+  appJs.indexOf("verticalFeatureState.segmentGrid.mountScroll(() => {") <
+    appJs.indexOf("applicationViewController.mount()") &&
+    appJs.indexOf("applicationViewController.mount()") <
+      appJs.indexOf('els.emptyTrashBtn?.addEventListener("click", emptyTrashPermanently)'),
+  "application view lifecycle must mount between segment-grid scrolling and the following command listeners at the existing position."
+);
+assert(
+  !/function\s+setView\b/.test(appJs) &&
+    !/\bsetView\s*\(/.test(appJs) &&
+    !/\bsetView\s*\(/.test(appWorkflowDriverJs) &&
+    !appJs.includes('els.brandHomeLink.addEventListener("click"') &&
+    !appJs.includes('els.projectsViewBtn.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('brandHomeLink.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('projectsViewBtn.addEventListener("click"'),
+  "application view orchestration and primary navigation listeners must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\bapplicationViewController\.show\b/g) || []).length === 2 &&
+    (appJs.match(/\bapplicationViewController\.mount\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bapplicationViewController\.show\b/g) || []).length === 1,
+  "all two application and one workflow view consumers must call ApplicationViewController directly with one lifecycle mount."
+);
+for (const forbiddenOwner of [
+  "applicationNavigation",
+  "applicationStore",
+  "editorSessionStore",
+  "refreshProjectSummaries",
+  "refreshResources",
+  "resourcesController",
+  "els."
+]) {
+  assert(
+    !applicationViewControllerJs.includes(forbiddenOwner),
+    `ApplicationViewController must use injected element, navigation, context, presentation, and refresh boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationViewController preserves Projects navigation, render, refresh, and return timing",
+  "ApplicationViewController preserves Resources navigation, render, refresh, and return timing",
+  "ApplicationViewController preserves Project route inputs without a refresh",
+  "ApplicationViewController preserves fallback Editor snapshot spreading without refresh",
+  "ApplicationViewController owns exact idempotent listener lifecycle and immutable API",
+  "ApplicationViewController preserves brand prevention and Projects button event effects",
+  "ApplicationViewController preserves navigation, render, refresh, and listener failure timing",
+  "ApplicationViewController validates every required boundary"
+]) {
+  assertIncludes(
+    applicationViewControllerUnitTests,
+    testName,
+    `focused application view tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(

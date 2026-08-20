@@ -3353,6 +3353,22 @@ const applicationMenuController = appRuntime.featureFactories.createApplicationM
     buttons: "button"
   }
 });
+const applicationViewController = appRuntime.featureFactories.createApplicationViewController({
+  elements: {
+    brandHomeLink: els.brandHomeLink,
+    projectsButton: els.projectsViewBtn
+  },
+  navigation: applicationNavigation,
+  context: {
+    getProjectId: () => editorSessionStore.getProject()?.id || null,
+    getNavigation: () => applicationStore.getState().navigation
+  },
+  presentation: { renderEditor },
+  refresh: {
+    projects: refreshProjectSummaries,
+    resources: refreshResources
+  }
+});
 const globalKeyboardController = appRuntime.featureFactories.createGlobalKeyboardController({
   target: window,
   normalizeKey: stableLower,
@@ -4249,7 +4265,7 @@ const resourcesController = appRuntime?.featureFactories?.createResourcesControl
     tbImportInput: els.resourceTbxImportInput,
     termListImportInput: els.resourceTermListImportInput
   },
-  navigate: () => setView("resources"),
+  navigate: () => applicationViewController.show("resources"),
   render: resourcesPresentationService.render,
   keyForItem: (item, type) => resourceCatalogService.key(item, type === "tm" ? "tmName" : "termBaseName"),
   normalizeLanguageInput: languageInputService.normalizeElement,
@@ -4645,7 +4661,7 @@ async function redoLastCommand() {
   if (result.receipt.commandId === "delete-project" && editorSessionStore.getProject()?.id === projectId) {
     editorSessionStore.replaceProject(null);
     editorSessionStore.replaceSegments([]);
-    setView("projects");
+    applicationViewController.show("projects");
     applicationNavigation.clearSelection();
   }
   await loadProjects(false);
@@ -5747,16 +5763,6 @@ async function loadProjects(selectFirst = false) {
   }
 }
 
-function setView(view) {
-  if (view === "projects") applicationNavigation?.openProjects?.();
-  else if (view === "resources") applicationNavigation?.openResources?.();
-  else if (view === "project") applicationNavigation?.openProject?.(editorSessionStore.getProject()?.id || null, applicationStore.getState().navigation.activeIndex);
-  else applicationNavigation?.openEditor?.({ ...applicationStore.getState().navigation, view: "editor" });
-  renderEditor();
-  if (view === "projects") refreshProjectSummaries();
-  if (view === "resources") refreshResources();
-}
-
 function showProjectHome() {
   if (!editorSessionStore.getProject()) return;
   const activeIndex = editorSessionStore.getSegments().length ? 0 : -1;
@@ -6676,11 +6682,7 @@ function wireEvents() {
     renderSegments({ fromScroll: true, preserveScroll: true });
   });
 
-  els.brandHomeLink.addEventListener("click", (event) => {
-    event.preventDefault();
-    setView("projects");
-  });
-  els.projectsViewBtn.addEventListener("click", () => setView("projects"));
+  applicationViewController.mount();
   els.emptyTrashBtn?.addEventListener("click", emptyTrashPermanently);
   els.undoBtn?.addEventListener("click", undoLastCommand);
   els.redoBtn?.addEventListener("click", redoLastCommand);

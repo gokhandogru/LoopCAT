@@ -4554,7 +4554,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         !els.tbResourcesPanel.hasAttribute("hidden"),
       "Resources tabs expose one keyboard-operated tab state and matching panel"
     );
-    setView("editor");
+    applicationViewController.show("editor");
     await yieldToUi();
     const editableResourceState = resourcesController.getState();
     const editableTmEntry = editableResourceState.tmEntries.find((entry) => entry.id === resourceTmEntry.id);
