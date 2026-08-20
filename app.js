@@ -80,11 +80,15 @@ const uiLocalizationService = appRuntime.featureFactories.createUiLocalizationSe
   confirm: (message) => window.confirm(message),
   alert: (message) => window.alert(message)
 });
+const qualityPresentationService = appRuntime.featureFactories.createQualityPresentationService({
+  localization: uiLocalizationService,
+  baseCategoryLabel: baseQualityCategoryLabel
+});
 const reportPresentationService = appRuntime.featureFactories.createReportPresentationService({
   localization: uiLocalizationService,
   escapeHtml,
   redactSensitiveText,
-  qualityCategoryName,
+  qualityCategoryName: qualityPresentationService.category,
   qaCheckMessage,
   qaCheckFixHint
 });
@@ -97,9 +101,9 @@ const reportDocumentCompositionService = appRuntime.featureFactories.createRepor
   sanitizeValidationReportForDisplay,
   languagePairDisplay: (...args) => languageInputService.pairDisplay(...args),
   formatDateTime,
-  qualityLabel,
-  qualityCategoryName,
-  qualityRiskLevelLabel
+  qualityLabel: qualityPresentationService.profile,
+  qualityCategoryName: qualityPresentationService.category,
+  qualityRiskLevelLabel: qualityPresentationService.riskLevel
 });
 const focusController = compatibilityModules.focusController.createFocusController();
 const replaceSafeHtml = appRuntime.safeHtml.replace;
@@ -3678,9 +3682,9 @@ const qualityReviewController = appRuntime?.featureFactories?.createQualityRevie
   defaultProfile: defaultQualityProfile,
   source: uiLocalizationService.source,
   label: uiLocalizationService.label,
-  profileLabel: qualityLabel,
-  categoryLabel: qualityCategoryName,
-  riskLevelLabel: qualityRiskLevelLabel,
+  profileLabel: qualityPresentationService.profile,
+  categoryLabel: qualityPresentationService.category,
+  riskLevelLabel: qualityPresentationService.riskLevel,
   formatDate,
   saveReview: (values) => reviewMetadataController.save(values),
   saveProfile: (values) => qualityProfileController.save(values),
@@ -3799,8 +3803,8 @@ const qualityDecisionController = appRuntime.featureFactories.createQualityDecis
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: setSaveStatus },
   labels: {
-    category: qualityCategoryName,
-    severity: qualityDecisionSeverityLabel
+    category: qualityPresentationService.category,
+    severity: qualityPresentationService.decisionSeverity
   },
   ids: { comment: () => makeId("comment") }
 });
@@ -6043,50 +6047,6 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-function qualityLabel(value) {
-  const label = {
-    "student-review": "Student review",
-    "freelance-delivery": "Freelance delivery",
-    "agency-delivery": "Agency delivery",
-    regulated: "Regulated",
-    targeted: "Targeted",
-    full: "Full",
-    lqa: "LQA",
-    balanced: "Balanced",
-    strict: "Strict",
-    standard: "Standard",
-    "not-used": "Not used",
-    "local-only": "Local only",
-    "hosted-disclosed": "Hosted disclosed",
-    "client-approved": "Client approved"
-  }[value] || value || "";
-  return uiLocalizationService.source(label);
-}
-
-function qualityCategoryName(value) {
-  const label = baseQualityCategoryLabel?.(value) || {
-    accuracy: "Accuracy",
-    terminology: "Terminology",
-    fluency: "Fluency",
-    style: "Style",
-    locale: "Locale",
-    formatting: "Formatting",
-    compliance: "Compliance",
-    review: "Review"
-  }[value] || value || "Review";
-  return uiLocalizationService.source(label);
-}
-
-function qualityDecisionSeverityLabel(value) {
-  const label = {
-    low: "Low",
-    medium: "Medium",
-    high: "High",
-    critical: "Critical"
-  }[value] || "Medium";
-  return uiLocalizationService.source(label);
-}
-
 function qualityQaBySegment(qaChecks = editorSessionStore.getQaChecks()) {
   const map = new Map();
   (qaChecks || []).forEach((check) => {
@@ -6106,17 +6066,6 @@ function currentQualityRiskQueue(qaChecks = editorSessionStore.getQaChecks()) {
     qaChecks,
     profile: editorSessionStore.getProject().qualityProfile
   });
-}
-
-function qualityRiskLevelLabel(level) {
-  const label = {
-    critical: "Critical",
-    high: "High",
-    medium: "Medium",
-    low: "Low",
-    clear: "Clear"
-  }[level] || "Risk";
-  return uiLocalizationService.source(label);
 }
 
 function activeQualityEvidence(queue = null) {

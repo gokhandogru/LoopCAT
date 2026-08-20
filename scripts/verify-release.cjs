@@ -224,6 +224,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-document-catalog-service.js",
   "src/features/import-export/text-encoding-input-service.js",
   "src/features/quality/quality-profile-controller.js",
+  "src/features/quality/quality-presentation-service.js",
   "src/features/quality/quality-decision-controller.js",
   "src/features/quality/quality-review-controller.js",
   "src/features/quality/review-metadata-controller.js",
@@ -301,6 +302,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-document-catalog-service.test.cjs",
   "tests/unit/text-encoding-input-service.test.cjs",
   "tests/unit/quality-profile-controller.test.cjs",
+  "tests/unit/quality-presentation-service.test.cjs",
   "tests/unit/quality-decision-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
   "tests/unit/review-metadata-controller.test.cjs",
@@ -439,6 +441,8 @@ const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslati
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
 const qualityProfileControllerJs = readText("src/features/quality/quality-profile-controller.js");
 const qualityProfileControllerUnitTests = readText("tests/unit/quality-profile-controller.test.cjs");
+const qualityPresentationServiceJs = readText("src/features/quality/quality-presentation-service.js");
+const qualityPresentationServiceUnitTests = readText("tests/unit/quality-presentation-service.test.cjs");
 const qualityDecisionControllerJs = readText("src/features/quality/quality-decision-controller.js");
 const qualityDecisionControllerUnitTests = readText("tests/unit/quality-decision-controller.test.cjs");
 const reviewMetadataControllerJs = readText("src/features/quality/review-metadata-controller.js");
@@ -986,6 +990,89 @@ assertIncludes(
   '"src/i18n/language-input-service.js"',
   "source-catalog extraction must scan the checked language-input service."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createQualityPresentationService } from "../features/quality/quality-presentation-service.js";',
+  "the application runtime must install the checked quality-presentation service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createQualityPresentationService,",
+  "the application runtime must expose the checked quality-presentation service factory."
+);
+for (const snippet of [
+  '"student-review": "Student review"',
+  '"client-approved": "Client approved"',
+  "baseCategoryLabel?.(value)",
+  'accuracy: "Accuracy"',
+  'review: "Review"',
+  'critical: "Critical"',
+  '}[String(value)] || "Medium"',
+  '}[String(value)] || "Risk"',
+  "return localization.source(label)",
+  "return Object.freeze({ category, decisionSeverity, profile, riskLevel })"
+]) {
+  assertIncludes(
+    qualityPresentationServiceJs,
+    snippet,
+    `QualityPresentationService must retain characterized localized label policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createQualityPresentationService({",
+  "localization: uiLocalizationService",
+  "baseCategoryLabel: baseQualityCategoryLabel",
+  "qualityCategoryName: qualityPresentationService.category",
+  "qualityLabel: qualityPresentationService.profile",
+  "qualityRiskLevelLabel: qualityPresentationService.riskLevel",
+  "profileLabel: qualityPresentationService.profile",
+  "categoryLabel: qualityPresentationService.category",
+  "riskLevelLabel: qualityPresentationService.riskLevel",
+  "severity: qualityPresentationService.decisionSeverity"
+]) {
+  assertIncludes(appJs, boundary, `quality-presentation composition must inject the checked ${boundary} boundary.`);
+}
+for (const removedFacade of [
+  "qualityLabel",
+  "qualityCategoryName: qualityPresentationService.category",
+  "qualityDecisionSeverityLabel",
+  "qualityRiskLevelLabel"
+]) {
+  const directFacade = new RegExp(`function\\s+${removedFacade}\\b`);
+  assert(
+    !directFacade.test(appJs) && !directFacade.test(appWorkflowDriverJs),
+    `${removedFacade} quality-presentation façade must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  !appJs.includes('"student-review": "Student review"') &&
+    !appJs.includes('accuracy: "Accuracy"') &&
+    !appJs.includes('clear: "Clear"'),
+  "quality profile, category, and risk label mappings must not return to app.js."
+);
+assert(
+  !qualityPresentationServiceJs.includes("uiLocalizationService") &&
+    !qualityPresentationServiceJs.includes("baseQualityCategoryLabel"),
+  "QualityPresentationService must use only injected localization and category-label boundaries."
+);
+for (const testName of [
+  "QualityPresentationService preserves every profile label and unknown or empty passthrough",
+  "QualityPresentationService preserves base category precedence, fallback mappings, and Review default",
+  "QualityPresentationService preserves decision severity mappings and Medium fallback",
+  "QualityPresentationService preserves risk-level mappings and Risk fallback",
+  "QualityPresentationService validates boundaries, propagates delegates, and exposes an immutable API"
+]) {
+  assertIncludes(
+    qualityPresentationServiceUnitTests,
+    testName,
+    `focused quality-presentation tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/quality/quality-presentation-service.js"',
+  "source-catalog extraction must scan the checked quality-presentation service."
+);
 for (const removedFacade of ["reportLocale", "reportDir", "reportText", "reportHtml"]) {
   assert(
     !new RegExp(`\\b${removedFacade}\\b`).test(appJs) &&
@@ -1106,9 +1193,9 @@ for (const boundary of [
   "sanitizeValidationReportForDisplay",
   "languagePairDisplay",
   "formatDateTime",
-  "qualityLabel",
-  "qualityCategoryName",
-  "qualityRiskLevelLabel"
+  "qualityLabel: qualityPresentationService.profile",
+  "qualityCategoryName: qualityPresentationService.category",
+  "qualityRiskLevelLabel: qualityPresentationService.riskLevel"
 ]) {
   assertIncludes(appJs, boundary, `report-document composition must inject the ${boundary} boundary.`);
 }
