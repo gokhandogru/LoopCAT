@@ -164,6 +164,7 @@ const requiredReleaseFiles = [
   "src/app/application-menu-controller.js",
   "src/app/application-persistence-lifecycle-controller.js",
   "src/app/application-save-status-controller.js",
+  "src/app/application-storage-durability-controller.js",
   "src/app/application-startup-controller.js",
   "src/app/application-trash-controller.js",
   "src/app/application-update-controls-controller.js",
@@ -308,6 +309,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-menu-controller.test.cjs",
   "tests/unit/application-persistence-lifecycle-controller.test.cjs",
   "tests/unit/application-save-status-controller.test.cjs",
+  "tests/unit/application-storage-durability-controller.test.cjs",
   "tests/unit/application-startup-controller.test.cjs",
   "tests/unit/application-trash-controller.test.cjs",
   "tests/unit/application-update-controls-controller.test.cjs",
@@ -493,6 +495,10 @@ const applicationPersistenceLifecycleControllerUnitTests = readText(
 );
 const applicationSaveStatusControllerJs = readText("src/app/application-save-status-controller.js");
 const applicationSaveStatusControllerUnitTests = readText("tests/unit/application-save-status-controller.test.cjs");
+const applicationStorageDurabilityControllerJs = readText("src/app/application-storage-durability-controller.js");
+const applicationStorageDurabilityControllerUnitTests = readText(
+  "tests/unit/application-storage-durability-controller.test.cjs"
+);
 const applicationStartupControllerJs = readText("src/app/application-startup-controller.js");
 const applicationStartupControllerUnitTests = readText("tests/unit/application-startup-controller.test.cjs");
 const applicationTrashControllerJs = readText("src/app/application-trash-controller.js");
@@ -8541,7 +8547,7 @@ for (const boundary of [
   "renderBusy: applicationImportProgressController.renderBusy",
   "renderValidation: renderValidationReport",
   "status: { set: applicationSaveStatusController.set }",
-  "durability: { refresh: refreshStorageDurability }"
+  "durability: { refresh: applicationStorageDurabilityController.refresh }"
 ]) {
   assertIncludes(appJs, boundary, `file-import composition must inject the checked ${boundary} boundary.`);
 }
@@ -16397,7 +16403,7 @@ for (const boundary of [
   "reconnect: workspaceStorage ? () => workspaceStorage.reconnectSavedWorkspace() : null",
   "state.workspaceStatus = workspaceStatus",
   "renderStatus: () => renderWorkspaceStatus()",
-  "refresh: () => refreshStorageDurability()",
+  "refresh: applicationStorageDurabilityController.refresh",
   "load: (restoreSelection) => loadProjects(restoreSelection)",
   "count: () => editorSessionStore.getProjects().length",
   "theme: themeController",
@@ -16523,7 +16529,7 @@ for (const boundary of [
   "progress: applicationImportProgressController.reportProgress",
   "progress: { report: applicationImportProgressController.reportProgress }",
   "yieldToUi: applicationImportProgressController.yieldToUi",
-  "applicationImportProgressController.formatFileSize(bytes)"
+  "fileSize: applicationImportProgressController.formatFileSize"
 ]) {
   assertIncludes(appJs, boundary, `application import-progress composition and consumers must retain ${boundary}.`);
 }
@@ -16600,25 +16606,118 @@ assertIncludes(
   "app workflow test must verify active import progress reports phase, file name, and file size."
 );
 assertIncludes(
-  appJs,
-  "async function refreshStorageDurability",
-  "app.js must check browser storage persistence and quota for long offline projects."
-);
-assertIncludes(appJs, "navigator.storage", "app.js must use the browser storage API when available.");
-assertIncludes(
-  functionBody(appJs, "async function refreshStorageDurability", "function stableLower"),
-  "storageApi.persist()",
-  "app.js must request persistent browser storage when supported."
+  appBootstrapJs,
+  'import { createApplicationStorageDurabilityController } from "./application-storage-durability-controller.js";',
+  "the application runtime must install the checked application storage-durability controller."
 );
 assertIncludes(
-  functionBody(appJs, "async function refreshStorageDurability", "function stableLower"),
-  "storageApi.estimate()",
-  "app.js must estimate local storage usage for recoverability warnings."
+  appBootstrapJs,
+  "createApplicationStorageDurabilityController,",
+  "the application runtime must expose the checked application storage-durability controller factory."
 );
+for (const snippet of [
+  "ApplicationStorageDurabilityController requires a checked live context boundary.",
+  "ApplicationStorageDurabilityController requires a checked storage API boundary.",
+  "ApplicationStorageDurabilityController requires a checked file-size boundary.",
+  "ApplicationStorageDurabilityController requires a checked presentation boundary.",
+  "ApplicationStorageDurabilityController requires checked storage-warning limits.",
+  'return formatting.fileSize(bytes) || "0 B"',
+  "function warnings(info = context.get())",
+  "if (!info?.checked || !info.supported) return []",
+  "const usage = Number(info.usageBytes || 0)",
+  "const quota = Number(info.quotaBytes || 0)",
+  "Browser storage is best-effort; export project packages or connect a workspace folder for recovery.",
+  "if (remaining <= limits.lowSpaceBytes || ratio >= limits.highUsageRatio)",
+  "Local storage is nearly full; export a backup before importing more files.",
+  "function line(info = context.get())",
+  'if (!info?.checked) return "Storage: checking local persistence"',
+  'if (!info.supported) return "Storage: browser-managed local cache"',
+  'const mode = info.persisted ? "persistent" : "best-effort"',
+  'const usageText = quota > 0 ? ` - ${formatSize(usage)} of ${formatSize(quota)} used` : ""',
+  "const request = options.request !== false",
+  "const storageApi = storage.getApi()",
+  "supported: Boolean(storageApi)",
+  'typeof storageApi.persisted === "function" ? Boolean(await storageApi.persisted()) : false',
+  'if (!next.persisted && request && typeof storageApi.persist === "function")',
+  "next.persisted = Boolean(await storageApi.persist())",
+  'if (typeof storageApi.estimate === "function")',
+  "const estimate = await storageApi.estimate()",
+  "next.usageBytes = Number.isFinite(Number(estimate?.usage)) ? Number(estimate.usage) : 0",
+  "next.quotaBytes = Number.isFinite(Number(estimate?.quota)) ? Number(estimate.quota) : 0",
+  "context.set(next)",
+  "presentation.renderWorkspaceStatus()",
+  "return Object.freeze({ formatSize, warnings, line, refresh })"
+]) {
+  assertIncludes(
+    applicationStorageDurabilityControllerJs,
+    snippet,
+    `ApplicationStorageDurabilityController must retain characterized warning, status, persistence, and estimate policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationStorageDurabilityController({",
+  "get: () => state.storageDurability",
+  "state.storageDurability = value",
+  'getApi: () => (typeof navigator === "undefined" ? null : navigator.storage)',
+  "fileSize: applicationImportProgressController.formatFileSize",
+  "renderWorkspaceStatus: () => renderWorkspaceStatus()",
+  "lowSpaceBytes: STORAGE_LOW_SPACE_BYTES",
+  "highUsageRatio: STORAGE_HIGH_USAGE_RATIO",
+  "durability: { refresh: applicationStorageDurabilityController.refresh }",
+  "applicationStorageDurabilityController.warnings(state.storageDurability)",
+  "applicationStorageDurabilityController.line(state.storageDurability)"
+]) {
+  assertIncludes(appJs, boundary, `application storage-durability composition and consumers must retain ${boundary}.`);
+}
+for (const removedHelper of [
+  "formatStorageSize",
+  "storageDurabilityWarnings",
+  "storageDurabilityLine",
+  "refreshStorageDurability"
+]) {
+  assert(
+    !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return as a coordinator or workflow helper.`
+  );
+}
+for (const forbiddenOwner of [
+  "appRuntime",
+  "state.",
+  "navigator.",
+  "applicationImportProgressController",
+  "STORAGE_LOW_SPACE_BYTES",
+  "STORAGE_HIGH_USAGE_RATIO",
+  "window.",
+  "document."
+]) {
+  assert(
+    !applicationStorageDurabilityControllerJs.includes(forbiddenOwner),
+    `ApplicationStorageDurabilityController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationStorageDurabilityController preserves live default state and immutable API",
+  "ApplicationStorageDurabilityController preserves every ordered warning threshold",
+  "ApplicationStorageDurabilityController preserves every status line and size fallback",
+  "ApplicationStorageDurabilityController publishes and renders the unsupported result",
+  "ApplicationStorageDurabilityController preserves persisted storage and finite estimates",
+  "ApplicationStorageDurabilityController preserves persistence request and opt-out branches",
+  "ApplicationStorageDurabilityController contains persistence and estimate failures independently",
+  "ApplicationStorageDurabilityController preserves live API and primary failure timing",
+  "ApplicationStorageDurabilityController preserves storage property failure boundaries",
+  "ApplicationStorageDurabilityController validates every injected owner"
+]) {
+  assertIncludes(
+    applicationStorageDurabilityControllerUnitTests,
+    testName,
+    `focused application storage-durability tests must retain characterization: ${testName}.`
+  );
+}
 assertIncludes(
-  functionBody(appJs, "function renderWorkspaceStatus()", "function workspaceRecoveryProjectIds"),
-  "storageDurabilityLine(state.storageDurability)",
-  "app.js workspace health must show browser storage durability."
+  i18nExtractScript,
+  '"src/app/application-storage-durability-controller.js"',
+  "source-catalog extraction must scan the checked application storage-durability controller."
 );
 assertIncludes(
   appJs,

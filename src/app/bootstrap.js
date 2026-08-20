@@ -7,6 +7,7 @@ import { createApplicationImportProgressController } from "./application-import-
 import { createApplicationMenuController } from "./application-menu-controller.js";
 import { createApplicationPersistenceLifecycleController } from "./application-persistence-lifecycle-controller.js";
 import { createApplicationSaveStatusController } from "./application-save-status-controller.js";
+import { createApplicationStorageDurabilityController } from "./application-storage-durability-controller.js";
 import { createApplicationStartupController } from "./application-startup-controller.js";
 import { createApplicationTrashController } from "./application-trash-controller.js";
 import { createApplicationUpdateControlsController } from "./application-update-controls-controller.js";
@@ -347,6 +348,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createApplicationMenuController,
       createApplicationPersistenceLifecycleController,
       createApplicationSaveStatusController,
+      createApplicationStorageDurabilityController,
       createApplicationStartupController,
       createApplicationTrashController,
       createApplicationUpdateControlsController,

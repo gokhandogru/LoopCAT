@@ -1210,6 +1210,24 @@ const applicationImportProgressController =
       timer: (callback, delay) => setTimeout(callback, delay)
     }
   });
+const applicationStorageDurabilityController =
+  appRuntime.featureFactories.createApplicationStorageDurabilityController({
+    context: {
+      get: () => state.storageDurability,
+      set: (value) => {
+        state.storageDurability = value;
+      }
+    },
+    storage: {
+      getApi: () => (typeof navigator === "undefined" ? null : navigator.storage)
+    },
+    formatting: { fileSize: applicationImportProgressController.formatFileSize },
+    presentation: { renderWorkspaceStatus: () => renderWorkspaceStatus() },
+    limits: {
+      lowSpaceBytes: STORAGE_LOW_SPACE_BYTES,
+      highUsageRatio: STORAGE_HIGH_USAGE_RATIO
+    }
+  });
 
 const revisionHistoryPresentationService =
   appRuntime.featureFactories.createRevisionHistoryPresentationService({
@@ -1264,7 +1282,7 @@ const fileImportService = appRuntime.featureFactories.createFileImportService({
     renderValidation: renderValidationReport
   },
   status: { set: applicationSaveStatusController.set },
-  durability: { refresh: refreshStorageDurability }
+  durability: { refresh: applicationStorageDurabilityController.refresh }
 });
 
 const protectedTagInspectionService = appRuntime.featureFactories.createProtectedTagInspectionService({
@@ -3791,7 +3809,7 @@ const applicationStartupController = appRuntime.featureFactories.createApplicati
     },
     renderStatus: () => renderWorkspaceStatus()
   },
-  durability: { refresh: () => refreshStorageDurability() },
+  durability: { refresh: applicationStorageDurabilityController.refresh },
   projects: {
     load: (restoreSelection) => loadProjects(restoreSelection),
     count: () => editorSessionStore.getProjects().length
@@ -4892,82 +4910,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
 });
 dialogLifecycleController?.mount?.();
 
-function formatStorageSize(bytes) {
-  return applicationImportProgressController.formatFileSize(bytes) || "0 B";
-}
-
-function storageDurabilityWarnings(info = state.storageDurability) {
-  if (!info?.checked || !info.supported) return [];
-  const warnings = [];
-  const usage = Number(info.usageBytes || 0);
-  const quota = Number(info.quotaBytes || 0);
-  if (!info.persisted) {
-    warnings.push("Browser storage is best-effort; export project packages or connect a workspace folder for recovery.");
-  }
-  if (quota > 0) {
-    const remaining = quota - usage;
-    const ratio = usage / quota;
-    if (remaining <= STORAGE_LOW_SPACE_BYTES || ratio >= STORAGE_HIGH_USAGE_RATIO) {
-      warnings.push("Local storage is nearly full; export a backup before importing more files.");
-    }
-  }
-  return warnings;
-}
-
-function storageDurabilityLine(info = state.storageDurability) {
-  if (!info?.checked) return "Storage: checking local persistence";
-  if (!info.supported) return "Storage: browser-managed local cache";
-  const mode = info.persisted ? "persistent" : "best-effort";
-  const usage = Number(info.usageBytes || 0);
-  const quota = Number(info.quotaBytes || 0);
-  const usageText = quota > 0 ? ` - ${formatStorageSize(usage)} of ${formatStorageSize(quota)} used` : "";
-  return `Storage: ${mode}${usageText}`;
-}
-
-async function refreshStorageDurability(options = {}) {
-  const request = options.request !== false;
-  const storageApi = typeof navigator === "undefined" ? null : navigator.storage;
-  const next = {
-    checked: true,
-    supported: Boolean(storageApi),
-    persisted: false,
-    requested: false,
-    usageBytes: 0,
-    quotaBytes: 0
-  };
-  if (!storageApi) {
-    state.storageDurability = next;
-    renderWorkspaceStatus();
-    return next;
-  }
-  try {
-    next.persisted = typeof storageApi.persisted === "function" ? Boolean(await storageApi.persisted()) : false;
-  } catch {
-    next.persisted = false;
-  }
-  if (!next.persisted && request && typeof storageApi.persist === "function") {
-    next.requested = true;
-    try {
-      next.persisted = Boolean(await storageApi.persist());
-    } catch {
-      next.persisted = false;
-    }
-  }
-  try {
-    if (typeof storageApi.estimate === "function") {
-      const estimate = await storageApi.estimate();
-      next.usageBytes = Number.isFinite(Number(estimate?.usage)) ? Number(estimate.usage) : 0;
-      next.quotaBytes = Number.isFinite(Number(estimate?.quota)) ? Number(estimate.quota) : 0;
-    }
-  } catch {
-    next.usageBytes = 0;
-    next.quotaBytes = 0;
-  }
-  state.storageDurability = next;
-  renderWorkspaceStatus();
-  return next;
-}
-
 function stableLower(value) {
   return String(value || "").toLowerCase();
 }
@@ -5600,11 +5542,11 @@ function renderWorkspaceStatus() {
   if (!workspaceStorage) return;
   const status = state.workspaceStatus || {};
   const dirtyCount = visibleWorkspaceDirtyCount(status);
-  const storageWarnings = storageDurabilityWarnings(state.storageDurability);
+  const storageWarnings = applicationStorageDurabilityController.warnings(state.storageDurability);
   recoveryWorkspaceController?.renderStatus?.({
     status,
     dirtyCount,
-    storageLine: storageDurabilityLine(state.storageDurability),
+    storageLine: applicationStorageDurabilityController.line(state.storageDurability),
     storageWarnings,
     importBusy: Boolean(state.importTask),
     hasProject: Boolean(editorSessionStore.getProject())
