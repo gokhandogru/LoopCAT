@@ -46,6 +46,7 @@ import { createProjectHomeController } from "../features/projects/project-home-c
 import { createEditorController } from "../features/editor/editor-controller.js";
 import { createEditorContextController } from "../features/editor/editor-context-controller.js";
 import { createEditorSessionStore } from "../features/editor/editor-session-store.js";
+import { createEditorFilterControlsController } from "../features/editor/editor-filter-controls-controller.js";
 import { createFilterStore } from "../features/editor/filter-store.js";
 import { createFilterPresetController } from "../features/editor/filter-preset-controller.js";
 import { createFocusModeController } from "../features/editor/focus-mode-controller.js";
@@ -257,6 +258,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createDialogController,
       createEditorController,
       createEditorContextController,
+      createEditorFilterControlsController,
       createFilterStore,
       createFilterPresetController,
       createFocusModeController,

@@ -216,6 +216,13 @@ const segmentDraftApplicationServicePath = path.join(
   "segment-draft-application-service.js"
 );
 const focusModeControllerPath = path.join(root, "src", "features", "editor", "focus-mode-controller.js");
+const editorFilterControlsControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "editor",
+  "editor-filter-controls-controller.js"
+);
 const inspectorToggleControllerPath = path.join(root, "src", "features", "editor", "inspector-toggle-controller.js");
 const panelToggleControllerPath = path.join(root, "src", "features", "editor", "panel-toggle-controller.js");
 const segmentActionButtonsControllerPath = path.join(
@@ -525,6 +532,11 @@ function main() {
     "src/features/editor/segment-draft-application-service.js"
   );
   extractScript(messagesByText, focusModeControllerPath, "src/features/editor/focus-mode-controller.js");
+  extractScript(
+    messagesByText,
+    editorFilterControlsControllerPath,
+    "src/features/editor/editor-filter-controls-controller.js"
+  );
   extractScript(messagesByText, inspectorToggleControllerPath, "src/features/editor/inspector-toggle-controller.js");
   extractScript(messagesByText, panelToggleControllerPath, "src/features/editor/panel-toggle-controller.js");
   extractScript(

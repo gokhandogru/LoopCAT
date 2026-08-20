@@ -3542,6 +3542,25 @@ const panelToggleController = appRuntime.featureFactories.createPanelToggleContr
     setContext: (context) => verticalFeatureState?.inspector?.setContext(context)
   }
 });
+const editorFilterControlsController =
+  appRuntime.featureFactories.createEditorFilterControlsController({
+    elements: {
+      documentFilter: els.documentFilter,
+      searchInput: els.segmentSearchInput,
+      searchScope: els.segmentSearchScope,
+      regexInput: els.segmentRegexInput,
+      caseInput: els.segmentCaseInput,
+      statusFilter: els.segmentStatusFilter,
+      reviewStateFilter: els.reviewStateFilter,
+      aiStateFilter: els.aiSegmentFilter
+    },
+    navigation: applicationNavigation,
+    store: editorFilterStore,
+    filters: { firstVisible: segmentFilterService.firstVisible },
+    presentation: { renderSegments, renderProgress },
+    preset: { markCustom: () => filterPresetController?.markCustom?.() },
+    selection: { select: (index) => segmentNavigationController.select(index) }
+  });
 
 const diagnosticsService = appRuntime?.featureFactories?.createDiagnosticsService?.({
   platform: appRuntime.platform,
@@ -6755,58 +6774,7 @@ function wireEvents() {
   segmentActionButtonsController.mount();
   projectQaController.mount();
   panelToggleController.mount();
-  els.documentFilter.addEventListener("change", async () => {
-    applicationNavigation.selectDocument({ documentId: els.documentFilter.value });
-    renderSegments();
-    renderProgress();
-    const first = segmentFilterService.firstVisible();
-    if (first !== -1) await segmentNavigationController.select(first);
-  });
-  els.segmentSearchInput.addEventListener("input", async () => {
-    editorFilterStore.update({ query: els.segmentSearchInput.value.trim() });
-    renderSegments();
-    const first = segmentFilterService.firstVisible();
-    if (first !== -1) await segmentNavigationController.select(first);
-  });
-  els.segmentSearchScope.addEventListener("change", async () => {
-    editorFilterStore.update({ scope: els.segmentSearchScope.value });
-    renderSegments();
-    const first = segmentFilterService.firstVisible();
-    if (first !== -1) await segmentNavigationController.select(first);
-  });
-  els.segmentRegexInput.addEventListener("change", async () => {
-    editorFilterStore.update({ regex: els.segmentRegexInput.checked });
-    renderSegments();
-    const first = segmentFilterService.firstVisible();
-    if (first !== -1) await segmentNavigationController.select(first);
-  });
-  els.segmentCaseInput.addEventListener("change", async () => {
-    editorFilterStore.update({ caseSensitive: els.segmentCaseInput.checked });
-    renderSegments();
-    const first = segmentFilterService.firstVisible();
-    if (first !== -1) await segmentNavigationController.select(first);
-  });
-  els.segmentStatusFilter.addEventListener("change", async () => {
-    filterPresetController?.markCustom?.();
-    editorFilterStore.update({ status: els.segmentStatusFilter.value });
-    renderSegments();
-    const first = segmentFilterService.firstVisible();
-    if (first !== -1) await segmentNavigationController.select(first);
-  });
-  els.reviewStateFilter?.addEventListener("change", async () => {
-    filterPresetController?.markCustom?.();
-    editorFilterStore.update({ reviewState: els.reviewStateFilter.value });
-    renderSegments();
-    const first = segmentFilterService.firstVisible();
-    if (first !== -1) await segmentNavigationController.select(first);
-  });
-  els.aiSegmentFilter?.addEventListener("change", async () => {
-    filterPresetController?.markCustom?.();
-    editorFilterStore.update({ aiState: els.aiSegmentFilter.value });
-    renderSegments();
-    const first = segmentFilterService.firstVisible();
-    if (first !== -1) await segmentNavigationController.select(first);
-  });
+  editorFilterControlsController.mount();
 
   termFormController.mount();
   projectDomainController.mount();

@@ -166,6 +166,7 @@ const requiredReleaseFiles = [
   "src/app/compatibility-module-registry.js",
   "src/app/install-runtime.js",
   "src/features/editor/filter-store.js",
+  "src/features/editor/editor-filter-controls-controller.js",
   "src/features/editor/focus-mode-controller.js",
   "src/features/editor/inspector-toggle-controller.js",
   "src/features/editor/panel-toggle-controller.js",
@@ -297,6 +298,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-update-controls-controller.test.cjs",
   "tests/unit/application-view-controller.test.cjs",
   "tests/unit/global-keyboard-controller.test.cjs",
+  "tests/unit/editor-filter-controls-controller.test.cjs",
   "tests/unit/focus-mode-controller.test.cjs",
   "tests/unit/inspector-toggle-controller.test.cjs",
   "tests/unit/panel-toggle-controller.test.cjs",
@@ -469,6 +471,12 @@ const applicationViewControllerJs = readText("src/app/application-view-controlle
 const applicationViewControllerUnitTests = readText("tests/unit/application-view-controller.test.cjs");
 const globalKeyboardControllerJs = readText("src/app/global-keyboard-controller.js");
 const globalKeyboardControllerUnitTests = readText("tests/unit/global-keyboard-controller.test.cjs");
+const editorFilterControlsControllerJs = readText(
+  "src/features/editor/editor-filter-controls-controller.js"
+);
+const editorFilterControlsControllerUnitTests = readText(
+  "tests/unit/editor-filter-controls-controller.test.cjs"
+);
 const focusModeControllerJs = readText("src/features/editor/focus-mode-controller.js");
 const focusModeControllerUnitTests = readText("tests/unit/focus-mode-controller.test.cjs");
 const inspectorToggleControllerJs = readText("src/features/editor/inspector-toggle-controller.js");
@@ -4887,8 +4895,7 @@ for (const boundary of [
 }
 assert(
   appJs.indexOf("projectQaController.mount()") < appJs.indexOf("panelToggleController.mount()") &&
-    appJs.indexOf("panelToggleController.mount()") <
-      appJs.indexOf('els.documentFilter.addEventListener("change"'),
+    appJs.indexOf("panelToggleController.mount()") < appJs.indexOf("editorFilterControlsController.mount()"),
   "panel toggles must mount between project-QA and document-filter listeners at the existing position."
 );
 for (const removedOwner of ["function syncPanelToggleState", "function syncAllPanelToggleStates"]) {
@@ -4927,6 +4934,109 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/panel-toggle-controller.js"',
   "source-catalog extraction must scan the checked panel-toggle controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createEditorFilterControlsController } from "../features/editor/editor-filter-controls-controller.js";',
+  "the application runtime must install the checked editor-filter controls controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createEditorFilterControlsController,",
+  "the application runtime must expose the checked editor-filter controls controller factory."
+);
+for (const snippet of [
+  "EditorFilterControlsController requires navigation, store, and filter boundaries.",
+  "EditorFilterControlsController requires editor presentation boundaries.",
+  "EditorFilterControlsController requires preset and selection boundaries.",
+  "navigation.selectDocument({ documentId: elements.documentFilter.value })",
+  "presentation.renderProgress()",
+  "const first = filters.firstVisible()",
+  "if (first !== -1) await selection.select(first)",
+  "elements.searchInput.value.trim()",
+  "elements.regexInput.checked",
+  "elements.caseInput.checked",
+  "if (markCustom) preset.markCustom()",
+  'elements.documentFilter.addEventListener("change", listeners.document)',
+  'elements.aiStateFilter?.removeEventListener("change", listeners.aiState)',
+  "return Object.freeze({ mount, unmount })"
+]) {
+  assertIncludes(
+    editorFilterControlsControllerJs,
+    snippet,
+    `EditorFilterControlsController must retain characterized filter policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createEditorFilterControlsController({",
+  "documentFilter: els.documentFilter",
+  "searchInput: els.segmentSearchInput",
+  "searchScope: els.segmentSearchScope",
+  "regexInput: els.segmentRegexInput",
+  "caseInput: els.segmentCaseInput",
+  "statusFilter: els.segmentStatusFilter",
+  "reviewStateFilter: els.reviewStateFilter",
+  "aiStateFilter: els.aiSegmentFilter",
+  "navigation: applicationNavigation",
+  "store: editorFilterStore",
+  "firstVisible: segmentFilterService.firstVisible",
+  "preset: { markCustom: () => filterPresetController?.markCustom?.() }",
+  "selection: { select: (index) => segmentNavigationController.select(index) }",
+  "editorFilterControlsController.mount()"
+]) {
+  assertIncludes(appJs, boundary, `editor-filter composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  appJs.indexOf("panelToggleController.mount()") < appJs.indexOf("editorFilterControlsController.mount()") &&
+    appJs.indexOf("editorFilterControlsController.mount()") < appJs.indexOf("termFormController.mount()"),
+  "editor-filter controls must mount between panel-toggle and term-form listeners at the existing position."
+);
+for (const removedListener of [
+  'els.documentFilter.addEventListener("change"',
+  'els.segmentSearchInput.addEventListener("input"',
+  'els.segmentSearchScope.addEventListener("change"',
+  'els.segmentRegexInput.addEventListener("change"',
+  'els.segmentCaseInput.addEventListener("change"',
+  'els.segmentStatusFilter.addEventListener("change"',
+  'els.reviewStateFilter?.addEventListener("change"',
+  'els.aiSegmentFilter?.addEventListener("change"'
+]) {
+  assert(
+    !appJs.includes(removedListener) && !appWorkflowDriverJs.includes(removedListener),
+    `direct editor-filter listener must not return: ${removedListener}.`
+  );
+}
+for (const forbiddenOwner of [
+  "document.",
+  "els.",
+  "applicationNavigation",
+  "editorFilterStore",
+  "segmentFilterService",
+  "segmentNavigationController"
+]) {
+  assert(
+    !editorFilterControlsControllerJs.includes(forbiddenOwner),
+    `EditorFilterControlsController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "EditorFilterControlsController owns exact ordered listener lifecycle and optional controls",
+  "EditorFilterControlsController preserves document selection and presentation sequence",
+  "EditorFilterControlsController preserves every live segment-filter patch and preset branch",
+  "EditorFilterControlsController rereads live controls and skips absent first selection",
+  "EditorFilterControlsController preserves synchronous and awaited failure timing",
+  "EditorFilterControlsController validates required, optional, and collaborator boundaries"
+]) {
+  assertIncludes(
+    editorFilterControlsControllerUnitTests,
+    testName,
+    `focused editor-filter controls tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/editor-filter-controls-controller.js"',
+  "source-catalog extraction must scan the checked editor-filter controls controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -9341,8 +9451,8 @@ for (const directConsumer of [
   );
 }
 assert(
-  appJs.split("segmentNavigationController.select(").length - 1 === 15,
-  "all fifteen application selection consumers must call SegmentNavigationController directly."
+  appJs.split("segmentNavigationController.select(").length - 1 === 8,
+  "all eight remaining application selection consumers must call SegmentNavigationController directly."
 );
 assert(
   appWorkflowDriverJs.split("segmentNavigationController.select(").length - 1 === 24,
