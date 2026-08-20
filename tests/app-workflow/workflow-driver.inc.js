@@ -4194,7 +4194,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           statusDownloadNames.some((name) => name.includes("[redacted secret]")),
         "downloads sanitize reserved names path separators unsafe characters and credential-looking labels"
       );
-      setSaveStatus("Bearer save-status-token-that-must-not-appear failed", "dirty");
+      applicationSaveStatusController.set("Bearer save-status-token-that-must-not-appear failed", "dirty");
       assert(
         els.saveStatus.textContent.includes("[redacted secret]") &&
           !els.saveStatus.textContent.includes("save-status-token-that-must-not-appear"),
@@ -5581,7 +5581,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } catch (error) {
       malformedBackupRejected = error.message === "Backup file is not valid JSON.";
       renderValidationReport(fileImportService.errorReport(error.message));
-      setSaveStatus(error.message, "dirty");
+      applicationSaveStatusController.set(error.message, "dirty");
     }
     assert(malformedBackupRejected && state.lastValidationReport?.errors?.[0] === "Backup file is not valid JSON.", "malformed backup JSON fails with validation report");
 
@@ -5594,7 +5594,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } catch (error) {
       oversizedBackupRejected = error.message.includes("too large");
       renderValidationReport(fileImportService.errorReport(error.message));
-      setSaveStatus(error.message, "dirty");
+      applicationSaveStatusController.set(error.message, "dirty");
     }
     assert(oversizedBackupRejected && state.lastValidationReport?.errors?.[0]?.includes("too large"), "oversized backup JSON fails before restore");
 
@@ -5604,7 +5604,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } catch (error) {
       malformedPackageRejected = error.message === "Project package is not valid JSON.";
       renderValidationReport(fileImportService.errorReport(error.message));
-      setSaveStatus(error.message, "dirty");
+      applicationSaveStatusController.set(error.message, "dirty");
     }
     assert(malformedPackageRejected && state.lastValidationReport?.errors?.[0] === "Project package is not valid JSON.", "malformed project package JSON fails with validation report");
 
@@ -5614,7 +5614,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } catch (error) {
       oversizedPackageRejected = error.message.includes("too large");
       renderValidationReport(fileImportService.errorReport(error.message));
-      setSaveStatus(error.message, "dirty");
+      applicationSaveStatusController.set(error.message, "dirty");
     }
     assert(oversizedPackageRejected && state.lastValidationReport?.errors?.[0]?.includes("too large"), "oversized project package JSON fails before import");
 

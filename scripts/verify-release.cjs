@@ -161,6 +161,7 @@ const requiredReleaseFiles = [
   "src/app/application-event-wiring-controller.js",
   "src/app/application-menu-controller.js",
   "src/app/application-persistence-lifecycle-controller.js",
+  "src/app/application-save-status-controller.js",
   "src/app/application-startup-controller.js",
   "src/app/application-update-controls-controller.js",
   "src/app/application-view-controller.js",
@@ -301,6 +302,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-event-wiring-controller.test.cjs",
   "tests/unit/application-menu-controller.test.cjs",
   "tests/unit/application-persistence-lifecycle-controller.test.cjs",
+  "tests/unit/application-save-status-controller.test.cjs",
   "tests/unit/application-startup-controller.test.cjs",
   "tests/unit/application-update-controls-controller.test.cjs",
   "tests/unit/application-view-controller.test.cjs",
@@ -475,6 +477,8 @@ const applicationPersistenceLifecycleControllerJs = readText("src/app/applicatio
 const applicationPersistenceLifecycleControllerUnitTests = readText(
   "tests/unit/application-persistence-lifecycle-controller.test.cjs"
 );
+const applicationSaveStatusControllerJs = readText("src/app/application-save-status-controller.js");
+const applicationSaveStatusControllerUnitTests = readText("tests/unit/application-save-status-controller.test.cjs");
 const applicationStartupControllerJs = readText("src/app/application-startup-controller.js");
 const applicationStartupControllerUnitTests = readText("tests/unit/application-startup-controller.test.cjs");
 const applicationUpdateControlsControllerJs = readText("src/app/application-update-controls-controller.js");
@@ -1303,7 +1307,7 @@ for (const boundary of [
   "navigation: { select: (index) => segmentNavigationController.select(index) }",
   "renderWorkbench: (viewModel) => qualityReviewController?.renderQuality?.(viewModel)",
   "focus: { target: () => targetEditController.focusActive() }",
-  "status: { set: setSaveStatus }"
+  "status: { set: applicationSaveStatusController.set }"
 ]) {
   assertIncludes(appJs, boundary, `quality-workbench composition must inject the checked ${boundary} boundary.`);
 }
@@ -1857,7 +1861,7 @@ for (const boundary of [
   "logOptionalProject: logOptionalProjectActivity",
   "appendActivityWarning",
   "exportMode: exportStatusMode",
-  "set: setSaveStatus"
+  "set: applicationSaveStatusController.set"
 ]) {
   assertIncludes(appJs, boundary, `report-export composition must inject the ${boundary} boundary.`);
 }
@@ -1942,7 +1946,7 @@ for (const boundary of [
   "localizationMimeType: localizationDownloadMimeType",
   "xliffMimeType",
   "logOptionalProject: logOptionalProjectActivity",
-  "set: setSaveStatus"
+  "set: applicationSaveStatusController.set"
 ]) {
   assertIncludes(appJs, boundary, `delivery-export composition must inject the ${boundary} boundary.`);
 }
@@ -2060,7 +2064,7 @@ for (const boundary of [
   "terms: termSuggestionsController.refresh",
   "builders: { buildTmx, buildTbx }",
   "logOptionalProject: logOptionalProjectActivity",
-  "set: setSaveStatus"
+  "set: applicationSaveStatusController.set"
 ]) {
   assertIncludes(appJs, boundary, `project-resource transfer composition must inject the ${boundary} boundary.`);
 }
@@ -2768,7 +2772,7 @@ for (const boundary of [
   "builders: { buildTmx, buildTbx }",
   "fileSafeName",
   "download",
-  "status: { set: setSaveStatus }"
+  "status: { set: applicationSaveStatusController.set }"
 ]) {
   assertIncludes(appJs, boundary, `resource-library export composition must inject the ${boundary} boundary.`);
 }
@@ -2854,7 +2858,7 @@ for (const boundary of [
   "refresh: refreshResources",
   "refreshProjectTerms",
   "alert: uiLocalizationService.alert",
-  "status: { set: setSaveStatus }"
+  "status: { set: applicationSaveStatusController.set }"
 ]) {
   assertIncludes(appJs, boundary, `resource-library import composition must inject the ${boundary} boundary.`);
 }
@@ -5424,7 +5428,7 @@ for (const boundary of [
   "renderReview: () => qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false })",
   "refreshEditorContext: () => editorContextController.refresh()",
   "write: (filename, content, type) => download(filename, content, type)",
-  "set: (message, mode) => setSaveStatus(message, mode)",
+  "set: applicationSaveStatusController.set",
   "now: () => new Date()",
   "refresh: uiLocaleOrchestrationController.refresh",
   "importCatalog: uiLocaleOrchestrationController.importCatalog",
@@ -7422,7 +7426,7 @@ for (const boundary of [
   "selection: { getActiveSegment: currentSegment }",
   "tm: { saveEntry: saveTmEntry, mainName: mainTmName, refreshMatches: tmMatchesController.refresh }",
   "workspace: { markDirty: markWorkspaceDirty }",
-  "status: { set: setSaveStatus }",
+  "status: { set: applicationSaveStatusController.set }",
   "if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG])"
 ]) {
   assertIncludes(appJs, boundary, `direct segment-TM-save composition must inject the checked ${boundary} boundary.`);
@@ -7724,7 +7728,7 @@ for (const boundary of [
   "renderTermbaseSelect,",
   "refreshProjectTerms: (options) => refreshProjectTerms(options)",
   "refreshSuggestions: termSuggestionsController.refresh",
-  "status: { set: setSaveStatus }",
+  "status: { set: applicationSaveStatusController.set }",
   "logger: console",
   "beforeSave: () =>",
   "if (LOOPCAT_TEST_BUILD && els.termForm[TERM_FORM_SAVE_FAILURE_TEST_FLAG])",
@@ -7847,7 +7851,7 @@ for (const boundary of [
   "renderWorkbench: qualityWorkbenchController.render",
   "getDocumentId: () => applicationStore.getState().navigation.documentId",
   "activity: { log: logProjectActivity }",
-  "status: { set: setSaveStatus }",
+  "status: { set: applicationSaveStatusController.set }",
   "logger: console",
   "beforeRun: () =>",
   "if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[QA_RUN_FAILURE_TEST_FLAG])",
@@ -7955,7 +7959,7 @@ for (const boundary of [
   "refreshSummaries: refreshProjectSummaries",
   "renderAll",
   "workspace: { markDirty: markWorkspaceDirty }",
-  "status: { set: setSaveStatus }",
+  "status: { set: applicationSaveStatusController.set }",
   "clone: structuredClone",
   "beforeSave: () =>",
   "if (LOOPCAT_TEST_BUILD && editorSessionStore.getProject()[PROJECT_DOMAIN_SAVE_FAILURE_TEST_FLAG])",
@@ -8124,7 +8128,7 @@ for (const boundary of [
   "chooseFolder: workspacePackageSaveController.chooseFolder",
   "markDirty: markWorkspaceDirty",
   "maybeSaveFromSettings: workspacePackageSaveController.maybeSaveFromSettings",
-  "status: { set: setSaveStatus }",
+  "status: { set: applicationSaveStatusController.set }",
   "Boolean(LOOPCAT_TEST_BUILD && els.projectForm[PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG])",
   "Boolean(LOOPCAT_TEST_BUILD && els.projectForm[CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG])",
   "logger: console",
@@ -8227,7 +8231,7 @@ for (const boundary of [
   "text: { lower: stableLower }",
   "renderBusy: renderImportBusyState",
   "renderValidation: renderValidationReport",
-  "status: { set: setSaveStatus }",
+  "status: { set: applicationSaveStatusController.set }",
   "durability: { refresh: refreshStorageDurability }"
 ]) {
   assertIncludes(appJs, boundary, `file-import composition must inject the checked ${boundary} boundary.`);
@@ -8497,7 +8501,7 @@ for (const boundary of [
   "renderEditor,",
   "renderBackupReminder",
   "workspace: { markDirty: markWorkspaceDirty }",
-  "status: { set: setSaveStatus, mode: exportStatusMode }",
+  "status: { set: applicationSaveStatusController.set, mode: exportStatusMode }",
   "now: () => new Date().toISOString()",
   "nowMs: () => Date.now()",
   "Boolean(LOOPCAT_TEST_BUILD && editorSessionStore.getProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG])",
@@ -8655,7 +8659,7 @@ for (const boundary of [
   "alertText: validationAlertText",
   "renderValidation: renderValidationReport",
   "renderWorkspaceStatus",
-  "status: { set: setSaveStatus, mode: exportStatusMode }",
+  "status: { set: applicationSaveStatusController.set, mode: exportStatusMode }",
   "alert: uiLocalizationService.alert",
   "confirm: uiLocalizationService.confirm",
   "text: { safe: displaySafeText }"
@@ -8761,7 +8765,7 @@ for (const boundary of [
   "session: editorSessionStore",
   "dirty: { ids: workspaceDirtyIds }",
   "renderValidation: renderValidationReport",
-  "status: { set: setSaveStatus }",
+  "status: { set: applicationSaveStatusController.set }",
   "repairWorkspace: (...args) => workspaceHealthRepairController.repair(...args)"
 ]) {
   assertIncludes(appJs, boundary, `workspace health-repair composition must inject the checked ${boundary} boundary.`);
@@ -8847,7 +8851,7 @@ for (const boundary of [
   "count: reportCount",
   "errorReport: fileImportService.errorReport",
   "renderValidation: renderValidationReport",
-  "status: { set: setSaveStatus }",
+  "status: { set: applicationSaveStatusController.set }",
   "exportWorkspaceBackup: (...args) => workspaceBackupExportController.exportBackup(...args)"
 ]) {
   assertIncludes(appJs, boundary, `workspace backup-export composition must inject the checked ${boundary} boundary.`);
@@ -8965,7 +8969,7 @@ for (const boundary of [
   "getStatus: () => workspaceStorage.getStatus()",
   "state.workspaceStatus = workspaceStatus",
   "renderValidation: renderValidationReport",
-  "status: { set: setSaveStatus }",
+  "status: { set: applicationSaveStatusController.set }",
   'syncWorkspace: () => fileImportService.runTask("Workspace sync", () => workspaceSyncController.sync())'
 ]) {
   assertIncludes(appJs, boundary, `workspace-sync composition must inject the checked ${boundary} boundary.`);
@@ -9113,7 +9117,7 @@ for (const boundary of [
   "renderValidation: renderValidationReport",
   "renderBackupReminder,",
   "renderRecovery: renderWorkspaceRecoveryPanel",
-  "status: { set: setSaveStatus }",
+  "status: { set: applicationSaveStatusController.set }",
   "saveToFolder: () => Boolean(els.saveProjectToFolderInput?.checked)",
   "clear: (timer) => clearInterval(timer)",
   "set: (callback, delayMs) => setInterval(callback, delayMs)",
@@ -9247,7 +9251,7 @@ for (const boundary of [
   "log: logOptionalProjectActivity",
   "appendWarning: appendActivityWarning",
   "workspace: { markDirty: markWorkspaceDirty }",
-  "status: { set: setSaveStatus, mode: exportStatusMode }",
+  "status: { set: applicationSaveStatusController.set, mode: exportStatusMode }",
   "refreshEditorContext: editorContextController.refresh",
   "text: { lower: stableLower, safe: displaySafeText }",
   "confirm: uiLocalizationService.confirm",
@@ -9472,7 +9476,7 @@ for (const boundary of [
   "text: { normalizeCase: stableLower, escapeHtml, escapeRegExp }",
   "safeHtml: { replace: replaceSafeHtml }",
   "target: { insert: targetProducerController.insertTmTarget }",
-  "status: { set: setSaveStatus }",
+  "status: { set: applicationSaveStatusController.set }",
   "getSelection: () => window.getSelection()",
   "getActiveElement: () => document.activeElement",
   "createElement: (tagName) => document.createElement(tagName)",
@@ -10291,7 +10295,7 @@ for (const [action, delegation] of aiAdministrationActionRoutes) {
 }
 assertIncludes(
   appJs,
-  'onError: (error) => setSaveStatus(error?.message || "AI action failed.", "dirty")',
+  'onError: (error) => applicationSaveStatusController.set(error?.message || "AI action failed.", "dirty")',
   "AI administration must retain its single action-error boundary."
 );
 assertIncludes(
@@ -15382,9 +15386,9 @@ assertIncludes(
   "app.js must centralize escaped redaction for rendered project/file/resource labels."
 );
 assertIncludes(
-  functionBody(appJs, "function setSaveStatus", "function renderImportBusyState"),
-  'redactSensitiveText(text || "")',
-  "app.js must redact credential-looking text before displaying save/status messages."
+  applicationSaveStatusControllerJs,
+  'redaction.sanitize(text || "")',
+  "ApplicationSaveStatusController must redact credential-looking text before displaying save/status messages."
 );
 assertIncludes(
   functionBody(appJs, "function clearOpenAiKey", "function clearLocalAiKey"),
@@ -15901,6 +15905,117 @@ for (const testName of [
 }
 assertIncludes(
   appBootstrapJs,
+  'import { createApplicationSaveStatusController } from "./application-save-status-controller.js";',
+  "the application runtime must install the checked save-status controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationSaveStatusController,",
+  "the application runtime must expose the checked save-status controller factory."
+);
+for (const snippet of [
+  "ApplicationSaveStatusController requires checked redaction, model, and context boundaries.",
+  "ApplicationSaveStatusController requires checked localization boundaries.",
+  "ApplicationSaveStatusController requires checked view boundaries.",
+  "ApplicationSaveStatusController requires checked timer boundaries.",
+  "let savedTimer = 0",
+  "if (savedTimer)",
+  "timers.clear(savedTimer)",
+  'const displayText = redaction.sanitize(text || "").trim()',
+  "model.publish({",
+  "projectId: context.getProjectId()",
+  "segmentId: context.getSegmentId()",
+  "view.setText(localization.source(displayText))",
+  "view.setClass(`save-status ${mode}`)",
+  "const operationActive = OPERATION_PATTERN.test(displayText)",
+  "view.setBusy(String(operationActive))",
+  '(mode === "saved" || displayText.startsWith("Saved to ")) && displayText !== "Saved"',
+  "savedTimer = timers.set(() => {",
+  'view.setText(localization.translate("app.status.saved"))',
+  'view.setClass("save-status saved")',
+  "}, 5000)",
+  "return Object.freeze({ set })"
+]) {
+  assertIncludes(
+    applicationSaveStatusControllerJs,
+    snippet,
+    `ApplicationSaveStatusController must retain save-status presentation and timer policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationSaveStatusController({",
+  "sanitize: (value) => redactSensitiveText(value)",
+  "publish: (record) => appRuntime?.status?.controller?.fromLegacy?.(record)",
+  "getProjectId: () => editorSessionStore.getProject()?.id || null",
+  "getSegmentId: () => applicationStore.getState().navigation.segmentId",
+  "source: (value) => uiLocalizationService.source(value)",
+  "translate: (key) => uiLocalizationService.translate(key)",
+  "els.saveStatus.textContent = value",
+  "els.saveStatus.className = value",
+  'els.saveStatus.setAttribute("aria-busy", value)',
+  "set: (callback, delay) => setTimeout(callback, delay)",
+  "clear: (timer) => clearTimeout(timer)",
+  "status: { set: applicationSaveStatusController.set }",
+  "setStatus: applicationSaveStatusController.set"
+]) {
+  assertIncludes(appJs, boundary, `save-status composition and direct consumers must retain ${boundary}.`);
+}
+assert(
+  !appJs.includes("setSaveStatus") &&
+    !appWorkflowDriverJs.includes("setSaveStatus") &&
+    !appJs.includes("saveStatusTimer") &&
+    !appWorkflowDriverJs.includes("saveStatusTimer"),
+  "the legacy setSaveStatus façade and shared timer field must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\bapplicationSaveStatusController\.set\b/g) || []).length >= 60 &&
+    (appWorkflowDriverJs.match(/\bapplicationSaveStatusController\.set\b/g) || []).length === 5,
+  "application and workflow save-status consumers must remain wired directly to ApplicationSaveStatusController."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "state.",
+  "els.",
+  "editorSessionStore",
+  "applicationStore",
+  "uiLocalizationService",
+  "redactSensitiveText",
+  "setTimeout",
+  "clearTimeout",
+  "document.",
+  "window."
+]) {
+  assert(
+    !applicationSaveStatusControllerJs.includes(forbiddenOwner),
+    `ApplicationSaveStatusController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationSaveStatusController preserves redaction, live context, model, and visible presentation order",
+  "ApplicationSaveStatusController preserves falsy text normalization and every operation-busy branch",
+  "ApplicationSaveStatusController replaces a pending saved timer before the next status",
+  "ApplicationSaveStatusController preserves delayed-saved eligibility, callback order, and private timer release",
+  "ApplicationSaveStatusController preserves synchronous failure timing and retained timer after callback failure",
+  "ApplicationSaveStatusController validates boundaries and exposes only an immutable set action"
+]) {
+  assertIncludes(
+    applicationSaveStatusControllerUnitTests,
+    testName,
+    `focused save-status tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/app/application-save-status-controller.js"',
+  "source-catalog extraction must scan the checked save-status controller."
+);
+assertIncludes(
+  i18nValidateScript,
+  '"application-save-status-controller.js"',
+  "explicit i18n-key validation must scan the checked save-status controller."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createApplicationStartupController } from "./application-startup-controller.js";',
   "the application runtime must install the checked startup controller."
 );
@@ -15977,7 +16092,7 @@ for (const boundary of [
   "run: () => (LOOPCAT_TEST_BUILD ? runAppWorkflowTest() : undefined)",
   "register: () => registerOfflineAppShell()",
   "log: (error) => console.error(error)",
-  "setStatus: (message, mode) => setSaveStatus(message, mode)",
+  "setStatus: applicationSaveStatusController.set",
   "applicationStartupController.start()"
 ]) {
   assertIncludes(appJs, boundary, `startup composition must retain ${boundary}.`);

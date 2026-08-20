@@ -7,6 +7,7 @@ const sourcePath = path.join(i18nDir, "source.en-US.json");
 const localeDir = path.join(i18nDir, "locales");
 const indexPath = path.join(root, "index.html");
 const appPath = path.join(root, "app.js");
+const applicationSaveStatusControllerPath = path.join(root, "src", "app", "application-save-status-controller.js");
 const focusModeControllerPath = path.join(root, "src", "features", "editor", "focus-mode-controller.js");
 
 function readJson(filePath) {
@@ -91,6 +92,11 @@ function validate() {
   const referencedKeys = [
     ...collectDataKeys(fs.existsSync(indexPath) ? fs.readFileSync(indexPath, "utf8") : ""),
     ...collectCodeKeys(fs.existsSync(appPath) ? fs.readFileSync(appPath, "utf8") : ""),
+    ...collectCodeKeys(
+      fs.existsSync(applicationSaveStatusControllerPath)
+        ? fs.readFileSync(applicationSaveStatusControllerPath, "utf8")
+        : ""
+    ),
     ...collectCodeKeys(fs.existsSync(focusModeControllerPath) ? fs.readFileSync(focusModeControllerPath, "utf8") : "")
   ];
   referencedKeys.forEach((key) => {

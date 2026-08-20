@@ -758,7 +758,6 @@ const state = {
   projectAnalysisRun: 0,
   importTask: "",
   revisionHistoryFrame: 0,
-  saveStatusTimer: 0,
   workspaceAutosaveTimer: 0,
   workspaceAutosaving: false,
   lastValidationReport: null,
@@ -1096,6 +1095,33 @@ const els = {
   backupExportBtn: document.querySelector("#backupExportBtn")
 };
 
+const applicationSaveStatusController =
+  appRuntime.featureFactories.createApplicationSaveStatusController({
+    redaction: { sanitize: (value) => redactSensitiveText(value) },
+    model: { publish: (record) => appRuntime?.status?.controller?.fromLegacy?.(record) },
+    context: {
+      getProjectId: () => editorSessionStore.getProject()?.id || null,
+      getSegmentId: () => applicationStore.getState().navigation.segmentId
+    },
+    localization: {
+      source: (value) => uiLocalizationService.source(value),
+      translate: (key) => uiLocalizationService.translate(key)
+    },
+    view: {
+      setText: (value) => {
+        els.saveStatus.textContent = value;
+      },
+      setClass: (value) => {
+        els.saveStatus.className = value;
+      },
+      setBusy: (value) => els.saveStatus.setAttribute("aria-busy", value)
+    },
+    timers: {
+      set: (callback, delay) => setTimeout(callback, delay),
+      clear: (timer) => clearTimeout(timer)
+    }
+  });
+
 const revisionHistoryPresentationService =
   appRuntime.featureFactories.createRevisionHistoryPresentationService({
     list: els.revisionHistoryList,
@@ -1148,7 +1174,7 @@ const fileImportService = appRuntime.featureFactories.createFileImportService({
     renderBusy: renderImportBusyState,
     renderValidation: renderValidationReport
   },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   durability: { refresh: refreshStorageDurability }
 });
 
@@ -1255,7 +1281,7 @@ const termFormController = appRuntime.featureFactories.createTermFormController(
     refreshProjectTerms: (options) => refreshProjectTerms(options),
     refreshSuggestions: termSuggestionsController.refresh
   },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   logger: console,
   testHooks: {
     beforeSave: () => {
@@ -1277,7 +1303,7 @@ const projectDomainController = appRuntime.featureFactories.createProjectDomainC
   repository: { update: updateProject },
   presentation: { refreshSummaries: refreshProjectSummaries, renderAll },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   clone: structuredClone,
   testHooks: {
     beforeSave: () => {
@@ -1293,7 +1319,7 @@ const segmentTmSaveController = appRuntime.featureFactories.createSegmentTmSaveC
   selection: { getActiveSegment: currentSegment },
   tm: { saveEntry: saveTmEntry, mainName: mainTmName, refreshMatches: tmMatchesController.refresh },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   testHooks: {
     beforeSave: (segment) => {
       if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG]) {
@@ -1451,7 +1477,7 @@ const aiAdministrationController = appRuntime?.featureFactories?.createAiAdminis
     languageChanged: (...args) => aiProviderFormController.handleLanguageChanged(...args)
   },
   source: uiLocalizationService.source,
-  onError: (error) => setSaveStatus(error?.message || "AI action failed.", "dirty")
+  onError: (error) => applicationSaveStatusController.set(error?.message || "AI action failed.", "dirty")
 });
 aiAdministrationController?.mount?.();
 
@@ -1500,7 +1526,7 @@ const autosaveService = appRuntime.featureFactories.createAutosaveService({
     finalizeProject: (projectId) => targetEditController?.finalizeProject?.(projectId) || [],
     finalizeAll: () => targetEditController?.finalizeAll?.() || []
   },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   onSaved: revisionHistoryPresentationService.render,
   testHooks: {
     beforeSave: (segment) => {
@@ -1603,7 +1629,7 @@ const qualityWorkbenchController = appRuntime.featureFactories.createQualityWork
     renderWorkbench: (viewModel) => qualityReviewController?.renderQuality?.(viewModel)
   },
   focus: { target: () => targetEditController.focusActive() },
-  status: { set: setSaveStatus }
+  status: { set: applicationSaveStatusController.set }
 });
 projectQaController = appRuntime.featureFactories.createProjectQaController({
   elements: { runButton: els.runQaBtn },
@@ -1628,7 +1654,7 @@ projectQaController = appRuntime.featureFactories.createProjectQaController({
   },
   navigation: { getDocumentId: () => applicationStore.getState().navigation.documentId },
   activity: { log: logProjectActivity },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   logger: console,
   testHooks: {
     beforeRun: () => {
@@ -1665,7 +1691,7 @@ const reportExportController = appRuntime.featureFactories.createReportExportCon
   status: {
     appendActivityWarning,
     exportMode: exportStatusMode,
-    set: setSaveStatus
+    set: applicationSaveStatusController.set
   }
 });
 const deliveryExportController = appRuntime.featureFactories.createDeliveryExportController({
@@ -1715,7 +1741,7 @@ const deliveryExportController = appRuntime.featureFactories.createDeliveryExpor
   status: {
     appendActivityWarning,
     exportMode: exportStatusMode,
-    set: setSaveStatus
+    set: applicationSaveStatusController.set
   }
 });
 const projectResourceTransferController =
@@ -1755,7 +1781,7 @@ const projectResourceTransferController =
     status: {
       appendActivityWarning,
       exportMode: exportStatusMode,
-      set: setSaveStatus
+      set: applicationSaveStatusController.set
     }
   });
 const segmentConfirmationController = appRuntime.featureFactories.createSegmentConfirmationController({
@@ -1805,7 +1831,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
     renderHistory: revisionHistoryPresentationService.render
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   testHooks: {
     beforeSave: (segment) => {
       if (LOOPCAT_TEST_BUILD && segment[CONFIRM_FAILURE_TEST_FLAG]) {
@@ -1901,7 +1927,7 @@ const targetProducerController = appRuntime.featureFactories.createTargetProduce
     renderHistory: revisionHistoryPresentationService.render
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus }
+  status: { set: applicationSaveStatusController.set }
 });
 targetProducerController.mount();
 const concordanceController = appRuntime.featureFactories.createConcordanceController({
@@ -1920,7 +1946,7 @@ const concordanceController = appRuntime.featureFactories.createConcordanceContr
   text: { normalizeCase: stableLower, escapeHtml, escapeRegExp },
   safeHtml: { replace: replaceSafeHtml },
   target: { insert: targetProducerController.insertTmTarget },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   dom: {
     getSelection: () => window.getSelection(),
     getActiveElement: () => document.activeElement,
@@ -1980,7 +2006,7 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
   activity: {
     log: (details) => logProjectActivity("replace-target", "Target text replaced", details)
   },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   testHooks: {
     beforeSave: (segments) => {
       if (LOOPCAT_TEST_BUILD && segments.some((segment) => segment[REPLACE_SAVE_FAILURE_TEST_FLAG])) {
@@ -2047,7 +2073,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
     log: (details) => logProjectActivity("pretranslate", "TM pretranslation applied", details)
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   batchSize: TM_PRETRANSLATE_BATCH_SIZE,
   testHooks: {
     beforeSave: (segments) => {
@@ -2129,7 +2155,7 @@ const aiLocalSettingsPersistenceController =
     localStore: { save: (settings) => localAISettingsStore.save(settings) },
     persistence: { updateProject },
     workspace: { markDirty: markWorkspaceDirty },
-    status: { set: setSaveStatus }
+    status: { set: applicationSaveStatusController.set }
   });
 const aiSegmentContextService = appRuntime.featureFactories.createAiSegmentContextService({
   project: {
@@ -2243,7 +2269,7 @@ const aiProviderFormController =
         state.localAi.statusText = statusText;
       }
     },
-    status: { setSave: setSaveStatus },
+    status: { setSave: applicationSaveStatusController.set },
     localization: { label: uiLocalizationService.label, source: uiLocalizationService.source },
     redact: redactSensitiveText,
     defaults: {
@@ -2269,7 +2295,7 @@ const aiCommandLifecycleCoordinator =
       patch: (values) => Object.assign(state.localAi, values)
     },
     presentation: { renderProgress: aiProviderFormController.renderProgress },
-    status: { set: setSaveStatus }
+    status: { set: applicationSaveStatusController.set }
   });
 const aiPretranslationController = appRuntime.featureFactories.createAiPretranslationController({
   editorSessionStore,
@@ -2350,7 +2376,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
       logProjectActivity("ai-pretranslate", "Local AI pretranslation applied", details)
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   testHooks: {
     beforeSave: (segments) => {
       if (
@@ -2436,7 +2462,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
       logProjectActivity("ai-batch-review", "Batch AI QA completed", details)
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   labels: { risk: qualityPresentationService.aiReviewRisk },
   redact: redactSensitiveText,
   ids: { next: () => (crypto.randomUUID ? crypto.randomUUID() : Date.now()) },
@@ -2515,7 +2541,7 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
       )
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   redact: redactSensitiveText,
   logger: console
 });
@@ -2602,7 +2628,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
       )
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   redact: redactSensitiveText,
   logger: console
 });
@@ -2683,7 +2709,7 @@ const aiTerminologyApplicationController =
         )
     },
     workspace: { markDirty: markWorkspaceDirty },
-    status: { set: setSaveStatus },
+    status: { set: applicationSaveStatusController.set },
     redact: redactSensitiveText,
     logger: console
   });
@@ -2764,7 +2790,7 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
         : logProjectActivity("ai-polish-batch", "Batch AI polish suggestions created", details)
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   redact: redactSensitiveText,
   logger: console
 });
@@ -2826,7 +2852,7 @@ const aiTerminologyExtractionController =
         )
     },
     workspace: { markDirty: markWorkspaceDirty },
-    status: { set: setSaveStatus },
+    status: { set: applicationSaveStatusController.set },
     logger: console
   });
 aiCommandLifecycleCoordinator.setCancelHandlers([
@@ -2882,7 +2908,7 @@ const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBrie
       logProjectActivity("ai-project-brief", "AI project brief generated", details)
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   logger: console
 });
 const aiSuggestionApplicationController =
@@ -2931,7 +2957,7 @@ const aiSuggestionApplicationController =
         if (editorSessionStore.getProject()?.id) markWorkspaceDirty(editorSessionStore.getProject().id);
       }
     },
-    status: { set: setSaveStatus },
+    status: { set: applicationSaveStatusController.set },
     testHooks: {
       beforeSave: (segment) => {
         if (LOOPCAT_TEST_BUILD && segment[AI_APPLY_SAVE_FAILURE_TEST_FLAG]) {
@@ -2971,7 +2997,7 @@ const aiSuggestionPersistenceController =
         if (editorSessionStore.getProject()?.id) markWorkspaceDirty(editorSessionStore.getProject().id);
       }
     },
-    status: { set: setSaveStatus },
+    status: { set: applicationSaveStatusController.set },
     redact: redactSensitiveText,
     ids: { suggestion: () => makeId("ai-suggestion") },
     testHooks: {
@@ -3024,7 +3050,7 @@ const aiOpenAiSuggestionController = appRuntime.featureFactories.createAiOpenAiS
     markDirty: markWorkspaceDirty,
     markRollbackDirty: markOpenAiProjectRollbackDirty
   },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   defaults: { model: OPENAI_DEFAULT_MODEL },
   testHooks: {
     beforeProjectSave: () => {
@@ -3076,7 +3102,7 @@ const aiSettingsPersistenceController =
       },
       markRollbackDirty: markOpenAiProjectRollbackDirty
     },
-    status: { set: setSaveStatus },
+    status: { set: applicationSaveStatusController.set },
     defaults: { model: OPENAI_DEFAULT_MODEL },
     testHooks: {
       beforeSave: (project) => {
@@ -3137,7 +3163,7 @@ const aiProviderAdministrationOperationsController =
     },
     status: {
       setConnection: aiProviderFormController.setStatus,
-      setSave: setSaveStatus
+      setSave: applicationSaveStatusController.set
     },
     defaults: { model: DEFAULT_LOCAL_AI_MODEL }
   });
@@ -3203,7 +3229,7 @@ const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestCon
     renderCommandCentre: aiProviderFormController.renderCommandCentre,
     renderOutput: aiProviderFormController.renderOutput
   },
-  status: { set: setSaveStatus }
+  status: { set: applicationSaveStatusController.set }
 });
 const structuralSegmentController = appRuntime.featureFactories.createStructuralSegmentController({
   elements: {
@@ -3247,7 +3273,7 @@ const structuralSegmentController = appRuntime.featureFactories.createStructural
     renderAll
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   ids: {
     segment: () => `segment-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`
   },
@@ -3352,7 +3378,7 @@ const paletteController = appRuntime?.featureFactories?.createPaletteController?
   translate: uiLocalizationService.source,
   focusController,
   preferencesRepository: appRuntime.preferencesRepository,
-  onError: (error) => setSaveStatus(error?.message || "Command failed", "dirty")
+  onError: (error) => applicationSaveStatusController.set(error?.message || "Command failed", "dirty")
 });
 if (LOOPCAT_TEST_BUILD) window.__loopcatTopLevelCheckpoint = "initializing palette controller";
 void paletteController?.initialize?.();
@@ -3444,7 +3470,7 @@ const uiLocaleOrchestrationController =
       refreshEditorContext: () => editorContextController.refresh()
     },
     downloads: { write: (filename, content, type) => download(filename, content, type) },
-    status: { set: (message, mode) => setSaveStatus(message, mode) },
+    status: { set: applicationSaveStatusController.set },
     clock: { now: () => new Date() }
   });
 const uiLocaleControlsController = appRuntime.featureFactories.createUiLocaleControlsController({
@@ -3689,7 +3715,7 @@ const applicationStartupController = appRuntime.featureFactories.createApplicati
   offline: { register: () => registerOfflineAppShell() },
   errors: {
     log: (error) => console.error(error),
-    setStatus: (message, mode) => setSaveStatus(message, mode)
+    setStatus: applicationSaveStatusController.set
   }
 });
 
@@ -3738,7 +3764,7 @@ const dialogLifecycleController = appRuntime?.featureFactories?.createDialogCont
       els.diagnosticsMessage.textContent = uiLocalizationService.source(error?.message || "Diagnostics could not be collected.");
       return;
     }
-    setSaveStatus(error?.message || "Dialog could not be opened.", "dirty");
+    applicationSaveStatusController.set(error?.message || "Dialog could not be opened.", "dirty");
   }
 });
 dialogLifecycleController?.register?.({
@@ -3824,7 +3850,7 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
       "export-recovery-copy": uiLocalizationService.source("Recovery copy export failed"),
       "dismiss-backup-reminder": uiLocalizationService.source("Backup reminder could not be dismissed")
     }[context?.phase] || uiLocalizationService.source("Workspace action failed");
-    setSaveStatus(error?.message || fallback, "dirty");
+    applicationSaveStatusController.set(error?.message || fallback, "dirty");
     if (context?.phase === "save-recovery") renderWorkspaceRecoveryPanel();
   }
 });
@@ -3897,7 +3923,7 @@ workspaceBackupExportController =
       renderWorkspaceStatus,
       renderValidation: renderValidationReport
     },
-    status: { set: setSaveStatus }
+    status: { set: applicationSaveStatusController.set }
   });
 workspaceHealthRepairController =
   appRuntime.featureFactories.createWorkspaceHealthRepairController({
@@ -3924,7 +3950,7 @@ workspaceHealthRepairController =
       renderValidation: renderValidationReport,
       renderWorkspaceStatus
     },
-    status: { set: setSaveStatus }
+    status: { set: applicationSaveStatusController.set }
   });
 projectExportController = appRuntime.featureFactories.createProjectExportController({
   build: projectExportBuildService,
@@ -3949,7 +3975,7 @@ projectExportController = appRuntime.featureFactories.createProjectExportControl
     renderBackupReminder
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus, mode: exportStatusMode },
+  status: { set: applicationSaveStatusController.set, mode: exportStatusMode },
   clock: {
     now: () => new Date().toISOString(),
     nowMs: () => Date.now()
@@ -4010,7 +4036,7 @@ workspacePackageSaveController =
       renderBackupReminder,
       renderRecovery: renderWorkspaceRecoveryPanel
     },
-    status: { set: setSaveStatus },
+    status: { set: applicationSaveStatusController.set },
     preferences: {
       saveToFolder: () => Boolean(els.saveProjectToFolderInput?.checked)
     },
@@ -4068,7 +4094,7 @@ const projectImportRestoreController =
       renderValidation: renderValidationReport,
       renderWorkspaceStatus
     },
-    status: { set: setSaveStatus, mode: exportStatusMode },
+    status: { set: applicationSaveStatusController.set, mode: exportStatusMode },
     localization: {
       alert: uiLocalizationService.alert,
       confirm: uiLocalizationService.confirm
@@ -4104,7 +4130,7 @@ workspaceSyncController = appRuntime.featureFactories.createWorkspaceSyncControl
     renderWorkspaceStatus,
     renderValidation: renderValidationReport
   },
-  status: { set: setSaveStatus }
+  status: { set: applicationSaveStatusController.set }
 });
 const projectDocumentImportController =
   appRuntime.featureFactories.createProjectDocumentImportController({
@@ -4138,7 +4164,7 @@ const projectDocumentImportController =
       appendWarning: appendActivityWarning
     },
     workspace: { markDirty: markWorkspaceDirty },
-    status: { set: setSaveStatus, mode: exportStatusMode },
+    status: { set: applicationSaveStatusController.set, mode: exportStatusMode },
     presentation: {
       renderAll,
       refreshEditorContext: editorContextController.refresh
@@ -4212,7 +4238,10 @@ const importExportController = appRuntime?.featureFactories?.createImportExportC
   scheduleFrame: requestAnimationFrame,
   onError: (error, context) => {
     console.warn(`Import/export action failed (${context?.phase || "unknown"}).`, error);
-    setSaveStatus(error?.message || uiLocalizationService.source("Import or export action failed."), "dirty");
+    applicationSaveStatusController.set(
+      error?.message || uiLocalizationService.source("Import or export action failed."),
+      "dirty"
+    );
   }
 });
 importExportController?.mount?.();
@@ -4323,7 +4352,7 @@ const projectDialogSaveController =
       markDirty: markWorkspaceDirty,
       maybeSaveFromSettings: workspacePackageSaveController.maybeSaveFromSettings
     },
-    status: { set: setSaveStatus },
+    status: { set: applicationSaveStatusController.set },
     test: {
       shouldFailSettingsActivity: () =>
         Boolean(LOOPCAT_TEST_BUILD && els.projectForm[PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG]),
@@ -4378,7 +4407,7 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
   workspaceSupported: () => Boolean(workspaceStorage?.isSupported()),
   translate: uiLocalizationService.source,
   scheduleFrame: requestAnimationFrame,
-  onError: (error) => setSaveStatus(error?.message || "Dialog could not be opened.", "dirty")
+  onError: (error) => applicationSaveStatusController.set(error?.message || "Dialog could not be opened.", "dirty")
 });
 projectDialogController?.mount?.();
 const tmPretranslationDialogController = appRuntime?.featureFactories?.createTmPretranslationDialogController?.({
@@ -4389,7 +4418,11 @@ const tmPretranslationDialogController = appRuntime?.featureFactories?.createTmP
   },
   defaultThreshold: 85,
   scheduleFrame: requestAnimationFrame,
-  onError: (error) => setSaveStatus(error?.message || "TM pretranslation settings could not be opened.", "dirty")
+  onError: (error) =>
+    applicationSaveStatusController.set(
+      error?.message || "TM pretranslation settings could not be opened.",
+      "dirty"
+    )
 });
 const opusCatHelpController = appRuntime?.featureFactories?.createOpusCatHelpController?.({
   dialogLifecycle: dialogLifecycleController,
@@ -4400,7 +4433,11 @@ const opusCatHelpController = appRuntime?.featureFactories?.createOpusCatHelpCon
     retryButton: els.retryOpusCatConnectionBtn
   },
   retryConnection: aiProviderAdministrationOperationsController.testConnection,
-  onError: (error) => setSaveStatus(error?.message || "OPUS-CAT connection help could not complete the action.", "dirty")
+  onError: (error) =>
+    applicationSaveStatusController.set(
+      error?.message || "OPUS-CAT connection help could not complete the action.",
+      "dirty"
+    )
 });
 opusCatHelpController?.mount?.();
 const resourceLibraryImportController =
@@ -4435,7 +4472,7 @@ const resourceLibraryImportController =
       refreshProjectTerms
     },
     alert: uiLocalizationService.alert,
-    status: { set: setSaveStatus }
+    status: { set: applicationSaveStatusController.set }
   });
 const resourceLibraryExportController =
   appRuntime.featureFactories.createResourceLibraryExportController({
@@ -4443,7 +4480,7 @@ const resourceLibraryExportController =
     builders: { buildTmx, buildTbx },
     fileSafeName,
     download,
-    status: { set: setSaveStatus }
+    status: { set: applicationSaveStatusController.set }
   });
 const resourceMutationController = appRuntime.featureFactories.createResourceMutationController({
   session: { getProjectId: () => editorSessionStore.getProject()?.id || null },
@@ -4468,7 +4505,7 @@ const resourceMutationController = appRuntime.featureFactories.createResourceMut
     synchronize: synchronizeResourceTrashChange
   },
   presentation: { renderUndo: renderUndoControls },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   testHooks: {
     beforeSaveTm: (entry) => {
       if (LOOPCAT_TEST_BUILD && entry[RESOURCE_TM_SAVE_FAILURE_TEST_FLAG]) {
@@ -4551,7 +4588,7 @@ const resourcesController = appRuntime?.featureFactories?.createResourcesControl
   saveTerm: resourceMutationController.saveTerm,
   deleteTerm: resourceMutationController.deleteTerm,
   scheduleFrame: requestAnimationFrame,
-  onError: (error) => setSaveStatus(error?.message || "Resource action failed.", "dirty")
+  onError: (error) => applicationSaveStatusController.set(error?.message || "Resource action failed.", "dirty")
 });
 resourcesController?.mount?.();
 qualityReviewController = appRuntime?.featureFactories?.createQualityReviewController?.({
@@ -4596,7 +4633,8 @@ qualityReviewController = appRuntime?.featureFactories?.createQualityReviewContr
   exportPassport: reportExportController.exportQualityPassport,
   openRisk: qualityWorkbenchController.openRisk,
   scheduleFrame: requestAnimationFrame,
-  onError: (error) => setSaveStatus(error?.message || "Quality or review action failed.", "dirty")
+  onError: (error) =>
+    applicationSaveStatusController.set(error?.message || "Quality or review action failed.", "dirty")
 });
 qualityReviewController?.mount?.();
 const qualityProfileController = appRuntime.featureFactories.createQualityProfileController({
@@ -4626,7 +4664,7 @@ const qualityProfileController = appRuntime.featureFactories.createQualityProfil
   },
   presentation: { renderWorkbench: qualityWorkbenchController.render },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus }
+  status: { set: applicationSaveStatusController.set }
 });
 const reviewMetadataController = appRuntime.featureFactories.createReviewMetadataController({
   editorSessionStore,
@@ -4657,7 +4695,7 @@ const reviewMetadataController = appRuntime.featureFactories.createReviewMetadat
     renderHistory: revisionHistoryPresentationService.render
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   ids: {
     comment: () => `comment-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`
   },
@@ -4703,7 +4741,7 @@ const qualityDecisionController = appRuntime.featureFactories.createQualityDecis
     updateRow
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   labels: {
     category: qualityPresentationService.category,
     severity: qualityPresentationService.decisionSeverity
@@ -4752,7 +4790,7 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
     renderHistory: revisionHistoryPresentationService.render
   },
   workspace: { markDirty: markWorkspaceDirty },
-  status: { set: setSaveStatus },
+  status: { set: applicationSaveStatusController.set },
   describeState: (reviewState) => stableLower(reviewLabel(reviewState)),
   testHooks: {
     beforeSave: (segment) => {
@@ -4764,31 +4802,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   logger: console
 });
 dialogLifecycleController?.mount?.();
-
-function setSaveStatus(text, mode = "") {
-  if (state.saveStatusTimer) {
-    clearTimeout(state.saveStatusTimer);
-    state.saveStatusTimer = 0;
-  }
-  const displayText = redactSensitiveText(text || "").trim();
-  appRuntime?.status?.controller?.fromLegacy?.({
-    text: displayText,
-    mode,
-    projectId: editorSessionStore.getProject()?.id || null,
-    segmentId: applicationStore.getState().navigation.segmentId
-  });
-  els.saveStatus.textContent = uiLocalizationService.source(displayText);
-  els.saveStatus.className = `save-status ${mode}`;
-  const operationActive = /^(saving|starting|requesting|sending|running|generating|extracting|polishing|adapting|pretranslating|canceling)|:\s*(reading|parsing|importing|saving)/i.test(displayText);
-  els.saveStatus.setAttribute("aria-busy", String(operationActive));
-  if ((mode === "saved" || displayText.startsWith("Saved to ")) && displayText !== "Saved") {
-    state.saveStatusTimer = setTimeout(() => {
-      els.saveStatus.textContent = uiLocalizationService.translate("app.status.saved");
-      els.saveStatus.className = "save-status saved";
-      state.saveStatusTimer = 0;
-    }, 5000);
-  }
-}
 
 function renderUndoControls() {
   const projectId = state.commandProjectId || editorSessionStore.getProject()?.id || null;
@@ -4851,7 +4864,7 @@ async function undoLastCommand() {
     await openProject(projectId);
   }
   await synchronizeResourceTrashChange(resourceTrashEntryFromCommandResult(result));
-  setSaveStatus(result.receipt.undoLabel, "saved");
+  applicationSaveStatusController.set(result.receipt.undoLabel, "saved");
   renderUndoControls();
   if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
     targetEditController.focusActive(result.result?.selection || null);
@@ -4888,7 +4901,7 @@ async function redoLastCommand() {
     renderAll();
   }
   await synchronizeResourceTrashChange(resourceTrashEntryFromCommandResult(result));
-  setSaveStatus(result.receipt.undoLabel.replace(/^Undo\s+/i, "Redid "), "saved");
+  applicationSaveStatusController.set(result.receipt.undoLabel.replace(/^Undo\s+/i, "Redid "), "saved");
   renderUndoControls();
   if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
     targetEditController.focusActive(result.result?.selection || null);
@@ -4910,11 +4923,14 @@ async function restoreTrashEntry(entryId) {
     await loadProjects(false);
     await synchronizeResourceTrashChange(entry, { refreshSuggestions: true });
     await renderTrashList();
-    setSaveStatus(`${entry.label || "Item"} restored from Trash`, "saved");
+    applicationSaveStatusController.set(`${entry.label || "Item"} restored from Trash`, "saved");
     renderUndoControls();
     return true;
   } catch (error) {
-    setSaveStatus(error.message || "Trash restore failed. Existing work was preserved.", "dirty");
+    applicationSaveStatusController.set(
+      error.message || "Trash restore failed. Existing work was preserved.",
+      "dirty"
+    );
     return false;
   }
 }
@@ -4975,7 +4991,7 @@ async function emptyTrashPermanently() {
   if (!confirmed) return false;
   await appRuntime.trashRepository.emptyAll();
   await renderTrashList();
-  setSaveStatus("Trash emptied permanently", "saved");
+  applicationSaveStatusController.set("Trash emptied permanently", "saved");
   return true;
 }
 
@@ -5080,7 +5096,7 @@ function setImportProgress(phase, file = null, detail = "") {
   const fileName = file?.name ? ` - ${file.name}` : "";
   const fileSize = file?.size ? ` (${formatFileSize(file.size)})` : "";
   const suffix = detail ? ` - ${detail}` : "";
-  setSaveStatus(`${task}: ${phase}${fileName}${fileSize}${suffix}`);
+  applicationSaveStatusController.set(`${task}: ${phase}${fileName}${fileSize}${suffix}`);
 }
 
 function yieldToUi() {
@@ -5336,7 +5352,11 @@ function registerOfflineAppShell() {
       }
     },
     onStateChange: renderOfflineUpdateState,
-    onError: (error) => setSaveStatus(error?.message || "Offline update failed; current version remains active", "dirty")
+    onError: (error) =>
+      applicationSaveStatusController.set(
+        error?.message || "Offline update failed; current version remains active",
+        "dirty"
+      )
   });
   offlineUpdateController
     ?.initialize?.("./service-worker.js")
@@ -6425,11 +6445,11 @@ async function confirmDeleteProject(projectId = editorSessionStore.getProject()?
       applicationNavigation.clearSelection();
     }
     await loadProjects(false);
-    setSaveStatus("Project moved to Trash. Undo is available.", "saved");
+    applicationSaveStatusController.set("Project moved to Trash. Undo is available.", "saved");
     renderUndoControls();
     return true;
   } catch (error) {
-    setSaveStatus(error.message || "Project delete failed", "dirty");
+    applicationSaveStatusController.set(error.message || "Project delete failed", "dirty");
     return false;
   }
 }
@@ -6469,11 +6489,14 @@ async function confirmDeleteFile(documentInfo) {
     }
     await refreshProjectSummaries();
     projectHomeController.show();
-    setSaveStatus(fileDeleteActivityFailed ? "File moved to Trash; activity log failed" : "File moved to Trash. Undo is available.", "saved");
+    applicationSaveStatusController.set(
+      fileDeleteActivityFailed ? "File moved to Trash; activity log failed" : "File moved to Trash. Undo is available.",
+      "saved"
+    );
     renderUndoControls();
     return true;
   } catch (error) {
-    setSaveStatus(error.message || "File delete failed", "dirty");
+    applicationSaveStatusController.set(error.message || "File delete failed", "dirty");
     return false;
   }
 }
@@ -6506,7 +6529,7 @@ async function addResourceToCurrentProject(type, resource) {
   await editorContextController.refresh();
   renderResourcesView();
   markWorkspaceDirty();
-  setSaveStatus(`${type === "tm" ? "TM" : "TB"} added to project`, "saved");
+  applicationSaveStatusController.set(`${type === "tm" ? "TM" : "TB"} added to project`, "saved");
 }
 
 function resourceItems(type, key) {
