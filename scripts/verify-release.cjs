@@ -159,6 +159,7 @@ const requiredReleaseFiles = [
   "src/app/app-store.js",
   "src/app/application-command-buttons-controller.js",
   "src/app/application-menu-controller.js",
+  "src/app/application-persistence-lifecycle-controller.js",
   "src/app/application-update-controls-controller.js",
   "src/app/application-view-controller.js",
   "src/app/global-keyboard-controller.js",
@@ -295,6 +296,7 @@ const requiredReleaseFiles = [
   "tests/unit/app-store.test.cjs",
   "tests/unit/application-command-buttons-controller.test.cjs",
   "tests/unit/application-menu-controller.test.cjs",
+  "tests/unit/application-persistence-lifecycle-controller.test.cjs",
   "tests/unit/application-update-controls-controller.test.cjs",
   "tests/unit/application-view-controller.test.cjs",
   "tests/unit/global-keyboard-controller.test.cjs",
@@ -461,6 +463,10 @@ const applicationCommandButtonsControllerUnitTests = readText(
 );
 const applicationMenuControllerJs = readText("src/app/application-menu-controller.js");
 const applicationMenuControllerUnitTests = readText("tests/unit/application-menu-controller.test.cjs");
+const applicationPersistenceLifecycleControllerJs = readText("src/app/application-persistence-lifecycle-controller.js");
+const applicationPersistenceLifecycleControllerUnitTests = readText(
+  "tests/unit/application-persistence-lifecycle-controller.test.cjs"
+);
 const applicationUpdateControlsControllerJs = readText("src/app/application-update-controls-controller.js");
 const applicationUpdateControlsControllerUnitTests = readText(
   "tests/unit/application-update-controls-controller.test.cjs"
@@ -471,12 +477,8 @@ const applicationViewControllerJs = readText("src/app/application-view-controlle
 const applicationViewControllerUnitTests = readText("tests/unit/application-view-controller.test.cjs");
 const globalKeyboardControllerJs = readText("src/app/global-keyboard-controller.js");
 const globalKeyboardControllerUnitTests = readText("tests/unit/global-keyboard-controller.test.cjs");
-const editorFilterControlsControllerJs = readText(
-  "src/features/editor/editor-filter-controls-controller.js"
-);
-const editorFilterControlsControllerUnitTests = readText(
-  "tests/unit/editor-filter-controls-controller.test.cjs"
-);
+const editorFilterControlsControllerJs = readText("src/features/editor/editor-filter-controls-controller.js");
+const editorFilterControlsControllerUnitTests = readText("tests/unit/editor-filter-controls-controller.test.cjs");
 const focusModeControllerJs = readText("src/features/editor/focus-mode-controller.js");
 const focusModeControllerUnitTests = readText("tests/unit/focus-mode-controller.test.cjs");
 const inspectorToggleControllerJs = readText("src/features/editor/inspector-toggle-controller.js");
@@ -484,9 +486,7 @@ const inspectorToggleControllerUnitTests = readText("tests/unit/inspector-toggle
 const panelToggleControllerJs = readText("src/features/editor/panel-toggle-controller.js");
 const panelToggleControllerUnitTests = readText("tests/unit/panel-toggle-controller.test.cjs");
 const segmentActionButtonsControllerJs = readText("src/features/editor/segment-action-buttons-controller.js");
-const segmentActionButtonsControllerUnitTests = readText(
-  "tests/unit/segment-action-buttons-controller.test.cjs"
-);
+const segmentActionButtonsControllerUnitTests = readText("tests/unit/segment-action-buttons-controller.test.cjs");
 const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
 const editorSessionStoreUnitTests = readText("tests/unit/editor-session-store.test.cjs");
 const editorFilterStoreJs = readText("src/features/editor/filter-store.js");
@@ -541,12 +541,8 @@ const projectDomainControllerJs = readText("src/features/projects/project-domain
 const projectDomainControllerUnitTests = readText("tests/unit/project-domain-controller.test.cjs");
 const projectDialogSaveControllerJs = readText("src/features/projects/project-dialog-save-controller.js");
 const projectDialogSaveControllerUnitTests = readText("tests/unit/project-dialog-save-controller.test.cjs");
-const projectFilterControlsControllerJs = readText(
-  "src/features/projects/project-filter-controls-controller.js"
-);
-const projectFilterControlsControllerUnitTests = readText(
-  "tests/unit/project-filter-controls-controller.test.cjs"
-);
+const projectFilterControlsControllerJs = readText("src/features/projects/project-filter-controls-controller.js");
+const projectFilterControlsControllerUnitTests = readText("tests/unit/project-filter-controls-controller.test.cjs");
 const projectHomeControllerJs = readText("src/features/projects/project-home-controller.js");
 const projectHomeControllerUnitTests = readText("tests/unit/project-home-controller.test.cjs");
 const projectDocumentImportControllerJs = readText("src/features/import-export/project-document-import-controller.js");
@@ -4823,12 +4819,7 @@ assert(
     !appWorkflowDriverJs.includes("segmentActionButtonsController"),
   "segment-action button listener ownership must not return to app.js or the workflow driver."
 );
-for (const forbiddenOwner of [
-  "document.",
-  "els.",
-  "segmentTmSaveController",
-  "segmentNavigationController"
-]) {
+for (const forbiddenOwner of ["document.", "els.", "segmentTmSaveController", "segmentNavigationController"]) {
   assert(
     !segmentActionButtonsControllerJs.includes(forbiddenOwner),
     `SegmentActionButtonsController must use injected elements and actions rather than own ${forbiddenOwner}.`
@@ -8969,7 +8960,7 @@ assert(
   (appJs.match(/\bworkspacePackageSaveController\.chooseFolder\b/g) || []).length === 3 &&
     (appJs.match(/\bworkspacePackageSaveController\.saveCurrent\b/g) || []).length === 1 &&
     !appJs.includes("workspacePackageSaveController.saveById") &&
-    (appJs.match(/\bworkspacePackageSaveController\.autosaveDirty\b/g) || []).length === 2 &&
+    (appJs.match(/\bworkspacePackageSaveController\.autosaveDirty\b/g) || []).length === 1 &&
     (appJs.match(/\bworkspacePackageSaveController\.saveRecovery\b/g) || []).length === 2 &&
     (appJs.match(/\bworkspacePackageSaveController\.startAutosave\b/g) || []).length === 1 &&
     (appJs.match(/\bworkspacePackageSaveController\.maybeSaveFromSettings\b/g) || []).length === 1 &&
@@ -15498,10 +15489,101 @@ assertIncludes(
   "app.js must flush pending edits before checked package-import and backup-restore boundaries."
 );
 assertIncludes(
-  functionBody(appJs, "function shouldWarnBeforeUnload()", "function handleBeforeUnload"),
-  "state.importTask",
-  "app.js must warn before close/reload while import or restore tasks are active."
+  applicationPersistenceLifecycleControllerJs,
+  "pending.hasImport() || autosave.size() || workspace.hasUnsaved()",
+  "the checked persistence lifecycle must warn before close/reload while import, autosave, or workspace work is active."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createApplicationPersistenceLifecycleController } from "./application-persistence-lifecycle-controller.js";',
+  "the application runtime must install the checked persistence lifecycle controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationPersistenceLifecycleController,",
+  "the application runtime must expose the checked persistence lifecycle controller factory."
+);
+for (const snippet of [
+  "ApplicationPersistenceLifecycleController requires checked window and document targets.",
+  "ApplicationPersistenceLifecycleController requires visibility and pending-work queries.",
+  "ApplicationPersistenceLifecycleController requires persistence actions and warning logger.",
+  "pending.hasImport() || autosave.size() || workspace.hasUnsaved()",
+  "event.preventDefault()",
+  'event.returnValue = ""',
+  'visibility.getState() !== "hidden"',
+  "autosave",
+  ".flush()",
+  ".then(() => workspace.autosaveDirty())",
+  ".catch((error) => logger.warn(error))",
+  'targets.window.addEventListener("beforeunload", beforeUnloadListener)',
+  'targets.document.addEventListener("visibilitychange", visibilityChangeListener)',
+  'targets.window.addEventListener("pagehide", pageHideListener)',
+  "return Object.freeze({ mount, unmount })"
+]) {
+  assertIncludes(
+    applicationPersistenceLifecycleControllerJs,
+    snippet,
+    `ApplicationPersistenceLifecycleController must retain persistence event policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationPersistenceLifecycleController({",
+  "targets: { window, document }",
+  "getState: () => document.visibilityState",
+  "hasImport: () => Boolean(state.importTask)",
+  "size: () => autosaveService.size()",
+  "flush: () => autosaveService.flush()",
+  "hasUnsaved: hasUnsavedWorkspacePackages",
+  "workspacePackageSaveController.autosaveDirty()",
+  "logger: { warn: (error) => console.warn(error) }",
+  "applicationPersistenceLifecycleController.mount()"
+]) {
+  assertIncludes(appJs, boundary, `persistence-lifecycle composition must retain ${boundary}.`);
+}
+assert(
+  appJs.indexOf("projectDomainController.mount()") < appJs.indexOf("applicationPersistenceLifecycleController.mount()"),
+  "persistence lifecycle must mount after project-domain controls at the former listener position."
+);
+for (const removedOwner of [
+  "shouldWarnBeforeUnload",
+  "handleBeforeUnload",
+  'window.addEventListener("beforeunload"',
+  'document.addEventListener("visibilitychange"',
+  'window.addEventListener("pagehide"'
+]) {
+  assert(
+    !appJs.includes(removedOwner) && !appWorkflowDriverJs.includes(removedOwner),
+    `direct persistence lifecycle ownership must not return: ${removedOwner}.`
+  );
+}
+for (const [forbiddenOwner, pattern] of [
+  ["window.", /(^|[^.\w])window\./m],
+  ["document.", /(^|[^.\w])document\./m],
+  ["state.", /state\./],
+  ["autosaveService", /autosaveService/],
+  ["workspacePackageSaveController", /workspacePackageSaveController/],
+  ["console.", /console\./]
+]) {
+  assert(
+    !pattern.test(applicationPersistenceLifecycleControllerJs),
+    `ApplicationPersistenceLifecycleController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationPersistenceLifecycleController owns exact ordered listener lifecycle and immutable API",
+  "ApplicationPersistenceLifecycleController preserves every live close-warning branch",
+  "ApplicationPersistenceLifecycleController preserves visible and hidden background-save guards",
+  "ApplicationPersistenceLifecycleController preserves Page hide and suppresses persistence promises",
+  "ApplicationPersistenceLifecycleController catches flush and workspace rejections through the logger",
+  "ApplicationPersistenceLifecycleController preserves synchronous query and flush failure timing",
+  "ApplicationPersistenceLifecycleController validates targets, queries, actions, and logger"
+]) {
+  assertIncludes(
+    applicationPersistenceLifecycleControllerUnitTests,
+    testName,
+    `focused persistence-lifecycle tests must retain characterization: ${testName}.`
+  );
+}
 assertIncludes(
   appJs,
   "overlapping import task is blocked before it mutates project data",

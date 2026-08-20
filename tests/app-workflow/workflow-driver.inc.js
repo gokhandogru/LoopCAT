@@ -128,15 +128,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       overlappingWorkspaceSyncRan = true;
     });
     assert(!overlappingWorkspaceSyncResult && !overlappingWorkspaceSyncRan && els.saveStatus.textContent.includes("still running"), "overlapping workspace sync is blocked before it reads package data");
-    const importBeforeUnloadEvent = {
-      prevented: false,
-      returnValue: null,
-      preventDefault() {
-        this.prevented = true;
-      }
-    };
-    handleBeforeUnload(importBeforeUnloadEvent);
-    assert(importBeforeUnloadEvent.prevented && importBeforeUnloadEvent.returnValue === "", "active import task warns before closing");
+    const importBeforeUnloadEvent = new Event("beforeunload", { cancelable: true });
+    const importBeforeUnloadResult = window.dispatchEvent(importBeforeUnloadEvent);
+    assert(!importBeforeUnloadResult && importBeforeUnloadEvent.defaultPrevented && importBeforeUnloadEvent.returnValue === false, "active import task warns before closing");
     finishLongImport?.();
     assert(
       (await longImportTask) &&
@@ -5138,7 +5132,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     clearWorkspaceDirtyMarkers();
     markWorkspaceDirty(project.id);
     renderWorkspaceStatus();
-    assert(!els.workspaceMenuSummary.textContent.includes("unsaved") && !shouldWarnBeforeUnload(), "browser-cache dirty recovery marker stays hidden until a workspace is connected");
+    const disconnectedBeforeUnloadEvent = new Event("beforeunload", { cancelable: true });
+    const disconnectedBeforeUnloadResult = window.dispatchEvent(disconnectedBeforeUnloadEvent);
+    assert(!els.workspaceMenuSummary.textContent.includes("unsaved") && disconnectedBeforeUnloadResult && !disconnectedBeforeUnloadEvent.defaultPrevented, "browser-cache dirty recovery marker stays hidden until a workspace is connected");
 
     const originalConnectChooseWorkspaceFolder = workspaceStorage.chooseWorkspaceFolder;
     const originalConnectListWorkspacePackages = workspaceStorage.listProjectPackages;
@@ -5179,15 +5175,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     restoreWorkspaceDirtyIds();
     pruneWorkspaceDirtyProjectIds();
     assert(state.workspaceDirtyProjectIds.has(project.id) && !state.workspaceDirtyProjectIds.has("missing-project"), "workspace dirty recovery prunes missing projects");
-    const beforeUnloadEvent = {
-      returnValue: undefined,
-      prevented: false,
-      preventDefault() {
-        this.prevented = true;
-      }
-    };
-    handleBeforeUnload(beforeUnloadEvent);
-    assert(beforeUnloadEvent.prevented && beforeUnloadEvent.returnValue === "", "workspace dirty packages warn before closing");
+    const beforeUnloadEvent = new Event("beforeunload", { cancelable: true });
+    const beforeUnloadResult = window.dispatchEvent(beforeUnloadEvent);
+    assert(!beforeUnloadResult && beforeUnloadEvent.defaultPrevented && beforeUnloadEvent.returnValue === false, "workspace dirty packages warn before closing");
 
     const originalSaveProjectPackage = workspaceStorage.saveProjectPackage;
     const originalGetWorkspaceStatus = workspaceStorage.getStatus;
@@ -5284,15 +5274,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       clearWorkspaceDirtyMarkers();
     }
 
-    const cleanBeforeUnloadEvent = {
-      returnValue: undefined,
-      prevented: false,
-      preventDefault() {
-        this.prevented = true;
-      }
-    };
-    handleBeforeUnload(cleanBeforeUnloadEvent);
-    assert(!cleanBeforeUnloadEvent.prevented, "clean workspace does not warn before closing");
+    const cleanBeforeUnloadEvent = new Event("beforeunload", { cancelable: true });
+    const cleanBeforeUnloadResult = window.dispatchEvent(cleanBeforeUnloadEvent);
+    assert(cleanBeforeUnloadResult && !cleanBeforeUnloadEvent.defaultPrevented, "clean workspace does not warn before closing");
 
     await openProject(project.id);
     clearWorkspaceDirtyMarkers();

@@ -3561,6 +3561,21 @@ const editorFilterControlsController =
     preset: { markCustom: () => filterPresetController?.markCustom?.() },
     selection: { select: (index) => segmentNavigationController.select(index) }
   });
+const applicationPersistenceLifecycleController =
+  appRuntime.featureFactories.createApplicationPersistenceLifecycleController({
+    targets: { window, document },
+    visibility: { getState: () => document.visibilityState },
+    pending: { hasImport: () => Boolean(state.importTask) },
+    autosave: {
+      size: () => autosaveService.size(),
+      flush: () => autosaveService.flush()
+    },
+    workspace: {
+      hasUnsaved: hasUnsavedWorkspacePackages,
+      autosaveDirty: () => workspacePackageSaveController.autosaveDirty()
+    },
+    logger: { warn: (error) => console.warn(error) }
+  });
 
 const diagnosticsService = appRuntime?.featureFactories?.createDiagnosticsService?.({
   platform: appRuntime.platform,
@@ -5600,16 +5615,6 @@ function visibleWorkspaceDirtyCount(status = state.workspaceStatus) {
   return status?.connected ? state.workspaceDirtyProjectIds.size : 0;
 }
 
-function shouldWarnBeforeUnload() {
-  return Boolean(state.importTask || autosaveService.size() || hasUnsavedWorkspacePackages());
-}
-
-function handleBeforeUnload(event) {
-  if (!shouldWarnBeforeUnload()) return;
-  event.preventDefault();
-  event.returnValue = "";
-}
-
 function markWorkspaceDirty(projectId = editorSessionStore.getProject()?.id) {
   if (!projectId) return;
   const changed = !state.workspaceDirtyProjectIds.has(projectId);
@@ -6778,20 +6783,7 @@ function wireEvents() {
 
   termFormController.mount();
   projectDomainController.mount();
-
-  window.addEventListener("beforeunload", handleBeforeUnload);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState !== "hidden" || !shouldWarnBeforeUnload()) return;
-    autosaveService.flush()
-      .then(() => workspacePackageSaveController.autosaveDirty())
-      .catch((error) => console.warn(error));
-  });
-  window.addEventListener("pagehide", () => {
-    if (!shouldWarnBeforeUnload()) return;
-    autosaveService.flush()
-      .then(() => workspacePackageSaveController.autosaveDirty())
-      .catch((error) => console.warn(error));
-  });
+  applicationPersistenceLifecycleController.mount();
 }
 
 /* LOOPCAT_TEST_WORKFLOW_DRIVER */
