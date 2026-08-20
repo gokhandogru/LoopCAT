@@ -223,6 +223,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-dialog-controller.js",
   "src/features/projects/project-dialog-save-controller.js",
   "src/features/projects/project-domain-controller.js",
+  "src/features/projects/project-home-controller.js",
   "src/features/projects/project-resource-selection-controller.js",
   "src/features/projects/project-language-pair-shortcuts-controller.js",
   "src/features/projects/project-language-context-controller.js",
@@ -313,6 +314,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-qa-controller.test.cjs",
   "tests/unit/project-domain-controller.test.cjs",
   "tests/unit/project-dialog-save-controller.test.cjs",
+  "tests/unit/project-home-controller.test.cjs",
   "tests/unit/project-document-import-controller.test.cjs",
   "tests/unit/file-import-service.test.cjs",
   "tests/unit/project-export-build-service.test.cjs",
@@ -509,6 +511,8 @@ const projectDomainControllerJs = readText("src/features/projects/project-domain
 const projectDomainControllerUnitTests = readText("tests/unit/project-domain-controller.test.cjs");
 const projectDialogSaveControllerJs = readText("src/features/projects/project-dialog-save-controller.js");
 const projectDialogSaveControllerUnitTests = readText("tests/unit/project-dialog-save-controller.test.cjs");
+const projectHomeControllerJs = readText("src/features/projects/project-home-controller.js");
+const projectHomeControllerUnitTests = readText("tests/unit/project-home-controller.test.cjs");
 const projectDocumentImportControllerJs = readText("src/features/import-export/project-document-import-controller.js");
 const projectDocumentImportControllerUnitTests = readText("tests/unit/project-document-import-controller.test.cjs");
 const fileImportServiceJs = readText("src/features/import-export/file-import-service.js");
@@ -4839,8 +4843,7 @@ for (const boundary of [
 }
 assert(
   appJs.indexOf("applicationUpdateControlsController.mount()") < appJs.indexOf("uiLocaleControlsController.mount()") &&
-    appJs.indexOf("uiLocaleControlsController.mount()") <
-      appJs.indexOf('els.projectFilesBtn.addEventListener("click", showProjectHome)'),
+    appJs.indexOf("uiLocaleControlsController.mount()") < appJs.indexOf("projectHomeController.mount()"),
   "UI-locale controls must mount between update controls and project-home listeners at the existing position."
 );
 assert(
@@ -4888,6 +4891,104 @@ assertIncludes(
   i18nExtractScript,
   '"src/i18n/ui-locale-controls-controller.js"',
   "source-catalog extraction must scan the checked UI-locale controls controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectHomeController } from "../features/projects/project-home-controller.js";',
+  "the application runtime must install the checked project-home controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectHomeController,",
+  "the application runtime must expose the checked project-home controller factory."
+);
+for (const snippet of [
+  "ProjectHomeController requires session, presentation, and project-delete boundaries.",
+  "ProjectHomeController requires a checked optional navigation boundary.",
+  "ProjectHomeController requires checked project-home control elements.",
+  "if (!session.getProject()) return",
+  "const activeIndex = session.getSegments().length ? 0 : -1",
+  "navigation?.openProject?.(session.getProject().id, activeIndex)",
+  "presentation.renderAll()",
+  "const deleteClickListener = () => actions.confirmDelete()",
+  'elements.projectFilesButton.addEventListener("click", show)',
+  'elements.deleteButton.addEventListener("click", deleteClickListener)',
+  'elements.projectFilesButton.removeEventListener("click", show)',
+  'elements.deleteButton.removeEventListener("click", deleteClickListener)',
+  "return Object.freeze({ show, mount, unmount })"
+]) {
+  assertIncludes(
+    projectHomeControllerJs,
+    snippet,
+    `ProjectHomeController must retain characterized navigation, action, and lifecycle policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectHomeController({",
+  "projectFilesButton: els.projectFilesBtn",
+  "deleteButton: els.projectHomeDeleteBtn",
+  "getProject: () => editorSessionStore.getProject()",
+  "getSegments: () => editorSessionStore.getSegments()",
+  "navigation: applicationNavigation",
+  "renderAll",
+  "confirmDelete: confirmDeleteProject",
+  "projectHomeController.mount()",
+  "projectHomeController.show()"
+]) {
+  assertIncludes(appJs, boundary, `project-home composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  appJs.indexOf("uiLocaleControlsController.mount()") < appJs.indexOf("projectHomeController.mount()") &&
+    appJs.indexOf("projectHomeController.mount()") <
+      appJs.indexOf('els.focusModeBtn?.addEventListener("click", toggleFocusMode)'),
+  "project-home controls must mount between UI-locale and Focus-mode listeners at the existing position."
+);
+assert(
+  !appJs.includes("function showProjectHome") &&
+    !appWorkflowDriverJs.includes("showProjectHome") &&
+    !appJs.includes('els.projectFilesBtn.addEventListener("click"') &&
+    !appJs.includes('els.projectHomeDeleteBtn.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('projectFilesBtn.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('projectHomeDeleteBtn.addEventListener("click"'),
+  "project-home navigation facade and listener ownership must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\bprojectHomeController\.mount\b/g) || []).length === 1 &&
+    (appJs.match(/\bprojectHomeController\.show\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bprojectHomeController\.show\b/g) || []).length === 1,
+  "wireEvents and direct application/workflow consumers must retain checked project-home controller calls."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "applicationNavigation",
+  "confirmDeleteProject",
+  "els."
+]) {
+  assert(
+    !projectHomeControllerJs.includes(forbiddenOwner),
+    `ProjectHomeController must use injected elements, session, navigation, presentation, and action boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectHomeController is inert without a current project",
+  "ProjectHomeController preserves live project reads and both active-index branches",
+  "ProjectHomeController preserves optional navigation short-circuit and final rendering",
+  "ProjectHomeController preserves direct files click and no-argument delete result passthrough",
+  "ProjectHomeController owns exact idempotent listener lifecycle and immutable API",
+  "ProjectHomeController preserves session, navigation, rendering, action, and listener failure timing",
+  "ProjectHomeController validates boundaries and project-home controls"
+]) {
+  assertIncludes(
+    projectHomeControllerUnitTests,
+    testName,
+    `focused project-home tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/project-home-controller.js"',
+  "source-catalog extraction must scan the checked project-home controller."
 );
 assertIncludes(
   appBootstrapJs,

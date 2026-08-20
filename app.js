@@ -3407,6 +3407,19 @@ const uiLocaleControlsController = appRuntime.featureFactories.createUiLocaleCon
     exportSource: exportUiSourceCatalog
   }
 });
+const projectHomeController = appRuntime.featureFactories.createProjectHomeController({
+  elements: {
+    projectFilesButton: els.projectFilesBtn,
+    deleteButton: els.projectHomeDeleteBtn
+  },
+  session: {
+    getProject: () => editorSessionStore.getProject(),
+    getSegments: () => editorSessionStore.getSegments()
+  },
+  navigation: applicationNavigation,
+  presentation: { renderAll },
+  actions: { confirmDelete: confirmDeleteProject }
+});
 const globalKeyboardController = appRuntime.featureFactories.createGlobalKeyboardController({
   target: window,
   normalizeKey: stableLower,
@@ -5801,13 +5814,6 @@ async function loadProjects(selectFirst = false) {
   }
 }
 
-function showProjectHome() {
-  if (!editorSessionStore.getProject()) return;
-  const activeIndex = editorSessionStore.getSegments().length ? 0 : -1;
-  applicationNavigation?.openProject?.(editorSessionStore.getProject().id, activeIndex);
-  renderAll();
-}
-
 function openProjectDialog(mode = "create") {
   return projectDialogController?.open?.(mode, { returnTarget: document.activeElement }) || Promise.resolve(false);
 }
@@ -6368,7 +6374,7 @@ async function confirmDeleteFile(documentInfo) {
       markWorkspaceDirty();
     }
     await refreshProjectSummaries();
-    showProjectHome();
+    projectHomeController.show();
     setSaveStatus(fileDeleteActivityFailed ? "File moved to Trash; activity log failed" : "File moved to Trash. Undo is available.", "saved");
     renderUndoControls();
     return true;
@@ -6724,8 +6730,7 @@ function wireEvents() {
   applicationCommandButtonsController.mount();
   applicationUpdateControlsController.mount();
   uiLocaleControlsController.mount();
-  els.projectFilesBtn.addEventListener("click", showProjectHome);
-  els.projectHomeDeleteBtn.addEventListener("click", () => confirmDeleteProject());
+  projectHomeController.mount();
   els.focusModeBtn?.addEventListener("click", toggleFocusMode);
   els.exitFocusModeBtn?.addEventListener("click", () => setFocusMode(false));
   els.inspectorToggleBtn?.addEventListener("click", () => {

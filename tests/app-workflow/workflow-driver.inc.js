@@ -784,7 +784,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       applicationStore.getState().navigation.view === "projects" && !els.projectsView.classList.contains("hidden"),
       "LoopCAT brand navigates to the Projects view"
     );
-    showProjectHome();
+    projectHomeController.show();
     const analysisPanel = document.querySelector(".analysis-panel");
     const analysisToggle = analysisPanel?.querySelector("[data-panel-toggle]");
     analysisToggle?.click();
