@@ -111,6 +111,7 @@ import { createResourceLibraryImportController } from "../features/resources/res
 import { createResourceLibraryExportController } from "../features/resources/resource-library-export-controller.js";
 import { createResourceMutationController } from "../features/resources/resource-mutation-controller.js";
 import { createQualityReviewController } from "../features/quality/quality-review-controller.js";
+import { createQaResultsController } from "../features/quality/qa-results-controller.js";
 import { createQualityPresentationService } from "../features/quality/quality-presentation-service.js";
 import { createQualityWorkbenchController } from "../features/quality/quality-workbench-controller.js";
 import { createRevisionHistoryPresentationService } from "../features/quality/revision-history-presentation-service.js";
@@ -254,6 +255,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createResourceLibraryImportController,
       createResourceMutationController,
       createQualityReviewController,
+      createQaResultsController,
       createQualityPresentationService,
       createQualityWorkbenchController,
       createRevisionHistoryPresentationService,

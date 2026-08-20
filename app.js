@@ -84,13 +84,30 @@ const qualityPresentationService = appRuntime.featureFactories.createQualityPres
   localization: uiLocalizationService,
   baseCategoryLabel: baseQualityCategoryLabel
 });
+const qaResultsController = appRuntime.featureFactories.createQaResultsController({
+  session: {
+    getQaChecks: () => editorSessionStore.getQaChecks(),
+    getSegments: () => editorSessionStore.getSegments()
+  },
+  getRoot: () => els.qaResults,
+  dom: {
+    createElement: (tagName) => document.createElement(tagName),
+    createDocumentFragment: () => document.createDocumentFragment()
+  },
+  localization: uiLocalizationService,
+  escapeHtml,
+  replaceSafeHtml: (...args) => appRuntime.safeHtml.replace(...args),
+  navigation: { select: (index) => segmentNavigationController.select(index) },
+  presentation: { renderSegments },
+  focus: { target: () => targetEditController.focusActive() }
+});
 const reportPresentationService = appRuntime.featureFactories.createReportPresentationService({
   localization: uiLocalizationService,
   escapeHtml,
   redactSensitiveText,
   qualityCategoryName: qualityPresentationService.category,
-  qaCheckMessage,
-  qaCheckFixHint
+  qaCheckMessage: qaResultsController.message,
+  qaCheckFixHint: qaResultsController.fixHint
 });
 const reportDocumentCompositionService = appRuntime.featureFactories.createReportDocumentCompositionService({
   localization: uiLocalizationService,
@@ -744,7 +761,6 @@ const state = {
   saveStatusTimer: 0,
   workspaceAutosaveTimer: 0,
   workspaceAutosaving: false,
-  qaFilter: "",
   lastValidationReport: null,
   commandQuery: "",
   commandProjectId: "",
@@ -1480,18 +1496,14 @@ const reportExportController = appRuntime.featureFactories.createReportExportCon
     replaceQaChecks: editorSessionStore.replaceQaChecks,
     replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue
   },
-  application: {
-    clearQaFilter: () => {
-      state.qaFilter = "";
-    }
-  },
+  application: { clearQaFilter: qaResultsController.clear },
   data: reportDataService,
   documents: reportDocumentCompositionService,
   finalizeDocument: finalizeReportDocument,
   fileSafeName,
   download,
   presentation: {
-    renderQaResults,
+    renderQaResults: qaResultsController.render,
     renderQualityWorkbench: qualityWorkbenchController.render,
     renderValidationReport
   },
@@ -1511,9 +1523,7 @@ const deliveryExportController = appRuntime.featureFactories.createDeliveryExpor
   },
   application: {
     getDocumentId: () => applicationStore.getState().navigation.documentId,
-    clearQaFilter: () => {
-      state.qaFilter = "";
-    }
+    clearQaFilter: qaResultsController.clear
   },
   autosave: autosaveService,
   documents: { list: projectDocumentCatalogService.list, type: projectDocumentCatalogService.type },
@@ -1547,7 +1557,7 @@ const deliveryExportController = appRuntime.featureFactories.createDeliveryExpor
   },
   fileSafeName,
   download,
-  presentation: { renderValidationReport, renderQaResults },
+  presentation: { renderValidationReport, renderQaResults: qaResultsController.render },
   activity: { logOptionalProject: logOptionalProjectActivity },
   status: {
     appendActivityWarning,
@@ -3950,7 +3960,7 @@ function refreshLocalizedUi() {
     qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false });
     qualityWorkbenchController.render();
     revisionHistoryPresentationService.render();
-    renderQaResults();
+    qaResultsController.render();
     editorContextController.refresh();
   }
 }
@@ -6099,78 +6109,6 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-function qaSummary(checks) {
-  return checks.reduce((summary, check) => {
-    summary[check.type] = (summary[check.type] || 0) + 1;
-    summary[check.severity] = (summary[check.severity] || 0) + 1;
-    return summary;
-  }, {});
-}
-
-function qaCheckMessage(check) {
-  return uiLocalizationService.source(check?.message || "", check?.messageValues || {});
-}
-
-function qaCheckFixHint(check) {
-  return check?.fixHint ? uiLocalizationService.source(check.fixHint, check.fixHintValues || {}) : "";
-}
-
-function renderQaResults() {
-  const qaChecks = editorSessionStore.getQaChecks();
-  const checks = state.qaFilter ? qaChecks.filter((check) => check.type === state.qaFilter) : qaChecks;
-  if (!qaChecks.length) {
-    els.qaResults.textContent = uiLocalizationService.source("No QA issues found.");
-    els.qaResults.classList.add("muted");
-    return;
-  }
-  els.qaResults.classList.remove("muted");
-  const summary = qaSummary(qaChecks);
-  const fragment = document.createDocumentFragment();
-  const summaryWrap = document.createElement("div");
-  summaryWrap.className = "qa-summary";
-  const allButton = document.createElement("button");
-  allButton.type = "button";
-  allButton.className = state.qaFilter ? "" : "active";
-  allButton.textContent = uiLocalizationService.source("All {value1}", { value1: qaChecks.length });
-  allButton.addEventListener("click", () => {
-    state.qaFilter = "";
-    renderQaResults();
-  });
-  summaryWrap.append(allButton);
-  Object.entries(summary).filter(([type]) => !["error", "warning", "info"].includes(type)).forEach(([type, count]) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = state.qaFilter === type ? "active" : "";
-    button.textContent = `${uiLocalizationService.source(type)} ${count}`;
-    button.addEventListener("click", () => {
-      state.qaFilter = state.qaFilter === type ? "" : type;
-      renderQaResults();
-    });
-    summaryWrap.append(button);
-  });
-  fragment.append(summaryWrap);
-  checks.slice(0, 100).forEach((check) => {
-    const card = document.createElement("article");
-    card.className = "qa-card";
-    const fixHint = qaCheckFixHint(check);
-    replaceSafeHtml(card, `<header><strong>${escapeHtml(uiLocalizationService.source(check.type))}</strong><span class="severity-pill ${escapeHtml(check.severity || "info")}">${escapeHtml(uiLocalizationService.source(check.severity || "info"))}</span><span>#${escapeHtml(check.label)}</span></header><p>${escapeHtml(qaCheckMessage(check))}</p>${fixHint ? `<p class="muted">${escapeHtml(fixHint)}</p>` : ""}`);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = uiLocalizationService.label("go");
-    button.addEventListener("click", async () => {
-      const index = editorSessionStore.getSegments().findIndex((segment) => segment.id === check.segmentId);
-      if (index !== -1) {
-        await segmentNavigationController.select(index);
-        renderSegments();
-        targetEditController.focusActive();
-      }
-    });
-    card.append(button);
-    fragment.append(card);
-  });
-  els.qaResults.replaceChildren(fragment);
-}
-
 async function refreshTmMatches() {
   const segment = currentSegment();
   if (!segment || !editorSessionStore.getProject()) {
@@ -6309,8 +6247,8 @@ async function runProjectQa() {
       ? await workerClient.runQaChecks({ segments: qaSegments, terms, fallback })
       : await fallback();
     editorSessionStore.replaceQaChecks(checks);
-    state.qaFilter = "";
-    renderQaResults();
+    qaResultsController.clear();
+    qaResultsController.render();
     editorSessionStore.replaceQualityRiskQueue(qualityWorkbenchController.buildQueue(checks));
     qualityWorkbenchController.render();
     try {
@@ -6322,7 +6260,7 @@ async function runProjectQa() {
     setSaveStatus(checks.length ? `QA found ${checks.length} issue${checks.length === 1 ? "" : "s"}` : "QA found no issues", checks.length ? "dirty" : "saved");
     return checks;
   } catch (error) {
-    renderQaResults();
+    qaResultsController.render();
     setSaveStatus(error.message || "QA checks failed", "dirty");
     return null;
   }

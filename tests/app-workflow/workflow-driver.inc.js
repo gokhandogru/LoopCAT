@@ -2645,7 +2645,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
 
     editorSessionStore.replaceQaChecks([{ id: "existing-qa-fixture", type: "existing", severity: "info", segmentId: editorSessionStore.getSegments()[segmentIndex].id, label: "fixture", message: "Existing QA fixture." }]);
-    renderQaResults();
+    qaResultsController.render();
     segmentTargetStateService.setHiddenField(editorSessionStore.getProject(), QA_RUN_FAILURE_TEST_FLAG, true);
     const failedQaRun = await runProjectQa();
     assert(

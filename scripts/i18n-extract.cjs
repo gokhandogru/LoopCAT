@@ -121,6 +121,7 @@ const segmentTmSaveControllerPath = path.join(root, "src", "features", "editor",
 const concordanceControllerPath = path.join(root, "src", "features", "editor", "concordance-controller.js");
 const qualityPresentationServicePath = path.join(root, "src", "features", "quality", "quality-presentation-service.js");
 const qualityWorkbenchControllerPath = path.join(root, "src", "features", "quality", "quality-workbench-controller.js");
+const qaResultsControllerPath = path.join(root, "src", "features", "quality", "qa-results-controller.js");
 const revisionHistoryPresentationServicePath = path.join(
   root,
   "src",
@@ -370,6 +371,7 @@ function main() {
   extractScript(messagesByText, concordanceControllerPath, "src/features/editor/concordance-controller.js");
   extractScript(messagesByText, qualityPresentationServicePath, "src/features/quality/quality-presentation-service.js");
   extractScript(messagesByText, qualityWorkbenchControllerPath, "src/features/quality/quality-workbench-controller.js");
+  extractScript(messagesByText, qaResultsControllerPath, "src/features/quality/qa-results-controller.js");
   extractScript(
     messagesByText,
     revisionHistoryPresentationServicePath,

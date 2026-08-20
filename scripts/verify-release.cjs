@@ -226,6 +226,7 @@ const requiredReleaseFiles = [
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-presentation-service.js",
   "src/features/quality/quality-workbench-controller.js",
+  "src/features/quality/qa-results-controller.js",
   "src/features/quality/revision-history-presentation-service.js",
   "src/features/quality/quality-decision-controller.js",
   "src/features/quality/quality-review-controller.js",
@@ -306,6 +307,7 @@ const requiredReleaseFiles = [
   "tests/unit/quality-profile-controller.test.cjs",
   "tests/unit/quality-presentation-service.test.cjs",
   "tests/unit/quality-workbench-controller.test.cjs",
+  "tests/unit/qa-results-controller.test.cjs",
   "tests/unit/revision-history-presentation-service.test.cjs",
   "tests/unit/quality-decision-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
@@ -449,6 +451,8 @@ const qualityPresentationServiceJs = readText("src/features/quality/quality-pres
 const qualityPresentationServiceUnitTests = readText("tests/unit/quality-presentation-service.test.cjs");
 const qualityWorkbenchControllerJs = readText("src/features/quality/quality-workbench-controller.js");
 const qualityWorkbenchControllerUnitTests = readText("tests/unit/quality-workbench-controller.test.cjs");
+const qaResultsControllerJs = readText("src/features/quality/qa-results-controller.js");
+const qaResultsControllerUnitTests = readText("tests/unit/qa-results-controller.test.cjs");
 const revisionHistoryPresentationServiceJs = readText("src/features/quality/revision-history-presentation-service.js");
 const revisionHistoryPresentationServiceUnitTests = readText(
   "tests/unit/revision-history-presentation-service.test.cjs"
@@ -1216,6 +1220,122 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createQaResultsController } from "../features/quality/qa-results-controller.js";',
+  "the application runtime must install the checked QA-results controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createQaResultsController,",
+  "the application runtime must expose the checked QA-results controller factory."
+);
+for (const snippet of [
+  'let filter = "";',
+  'filter = "";',
+  "return checks.reduce((result, check) => {",
+  "result[check.type] = (result[check.type] || 0) + 1;",
+  "result[check.severity] = (result[check.severity] || 0) + 1;",
+  'localization.source(check?.message || "", check?.messageValues || {})',
+  'check?.fixHint ? localization.source(check.fixHint, check.fixHintValues || {}) : ""',
+  "const qaChecks = session.getQaChecks();",
+  "const checks = filter ? qaChecks.filter((check) => check.type === filter) : qaChecks;",
+  'root.textContent = localization.source("No QA issues found.");',
+  'root.classList.add("muted");',
+  'summaryWrap.className = "qa-summary";',
+  'allButton.className = filter ? "" : "active";',
+  'localization.source("All {value1}", { value1: qaChecks.length })',
+  '!["error", "warning", "info"].includes(type)',
+  'filter = filter === type ? "" : type;',
+  "checks.slice(0, 100).forEach((check) => {",
+  'card.className = "qa-card";',
+  'check.severity || "info"',
+  'button.textContent = localization.label("go");',
+  "const index = session.getSegments().findIndex((segment) => segment.id === check.segmentId);",
+  "await navigation.select(index);",
+  "presentation.renderSegments();",
+  "focus.target();",
+  "root.replaceChildren(fragment);",
+  "return Object.freeze({ clear, fixHint, message, render, summary });"
+]) {
+  assertIncludes(
+    qaResultsControllerJs,
+    snippet,
+    `QaResultsController must retain characterized aggregation, filter, safe-render, and navigation policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createQaResultsController({",
+  "getQaChecks: () => editorSessionStore.getQaChecks()",
+  "getSegments: () => editorSessionStore.getSegments()",
+  "getRoot: () => els.qaResults",
+  "createElement: (tagName) => document.createElement(tagName)",
+  "createDocumentFragment: () => document.createDocumentFragment()",
+  "localization: uiLocalizationService",
+  "escapeHtml",
+  "replaceSafeHtml: (...args) => appRuntime.safeHtml.replace(...args)",
+  "navigation: { select: (index) => segmentNavigationController.select(index) }",
+  "presentation: { renderSegments }",
+  "focus: { target: () => targetEditController.focusActive() }"
+]) {
+  assertIncludes(appJs, boundary, `QA-results composition must inject the checked ${boundary} boundary.`);
+}
+for (const consumer of [
+  "qaCheckMessage: qaResultsController.message",
+  "qaCheckFixHint: qaResultsController.fixHint",
+  "clearQaFilter: qaResultsController.clear",
+  "renderQaResults: qaResultsController.render",
+  "qaResultsController.clear();",
+  "qaResultsController.render();"
+]) {
+  const source = consumer === "qaResultsController.render();" ? `${appJs}\n${appWorkflowDriverJs}` : appJs;
+  assertIncludes(source, consumer, `QA-results consumers must call the checked controller directly: ${consumer}.`);
+}
+assert(
+  (appJs.match(/\bqaResultsController\.clear\b/g) || []).length === 3 &&
+    (appJs.match(/\bqaResultsController\.render\b/g) || []).length === 5 &&
+    (appWorkflowDriverJs.match(/\bqaResultsController\.render\b/g) || []).length === 1,
+  "all report, delivery, QA-run, locale-refresh, and workflow consumers must call QaResultsController directly."
+);
+for (const removedHelper of ["qaSummary", "qaCheckMessage", "qaCheckFixHint", "renderQaResults"]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} QA-results helper must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  !appJs.includes("state.qaFilter") && !appWorkflowDriverJs.includes("state.qaFilter"),
+  "QA filter state must remain private to QaResultsController."
+);
+assert(
+  !qaResultsControllerJs.includes("editorSessionStore") &&
+    !qaResultsControllerJs.includes("segmentNavigationController") &&
+    !qaResultsControllerJs.includes("targetEditController") &&
+    !qaResultsControllerJs.includes("uiLocalizationService") &&
+    !qaResultsControllerJs.includes("els."),
+  "QaResultsController must use only its injected boundaries."
+);
+for (const testName of [
+  "QaResultsController preserves summary aggregation, insertion order, and matching type-severity double counts",
+  "QaResultsController preserves localized message and optional fix-hint values",
+  "QaResultsController preserves the localized muted no-issues state and clear return",
+  "QaResultsController preserves exact safe cards, summary controls, and filter toggle rerenders",
+  "QaResultsController preserves active-filter no-match presentation, clear behavior, and the 100-card bound",
+  "QaResultsController preserves awaited Go navigation, missing-segment no-op, and failure timing",
+  "QaResultsController validates boundaries, propagates rendering failures, and exposes an immutable API"
+]) {
+  assertIncludes(
+    qaResultsControllerUnitTests,
+    testName,
+    `focused QA-results tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/quality/qa-results-controller.js"',
+  "source-catalog extraction must scan the checked QA-results controller."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createRevisionHistoryPresentationService } from "../features/quality/revision-history-presentation-service.js";',
   "the application runtime must install the checked revision-history presentation service."
 );
@@ -1366,8 +1486,8 @@ for (const boundary of [
   "escapeHtml",
   "redactSensitiveText",
   "qualityCategoryName",
-  "qaCheckMessage",
-  "qaCheckFixHint"
+  "qaCheckMessage: qaResultsController.message",
+  "qaCheckFixHint: qaResultsController.fixHint"
 ]) {
   assertIncludes(appJs, boundary, `report-presentation composition must inject the ${boundary} boundary.`);
 }
@@ -1571,13 +1691,13 @@ assertIncludes(appJs, "createReportExportController({", "app.js must compose the
 for (const boundary of [
   "replaceQaChecks: editorSessionStore.replaceQaChecks",
   "replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue",
-  "clearQaFilter: () =>",
+  "clearQaFilter: qaResultsController.clear",
   "data: reportDataService",
   "documents: reportDocumentCompositionService",
   "finalizeDocument: finalizeReportDocument",
   "fileSafeName",
   "download",
-  "renderQaResults",
+  "renderQaResults: qaResultsController.render",
   "renderQualityWorkbench: qualityWorkbenchController.render",
   "renderValidationReport",
   "validation: { reportCount }",
@@ -5794,7 +5914,7 @@ for (const directConsumer of [
   'els.nextOpenBtn.addEventListener("click", segmentNavigationController.nextOpen)',
   "segmentNavigationController.select(rowIndex)",
   'row.addEventListener("click", () => segmentNavigationController.select(index))',
-  "await segmentNavigationController.select(index)",
+  "navigation: { select: (index) => segmentNavigationController.select(index) }",
   "await segmentNavigationController.select(first)"
 ]) {
   assertIncludes(
@@ -11252,9 +11372,9 @@ assertIncludes(
   "ConcordanceController results must render in one DOM replacement."
 );
 assertIncludes(
-  appJs,
-  "els.qaResults.replaceChildren(fragment)",
-  "app.js QA result cards must render in one DOM replacement."
+  qaResultsControllerJs,
+  "root.replaceChildren(fragment)",
+  "QaResultsController cards must render in one DOM replacement."
 );
 assertIncludes(
   appJs,
