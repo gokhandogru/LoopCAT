@@ -167,6 +167,7 @@ const requiredReleaseFiles = [
   "src/app/install-runtime.js",
   "src/features/editor/filter-store.js",
   "src/features/editor/focus-mode-controller.js",
+  "src/features/editor/inspector-toggle-controller.js",
   "src/features/editor/editor-session-store.js",
   "src/features/editor/editor-context-controller.js",
   "src/features/editor/segment-grid-controller.js",
@@ -293,6 +294,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-view-controller.test.cjs",
   "tests/unit/global-keyboard-controller.test.cjs",
   "tests/unit/focus-mode-controller.test.cjs",
+  "tests/unit/inspector-toggle-controller.test.cjs",
   "tests/unit/editor-state.test.cjs",
   "tests/unit/editor-session-store.test.cjs",
   "tests/unit/editor-context-controller.test.cjs",
@@ -461,6 +463,8 @@ const globalKeyboardControllerJs = readText("src/app/global-keyboard-controller.
 const globalKeyboardControllerUnitTests = readText("tests/unit/global-keyboard-controller.test.cjs");
 const focusModeControllerJs = readText("src/features/editor/focus-mode-controller.js");
 const focusModeControllerUnitTests = readText("tests/unit/focus-mode-controller.test.cjs");
+const inspectorToggleControllerJs = readText("src/features/editor/inspector-toggle-controller.js");
+const inspectorToggleControllerUnitTests = readText("tests/unit/inspector-toggle-controller.test.cjs");
 const editorSessionStoreJs = readText("src/features/editor/editor-session-store.js");
 const editorSessionStoreUnitTests = readText("tests/unit/editor-session-store.test.cjs");
 const editorFilterStoreJs = readText("src/features/editor/filter-store.js");
@@ -5065,7 +5069,7 @@ for (const boundary of [
 }
 assert(
   appJs.indexOf("projectHomeController.mount()") < appJs.indexOf("focusModeController.mount()") &&
-    appJs.indexOf("focusModeController.mount()") < appJs.indexOf('els.inspectorToggleBtn?.addEventListener("click"'),
+    appJs.indexOf("focusModeController.mount()") < appJs.indexOf("inspectorToggleController.mount()"),
   "Focus-mode controls must mount between project-home and inspector listeners at the existing position."
 );
 assert(
@@ -5136,6 +5140,98 @@ assertIncludes(
   i18nValidateScript,
   "localization\\.translate",
   "locale validation must retain the injected localization key-reference pattern."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createInspectorToggleController } from "../features/editor/inspector-toggle-controller.js";',
+  "the application runtime must install the checked inspector-toggle controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createInspectorToggleController,",
+  "the application runtime must expose the checked inspector-toggle controller factory."
+);
+for (const snippet of [
+  "InspectorToggleController requires state, layout, and editor-presentation boundaries.",
+  "InspectorToggleController requires animation-frame and selected-tab-query boundaries.",
+  "InspectorToggleController requires a checked optional toggle element.",
+  "state.setOpen(!state.getOpen())",
+  "void layout.setOpen(state.getOpen())",
+  "presentation.renderEditor()",
+  "if (state.getOpen())",
+  "frame.request(() => selection.getSelected()?.focus())",
+  "element.focus()",
+  'element?.addEventListener("click", toggleClickListener)',
+  'element?.removeEventListener("click", toggleClickListener)',
+  "return Object.freeze({ mount, unmount })"
+]) {
+  assertIncludes(
+    inspectorToggleControllerJs,
+    snippet,
+    `InspectorToggleController must retain characterized live-state, persistence, render, focus, and lifecycle policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createInspectorToggleController({",
+  "element: els.inspectorToggleBtn",
+  "getOpen: () => state.inspectorOpen",
+  "state.inspectorOpen = inspectorOpen",
+  "workspaceLayoutController?.setInspectorOpen?.(inspectorOpen)",
+  "renderEditor",
+  "request: (callback) => requestAnimationFrame(callback)",
+  `document.querySelector("[data-inspector-tab][aria-selected='true']")`,
+  "inspectorToggleController.mount()"
+]) {
+  assertIncludes(appJs, boundary, `inspector-toggle composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  appJs.indexOf("focusModeController.mount()") < appJs.indexOf("inspectorToggleController.mount()") &&
+    appJs.indexOf("inspectorToggleController.mount()") <
+      appJs.indexOf('els.commandPaletteBtn.addEventListener("click"'),
+  "inspector-toggle controls must mount between Focus-mode and command-palette listeners at the existing position."
+);
+assert(
+  !appJs.includes('els.inspectorToggleBtn?.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('inspectorToggleBtn?.addEventListener("click"'),
+  "inspector-toggle listener ownership must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\binspectorToggleController\.mount\b/g) || []).length === 1 &&
+    !appWorkflowDriverJs.includes("inspectorToggleController"),
+  "wireEvents must retain exactly one inspector-toggle mount without workflow-only consumers."
+);
+for (const forbiddenOwner of [
+  "state.inspectorOpen",
+  "workspaceLayoutController",
+  "requestAnimationFrame",
+  "document.",
+  "els."
+]) {
+  assert(
+    !inspectorToggleControllerJs.includes(forbiddenOwner),
+    `InspectorToggleController must use injected element, state, layout, presentation, frame, and selection boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "InspectorToggleController opens with exact state, layout, render, and deferred focus order",
+  "InspectorToggleController closes with immediate toggle focus and no animation frame",
+  "InspectorToggleController preserves live post-layout state branching",
+  "InspectorToggleController queries the selected tab at callback time and tolerates its absence",
+  "InspectorToggleController owns exact idempotent listener lifecycle and immutable API",
+  "InspectorToggleController independently skips an absent optional toggle",
+  "InspectorToggleController preserves synchronous and deferred failure timing",
+  "InspectorToggleController validates boundaries and optional toggle elements"
+]) {
+  assertIncludes(
+    inspectorToggleControllerUnitTests,
+    testName,
+    `focused inspector-toggle tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/inspector-toggle-controller.js"',
+  "source-catalog extraction must scan the checked inspector-toggle controller."
 );
 assertIncludes(
   appBootstrapJs,

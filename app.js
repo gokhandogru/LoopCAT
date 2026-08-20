@@ -3489,6 +3489,23 @@ const workspaceLayoutController = appRuntime?.featureFactories?.createWorkspaceL
     renderEditor();
   }
 });
+const inspectorToggleController = appRuntime.featureFactories.createInspectorToggleController({
+  element: els.inspectorToggleBtn,
+  state: {
+    getOpen: () => state.inspectorOpen,
+    setOpen: (inspectorOpen) => {
+      state.inspectorOpen = inspectorOpen;
+    }
+  },
+  layout: {
+    setOpen: (inspectorOpen) => workspaceLayoutController?.setInspectorOpen?.(inspectorOpen)
+  },
+  presentation: { renderEditor },
+  frame: { request: (callback) => requestAnimationFrame(callback) },
+  selection: {
+    getSelected: () => document.querySelector("[data-inspector-tab][aria-selected='true']")
+  }
+});
 
 const diagnosticsService = appRuntime?.featureFactories?.createDiagnosticsService?.({
   platform: appRuntime.platform,
@@ -6716,16 +6733,7 @@ function wireEvents() {
   uiLocaleControlsController.mount();
   projectHomeController.mount();
   focusModeController.mount();
-  els.inspectorToggleBtn?.addEventListener("click", () => {
-    state.inspectorOpen = !state.inspectorOpen;
-    void workspaceLayoutController?.setInspectorOpen?.(state.inspectorOpen);
-    renderEditor();
-    if (state.inspectorOpen) {
-      requestAnimationFrame(() => document.querySelector("[data-inspector-tab][aria-selected='true']")?.focus());
-    } else {
-      els.inspectorToggleBtn.focus();
-    }
-  });
+  inspectorToggleController.mount();
   els.commandPaletteBtn.addEventListener("click", () => paletteController?.open?.());
   els.projectSearchInput.addEventListener("input", renderProjectsView);
   els.languagePairFilter.addEventListener("change", renderProjectsView);
