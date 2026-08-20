@@ -226,6 +226,7 @@ const requiredReleaseFiles = [
   "src/features/import-export/text-encoding-input-service.js",
   "src/features/import-export/project-document-import-controller.js",
   "src/features/import-export/file-import-service.js",
+  "src/features/import-export/project-export-build-service.js",
   "src/features/import-export/project-package-portability-service.js",
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-presentation-service.js",
@@ -296,6 +297,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-domain-controller.test.cjs",
   "tests/unit/project-document-import-controller.test.cjs",
   "tests/unit/file-import-service.test.cjs",
+  "tests/unit/project-export-build-service.test.cjs",
   "tests/unit/project-package-portability-service.test.cjs",
   "tests/unit/concordance-controller.test.cjs",
   "tests/unit/segment-navigation-controller.test.cjs",
@@ -469,6 +471,8 @@ const projectDocumentImportControllerJs = readText("src/features/import-export/p
 const projectDocumentImportControllerUnitTests = readText("tests/unit/project-document-import-controller.test.cjs");
 const fileImportServiceJs = readText("src/features/import-export/file-import-service.js");
 const fileImportServiceUnitTests = readText("tests/unit/file-import-service.test.cjs");
+const projectExportBuildServiceJs = readText("src/features/import-export/project-export-build-service.js");
+const projectExportBuildServiceUnitTests = readText("tests/unit/project-export-build-service.test.cjs");
 const projectPackagePortabilityServiceJs = readText(
   "src/features/import-export/project-package-portability-service.js"
 );
@@ -4966,6 +4970,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectExportBuildService } from "../features/import-export/project-export-build-service.js";',
+  "The application runtime must install the checked project-export build service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectExportBuildService,",
+  "The application runtime must expose the checked project-export build factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createProjectPackagePortabilityService } from "../features/import-export/project-package-portability-service.js";',
   "The application runtime must install the checked project-package portability service."
 );
@@ -6484,6 +6498,139 @@ assertIncludes(
   "source-catalog extraction must scan the checked file-import service."
 );
 for (const snippet of [
+  "ProjectExportBuildService requires session, autosave, storage, resource, document, AI, portable, backup, validation, workspace, constant, and clock boundaries.",
+  "async function buildProjectPackage(project = session.getProject(), segmentRecords = null, buildOptions = {})",
+  "if (!project) return null",
+  "await autosave.flush(project.id)",
+  "segmentRecords ||",
+  "project.id === session.getProject()?.id ? session.getSegments() : await storage.getProjectSegments(project.id)",
+  'storage.getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`)',
+  "termBaseNames: resources.getTermBaseNames(project)",
+  "storage.listActivityEvents(project.id)",
+  "const tmNames = new Set(resources.getTmNames(project))",
+  "const scopedTm = tmEntries.filter((entry) => tmNames.has(entry.tmName))",
+  "const portableContext = portable.createContext()",
+  "app: constants.appName",
+  'type: "project-package"',
+  "schemaVersion: constants.projectPackageSchemaVersion",
+  "exportedAt: clock.now()",
+  'storageMode: workspace.isConnected() ? "workspace-folder" : "browser-cache"',
+  "resourceLinks: resources.getLinks(project)",
+  "aiSettings: ai.normalizeProjectSettings(project.aiSettings)",
+  'portable.sanitize(projectSegments, "", [], portableContext)',
+  '"resourceReferences"',
+  '"sourceAssets"',
+  "project.docxStructures?.[documentInfo.id]",
+  'documentInfo.type === "docx" ? project.docxStructure : null',
+  "portable.hasOriginalLocalizationStructure(localizationStructure)",
+  "structurePreserved: Boolean(docxStructure || localizationStructure)",
+  "[...(activityEvents || []), ...(buildOptions.activityEvents || [])]",
+  "const packageValidation = portable.validateProjectPackage(pkg)",
+  "validationReports: { package: packageValidation }",
+  "const packageValidation = pkg?.validation || portable.validateProjectPackage(pkg)",
+  "new Error(`Cannot ${actionLabel}: ${validation.summary(packageValidation)}`)",
+  "error.validation = packageValidation",
+  "const backupValidation = backup.validate(backupRecord)",
+  "await autosave.flush()",
+  "const backupRecord = await storage.exportAllData()",
+  'assertValidBackupForWrite(backupRecord, "export backup")',
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    projectExportBuildServiceJs,
+    snippet,
+    `ProjectExportBuildService must retain characterized package/backup construction and write-validation policy: ${snippet}`
+  );
+}
+assert(
+  !projectExportBuildServiceJs.includes("editorSessionStore") &&
+    !projectExportBuildServiceJs.includes("autosaveService") &&
+    !projectExportBuildServiceJs.includes("projectResourceLinks") &&
+    !projectExportBuildServiceJs.includes("projectTmNames") &&
+    !projectExportBuildServiceJs.includes("projectTermBaseNames") &&
+    !projectExportBuildServiceJs.includes("projectDocumentManifest") &&
+    !projectExportBuildServiceJs.includes("aiRuntimeSettingsService") &&
+    !projectExportBuildServiceJs.includes("projectPackagePortabilityService") &&
+    !projectExportBuildServiceJs.includes("validateBackupFile") &&
+    !projectExportBuildServiceJs.includes("sanitizePortableValue") &&
+    !projectExportBuildServiceJs.includes("createPortableSanitizerContext") &&
+    !projectExportBuildServiceJs.includes("storageConstants") &&
+    !projectExportBuildServiceJs.includes("state.workspaceStatus") &&
+    !projectExportBuildServiceJs.includes("new Date"),
+  "the checked project-export build service must use only its injected session, autosave, storage, resource, document, AI, portable, backup, validation, workspace, constant, and clock boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectExportBuildService({",
+  "getProject: editorSessionStore.getProject",
+  "getSegments: editorSessionStore.getSegments",
+  "autosave: { flush: autosaveService.flush }",
+  "getProjectSegments,",
+  "getAllByIndex,",
+  "listTerms,",
+  "listActivityEvents,",
+  "exportAllData",
+  "getLinks: projectResourceLinks",
+  "getTmNames: projectTmNames",
+  "getTermBaseNames: projectTermBaseNames",
+  "documents: { manifest: projectDocumentManifest }",
+  "normalizeProjectSettings: aiRuntimeSettingsService.normalizeProjectSettings",
+  "createContext: createPortableSanitizerContext",
+  "sanitize: sanitizePortableValue",
+  "validateProjectPackage: projectPackagePortabilityService.validate",
+  "hasOriginalLocalizationStructure: projectPackagePortabilityService.hasOriginalLocalizationStructure",
+  "backup: { validate: validateBackupFile }",
+  "validation: { summary: reportSummary }",
+  "workspace: { isConnected: () => Boolean(state.workspaceStatus?.connected) }",
+  "appName: APP_NAME",
+  "projectPackageSchemaVersion: storageConstants.PROJECT_PACKAGE_SCHEMA_VERSION",
+  "clock: { now: () => new Date().toISOString() }"
+]) {
+  assertIncludes(appJs, boundary, `project-export build composition must inject the checked ${boundary} boundary.`);
+}
+for (const removedHelper of [
+  "buildProjectPackage",
+  "assertValidProjectPackageForWrite",
+  "assertValidBackupForWrite",
+  "buildBackupExport"
+]) {
+  assert(
+    !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  (appJs.match(/\bprojectExportBuildService\.buildProjectPackage\b/g) || []).length === 4 &&
+    (appJs.match(/\bprojectExportBuildService\.assertValidProjectPackageForWrite\b/g) || []).length === 4 &&
+    (appJs.match(/\bprojectExportBuildService\.buildBackupExport\b/g) || []).length === 2 &&
+    !appJs.includes("projectExportBuildService.assertValidBackupForWrite") &&
+    (appWorkflowDriverJs.match(/\bprojectExportBuildService\.buildProjectPackage\b/g) || []).length === 4 &&
+    (appWorkflowDriverJs.match(/\bprojectExportBuildService\.assertValidBackupForWrite\b/g) || []).length === 1,
+  "all application and workflow package/backup build and write-validation consumers must call ProjectExportBuildService directly."
+);
+for (const testName of [
+  "ProjectExportBuildService preserves the default no-project guard before every effect",
+  "ProjectExportBuildService builds the current project with exact store queries, scoping, and metadata",
+  "ProjectExportBuildService preserves repository fallback and explicit segment precedence",
+  "ProjectExportBuildService preserves source-asset structure and shared sanitizer policy",
+  "ProjectExportBuildService preserves cached and fresh package validation with exact attached errors",
+  "ProjectExportBuildService builds browser backups with exact flush, export, and validation order",
+  "ProjectExportBuildService preserves backup errors and delegate failure timing",
+  "ProjectExportBuildService preserves package failure boundaries without late effects",
+  "ProjectExportBuildService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectExportBuildServiceUnitTests,
+    testName,
+    `focused project-export build tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/import-export/project-export-build-service.js"',
+  "source-catalog extraction must scan the checked project-export build service."
+);
+for (const snippet of [
   "ProjectDocumentImportController requires checked session, catalog, file, format, repository, history, progress, ID, summary, navigation, activity, workspace, status, presentation, text, and confirmation boundaries.",
   'files.assertSize(file, "Project file", files.maxBytes)',
   'await progress.report("Reading DOCX package", file)',
@@ -6675,7 +6822,7 @@ for (const removedHelper of [
   );
 }
 assert(
-  (appJs.match(/\bprojectPackagePortabilityService\.validate\b/g) || []).length === 3 &&
+  (appJs.match(/\bprojectPackagePortabilityService\.validate\b/g) || []).length === 2 &&
     (appJs.match(/\bprojectPackagePortabilityService\.hasOriginalLocalizationStructure\b/g) || []).length === 1 &&
     (appJs.match(/\bprojectPackagePortabilityService\.prepare\b/g) || []).length === 1 &&
     !appWorkflowDriverJs.includes("projectPackagePortabilityService."),
@@ -13536,9 +13683,9 @@ assertIncludes(
   "storage.js direct backup restore must share one record-ID surrogate map across backup stores."
 );
 assertIncludes(
-  appJs,
-  "const portableContext = createPortableSanitizerContext();",
-  "app.js project package export must share one record-ID surrogate map across package sections."
+  projectExportBuildServiceJs,
+  "const portableContext = portable.createContext();",
+  "ProjectExportBuildService must share one record-ID surrogate map across package sections."
 );
 assertIncludes(
   readText("storage.js"),

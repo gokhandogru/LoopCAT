@@ -999,7 +999,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     Reflect.deleteProperty(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG);
     await autosaveService.flush(project.id);
-    const replaceGuardPackage = await buildProjectPackage(editorSessionStore.getProject());
+    const replaceGuardPackage = await projectExportBuildService.buildProjectPackage(editorSessionStore.getProject());
     const replaceGuardText = `Paket degisimi oncesi bekleyen hedef ${Date.now()}`;
     targetEditController.updateDraft(segmentIndex, replaceGuardText);
     segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
@@ -4254,7 +4254,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const validationAlerts = [];
       try {
         window.alert = (message) => validationAlerts.push(String(message || ""));
-        const alertLeakPackage = await buildProjectPackage(editorSessionStore.getProject());
+        const alertLeakPackage = await projectExportBuildService.buildProjectPackage(editorSessionStore.getProject());
         alertLeakPackage.activityEvents = [
           {
             id: "Bearer validation-alert-activity-token-that-must-not-appear",
@@ -5411,7 +5411,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     let invalidBackupWriteRejected = false;
     try {
-      assertValidBackupForWrite({ app: "LoopCAT", schemaVersion: storageConstants.BACKUP_SCHEMA_VERSION, projects: {}, segments: [], tmEntries: [], terms: [], activityEvents: [], trashEntries: [] }, "export backup");
+      projectExportBuildService.assertValidBackupForWrite({ app: "LoopCAT", schemaVersion: storageConstants.BACKUP_SCHEMA_VERSION, projects: {}, segments: [], tmEntries: [], terms: [], activityEvents: [], trashEntries: [] }, "export backup");
     } catch (error) {
       invalidBackupWriteRejected = error.validation?.errors?.some((item) => item.includes("Projects must be an array")) && error.message.includes("Cannot export backup");
     }
@@ -5705,7 +5705,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const originalWarningSyncListWorkspacePackages = workspaceStorage.listProjectPackages;
     const originalWarningSyncReadWorkspacePackage = workspaceStorage.readProjectPackage;
     const originalWarningSyncWorkspaceStatus = state.workspaceStatus;
-    const workspaceWarningPackage = await buildProjectPackage({
+    const workspaceWarningPackage = await projectExportBuildService.buildProjectPackage({
       ...project,
       id: `workspace-warning-${Date.now()}`,
       name: `Workspace Warning ${Date.now()}`,
@@ -5812,7 +5812,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await bulkPut("tmEntries", [collisionTm]);
     await bulkPut("terms", [collisionTerm]);
     await bulkPut("activityEvents", [collisionActivity]);
-    const collisionPackage = await buildProjectPackage(editorSessionStore.getProject(), packageSourceSegments);
+    const collisionPackage = await projectExportBuildService.buildProjectPackage(editorSessionStore.getProject(), packageSourceSegments);
     collisionPackage.resources.tmEntries = [{ ...collisionTm, target: "Incoming TM target" }];
     collisionPackage.resources.terms = [{ ...collisionTerm, targetTerm: "incoming term" }];
     collisionPackage.activityEvents = [{ ...collisionActivity, projectId: project.id, summary: "Incoming activity" }];

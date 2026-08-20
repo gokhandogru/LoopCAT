@@ -3538,6 +3538,42 @@ const projectPackagePortabilityService =
     projects: { getAll: editorSessionStore.getProjects },
     clock: { now: () => new Date().toISOString() }
   });
+const projectExportBuildService =
+  appRuntime.featureFactories.createProjectExportBuildService({
+    session: {
+      getProject: editorSessionStore.getProject,
+      getSegments: editorSessionStore.getSegments
+    },
+    autosave: { flush: autosaveService.flush },
+    storage: {
+      getProjectSegments,
+      getAllByIndex,
+      listTerms,
+      listActivityEvents,
+      exportAllData
+    },
+    resources: {
+      getLinks: projectResourceLinks,
+      getTmNames: projectTmNames,
+      getTermBaseNames: projectTermBaseNames
+    },
+    documents: { manifest: projectDocumentManifest },
+    ai: { normalizeProjectSettings: aiRuntimeSettingsService.normalizeProjectSettings },
+    portable: {
+      createContext: createPortableSanitizerContext,
+      sanitize: sanitizePortableValue,
+      validateProjectPackage: projectPackagePortabilityService.validate,
+      hasOriginalLocalizationStructure: projectPackagePortabilityService.hasOriginalLocalizationStructure
+    },
+    backup: { validate: validateBackupFile },
+    validation: { summary: reportSummary },
+    workspace: { isConnected: () => Boolean(state.workspaceStatus?.connected) },
+    constants: {
+      appName: APP_NAME,
+      projectPackageSchemaVersion: storageConstants.PROJECT_PACKAGE_SCHEMA_VERSION
+    },
+    clock: { now: () => new Date().toISOString() }
+  });
 const projectDocumentImportController =
   appRuntime.featureFactories.createProjectDocumentImportController({
     session: editorSessionStore,
@@ -6313,100 +6349,9 @@ function renderProgress(options = {}) {
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
-async function buildProjectPackage(project = editorSessionStore.getProject(), segmentRecords = null, options = {}) {
-  if (!project) return null;
-  await autosaveService.flush(project.id);
-  const projectSegments = segmentRecords || (project.id === editorSessionStore.getProject()?.id ? editorSessionStore.getSegments() : await getProjectSegments(project.id));
-  const [tmEntries, terms, activityEvents] = await Promise.all([
-    getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`),
-    listTerms({
-      sourceLang: project.sourceLang,
-      targetLang: project.targetLang,
-      termBaseNames: projectTermBaseNames(project)
-    }),
-    listActivityEvents(project.id)
-  ]);
-  const tmNames = new Set(projectTmNames(project));
-  const scopedTm = tmEntries.filter((entry) => tmNames.has(entry.tmName));
-  const portableContext = createPortableSanitizerContext();
-  const pkg = {
-    app: APP_NAME,
-    type: "project-package",
-    version: 1,
-    schemaVersion: storageConstants.PROJECT_PACKAGE_SCHEMA_VERSION,
-    exportedAt: new Date().toISOString(),
-    packageMetadata: {
-      format: "loopcat-project-package",
-      packageVersion: 1,
-      contractVersion: "loopcat-package-v1",
-      generator: "LoopCAT browser workspace",
-      storageMode: state.workspaceStatus?.connected ? "workspace-folder" : "browser-cache"
-    },
-    project: sanitizePortableValue({
-      ...project,
-      resourceLinks: projectResourceLinks(project),
-      aiSettings: aiRuntimeSettingsService.normalizeProjectSettings(project.aiSettings)
-    }, "", [], portableContext),
-    segments: sanitizePortableValue(projectSegments, "", [], portableContext),
-    resources: sanitizePortableValue({
-      tmEntries: scopedTm,
-      terms
-    }, "", [], portableContext),
-    resourceReferences: sanitizePortableValue(projectResourceLinks(project).map((link) => ({
-      id: link.id,
-      type: link.type,
-      name: link.name,
-      role: link.role || "",
-      sourceLang: project.sourceLang,
-      targetLang: project.targetLang
-    })), "resourceReferences", [], portableContext),
-    sourceAssets: sanitizePortableValue(projectDocumentManifest(project).map((documentInfo) => {
-      const docxStructure = project.docxStructures?.[documentInfo.id] || (documentInfo.type === "docx" ? project.docxStructure : null);
-      const localizationStructure = project.localizationStructures?.[documentInfo.id];
-      const originalAvailable = Boolean(
-        docxStructure?.docxPackageBase64 ||
-          projectPackagePortabilityService.hasOriginalLocalizationStructure(localizationStructure)
-      );
-      return {
-        id: documentInfo.id,
-        name: documentInfo.name,
-        type: documentInfo.type,
-        originalAvailable,
-        structurePreserved: Boolean(docxStructure || localizationStructure)
-      };
-    }), "sourceAssets", [], portableContext),
-    activityEvents: sanitizePortableValue([...(activityEvents || []), ...(options.activityEvents || [])], "", [], portableContext)
-  };
-  const validation = projectPackagePortabilityService.validate(pkg);
-  return { ...pkg, validation, validationReports: { package: validation } };
-}
-
-function assertValidProjectPackageForWrite(pkg, actionLabel) {
-  const validation = pkg?.validation || projectPackagePortabilityService.validate(pkg);
-  if (validation.ok) return validation;
-  const error = new Error(`Cannot ${actionLabel}: ${reportSummary(validation)}`);
-  error.validation = validation;
-  throw error;
-}
-
-function assertValidBackupForWrite(backup, actionLabel) {
-  const validation = validateBackupFile(backup);
-  if (validation.ok) return validation;
-  const error = new Error(`Cannot ${actionLabel}: ${reportSummary(validation)}`);
-  error.validation = validation;
-  throw error;
-}
-
-async function buildBackupExport() {
-  await autosaveService.flush();
-  const backup = await exportAllData();
-  const validation = assertValidBackupForWrite(backup, "export backup");
-  return { backup, validation };
-}
-
 async function exportBrowserBackup() {
   try {
-    const { backup, validation } = await buildBackupExport();
+    const { backup, validation } = await projectExportBuildService.buildBackupExport();
     download(
       `loopcat-backup-${new Date().toISOString().slice(0, 10)}.json`,
       JSON.stringify(backup, null, 2),
@@ -6441,8 +6386,8 @@ async function exportProjectPackage() {
   const filename = `${base}.loopcat.json`;
   let previewPackage = null;
   try {
-    previewPackage = await buildProjectPackage();
-    assertValidProjectPackageForWrite(previewPackage, "export project package");
+    previewPackage = await projectExportBuildService.buildProjectPackage();
+    projectExportBuildService.assertValidProjectPackageForWrite(previewPackage, "export project package");
   } catch (error) {
     reportProjectPackageExportFailure(error, previewPackage);
     return;
@@ -6463,10 +6408,10 @@ async function exportProjectPackage() {
     : draftProjectActivityEvent(editorSessionStore.getProject(), "export", "Project package exported", activityDetail);
   let pkg = null;
   try {
-    pkg = await buildProjectPackage(pendingProject, null, {
+    pkg = await projectExportBuildService.buildProjectPackage(pendingProject, null, {
       activityEvents: pendingActivityEvent ? [pendingActivityEvent] : []
     });
-    assertValidProjectPackageForWrite(pkg, "export project package");
+    projectExportBuildService.assertValidProjectPackageForWrite(pkg, "export project package");
   } catch (error) {
     reportProjectPackageExportFailure(error, pkg);
     return;
@@ -6652,8 +6597,8 @@ async function saveCurrentProjectPackageToWorkspace() {
   await autosaveService.flush();
   if (!state.workspaceStatus?.connected) await chooseWorkspaceFolder();
   if (!state.workspaceStatus?.connected) return;
-  const previewPackage = await buildProjectPackage(editorSessionStore.getProject());
-  assertValidProjectPackageForWrite(previewPackage, "save project package to workspace");
+  const previewPackage = await projectExportBuildService.buildProjectPackage(editorSessionStore.getProject());
+  projectExportBuildService.assertValidProjectPackageForWrite(previewPackage, "save project package to workspace");
   const shouldSimulateActivityFailure = Boolean(LOOPCAT_TEST_BUILD && state[WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG]);
   const pendingActivityEvent = shouldSimulateActivityFailure
     ? null
@@ -6688,8 +6633,8 @@ async function saveProjectPackageToWorkspaceById(projectId, options = {}) {
   if (!project) throw new Error("Project package could not be found.");
   try {
     await autosaveService.flush(projectId);
-    const pkg = await buildProjectPackage(project, null, options);
-    assertValidProjectPackageForWrite(pkg, "save project package to workspace");
+    const pkg = await projectExportBuildService.buildProjectPackage(project, null, options);
+    projectExportBuildService.assertValidProjectPackageForWrite(pkg, "save project package to workspace");
     const result = await workspaceStorage.saveProjectPackage(pkg);
     if (editorSessionStore.getProject()?.id === projectId) {
       state.workspaceStatus = await workspaceStorage.getStatus();
@@ -6914,7 +6859,7 @@ async function syncWorkspaceFromFolder() {
 async function exportWorkspaceBackupToFolder() {
   if (!workspaceStorage || !state.workspaceStatus?.connected) return;
   try {
-    const { backup, validation } = await buildBackupExport();
+    const { backup, validation } = await projectExportBuildService.buildBackupExport();
     const ref = await workspaceStorage.exportFullBackup(backup);
     state.workspaceStatus = await workspaceStorage.getStatus();
     renderWorkspaceStatus();

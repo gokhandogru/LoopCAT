@@ -131,6 +131,13 @@ const projectDocumentImportControllerPath = path.join(
   "project-document-import-controller.js"
 );
 const fileImportServicePath = path.join(root, "src", "features", "import-export", "file-import-service.js");
+const projectExportBuildServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "import-export",
+  "project-export-build-service.js"
+);
 const projectPackagePortabilityServicePath = path.join(
   root,
   "src",
@@ -399,6 +406,11 @@ function main() {
     "src/features/import-export/project-document-import-controller.js"
   );
   extractScript(messagesByText, fileImportServicePath, "src/features/import-export/file-import-service.js");
+  extractScript(
+    messagesByText,
+    projectExportBuildServicePath,
+    "src/features/import-export/project-export-build-service.js"
+  );
   extractScript(
     messagesByText,
     projectPackagePortabilityServicePath,

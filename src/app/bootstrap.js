@@ -130,6 +130,7 @@ import { createProjectResourceTransferController } from "../features/import-expo
 import { createImportExportController } from "../features/import-export/import-export-controller.js";
 import { createFileImportService } from "../features/import-export/file-import-service.js";
 import { createProjectDocumentImportController } from "../features/import-export/project-document-import-controller.js";
+import { createProjectExportBuildService } from "../features/import-export/project-export-build-service.js";
 import { createProjectPackagePortabilityService } from "../features/import-export/project-package-portability-service.js";
 import { createTextEncodingInputService } from "../features/import-export/text-encoding-input-service.js";
 import {
@@ -246,6 +247,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createImportExportController,
       createFileImportService,
       createProjectDocumentImportController,
+      createProjectExportBuildService,
       createProjectPackagePortabilityService,
       createTextEncodingInputService,
       createReportDataService,
