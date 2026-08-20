@@ -1080,6 +1080,17 @@ const els = {
   backupExportBtn: document.querySelector("#backupExportBtn")
 };
 
+const revisionHistoryPresentationService =
+  appRuntime.featureFactories.createRevisionHistoryPresentationService({
+    list: els.revisionHistoryList,
+    getSegment: currentSegment,
+    localization: uiLocalizationService,
+    statusLabel: segmentStatusLabel,
+    formatDateTime,
+    escapeHtml,
+    replaceSafeHtml
+  });
+
 const languageInputService = appRuntime.featureFactories.createLanguageInputService({
   entries: LANGUAGE_ENTRIES,
   aliases: LANGUAGE_ALIAS_CODES,
@@ -1360,7 +1371,7 @@ const autosaveService = appRuntime.featureFactories.createAutosaveService({
     finalizeAll: () => targetEditController?.finalizeAll?.() || []
   },
   status: { set: setSaveStatus },
-  onSaved: renderRevisionHistory,
+  onSaved: revisionHistoryPresentationService.render,
   testHooks: {
     beforeSave: (segment) => {
       if (LOOPCAT_TEST_BUILD && segment[AUTOSAVE_SAVE_FAILURE_TEST_FLAG]) {
@@ -1395,7 +1406,7 @@ const segmentCommandRestorationController =
     presentation: {
       renderSegments,
       renderProgress,
-      renderHistory: renderRevisionHistory,
+      renderHistory: revisionHistoryPresentationService.render,
       renderAll,
       refreshContext: () => editorContextController.refresh()
     },
@@ -1628,7 +1639,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
     renderSegments,
     renderProgress,
     scheduleHistory: scheduleRevisionHistoryRender,
-    renderHistory: renderRevisionHistory
+    renderHistory: revisionHistoryPresentationService.render
   },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: setSaveStatus },
@@ -1724,7 +1735,7 @@ const targetProducerController = appRuntime.featureFactories.createTargetProduce
   view: {
     renderSegments,
     renderProgress,
-    renderHistory: renderRevisionHistory
+    renderHistory: revisionHistoryPresentationService.render
   },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: setSaveStatus }
@@ -1801,7 +1812,7 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
     renderSegments,
     renderProgress,
     refreshSidebar: () => editorContextController.refresh(),
-    renderHistory: renderRevisionHistory
+    renderHistory: revisionHistoryPresentationService.render
   },
   activity: {
     log: (details) => logProjectActivity("replace-target", "Target text replaced", details)
@@ -1866,7 +1877,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
     yieldToUi,
     renderSegments,
     renderProgress,
-    renderHistory: renderRevisionHistory,
+    renderHistory: revisionHistoryPresentationService.render,
     refreshSidebar: () => editorContextController.refresh()
   },
   activity: {
@@ -2166,7 +2177,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
     renderAll,
     renderSegments,
     renderProjectProgress: renderProgress,
-    renderHistory: renderRevisionHistory,
+    renderHistory: revisionHistoryPresentationService.render,
     renderAiProgress: aiProviderFormController.renderProgress,
     renderCommandCentre: aiProviderFormController.renderCommandCentre,
     refreshSidebar: () => editorContextController.refresh()
@@ -2253,7 +2264,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
     refreshSidebar: () => editorContextController.refresh(),
     renderSegments,
     renderProjectProgress: renderProgress,
-    renderHistory: renderRevisionHistory
+    renderHistory: revisionHistoryPresentationService.render
   },
   activity: {
     logActive: (details) =>
@@ -2745,7 +2756,7 @@ const aiSuggestionApplicationController =
     presentation: {
       renderSegments,
       renderProgress,
-      renderHistory: renderRevisionHistory,
+      renderHistory: revisionHistoryPresentationService.render,
       renderSuggestions: aiSuggestionListController.render,
       refreshSidebar: () => editorContextController.refresh(),
       renderAll,
@@ -2789,7 +2800,7 @@ const aiSuggestionPersistenceController =
     activity: { log: logProjectActivity },
     presentation: {
       renderSuggestions: aiSuggestionListController.render,
-      renderHistory: renderRevisionHistory
+      renderHistory: revisionHistoryPresentationService.render
     },
     workspace: {
       markDirty: markWorkspaceDirty,
@@ -3099,7 +3110,7 @@ const editorContextController = appRuntime?.featureFactories?.createEditorContex
   }),
   renderReview: () =>
     qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false }),
-  renderHistory: () => renderRevisionHistory(),
+  renderHistory: revisionHistoryPresentationService.render,
   renderAi: aiSuggestionListController.render,
   renderQuality: qualityWorkbenchController.render,
   refreshMatches: () => refreshTmMatches(),
@@ -3793,7 +3804,7 @@ const reviewMetadataController = appRuntime.featureFactories.createReviewMetadat
     renderReview: (options = {}) =>
       qualityReviewController?.renderReview?.({ segment: currentSegment(), force: Boolean(options.force) }),
     updateRow,
-    renderHistory: renderRevisionHistory
+    renderHistory: revisionHistoryPresentationService.render
   },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: setSaveStatus },
@@ -3888,7 +3899,7 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
     renderReview: () =>
       qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false }),
     updateRow,
-    renderHistory: renderRevisionHistory
+    renderHistory: revisionHistoryPresentationService.render
   },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: setSaveStatus },
@@ -3938,7 +3949,7 @@ function refreshLocalizedUi() {
     renderProgress();
     qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false });
     qualityWorkbenchController.render();
-    renderRevisionHistory();
+    revisionHistoryPresentationService.render();
     renderQaResults();
     editorContextController.refresh();
   }
@@ -6075,7 +6086,7 @@ function scheduleRevisionHistoryRender() {
   if (state.revisionHistoryFrame) return;
   state.revisionHistoryFrame = requestAnimationFrame(() => {
     state.revisionHistoryFrame = 0;
-    renderRevisionHistory();
+    revisionHistoryPresentationService.render();
   });
 }
 
@@ -6086,49 +6097,6 @@ function renderProgress(options = {}) {
   els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
   els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
-}
-
-function revisionReasonLabel(reason) {
-  const label = {
-    edit: "Edit",
-    replace: "Replace",
-    confirm: "Confirm",
-    pretranslate: "Pretranslate",
-    "insert-target": "Insert",
-    "copy-source": "Copy source",
-    "insert-tag": "Insert tag",
-    "ai-suggestion": "AI suggestion",
-    split: "Split",
-    merge: "Merge"
-  }[reason] || reason || "Change";
-  return uiLocalizationService.source(label);
-}
-
-function renderRevisionHistory() {
-  if (!els.revisionHistoryList) return;
-  const segment = currentSegment();
-  if (!segment) {
-    els.revisionHistoryList.textContent = uiLocalizationService.source("No active segment.");
-    els.revisionHistoryList.classList.add("muted");
-    return;
-  }
-  const history = Array.isArray(segment.targetHistory) ? segment.targetHistory.slice().reverse() : [];
-  if (!history.length) {
-    els.revisionHistoryList.textContent = uiLocalizationService.source("No target revisions yet.");
-    els.revisionHistoryList.classList.add("muted");
-    return;
-  }
-  els.revisionHistoryList.classList.remove("muted");
-  replaceSafeHtml(els.revisionHistoryList, history.slice(0, 8).map((entry) => `
-    <article class="revision-card">
-      <header><strong>${escapeHtml(revisionReasonLabel(entry.reason))}</strong><span>${escapeHtml(formatDateTime(entry.updatedAt || entry.createdAt))}</span></header>
-      <div class="revision-status">${escapeHtml(segmentStatusLabel(entry.fromStatus || "empty"))} -> ${escapeHtml(segmentStatusLabel(entry.toStatus || "empty"))}</div>
-      <div class="revision-pair">
-        <div><span>${uiLocalizationService.labelHtml("before")}</span><p>${escapeHtml(entry.fromTarget || "") || "&nbsp;"}</p></div>
-        <div><span>${uiLocalizationService.labelHtml("after")}</span><p>${escapeHtml(entry.toTarget || "") || "&nbsp;"}</p></div>
-      </div>
-    </article>
-  `).join(""));
 }
 
 function qaSummary(checks) {

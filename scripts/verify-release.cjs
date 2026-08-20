@@ -226,6 +226,7 @@ const requiredReleaseFiles = [
   "src/features/quality/quality-profile-controller.js",
   "src/features/quality/quality-presentation-service.js",
   "src/features/quality/quality-workbench-controller.js",
+  "src/features/quality/revision-history-presentation-service.js",
   "src/features/quality/quality-decision-controller.js",
   "src/features/quality/quality-review-controller.js",
   "src/features/quality/review-metadata-controller.js",
@@ -305,6 +306,7 @@ const requiredReleaseFiles = [
   "tests/unit/quality-profile-controller.test.cjs",
   "tests/unit/quality-presentation-service.test.cjs",
   "tests/unit/quality-workbench-controller.test.cjs",
+  "tests/unit/revision-history-presentation-service.test.cjs",
   "tests/unit/quality-decision-controller.test.cjs",
   "tests/unit/quality-review-controller.test.cjs",
   "tests/unit/review-metadata-controller.test.cjs",
@@ -447,6 +449,10 @@ const qualityPresentationServiceJs = readText("src/features/quality/quality-pres
 const qualityPresentationServiceUnitTests = readText("tests/unit/quality-presentation-service.test.cjs");
 const qualityWorkbenchControllerJs = readText("src/features/quality/quality-workbench-controller.js");
 const qualityWorkbenchControllerUnitTests = readText("tests/unit/quality-workbench-controller.test.cjs");
+const revisionHistoryPresentationServiceJs = readText("src/features/quality/revision-history-presentation-service.js");
+const revisionHistoryPresentationServiceUnitTests = readText(
+  "tests/unit/revision-history-presentation-service.test.cjs"
+);
 const qualityDecisionControllerJs = readText("src/features/quality/quality-decision-controller.js");
 const qualityDecisionControllerUnitTests = readText("tests/unit/quality-decision-controller.test.cjs");
 const reviewMetadataControllerJs = readText("src/features/quality/review-metadata-controller.js");
@@ -1207,6 +1213,112 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/quality/quality-workbench-controller.js"',
   "source-catalog extraction must scan the checked quality-workbench controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createRevisionHistoryPresentationService } from "../features/quality/revision-history-presentation-service.js";',
+  "the application runtime must install the checked revision-history presentation service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createRevisionHistoryPresentationService,",
+  "the application runtime must expose the checked revision-history presentation factory."
+);
+for (const snippet of [
+  'edit: "Edit"',
+  'replace: "Replace"',
+  'confirm: "Confirm"',
+  'pretranslate: "Pretranslate"',
+  '"insert-target": "Insert"',
+  '"copy-source": "Copy source"',
+  '"insert-tag": "Insert tag"',
+  '"ai-suggestion": "AI suggestion"',
+  'split: "Split"',
+  'merge: "Merge"',
+  'reason ||\n      "Change"',
+  "return localization.source(label);",
+  "if (!list) return;",
+  'list.textContent = localization.source("No active segment.");',
+  "Array.isArray(segment.targetHistory) ? segment.targetHistory.slice().reverse() : []",
+  'list.textContent = localization.source("No target revisions yet.");',
+  'list.classList.remove("muted");',
+  ".slice(0, 8)",
+  "entry.updatedAt || entry.createdAt",
+  'statusLabel(entry.fromStatus || "empty")',
+  'statusLabel(entry.toStatus || "empty")',
+  '${localization.labelHtml("before")}',
+  '${localization.labelHtml("after")}',
+  'escapeHtml(entry.fromTarget || "") || "&nbsp;"',
+  'escapeHtml(entry.toTarget || "") || "&nbsp;"',
+  "return Object.freeze({ reasonLabel, render });"
+]) {
+  assertIncludes(
+    revisionHistoryPresentationServiceJs,
+    snippet,
+    `RevisionHistoryPresentationService must retain characterized label and safe-render policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createRevisionHistoryPresentationService({",
+  "list: els.revisionHistoryList",
+  "getSegment: currentSegment",
+  "localization: uiLocalizationService",
+  "statusLabel: segmentStatusLabel",
+  "formatDateTime",
+  "escapeHtml",
+  "replaceSafeHtml"
+]) {
+  assertIncludes(appJs, boundary, `revision-history composition must inject the checked ${boundary} boundary.`);
+}
+for (const consumer of [
+  "onSaved: revisionHistoryPresentationService.render",
+  "renderHistory: revisionHistoryPresentationService.render",
+  "revisionHistoryPresentationService.render();"
+]) {
+  assertIncludes(appJs, consumer, `revision-history consumers must call the checked service directly: ${consumer}.`);
+}
+assert(
+  (appJs.match(/\brevisionHistoryPresentationService\.render\b/g) || []).length === 15,
+  "all fifteen autosave, command, editor-context, refresh, scheduled, and presentation consumers must call RevisionHistoryPresentationService directly."
+);
+for (const removedHelper of ["revisionReasonLabel", "renderRevisionHistory"]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} revision-history helper must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  !appJs.includes('"insert-target": "Insert"') &&
+    !appJs.includes('"copy-source": "Copy source"') &&
+    !appJs.includes('"ai-suggestion": "AI suggestion"'),
+  "revision-reason label mappings must not return to app.js."
+);
+assert(
+  !revisionHistoryPresentationServiceJs.includes("uiLocalizationService") &&
+    !revisionHistoryPresentationServiceJs.includes("currentSegment") &&
+    !revisionHistoryPresentationServiceJs.includes("segmentStatusLabel") &&
+    !revisionHistoryPresentationServiceJs.includes("els."),
+  "RevisionHistoryPresentationService must use only its injected boundaries."
+);
+for (const testName of [
+  "RevisionHistoryPresentationService preserves every reason label and fallback with one localization call",
+  "RevisionHistoryPresentationService preserves absent-list, missing-segment, and empty-history branches",
+  "RevisionHistoryPresentationService preserves exact safe card markup and delegate inputs",
+  "RevisionHistoryPresentationService reverses a copied history and keeps only the newest eight cards",
+  "RevisionHistoryPresentationService validates boundaries and exposes an immutable API",
+  "RevisionHistoryPresentationService propagates selection, localization, presentation, and safe-HTML failures"
+]) {
+  assertIncludes(
+    revisionHistoryPresentationServiceUnitTests,
+    testName,
+    `focused revision-history tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/quality/revision-history-presentation-service.js"',
+  "source-catalog extraction must scan the checked revision-history presentation service."
 );
 for (const removedFacade of ["reportLocale", "reportDir", "reportText", "reportHtml"]) {
   assert(
@@ -5261,7 +5373,7 @@ for (const boundary of [
   "targetEditController.focusActive(...args)",
   "navigateNext: (...args) => segmentNavigationController.nextOpen(...args)",
   "filters: { invalidate: segmentFilterService.invalidate }",
-  "renderHistory: renderRevisionHistory",
+  "renderHistory: revisionHistoryPresentationService.render",
   "refreshContext: () => editorContextController.refresh()",
   "workspace: { markDirty: markWorkspaceDirty }",
   "clone: structuredClone",
