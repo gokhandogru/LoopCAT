@@ -3369,6 +3369,19 @@ const applicationViewController = appRuntime.featureFactories.createApplicationV
     resources: refreshResources
   }
 });
+const applicationCommandButtonsController =
+  appRuntime.featureFactories.createApplicationCommandButtonsController({
+    elements: {
+      emptyTrashButton: els.emptyTrashBtn,
+      undoButton: els.undoBtn,
+      redoButton: els.redoBtn
+    },
+    actions: {
+      emptyTrash: emptyTrashPermanently,
+      undo: undoLastCommand,
+      redo: redoLastCommand
+    }
+  });
 const globalKeyboardController = appRuntime.featureFactories.createGlobalKeyboardController({
   target: window,
   normalizeKey: stableLower,
@@ -6683,9 +6696,7 @@ function wireEvents() {
   });
 
   applicationViewController.mount();
-  els.emptyTrashBtn?.addEventListener("click", emptyTrashPermanently);
-  els.undoBtn?.addEventListener("click", undoLastCommand);
-  els.redoBtn?.addEventListener("click", redoLastCommand);
+  applicationCommandButtonsController.mount();
   els.reloadUpdateBtn?.addEventListener("click", () => void offlineUpdateController?.activate?.());
   els.deferUpdateBtn?.addEventListener("click", () => offlineUpdateController?.defer?.());
   els.uiLocaleSelect?.addEventListener("change", async () => {

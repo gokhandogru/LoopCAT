@@ -157,6 +157,7 @@ const requiredReleaseFiles = [
   "src/entry/test.js",
   "src/app/bootstrap.js",
   "src/app/app-store.js",
+  "src/app/application-command-buttons-controller.js",
   "src/app/application-menu-controller.js",
   "src/app/application-view-controller.js",
   "src/app/global-keyboard-controller.js",
@@ -282,6 +283,7 @@ const requiredReleaseFiles = [
   "tests/unit/cohere-provider-adapter.test.cjs",
   "tests/unit/compatibility-module-registry.test.cjs",
   "tests/unit/app-store.test.cjs",
+  "tests/unit/application-command-buttons-controller.test.cjs",
   "tests/unit/application-menu-controller.test.cjs",
   "tests/unit/application-view-controller.test.cjs",
   "tests/unit/global-keyboard-controller.test.cjs",
@@ -433,6 +435,10 @@ const i18nValidateScript = readText("scripts/i18n-validate.cjs");
 const compatibilityModuleRegistryJs = readText("src/app/compatibility-module-registry.js");
 const compatibilityModuleRegistryUnitTests = readText("tests/unit/compatibility-module-registry.test.cjs");
 const installRuntimeJs = readText("src/app/install-runtime.js");
+const applicationCommandButtonsControllerJs = readText("src/app/application-command-buttons-controller.js");
+const applicationCommandButtonsControllerUnitTests = readText(
+  "tests/unit/application-command-buttons-controller.test.cjs"
+);
 const applicationMenuControllerJs = readText("src/app/application-menu-controller.js");
 const applicationMenuControllerUnitTests = readText("tests/unit/application-menu-controller.test.cjs");
 const applicationViewControllerJs = readText("src/app/application-view-controller.js");
@@ -4599,6 +4605,98 @@ for (const removedFacade of ["openCommandPalette", "closeCommandPalette", "rende
 }
 assertIncludes(
   appBootstrapJs,
+  'import { createApplicationCommandButtonsController } from "./application-command-buttons-controller.js";',
+  "the application runtime must install the checked application command-buttons controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationCommandButtonsController,",
+  "the application runtime must expose the checked application command-buttons controller factory."
+);
+for (const snippet of [
+  "ApplicationCommandButtonsController requires Empty Trash, Undo, and Redo actions.",
+  "ApplicationCommandButtonsController requires checked optional button elements.",
+  "elements?.emptyTrashButton",
+  "elements?.undoButton",
+  "elements?.redoButton",
+  "[elements?.emptyTrashButton, actions.emptyTrash]",
+  "[elements?.undoButton, actions.undo]",
+  "[elements?.redoButton, actions.redo]",
+  'element?.addEventListener("click", action)',
+  'element?.removeEventListener("click", action)',
+  "return Object.freeze({ mount, unmount })"
+]) {
+  assertIncludes(
+    applicationCommandButtonsControllerJs,
+    snippet,
+    `ApplicationCommandButtonsController must retain characterized optional element and direct listener policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationCommandButtonsController({",
+  "emptyTrashButton: els.emptyTrashBtn",
+  "undoButton: els.undoBtn",
+  "redoButton: els.redoBtn",
+  "emptyTrash: emptyTrashPermanently",
+  "undo: undoLastCommand",
+  "redo: redoLastCommand",
+  "applicationCommandButtonsController.mount()"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `application command-button composition must retain the checked ${boundary} boundary.`
+  );
+}
+assert(
+  appJs.indexOf("applicationViewController.mount()") < appJs.indexOf("applicationCommandButtonsController.mount()") &&
+    appJs.indexOf("applicationCommandButtonsController.mount()") <
+      appJs.indexOf('els.reloadUpdateBtn?.addEventListener("click"'),
+  "application command-button lifecycle must mount between application-view and offline-update listeners at the existing position."
+);
+assert(
+  !appJs.includes('els.emptyTrashBtn?.addEventListener("click"') &&
+    !appJs.includes('els.undoBtn?.addEventListener("click"') &&
+    !appJs.includes('els.redoBtn?.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('emptyTrashBtn?.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('undoBtn?.addEventListener("click"') &&
+    !appWorkflowDriverJs.includes('redoBtn?.addEventListener("click"'),
+  "Empty Trash, Undo, and Redo button listener ownership must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\bapplicationCommandButtonsController\.mount\b/g) || []).length === 1 &&
+    !appWorkflowDriverJs.includes("applicationCommandButtonsController"),
+  "wireEvents must retain exactly one application command-button mount without workflow-only consumers."
+);
+for (const forbiddenOwner of [
+  "emptyTrashPermanently",
+  "undoLastCommand",
+  "redoLastCommand",
+  "appRuntime",
+  "editorSessionStore",
+  "commandBus",
+  "els."
+]) {
+  assert(
+    !applicationCommandButtonsControllerJs.includes(forbiddenOwner),
+    `ApplicationCommandButtonsController must use injected optional element and action boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationCommandButtonsController owns exact mount, unmount, identity, and immutable lifecycle",
+  "ApplicationCommandButtonsController preserves event and promise passthrough for every action",
+  "ApplicationCommandButtonsController independently skips each absent optional button",
+  "ApplicationCommandButtonsController preserves action and listener failure timing",
+  "ApplicationCommandButtonsController validates actions and present optional elements"
+]) {
+  assertIncludes(
+    applicationCommandButtonsControllerUnitTests,
+    testName,
+    `focused application command-button tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
   'import { createApplicationMenuController } from "./application-menu-controller.js";',
   "the application runtime must install the checked application menu controller."
 );
@@ -4750,8 +4848,7 @@ assertIncludes(
 assert(
   appJs.indexOf("verticalFeatureState.segmentGrid.mountScroll(() => {") <
     appJs.indexOf("applicationViewController.mount()") &&
-    appJs.indexOf("applicationViewController.mount()") <
-      appJs.indexOf('els.emptyTrashBtn?.addEventListener("click", emptyTrashPermanently)'),
+    appJs.indexOf("applicationViewController.mount()") < appJs.indexOf("applicationCommandButtonsController.mount()"),
   "application view lifecycle must mount between segment-grid scrolling and the following command listeners at the existing position."
 );
 assert(
