@@ -3881,6 +3881,76 @@ const projectLanguagePairShortcutsController =
     escapeHtml,
     replaceSafeHtml
   });
+const projectDialogSaveController =
+  appRuntime.featureFactories.createProjectDialogSaveController({
+    form: {
+      hasValidityCheck: () => Boolean(els.projectForm?.checkValidity),
+      checkValidity: () => els.projectForm.checkValidity(),
+      reportValidity: () => els.projectForm.reportValidity?.(),
+      name: () => els.projectNameInput.value,
+      creator: () => els.projectCreatorInput?.value || "",
+      domain: () => els.projectDomainInput.value,
+      saveToFolder: () => Boolean(els.saveProjectToFolderInput?.checked),
+      setSaveToFolder: (value) => {
+        els.saveProjectToFolderInput.checked = value;
+      },
+      reset: () => els.projectForm.reset(),
+      clearNewTmName: () => {
+        els.newTmNameInput.value = "";
+      },
+      clearNewTermBaseName: () => {
+        els.newTermBaseNameInput.value = "";
+      },
+      close: () => els.projectDialog.close()
+    },
+    mode: { get: () => projectDialogController?.getMode?.() || null },
+    resources: {
+      collect: projectResourceSelectionController.collect,
+      mainTmName,
+      tmNames: projectTmNames,
+      termBaseNames: projectTermBaseNames
+    },
+    session: editorSessionStore,
+    projects: {
+      update: updateProject,
+      create: createProject,
+      load: loadProjects,
+      open: openProject
+    },
+    creator: { remember: rememberCreatorName },
+    language: {
+      setSource: (value) => languageInputService.setInput(els.sourceLangInput, value),
+      setTarget: (value) => languageInputService.setInput(els.targetLangInput, value)
+    },
+    refresh: {
+      terms: refreshProjectTerms,
+      summaries: refreshProjectSummaries,
+      editorContext: editorContextController.refresh
+    },
+    presentation: {
+      renderAll,
+      renderStorageStatus: renderProjectStorageStatus
+    },
+    activity: {
+      logProject: logProjectActivity,
+      record: recordActivityEvent
+    },
+    workspace: {
+      isSupported: () => Boolean(workspaceStorage?.isSupported()),
+      isConnected: () => Boolean(state.workspaceStatus?.connected),
+      chooseFolder: workspacePackageSaveController.chooseFolder,
+      markDirty: markWorkspaceDirty,
+      maybeSaveFromSettings: workspacePackageSaveController.maybeSaveFromSettings
+    },
+    status: { set: setSaveStatus },
+    test: {
+      shouldFailSettingsActivity: () =>
+        Boolean(LOOPCAT_TEST_BUILD && els.projectForm[PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG]),
+      shouldFailCreationActivity: () =>
+        Boolean(LOOPCAT_TEST_BUILD && els.projectForm[CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG])
+    },
+    logger: console
+  });
 const projectDialogController = appRuntime?.featureFactories?.createProjectDialogController?.({
   dialogLifecycle: dialogLifecycleController,
   elements: {
@@ -3922,7 +3992,7 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
   renderStorageStatus: renderProjectStorageStatus,
   renderResourcePickers: projectResourceSelectionController.render,
   renderFrequentPairs: projectLanguagePairShortcutsController.render,
-  save: saveProjectFromDialog,
+  save: projectDialogSaveController.save,
   chooseWorkspace: workspacePackageSaveController.chooseFolder,
   workspaceSupported: () => Boolean(workspaceStorage?.isSupported()),
   translate: uiLocalizationService.source,
@@ -6498,97 +6568,6 @@ function renderProgress(options = {}) {
   els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
   els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
   els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
-}
-
-async function saveProjectFromDialog() {
-  if (els.projectForm?.checkValidity && !els.projectForm.checkValidity()) {
-    els.projectForm.reportValidity?.();
-    setSaveStatus("Complete required project fields.", "dirty");
-    return false;
-  }
-  const editing = projectDialogController?.getMode?.() === "edit" && Boolean(editorSessionStore.getProject());
-  const settings = projectResourceSelectionController.collect(editing ? editorSessionStore.getProject() : null);
-  const shouldSaveToFolder = Boolean(els.saveProjectToFolderInput?.checked);
-  if (shouldSaveToFolder && workspaceStorage?.isSupported() && !state.workspaceStatus?.connected) {
-    try {
-      await workspacePackageSaveController.chooseFolder();
-    } catch (error) {
-      if (error.name !== "AbortError") throw error;
-      els.saveProjectToFolderInput.checked = false;
-      renderProjectStorageStatus();
-    }
-  }
-  if (editing && editorSessionStore.getProject()) {
-    const creatorName = rememberCreatorName(els.projectCreatorInput?.value || "");
-    editorSessionStore.replaceProject(await updateProject({
-      ...editorSessionStore.getProject(),
-      name: els.projectNameInput.value.trim(),
-      creatorName,
-      creatorOrigin: editorSessionStore.getProject().creatorOrigin || "manual",
-      domain: els.projectDomainInput.value.trim(),
-      ...settings
-    }));
-    editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
-    await refreshProjectTerms({ rerender: true });
-    await refreshProjectSummaries();
-    renderAll();
-    await editorContextController.refresh();
-    els.projectDialog.close();
-    markWorkspaceDirty();
-    let activityLogged = true;
-    try {
-      if (LOOPCAT_TEST_BUILD && els.projectForm[PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated project settings activity failure");
-      await logProjectActivity("project-settings", "Project resource settings updated", {
-        mainTmName: mainTmName(),
-        creatorName,
-        tmCount: projectTmNames().length,
-        termbaseCount: projectTermBaseNames().length
-      });
-    } catch (activityError) {
-      activityLogged = false;
-      console.warn("Project settings activity log failed.", activityError);
-      markWorkspaceDirty();
-    }
-    const savedToFolder = await workspacePackageSaveController.maybeSaveFromSettings(shouldSaveToFolder);
-    if (!savedToFolder) {
-      setSaveStatus(
-        activityLogged ? "Project settings saved" : "Project settings saved; activity log failed",
-        activityLogged ? "saved" : "dirty"
-      );
-    }
-    return editorSessionStore.getProject();
-  }
-
-  const creatorName = rememberCreatorName(els.projectCreatorInput?.value || "");
-  const project = await createProject({
-    name: els.projectNameInput.value,
-    creatorName,
-    creatorOrigin: "manual",
-    domain: els.projectDomainInput.value,
-    ...settings
-  });
-  els.projectForm.reset();
-  languageInputService.setInput(els.sourceLangInput, "en");
-  languageInputService.setInput(els.targetLangInput, "tr");
-  els.newTmNameInput.value = "";
-  els.newTermBaseNameInput.value = "";
-  els.projectDialog.close();
-  let activityLogged = true;
-  try {
-      if (LOOPCAT_TEST_BUILD && els.projectForm[CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated project creation activity failure");
-    await recordActivityEvent({ projectId: project.id, type: "create-project", summary: "Project created" });
-  } catch (activityError) {
-    activityLogged = false;
-    console.warn("Project creation activity log failed.", activityError);
-  }
-  markWorkspaceDirty(project.id);
-  await loadProjects(false);
-  await openProject(project.id);
-  const savedToFolder = await workspacePackageSaveController.maybeSaveFromSettings(shouldSaveToFolder);
-  if (!savedToFolder) {
-    setSaveStatus(activityLogged ? "Project created" : "Project created; activity log failed", activityLogged ? "saved" : "dirty");
-  }
-  return project;
 }
 
 async function syncWorkspaceFromFolder() {

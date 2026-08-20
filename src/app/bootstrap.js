@@ -35,6 +35,7 @@ import { createElectronPlatform } from "../platform/electron-platform.js";
 import { createDashboardController } from "../features/projects/dashboard-controller.js";
 import { createProjectsController } from "../features/projects/projects-controller.js";
 import { createProjectDialogController } from "../features/projects/project-dialog-controller.js";
+import { createProjectDialogSaveController } from "../features/projects/project-dialog-save-controller.js";
 import { createProjectDomainController } from "../features/projects/project-domain-controller.js";
 import { createEditorController } from "../features/editor/editor-controller.js";
 import { createEditorContextController } from "../features/editor/editor-context-controller.js";
@@ -263,6 +264,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createLanguageInputService,
       createUiLocalizationService,
       createProjectDialogController,
+      createProjectDialogSaveController,
       createProjectDomainController,
       createProjectDocumentCatalogService,
       createProjectDocumentStatisticsService,

@@ -189,7 +189,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     document.querySelector("#sourceLangInput").value = languageInputService.optionValue("en");
     document.querySelector("#targetLangInput").value = languageInputService.optionValue("tr");
     const invalidDialogProjectCount = editorSessionStore.getProjects().length;
-    const invalidDialogProject = await saveProjectFromDialog();
+    const invalidDialogProject = await projectDialogSaveController.save();
     assert(
       !invalidDialogProject &&
         editorSessionStore.getProjects().length === invalidDialogProjectCount &&
@@ -386,7 +386,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     document.querySelector("#projectDomainInput").value = "Settings activity warning";
     if (els.saveProjectToFolderInput) els.saveProjectToFolderInput.checked = false;
     segmentTargetStateService.setHiddenField(els.projectForm, PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const settingsActivityProject = await saveProjectFromDialog();
+    const settingsActivityProject = await projectDialogSaveController.save();
     assert(
       settingsActivityProject?.id === project.id &&
         editorSessionStore.getProject().domain === "Settings activity warning" &&
@@ -5000,7 +5000,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.newTermBaseNameInput.value = "Workflow TB";
     if (els.saveProjectToFolderInput) els.saveProjectToFolderInput.checked = false;
     segmentTargetStateService.setHiddenField(els.projectForm, CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG, true);
-    const createActivityProject = await saveProjectFromDialog();
+    const createActivityProject = await projectDialogSaveController.save();
     assert(
       createActivityProject?.id &&
         editorSessionStore.getProject()?.id === createActivityProject.id &&

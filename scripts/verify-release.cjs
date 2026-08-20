@@ -217,6 +217,7 @@ const requiredReleaseFiles = [
   "src/features/ai/ai-tag-repair-controller.js",
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
+  "src/features/projects/project-dialog-save-controller.js",
   "src/features/projects/project-domain-controller.js",
   "src/features/projects/project-resource-selection-controller.js",
   "src/features/projects/project-language-pair-shortcuts-controller.js",
@@ -298,6 +299,7 @@ const requiredReleaseFiles = [
   "tests/unit/term-form-controller.test.cjs",
   "tests/unit/project-qa-controller.test.cjs",
   "tests/unit/project-domain-controller.test.cjs",
+  "tests/unit/project-dialog-save-controller.test.cjs",
   "tests/unit/project-document-import-controller.test.cjs",
   "tests/unit/file-import-service.test.cjs",
   "tests/unit/project-export-build-service.test.cjs",
@@ -473,6 +475,8 @@ const projectQaControllerJs = readText("src/features/quality/project-qa-controll
 const projectQaControllerUnitTests = readText("tests/unit/project-qa-controller.test.cjs");
 const projectDomainControllerJs = readText("src/features/projects/project-domain-controller.js");
 const projectDomainControllerUnitTests = readText("tests/unit/project-domain-controller.test.cjs");
+const projectDialogSaveControllerJs = readText("src/features/projects/project-dialog-save-controller.js");
+const projectDialogSaveControllerUnitTests = readText("tests/unit/project-dialog-save-controller.test.cjs");
 const projectDocumentImportControllerJs = readText("src/features/import-export/project-document-import-controller.js");
 const projectDocumentImportControllerUnitTests = readText("tests/unit/project-document-import-controller.test.cjs");
 const fileImportServiceJs = readText("src/features/import-export/file-import-service.js");
@@ -4962,6 +4966,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectDialogSaveController } from "../features/projects/project-dialog-save-controller.js";',
+  "The application runtime must install the checked project-dialog save controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectDialogSaveController,",
+  "The application runtime must expose the checked project-dialog save controller factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createProjectDocumentImportController } from "../features/import-export/project-document-import-controller.js";',
   "The application runtime must install the checked project-document import controller."
 );
@@ -6423,6 +6437,172 @@ assertIncludes(
   "source-catalog extraction must scan the checked project-domain controller."
 );
 for (const snippet of [
+  "ProjectDialogSaveController requires form, mode, resource, session, project, creator, language, refresh, presentation, activity, workspace, status, test, and logger boundaries.",
+  "async function save()",
+  "if (form.hasValidityCheck() && !form.checkValidity())",
+  "form.reportValidity()",
+  'status.set("Complete required project fields.", "dirty")',
+  "return false",
+  'const editing = mode.get() === "edit" && Boolean(session.getProject())',
+  "const settings = resources.collect(editing ? session.getProject() : null)",
+  "const shouldSaveToFolder = form.saveToFolder()",
+  "if (shouldSaveToFolder && workspace.isSupported() && !workspace.isConnected())",
+  "await workspace.chooseFolder()",
+  'if (error.name !== "AbortError") throw error',
+  "form.setSaveToFolder(false)",
+  "presentation.renderStorageStatus()",
+  "if (editing && session.getProject())",
+  'const creatorName = creator.remember(form.creator() || "")',
+  "await projects.update({",
+  "name: form.name().trim()",
+  'creatorOrigin: session.getProject().creatorOrigin || "manual"',
+  "domain: form.domain().trim()",
+  "session.replaceProjects(",
+  ".map((project) => (project.id === session.getProject().id ? session.getProject() : project))",
+  "await refresh.terms({ rerender: true })",
+  "await refresh.summaries()",
+  "presentation.renderAll()",
+  "await refresh.editorContext()",
+  "form.close()",
+  "workspace.markDirty()",
+  'throw new Error("Simulated project settings activity failure")',
+  'activity.logProject("project-settings", "Project resource settings updated", {',
+  "mainTmName: resources.mainTmName()",
+  "tmCount: resources.tmNames().length",
+  "termbaseCount: resources.termBaseNames().length",
+  'logger.warn("Project settings activity log failed.", activityError)',
+  "const savedToFolder = await workspace.maybeSaveFromSettings(shouldSaveToFolder)",
+  'activityLogged ? "Project settings saved" : "Project settings saved; activity log failed"',
+  "return session.getProject()",
+  "const project = await projects.create({",
+  "name: form.name()",
+  'creatorOrigin: "manual"',
+  "domain: form.domain()",
+  "form.reset()",
+  'language.setSource("en")',
+  'language.setTarget("tr")',
+  "form.clearNewTmName()",
+  "form.clearNewTermBaseName()",
+  'throw new Error("Simulated project creation activity failure")',
+  'activity.record({ projectId: project.id, type: "create-project", summary: "Project created" })',
+  'logger.warn("Project creation activity log failed.", activityError)',
+  "workspace.markDirty(project.id)",
+  "await projects.load(false)",
+  "await projects.open(project.id)",
+  'activityLogged ? "Project created" : "Project created; activity log failed"',
+  "return project",
+  "return Object.freeze({ save })"
+]) {
+  assertIncludes(
+    projectDialogSaveControllerJs,
+    snippet,
+    `ProjectDialogSaveController must retain characterized validation, edit/create, activity, workspace, presentation, and return policy: ${snippet}`
+  );
+}
+assert(
+  !projectDialogSaveControllerJs.includes("els.") &&
+    !projectDialogSaveControllerJs.includes("projectDialogController") &&
+    !projectDialogSaveControllerJs.includes("projectResourceSelectionController") &&
+    !projectDialogSaveControllerJs.includes("editorSessionStore") &&
+    !/\bupdateProject\b/.test(projectDialogSaveControllerJs) &&
+    !/\bcreateProject\b/.test(projectDialogSaveControllerJs) &&
+    !projectDialogSaveControllerJs.includes("rememberCreatorName") &&
+    !projectDialogSaveControllerJs.includes("languageInputService") &&
+    !projectDialogSaveControllerJs.includes("refreshProjectTerms") &&
+    !projectDialogSaveControllerJs.includes("refreshProjectSummaries") &&
+    !projectDialogSaveControllerJs.includes("editorContextController") &&
+    !projectDialogSaveControllerJs.includes("renderProjectStorageStatus") &&
+    !projectDialogSaveControllerJs.includes("logProjectActivity") &&
+    !projectDialogSaveControllerJs.includes("recordActivityEvent") &&
+    !projectDialogSaveControllerJs.includes("workspaceStorage") &&
+    !projectDialogSaveControllerJs.includes("workspacePackageSaveController") &&
+    !projectDialogSaveControllerJs.includes("markWorkspaceDirty") &&
+    !projectDialogSaveControllerJs.includes("setSaveStatus") &&
+    !projectDialogSaveControllerJs.includes("LOOPCAT_TEST_BUILD") &&
+    !projectDialogSaveControllerJs.includes("PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG") &&
+    !projectDialogSaveControllerJs.includes("CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG") &&
+    !projectDialogSaveControllerJs.includes("console"),
+  "the checked project-dialog save controller must use only its injected form, mode, resource, session, project, creator, language, refresh, presentation, activity, workspace, status, test, and logger boundaries."
+);
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectDialogSaveController({",
+  "hasValidityCheck: () => Boolean(els.projectForm?.checkValidity)",
+  "checkValidity: () => els.projectForm.checkValidity()",
+  "reportValidity: () => els.projectForm.reportValidity?.()",
+  "name: () => els.projectNameInput.value",
+  'creator: () => els.projectCreatorInput?.value || ""',
+  "domain: () => els.projectDomainInput.value",
+  "saveToFolder: () => Boolean(els.saveProjectToFolderInput?.checked)",
+  "els.saveProjectToFolderInput.checked = value",
+  "reset: () => els.projectForm.reset()",
+  'els.newTmNameInput.value = ""',
+  'els.newTermBaseNameInput.value = ""',
+  "close: () => els.projectDialog.close()",
+  "mode: { get: () => projectDialogController?.getMode?.() || null }",
+  "collect: projectResourceSelectionController.collect",
+  "mainTmName,",
+  "tmNames: projectTmNames",
+  "termBaseNames: projectTermBaseNames",
+  "session: editorSessionStore",
+  "update: updateProject",
+  "create: createProject",
+  "load: loadProjects",
+  "open: openProject",
+  "creator: { remember: rememberCreatorName }",
+  "languageInputService.setInput(els.sourceLangInput, value)",
+  "languageInputService.setInput(els.targetLangInput, value)",
+  "terms: refreshProjectTerms",
+  "summaries: refreshProjectSummaries",
+  "editorContext: editorContextController.refresh",
+  "renderStorageStatus: renderProjectStorageStatus",
+  "logProject: logProjectActivity",
+  "record: recordActivityEvent",
+  "isSupported: () => Boolean(workspaceStorage?.isSupported())",
+  "chooseFolder: workspacePackageSaveController.chooseFolder",
+  "markDirty: markWorkspaceDirty",
+  "maybeSaveFromSettings: workspacePackageSaveController.maybeSaveFromSettings",
+  "status: { set: setSaveStatus }",
+  "Boolean(LOOPCAT_TEST_BUILD && els.projectForm[PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG])",
+  "Boolean(LOOPCAT_TEST_BUILD && els.projectForm[CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG])",
+  "logger: console",
+  "save: projectDialogSaveController.save"
+]) {
+  assertIncludes(appJs, boundary, `project-dialog save composition must inject the checked ${boundary} boundary.`);
+}
+assert(
+  !/async\s+function\s+saveProjectFromDialog\b/.test(appJs) &&
+    !/async\s+function\s+saveProjectFromDialog\b/.test(appWorkflowDriverJs),
+  "saveProjectFromDialog must not return to app.js or the workflow driver."
+);
+assert(
+  (appJs.match(/\bprojectDialogSaveController\.save\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bprojectDialogSaveController\.save\b/g) || []).length === 3,
+  "ProjectDialogController and every workflow project-dialog save consumer must call ProjectDialogSaveController directly."
+);
+for (const testName of [
+  "ProjectDialogSaveController preserves invalid form reporting and false return",
+  "ProjectDialogSaveController preserves workspace pre-connect cancellation and failure timing",
+  "ProjectDialogSaveController edits with exact payload, synchronization, refresh, and activity detail",
+  "ProjectDialogSaveController preserves edit activity warnings and folder-save status suppression",
+  "ProjectDialogSaveController preserves completed edit effects before late refresh failure",
+  "ProjectDialogSaveController creates with raw fields, reset defaults, navigation, and exact status",
+  "ProjectDialogSaveController preserves creation activity warning and folder-save outcome",
+  "ProjectDialogSaveController falls back from edit mode to create when the project is absent",
+  "ProjectDialogSaveController propagates primary creation failures before reset effects",
+  "ProjectDialogSaveController validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectDialogSaveControllerUnitTests,
+    testName,
+    `focused project-dialog save tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/project-dialog-save-controller.js"',
+  "source-catalog extraction must scan the checked project-dialog save controller."
+);
+for (const snippet of [
   "FileImportService requires encoding, limit, task, text, presentation, status, and durability boundaries.",
   "ok: false",
   "errors: [message]",
@@ -7110,7 +7290,7 @@ assert(
     (appJs.match(/\bworkspacePackageSaveController\.autosaveDirty\b/g) || []).length === 2 &&
     (appJs.match(/\bworkspacePackageSaveController\.saveRecovery\b/g) || []).length === 2 &&
     (appJs.match(/\bworkspacePackageSaveController\.startAutosave\b/g) || []).length === 1 &&
-    (appJs.match(/\bworkspacePackageSaveController\.maybeSaveFromSettings\b/g) || []).length === 2 &&
+    (appJs.match(/\bworkspacePackageSaveController\.maybeSaveFromSettings\b/g) || []).length === 1 &&
     (appWorkflowDriverJs.match(/\bworkspacePackageSaveController\.chooseFolder\b/g) || []).length === 2 &&
     (appWorkflowDriverJs.match(/\bworkspacePackageSaveController\.saveCurrent\b/g) || []).length === 2 &&
     (appWorkflowDriverJs.match(/\bworkspacePackageSaveController\.saveById\b/g) || []).length === 1 &&
