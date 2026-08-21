@@ -249,6 +249,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-name-service.js",
   "src/features/projects/project-document-manifest-service.js",
   "src/features/projects/project-resource-context-service.js",
+  "src/features/projects/project-search-text-service.js",
   "src/features/projects/project-tm-match-service.js",
   "src/features/projects/project-language-pair-shortcuts-controller.js",
   "src/features/projects/project-language-context-controller.js",
@@ -386,6 +387,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-name-service.test.cjs",
   "tests/unit/project-document-manifest-service.test.cjs",
   "tests/unit/project-resource-context-service.test.cjs",
+  "tests/unit/project-search-text-service.test.cjs",
   "tests/unit/project-tm-match-service.test.cjs",
   "tests/unit/project-language-pair-shortcuts-controller.test.cjs",
   "tests/unit/project-language-context-controller.test.cjs",
@@ -668,6 +670,8 @@ const projectDocumentManifestServiceJs = readText("src/features/projects/project
 const projectDocumentManifestServiceUnitTests = readText("tests/unit/project-document-manifest-service.test.cjs");
 const projectResourceContextServiceJs = readText("src/features/projects/project-resource-context-service.js");
 const projectResourceContextServiceUnitTests = readText("tests/unit/project-resource-context-service.test.cjs");
+const projectSearchTextServiceJs = readText("src/features/projects/project-search-text-service.js");
+const projectSearchTextServiceUnitTests = readText("tests/unit/project-search-text-service.test.cjs");
 const projectTmMatchServiceJs = readText("src/features/projects/project-tm-match-service.js");
 const projectTmMatchServiceUnitTests = readText("tests/unit/project-tm-match-service.test.cjs");
 const projectLanguagePairShortcutsControllerJs = readText(
@@ -1210,7 +1214,7 @@ for (const [method, appCount, workflowCount] of [
   ["tmNames", 11, 0],
   ["termBaseNames", 15, 2],
   ["primaryTermBase", 5, 15],
-  ["summary", 5, 1]
+  ["summary", 4, 1]
 ]) {
   assert(
     (appJs.match(new RegExp(`\\bprojectResourceContextService\\.${method}\\b`, "g")) || []).length === appCount &&
@@ -1265,6 +1269,82 @@ for (const testName of [
     projectResourceContextServiceUnitTests,
     testName,
     `focused project resource-context tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectSearchTextService } from "../features/projects/project-search-text-service.js";',
+  "The application runtime must install the checked project search-text service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectSearchTextService,",
+  "The application runtime must expose the checked project search-text service factory."
+);
+for (const snippet of [
+  "ProjectSearchTextService requires a project-resource summary boundary.",
+  "ProjectSearchTextService requires a locale-stable text boundary.",
+  "function resourceNames(project)",
+  "const summary = resources.summary(project)",
+  'return [...summary.tmNames, ...summary.tbNames].join(" ")',
+  "function build(project)",
+  '${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${resourceNames(project)}',
+  "return text.stableLower(",
+  "return Object.freeze({ build })"
+]) {
+  assertIncludes(
+    projectSearchTextServiceJs,
+    snippet,
+    `ProjectSearchTextService must retain characterized composition: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectSearchTextService({",
+  "resources: projectResourceContextService",
+  "text: applicationTextSafetyService"
+]) {
+  assertIncludes(appJs, boundary, `project search-text composition must retain ${boundary}.`);
+}
+assert(
+  (appJs.match(/\bprojectSearchTextService\.build\b/g) || []).length === 3 &&
+    !(appWorkflowDriverJs.match(/\bprojectSearchTextService\.build\b/g) || []).length,
+  "all three project-summary and Projects-filter consumers must call ProjectSearchTextService directly."
+);
+assert(
+  !/function\s+projectResourceSearchText\b/.test(appJs) &&
+    !/function\s+projectResourceSearchText\b/.test(appWorkflowDriverJs),
+  "projectResourceSearchText must not return to app.js or the workflow driver."
+);
+assert(
+  !appJs.includes('${project.name} ${project.domain || ""} ${project.sourceFileName || ""}') &&
+    !appWorkflowDriverJs.includes('${project.name} ${project.domain || ""} ${project.sourceFileName || ""}'),
+  "duplicated project/resource search-string templates must not return to app.js or the workflow driver."
+);
+for (const forbiddenOwner of [
+  "projectResourceContextService",
+  "applicationTextSafetyService",
+  "editorSessionStore",
+  "appRuntime",
+  "window.",
+  "document."
+]) {
+  assert(
+    !projectSearchTextServiceJs.includes(forbiddenOwner),
+    `ProjectSearchTextService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectSearchTextService preserves exact project and resource access and conversion order",
+  "ProjectSearchTextService preserves exact falsy field fallbacks and name coercion",
+  "ProjectSearchTextService preserves TM-before-termbase ordering and source records",
+  "ProjectSearchTextService returns the exact locale-normalization result once",
+  "ProjectSearchTextService preserves property, resource, iterable, and normalization failure timing",
+  "ProjectSearchTextService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectSearchTextServiceUnitTests,
+    testName,
+    `focused project search-text tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
@@ -16508,7 +16588,7 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `application text-safety composition and consumers must retain ${boundary}.`);
 }
 for (const [method, count] of [
-  ["stableLower", 17],
+  ["stableLower", 14],
   ["escapeHtml", 18],
   ["displaySafeText", 21],
   ["displaySafeHtml", 14],

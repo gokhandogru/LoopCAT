@@ -46,6 +46,8 @@ The latest project resource-context checkpoint also moves resource-link validati
 
 The latest project TM-match checkpoint also moves single and batch candidate lookup, optional worker ranking, local-score fallback, batch-to-single fallback, and exact request ordering and failure timing behind a checked immutable service boundary while retaining TM repositories, scoring policy, worker transport, resource selection, match presentation, AI context, and pretranslation in their existing owners.
 
+The latest project search-text checkpoint also moves exact project name/domain/source-file plus TM/termbase name composition and one locale-stable normalization behind a checked immutable service boundary while retaining project summaries, revision caching, filters, sorting, search input, resource-link policy, analysis, and presentation in their existing owners.
+
 The latest UI-locale controls checkpoint also moves locale-change sequencing plus select/import/export listener lifecycle behind a checked controller boundary while leaving catalog parsing, storage, export construction, and full localized-UI refresh policy in their existing application services.
 
 The latest project-home checkpoint also moves current-project navigation, active-index selection, Project files listener lifecycle, and no-argument Project home Delete delegation behind a checked controller boundary while leaving project deletion and Trash orchestration in their existing services.
@@ -193,10 +195,10 @@ This document records what the current working tree implements from the 2026 mod
 
 ## Measured results
 
-- Packaged production JavaScript graph: 2,839,236 bytes across five modules, including both mutually exclusive startup paths.
-- Hosted/desktop initial production `app.js`: 1,175,047 bytes minified and 312,468 bytes gzip. Its two locale chunks remain lazy.
-- Direct-file web fallback `app-file.js`: 1,419,596 bytes minified and 395,592 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
-- Initial synchronous JavaScript is more than 40% below the recorded approximately 2.62 MB baseline. Hosted gzip remains within the 250 KiB-class budget but is 62,468 bytes above a strict 250,000-byte interpretation; the hosted entry remains 425,047 bytes above the 750 KB minified stretch target.
+- Packaged production JavaScript graph: 2,840,136 bytes across five modules, including both mutually exclusive startup paths.
+- Hosted/desktop initial production `app.js`: 1,175,497 bytes minified and 312,447 bytes gzip. Its two locale chunks remain lazy.
+- Direct-file web fallback `app-file.js`: 1,420,046 bytes minified and 395,543 bytes gzip; it is self-contained because browsers block module imports from `file://` and is not executed by HTTP(S) or Electron.
+- Initial synchronous JavaScript is more than 40% below the recorded approximately 2.62 MB baseline. Hosted gzip remains within the 250 KiB-class budget but is 62,447 bytes above a strict 250,000-byte interpretation; the hosted entry remains 425,497 bytes above the 750 KB minified stretch target.
 - Visual verification passes 81 deterministic screenshots covering 1440×900, 1366×768, and 1024×768, including an actionable import-validation failure, visible focus recovery, the local recovery panel and open workspace-status menu, populated Comments and Quality Workbench inspectors, Resources TM dashboard/detail, termbase dashboard, populated resource Trash, post-restore empty Trash, the TM threshold and OPUS-CAT help dialogs, provider administration/AI Command Centre, light/dark, inspector open/closed, Focus mode, AI, status, and compact-density states.
 - Automated accessibility checks pass the deterministic Projects, import-validation error and focus-return path, actionable local recovery panel, open workspace-status menu, Resources translation-memory/termbase empty states, populated resource Trash, populated Comments and Quality Workbench states, AI provider administration/Command Centre and focus-return path, New project dialog, About dialog, TM threshold dialog, OPUS-CAT help dialog, and command-palette states with zero blocking findings. This is not a WCAG conformance claim.
 - The full Electron browser suite passes security, offline shell, smoke, regression, application workflow, workspace storage, package round trip, and large-project coverage.
@@ -346,6 +348,8 @@ The checked project resource-context slice is also complete: an immutable Projec
 
 The checked project TM-match slice is also complete: an immutable ProjectTmMatchService now owns direct single-entry ranking, candidate-before-ranking lookup, exact optional-worker requests with lazy local fallback, array-only batch normalization, immediate empty results, optional batched candidate lookup, concurrent per-request `Promise.all` fallback, exact candidate/result ordering, per-index `optionsList[index] || {}` scoring, live optional worker and batch availability, and rejected-promise failure timing. TmMatchesController, TmPretranslationController, and AiSegmentContextService call its immutable `find` or `findBatch` methods directly; `rankTmMatchesFromEntries`, `findProjectTmMatches`, `rankTmMatchBatches`, and `findProjectTmMatchesBatch` are removed from the coordinator. Eleven focused service tests, 49 combined TM-match/pretranslation/concordance/AI/resource-context tests, and the full 966-test quality gate characterize local and worker ranking, lazy fallbacks, exact request shapes, lookup order, concurrent fallback, empty and malformed inputs, live availability, failures, checked boundaries, and immutable API; release/import, source-isolation, bundle, i18n validation, deep TM/TMX/concordance/pretranslation/AI/project-resource browser workflows, all 15 accessibility states, 81 visual screenshots, web/desktop artifacts, fuses, and GPU-on/off packaged startup pass with no intended user-visible difference.
 
+The checked project search-text slice is also complete: an immutable ProjectSearchTextService now owns exact project-name, domain, source-filename, TM-name, and termbase-name composition order; legacy falsy domain/source fallbacks; JavaScript conversion and getter timing; TM-before-termbase ordering; and one locale-stable normalization call. Fresh project summaries, valid cached-summary refreshes, and Projects-filter fallbacks call its immutable `build` method directly; `projectResourceSearchText` and all three duplicated coordinator templates are removed while ProjectResourceContextService remains the sole resource-summary policy owner. Six focused service tests, 35 combined search/resource/filter/progress/language-context tests, and the full 972-test quality gate characterize access/conversion order, falsy values, resource ordering, exact normalization returns, failure timing, checked boundaries, and immutable API; release/import, source-isolation, bundle, i18n validation, deep project creation/edit/search/resource/package/workspace browser workflows, all 15 accessibility states, 81 visual screenshots, web/desktop artifacts, fuses, and GPU-on/off packaged startup pass with no intended user-visible difference.
+
 Earlier checkpoint descriptions that say `wireEvents` mounted an individual controller or that top-level startup called `ApplicationEventWiringController` directly record the state at those checkpoints; ApplicationEventWiringController now owns the complete mount sequence, and ApplicationStartupController is its sole top-level startup caller.
 
 1. Reduce the remaining `app.js` compatibility coordinator toward the roadmap's bootstrap-only goal, one characterized feature boundary at a time.
@@ -353,7 +357,7 @@ Earlier checkpoint descriptions that say `wireEvents` mounted an individual cont
 
 ### P2-05 — Performance stretch target
 
-Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The production graph is 2,839,236 bytes across five modules; the hosted/desktop initial app is 1,175,047 bytes (312,468 bytes gzip), and the separate direct-file fallback is 1,419,596 bytes (395,592 bytes gzip). The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 425,047 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
+Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The production graph is 2,840,136 bytes across five modules; the hosted/desktop initial app is 1,175,497 bytes (312,447 bytes gzip), and the separate direct-file fallback is 1,420,046 bytes (395,543 bytes gzip). The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 425,497 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
 
 ## Manual and external release gates still required
 
@@ -384,17 +388,17 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 in source order by extracting normalized project/resource search-text composition behind a checked ProjectSearchTextService boundary.
+Continue P1-08 in source order by removing the obsolete selected-editor-text helper and extracting review-state and segment-status label policy behind a checked SegmentLabelService boundary.
 
 Entry criteria:
 
-- Preserve exact project name, domain, source-file, TM-name, and termbase-name ordering; existing empty-string fallbacks; JavaScript property conversion/access timing; and one locale-stable normalization of the completed search string.
-- Preserve ProjectResourceContextService summary lookup and TM-before-termbase name ordering without moving resource-link normalization or project-session selection into the new service.
-- Keep project-summary caching/revisions, project loading, project-list filtering/sorting, search-input state, project-card presentation, and analysis orchestration in their existing injected owners.
+- Preserve eager `Needs review`, `Reviewed`, and `Blocked` localization call order on every review-label request, exact key mapping, and the final empty-string fallback for unknown or falsy values.
+- Preserve eager `empty`, `draft`, and `confirmed` status-label localization call order, exact mapping, and the existing localized-source fallback whenever the selected mapping is missing or falsy.
+- Keep segment-row DOM construction, provenance, review commands/forms, status mutation, localization implementation, and editor rendering in their existing injected owners; remove `selectedEditorText` only after proving it has no remaining application or workflow consumers.
 
 Exit criteria:
 
-- `projectResourceSearchText` and the three duplicated coordinator search-string templates are removed from `app.js`; project-summary and Projects-filter consumers call the immutable service directly.
-- Focused ProjectSearchTextService ordering/fallback/conversion/failure tests, deep project summary/search/resource workflows, all 15 accessibility states, 81 visual screenshots, and FULL-SUITE gates pass with no intended user-visible difference.
+- `selectedEditorText`, `reviewLabel`, and `segmentStatusLabel` are removed from `app.js`; ReviewStateController and segment-row consumers call the immutable service directly.
+- Focused SegmentLabelService eager-localization/mapping/fallback/failure tests, deep review/status/editor workflows, all 15 accessibility states, 81 visual screenshots, and FULL-SUITE gates pass with no intended user-visible difference.
 
 Continue until `app.js` is a bootstrap-only compatibility entry and the façade can be removed without changing mature LoopCAT behavior.

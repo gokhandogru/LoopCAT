@@ -794,6 +794,10 @@ const projectResourceContextService = appRuntime.featureFactories.createProjectR
   names: { clean: projectNameService.clean, unique: projectNameService.unique },
   ids: { make: makeId }
 });
+const projectSearchTextService = appRuntime.featureFactories.createProjectSearchTextService({
+  resources: projectResourceContextService,
+  text: applicationTextSafetyService
+});
 const projectTmMatchService = appRuntime.featureFactories.createProjectTmMatchService({
   candidates: {
     single: getTmMatchCandidates,
@@ -5044,12 +5048,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
 });
 dialogLifecycleController?.mount?.();
 
-function projectResourceSearchText(project) {
-  const summary = projectResourceContextService.summary(project);
-  return [...summary.tmNames, ...summary.tbNames].join(" ");
-}
-
-
 function selectedEditorText() {
   const active = document.activeElement;
   if (active?.tagName === "TEXTAREA" || active?.tagName === "INPUT") {
@@ -5387,9 +5385,7 @@ function markProjectSummaryDirty(projectId) {
 
 function projectSummaryRecord(project, segments, summaryRevision = projectSummaryRevision(project.id)) {
   const progress = segmentProgressService.projectProgress(segments);
-  const projectSearchText = applicationTextSafetyService.stableLower(
-    `${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`
-  );
+  const projectSearchText = projectSearchTextService.build(project);
   return {
     ...project,
     progress,
@@ -5416,9 +5412,7 @@ async function refreshProjectSummaries() {
         ...project,
         progress: cached.progress,
         wordCount: cached.wordCount,
-        searchText: applicationTextSafetyService.stableLower(
-          `${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`
-        ),
+        searchText: projectSearchTextService.build(project),
         languagePairKey: projectLanguageContextController.key(project),
         summaryRevision: revision
       };
@@ -5933,11 +5927,7 @@ function renderProjectsView() {
   const pair = els.languagePairFilter.value;
   const summaries = editorSessionStore.getProjectSummaries().map((project) => ({
     ...project,
-    searchText:
-      project.searchText ||
-      applicationTextSafetyService.stableLower(
-        `${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`
-      ),
+    searchText: project.searchText || projectSearchTextService.build(project),
     languagePairKey: project.languagePairKey || projectLanguageContextController.key(project)
   }));
   if (verticalFeatureState?.projects) {
