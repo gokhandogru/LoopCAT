@@ -1432,6 +1432,16 @@ const segmentProgressService = appRuntime.featureFactories.createSegmentProgress
   getCachedSummary: () => editorSessionStore.getProgressSummary(),
   replaceCachedSummary: (summary) => editorSessionStore.replaceProgressSummary(summary)
 });
+const segmentProgressPresentationService =
+  appRuntime.featureFactories.createSegmentProgressPresentationService({
+    summary: { refresh: segmentProgressService.refresh },
+    elements: {
+      progressText: els.progressText,
+      wordCountText: els.wordCountText,
+      progressFill: els.progressFill
+    },
+    localization: uiLocalizationService
+  });
 
 const languagePairFilterPresentationController =
   appRuntime.featureFactories.createLanguagePairFilterPresentationController({
@@ -1766,7 +1776,7 @@ const applicationAggregatePresentationController =
       renderProjectAnalysis: () => projectAnalysisController.render(),
       renderDocumentFilter: documentFilterPresentationController.render,
       renderSegments: () => segmentGridPresentationController.render(),
-      renderProgress: () => renderProgress()
+      renderProgress: () => segmentProgressPresentationService.render()
     }
   });
 
@@ -2316,7 +2326,7 @@ const segmentCommandRestorationController =
     filters: { invalidate: segmentFilterService.invalidate },
     presentation: {
       renderSegments: segmentGridPresentationController.render,
-      renderProgress,
+      renderProgress: segmentProgressPresentationService.render,
       renderHistory: revisionHistoryPresentationService.render,
       renderAll: applicationAggregatePresentationController.render,
       refreshContext: () => editorContextController.refresh()
@@ -2589,7 +2599,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
   view: {
     updateRow: segmentRowPresentationService.update,
     renderSegments: segmentGridPresentationController.render,
-    renderProgress,
+    renderProgress: segmentProgressPresentationService.render,
     scheduleHistory: scheduleRevisionHistoryRender,
     renderHistory: revisionHistoryPresentationService.render
   },
@@ -2626,7 +2636,7 @@ const segmentDraftApplicationService = appRuntime.featureFactories.createSegment
     renderSegments: segmentGridPresentationController.render,
     scheduleRowUpdate: segmentGridPresentationController.scheduleRowUpdate,
     cancelRowUpdate: segmentGridPresentationController.cancelRowUpdate,
-    renderProgress,
+    renderProgress: segmentProgressPresentationService.render,
     scheduleHistory: scheduleRevisionHistoryRender
   },
   workspace: { markDirty: workspaceDirtyStateController.mark }
@@ -2686,7 +2696,7 @@ const targetProducerController = appRuntime.featureFactories.createTargetProduce
   restoration: { restorePatch: segmentCommandRestorationController.restorePatch },
   view: {
     renderSegments: segmentGridPresentationController.render,
-    renderProgress,
+    renderProgress: segmentProgressPresentationService.render,
     renderHistory: revisionHistoryPresentationService.render
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
@@ -2766,7 +2776,7 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
   },
   presentation: {
     renderSegments: segmentGridPresentationController.render,
-    renderProgress,
+    renderProgress: segmentProgressPresentationService.render,
     refreshSidebar: () => editorContextController.refresh(),
     renderHistory: revisionHistoryPresentationService.render
   },
@@ -2832,7 +2842,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
   presentation: {
     yieldToUi: applicationImportProgressController.yieldToUi,
     renderSegments: segmentGridPresentationController.render,
-    renderProgress,
+    renderProgress: segmentProgressPresentationService.render,
     renderHistory: revisionHistoryPresentationService.render,
     refreshSidebar: () => editorContextController.refresh()
   },
@@ -3149,7 +3159,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
     invalidateFilters: segmentFilterService.invalidate,
     renderAll: applicationAggregatePresentationController.render,
     renderSegments: segmentGridPresentationController.render,
-    renderProjectProgress: renderProgress,
+    renderProjectProgress: segmentProgressPresentationService.render,
     renderHistory: revisionHistoryPresentationService.render,
     renderAiProgress: aiProviderFormController.renderProgress,
     renderCommandCentre: aiProviderFormController.renderCommandCentre,
@@ -3239,7 +3249,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
     renderAll: applicationAggregatePresentationController.render,
     refreshSidebar: () => editorContextController.refresh(),
     renderSegments: segmentGridPresentationController.render,
-    renderProjectProgress: renderProgress,
+    renderProjectProgress: segmentProgressPresentationService.render,
     renderHistory: revisionHistoryPresentationService.render
   },
   activity: {
@@ -3731,7 +3741,7 @@ const aiSuggestionApplicationController =
     },
     presentation: {
       renderSegments: segmentGridPresentationController.render,
-      renderProgress,
+      renderProgress: segmentProgressPresentationService.render,
       renderHistory: revisionHistoryPresentationService.render,
       renderSuggestions: aiSuggestionListController.render,
       refreshSidebar: () => editorContextController.refresh(),
@@ -4291,7 +4301,7 @@ const uiLocaleOrchestrationController =
       renderProjectHome: projectHomePresentationController.render,
       renderProjectAnalysis: projectAnalysisController.render,
       renderEditor: editorShellPresentationController.render,
-      renderProgress: () => renderProgress(),
+      renderProgress: segmentProgressPresentationService.render,
       renderReview: () =>
         qualityReviewController?.renderReview?.({ segment: applicationActiveSegmentService.get(), force: false }),
       renderWorkbench: () => qualityWorkbenchController.render(),
@@ -4455,7 +4465,10 @@ const editorFilterControlsController =
     navigation: applicationNavigation,
     store: editorFilterStore,
     filters: { firstVisible: segmentFilterService.firstVisible },
-    presentation: { renderSegments: segmentGridPresentationController.render, renderProgress },
+    presentation: {
+      renderSegments: segmentGridPresentationController.render,
+      renderProgress: segmentProgressPresentationService.render
+    },
     preset: { markCustom: () => filterPresetController?.markCustom?.() },
     selection: { select: (index) => segmentNavigationController.select(index) }
   });
@@ -5716,15 +5729,6 @@ function scheduleRevisionHistoryRender() {
     state.revisionHistoryFrame = 0;
     revisionHistoryPresentationService.render();
   });
-}
-
-function renderProgress(options = {}) {
-  const summary = segmentProgressService.refresh(options);
-  const { total, confirmed, words } = summary;
-  const open = total - confirmed;
-  els.progressText.textContent = uiLocalizationService.label("progressSummary", { confirmed, open, total });
-  els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount", { count: words });
-  els.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
 }
 
 /* LOOPCAT_TEST_WORKFLOW_DRIVER */

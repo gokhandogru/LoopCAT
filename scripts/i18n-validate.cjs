@@ -58,6 +58,13 @@ const projectsViewPresentationControllerPath = path.join(
   "projects",
   "projects-view-presentation-controller.js"
 );
+const segmentProgressPresentationServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "editor",
+  "segment-progress-presentation-service.js"
+);
 const segmentStatusPresentationServicePath = path.join(
   root,
   "src",
@@ -190,6 +197,11 @@ function validate() {
     ...collectCodeKeys(
       fs.existsSync(projectsViewPresentationControllerPath)
         ? fs.readFileSync(projectsViewPresentationControllerPath, "utf8")
+        : ""
+    ),
+    ...collectCodeKeys(
+      fs.existsSync(segmentProgressPresentationServicePath)
+        ? fs.readFileSync(segmentProgressPresentationServicePath, "utf8")
         : ""
     ),
     ...collectCodeKeys(

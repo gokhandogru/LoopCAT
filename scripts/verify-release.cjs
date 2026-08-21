@@ -641,6 +641,7 @@ const segmentLabelServiceJs = readText("src/features/editor/segment-label-servic
 const segmentProvenanceServiceJs = readText("src/features/editor/segment-provenance-service.js");
 const segmentFilterServiceJs = readText("src/features/editor/segment-filter-service.js");
 const segmentProgressServiceJs = readText("src/features/editor/segment-progress-service.js");
+const segmentProgressPresentationServiceJs = readText("src/features/editor/segment-progress-presentation-service.js");
 const segmentTargetStateServiceJs = readText("src/features/editor/segment-target-state-service.js");
 const segmentCommandRestorationControllerJs = readText("src/features/editor/segment-command-restoration-controller.js");
 const segmentConfirmationStateServiceJs = readText("src/features/editor/segment-confirmation-state-service.js");
@@ -667,6 +668,9 @@ const segmentLabelServiceUnitTests = readText("tests/unit/segment-label-service.
 const segmentProvenanceServiceUnitTests = readText("tests/unit/segment-provenance-service.test.cjs");
 const segmentFilterServiceUnitTests = readText("tests/unit/segment-filter-service.test.cjs");
 const segmentProgressServiceUnitTests = readText("tests/unit/segment-progress-service.test.cjs");
+const segmentProgressPresentationServiceUnitTests = readText(
+  "tests/unit/segment-progress-presentation-service.test.cjs"
+);
 const segmentTargetStateServiceUnitTests = readText("tests/unit/segment-target-state-service.test.cjs");
 const segmentCommandRestorationControllerUnitTests = readText(
   "tests/unit/segment-command-restoration-controller.test.cjs"
@@ -11453,11 +11457,15 @@ for (const boundary of [
 }
 for (const consumer of [
   "sourceWordCount: segmentProgressService.sourceWordCount",
-  "progress: { project: segmentProgressService.projectProgress }",
-  "segmentProgressService.refresh(options)"
+  "progress: { project: segmentProgressService.projectProgress }"
 ]) {
   assertIncludes(appJs, consumer, `segment progress consumers must call the checked service directly: ${consumer}.`);
 }
+assertIncludes(
+  segmentProgressPresentationServiceJs,
+  "summary.refresh(options)",
+  "segment progress presentation must call the checked SegmentProgressService refresh boundary directly."
+);
 for (const removedHelper of ["wordCount", "sourceWordCount", "projectProgress", "calculateProgressSummary"]) {
   const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
   assert(
@@ -11486,6 +11494,116 @@ for (const testName of [
     `focused segment progress tests must retain characterization: ${testName}`
   );
 }
+assertIncludes(
+  appBootstrapJs,
+  'import { createSegmentProgressPresentationService } from "../features/editor/segment-progress-presentation-service.js";',
+  "The application runtime must install the checked segment-progress presentation service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentProgressPresentationService,",
+  "The application runtime must expose the checked segment-progress presentation factory."
+);
+for (const snippet of [
+  "SegmentProgressPresentationService requires summary, progress text, word-count text, progress-fill, and localization boundaries.",
+  "const progress = summary.refresh(options)",
+  "const { total, confirmed, words } = progress",
+  "const open = total - confirmed",
+  'localization.label("progressSummary", { confirmed, open, total })',
+  'localization.label("sourceWordCount", { count: words })',
+  'total ? `${Math.round((confirmed / total) * 100)}%` : "0"',
+  "return Object.freeze({ render })"
+]) {
+  assertIncludes(
+    segmentProgressPresentationServiceJs,
+    snippet,
+    `SegmentProgressPresentationService must retain characterized progress DOM policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createSegmentProgressPresentationService({",
+  "app.js must compose the checked segment-progress presentation service."
+);
+const segmentProgressPresentationComposition = functionBody(
+  appJs,
+  "const segmentProgressPresentationService =",
+  "const languagePairFilterPresentationController ="
+);
+for (const boundary of [
+  "summary: { refresh: segmentProgressService.refresh }",
+  "progressText: els.progressText",
+  "wordCountText: els.wordCountText",
+  "progressFill: els.progressFill",
+  "localization: uiLocalizationService"
+]) {
+  assertIncludes(
+    segmentProgressPresentationComposition,
+    boundary,
+    `segment-progress presentation composition must inject the ${boundary} boundary.`
+  );
+}
+assert(
+  appJs.indexOf("const segmentProgressService =") < appJs.indexOf("const segmentProgressPresentationService =") &&
+    appJs.indexOf("const segmentProgressPresentationService =") <
+      appJs.indexOf("const languagePairFilterPresentationController ="),
+  "SegmentProgressPresentationService must follow progress derivation and precede every presentation consumer."
+);
+assert(
+  (appJs.match(/\bsegmentProgressPresentationService\.render\b/g) || []).length === 12,
+  "all 12 application progress consumers must call SegmentProgressPresentationService.render directly."
+);
+assert(
+  !/function\s+renderProgress\b/.test(appJs) && !/function\s+renderProgress\b/.test(appWorkflowDriverJs),
+  "renderProgress must not return to app.js or the workflow driver."
+);
+for (const removedOwner of [
+  'els.progressText.textContent = uiLocalizationService.label("progressSummary"',
+  'els.wordCountText.textContent = uiLocalizationService.label("sourceWordCount"',
+  "els.progressFill.style.width = total"
+]) {
+  assert(
+    !appJs.includes(removedOwner),
+    `segment progress DOM ownership must not return to the compatibility coordinator: ${removedOwner}`
+  );
+}
+for (const forbiddenOwner of [
+  "appRuntime",
+  "segmentProgressService",
+  "uiLocalizationService",
+  "document.",
+  "els.",
+  "state."
+]) {
+  assert(
+    !segmentProgressPresentationServiceJs.includes(forbiddenOwner),
+    `SegmentProgressPresentationService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "SegmentProgressPresentationService forwards options and preserves label and width order",
+  "SegmentProgressPresentationService preserves zero-total width fallback and raw summary values",
+  "SegmentProgressPresentationService reads a fresh summary and default options on every render",
+  "SegmentProgressPresentationService preserves falsy localized text assignment",
+  "SegmentProgressPresentationService preserves primary and downstream failure timing",
+  "SegmentProgressPresentationService validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentProgressPresentationServiceUnitTests,
+    testName,
+    `focused segment-progress presentation tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-progress-presentation-service.js"',
+  "source-catalog extraction must scan the checked segment-progress presentation service."
+);
+assertIncludes(
+  i18nValidateScript,
+  '"segment-progress-presentation-service.js"',
+  "source-catalog validation must scan explicit label keys in the checked segment-progress presentation service."
+);
 assertIncludes(
   i18nExtractScript,
   '"src/features/editor/segment-progress-service.js"',
@@ -20391,7 +20509,7 @@ for (const boundary of [
   "renderProjectAnalysis: () => projectAnalysisController.render()",
   "renderDocumentFilter: documentFilterPresentationController.render",
   "renderSegments: () => segmentGridPresentationController.render()",
-  "renderProgress: () => renderProgress()"
+  "renderProgress: () => segmentProgressPresentationService.render()"
 ]) {
   assertIncludes(appJs, boundary, `aggregate-presentation composition must retain the checked ${boundary} boundary.`);
 }

@@ -83,6 +83,7 @@ import { createSegmentActionButtonsController } from "../features/editor/segment
 import { createSegmentGridController } from "../features/editor/segment-grid-controller.js";
 import { createSegmentGridPresentationController } from "../features/editor/segment-grid-presentation-controller.js";
 import { createSegmentMarkupPresentationService } from "../features/editor/segment-markup-presentation-service.js";
+import { createSegmentProgressPresentationService } from "../features/editor/segment-progress-presentation-service.js";
 import { createSegmentRowPresentationService } from "../features/editor/segment-row-presentation-service.js";
 import { createSegmentStatusPresentationService } from "../features/editor/segment-status-presentation-service.js";
 import { createAutosaveService } from "../features/editor/autosave-service.js";
@@ -321,6 +322,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createSegmentActionButtonsController,
       createSegmentGridPresentationController,
       createSegmentMarkupPresentationService,
+      createSegmentProgressPresentationService,
       createSegmentRowPresentationService,
       createSegmentStatusPresentationService,
       createDeliveryExportController,
