@@ -1396,6 +1396,21 @@ const segmentProgressService = appRuntime.featureFactories.createSegmentProgress
   replaceCachedSummary: (summary) => editorSessionStore.replaceProgressSummary(summary)
 });
 
+const languagePairFilterPresentationController =
+  appRuntime.featureFactories.createLanguagePairFilterPresentationController({
+    select: els.languagePairFilter,
+    projects: { list: editorSessionStore.getProjects },
+    language: {
+      key: projectLanguageContextController.key,
+      display: languageInputService.pairDisplay
+    },
+    localization: { source: uiLocalizationService.source },
+    dom: {
+      createElement: (tagName) => document.createElement(tagName),
+      createDocumentFragment: () => document.createDocumentFragment()
+    }
+  });
+
 const projectSummaryController = appRuntime.featureFactories.createProjectSummaryController({
   session: {
     getProject: editorSessionStore.getProject,
@@ -1410,7 +1425,7 @@ const projectSummaryController = appRuntime.featureFactories.createProjectSummar
   search: { build: projectSearchTextService.build },
   language: { key: projectLanguageContextController.key },
   presentation: {
-    renderLanguageFilter: renderLanguagePairFilter,
+    renderLanguageFilter: languagePairFilterPresentationController.render,
     renderProjects: renderProjectsView
   }
 });
@@ -5558,25 +5573,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-function renderLanguagePairFilter() {
-  const current = els.languagePairFilter.value;
-  const pairs = Array.from(new Set(editorSessionStore.getProjects().map((project) => projectLanguageContextController.key(project)).filter((pair) => pair !== "::"))).sort();
-  const fragment = document.createDocumentFragment();
-  const allOption = document.createElement("option");
-  allOption.value = "";
-  allOption.textContent = uiLocalizationService.source("All language pairs");
-  fragment.append(allOption);
-  pairs.forEach((pair) => {
-    const [sourceLang, targetLang] = pair.split("::");
-    const option = document.createElement("option");
-    option.value = pair;
-    option.textContent = languageInputService.pairDisplay(sourceLang, targetLang);
-    fragment.append(option);
-  });
-  els.languagePairFilter.replaceChildren(fragment);
-  els.languagePairFilter.value = pairs.includes(current) ? current : "";
-}
 
 function createProjectTile(project) {
   const tile = document.createElement("article");

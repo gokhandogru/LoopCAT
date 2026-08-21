@@ -255,6 +255,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-filter-controls-controller.js",
   "src/features/projects/project-home-controller.js",
   "src/features/projects/project-home-presentation-controller.js",
+  "src/features/projects/language-pair-filter-presentation-controller.js",
   "src/features/projects/project-list-presentation-controller.js",
   "src/features/projects/project-resource-selection-controller.js",
   "src/features/projects/project-name-service.js",
@@ -385,6 +386,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-filter-controls-controller.test.cjs",
   "tests/unit/project-home-controller.test.cjs",
   "tests/unit/project-home-presentation-controller.test.cjs",
+  "tests/unit/language-pair-filter-presentation-controller.test.cjs",
   "tests/unit/project-list-presentation-controller.test.cjs",
   "tests/unit/project-document-import-controller.test.cjs",
   "tests/unit/file-import-service.test.cjs",
@@ -683,6 +685,12 @@ const projectHomeControllerJs = readText("src/features/projects/project-home-con
 const projectHomeControllerUnitTests = readText("tests/unit/project-home-controller.test.cjs");
 const projectHomePresentationControllerJs = readText("src/features/projects/project-home-presentation-controller.js");
 const projectHomePresentationControllerUnitTests = readText("tests/unit/project-home-presentation-controller.test.cjs");
+const languagePairFilterPresentationControllerJs = readText(
+  "src/features/projects/language-pair-filter-presentation-controller.js"
+);
+const languagePairFilterPresentationControllerUnitTests = readText(
+  "tests/unit/language-pair-filter-presentation-controller.test.cjs"
+);
 const projectDocumentImportControllerJs = readText("src/features/import-export/project-document-import-controller.js");
 const projectDocumentImportControllerUnitTests = readText("tests/unit/project-document-import-controller.test.cjs");
 const fileImportServiceJs = readText("src/features/import-export/file-import-service.js");
@@ -1223,6 +1231,128 @@ for (const testName of [
 }
 assertIncludes(
   appBootstrapJs,
+  'import { createLanguagePairFilterPresentationController } from "../features/projects/language-pair-filter-presentation-controller.js";',
+  "the application runtime must install the checked language-pair filter presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createLanguagePairFilterPresentationController,",
+  "the application runtime must expose the checked language-pair filter presentation controller factory."
+);
+for (const snippet of [
+  "LanguagePairFilterPresentationController requires a language-pair select.",
+  "LanguagePairFilterPresentationController requires a project-list boundary.",
+  "LanguagePairFilterPresentationController requires language boundaries.",
+  "LanguagePairFilterPresentationController requires a localization boundary.",
+  "LanguagePairFilterPresentationController requires DOM creation boundaries.",
+  "const current = select.value;",
+  "const pairs = Array.from(",
+  ".map((project) => language.key(project))",
+  '.filter((pair) => pair !== "::")',
+  ").sort();",
+  "const fragment = dom.createDocumentFragment();",
+  'const allOption = dom.createElement("option");',
+  'allOption.textContent = localization.source("All language pairs");',
+  "pairs.forEach((pair) => {",
+  'const [sourceLanguage, targetLanguage] = pair.split("::");',
+  "option.value = pair;",
+  "option.textContent = language.display(sourceLanguage, targetLanguage);",
+  "select.replaceChildren(fragment);",
+  'select.value = pairs.includes(current) ? current : "";',
+  "return Object.freeze({ render });"
+]) {
+  assertIncludes(
+    languagePairFilterPresentationControllerJs,
+    snippet,
+    `LanguagePairFilterPresentationController must retain characterized mapping, option, replacement, and selection policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createLanguagePairFilterPresentationController({",
+  "select: els.languagePairFilter",
+  "projects: { list: editorSessionStore.getProjects }",
+  "key: projectLanguageContextController.key",
+  "display: languageInputService.pairDisplay",
+  "localization: { source: uiLocalizationService.source }",
+  "createElement: (tagName) => document.createElement(tagName)",
+  "createDocumentFragment: () => document.createDocumentFragment()",
+  "renderLanguageFilter: languagePairFilterPresentationController.render"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `language-pair filter presentation composition must retain the checked ${boundary} boundary.`
+  );
+}
+assert(
+  (appJs.match(/\blanguagePairFilterPresentationController\.render\b/g) || []).length === 1 &&
+    !appWorkflowDriverJs.includes("languagePairFilterPresentationController"),
+  "ProjectSummaryController must be the sole direct language-pair filter presentation consumer."
+);
+assert(
+  !/function\s+renderLanguagePairFilter\b/.test(appJs) &&
+    !/function\s+renderLanguagePairFilter\b/.test(appWorkflowDriverJs),
+  "renderLanguagePairFilter must not return as a coordinator or workflow helper."
+);
+for (const removedPolicy of [
+  "els.languagePairFilter.replaceChildren(fragment)",
+  "els.languagePairFilter.value = pairs.includes(current)",
+  "new Set(editorSessionStore.getProjects()"
+]) {
+  assert(
+    !appJs.includes(removedPolicy) && !appWorkflowDriverJs.includes(removedPolicy),
+    `language-pair mapping, option, replacement, and selection policy must not return through ${removedPolicy}.`
+  );
+}
+assert(
+  appJs.indexOf("const languageInputService =") < appJs.indexOf("const languagePairFilterPresentationController =") &&
+    appJs.indexOf("const projectLanguageContextController =") <
+      appJs.indexOf("const languagePairFilterPresentationController =") &&
+    appJs.indexOf("const languagePairFilterPresentationController =") <
+      appJs.indexOf("const projectSummaryController ="),
+  "LanguagePairFilterPresentationController must be composed after language policy and before ProjectSummaryController."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "projectLanguageContextController",
+  "languageInputService",
+  "uiLocalizationService",
+  "document.",
+  "els."
+]) {
+  assert(
+    !languagePairFilterPresentationControllerJs.includes(forbiddenOwner),
+    `LanguagePairFilterPresentationController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "LanguagePairFilterPresentationController captures current selection before live projects",
+  "LanguagePairFilterPresentationController preserves key mapping exclusion deduplication and sorting",
+  "LanguagePairFilterPresentationController delegates split display and preserves full raw pair values",
+  "LanguagePairFilterPresentationController preserves strict selection retention and empty fallback",
+  "LanguagePairFilterPresentationController preserves empty and fresh repeated live renders",
+  "LanguagePairFilterPresentationController preserves every populated failure boundary",
+  "LanguagePairFilterPresentationController validates every owner and exposes an immutable API"
+]) {
+  assertIncludes(
+    languagePairFilterPresentationControllerUnitTests,
+    testName,
+    `focused language-pair filter presentation tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/language-pair-filter-presentation-controller.js"',
+  "source-catalog extraction must scan the checked language-pair filter presentation controller."
+);
+assertIncludes(
+  i18nValidateScript,
+  '"language-pair-filter-presentation-controller.js"',
+  "source-catalog validation must check explicit keys in the checked language-pair filter presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createProjectSummaryController } from "../features/projects/project-summary-controller.js";',
   "The application runtime must install the checked project-summary controller."
 );
@@ -1283,7 +1413,7 @@ for (const boundary of [
   "progress: { project: segmentProgressService.projectProgress }",
   "search: { build: projectSearchTextService.build }",
   "language: { key: projectLanguageContextController.key }",
-  "renderLanguageFilter: renderLanguagePairFilter",
+  "renderLanguageFilter: languagePairFilterPresentationController.render",
   "renderProjects: renderProjectsView"
 ]) {
   assertIncludes(appJs, boundary, `project-summary composition must retain the checked ${boundary} boundary.`);
@@ -18330,9 +18460,9 @@ assertIncludes(
   "DocumentFilterPresentationController options must render in one DOM replacement."
 );
 assertIncludes(
-  appJs,
-  "els.languagePairFilter.replaceChildren(fragment)",
-  "app.js language-pair filter options must render in one DOM replacement."
+  languagePairFilterPresentationControllerJs,
+  "select.replaceChildren(fragment)",
+  "LanguagePairFilterPresentationController options must render in one DOM replacement."
 );
 assertIncludes(
   segmentProgressServiceJs,
