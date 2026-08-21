@@ -634,7 +634,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const originalMetadataOnlyConfirm = window.confirm;
     window.confirm = () => true;
     try {
-      const deletedMetadataOnlyDocument = await confirmDeleteFile(metadataOnlyDocument);
+      const deletedMetadataOnlyDocument = await projectDeletionController.deleteDocument(metadataOnlyDocument);
       assert(
         deletedMetadataOnlyDocument &&
           !projectDocumentCatalogService.list().some((item) => item.id === metadataOnlyDocument.id) &&
@@ -4317,8 +4317,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         };
         applicationAggregatePresentationController.render();
         projectsViewPresentationController.render();
-        await confirmDeleteProject(labelProject.id);
-        await confirmDeleteFile(projectDocumentCatalogService.list()[0]);
+        await projectDeletionController.deleteProject(labelProject.id);
+        await projectDeletionController.deleteDocument(projectDocumentCatalogService.list()[0]);
         projectDocumentImportController.confirmDuplicate(new File(["duplicate"], labelDocumentName, { type: "text/plain" }));
         const labelUiText = [
           els.projectList.textContent,
@@ -5038,7 +5038,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     try {
       const deleteProjectListEntry = editorSessionStore.getProjects().find((item) => item.id === deleteProjectFixture.id);
       segmentTargetStateService.setHiddenField(deleteProjectListEntry, PROJECT_DELETE_FAILURE_TEST_FLAG, true);
-      const failedProjectDelete = await confirmDeleteProject(deleteProjectFixture.id);
+      const failedProjectDelete = await projectDeletionController.deleteProject(deleteProjectFixture.id);
       const failedProjectDeleteSegments = await getProjectSegments(deleteProjectFixture.id);
       assert(
         !failedProjectDelete &&
@@ -5048,7 +5048,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         "project delete failure reports visible status without deleting stored project"
       );
       Reflect.deleteProperty(deleteProjectListEntry, PROJECT_DELETE_FAILURE_TEST_FLAG);
-      const successfulProjectDelete = await confirmDeleteProject(deleteProjectFixture.id);
+      const successfulProjectDelete = await projectDeletionController.deleteProject(deleteProjectFixture.id);
       const projectTrashEntry = (await appRuntime.trashRepository.list()).find(
         (entry) => entry.entityType === "project" && entry.projectId === deleteProjectFixture.id
       );
@@ -5087,7 +5087,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     window.confirm = () => true;
     try {
       segmentTargetStateService.setHiddenField(deleteFileDocument, FILE_DELETE_FAILURE_TEST_FLAG, true);
-      const failedFileDelete = await confirmDeleteFile(deleteFileDocument);
+      const failedFileDelete = await projectDeletionController.deleteDocument(deleteFileDocument);
       const failedFileDeleteSegments = await getProjectSegments(deleteFileFixture.id);
       assert(
         !failedFileDelete &&
@@ -5098,7 +5098,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       Reflect.deleteProperty(deleteFileDocument, FILE_DELETE_FAILURE_TEST_FLAG);
       segmentTargetStateService.setHiddenField(deleteFileDocument, FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG, true);
-      const successfulFileDelete = await confirmDeleteFile(deleteFileDocument);
+      const successfulFileDelete = await projectDeletionController.deleteDocument(deleteFileDocument);
       const fileTrashEntry = (await appRuntime.trashRepository.list()).find(
         (entry) => entry.entityType === "document" && entry.entityId === deleteFileDocument.id
       );

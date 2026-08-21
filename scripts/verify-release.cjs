@@ -250,6 +250,7 @@ const requiredReleaseFiles = [
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
   "src/features/projects/project-dialog-save-controller.js",
+  "src/features/projects/project-deletion-controller.js",
   "src/features/projects/project-analysis-controller.js",
   "src/features/projects/project-domain-controller.js",
   "src/features/projects/project-filter-controls-controller.js",
@@ -383,6 +384,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-qa-controller.test.cjs",
   "tests/unit/project-domain-controller.test.cjs",
   "tests/unit/project-dialog-save-controller.test.cjs",
+  "tests/unit/project-deletion-controller.test.cjs",
   "tests/unit/project-analysis-controller.test.cjs",
   "tests/unit/project-filter-controls-controller.test.cjs",
   "tests/unit/project-home-controller.test.cjs",
@@ -675,6 +677,8 @@ const projectDomainControllerJs = readText("src/features/projects/project-domain
 const projectDomainControllerUnitTests = readText("tests/unit/project-domain-controller.test.cjs");
 const projectDialogSaveControllerJs = readText("src/features/projects/project-dialog-save-controller.js");
 const projectDialogSaveControllerUnitTests = readText("tests/unit/project-dialog-save-controller.test.cjs");
+const projectDeletionControllerJs = readText("src/features/projects/project-deletion-controller.js");
+const projectDeletionControllerUnitTests = readText("tests/unit/project-deletion-controller.test.cjs");
 const projectActivityControllerJs = readText("src/features/projects/project-activity-controller.js");
 const projectActivityControllerUnitTests = readText("tests/unit/project-activity-controller.test.cjs");
 const projectAnalysisControllerJs = readText("src/features/projects/project-analysis-controller.js");
@@ -1432,7 +1436,7 @@ for (const boundary of [
   "dom: { createElement: (tagName) => document.createElement(tagName) }",
   "presentation: { replaceSafeHtml }",
   "vertical: { getProjects: () => verticalFeatureState?.projects }",
-  "deleteProject: (...args) => confirmDeleteProject(...args)",
+  "deleteProject: projectDeletionController.deleteProject",
   "open: (...args) => projectOpenController.open(...args)",
   "clearFilters: (...args) => projectFilterControlsController.clear(...args)",
   "importPackage: (...args) => els.projectPackageImportInput.click(...args)",
@@ -1531,6 +1535,202 @@ assertIncludes(
   '"projects-view-presentation-controller.js"',
   "source-catalog validation must check explicit keys in the checked Projects view presentation controller."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectDeletionController } from "../features/projects/project-deletion-controller.js";',
+  "the application runtime must install the checked project-deletion controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectDeletionController,",
+  "the application runtime must expose the checked project-deletion controller factory."
+);
+for (const snippet of [
+  "ProjectDeletionController requires project session boundaries.",
+  "ProjectDeletionController requires confirmation and text-safety boundaries.",
+  "ProjectDeletionController requires an autosave boundary.",
+  "ProjectDeletionController requires reversible command boundaries.",
+  "ProjectDeletionController requires a command-state boundary.",
+  "ProjectDeletionController requires workspace-dirty boundaries.",
+  "ProjectDeletionController requires navigation boundaries.",
+  "ProjectDeletionController requires project and segment repository boundaries.",
+  "ProjectDeletionController requires activity and presentation boundaries.",
+  "ProjectDeletionController requires status and history boundaries.",
+  "ProjectDeletionController requires checked test boundaries.",
+  "ProjectDeletionController requires a warning logger boundary.",
+  "async function deleteProject(projectId = session.getProject()?.id)",
+  "const project = session.getProjects().find((item) => item.id === projectId);",
+  "if (!project) return false;",
+  'confirmation.ask(`Move project "${text.safe(project.name)}" and all of its files to Trash?`)',
+  "await autosave.flush(project.id);",
+  'if (test.projectDeleteFails(project)) throw new Error("Simulated project delete failure");',
+  "const command = commands.createProjectDelete({ projectId: project.id });",
+  'if (!command) throw new Error("The reversible project deletion service is unavailable.");',
+  "await commands.execute(command);",
+  "commandState.selectProject(project.id);",
+  "workspace.clear(project.id);",
+  "if (session.getProject()?.id === project.id)",
+  "session.replaceProject(null);",
+  "session.replaceSegments([]);",
+  "navigation.openProjects();",
+  "navigation.clearSelection();",
+  "await projects.load(false);",
+  'status.set("Project moved to Trash. Undo is available.", "saved");',
+  'status.set(error.message || "Project delete failed", "dirty");',
+  "async function deleteDocument(documentInfo)",
+  "if (!session.getProject() || !documentInfo) return false;",
+  'confirmation.ask(`Move file "${text.safe(documentInfo.name)}" to Trash?`)',
+  "await autosave.flush(session.getProject().id);",
+  'if (test.documentDeleteFails(documentInfo)) throw new Error("Simulated file delete failure");',
+  "const command = commands.createDocumentDelete({",
+  "project: session.getProject(),",
+  "documentId: documentInfo.id",
+  'if (!command) throw new Error("The reversible file deletion service is unavailable.");',
+  "const commandResult = await commands.execute(command);",
+  "session.replaceProject(commandResult.result.project);",
+  ".map((project) => (project.id === session.getProject().id ? session.getProject() : project))",
+  "session.replaceSegments(histories.prepare(await segments.list(session.getProject().id)));",
+  'navigation.selectDocument({ documentId: "" });',
+  "const activeIndex = session.getSegments().length ? 0 : -1;",
+  'segmentId: session.getSegments()[activeIndex]?.id || ""',
+  "workspace.mark();",
+  "let fileDeleteActivityFailed = false;",
+  'if (test.documentActivityFails(documentInfo)) throw new Error("Simulated file delete activity failure");',
+  'await activity.log("delete-file", "Project file deleted", {',
+  'logger.warn("File delete activity log failed.", activityError);',
+  "await summaries.refresh();",
+  "home.show();",
+  'status.set(error.message || "File delete failed", "dirty");',
+  "return Object.freeze({ deleteProject, deleteDocument });"
+]) {
+  assertIncludes(
+    projectDeletionControllerJs,
+    snippet,
+    `ProjectDeletionController must retain characterized project/document guard, confirmation, command, session, navigation, activity, presentation, and failure policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectDeletionController({",
+  "getProject: editorSessionStore.getProject",
+  "getProjects: editorSessionStore.getProjects",
+  "getSegments: editorSessionStore.getSegments",
+  "replaceProject: editorSessionStore.replaceProject",
+  "replaceProjects: editorSessionStore.replaceProjects",
+  "replaceSegments: editorSessionStore.replaceSegments",
+  "confirmation: { ask: uiLocalizationService.confirm }",
+  "text: { safe: applicationTextSafetyService.displaySafeText }",
+  "autosave: { flush: (...args) => autosaveService.flush(...args) }",
+  "createProjectDelete: (...args) => appRuntime?.commands?.createDeleteProjectCommand?.(...args)",
+  "createDocumentDelete: (...args) => appRuntime?.commands?.createDeleteDocumentCommand?.(...args)",
+  "execute: (...args) => appRuntime.commands.bus.execute(...args)",
+  "state.commandProjectId = projectId",
+  "clear: workspaceDirtyStateController.clear",
+  "mark: workspaceDirtyStateController.mark",
+  "openProjects: applicationNavigation.openProjects",
+  "clearSelection: applicationNavigation.clearSelection",
+  "selectDocument: applicationNavigation.selectDocument",
+  "selectSegment: applicationNavigation.selectSegment",
+  "projects: { load: (...args) => projectCollectionLoadController.load(...args) }",
+  "segments: { list: getProjectSegments }",
+  "histories: { prepare: (...args) => segmentTargetStateService.prepareHistories(...args) }",
+  "activity: { log: (...args) => projectActivityController.log(...args) }",
+  "summaries: { refresh: (...args) => projectSummaryController.refresh(...args) }",
+  "home: { show: (...args) => projectHomeController.show(...args) }",
+  "status: { set: applicationSaveStatusController.set }",
+  "history: { render: (...args) => applicationCommandHistoryController.render(...args) }",
+  "Boolean(LOOPCAT_TEST_BUILD && project[PROJECT_DELETE_FAILURE_TEST_FLAG])",
+  "Boolean(LOOPCAT_TEST_BUILD && documentInfo[FILE_DELETE_FAILURE_TEST_FLAG])",
+  "Boolean(LOOPCAT_TEST_BUILD && documentInfo[FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG])",
+  "logger: console",
+  "deleteProject: projectDeletionController.deleteProject",
+  "deleteDocument: projectDeletionController.deleteDocument",
+  "confirmDelete: projectDeletionController.deleteProject"
+]) {
+  assertIncludes(appJs, boundary, `project-deletion composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/\bprojectDeletionController\.deleteProject\b/g) || []).length === 2 &&
+    (appJs.match(/\bprojectDeletionController\.deleteDocument\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bprojectDeletionController\.deleteProject\b/g) || []).length === 3 &&
+    (appWorkflowDriverJs.match(/\bprojectDeletionController\.deleteDocument\b/g) || []).length === 4,
+  "all project and document deletion application/workflow consumers must call ProjectDeletionController directly."
+);
+for (const removedHelper of ["confirmDeleteProject", "confirmDeleteFile"]) {
+  assert(
+    !new RegExp(`\\b${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`\\b${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+for (const removedPolicy of [
+  "fileDeleteActivityFailed",
+  "uiLocalizationService.confirm(`Move project",
+  "uiLocalizationService.confirm(`Move file",
+  'console.warn("File delete activity log failed."',
+  "state.commandProjectId = project.id"
+]) {
+  assert(
+    !appJs.includes(removedPolicy) && !appWorkflowDriverJs.includes(removedPolicy),
+    `project/document deletion orchestration must not return through ${removedPolicy}.`
+  );
+}
+assert(
+  appJs.indexOf("const languagePairFilterPresentationController =") <
+    appJs.indexOf("const projectDeletionController =") &&
+    appJs.indexOf("const projectDeletionController =") < appJs.indexOf("const projectsViewPresentationController =") &&
+    appJs.indexOf("const projectDeletionController =") < appJs.indexOf("const projectSummaryController =") &&
+    appJs.indexOf("const projectDeletionController =") < appJs.indexOf("const projectActivityController =") &&
+    appJs.indexOf("const projectDeletionController =") < appJs.indexOf("const projectCollectionLoadController =") &&
+    appJs.indexOf("const projectDeletionController =") < appJs.indexOf("const applicationCommandHistoryController =") &&
+    appJs.indexOf("const projectDeletionController =") < appJs.indexOf("const segmentTargetStateService =") &&
+    appJs.indexOf("const projectDeletionController =") < appJs.indexOf("const autosaveService =") &&
+    appJs.indexOf("const projectDeletionController =") < appJs.indexOf("const projectHomeController ="),
+  "ProjectDeletionController must be composed before direct consumers with checked call-time adapters for later owners."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "uiLocalizationService",
+  "applicationTextSafetyService",
+  "autosaveService",
+  "workspaceDirtyStateController",
+  "applicationNavigation",
+  "projectCollectionLoadController",
+  "getProjectSegments",
+  "segmentTargetStateService",
+  "projectActivityController",
+  "projectSummaryController",
+  "projectHomeController",
+  "applicationSaveStatusController",
+  "applicationCommandHistoryController",
+  "LOOPCAT_TEST_BUILD",
+  "PROJECT_DELETE_FAILURE_TEST_FLAG",
+  "FILE_DELETE_FAILURE_TEST_FLAG",
+  "document.",
+  "els."
+]) {
+  assert(
+    !projectDeletionControllerJs.includes(forbiddenOwner),
+    `ProjectDeletionController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectDeletionController preserves default project lookup strict matching and missing no-op",
+  "ProjectDeletionController preserves active project command cleanup reload status and history order",
+  "ProjectDeletionController preserves inactive project branch and contained primary failures",
+  "ProjectDeletionController preserves project failure short circuit and status failure timing",
+  "ProjectDeletionController preserves document guards confirmation and exact live session replacement",
+  "ProjectDeletionController preserves document command live reads histories selection activity and presentation",
+  "ProjectDeletionController preserves empty segment selection and contained activity warnings",
+  "ProjectDeletionController preserves document primary failure containment and post-save timing",
+  "ProjectDeletionController validates every owner and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectDeletionControllerUnitTests,
+    testName,
+    `focused project-deletion tests must retain characterization: ${testName}.`
+  );
+}
 assertIncludes(
   appBootstrapJs,
   'import { createProjectSummaryController } from "../features/projects/project-summary-controller.js";',
@@ -2403,7 +2603,7 @@ for (const [method, appCount, workflowCount] of [
   ["clearMemory", 0, 1],
   ["hasUnsaved", 1, 0],
   ["ids", 2, 0],
-  ["mark", 39, 6],
+  ["mark", 38, 6],
   ["markProjects", 2, 0],
   ["markProjectsUsingResource", 6, 1],
   ["prune", 1, 1],
@@ -9014,9 +9214,9 @@ for (const boundary of [
   "getSegments: () => editorSessionStore.getSegments()",
   "navigation: applicationNavigation",
   "renderAll",
-  "confirmDelete: confirmDeleteProject",
+  "confirmDelete: projectDeletionController.deleteProject",
   "projectHome: projectHomeController",
-  "projectHomeController.show()"
+  "home: { show: (...args) => projectHomeController.show(...args) }"
 ]) {
   assertIncludes(appJs, boundary, `project-home composition must retain the checked ${boundary} boundary.`);
 }
@@ -19342,7 +19542,7 @@ for (const boundary of [
   "createElement: (tagName) => document.createElement(tagName)",
   "createDocumentFragment: () => document.createDocumentFragment()",
   "presentation: { replaceSafeHtml }",
-  "deleteDocument: (documentInfo) => confirmDeleteFile(documentInfo)",
+  "deleteDocument: projectDeletionController.deleteDocument",
   "openDocument: (documentId) => projectDocumentOpenController.open(documentId)",
   "renderProjectHome: projectHomePresentationController.render"
 ]) {
@@ -19760,7 +19960,7 @@ for (const boundary of [
 for (const [method, count] of [
   ["stableLower", 14],
   ["escapeHtml", 17],
-  ["displaySafeText", 13],
+  ["displaySafeText", 12],
   ["displaySafeHtml", 6],
   ["escapeRegExp", 1],
   ["fileSafeName", 5],

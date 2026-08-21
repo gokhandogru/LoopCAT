@@ -1411,6 +1411,56 @@ const languagePairFilterPresentationController =
     }
   });
 
+const projectDeletionController = appRuntime.featureFactories.createProjectDeletionController({
+  session: {
+    getProject: editorSessionStore.getProject,
+    getProjects: editorSessionStore.getProjects,
+    getSegments: editorSessionStore.getSegments,
+    replaceProject: editorSessionStore.replaceProject,
+    replaceProjects: editorSessionStore.replaceProjects,
+    replaceSegments: editorSessionStore.replaceSegments
+  },
+  confirmation: { ask: uiLocalizationService.confirm },
+  text: { safe: applicationTextSafetyService.displaySafeText },
+  autosave: { flush: (...args) => autosaveService.flush(...args) },
+  commands: {
+    createProjectDelete: (...args) => appRuntime?.commands?.createDeleteProjectCommand?.(...args),
+    createDocumentDelete: (...args) => appRuntime?.commands?.createDeleteDocumentCommand?.(...args),
+    execute: (...args) => appRuntime.commands.bus.execute(...args)
+  },
+  commandState: {
+    selectProject: (projectId) => {
+      state.commandProjectId = projectId;
+    }
+  },
+  workspace: {
+    clear: workspaceDirtyStateController.clear,
+    mark: workspaceDirtyStateController.mark
+  },
+  navigation: {
+    openProjects: applicationNavigation.openProjects,
+    clearSelection: applicationNavigation.clearSelection,
+    selectDocument: applicationNavigation.selectDocument,
+    selectSegment: applicationNavigation.selectSegment
+  },
+  projects: { load: (...args) => projectCollectionLoadController.load(...args) },
+  segments: { list: getProjectSegments },
+  histories: { prepare: (...args) => segmentTargetStateService.prepareHistories(...args) },
+  activity: { log: (...args) => projectActivityController.log(...args) },
+  summaries: { refresh: (...args) => projectSummaryController.refresh(...args) },
+  home: { show: (...args) => projectHomeController.show(...args) },
+  status: { set: applicationSaveStatusController.set },
+  history: { render: (...args) => applicationCommandHistoryController.render(...args) },
+  test: {
+    projectDeleteFails: (project) => Boolean(LOOPCAT_TEST_BUILD && project[PROJECT_DELETE_FAILURE_TEST_FLAG]),
+    documentDeleteFails: (documentInfo) =>
+      Boolean(LOOPCAT_TEST_BUILD && documentInfo[FILE_DELETE_FAILURE_TEST_FLAG]),
+    documentActivityFails: (documentInfo) =>
+      Boolean(LOOPCAT_TEST_BUILD && documentInfo[FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG])
+  },
+  logger: console
+});
+
 const projectsViewPresentationController =
   appRuntime.featureFactories.createProjectsViewPresentationController({
     elements: {
@@ -1436,7 +1486,7 @@ const projectsViewPresentationController =
     presentation: { replaceSafeHtml },
     vertical: { getProjects: () => verticalFeatureState?.projects },
     actions: {
-      deleteProject: (...args) => confirmDeleteProject(...args),
+      deleteProject: projectDeletionController.deleteProject,
       open: (...args) => projectOpenController.open(...args),
       clearFilters: (...args) => projectFilterControlsController.clear(...args),
       importPackage: (...args) => els.projectPackageImportInput.click(...args)
@@ -1580,7 +1630,7 @@ const projectHomePresentationController =
     },
     presentation: { replaceSafeHtml },
     actions: {
-      deleteDocument: (documentInfo) => confirmDeleteFile(documentInfo),
+      deleteDocument: projectDeletionController.deleteDocument,
       openDocument: (documentId) => projectDocumentOpenController.open(documentId)
     }
   });
@@ -4227,7 +4277,7 @@ const projectHomeController = appRuntime.featureFactories.createProjectHomeContr
   },
   navigation: applicationNavigation,
   presentation: { renderAll: applicationAggregatePresentationController.render },
-  actions: { confirmDelete: confirmDeleteProject }
+  actions: { confirmDelete: projectDeletionController.deleteProject }
 });
 const projectFilterControlsController =
   appRuntime.featureFactories.createProjectFilterControlsController({
@@ -5605,89 +5655,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-async function confirmDeleteProject(projectId = editorSessionStore.getProject()?.id) {
-  const project = editorSessionStore.getProjects().find((item) => item.id === projectId);
-  if (!project) return false;
-  const ok = uiLocalizationService.confirm(
-    `Move project "${applicationTextSafetyService.displaySafeText(project.name)}" and all of its files to Trash?`
-  );
-  if (!ok) return false;
-  try {
-    await autosaveService.flush(project.id);
-    if (LOOPCAT_TEST_BUILD && project[PROJECT_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated project delete failure");
-    const command = appRuntime?.commands?.createDeleteProjectCommand?.({ projectId: project.id });
-    if (!command) throw new Error("The reversible project deletion service is unavailable.");
-    await appRuntime.commands.bus.execute(command);
-    state.commandProjectId = project.id;
-    workspaceDirtyStateController.clear(project.id);
-    if (editorSessionStore.getProject()?.id === project.id) {
-      editorSessionStore.replaceProject(null);
-      editorSessionStore.replaceSegments([]);
-      applicationNavigation.openProjects();
-      applicationNavigation.clearSelection();
-    }
-    await projectCollectionLoadController.load(false);
-    applicationSaveStatusController.set("Project moved to Trash. Undo is available.", "saved");
-    applicationCommandHistoryController.render();
-    return true;
-  } catch (error) {
-    applicationSaveStatusController.set(error.message || "Project delete failed", "dirty");
-    return false;
-  }
-}
-
-async function confirmDeleteFile(documentInfo) {
-  if (!editorSessionStore.getProject() || !documentInfo) return false;
-  const ok = uiLocalizationService.confirm(
-    `Move file "${applicationTextSafetyService.displaySafeText(documentInfo.name)}" to Trash?`
-  );
-  if (!ok) return false;
-  try {
-    await autosaveService.flush(editorSessionStore.getProject().id);
-    if (LOOPCAT_TEST_BUILD && documentInfo[FILE_DELETE_FAILURE_TEST_FLAG]) throw new Error("Simulated file delete failure");
-    const command = appRuntime?.commands?.createDeleteDocumentCommand?.({
-      project: editorSessionStore.getProject(),
-      documentId: documentInfo.id
-    });
-    if (!command) throw new Error("The reversible file deletion service is unavailable.");
-    const commandResult = await appRuntime.commands.bus.execute(command);
-    state.commandProjectId = editorSessionStore.getProject().id;
-    editorSessionStore.replaceProject(commandResult.result.project);
-    editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
-    editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(editorSessionStore.getProject().id)));
-    applicationNavigation.selectDocument({ documentId: "" });
-    const activeIndex = editorSessionStore.getSegments().length ? 0 : -1;
-    applicationNavigation.selectSegment({
-      activeIndex,
-      segmentId: editorSessionStore.getSegments()[activeIndex]?.id || ""
-    });
-    workspaceDirtyStateController.mark();
-    let fileDeleteActivityFailed = false;
-    try {
-      if (LOOPCAT_TEST_BUILD && documentInfo[FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated file delete activity failure");
-      await projectActivityController.log("delete-file", "Project file deleted", {
-        documentId: documentInfo.id,
-        fileName: documentInfo.name
-      });
-    } catch (activityError) {
-      fileDeleteActivityFailed = true;
-      console.warn("File delete activity log failed.", activityError);
-      workspaceDirtyStateController.mark();
-    }
-    await projectSummaryController.refresh();
-    projectHomeController.show();
-    applicationSaveStatusController.set(
-      fileDeleteActivityFailed ? "File moved to Trash; activity log failed" : "File moved to Trash. Undo is available.",
-      "saved"
-    );
-    applicationCommandHistoryController.render();
-    return true;
-  } catch (error) {
-    applicationSaveStatusController.set(error.message || "File delete failed", "dirty");
-    return false;
-  }
-}
 
 function renderResourcesView() {
   resourcesController?.render?.();
