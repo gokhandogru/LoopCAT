@@ -855,6 +855,8 @@ const resourceCatalogServiceJs = readText("src/features/resources/resource-catal
 const resourceCatalogServiceUnitTests = readText("tests/unit/resource-catalog-service.test.cjs");
 const resourceCatalogRefreshControllerJs = readText("src/features/resources/resource-catalog-refresh-controller.js");
 const resourceCatalogRefreshControllerUnitTests = readText("tests/unit/resource-catalog-refresh-controller.test.cjs");
+const projectTermRefreshControllerJs = readText("src/features/resources/project-term-refresh-controller.js");
+const projectTermRefreshControllerUnitTests = readText("tests/unit/project-term-refresh-controller.test.cjs");
 const resourceLibraryExportControllerJs = readText("src/features/resources/resource-library-export-controller.js");
 const resourceLibraryExportControllerUnitTests = readText("tests/unit/resource-library-export-controller.test.cjs");
 const resourceLibraryImportControllerJs = readText("src/features/resources/resource-library-import-controller.js");
@@ -1252,7 +1254,7 @@ for (const boundary of [
   "listSegments: getProjectSegments",
   "listActivity: listActivityEvents",
   "histories: { prepare: (...args) => segmentTargetStateService.prepareHistories(...args) }",
-  "terms: { refresh: (...args) => refreshProjectTerms(...args) }",
+  "terms: { refresh: projectTermRefreshController.refresh }",
   "ready: () => filterPresetReady",
   "restore: (projectId) => filterPresetController?.restoreForProject?.(projectId)",
   "open: (...args) => applicationNavigation?.openProject?.(...args)",
@@ -2868,6 +2870,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectTermRefreshController } from "../features/resources/project-term-refresh-controller.js";',
+  "The application runtime must install the checked project-term refresh controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectTermRefreshController,",
+  "The application runtime must expose the checked project-term refresh factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createResourceLibraryExportController } from "../features/resources/resource-library-export-controller.js";',
   "The application runtime must install the checked resource-library export controller."
 );
@@ -3967,7 +3979,7 @@ for (const boundary of [
   "selectedTermBaseName: () => els.termBaseSelect.value || projectResourceContextService.primaryTermBase()",
   "markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource",
   "tmMatches: tmMatchesController.refresh",
-  "projectTerms: refreshProjectTerms",
+  "projectTerms: projectTermRefreshController.refresh",
   "terms: termSuggestionsController.refresh",
   "builders: { buildTmx, buildTbx }",
   "logOptionalProject: logOptionalProjectActivity",
@@ -4139,6 +4151,90 @@ for (const testName of [
     resourceCatalogRefreshControllerUnitTests,
     testName,
     `focused resource-catalog refresh tests must retain characterization: ${testName}`
+  );
+}
+for (const snippet of [
+  "ProjectTermRefreshController requires project session boundaries.",
+  "ProjectTermRefreshController requires terminology repository and resource boundaries.",
+  "ProjectTermRefreshController requires a segment-filter boundary.",
+  "ProjectTermRefreshController requires terminology presentation boundaries.",
+  "async function refresh({ rerender = false } = {})",
+  "if (!session.getProject()) {",
+  "session.replaceProjectTerms([]);",
+  "await repository.listTerms({",
+  "sourceLang: session.getProject().sourceLang,",
+  "targetLang: session.getProject().targetLang,",
+  "termBaseNames: resources.termBaseNames()",
+  "filters.invalidate();",
+  "presentation.renderTermbaseSelect();",
+  "if (rerender) presentation.renderSegments({ preserveScroll: true });",
+  "return Object.freeze({ refresh });"
+]) {
+  assertIncludes(
+    projectTermRefreshControllerJs,
+    snippet,
+    `ProjectTermRefreshController must retain characterized project/query/replacement/invalidation/presentation policy: ${snippet}`
+  );
+}
+for (const boundary of [
+  "const projectTermRefreshController = appRuntime.featureFactories.createProjectTermRefreshController({",
+  "getProject: editorSessionStore.getProject",
+  "replaceProjectTerms: editorSessionStore.replaceProjectTerms",
+  "repository: { listTerms }",
+  "resources: { termBaseNames: projectResourceContextService.termBaseNames }",
+  "filters: { invalidate: segmentFilterService.invalidate }",
+  "presentation: { renderTermbaseSelect, renderSegments }"
+]) {
+  assertIncludes(appJs, boundary, `project-term refresh composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/createProjectTermRefreshController\(/g) || []).length === 1 &&
+    (appJs.match(/\bprojectTermRefreshController\.refresh\b/g) || []).length === 9 &&
+    (appWorkflowDriverJs.match(/\bprojectTermRefreshController\.refresh\b/g) || []).length === 1,
+  "app.js must compose one project-term refresh controller and all nine application and one workflow consumers must call it directly."
+);
+assert(
+  !/async\s+function\s+refreshProjectTerms\b/.test(appJs) && !/\brefreshProjectTerms\s*\(/.test(appWorkflowDriverJs),
+  "refreshProjectTerms must not return to app.js or the workflow driver after project-term refresh extraction."
+);
+assert(
+  !appJs.includes("editorSessionStore.replaceProjectTerms(await listTerms({") &&
+    !appJs.includes("if (rerender) renderSegments({ preserveScroll: true });"),
+  "project-term lookup, replacement, invalidation, and optional rerender orchestration must not return to app.js."
+);
+assert(
+  appJs.indexOf("const projectSummaryController =") < appJs.indexOf("const projectTermRefreshController =") &&
+    appJs.indexOf("const projectTermRefreshController =") < appJs.indexOf("const projectOpenController ="),
+  "ProjectTermRefreshController must follow project-summary policy and precede project opening and its first direct consumer."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "projectResourceContextService",
+  "segmentFilterService",
+  "refreshProjectTerms",
+  "document.",
+  "els."
+]) {
+  assert(
+    !projectTermRefreshControllerJs.includes(forbiddenOwner),
+    `ProjectTermRefreshController must use injected session, repository, resource, filter, and presentation boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectTermRefreshController replaces fresh empty terms and stops when no project is selected",
+  "ProjectTermRefreshController preserves repeated live project reads and exact terminology query identity",
+  "ProjectTermRefreshController rerenders only when requested and preserves presentation order",
+  "ProjectTermRefreshController awaits terminology before replacement and propagates repository rejection",
+  "ProjectTermRefreshController preserves live-read and resource failure short circuiting",
+  "ProjectTermRefreshController preserves every post-query failure boundary",
+  "ProjectTermRefreshController preserves option destructuring and synchronous dependency failures",
+  "ProjectTermRefreshController validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectTermRefreshControllerUnitTests,
+    testName,
+    `focused project-term refresh tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(
@@ -4827,7 +4923,7 @@ for (const boundary of [
   "markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource",
   "open: (...args) => resourcesController?.openResource?.(...args)",
   "refresh: resourceCatalogRefreshController.refresh",
-  "refreshProjectTerms",
+  "refreshProjectTerms: projectTermRefreshController.refresh",
   "alert: uiLocalizationService.alert",
   "status: { set: applicationSaveStatusController.set }"
 ]) {
@@ -4901,7 +4997,7 @@ for (const boundary of [
   "repositories: { updateTmEntry, updateTerm }",
   "markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource",
   "refresh: resourceCatalogRefreshController.refresh",
-  "refreshProjectTerms",
+  "refreshProjectTerms: projectTermRefreshController.refresh",
   "labelFromKey: resourceCatalogService.labelFromKey",
   "items: resourceItems",
   "execute: (...args) => appRuntime.commands.bus.execute(...args)",
@@ -7244,7 +7340,7 @@ for (const boundary of [
   'showProjects: () => applicationViewController.show("projects")',
   "workspaceDirtyStateController.markProjectsUsingResource(type, name, sourceLang, targetLang)",
   "refreshResources: resourceCatalogRefreshController.refresh",
-  "refreshTerms: (options) => refreshProjectTerms(options)",
+  "refreshTerms: projectTermRefreshController.refresh",
   "refreshSuggestions: () => termSuggestionsController.refresh()",
   "refreshEditorContext: () => editorContextController.refresh()",
   "isOpen: () => Boolean(els.trashDialog?.open)",
@@ -10250,7 +10346,7 @@ for (const boundary of [
   "markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource",
   "repository: { save: saveTerm }",
   "renderTermbaseSelect,",
-  "refreshProjectTerms: (options) => refreshProjectTerms(options)",
+  "refreshProjectTerms: projectTermRefreshController.refresh",
   "refreshSuggestions: termSuggestionsController.refresh",
   "status: { set: applicationSaveStatusController.set }",
   "logger: console",
@@ -10642,7 +10738,7 @@ for (const boundary of [
   "creator: { remember: projectNameService.rememberCreator }",
   "languageInputService.setInput(els.sourceLangInput, value)",
   "languageInputService.setInput(els.targetLangInput, value)",
-  "terms: refreshProjectTerms",
+  "terms: projectTermRefreshController.refresh",
   "summaries: projectSummaryController.refresh",
   "editorContext: editorContextController.refresh",
   "renderStorageStatus: workspaceRecoveryPresentationService.renderProjectStorage",

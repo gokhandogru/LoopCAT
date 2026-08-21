@@ -1381,6 +1381,17 @@ const projectSummaryController = appRuntime.featureFactories.createProjectSummar
   }
 });
 
+const projectTermRefreshController = appRuntime.featureFactories.createProjectTermRefreshController({
+  session: {
+    getProject: editorSessionStore.getProject,
+    replaceProjectTerms: editorSessionStore.replaceProjectTerms
+  },
+  repository: { listTerms },
+  resources: { termBaseNames: projectResourceContextService.termBaseNames },
+  filters: { invalidate: segmentFilterService.invalidate },
+  presentation: { renderTermbaseSelect, renderSegments }
+});
+
 const projectOpenController = appRuntime.featureFactories.createProjectOpenController({
   autosave: { flush: (...args) => autosaveService.flush(...args) },
   session: {
@@ -1401,7 +1412,7 @@ const projectOpenController = appRuntime.featureFactories.createProjectOpenContr
     listActivity: listActivityEvents
   },
   histories: { prepare: (...args) => segmentTargetStateService.prepareHistories(...args) },
-  terms: { refresh: (...args) => refreshProjectTerms(...args) },
+  terms: { refresh: projectTermRefreshController.refresh },
   filters: {
     ready: () => filterPresetReady,
     restore: (projectId) => filterPresetController?.restoreForProject?.(projectId)
@@ -1496,7 +1507,7 @@ const applicationCommandHistoryController =
       markLinkedDirty: (type, name, sourceLang, targetLang) =>
         workspaceDirtyStateController.markProjectsUsingResource(type, name, sourceLang, targetLang),
       refreshResources: resourceCatalogRefreshController.refresh,
-      refreshTerms: (options) => refreshProjectTerms(options),
+      refreshTerms: projectTermRefreshController.refresh,
       refreshSuggestions: () => termSuggestionsController.refresh(),
       refreshEditorContext: () => editorContextController.refresh()
     },
@@ -1606,7 +1617,7 @@ const termFormController = appRuntime.featureFactories.createTermFormController(
   repository: { save: saveTerm },
   presentation: {
     renderTermbaseSelect,
-    refreshProjectTerms: (options) => refreshProjectTerms(options),
+    refreshProjectTerms: projectTermRefreshController.refresh,
     refreshSuggestions: termSuggestionsController.refresh
   },
   status: { set: applicationSaveStatusController.set },
@@ -2108,7 +2119,7 @@ const projectResourceTransferController =
     },
     refresh: {
       tmMatches: tmMatchesController.refresh,
-      projectTerms: refreshProjectTerms,
+      projectTerms: projectTermRefreshController.refresh,
       terms: termSuggestionsController.refresh
     },
     builders: { buildTmx, buildTbx },
@@ -3199,7 +3210,7 @@ const aiTerminologyExtractionController =
       renderCommandCentre: aiProviderFormController.renderCommandCentre,
       renderAiProgress: aiProviderFormController.renderProgress,
       renderOutput: aiProviderFormController.renderOutput,
-      refreshProjectTerms: () => refreshProjectTerms({ rerender: true }),
+      refreshProjectTerms: () => projectTermRefreshController.refresh({ rerender: true }),
       refreshTerms: termSuggestionsController.refresh
     },
     activity: {
@@ -4763,7 +4774,7 @@ const projectDialogSaveController =
       setTarget: (value) => languageInputService.setInput(els.targetLangInput, value)
     },
     refresh: {
-      terms: refreshProjectTerms,
+      terms: projectTermRefreshController.refresh,
       summaries: projectSummaryController.refresh,
       editorContext: editorContextController.refresh
     },
@@ -4900,7 +4911,7 @@ const resourceLibraryImportController =
       markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource,
       open: (...args) => resourcesController?.openResource?.(...args),
       refresh: resourceCatalogRefreshController.refresh,
-      refreshProjectTerms
+      refreshProjectTerms: projectTermRefreshController.refresh
     },
     alert: uiLocalizationService.alert,
     status: { set: applicationSaveStatusController.set }
@@ -4919,7 +4930,7 @@ const resourceMutationController = appRuntime.featureFactories.createResourceMut
   resources: {
     markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource,
     refresh: resourceCatalogRefreshController.refresh,
-    refreshProjectTerms,
+    refreshProjectTerms: projectTermRefreshController.refresh,
     labelFromKey: resourceCatalogService.labelFromKey,
     items: resourceItems
   },
@@ -5281,21 +5292,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-async function refreshProjectTerms({ rerender = false } = {}) {
-  if (!editorSessionStore.getProject()) {
-    editorSessionStore.replaceProjectTerms([]);
-    return;
-  }
-  editorSessionStore.replaceProjectTerms(await listTerms({
-    sourceLang: editorSessionStore.getProject().sourceLang,
-    targetLang: editorSessionStore.getProject().targetLang,
-    termBaseNames: projectResourceContextService.termBaseNames()
-  }));
-  segmentFilterService.invalidate();
-  renderTermbaseSelect();
-  if (rerender) renderSegments({ preserveScroll: true });
-}
 
 async function projectTermsForValidation() {
   if (!editorSessionStore.getProject()) return [];
@@ -5853,7 +5849,7 @@ async function addResourceToCurrentProject(type, resource) {
   });
   editorSessionStore.replaceProject(await updateProject({ ...editorSessionStore.getProject(), resourceLinks: links }));
   editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
-  await refreshProjectTerms({ rerender: true });
+  await projectTermRefreshController.refresh({ rerender: true });
   await projectSummaryController.refresh();
   renderAll();
   await editorContextController.refresh();

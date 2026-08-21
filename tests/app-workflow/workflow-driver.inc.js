@@ -2455,7 +2455,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (aiExtractedTermIds.length) {
         await deleteTerms(aiExtractedTermIds);
         workspaceDirtyStateController.markProjectsUsingResource("termbase", "Workflow TB", editorSessionStore.getProject().sourceLang, editorSessionStore.getProject().targetLang);
-        await refreshProjectTerms({ rerender: true });
+        await projectTermRefreshController.refresh({ rerender: true });
         await termSuggestionsController.refresh();
       }
     }
