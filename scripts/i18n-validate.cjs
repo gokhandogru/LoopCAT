@@ -16,6 +16,13 @@ const applicationValidationPresentationControllerPath = path.join(
 const applicationSaveStatusControllerPath = path.join(root, "src", "app", "application-save-status-controller.js");
 const focusModeControllerPath = path.join(root, "src", "features", "editor", "focus-mode-controller.js");
 const projectAnalysisControllerPath = path.join(root, "src", "features", "projects", "project-analysis-controller.js");
+const projectListPresentationControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "projects",
+  "project-list-presentation-controller.js"
+);
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -112,6 +119,11 @@ function validate() {
     ...collectCodeKeys(fs.existsSync(focusModeControllerPath) ? fs.readFileSync(focusModeControllerPath, "utf8") : ""),
     ...collectCodeKeys(
       fs.existsSync(projectAnalysisControllerPath) ? fs.readFileSync(projectAnalysisControllerPath, "utf8") : ""
+    ),
+    ...collectCodeKeys(
+      fs.existsSync(projectListPresentationControllerPath)
+        ? fs.readFileSync(projectListPresentationControllerPath, "utf8")
+        : ""
     )
   ];
   referencedKeys.forEach((key) => {

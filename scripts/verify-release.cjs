@@ -250,6 +250,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-domain-controller.js",
   "src/features/projects/project-filter-controls-controller.js",
   "src/features/projects/project-home-controller.js",
+  "src/features/projects/project-list-presentation-controller.js",
   "src/features/projects/project-resource-selection-controller.js",
   "src/features/projects/project-name-service.js",
   "src/features/projects/project-record-lookup-service.js",
@@ -375,6 +376,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-analysis-controller.test.cjs",
   "tests/unit/project-filter-controls-controller.test.cjs",
   "tests/unit/project-home-controller.test.cjs",
+  "tests/unit/project-list-presentation-controller.test.cjs",
   "tests/unit/project-document-import-controller.test.cjs",
   "tests/unit/file-import-service.test.cjs",
   "tests/unit/project-export-build-service.test.cjs",
@@ -646,6 +648,8 @@ const projectActivityControllerJs = readText("src/features/projects/project-acti
 const projectActivityControllerUnitTests = readText("tests/unit/project-activity-controller.test.cjs");
 const projectAnalysisControllerJs = readText("src/features/projects/project-analysis-controller.js");
 const projectAnalysisControllerUnitTests = readText("tests/unit/project-analysis-controller.test.cjs");
+const projectListPresentationControllerJs = readText("src/features/projects/project-list-presentation-controller.js");
+const projectListPresentationControllerUnitTests = readText("tests/unit/project-list-presentation-controller.test.cjs");
 const projectFilterControlsControllerJs = readText("src/features/projects/project-filter-controls-controller.js");
 const projectFilterControlsControllerUnitTests = readText("tests/unit/project-filter-controls-controller.test.cjs");
 const projectHomeControllerJs = readText("src/features/projects/project-home-controller.js");
@@ -1476,7 +1480,7 @@ for (const boundary of [
   "pruneProjectSummaryRevisions: editorSessionStore.pruneProjectSummaryRevisions",
   "dirty: { prune: workspaceDirtyStateController.prune }",
   "summaries: { refresh: projectSummaryController.refresh }",
-  "renderList: renderProjectList",
+  "renderList: projectListPresentationController.render",
   "renderEditor,",
   "renderTrashSummary: () => applicationTrashController.renderSummary()",
   "selection: { open: projectOpenController.open }"
@@ -4618,6 +4622,122 @@ assertIncludes(
   i18nValidateScript,
   '"project-analysis-controller.js"',
   "source-catalog validation must check explicit keys in the checked project-analysis controller."
+);
+for (const snippet of [
+  "ProjectListPresentationController requires a project-list root.",
+  "ProjectListPresentationController requires project session boundaries.",
+  "ProjectListPresentationController requires DOM creation boundaries.",
+  "ProjectListPresentationController requires text-safety boundaries.",
+  "ProjectListPresentationController requires a language boundary.",
+  "ProjectListPresentationController requires localization boundaries.",
+  "ProjectListPresentationController requires presentation and navigation boundaries.",
+  "if (!session.getProjects().length) {",
+  'presentation.replaceSafeHtml(root, `<div class="muted">${localization.sourceHtml("No projects yet.")}</div>`);',
+  "const fragment = dom.createDocumentFragment();",
+  "session.getProjects().forEach((project) => {",
+  'const button = dom.createElement("button");',
+  'button.className = `project-item ${session.getProject()?.id === project.id ? "active" : ""}`;',
+  "text.displaySafeHtml(project.name)",
+  "text.escapeHtml(language.display(project))",
+  'project.sourceFileName ? text.displaySafeHtml(project.sourceFileName) : localization.labelHtml("noSourceFile")',
+  'button.addEventListener("click", () => navigation.open(project.id));',
+  "fragment.append(button);",
+  "root.replaceChildren(fragment);",
+  "return Object.freeze({ render });"
+]) {
+  assertIncludes(
+    projectListPresentationControllerJs,
+    snippet,
+    `ProjectListPresentationController must retain characterized empty/list/card/selection/listener/replacement policy: ${snippet}`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectListPresentationController({",
+  "root: els.projectList",
+  "getProject: editorSessionStore.getProject",
+  "getProjects: editorSessionStore.getProjects",
+  "createElement: (tagName) => document.createElement(tagName)",
+  "createDocumentFragment: () => document.createDocumentFragment()",
+  "displaySafeHtml: applicationTextSafetyService.displaySafeHtml",
+  "escapeHtml: applicationTextSafetyService.escapeHtml",
+  "display: projectLanguageContextController.display",
+  "localization: uiLocalizationService",
+  "presentation: { replaceSafeHtml }",
+  "navigation: { open: projectOpenController.open }",
+  "renderList: projectListPresentationController.render"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `project-list presentation composition must retain the checked ${boundary} boundary.`
+  );
+}
+assert(
+  (appJs.match(/\bprojectListPresentationController\.render\b/g) || []).length === 2,
+  "project loading and aggregate rendering must call ProjectListPresentationController.render directly."
+);
+assert(
+  (appWorkflowDriverJs.match(/\bprojectListPresentationController\.render\b/g) || []).length === 0,
+  "workflow characterization must not require a project-list presentation compatibility facade."
+);
+assert(
+  !/function\s+renderProjectList\b/.test(appJs) && !/function\s+renderProjectList\b/.test(appWorkflowDriverJs),
+  "renderProjectList must not return after project-list presentation extraction."
+);
+assert(
+  !appJs.includes("button.className = `project-item ${editorSessionStore.getProject()?.id") &&
+    !appJs.includes('uiLocalizationService.sourceHtml("No projects yet.")') &&
+    !appJs.includes('button.addEventListener("click", () => projectOpenController.open(project.id))'),
+  "project-list empty, selection, and listener policy must not return to app.js."
+);
+assert(
+  appJs.indexOf("const projectOpenController =") < appJs.indexOf("const projectListPresentationController =") &&
+    appJs.indexOf("const projectListPresentationController =") <
+      appJs.indexOf("const projectDocumentOpenController =") &&
+    appJs.indexOf("const projectListPresentationController =") <
+      appJs.indexOf("const projectCollectionLoadController ="),
+  "ProjectListPresentationController must follow project opening and precede document opening, project loading, and aggregate rendering consumers."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "projectOpenController",
+  "projectLanguageContextController",
+  "applicationTextSafetyService",
+  "uiLocalizationService",
+  "document.",
+  "els."
+]) {
+  assert(
+    !projectListPresentationControllerJs.includes(forbiddenOwner),
+    `ProjectListPresentationController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectListPresentationController preserves the first-read empty state and immediate return",
+  "ProjectListPresentationController preserves the second fresh project read and stable order",
+  "ProjectListPresentationController reads current project per item with strict active IDs",
+  "ProjectListPresentationController preserves safe card markup and no-source fallback",
+  "ProjectListPresentationController captures exact project IDs in open listeners",
+  "ProjectListPresentationController preserves a non-empty guard followed by an empty live list",
+  "ProjectListPresentationController preserves empty and populated failure timing",
+  "ProjectListPresentationController validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectListPresentationControllerUnitTests,
+    testName,
+    `focused project-list presentation tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/project-list-presentation-controller.js"',
+  "source-catalog extraction must scan the checked project-list presentation controller."
+);
+assertIncludes(
+  i18nValidateScript,
+  '"project-list-presentation-controller.js"',
+  "source-catalog validation must check explicit keys in the checked project-list presentation controller."
 );
 assertIncludes(
   i18nExtractScript,
@@ -9532,6 +9652,16 @@ assertIncludes(
   appBootstrapJs,
   "createProjectAnalysisController,",
   "The application runtime must expose the checked project-analysis controller factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectListPresentationController } from "../features/projects/project-list-presentation-controller.js";',
+  "The application runtime must install the checked project-list presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectListPresentationController,",
+  "The application runtime must expose the checked project-list presentation controller factory."
 );
 assertIncludes(
   appBootstrapJs,
@@ -18052,9 +18182,9 @@ assertIncludes(
   "app.js project home file cards must render in one DOM replacement."
 );
 assertIncludes(
-  appJs,
-  "els.projectList.replaceChildren(fragment)",
-  "app.js sidebar project list must render in one DOM replacement."
+  projectListPresentationControllerJs,
+  "root.replaceChildren(fragment)",
+  "ProjectListPresentationController sidebar list must render in one DOM replacement."
 );
 assertIncludes(
   appJs,
@@ -18642,7 +18772,7 @@ for (const [method, count] of [
   ["stableLower", 14],
   ["escapeHtml", 18],
   ["displaySafeText", 21],
-  ["displaySafeHtml", 14],
+  ["displaySafeHtml", 13],
   ["escapeRegExp", 1],
   ["fileSafeName", 5],
   ["redactSensitiveText", 18]

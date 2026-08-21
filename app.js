@@ -1514,6 +1514,26 @@ const projectOpenController = appRuntime.featureFactories.createProjectOpenContr
     refreshEditor: (...args) => editorContextController.refresh(...args)
   }
 });
+const projectListPresentationController =
+  appRuntime.featureFactories.createProjectListPresentationController({
+    root: els.projectList,
+    session: {
+      getProject: editorSessionStore.getProject,
+      getProjects: editorSessionStore.getProjects
+    },
+    dom: {
+      createElement: (tagName) => document.createElement(tagName),
+      createDocumentFragment: () => document.createDocumentFragment()
+    },
+    text: {
+      displaySafeHtml: applicationTextSafetyService.displaySafeHtml,
+      escapeHtml: applicationTextSafetyService.escapeHtml
+    },
+    language: { display: projectLanguageContextController.display },
+    localization: uiLocalizationService,
+    presentation: { replaceSafeHtml },
+    navigation: { open: projectOpenController.open }
+  });
 
 const projectDocumentOpenController =
   appRuntime.featureFactories.createProjectDocumentOpenController({
@@ -1553,7 +1573,7 @@ const projectCollectionLoadController =
     dirty: { prune: workspaceDirtyStateController.prune },
     summaries: { refresh: projectSummaryController.refresh },
     presentation: {
-      renderList: renderProjectList,
+      renderList: projectListPresentationController.render,
       renderEditor,
       renderTrashSummary: () => applicationTrashController.renderSummary()
     },
@@ -5383,28 +5403,9 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
   }
 });
 
-function renderProjectList() {
-  if (!editorSessionStore.getProjects().length) {
-    replaceSafeHtml(els.projectList, `<div class="muted">${uiLocalizationService.sourceHtml("No projects yet.")}</div>`);
-    return;
-  }
-  const fragment = document.createDocumentFragment();
-  editorSessionStore.getProjects().forEach((project) => {
-    const button = document.createElement("button");
-    button.className = `project-item ${editorSessionStore.getProject()?.id === project.id ? "active" : ""}`;
-    replaceSafeHtml(
-      button,
-      `<strong>${applicationTextSafetyService.displaySafeHtml(project.name)}</strong><span>${applicationTextSafetyService.escapeHtml(projectLanguageContextController.display(project))}</span><span>${project.sourceFileName ? applicationTextSafetyService.displaySafeHtml(project.sourceFileName) : uiLocalizationService.labelHtml("noSourceFile")}</span>`
-    );
-    button.addEventListener("click", () => projectOpenController.open(project.id));
-    fragment.append(button);
-  });
-  els.projectList.replaceChildren(fragment);
-}
-
 function renderAll() {
   segmentFilterService.invalidate();
-  renderProjectList();
+  projectListPresentationController.render();
   renderEditor();
   renderProjectHome();
   projectAnalysisController.render();
