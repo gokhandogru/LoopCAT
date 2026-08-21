@@ -167,6 +167,7 @@ const requiredReleaseFiles = [
   "src/app/application-save-status-controller.js",
   "src/app/application-storage-durability-controller.js",
   "src/app/application-startup-controller.js",
+  "src/app/application-text-safety-service.js",
   "src/app/application-trash-controller.js",
   "src/app/application-update-controls-controller.js",
   "src/app/application-view-controller.js",
@@ -313,6 +314,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-save-status-controller.test.cjs",
   "tests/unit/application-storage-durability-controller.test.cjs",
   "tests/unit/application-startup-controller.test.cjs",
+  "tests/unit/application-text-safety-service.test.cjs",
   "tests/unit/application-trash-controller.test.cjs",
   "tests/unit/application-update-controls-controller.test.cjs",
   "tests/unit/application-view-controller.test.cjs",
@@ -505,6 +507,8 @@ const applicationStorageDurabilityControllerUnitTests = readText(
 );
 const applicationStartupControllerJs = readText("src/app/application-startup-controller.js");
 const applicationStartupControllerUnitTests = readText("tests/unit/application-startup-controller.test.cjs");
+const applicationTextSafetyServiceJs = readText("src/app/application-text-safety-service.js");
+const applicationTextSafetyServiceUnitTests = readText("tests/unit/application-text-safety-service.test.cjs");
 const applicationTrashControllerJs = readText("src/app/application-trash-controller.js");
 const applicationTrashControllerUnitTests = readText("tests/unit/application-trash-controller.test.cjs");
 const applicationUpdateControlsControllerJs = readText("src/app/application-update-controls-controller.js");
@@ -1097,7 +1101,7 @@ assertIncludes(appJs, "createLanguageInputService({", "app.js must compose the c
 for (const boundary of [
   "entries: LANGUAGE_ENTRIES",
   "aliases: LANGUAGE_ALIAS_CODES",
-  "redact: redactSensitiveText",
+  "redact: applicationTextSafetyService.redactSensitiveText",
   "localization: uiLocalizationService",
   'getLocale: () => uiI18n?.getLocale?.() || ""',
   'getNavigatorLanguage: () => navigator.language || "en"',
@@ -2566,7 +2570,7 @@ for (const boundary of [
   "getManifest: projectDocumentManifest",
   "getSegments: () => editorSessionStore.getSegments()",
   "getSelectedDocumentId: () => applicationStore.getState().navigation.documentId",
-  "normalizeType: stableLower"
+  "normalizeType: applicationTextSafetyService.stableLower"
 ]) {
   assertIncludes(appJs, boundary, `project document-catalog composition must inject the ${boundary} boundary.`);
 }
@@ -5395,7 +5399,7 @@ for (const boundary of [
   'dialog: { open: () => dialogLifecycleController?.open?.("trash") || false }',
   "source: (value, variables) => uiLocalizationService.source(value, variables)",
   "confirm: (value) => uiLocalizationService.confirm(value)",
-  "text: { safe: (value, fallback) => displaySafeText(value, fallback) }",
+  "text: { safe: applicationTextSafetyService.displaySafeText }",
   "date: { format: (value) => formatDate(value) }",
   "createElement: (tagName) => document.createElement(tagName)",
   "createFragment: () => document.createDocumentFragment()",
@@ -6382,7 +6386,7 @@ for (const boundary of [
 for (const boundary of [
   "appRuntime.featureFactories.createGlobalKeyboardController({",
   "target: window",
-  "normalizeKey: stableLower",
+  "normalizeKey: applicationTextSafetyService.stableLower",
   "getProjectId: () => state.commandProjectId || editorSessionStore.getProject()?.id || null",
   "canUndo: (projectId) => Boolean(appRuntime?.commands?.bus?.canUndo?.(projectId))",
   "canRedo: (projectId) => Boolean(appRuntime?.commands?.bus?.canRedo?.(projectId))",
@@ -7117,7 +7121,7 @@ assertIncludes(
   "createProtectedTextReplacementService({",
   "app.js must compose the checked protected-text replacement service."
 );
-for (const boundary of ["detectTags: detectProtectedTags", "normalizeCase: stableLower"]) {
+for (const boundary of ["detectTags: detectProtectedTags", "normalizeCase: applicationTextSafetyService.stableLower"]) {
   assertIncludes(appJs, boundary, `protected-text replacement composition must inject the ${boundary} boundary.`);
 }
 assertIncludes(
@@ -7266,7 +7270,7 @@ for (const boundary of [
   "getSegments: () => editorSessionStore.getSegments()",
   "getFilters: () => editorFilterStore.getState()",
   "getDocumentId: () => applicationStore.getState().navigation.documentId",
-  "normalizeCase: stableLower",
+  "normalizeCase: applicationTextSafetyService.stableLower",
   "provenance: segmentProvenanceService"
 ]) {
   assertIncludes(appJs, boundary, `segment filter composition must inject the checked ${boundary} boundary.`);
@@ -7838,7 +7842,7 @@ for (const boundary of [
   "getNames: projectTmNames",
   "findMatches: findProjectTmMatches",
   "localization: uiLocalizationService",
-  "text: { escapeHtml }",
+  "text: { escapeHtml: applicationTextSafetyService.escapeHtml }",
   "safeHtml: { replace: replaceSafeHtml }",
   "target: { insert: (...args) => targetProducerController.insertTmTarget(...args) }",
   "createElement: (tagName) => document.createElement(tagName)",
@@ -7939,7 +7943,7 @@ for (const boundary of [
   "getNames: projectTermBaseNames",
   "find: findTerms",
   "localization: uiLocalizationService",
-  "text: { escapeHtml }",
+  "text: { escapeHtml: applicationTextSafetyService.escapeHtml }",
   "safeHtml: { replace: replaceSafeHtml }",
   "mutation: { deleteTerm: (...args) => resourceMutationController.deleteTerm(...args) }",
   "createElement: (tagName) => document.createElement(tagName)",
@@ -8547,7 +8551,7 @@ for (const boundary of [
   "limits: { portableJsonBytes: MAX_PORTABLE_JSON_BYTES }",
   "get: () => state.importTask",
   "state.importTask = value",
-  "text: { lower: stableLower }",
+  "text: { lower: applicationTextSafetyService.stableLower }",
   "renderBusy: applicationImportProgressController.renderBusy",
   "renderValidation: renderValidationReport",
   "status: { set: applicationSaveStatusController.set }",
@@ -8813,7 +8817,7 @@ for (const boundary of [
   "listActivityEvents",
   "draft: draftProjectActivityEvent",
   "appendWarning: appendActivityWarning",
-  "files: { safeName: fileSafeName, download: applicationDownloadController.download }",
+  "safeName: applicationTextSafetyService.fileSafeName",
   "count: reportCount",
   "errorReport: fileImportService.errorReport",
   "renderValidation: renderValidationReport",
@@ -8981,7 +8985,7 @@ for (const boundary of [
   "status: { set: applicationSaveStatusController.set, mode: exportStatusMode }",
   "alert: uiLocalizationService.alert",
   "confirm: uiLocalizationService.confirm",
-  "text: { safe: displaySafeText }"
+  "text: { safe: applicationTextSafetyService.displaySafeText }"
 ]) {
   assertIncludes(appJs, boundary, `project-import/restore composition must inject the checked ${boundary} boundary.`);
 }
@@ -9280,7 +9284,7 @@ for (const boundary of [
   "dirty: { has: (projectId) => state.workspaceDirtyProjectIds.has(projectId) }",
   "imports: { importProjectPackageData: projectImportRestoreController.importProjectPackageData }",
   "validation: { count: reportCount }",
-  "text: { redact: redactSensitiveText }",
+  "text: { redact: applicationTextSafetyService.redactSensitiveText }",
   "session: editorSessionStore",
   "openProjects: applicationNavigation.openProjects",
   "clearSelection: applicationNavigation.clearSelection",
@@ -9572,7 +9576,8 @@ for (const boundary of [
   "workspace: { markDirty: markWorkspaceDirty }",
   "status: { set: applicationSaveStatusController.set, mode: exportStatusMode }",
   "refreshEditorContext: editorContextController.refresh",
-  "text: { lower: stableLower, safe: displaySafeText }",
+  "lower: applicationTextSafetyService.stableLower",
+  "safe: applicationTextSafetyService.displaySafeText",
   "confirm: uiLocalizationService.confirm",
   "importProjectFile: projectDocumentImportController.importFile"
 ]) {
@@ -9792,7 +9797,9 @@ for (const boundary of [
   "resources: { summary: projectResourceSummary }",
   "languages: { display: projectLanguageContextController.display }",
   "localization: uiLocalizationService",
-  "text: { normalizeCase: stableLower, escapeHtml, escapeRegExp }",
+  "normalizeCase: applicationTextSafetyService.stableLower",
+  "escapeHtml: applicationTextSafetyService.escapeHtml",
+  "escapeRegExp: applicationTextSafetyService.escapeRegExp",
   "safeHtml: { replace: replaceSafeHtml }",
   "target: { insert: targetProducerController.insertTmTarget }",
   "status: { set: applicationSaveStatusController.set }",
@@ -15363,7 +15370,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "searchText: project.searchText ||",
+  "project.searchText ||",
   "app.js project dashboard filtering must reuse cached project search text."
 );
 assertIncludes(
@@ -15724,7 +15731,7 @@ for (const snippet of [
 }
 for (const boundary of [
   "appRuntime.featureFactories.createApplicationDownloadController({",
-  "sanitize: (value) => redactSensitiveText(value)",
+  "sanitize: applicationTextSafetyService.redactSensitiveText",
   "create: (parts, options) => new Blob(parts, options)",
   "create: (blob) => URL.createObjectURL(blob)",
   "revoke: (url) => URL.revokeObjectURL(url)",
@@ -15794,15 +15801,102 @@ for (const testName of [
   );
 }
 assertIncludes(
-  appJs,
-  "function displaySafeText",
-  "app.js must centralize redaction for user-visible project/file/resource labels."
+  appBootstrapJs,
+  'import { createApplicationTextSafetyService } from "./application-text-safety-service.js";',
+  "the application runtime must install the checked application text-safety service."
 );
 assertIncludes(
-  appJs,
-  "function displaySafeHtml",
-  "app.js must centralize escaped redaction for rendered project/file/resource labels."
+  appBootstrapJs,
+  "createApplicationTextSafetyService,",
+  "the application runtime must expose the checked application text-safety service factory."
 );
+for (const snippet of [
+  "ApplicationTextSafetyService requires a checked sensitive-value pattern.",
+  'return String(value || "").toLowerCase()',
+  'replaceAll("&", "&amp;")',
+  'replaceAll("<", "&lt;")',
+  'replaceAll(">", "&gt;")',
+  'replaceAll(\'"\', "&quot;")',
+  'new RegExp(patterns.sensitiveValue.source, "gi")',
+  '"[redacted secret]"',
+  'return redactSensitiveText(value || "").trim() || fallback',
+  "return escapeHtml(displaySafeText(value, fallback))",
+  'replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")',
+  'redactSensitiveText(value || "export").trim() || "export"',
+  'replace(/[^\\p{L}\\p{N}-]+/gu, "_")',
+  "return Object.freeze({",
+  "redactSensitiveText"
+]) {
+  assertIncludes(
+    applicationTextSafetyServiceJs,
+    snippet,
+    `ApplicationTextSafetyService must retain characterized normalization and safety policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationTextSafetyService({",
+  "patterns: { sensitiveValue: SENSITIVE_TEXT_VALUE_PATTERN }",
+  "escapeHtml: applicationTextSafetyService.escapeHtml",
+  "redactSensitiveText: applicationTextSafetyService.redactSensitiveText",
+  "normalizeCase: applicationTextSafetyService.stableLower",
+  "safeName: applicationTextSafetyService.fileSafeName",
+  "displaySafeText: applicationTextSafetyService.displaySafeText",
+  "displaySafeHtml: applicationTextSafetyService.displaySafeHtml",
+  "escapeRegExp: applicationTextSafetyService.escapeRegExp"
+]) {
+  assertIncludes(appJs, boundary, `application text-safety composition and consumers must retain ${boundary}.`);
+}
+for (const [method, count] of [
+  ["stableLower", 17],
+  ["escapeHtml", 18],
+  ["displaySafeText", 21],
+  ["displaySafeHtml", 14],
+  ["escapeRegExp", 1],
+  ["fileSafeName", 5],
+  ["redactSensitiveText", 20]
+]) {
+  assert(
+    (appJs.match(new RegExp(`\\bapplicationTextSafetyService\\.${method}\\b`, "g")) || []).length === count,
+    `all ${method} consumers must call ApplicationTextSafetyService directly.`
+  );
+}
+for (const removedHelper of [
+  "stableLower",
+  "escapeHtml",
+  "displaySafeText",
+  "displaySafeHtml",
+  "escapeRegExp",
+  "fileSafeName",
+  "redactSensitiveText"
+]) {
+  assert(
+    !new RegExp(`function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return as a coordinator or workflow helper.`
+  );
+}
+for (const forbiddenOwner of ["appRuntime", "SENSITIVE_TEXT_VALUE_PATTERN", "window.", "document."]) {
+  assert(
+    !applicationTextSafetyServiceJs.includes(forbiddenOwner),
+    `ApplicationTextSafetyService must use its injected pattern rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationTextSafetyService preserves every stable lowercasing branch and immutable API",
+  "ApplicationTextSafetyService recreates global case-insensitive redaction on every call",
+  "ApplicationTextSafetyService preserves ordered HTML escaping and falsy coercion",
+  "ApplicationTextSafetyService preserves safe-text trimming redaction and fallback timing",
+  "ApplicationTextSafetyService composes safe HTML through exact text and escape policy",
+  "ApplicationTextSafetyService preserves Unicode file stems redaction and fallback",
+  "ApplicationTextSafetyService preserves every regular-expression metacharacter escape",
+  "ApplicationTextSafetyService validates its sensitive-value pattern boundary"
+]) {
+  assertIncludes(
+    applicationTextSafetyServiceUnitTests,
+    testName,
+    `focused application text-safety tests must retain characterization: ${testName}.`
+  );
+}
 assertIncludes(
   applicationSaveStatusControllerJs,
   'redaction.sanitize(text || "")',
@@ -15810,7 +15904,7 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "function clearOpenAiKey", "function clearLocalAiKey"),
-  'redactSensitiveText(error.message || "OpenAI key could not be cleared.")',
+  'applicationTextSafetyService.redactSensitiveText(error.message || "OpenAI key could not be cleared.")',
   "app.js must redact credential-looking text from AI key-storage status errors."
 );
 assertIncludes(
@@ -15820,7 +15914,7 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "function sanitizeValidationReportForDisplay", "function renderValidationReport"),
-  'redactSensitiveText(message || "")',
+  'applicationTextSafetyService.redactSensitiveText(message || "")',
   "app.js must redact credential-looking validation report messages before display."
 );
 assertIncludes(
@@ -15873,7 +15967,11 @@ assertIncludes(
   "target TXT export click failure cleans up temporary download link and URL",
   "app workflow test must verify failed browser download clicks clean up temporary links and object URLs."
 );
-assertIncludes(appJs, "function stableLower(value)", "app.js must centralize locale-stable UI search casing.");
+assertIncludes(
+  applicationTextSafetyServiceJs,
+  "toLowerCase()",
+  "ApplicationTextSafetyService must centralize locale-stable UI search casing."
+);
 assert(
   !appJs.includes(".toLocaleLowerCase()"),
   "app.js must not use the user interface locale for editor search, replace, command, or duplicate-file matching."
@@ -16356,7 +16454,7 @@ for (const snippet of [
 }
 for (const boundary of [
   "appRuntime.featureFactories.createApplicationSaveStatusController({",
-  "sanitize: (value) => redactSensitiveText(value)",
+  "sanitize: applicationTextSafetyService.redactSensitiveText",
   "publish: (record) => appRuntime?.status?.controller?.fromLegacy?.(record)",
   "getProjectId: () => editorSessionStore.getProject()?.id || null",
   "getSegmentId: () => applicationStore.getState().navigation.segmentId",
@@ -16869,7 +16967,7 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "function projectDocumentManifest", "function cleanProjectResourceLinks"),
-  "stableLower(cleanProjectText(documentInfo.type",
+  "applicationTextSafetyService.stableLower(cleanProjectText(documentInfo.type",
   "app.js document metadata types must be normalized before export selection."
 );
 assertIncludes(

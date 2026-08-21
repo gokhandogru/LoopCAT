@@ -73,10 +73,14 @@ const {
 const workerClient = compatibilityModules.workerClient;
 const workspaceStorage = compatibilityModules.workspaceStorage;
 const uiI18n = compatibilityModules.i18n;
+const SENSITIVE_TEXT_VALUE_PATTERN = /(sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._~+/=-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|npm_[A-Za-z0-9_]{8,}|(?:session|cookie)[=:][A-Za-z0-9._~+/=-]{8,})/i;
+const applicationTextSafetyService = appRuntime.featureFactories.createApplicationTextSafetyService({
+  patterns: { sensitiveValue: SENSITIVE_TEXT_VALUE_PATTERN }
+});
 const uiLocalizationService = appRuntime.featureFactories.createUiLocalizationService({
   i18n: uiI18n,
   documentElement: document.documentElement,
-  escapeHtml,
+  escapeHtml: applicationTextSafetyService.escapeHtml,
   confirm: (message) => window.confirm(message),
   alert: (message) => window.alert(message)
 });
@@ -95,7 +99,7 @@ const qaResultsController = appRuntime.featureFactories.createQaResultsControlle
     createDocumentFragment: () => document.createDocumentFragment()
   },
   localization: uiLocalizationService,
-  escapeHtml,
+  escapeHtml: applicationTextSafetyService.escapeHtml,
   replaceSafeHtml: (...args) => appRuntime.safeHtml.replace(...args),
   navigation: { select: (index) => segmentNavigationController.select(index) },
   presentation: { renderSegments },
@@ -103,8 +107,8 @@ const qaResultsController = appRuntime.featureFactories.createQaResultsControlle
 });
 const reportPresentationService = appRuntime.featureFactories.createReportPresentationService({
   localization: uiLocalizationService,
-  escapeHtml,
-  redactSensitiveText,
+  escapeHtml: applicationTextSafetyService.escapeHtml,
+  redactSensitiveText: applicationTextSafetyService.redactSensitiveText,
   qualityCategoryName: qualityPresentationService.category,
   qaCheckMessage: qaResultsController.message,
   qaCheckFixHint: qaResultsController.fixHint
@@ -112,8 +116,8 @@ const reportPresentationService = appRuntime.featureFactories.createReportPresen
 const reportDocumentCompositionService = appRuntime.featureFactories.createReportDocumentCompositionService({
   localization: uiLocalizationService,
   presentation: reportPresentationService,
-  escapeHtml,
-  redactSensitiveText,
+  escapeHtml: applicationTextSafetyService.escapeHtml,
+  redactSensitiveText: applicationTextSafetyService.redactSensitiveText,
   defaultQualityProfile,
   sanitizeValidationReportForDisplay,
   languagePairDisplay: (...args) => languageInputService.pairDisplay(...args),
@@ -168,7 +172,6 @@ const LOCALIZATION_EXPORT_TYPES = new Set([
   "srt", "vtt", "sbv", "txt"
 ]);
 const RESOURCE_LINK_TYPES = new Set(["tm", "termbase"]);
-const SENSITIVE_TEXT_VALUE_PATTERN = /(sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._~+/=-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|npm_[A-Za-z0-9_]{8,}|(?:session|cookie)[=:][A-Za-z0-9._~+/=-]{8,})/i;
 // Bundled language/locales for offline use.
 const LOOPCAT_LANGUAGE_CATALOG_ENTRIES = [
   ["ace-ID", "Acehnese"],
@@ -1097,7 +1100,7 @@ const els = {
 
 const applicationSaveStatusController =
   appRuntime.featureFactories.createApplicationSaveStatusController({
-    redaction: { sanitize: (value) => redactSensitiveText(value) },
+    redaction: { sanitize: applicationTextSafetyService.redactSensitiveText },
     model: { publish: (record) => appRuntime?.status?.controller?.fromLegacy?.(record) },
     context: {
       getProjectId: () => editorSessionStore.getProject()?.id || null,
@@ -1185,7 +1188,7 @@ const applicationTrashController = appRuntime.featureFactories.createApplication
     source: (value, variables) => uiLocalizationService.source(value, variables),
     confirm: (value) => uiLocalizationService.confirm(value)
   },
-  text: { safe: (value, fallback) => displaySafeText(value, fallback) },
+  text: { safe: applicationTextSafetyService.displaySafeText },
   date: { format: (value) => formatDate(value) },
   dom: {
     createElement: (tagName) => document.createElement(tagName),
@@ -1229,7 +1232,7 @@ const applicationStorageDurabilityController =
     }
   });
 const applicationDownloadController = appRuntime.featureFactories.createApplicationDownloadController({
-  redaction: { sanitize: (value) => redactSensitiveText(value) },
+  redaction: { sanitize: applicationTextSafetyService.redactSensitiveText },
   blobs: { create: (parts, options) => new Blob(parts, options) },
   urls: {
     create: (blob) => URL.createObjectURL(blob),
@@ -1249,14 +1252,14 @@ const revisionHistoryPresentationService =
     localization: uiLocalizationService,
     statusLabel: segmentStatusLabel,
     formatDateTime,
-    escapeHtml,
+    escapeHtml: applicationTextSafetyService.escapeHtml,
     replaceSafeHtml
   });
 
 const languageInputService = appRuntime.featureFactories.createLanguageInputService({
   entries: LANGUAGE_ENTRIES,
   aliases: LANGUAGE_ALIAS_CODES,
-  redact: redactSensitiveText,
+  redact: applicationTextSafetyService.redactSensitiveText,
   localization: uiLocalizationService,
   getLocale: () => uiI18n?.getLocale?.() || "",
   getNavigatorLanguage: () => navigator.language || "en",
@@ -1266,14 +1269,14 @@ const languageInputService = appRuntime.featureFactories.createLanguageInputServ
     codes: els.languageCodeOptions,
     names: els.languageNameOptions
   },
-  escapeHtml,
+  escapeHtml: applicationTextSafetyService.escapeHtml,
   replaceSafeHtml
 });
 
 const textEncodingInputService = appRuntime.featureFactories.createTextEncodingInputService({
   select: els.fileEncodingSelect,
   getOptions: () => encodingApi.TEXT_ENCODING_OPTIONS,
-  escapeHtml,
+  escapeHtml: applicationTextSafetyService.escapeHtml,
   replaceSafeHtml
 });
 
@@ -1289,7 +1292,7 @@ const fileImportService = appRuntime.featureFactories.createFileImportService({
       state.importTask = value;
     }
   },
-  text: { lower: stableLower },
+  text: { lower: applicationTextSafetyService.stableLower },
   presentation: {
     renderBusy: applicationImportProgressController.renderBusy,
     renderValidation: renderValidationReport
@@ -1304,7 +1307,7 @@ const protectedTagInspectionService = appRuntime.featureFactories.createProtecte
 
 const protectedTextReplacementService = appRuntime.featureFactories.createProtectedTextReplacementService({
   detectTags: detectProtectedTags,
-  normalizeCase: stableLower
+  normalizeCase: applicationTextSafetyService.stableLower
 });
 
 const segmentProvenanceService = appRuntime.featureFactories.createSegmentProvenanceService({
@@ -1315,7 +1318,7 @@ const segmentFilterService = appRuntime.featureFactories.createSegmentFilterServ
   getSegments: () => editorSessionStore.getSegments(),
   getFilters: () => editorFilterStore.getState(),
   getDocumentId: () => applicationStore.getState().navigation.documentId,
-  normalizeCase: stableLower,
+  normalizeCase: applicationTextSafetyService.stableLower,
   provenance: segmentProvenanceService
 });
 
@@ -1352,7 +1355,7 @@ const tmMatchesController = appRuntime.featureFactories.createTmMatchesControlle
     findMatches: findProjectTmMatches
   },
   localization: uiLocalizationService,
-  text: { escapeHtml },
+  text: { escapeHtml: applicationTextSafetyService.escapeHtml },
   safeHtml: { replace: replaceSafeHtml },
   target: { insert: (...args) => targetProducerController.insertTmTarget(...args) },
   dom: {
@@ -1372,7 +1375,7 @@ const termSuggestionsController = appRuntime.featureFactories.createTermSuggesti
     find: findTerms
   },
   localization: uiLocalizationService,
-  text: { escapeHtml },
+  text: { escapeHtml: applicationTextSafetyService.escapeHtml },
   safeHtml: { replace: replaceSafeHtml },
   mutation: { deleteTerm: (...args) => resourceMutationController.deleteTerm(...args) },
   dom: {
@@ -1461,7 +1464,7 @@ const projectDocumentCatalogService = appRuntime.featureFactories.createProjectD
   getManifest: projectDocumentManifest,
   getSegments: () => editorSessionStore.getSegments(),
   getSelectedDocumentId: () => applicationStore.getState().navigation.documentId,
-  normalizeType: stableLower
+  normalizeType: applicationTextSafetyService.stableLower
 });
 
 const projectDocumentStatisticsService = appRuntime.featureFactories.createProjectDocumentStatisticsService({
@@ -1706,7 +1709,7 @@ const reportDataService = appRuntime.featureFactories.createReportDataService({
   reporting: { validateExportReadiness, analyzeProject, runQaChecks, buildQualityPassportData },
   worker: workerClient,
   tags: { forSegment: protectedTagInspectionService.sourceTags, missing: protectedTagInspectionService.missing },
-  redactSensitiveText,
+  redactSensitiveText: applicationTextSafetyService.redactSensitiveText,
   timestamp: () => new Date().toISOString()
 });
 let qualityReviewController;
@@ -1799,7 +1802,7 @@ const reportExportController = appRuntime.featureFactories.createReportExportCon
   data: reportDataService,
   documents: reportDocumentCompositionService,
   finalizeDocument: finalizeReportDocument,
-  fileSafeName,
+  fileSafeName: applicationTextSafetyService.fileSafeName,
   download: applicationDownloadController.download,
   presentation: {
     renderQaResults: qaResultsController.render,
@@ -1835,7 +1838,7 @@ const deliveryExportController = appRuntime.featureFactories.createDeliveryExpor
   },
   localization: { source: uiLocalizationService.source },
   confirm: (message) => window.confirm(message),
-  displaySafeText,
+  displaySafeText: applicationTextSafetyService.displaySafeText,
   qa: {
     worker: workerClient,
     run: runQaChecks,
@@ -1854,7 +1857,7 @@ const deliveryExportController = appRuntime.featureFactories.createDeliveryExpor
     localizationMimeType: localizationDownloadMimeType,
     xliffMimeType
   },
-  fileSafeName,
+  fileSafeName: applicationTextSafetyService.fileSafeName,
   download: applicationDownloadController.download,
   presentation: { renderValidationReport, renderQaResults: qaResultsController.render },
   activity: { logOptionalProject: logOptionalProjectActivity },
@@ -1895,7 +1898,7 @@ const projectResourceTransferController =
       terms: termSuggestionsController.refresh
     },
     builders: { buildTmx, buildTbx },
-    fileSafeName,
+    fileSafeName: applicationTextSafetyService.fileSafeName,
     download: applicationDownloadController.download,
     activity: { logOptionalProject: logOptionalProjectActivity },
     status: {
@@ -2007,7 +2010,7 @@ targetEditController = appRuntime.featureFactories.createTargetEditController({
   getCommandProjectId: () => state.commandProjectId,
   getVisibleIndexes: segmentFilterService.visibleIndexes,
   getVisiblePosition: segmentFilterService.visiblePosition,
-  normalizeKey: stableLower,
+  normalizeKey: applicationTextSafetyService.stableLower,
   undo: applicationCommandHistoryController.undo,
   redo: applicationCommandHistoryController.redo
 });
@@ -2063,7 +2066,11 @@ const concordanceController = appRuntime.featureFactories.createConcordanceContr
   resources: { summary: projectResourceSummary },
   languages: { display: projectLanguageContextController.display },
   localization: uiLocalizationService,
-  text: { normalizeCase: stableLower, escapeHtml, escapeRegExp },
+  text: {
+    normalizeCase: applicationTextSafetyService.stableLower,
+    escapeHtml: applicationTextSafetyService.escapeHtml,
+    escapeRegExp: applicationTextSafetyService.escapeRegExp
+  },
   safeHtml: { replace: replaceSafeHtml },
   target: { insert: targetProducerController.insertTmTarget },
   status: { set: applicationSaveStatusController.set },
@@ -2252,7 +2259,7 @@ const aiRuntimeSettingsService =
       readLocal: aiCredentialStorageService.storedLocalAiKey,
       readOpenAi: aiCredentialStorageService.storedOpenAiKey
     },
-    redact: redactSensitiveText,
+    redact: applicationTextSafetyService.redactSensitiveText,
     defaults: {
       openAiModel: OPENAI_DEFAULT_MODEL,
       projectLocalProviderId: "ollama",
@@ -2391,7 +2398,7 @@ const aiProviderFormController =
     },
     status: { setSave: applicationSaveStatusController.set },
     localization: { label: uiLocalizationService.label, source: uiLocalizationService.source },
-    redact: redactSensitiveText,
+    redact: applicationTextSafetyService.redactSensitiveText,
     defaults: {
       localBaseUrl: OLLAMA_DEFAULT_BASE_URL,
       localModel: DEFAULT_LOCAL_AI_MODEL,
@@ -2584,7 +2591,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: applicationSaveStatusController.set },
   labels: { risk: qualityPresentationService.aiReviewRisk },
-  redact: redactSensitiveText,
+  redact: applicationTextSafetyService.redactSensitiveText,
   ids: { next: () => (crypto.randomUUID ? crypto.randomUUID() : Date.now()) },
   clock: { now: () => new Date().toISOString() },
   logger: console
@@ -2662,7 +2669,7 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
   },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: applicationSaveStatusController.set },
-  redact: redactSensitiveText,
+  redact: applicationTextSafetyService.redactSensitiveText,
   logger: console
 });
 const aiAlternativesController = appRuntime.featureFactories.createAiAlternativesController({
@@ -2749,7 +2756,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
   },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: applicationSaveStatusController.set },
-  redact: redactSensitiveText,
+  redact: applicationTextSafetyService.redactSensitiveText,
   logger: console
 });
 const aiTerminologyApplicationController =
@@ -2830,7 +2837,7 @@ const aiTerminologyApplicationController =
     },
     workspace: { markDirty: markWorkspaceDirty },
     status: { set: applicationSaveStatusController.set },
-    redact: redactSensitiveText,
+    redact: applicationTextSafetyService.redactSensitiveText,
     logger: console
   });
 const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditingController({
@@ -2911,7 +2918,7 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
   },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: applicationSaveStatusController.set },
-  redact: redactSensitiveText,
+  redact: applicationTextSafetyService.redactSensitiveText,
   logger: console
 });
 const aiTermCandidatePersistenceService =
@@ -2921,7 +2928,7 @@ const aiTermCandidatePersistenceService =
       list: listTerms,
       save: saveTerm
     },
-    normalize: { stableLower },
+    normalize: { stableLower: applicationTextSafetyService.stableLower },
     workspace: { markProjectsUsingResourceDirty }
   });
 const aiTerminologyExtractionController =
@@ -3118,7 +3125,7 @@ const aiSuggestionPersistenceController =
       }
     },
     status: { set: applicationSaveStatusController.set },
-    redact: redactSensitiveText,
+    redact: applicationTextSafetyService.redactSensitiveText,
     ids: { suggestion: () => makeId("ai-suggestion") },
     testHooks: {
       beforeSave: (segment) => {
@@ -3313,7 +3320,7 @@ const aiPromptPreviewController = appRuntime.featureFactories.createAiPromptPrev
     extractTerms: buildTerminologyExtractionPrompt,
     projectBrief: buildProjectBriefPrompt
   },
-  normalize: { stableLower }
+  normalize: { stableLower: applicationTextSafetyService.stableLower }
 });
 const aiPromptTestController = appRuntime.featureFactories.createAiPromptTestController({
   project: { get: editorSessionStore.getProject },
@@ -3647,7 +3654,7 @@ const focusModeController = appRuntime.featureFactories.createFocusModeControlle
 });
 const globalKeyboardController = appRuntime.featureFactories.createGlobalKeyboardController({
   target: window,
-  normalizeKey: stableLower,
+  normalizeKey: applicationTextSafetyService.stableLower,
   commands: {
     getProjectId: () => state.commandProjectId || editorSessionStore.getProject()?.id || null,
     canUndo: (projectId) => Boolean(appRuntime?.commands?.bus?.canUndo?.(projectId)),
@@ -3948,7 +3955,7 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
   source: uiLocalizationService.source,
   label: uiLocalizationService.label,
   formatDateTime,
-  safeText: displaySafeText,
+  safeText: applicationTextSafetyService.displaySafeText,
   chooseWorkspace: (...args) => workspacePackageSaveController.chooseFolder(...args),
   saveProject: (...args) => workspacePackageSaveController.saveCurrent(...args),
   syncWorkspace: () => fileImportService.runTask("Workspace sync", () => workspaceSyncController.sync()),
@@ -4084,7 +4091,10 @@ projectExportController = appRuntime.featureFactories.createProjectExportControl
     draft: draftProjectActivityEvent,
     appendWarning: appendActivityWarning
   },
-  files: { safeName: fileSafeName, download: applicationDownloadController.download },
+  files: {
+    safeName: applicationTextSafetyService.fileSafeName,
+    download: applicationDownloadController.download
+  },
   validation: {
     count: reportCount,
     errorReport: fileImportService.errorReport
@@ -4219,7 +4229,7 @@ const projectImportRestoreController =
       alert: uiLocalizationService.alert,
       confirm: uiLocalizationService.confirm
     },
-    text: { safe: displaySafeText }
+    text: { safe: applicationTextSafetyService.displaySafeText }
   });
 workspaceSyncController = appRuntime.featureFactories.createWorkspaceSyncController({
   connection: {
@@ -4233,7 +4243,7 @@ workspaceSyncController = appRuntime.featureFactories.createWorkspaceSyncControl
   dirty: { has: (projectId) => state.workspaceDirtyProjectIds.has(projectId) },
   imports: { importProjectPackageData: projectImportRestoreController.importProjectPackageData },
   validation: { count: reportCount },
-  text: { redact: redactSensitiveText },
+  text: { redact: applicationTextSafetyService.redactSensitiveText },
   session: editorSessionStore,
   navigation: {
     openProjects: applicationNavigation.openProjects,
@@ -4289,7 +4299,10 @@ const projectDocumentImportController =
       renderAll,
       refreshEditorContext: editorContextController.refresh
     },
-    text: { lower: stableLower, safe: displaySafeText },
+    text: {
+      lower: applicationTextSafetyService.stableLower,
+      safe: applicationTextSafetyService.displaySafeText
+    },
     confirm: uiLocalizationService.confirm
   });
 const importExportController = appRuntime?.featureFactories?.createImportExportController?.({
@@ -4393,8 +4406,8 @@ const projectResourceSelectionController =
     localization: uiLocalizationService,
     presentation: {
       replaceSafeHtml,
-      escapeHtml,
-      displaySafeHtml,
+      escapeHtml: applicationTextSafetyService.escapeHtml,
+      displaySafeHtml: applicationTextSafetyService.displaySafeHtml,
       languagePairDisplay: languageInputService.pairDisplay
     },
     names: { unique: uniqueNames, clean: cleanProjectText },
@@ -4408,7 +4421,7 @@ const projectLanguagePairShortcutsController =
     normalizeLanguage: languageInputService.normalizeInput,
     defaultPairs: DEFAULT_LANGUAGE_PAIRS,
     languagePairDisplay: languageInputService.pairDisplay,
-    escapeHtml,
+    escapeHtml: applicationTextSafetyService.escapeHtml,
     replaceSafeHtml
   });
 const projectDialogSaveController =
@@ -4598,7 +4611,7 @@ const resourceLibraryExportController =
   appRuntime.featureFactories.createResourceLibraryExportController({
     resources: { labelFromKey: resourceCatalogService.labelFromKey, items: resourceItems },
     builders: { buildTmx, buildTbx },
-    fileSafeName,
+    fileSafeName: applicationTextSafetyService.fileSafeName,
     download: applicationDownloadController.download,
     status: { set: applicationSaveStatusController.set }
   });
@@ -4669,9 +4682,9 @@ const resourcesPresentationService = appRuntime?.featureFactories?.createResourc
   localization: uiLocalizationService,
   languagePairDisplay: languageInputService.pairDisplay,
   formatDate,
-  displaySafeHtml,
-  displaySafeText,
-  escapeHtml,
+  displaySafeHtml: applicationTextSafetyService.displaySafeHtml,
+  displaySafeText: applicationTextSafetyService.displaySafeText,
+  escapeHtml: applicationTextSafetyService.escapeHtml,
   replaceSafeHtml
 });
 const resourcesController = appRuntime?.featureFactories?.createResourcesController?.({
@@ -4911,7 +4924,7 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: applicationSaveStatusController.set },
-  describeState: (reviewState) => stableLower(reviewLabel(reviewState)),
+  describeState: (reviewState) => applicationTextSafetyService.stableLower(reviewLabel(reviewState)),
   testHooks: {
     beforeSave: (segment) => {
       if (LOOPCAT_TEST_BUILD && segment[REVIEW_STATE_SAVE_FAILURE_TEST_FLAG]) {
@@ -4923,12 +4936,8 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
 });
 dialogLifecycleController?.mount?.();
 
-function stableLower(value) {
-  return String(value || "").toLowerCase();
-}
-
 function localizationDownloadMimeType(ext, structure = null) {
-  const value = stableLower(ext);
+  const value = applicationTextSafetyService.stableLower(ext);
   if (XLIFF_DOCUMENT_TYPES.has(value)) return xliffMimeType(structure?.version || "1.2");
   if (["html", "htm"].includes(value)) return "text/html";
   if (value === "xhtml") return "application/xhtml+xml";
@@ -4944,36 +4953,8 @@ function localizationDownloadMimeType(ext, structure = null) {
   return "text/plain";
 }
 
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function displaySafeText(value, fallback = "") {
-  return redactSensitiveText(value || "").trim() || fallback;
-}
-
-function displaySafeHtml(value, fallback = "") {
-  return escapeHtml(displaySafeText(value, fallback));
-}
-
-function escapeRegExp(value) {
-  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function currentSegment() {
   return editorSessionStore.getSegments()[applicationStore.getState().navigation.activeIndex] || null;
-}
-
-function fileSafeName(value) {
-  return (redactSensitiveText(value || "export").trim() || "export").replace(/[^\p{L}\p{N}-]+/gu, "_");
-}
-
-function redactSensitiveText(value) {
-  return String(value || "").replace(new RegExp(SENSITIVE_TEXT_VALUE_PATTERN.source, "gi"), "[redacted secret]");
 }
 
 function clearOpenAiKey() {
@@ -4981,7 +4962,7 @@ function clearOpenAiKey() {
     aiCredentialStorageService.saveOpenAiKey("", false);
   } catch (error) {
     aiAdministrationController?.renderGlobalConnectionStatus?.(
-      redactSensitiveText(error.message || "OpenAI key could not be cleared.")
+      applicationTextSafetyService.redactSensitiveText(error.message || "OpenAI key could not be cleared.")
     );
     return false;
   }
@@ -4999,7 +4980,7 @@ function clearLocalAiKey() {
   } catch (error) {
     aiProviderFormController.setStatus(
       "error",
-      redactSensitiveText(error.message || "Local AI key could not be cleared.")
+      applicationTextSafetyService.redactSensitiveText(error.message || "Local AI key could not be cleared.")
     );
     return false;
   }
@@ -5133,7 +5114,7 @@ function cleanProjectText(value, fallback = "") {
 }
 
 function cleanCreatorName(value, fallback = "") {
-  return cleanProjectText(redactSensitiveText(value || ""), fallback).slice(0, 120);
+  return cleanProjectText(applicationTextSafetyService.redactSensitiveText(value || ""), fallback).slice(0, 120);
 }
 
 function storedCreatorName() {
@@ -5183,7 +5164,7 @@ function projectDocumentManifest(project = editorSessionStore.getProject()) {
         ...documentInfo,
         id,
         name: cleanProjectText(documentInfo.name, project?.sourceFileName || "Document"),
-        type: stableLower(cleanProjectText(documentInfo.type, "file")) || "file"
+        type: applicationTextSafetyService.stableLower(cleanProjectText(documentInfo.type, "file")) || "file"
       };
     })
     .filter(Boolean);
@@ -5633,7 +5614,9 @@ function markProjectSummaryDirty(projectId) {
 
 function projectSummaryRecord(project, segments, summaryRevision = projectSummaryRevision(project.id)) {
   const progress = segmentProgressService.projectProgress(segments);
-  const projectSearchText = stableLower(`${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`);
+  const projectSearchText = applicationTextSafetyService.stableLower(
+    `${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`
+  );
   return {
     ...project,
     progress,
@@ -5660,7 +5643,9 @@ async function refreshProjectSummaries() {
         ...project,
         progress: cached.progress,
         wordCount: cached.wordCount,
-        searchText: stableLower(`${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`),
+        searchText: applicationTextSafetyService.stableLower(
+          `${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`
+        ),
         languagePairKey: projectLanguageContextController.key(project),
         summaryRevision: revision
       };
@@ -5796,7 +5781,9 @@ function sanitizeValidationReportForDisplay(report) {
   const clean = { ...report };
   ["errors", "risky", "warnings", "simplified", "skipped", "preserved"].forEach((key) => {
     clean[key] = Array.isArray(report[key])
-      ? report[key].map((message) => redactSensitiveText(message || "").trim()).filter(Boolean)
+      ? report[key]
+          .map((message) => applicationTextSafetyService.redactSensitiveText(message || "").trim())
+          .filter(Boolean)
       : [];
   });
   clean.ok = clean.errors.length === 0;
@@ -5806,7 +5793,7 @@ function sanitizeValidationReportForDisplay(report) {
 function validationAlertText(report, fallback = "Validation failed.") {
   const clean = sanitizeValidationReportForDisplay(report);
   const errors = Array.isArray(clean?.errors) ? clean.errors : [];
-  return errors.length ? errors.join("\n") : redactSensitiveText(fallback);
+  return errors.length ? errors.join("\n") : applicationTextSafetyService.redactSensitiveText(fallback);
 }
 
 function renderValidationReport(report) {
@@ -5865,7 +5852,10 @@ function renderProjectList() {
   editorSessionStore.getProjects().forEach((project) => {
     const button = document.createElement("button");
     button.className = `project-item ${editorSessionStore.getProject()?.id === project.id ? "active" : ""}`;
-    replaceSafeHtml(button, `<strong>${displaySafeHtml(project.name)}</strong><span>${escapeHtml(projectLanguageContextController.display(project))}</span><span>${project.sourceFileName ? displaySafeHtml(project.sourceFileName) : uiLocalizationService.labelHtml("noSourceFile")}</span>`);
+    replaceSafeHtml(
+      button,
+      `<strong>${applicationTextSafetyService.displaySafeHtml(project.name)}</strong><span>${applicationTextSafetyService.escapeHtml(projectLanguageContextController.display(project))}</span><span>${project.sourceFileName ? applicationTextSafetyService.displaySafeHtml(project.sourceFileName) : uiLocalizationService.labelHtml("noSourceFile")}</span>`
+    );
     button.addEventListener("click", () => openProject(project.id));
     fragment.append(button);
   });
@@ -5949,21 +5939,21 @@ function renderEditor() {
   if (!editorSessionStore.getProject()) return;
 
   const resources = projectResourceSummary();
-  els.projectTitle.textContent = displaySafeText(editorSessionStore.getProject().name);
-  els.projectMeta.textContent = `${projectLanguageContextController.display()} - ${uiLocalizationService.label("mainTm")}: ${displaySafeText(resources.mainTm, uiLocalizationService.label("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
+  els.projectTitle.textContent = applicationTextSafetyService.displaySafeText(editorSessionStore.getProject().name);
+  els.projectMeta.textContent = `${projectLanguageContextController.display()} - ${uiLocalizationService.label("mainTm")}: ${applicationTextSafetyService.displaySafeText(resources.mainTm, uiLocalizationService.label("none"))} - ${applicationTextSafetyService.displaySafeText(resources.tmLabel)} - ${applicationTextSafetyService.displaySafeText(resources.tbLabel)}`;
   els.projectDomainEditInput.value = editorSessionStore.getProject().domain || "";
   els.domainForm.classList.add("clean");
   els.domainForm.classList.toggle("hidden", Boolean((editorSessionStore.getProject().domain || "").trim()));
   replaceSafeHtml(els.projectInfo, `
-    <dt>${uiLocalizationService.labelHtml("name")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().name)}</dd>
-    <dt>${uiLocalizationService.sourceHtml("Creator")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().creatorName || uiLocalizationService.label("notSet"))}</dd>
-    <dt>${uiLocalizationService.sourceHtml("Domain")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().domain || uiLocalizationService.label("notSet"))}</dd>
-    <dt>${uiLocalizationService.labelHtml("languages")}</dt><dd>${escapeHtml(projectLanguageContextController.display())}</dd>
-    <dt>${uiLocalizationService.sourceHtml("Workspace")}</dt><dd>${escapeHtml(editorSessionStore.getProject().workspaceId || "local-workspace")}</dd>
-    <dt>${uiLocalizationService.labelHtml("sourceFile")}</dt><dd>${displaySafeHtml(editorSessionStore.getProject().sourceFileName || uiLocalizationService.label("notImported"))}</dd>
-    <dt>${uiLocalizationService.labelHtml("mainTm")}</dt><dd>${displaySafeHtml(resources.mainTm)}</dd>
-    <dt>${uiLocalizationService.labelHtml("linkedTms")}</dt><dd>${displaySafeHtml(resources.tmNames.join(", "))}</dd>
-    <dt>${uiLocalizationService.labelHtml("linkedTbs")}</dt><dd>${displaySafeHtml(resources.tbNames.join(", "))}</dd>
+    <dt>${uiLocalizationService.labelHtml("name")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(editorSessionStore.getProject().name)}</dd>
+    <dt>${uiLocalizationService.sourceHtml("Creator")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(editorSessionStore.getProject().creatorName || uiLocalizationService.label("notSet"))}</dd>
+    <dt>${uiLocalizationService.sourceHtml("Domain")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(editorSessionStore.getProject().domain || uiLocalizationService.label("notSet"))}</dd>
+    <dt>${uiLocalizationService.labelHtml("languages")}</dt><dd>${applicationTextSafetyService.escapeHtml(projectLanguageContextController.display())}</dd>
+    <dt>${uiLocalizationService.sourceHtml("Workspace")}</dt><dd>${applicationTextSafetyService.escapeHtml(editorSessionStore.getProject().workspaceId || "local-workspace")}</dd>
+    <dt>${uiLocalizationService.labelHtml("sourceFile")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(editorSessionStore.getProject().sourceFileName || uiLocalizationService.label("notImported"))}</dd>
+    <dt>${uiLocalizationService.labelHtml("mainTm")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(resources.mainTm)}</dd>
+    <dt>${uiLocalizationService.labelHtml("linkedTms")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(resources.tmNames.join(", "))}</dd>
+    <dt>${uiLocalizationService.labelHtml("linkedTbs")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(resources.tbNames.join(", "))}</dd>
     <dt>${uiLocalizationService.sourceHtml("Documents")}</dt><dd>${projectDocumentCatalogService.list().length || 0}</dd>
     <dt>${uiLocalizationService.labelHtml("segmentsTitle")}</dt><dd>${editorSessionStore.getSegments().length}</dd>
     <dt>${uiLocalizationService.labelHtml("activity")}</dt><dd>${uiLocalizationService.labelHtml("eventCount", { count: editorSessionStore.getActivityEvents().length })}</dd>
@@ -5988,7 +5978,7 @@ function renderTermbaseSelect() {
   names.forEach((name) => {
     const option = document.createElement("option");
     option.value = name;
-    option.textContent = displaySafeText(name);
+    option.textContent = applicationTextSafetyService.displaySafeText(name);
     fragment.append(option);
   });
   els.termBaseSelect.replaceChildren(fragment);
@@ -6002,8 +5992,10 @@ function renderProjectHome() {
   const total = projectDocumentStatisticsService.aggregate(documentStatsById);
   const sourceWords = total.words;
   const resources = projectResourceSummary();
-  els.projectHomeTitle.textContent = displaySafeText(editorSessionStore.getProject().name);
-  els.projectHomeMeta.textContent = `${projectLanguageContextController.display()} - ${displaySafeText(editorSessionStore.getProject().domain || uiLocalizationService.label("noDomain"))} - ${uiLocalizationService.label("mainTm")}: ${displaySafeText(resources.mainTm, uiLocalizationService.label("none"))} - ${displaySafeText(resources.tmLabel)} - ${displaySafeText(resources.tbLabel)}`;
+  els.projectHomeTitle.textContent = applicationTextSafetyService.displaySafeText(
+    editorSessionStore.getProject().name
+  );
+  els.projectHomeMeta.textContent = `${projectLanguageContextController.display()} - ${applicationTextSafetyService.displaySafeText(editorSessionStore.getProject().domain || uiLocalizationService.label("noDomain"))} - ${uiLocalizationService.label("mainTm")}: ${applicationTextSafetyService.displaySafeText(resources.mainTm, uiLocalizationService.label("none"))} - ${applicationTextSafetyService.displaySafeText(resources.tmLabel)} - ${applicationTextSafetyService.displaySafeText(resources.tbLabel)}`;
   replaceSafeHtml(els.projectHomeStats, `
     <div><strong>${total.percent}%</strong><span>${uiLocalizationService.labelHtml("confirmed")}</span></div>
     <div><strong>${documents.length}</strong><span>${uiLocalizationService.labelHtml("files")}</span></div>
@@ -6023,8 +6015,8 @@ function renderProjectHome() {
     replaceSafeHtml(card, `
       <header>
         <div>
-          <h4>${displaySafeHtml(documentInfo.name)}</h4>
-          <p>${escapeHtml((documentInfo.type || "file").toUpperCase())}</p>
+          <h4>${applicationTextSafetyService.displaySafeHtml(documentInfo.name)}</h4>
+          <p>${applicationTextSafetyService.escapeHtml((documentInfo.type || "file").toUpperCase())}</p>
         </div>
         <span class="language-badge">${stats.percent}%</span>
       </header>
@@ -6040,7 +6032,10 @@ function renderProjectHome() {
     `);
     card.querySelector(".progress-bar > div").style.width = `${stats.percent}%`;
     const deleteButton = document.createElement("button");
-    const fileLabel = displaySafeText(documentInfo.name, uiLocalizationService.source("file"));
+    const fileLabel = applicationTextSafetyService.displaySafeText(
+      documentInfo.name,
+      uiLocalizationService.source("file")
+    );
     deleteButton.className = "danger-small";
     deleteButton.type = "button";
     deleteButton.textContent = uiLocalizationService.source("Delete");
@@ -6069,7 +6064,7 @@ function renderDocumentFilter() {
   documents.forEach((documentInfo) => {
     const option = document.createElement("option");
     option.value = documentInfo.id;
-    option.textContent = displaySafeText(documentInfo.name);
+    option.textContent = applicationTextSafetyService.displaySafeText(documentInfo.name);
     fragment.append(option);
   });
   els.documentFilter.replaceChildren(fragment);
@@ -6102,10 +6097,10 @@ function createProjectTile(project) {
   replaceSafeHtml(tile, `
     <header>
       <div>
-        <h3>${displaySafeHtml(project.name)}</h3>
-        <p>${displaySafeHtml(project.domain ? `${project.domain} - ${project.sourceFileName || uiLocalizationService.label("noSourceFileImported")}` : project.sourceFileName || uiLocalizationService.label("noSourceFileImported"))}</p>
+        <h3>${applicationTextSafetyService.displaySafeHtml(project.name)}</h3>
+        <p>${applicationTextSafetyService.displaySafeHtml(project.domain ? `${project.domain} - ${project.sourceFileName || uiLocalizationService.label("noSourceFileImported")}` : project.sourceFileName || uiLocalizationService.label("noSourceFileImported"))}</p>
       </div>
-      <span class="language-badge">${escapeHtml(projectLanguageContextController.display(project))}</span>
+      <span class="language-badge">${applicationTextSafetyService.escapeHtml(projectLanguageContextController.display(project))}</span>
     </header>
     <div class="project-stats">
       <div><strong>${project.progress.percent}%</strong><span>${uiLocalizationService.labelHtml("confirmed")}</span></div>
@@ -6119,7 +6114,10 @@ function createProjectTile(project) {
   `);
   tile.querySelector(".progress-bar > div").style.width = `${project.progress.percent}%`;
   const deleteButton = document.createElement("button");
-  const projectLabel = displaySafeText(project.name, uiLocalizationService.source("project"));
+  const projectLabel = applicationTextSafetyService.displaySafeText(
+    project.name,
+    uiLocalizationService.source("project")
+  );
   deleteButton.className = "danger-small";
   deleteButton.type = "button";
   deleteButton.textContent = uiLocalizationService.source("Delete");
@@ -6158,11 +6156,15 @@ function projectEmptyState({ hasProjects }) {
 }
 
 function renderProjectsView() {
-  const query = stableLower(els.projectSearchInput.value.trim());
+  const query = applicationTextSafetyService.stableLower(els.projectSearchInput.value.trim());
   const pair = els.languagePairFilter.value;
   const summaries = editorSessionStore.getProjectSummaries().map((project) => ({
     ...project,
-    searchText: project.searchText || stableLower(`${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`),
+    searchText:
+      project.searchText ||
+      applicationTextSafetyService.stableLower(
+        `${project.name} ${project.domain || ""} ${project.sourceFileName || ""} ${projectResourceSearchText(project)}`
+      ),
     languagePairKey: project.languagePairKey || projectLanguageContextController.key(project)
   }));
   if (verticalFeatureState?.projects) {
@@ -6182,7 +6184,9 @@ function renderProjectsView() {
 async function confirmDeleteProject(projectId = editorSessionStore.getProject()?.id) {
   const project = editorSessionStore.getProjects().find((item) => item.id === projectId);
   if (!project) return false;
-  const ok = uiLocalizationService.confirm(`Move project "${displaySafeText(project.name)}" and all of its files to Trash?`);
+  const ok = uiLocalizationService.confirm(
+    `Move project "${applicationTextSafetyService.displaySafeText(project.name)}" and all of its files to Trash?`
+  );
   if (!ok) return false;
   try {
     await autosaveService.flush(project.id);
@@ -6210,7 +6214,9 @@ async function confirmDeleteProject(projectId = editorSessionStore.getProject()?
 
 async function confirmDeleteFile(documentInfo) {
   if (!editorSessionStore.getProject() || !documentInfo) return false;
-  const ok = uiLocalizationService.confirm(`Move file "${displaySafeText(documentInfo.name)}" to Trash?`);
+  const ok = uiLocalizationService.confirm(
+    `Move file "${applicationTextSafetyService.displaySafeText(documentInfo.name)}" to Trash?`
+  );
   if (!ok) return false;
   try {
     await autosaveService.flush(editorSessionStore.getProject().id);

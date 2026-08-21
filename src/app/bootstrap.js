@@ -10,6 +10,7 @@ import { createApplicationPersistenceLifecycleController } from "./application-p
 import { createApplicationSaveStatusController } from "./application-save-status-controller.js";
 import { createApplicationStorageDurabilityController } from "./application-storage-durability-controller.js";
 import { createApplicationStartupController } from "./application-startup-controller.js";
+import { createApplicationTextSafetyService } from "./application-text-safety-service.js";
 import { createApplicationTrashController } from "./application-trash-controller.js";
 import { createApplicationUpdateControlsController } from "./application-update-controls-controller.js";
 import { createApplicationViewController } from "./application-view-controller.js";
@@ -352,6 +353,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createApplicationSaveStatusController,
       createApplicationStorageDurabilityController,
       createApplicationStartupController,
+      createApplicationTextSafetyService,
       createApplicationTrashController,
       createApplicationUpdateControlsController,
       createApplicationViewController,
