@@ -134,6 +134,7 @@ import { createOpusCatHelpController } from "../features/ai/opus-cat-help-contro
 import { createProjectResourceSelectionController } from "../features/projects/project-resource-selection-controller.js";
 import { createProjectLanguagePairShortcutsController } from "../features/projects/project-language-pair-shortcuts-controller.js";
 import { createProjectNameService } from "../features/projects/project-name-service.js";
+import { createProjectRecordLookupService } from "../features/projects/project-record-lookup-service.js";
 import { createProjectDocumentManifestService } from "../features/projects/project-document-manifest-service.js";
 import { createProjectResourceContextService } from "../features/projects/project-resource-context-service.js";
 import { createProjectSearchTextService } from "../features/projects/project-search-text-service.js";
@@ -332,6 +333,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createProjectLanguageContextController,
       createProjectLanguagePairShortcutsController,
       createProjectNameService,
+      createProjectRecordLookupService,
       createProjectsController,
       createProjectResourceSelectionController,
       createResourceCatalogService,

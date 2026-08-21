@@ -788,6 +788,13 @@ const state = {
   }
 };
 const editorSessionStore = appRuntime.editorSession;
+const projectRecordLookupService = appRuntime.featureFactories.createProjectRecordLookupService({
+  session: {
+    getProject: editorSessionStore.getProject,
+    getProjects: editorSessionStore.getProjects,
+    getProjectSummaries: editorSessionStore.getProjectSummaries
+  }
+});
 const segmentLabelService = appRuntime.featureFactories.createSegmentLabelService({
   localization: uiLocalizationService
 });
@@ -4151,7 +4158,7 @@ workspaceRecoveryPresentationService =
     dirty: { visibleCount: workspaceDirtyStateController.visibleCount },
     projects: {
       getCurrent: editorSessionStore.getProject,
-      knownById: knownProjectById
+      knownById: projectRecordLookupService.findById
     },
     durability: {
       warnings: applicationStorageDurabilityController.warnings,
@@ -4312,7 +4319,7 @@ workspacePackageSaveController =
     autosave: { flush: autosaveService.flush },
     build: projectExportBuildService,
     projects: {
-      knownById: knownProjectById,
+      knownById: projectRecordLookupService.findById,
       list: listProjects
     },
     activity: {
@@ -5164,12 +5171,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-function knownProjectById(projectId) {
-  return editorSessionStore.getProject()?.id === projectId
-    ? editorSessionStore.getProject()
-    : editorSessionStore.getProjects().find((project) => project.id === projectId) || editorSessionStore.getProjectSummaries().find((project) => project.id === projectId) || null;
-}
 
 async function refreshWorkspaceStatus() {
   if (!workspaceStorage) return;

@@ -250,6 +250,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-home-controller.js",
   "src/features/projects/project-resource-selection-controller.js",
   "src/features/projects/project-name-service.js",
+  "src/features/projects/project-record-lookup-service.js",
   "src/features/projects/project-document-manifest-service.js",
   "src/features/projects/project-resource-context-service.js",
   "src/features/projects/project-search-text-service.js",
@@ -394,6 +395,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/project-resource-selection-controller.test.cjs",
   "tests/unit/project-name-service.test.cjs",
+  "tests/unit/project-record-lookup-service.test.cjs",
   "tests/unit/project-document-manifest-service.test.cjs",
   "tests/unit/project-resource-context-service.test.cjs",
   "tests/unit/project-search-text-service.test.cjs",
@@ -684,6 +686,8 @@ const projectResourceSelectionControllerUnitTests = readText(
 );
 const projectNameServiceJs = readText("src/features/projects/project-name-service.js");
 const projectNameServiceUnitTests = readText("tests/unit/project-name-service.test.cjs");
+const projectRecordLookupServiceJs = readText("src/features/projects/project-record-lookup-service.js");
+const projectRecordLookupServiceUnitTests = readText("tests/unit/project-record-lookup-service.test.cjs");
 const projectDocumentManifestServiceJs = readText("src/features/projects/project-document-manifest-service.js");
 const projectDocumentManifestServiceUnitTests = readText("tests/unit/project-document-manifest-service.test.cjs");
 const projectResourceContextServiceJs = readText("src/features/projects/project-resource-context-service.js");
@@ -808,9 +812,7 @@ const recoveryWorkspaceControllerUnitTests = readText("tests/unit/recovery-works
 const workspaceBackupExportControllerJs = readText("src/features/workspace/workspace-backup-export-controller.js");
 const workspaceBackupExportControllerUnitTests = readText("tests/unit/workspace-backup-export-controller.test.cjs");
 const workspaceBackupReminderServiceJs = readText("src/features/workspace/workspace-backup-reminder-service.js");
-const workspaceBackupReminderServiceUnitTests = readText(
-  "tests/unit/workspace-backup-reminder-service.test.cjs"
-);
+const workspaceBackupReminderServiceUnitTests = readText("tests/unit/workspace-backup-reminder-service.test.cjs");
 const workspaceDirtyStateControllerJs = readText("src/features/workspace/workspace-dirty-state-controller.js");
 const workspaceDirtyStateControllerUnitTests = readText("tests/unit/workspace-dirty-state-controller.test.cjs");
 const workspaceHealthRepairControllerJs = readText("src/features/workspace/workspace-health-repair-controller.js");
@@ -974,6 +976,82 @@ assertIncludes(
   "createProjectResourceTransferController,",
   "The application runtime must expose the checked project-resource transfer factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectRecordLookupService } from "../features/projects/project-record-lookup-service.js";',
+  "The application runtime must install the checked project-record lookup service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectRecordLookupService,",
+  "The application runtime must expose the checked project-record lookup service factory."
+);
+for (const snippet of [
+  "ProjectRecordLookupService requires current-project, project-list, and project-summary boundaries.",
+  "function findById(projectId)",
+  "return session.getProject()?.id === projectId",
+  "? session.getProject()",
+  ": session.getProjects().find((project) => project.id === projectId) ||",
+  "session.getProjectSummaries().find((project) => project.id === projectId) ||",
+  "null;",
+  "return Object.freeze({ findById });"
+]) {
+  assertIncludes(
+    projectRecordLookupServiceJs,
+    snippet,
+    `ProjectRecordLookupService must retain characterized live lookup policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "const projectRecordLookupService = appRuntime.featureFactories.createProjectRecordLookupService({",
+  "getProject: editorSessionStore.getProject",
+  "getProjects: editorSessionStore.getProjects",
+  "getProjectSummaries: editorSessionStore.getProjectSummaries"
+]) {
+  assertIncludes(appJs, boundary, `project-record lookup composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/createProjectRecordLookupService\(/g) || []).length === 1,
+  "app.js must compose exactly one checked project-record lookup service."
+);
+assert(
+  (appJs.match(/knownById: projectRecordLookupService\.findById/g) || []).length === 2,
+  "workspace recovery and package-save consumers must use the checked project-record lookup directly."
+);
+assert(
+  !/\bknownProjectById\b/.test(appJs) && !/\bknownProjectById\b/.test(appWorkflowDriverJs),
+  "knownProjectById must not return to app.js or the workflow driver after project-record lookup extraction."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "workspaceRecoveryPresentationService",
+  "workspacePackageSaveController",
+  "knownProjectById",
+  "document.",
+  "els."
+]) {
+  assert(
+    !projectRecordLookupServiceJs.includes(forbiddenOwner),
+    `ProjectRecordLookupService must use its injected session boundary rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectRecordLookupService preserves the matching current project's second live read",
+  "ProjectRecordLookupService preserves strict current-ID comparison",
+  "ProjectRecordLookupService gives the live project list stable precedence over summaries",
+  "ProjectRecordLookupService falls through to the first cached summary then null",
+  "ProjectRecordLookupService reads every dependency live on each lookup",
+  "ProjectRecordLookupService preserves dependency failure timing and short circuiting",
+  "ProjectRecordLookupService preserves direct list and record access failures",
+  "ProjectRecordLookupService validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectRecordLookupServiceUnitTests,
+    testName,
+    `focused project-record lookup tests must retain characterization: ${testName}.`
+  );
+}
 assertIncludes(
   appBootstrapJs,
   'import { createProjectNameService } from "../features/projects/project-name-service.js";',
@@ -1259,7 +1337,7 @@ for (const boundary of [
   "formatDateTime: applicationDateTimeService.dateTime",
   "date: { format: applicationDateTimeService.date }",
   "formatDate: applicationDateTimeService.date",
-  'applicationDateTimeService.date(analysis.generatedAt)',
+  "applicationDateTimeService.date(analysis.generatedAt)",
   "applicationDateTimeService.date(project.updatedAt)"
 ]) {
   assertIncludes(appJs, boundary, `application date-time composition and consumers must retain ${boundary}.`);
@@ -1346,9 +1424,9 @@ for (const snippet of [
   "const changed = !state.getDirty().has(projectId);",
   "summary.markDirty(projectId);",
   "function markProjects(projectIds = [])",
-  "function usesResource(project, type, name, sourceLang = \"\", targetLang = \"\")",
+  'function usesResource(project, type, name, sourceLang = "", targetLang = "")',
   "return resources.links(project).some((link) => link.type === type && link.name === name);",
-  "function markProjectsUsingResource(type, name, sourceLang = \"\", targetLang = \"\")",
+  'function markProjectsUsingResource(type, name, sourceLang = "", targetLang = "")',
   "markProjects(projectIds);",
   "return projectIds.length;",
   "function clear(projectId = session.getProject()?.id)",
@@ -1423,10 +1501,7 @@ for (const removedHelper of [
 ]) {
   const checkedAppSource =
     removedHelper === "markProjectsUsingResourceDirty"
-      ? appJs.replace(
-          "markProjectsUsingResourceDirty: workspaceDirtyStateController.markProjectsUsingResource",
-          ""
-        )
+      ? appJs.replace("markProjectsUsingResourceDirty: workspaceDirtyStateController.markProjectsUsingResource", "")
       : appJs;
   assert(
     !checkedAppSource.includes(removedHelper) && !appWorkflowDriverJs.includes(removedHelper),
@@ -1525,7 +1600,7 @@ for (const boundary of [
   "getAutosaving: () => state.workspaceAutosaving",
   "dirty: { visibleCount: workspaceDirtyStateController.visibleCount }",
   "getCurrent: editorSessionStore.getProject",
-  "knownById: knownProjectById",
+  "knownById: projectRecordLookupService.findById",
   "warnings: applicationStorageDurabilityController.warnings",
   "line: applicationStorageDurabilityController.line",
   "renderStatus: (viewModel) => recoveryWorkspaceController?.renderStatus?.(viewModel)",
@@ -1539,22 +1614,16 @@ for (const [method, appCount, workflowCount] of [
   ["renderRecovery", 3, 0]
 ]) {
   assert(
-    (appJs.match(new RegExp(`\\bworkspaceRecoveryPresentationService\\.${method}\\b`, "g")) || []).length ===
-      appCount,
+    (appJs.match(new RegExp(`\\bworkspaceRecoveryPresentationService\\.${method}\\b`, "g")) || []).length === appCount,
     `application consumers must retain all ${appCount} direct WorkspaceRecoveryPresentationService.${method} references.`
   );
   assert(
-    (appWorkflowDriverJs.match(
-      new RegExp(`\\bworkspaceRecoveryPresentationService\\.${method}\\b`, "g")
-    ) || []).length === workflowCount,
+    (appWorkflowDriverJs.match(new RegExp(`\\bworkspaceRecoveryPresentationService\\.${method}\\b`, "g")) || [])
+      .length === workflowCount,
     `workflow consumers must retain all ${workflowCount} direct WorkspaceRecoveryPresentationService.${method} references.`
   );
 }
-for (const removedHelper of [
-  "renderWorkspaceStatus",
-  "workspaceRecoveryProjectIds",
-  "renderWorkspaceRecoveryPanel"
-]) {
+for (const removedHelper of ["renderWorkspaceStatus", "workspaceRecoveryProjectIds", "renderWorkspaceRecoveryPanel"]) {
   assert(
     !new RegExp(`function\\s+${removedHelper}\\b`).test(appJs) &&
       !new RegExp(`function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs) &&
@@ -1628,7 +1697,7 @@ for (const snippet of [
   "Math.max(0, Math.floor((toDate.getTime() - from.getTime()) / 86400000))",
   "function dismissals()",
   'JSON.parse(storage.getItem(BACKUP_REMINDER_STORAGE) || "{}")',
-  "parsed && typeof parsed === \"object\" && !Array.isArray(parsed) ? parsed : {}",
+  'parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}',
   "storage.removeItem(BACKUP_REMINDER_STORAGE);",
   "function isDismissed(projectId, now = clock.now())",
   "return until ? clock.create(until).getTime() > now.getTime() : false;",
@@ -1646,8 +1715,8 @@ for (const snippet of [
   "projectAgeDays >= BACKUP_REMINDER_PROJECT_DAYS",
   "daysSinceExport >= BACKUP_REMINDER_EXPORT_DAYS",
   "activitiesSinceExport >= BACKUP_REMINDER_ACTIVITY_SINCE_EXPORT",
-  "This project is ${projectAgeDays} day${projectAgeDays === 1 ? \"\" : \"s\"} old and has no project package export yet.",
-  "project activit${activitiesSinceExport === 1 ? \"y has\" : \"ies have\"} happened since the last project package export.",
+  'This project is ${projectAgeDays} day${projectAgeDays === 1 ? "" : "s"} old and has no project package export yet.',
+  'project activit${activitiesSinceExport === 1 ? "y has" : "ies have"} happened since the last project package export.',
   "recovery.render({ info: reminderInfo });",
   "return Object.freeze({ daysBetween, dismissals, isDismissed, dismiss, latestExport, info, render });"
 ]) {
@@ -1683,8 +1752,8 @@ for (const [method, appCount, workflowCount] of [
     `application consumers must retain all ${appCount} direct WorkspaceBackupReminderService.${method} references.`
   );
   assert(
-    (appWorkflowDriverJs.match(new RegExp(`\\bworkspaceBackupReminderService\\.${method}\\b`, "g")) || [])
-      .length === workflowCount,
+    (appWorkflowDriverJs.match(new RegExp(`\\bworkspaceBackupReminderService\\.${method}\\b`, "g")) || []).length ===
+      workflowCount,
     `workflow consumers must retain all ${workflowCount} direct WorkspaceBackupReminderService.${method} references.`
   );
 }
@@ -10866,7 +10935,7 @@ for (const boundary of [
   "replaceActivityEvents: editorSessionStore.replaceActivityEvents",
   "autosave: { flush: autosaveService.flush }",
   "build: projectExportBuildService",
-  "knownById: knownProjectById",
+  "knownById: projectRecordLookupService.findById",
   "list: listProjects",
   "draft: draftProjectActivityEvent",
   "bulkPut,",
