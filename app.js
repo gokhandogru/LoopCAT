@@ -1380,6 +1380,15 @@ const protectedTextReplacementService = appRuntime.featureFactories.createProtec
 const segmentProvenanceService = appRuntime.featureFactories.createSegmentProvenanceService({
   localization: uiLocalizationService
 });
+const segmentStatusPresentationService =
+  appRuntime.featureFactories.createSegmentStatusPresentationService({
+    document,
+    labels: segmentLabelService,
+    protectedTags: protectedTagInspectionService,
+    provenance: segmentProvenanceService,
+    localization: uiLocalizationService,
+    quality: qualityPresentationService
+  });
 
 const segmentFilterService = appRuntime.featureFactories.createSegmentFilterService({
   getSegments: () => editorSessionStore.getSegments(),
@@ -5706,76 +5715,10 @@ function renderSegmentRow(index) {
     segmentId: segment.id
   });
   segmentMarkupPresentationService.renderTargetPreview(row, segment);
-  renderStatusCell(row, segment);
+  segmentStatusPresentationService.render(row, segment);
   segmentMarkupPresentationService.renderTagTray(row, segment);
   row.addEventListener("click", () => segmentNavigationController.select(index));
   return row;
-}
-
-function renderStatusCell(row, segment) {
-  const statusCell = row.querySelector(".status-col");
-  const pill = row.querySelector(".status-pill");
-  pill.className = `status-pill ${segment.status}`;
-  pill.textContent = segmentLabelService.status(segment.status);
-  statusCell.querySelectorAll(".tag-warning, .review-pill, .comment-marker, .tm-match-badge, .ai-segment-badge").forEach((item) => item.remove());
-  if (segmentProvenanceService.hasTmPretranslation(segment)) {
-    const item = segmentProvenanceService.tmBadge(segment);
-    const badge = document.createElement("div");
-    badge.className = `tm-match-badge ${item.className}`;
-    badge.textContent = item.text;
-    badge.title = item.title;
-    statusCell.append(badge);
-  }
-  if (protectedTagInspectionService.hasIssue(segment)) {
-    const warning = document.createElement("div");
-    warning.className = "tag-warning";
-    warning.textContent = uiLocalizationService.label("missingValue", {
-      value: protectedTagInspectionService
-        .missing(segment)
-        .map(protectedTagInspectionService.displayText)
-        .join(", ")
-    });
-    statusCell.append(warning);
-  }
-  if (segment.reviewState) {
-    const review = document.createElement("div");
-    review.className = `review-pill ${segment.reviewState}`;
-    review.textContent = segmentLabelService.review(segment.reviewState);
-    statusCell.append(review);
-  }
-  const commentCount = (segment.comments || []).length + ((segment.reviewNote || "").trim() ? 1 : 0);
-  if (commentCount) {
-    const marker = document.createElement("div");
-    marker.className = "comment-marker";
-    marker.textContent = uiLocalizationService.label("noteCount", { count: commentCount });
-    statusCell.append(marker);
-  }
-  const aiBadges = [];
-  if (segmentProvenanceService.hasAiDraft(segment)) {
-    aiBadges.push(segmentProvenanceService.aiBadge(segment));
-  }
-  if (segmentProvenanceService.hasAiSuggestions(segment)) {
-    aiBadges.push({
-      className: "ai-suggestion",
-      text: uiLocalizationService.label("aiSuggestionCount", { count: segment.aiSuggestions.length }),
-      title: uiLocalizationService.source("Reviewable AI suggestions are available for this segment")
-    });
-  }
-  const riskLevel = segmentProvenanceService.aiRiskLevel(segment);
-  if (riskLevel) {
-    aiBadges.push({
-      className: `ai-risk ai-risk-${riskLevel}`,
-      text: `${qualityPresentationService.aiReviewRisk(riskLevel)}`,
-      title: uiLocalizationService.source("Risk-ranked AI review comment")
-    });
-  }
-  aiBadges.forEach((item) => {
-    const badge = document.createElement("div");
-    badge.className = `ai-segment-badge ${item.className}`;
-    badge.textContent = item.text;
-    badge.title = item.title;
-    statusCell.append(badge);
-  });
 }
 
 function segmentWindow(indexes) {
@@ -5830,7 +5773,7 @@ function updateRow(index) {
   row.classList.toggle("active", index === applicationStore.getState().navigation.activeIndex);
   row.classList.toggle("tag-warning-row", protectedTagInspectionService.hasIssue(segment));
   segmentMarkupPresentationService.renderTargetPreview(row, segment);
-  renderStatusCell(row, segment);
+  segmentStatusPresentationService.render(row, segment);
 }
 
 function scheduleRowUpdate(index) {

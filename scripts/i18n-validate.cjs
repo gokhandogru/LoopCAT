@@ -58,6 +58,13 @@ const projectsViewPresentationControllerPath = path.join(
   "projects",
   "projects-view-presentation-controller.js"
 );
+const segmentStatusPresentationServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "editor",
+  "segment-status-presentation-service.js"
+);
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -183,6 +190,11 @@ function validate() {
     ...collectCodeKeys(
       fs.existsSync(projectsViewPresentationControllerPath)
         ? fs.readFileSync(projectsViewPresentationControllerPath, "utf8")
+        : ""
+    ),
+    ...collectCodeKeys(
+      fs.existsSync(segmentStatusPresentationServicePath)
+        ? fs.readFileSync(segmentStatusPresentationServicePath, "utf8")
         : ""
     )
   ];

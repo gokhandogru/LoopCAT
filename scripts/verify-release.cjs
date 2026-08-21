@@ -632,6 +632,7 @@ const targetEditControllerJs = readText("src/features/editor/target-edit-control
 const targetProducerControllerJs = readText("src/features/editor/target-producer-controller.js");
 const protectedTagInspectionServiceJs = readText("src/features/editor/protected-tag-inspection-service.js");
 const segmentMarkupPresentationServiceJs = readText("src/features/editor/segment-markup-presentation-service.js");
+const segmentStatusPresentationServiceJs = readText("src/features/editor/segment-status-presentation-service.js");
 const protectedTextReplacementServiceJs = readText("src/features/editor/protected-text-replacement-service.js");
 const segmentLabelServiceJs = readText("src/features/editor/segment-label-service.js");
 const segmentProvenanceServiceJs = readText("src/features/editor/segment-provenance-service.js");
@@ -656,6 +657,7 @@ const targetEditControllerUnitTests = readText("tests/unit/target-edit-controlle
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
 const protectedTagInspectionServiceUnitTests = readText("tests/unit/protected-tag-inspection-service.test.cjs");
 const segmentMarkupPresentationServiceUnitTests = readText("tests/unit/segment-markup-presentation-service.test.cjs");
+const segmentStatusPresentationServiceUnitTests = readText("tests/unit/segment-status-presentation-service.test.cjs");
 const protectedTextReplacementServiceUnitTests = readText("tests/unit/protected-text-replacement-service.test.cjs");
 const segmentLabelServiceUnitTests = readText("tests/unit/segment-label-service.test.cjs");
 const segmentProvenanceServiceUnitTests = readText("tests/unit/segment-provenance-service.test.cjs");
@@ -3793,7 +3795,7 @@ for (const boundary of [
   "riskLevelLabel: qualityPresentationService.riskLevel",
   "severity: qualityPresentationService.decisionSeverity",
   "labels: { risk: qualityPresentationService.aiReviewRisk }",
-  "qualityPresentationService.aiReviewRisk(riskLevel)"
+  "quality: qualityPresentationService"
 ]) {
   assertIncludes(appJs, boundary, `quality-presentation composition must inject the checked ${boundary} boundary.`);
 }
@@ -3815,8 +3817,9 @@ assert(
     !appJs.includes('accuracy: "Accuracy"') &&
     !appJs.includes('clear: "Clear"') &&
     !appJs.includes('low: uiLocalizationService.label("lowRisk")') &&
-    (appJs.match(/\bqualityPresentationService\.aiReviewRisk\b/g) || []).length === 2,
-  "quality profile, category, general-risk, and AI-review-risk label mappings must not return to app.js, and both AI-review consumers must call the checked service."
+    (appJs.match(/\bqualityPresentationService\.aiReviewRisk\b/g) || []).length === 1 &&
+    segmentStatusPresentationServiceJs.includes("quality.aiReviewRisk(riskLevel)"),
+  "quality profile, category, general-risk, and AI-review-risk mappings must remain behind checked presentation boundaries."
 );
 assert(
   !qualityPresentationServiceJs.includes("uiLocalizationService") &&
@@ -10101,6 +10104,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createSegmentStatusPresentationService } from "../features/editor/segment-status-presentation-service.js";',
+  "The application runtime must install the checked segment-status presentation service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentStatusPresentationService,",
+  "The application runtime must expose the checked segment-status presentation factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createProtectedTextReplacementService } from "../features/editor/protected-text-replacement-service.js";',
   "The application runtime must install the checked protected-text replacement service."
 );
@@ -10143,19 +10156,21 @@ for (const boundary of [
   "appRuntime.featureFactories.createSegmentLabelService({",
   "localization: uiLocalizationService",
   "segmentLabelService.review(reviewState)",
-  "segmentLabelService.status(segment.status)",
-  "segmentLabelService.review(segment.reviewState)"
+  "labels: segmentLabelService"
 ]) {
   assertIncludes(appJs, boundary, `segment-label composition and consumers must retain ${boundary}.`);
 }
 for (const [method, appCount, workflowCount] of [
-  ["review", 2, 0],
-  ["status", 2, 0]
+  ["review", 1, 0],
+  ["status", 1, 0]
 ]) {
   assert(
     (appJs.match(new RegExp(`\\bsegmentLabelService\\.${method}\\b`, "g")) || []).length === appCount &&
       (appWorkflowDriverJs.match(new RegExp(`\\bsegmentLabelService\\.${method}\\b`, "g")) || []).length ===
-        workflowCount,
+        workflowCount &&
+      segmentStatusPresentationServiceJs.includes(
+        `labels.${method}(segment.${method === "status" ? "status" : "reviewState"})`
+      ),
     `all application and workflow segment-label ${method} consumers must call SegmentLabelService directly.`
   );
 }
@@ -10741,6 +10756,129 @@ assertIncludes(
   "source-catalog extraction must scan the checked segment-markup presentation service."
 );
 for (const snippet of [
+  "SegmentStatusPresentationService requires DOM, label, protected-tag, provenance, localization, and quality boundaries.",
+  'const statusCell = row.querySelector(".status-col")',
+  'const pill = row.querySelector(".status-pill")',
+  "pill.className = `status-pill ${segment.status}`",
+  "pill.textContent = labels.status(segment.status)",
+  '.querySelectorAll(".tag-warning, .review-pill, .comment-marker, .tm-match-badge, .ai-segment-badge")',
+  ".forEach((item) => item.remove())",
+  "if (provenance.hasTmPretranslation(segment))",
+  "const item = provenance.tmBadge(segment)",
+  "if (protectedTags.hasIssue(segment))",
+  'protectedTags.missing(segment).map(protectedTags.displayText).join(", ")',
+  "if (segment.reviewState)",
+  'const commentCount = (segment.comments || []).length + ((segment.reviewNote || "").trim() ? 1 : 0)',
+  "if (provenance.hasAiDraft(segment))",
+  "aiBadges.push(provenance.aiBadge(segment))",
+  "if (provenance.hasAiSuggestions(segment))",
+  'localization.label("aiSuggestionCount", { count: segment.aiSuggestions.length })',
+  "const riskLevel = provenance.aiRiskLevel(segment)",
+  "className: `ai-risk ai-risk-${riskLevel}`",
+  "text: `${quality.aiReviewRisk(riskLevel)}`",
+  "aiBadges.forEach((item) =>",
+  "return Object.freeze({ render })"
+]) {
+  assertIncludes(
+    segmentStatusPresentationServiceJs,
+    snippet,
+    `SegmentStatusPresentationService must retain characterized status/badge DOM policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createSegmentStatusPresentationService({",
+  "app.js must compose the checked segment-status presentation service."
+);
+const segmentStatusComposition = functionBody(
+  appJs,
+  "const segmentStatusPresentationService =",
+  "const segmentFilterService ="
+);
+for (const boundary of [
+  "document",
+  "labels: segmentLabelService",
+  "protectedTags: protectedTagInspectionService",
+  "provenance: segmentProvenanceService",
+  "localization: uiLocalizationService",
+  "quality: qualityPresentationService"
+]) {
+  assertIncludes(
+    segmentStatusComposition,
+    boundary,
+    `segment-status presentation composition must inject the ${boundary} boundary.`
+  );
+}
+assert(
+  appJs.indexOf("const segmentProvenanceService =") < appJs.indexOf("const segmentStatusPresentationService =") &&
+    appJs.indexOf("const segmentStatusPresentationService =") < appJs.indexOf("const segmentFilterService ="),
+  "SegmentStatusPresentationService must follow its checked label/provenance owners and precede row consumers."
+);
+assert(
+  (appJs.match(/\bsegmentStatusPresentationService\.render\b/g) || []).length === 2,
+  "both segment-row creation and update consumers must call SegmentStatusPresentationService.render directly."
+);
+assert(
+  !/function\s+renderStatusCell\b/.test(appJs) && !/function\s+renderStatusCell\b/.test(appWorkflowDriverJs),
+  "renderStatusCell must not return to app.js or the workflow driver."
+);
+for (const removedOwner of [
+  '.querySelectorAll(".tag-warning, .review-pill, .comment-marker, .tm-match-badge, .ai-segment-badge")',
+  'className = "comment-marker"',
+  "ai-segment-badge ${item.className}",
+  "Reviewable AI suggestions are available for this segment",
+  "Risk-ranked AI review comment"
+]) {
+  assert(
+    !appJs.includes(removedOwner),
+    `segment status/badge DOM ownership must not return to the compatibility coordinator: ${removedOwner}`
+  );
+}
+for (const forbiddenOwner of [
+  "appRuntime",
+  "segmentLabelService",
+  "protectedTagInspectionService",
+  "segmentProvenanceService",
+  "uiLocalizationService",
+  "qualityPresentationService",
+  "editorSessionStore",
+  "state."
+]) {
+  assert(
+    !segmentStatusPresentationServiceJs.includes(forbiddenOwner),
+    `SegmentStatusPresentationService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+assert(
+  !/\bels\./.test(segmentStatusPresentationServiceJs),
+  "SegmentStatusPresentationService must use injected row and DOM boundaries rather than global elements."
+);
+for (const testName of [
+  "SegmentStatusPresentationService preserves status pill and exact stale-marker cleanup",
+  "SegmentStatusPresentationService preserves TM and missing-tag badge identity and order",
+  "SegmentStatusPresentationService preserves review and trimmed note plus comment counting",
+  "SegmentStatusPresentationService preserves AI draft suggestion and risk badge order",
+  "SegmentStatusPresentationService replaces prior dynamic badges on repeated renders",
+  "SegmentStatusPresentationService preserves primary and accumulated AI failure timing",
+  "SegmentStatusPresentationService validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentStatusPresentationServiceUnitTests,
+    testName,
+    `focused segment-status presentation tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-status-presentation-service.js"',
+  "source-catalog extraction must scan the checked segment-status presentation service."
+);
+assertIncludes(
+  i18nValidateScript,
+  '"segment-status-presentation-service.js"',
+  "source-catalog validation must scan explicit label keys in the checked segment-status presentation service."
+);
+for (const snippet of [
   'const source = String(text || "")',
   'const find = String(findText || "")',
   "if (!find) return { text: source, count: 0 }",
@@ -10844,8 +10982,8 @@ assertIncludes(
 );
 for (const method of ["aiRiskLevel", "hasAiDraft", "aiBadge", "hasTmPretranslation", "tmBadge", "hasAiSuggestions"]) {
   assertIncludes(
-    appJs,
-    `segmentProvenanceService.${method}`,
+    segmentStatusPresentationServiceJs,
+    `provenance.${method}`,
     `segment provenance consumers must call SegmentProvenanceService.${method} directly.`
   );
 }
@@ -18101,8 +18239,8 @@ assertIncludes(
   "app workflow test must verify confirmed AI-pretranslated rows clear needs-review and keep AI origin visible."
 );
 assertIncludes(
-  appJs,
-  "segmentProvenanceService.aiBadge(segment)",
+  segmentStatusPresentationServiceJs,
+  "provenance.aiBadge(segment)",
   "the checked segment provenance service must centralize AI draft to AI initiated row-badge behavior."
 );
 assertIncludes(
