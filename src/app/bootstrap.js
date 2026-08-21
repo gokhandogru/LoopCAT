@@ -130,6 +130,7 @@ import { createExternalAiConsentService } from "../features/ai/external-ai-conse
 import { createOpusCatHelpController } from "../features/ai/opus-cat-help-controller.js";
 import { createProjectResourceSelectionController } from "../features/projects/project-resource-selection-controller.js";
 import { createProjectLanguagePairShortcutsController } from "../features/projects/project-language-pair-shortcuts-controller.js";
+import { createProjectNameService } from "../features/projects/project-name-service.js";
 import { createProjectLanguageContextController } from "../features/projects/project-language-context-controller.js";
 import { createProjectDocumentStatisticsService } from "../features/projects/project-document-statistics-service.js";
 import { createProjectDocumentCatalogService } from "../features/projects/project-document-catalog-service.js";
@@ -313,6 +314,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createProjectDocumentStatisticsService,
       createProjectLanguageContextController,
       createProjectLanguagePairShortcutsController,
+      createProjectNameService,
       createProjectsController,
       createProjectResourceSelectionController,
       createResourceCatalogService,

@@ -77,6 +77,20 @@ const SENSITIVE_TEXT_VALUE_PATTERN = /(sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9.
 const applicationTextSafetyService = appRuntime.featureFactories.createApplicationTextSafetyService({
   patterns: { sensitiveValue: SENSITIVE_TEXT_VALUE_PATTERN }
 });
+const projectNameService = appRuntime.featureFactories.createProjectNameService({
+  redaction: { sanitize: applicationTextSafetyService.redactSensitiveText },
+  storage: {
+    getItem: (key) => localStorage.getItem(key),
+    setItem: (key, value) => localStorage.setItem(key, value),
+    removeItem: (key) => localStorage.removeItem(key)
+  },
+  identity: {
+    available: () => Boolean(window.LoopCATDesktop?.getCreatorIdentity),
+    read: () => window.LoopCATDesktop.getCreatorIdentity()
+  },
+  storageKey: "loopcat.creatorName",
+  logger: console
+});
 const uiLocalizationService = appRuntime.featureFactories.createUiLocalizationService({
   i18n: uiI18n,
   documentElement: document.documentElement,
@@ -138,7 +152,6 @@ const {
   openAi: OPENAI_KEY_STORAGE,
   localAiLegacy: LOCAL_AI_KEY_STORAGE
 } = appRuntime.featureFactories.aiCredentialStorageKeys;
-const CREATOR_NAME_STORAGE = "loopcat.creatorName";
 const WORKSPACE_DIRTY_STORAGE = "loopcat.workspace.dirtyProjectIds";
 const BACKUP_REMINDER_STORAGE = "loopcat.backupReminder.dismissedUntil";
 
@@ -4476,7 +4489,7 @@ const projectResourceSelectionController =
       displaySafeHtml: applicationTextSafetyService.displaySafeHtml,
       languagePairDisplay: languageInputService.pairDisplay
     },
-    names: { unique: uniqueNames, clean: cleanProjectText },
+    names: { unique: projectNameService.unique, clean: projectNameService.clean },
     makeId
   });
 const projectLanguagePairShortcutsController =
@@ -4526,7 +4539,7 @@ const projectDialogSaveController =
       load: loadProjects,
       open: openProject
     },
-    creator: { remember: rememberCreatorName },
+    creator: { remember: projectNameService.rememberCreator },
     language: {
       setSource: (value) => languageInputService.setInput(els.sourceLangInput, value),
       setTarget: (value) => languageInputService.setInput(els.targetLangInput, value)
@@ -4594,8 +4607,8 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
   ],
   getProject: () => editorSessionStore.getProject(),
   refreshResources,
-  suggestedCreatorName,
-  cleanCreatorName,
+  suggestedCreatorName: projectNameService.suggestedCreator,
+  cleanCreatorName: projectNameService.cleanCreator,
   setLanguageValue: languageInputService.setInput,
   normalizeLanguageValue: languageInputService.normalizeElement,
   renderStorageStatus: renderProjectStorageStatus,
@@ -5008,68 +5021,20 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
 });
 dialogLifecycleController?.mount?.();
 
-function uniqueNames(values) {
-  return Array.from(new Set((Array.isArray(values) ? values : []).map((value) => String(value || "").trim()).filter(Boolean)));
-}
-
-function cleanProjectText(value, fallback = "") {
-  if (typeof value !== "string" && typeof value !== "number") return fallback;
-  const clean = String(value).trim();
-  return clean || fallback;
-}
-
-function cleanCreatorName(value, fallback = "") {
-  return cleanProjectText(applicationTextSafetyService.redactSensitiveText(value || ""), fallback).slice(0, 120);
-}
-
-function storedCreatorName() {
-  try {
-    return cleanCreatorName(localStorage.getItem(CREATOR_NAME_STORAGE));
-  } catch {
-    return "";
-  }
-}
-
-function rememberCreatorName(value) {
-  const clean = cleanCreatorName(value);
-  try {
-    if (clean) localStorage.setItem(CREATOR_NAME_STORAGE, clean);
-    else localStorage.removeItem(CREATOR_NAME_STORAGE);
-  } catch {
-    // The project keeps its creator field even if browser preference storage is unavailable.
-  }
-  return clean;
-}
-
-async function suggestedCreatorName() {
-  const stored = storedCreatorName();
-  if (stored) return stored;
-  const desktop = window.LoopCATDesktop;
-  if (desktop?.getCreatorIdentity) {
-    try {
-      const identity = await desktop.getCreatorIdentity();
-      const desktopName = cleanCreatorName(identity?.displayName || identity?.hostName);
-      if (desktopName) return desktopName;
-    } catch (error) {
-      console.warn("Desktop creator identity lookup failed.", error);
-    }
-  }
-  return "This computer";
-}
-
 function projectDocumentManifest(project = editorSessionStore.getProject()) {
   const seen = new Set();
   return (Array.isArray(project?.documents) ? project.documents : [])
     .map((documentInfo) => {
       if (!documentInfo || typeof documentInfo !== "object" || Array.isArray(documentInfo)) return null;
-      const id = cleanProjectText(documentInfo.id);
+      const id = projectNameService.clean(documentInfo.id);
       if (!id || seen.has(id)) return null;
       seen.add(id);
       return {
         ...documentInfo,
         id,
-        name: cleanProjectText(documentInfo.name, project?.sourceFileName || "Document"),
-        type: applicationTextSafetyService.stableLower(cleanProjectText(documentInfo.type, "file")) || "file"
+        name: projectNameService.clean(documentInfo.name, project?.sourceFileName || "Document"),
+        type:
+          applicationTextSafetyService.stableLower(projectNameService.clean(documentInfo.type, "file")) || "file"
       };
     })
     .filter(Boolean);
@@ -5094,13 +5059,16 @@ function cleanProjectResourceLinks(resourceLinks = []) {
 
 function projectResourceLinks(project) {
   if (!project) return [];
-  const main = cleanProjectText(project.mainTmName, cleanProjectText(project.tmName, "Default TM"));
+  const main = projectNameService.clean(
+    project.mainTmName,
+    projectNameService.clean(project.tmName, "Default TM")
+  );
   const cleanLinks = cleanProjectResourceLinks(project.resourceLinks);
   const rawLinks = cleanLinks.length
     ? cleanLinks
     : [
       { type: "tm", name: main, role: "main" },
-      { type: "termbase", name: cleanProjectText(project.termBaseName, "Default TB") }
+      { type: "termbase", name: projectNameService.clean(project.termBaseName, "Default TB") }
     ];
   const links = [];
   rawLinks.forEach((link) => {
@@ -5116,25 +5084,44 @@ function projectResourceLinks(project) {
     links.unshift({ id: makeId("resource-link"), type: "tm", name: main, role: "main" });
   }
   if (!links.some((link) => link.type === "termbase")) {
-    links.push({ id: makeId("resource-link"), type: "termbase", name: cleanProjectText(project.termBaseName, "Default TB") });
+    links.push({
+      id: makeId("resource-link"),
+      type: "termbase",
+      name: projectNameService.clean(project.termBaseName, "Default TB")
+    });
   }
   return links;
 }
 
 function mainTmName(project = editorSessionStore.getProject()) {
-  return projectResourceLinks(project).find((link) => link.type === "tm" && link.role === "main")?.name || cleanProjectText(project?.mainTmName, cleanProjectText(project?.tmName, "Default TM"));
+  return (
+    projectResourceLinks(project).find((link) => link.type === "tm" && link.role === "main")?.name ||
+    projectNameService.clean(
+      project?.mainTmName,
+      projectNameService.clean(project?.tmName, "Default TM")
+    )
+  );
 }
 
 function projectTmNames(project = editorSessionStore.getProject()) {
-  return uniqueNames([mainTmName(project), ...projectResourceLinks(project).filter((link) => link.type === "tm").map((link) => link.name)]);
+  return projectNameService.unique([
+    mainTmName(project),
+    ...projectResourceLinks(project)
+      .filter((link) => link.type === "tm")
+      .map((link) => link.name)
+  ]);
 }
 
 function projectTermBaseNames(project = editorSessionStore.getProject()) {
-  return uniqueNames(projectResourceLinks(project).filter((link) => link.type === "termbase").map((link) => link.name));
+  return projectNameService.unique(
+    projectResourceLinks(project)
+      .filter((link) => link.type === "termbase")
+      .map((link) => link.name)
+  );
 }
 
 function primaryTermBaseName(project = editorSessionStore.getProject()) {
-  return projectTermBaseNames(project)[0] || cleanProjectText(project?.termBaseName, "Default TB");
+  return projectTermBaseNames(project)[0] || projectNameService.clean(project?.termBaseName, "Default TB");
 }
 
 function projectResourceSummary(project = editorSessionStore.getProject()) {

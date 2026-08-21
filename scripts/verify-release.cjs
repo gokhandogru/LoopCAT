@@ -246,6 +246,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-filter-controls-controller.js",
   "src/features/projects/project-home-controller.js",
   "src/features/projects/project-resource-selection-controller.js",
+  "src/features/projects/project-name-service.js",
   "src/features/projects/project-language-pair-shortcuts-controller.js",
   "src/features/projects/project-language-context-controller.js",
   "src/features/projects/project-document-statistics-service.js",
@@ -379,6 +380,7 @@ const requiredReleaseFiles = [
   "tests/unit/perplexity-provider-adapter.test.cjs",
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/project-resource-selection-controller.test.cjs",
+  "tests/unit/project-name-service.test.cjs",
   "tests/unit/project-language-pair-shortcuts-controller.test.cjs",
   "tests/unit/project-language-context-controller.test.cjs",
   "tests/unit/project-document-statistics-service.test.cjs",
@@ -656,6 +658,8 @@ const projectResourceSelectionControllerJs = readText("src/features/projects/pro
 const projectResourceSelectionControllerUnitTests = readText(
   "tests/unit/project-resource-selection-controller.test.cjs"
 );
+const projectNameServiceJs = readText("src/features/projects/project-name-service.js");
+const projectNameServiceUnitTests = readText("tests/unit/project-name-service.test.cjs");
 const projectLanguagePairShortcutsControllerJs = readText(
   "src/features/projects/project-language-pair-shortcuts-controller.js"
 );
@@ -926,6 +930,106 @@ assertIncludes(
   "createProjectResourceTransferController,",
   "The application runtime must expose the checked project-resource transfer factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectNameService } from "../features/projects/project-name-service.js";',
+  "The application runtime must install the checked project-name service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectNameService,",
+  "The application runtime must expose the checked project-name service factory."
+);
+for (const snippet of [
+  "ProjectNameService requires a sensitive-text redaction boundary.",
+  "ProjectNameService requires browser storage boundaries.",
+  "ProjectNameService requires desktop identity boundaries.",
+  "ProjectNameService requires a storage key and logger boundary.",
+  "(Array.isArray(values) ? values : [])",
+  '.map((value) => String(value || "").trim())',
+  ".filter(Boolean)",
+  'if (typeof value !== "string" && typeof value !== "number") return fallback',
+  "const cleaned = String(value).trim()",
+  'clean(redaction.sanitize(value || ""), fallback).slice(0, 120)',
+  "return cleanCreator(storage.getItem(storageKey))",
+  "if (cleaned) storage.setItem(storageKey, cleaned)",
+  "else storage.removeItem(storageKey)",
+  "return cleaned",
+  "const stored = storedCreator()",
+  "if (stored) return stored",
+  "if (identity.available())",
+  "const userIdentity = await identity.read()",
+  "userIdentity?.displayName || userIdentity?.hostName",
+  'logger.warn("Desktop creator identity lookup failed.", error)',
+  'return "This computer"',
+  "return Object.freeze({ unique, clean, cleanCreator, storedCreator, rememberCreator, suggestedCreator })"
+]) {
+  assertIncludes(projectNameServiceJs, snippet, `ProjectNameService must retain characterized policy: ${snippet}.`);
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectNameService({",
+  "redaction: { sanitize: applicationTextSafetyService.redactSensitiveText }",
+  "getItem: (key) => localStorage.getItem(key)",
+  "setItem: (key, value) => localStorage.setItem(key, value)",
+  "removeItem: (key) => localStorage.removeItem(key)",
+  "available: () => Boolean(window.LoopCATDesktop?.getCreatorIdentity)",
+  "read: () => window.LoopCATDesktop.getCreatorIdentity()",
+  'storageKey: "loopcat.creatorName"',
+  "names: { unique: projectNameService.unique, clean: projectNameService.clean }",
+  "creator: { remember: projectNameService.rememberCreator }",
+  "suggestedCreatorName: projectNameService.suggestedCreator",
+  "cleanCreatorName: projectNameService.cleanCreator"
+]) {
+  assertIncludes(appJs, boundary, `project-name composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/createProjectNameService\(/g) || []).length === 1,
+  "app.js must compose exactly one checked project-name service."
+);
+for (const removedOwner of [
+  "CREATOR_NAME_STORAGE",
+  "function uniqueNames",
+  "function cleanProjectText",
+  "function cleanCreatorName",
+  "function storedCreatorName",
+  "function rememberCreatorName",
+  "function suggestedCreatorName"
+]) {
+  assert(
+    !appJs.includes(removedOwner) && !appWorkflowDriverJs.includes(removedOwner),
+    `${removedOwner} must not return to app.js or the workflow driver after project-name extraction.`
+  );
+}
+for (const forbiddenOwner of [
+  "localStorage",
+  "window.",
+  "LoopCATDesktop",
+  "appRuntime",
+  "applicationTextSafetyService",
+  "CREATOR_NAME_STORAGE",
+  "console."
+]) {
+  assert(
+    !projectNameServiceJs.includes(forbiddenOwner),
+    `ProjectNameService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectNameService preserves stable trimmed deduplication and non-array fallback",
+  "ProjectNameService preserves string-number cleanup and exact fallback identity",
+  "ProjectNameService redacts creator names before cleanup and applies the exact 120-character cap",
+  "ProjectNameService contains stored creator read and cleanup failures with the exact key",
+  "ProjectNameService remembers or clears the cleaned creator while containing storage failures",
+  "ProjectNameService gives the stored creator precedence over desktop identity",
+  "ProjectNameService preserves display-name, host-name, unavailable, blank, and failed identity fallbacks",
+  "ProjectNameService validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectNameServiceUnitTests,
+    testName,
+    `focused project-name tests must retain characterization: ${testName}.`
+  );
+}
 assertIncludes(
   appBootstrapJs,
   'import { createProjectResourceSelectionController } from "../features/projects/project-resource-selection-controller.js";',
@@ -2284,7 +2388,7 @@ for (const boundary of [
   "links: projectResourceLinks",
   "catalog: resourceCatalogService",
   "localization: uiLocalizationService",
-  "names: { unique: uniqueNames, clean: cleanProjectText }",
+  "names: { unique: projectNameService.unique, clean: projectNameService.clean }",
   "makeId"
 ]) {
   assertIncludes(appJs, boundary, `project resource-selection composition must inject the ${boundary} boundary.`);
@@ -8587,7 +8691,7 @@ for (const boundary of [
   "create: createProject",
   "load: loadProjects",
   "open: openProject",
-  "creator: { remember: rememberCreatorName }",
+  "creator: { remember: projectNameService.rememberCreator }",
   "languageInputService.setInput(els.sourceLangInput, value)",
   "languageInputService.setInput(els.targetLangInput, value)",
   "terms: refreshProjectTerms",
@@ -17358,7 +17462,7 @@ assertIncludes(
 );
 assertIncludes(
   functionBody(appJs, "function projectDocumentManifest", "function cleanProjectResourceLinks"),
-  "applicationTextSafetyService.stableLower(cleanProjectText(documentInfo.type",
+  "applicationTextSafetyService.stableLower(projectNameService.clean(documentInfo.type",
   "app.js document metadata types must be normalized before export selection."
 );
 assertIncludes(
