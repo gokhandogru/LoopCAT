@@ -632,6 +632,7 @@ const targetEditControllerJs = readText("src/features/editor/target-edit-control
 const targetProducerControllerJs = readText("src/features/editor/target-producer-controller.js");
 const protectedTagInspectionServiceJs = readText("src/features/editor/protected-tag-inspection-service.js");
 const segmentMarkupPresentationServiceJs = readText("src/features/editor/segment-markup-presentation-service.js");
+const segmentRowPresentationServiceJs = readText("src/features/editor/segment-row-presentation-service.js");
 const segmentStatusPresentationServiceJs = readText("src/features/editor/segment-status-presentation-service.js");
 const protectedTextReplacementServiceJs = readText("src/features/editor/protected-text-replacement-service.js");
 const segmentLabelServiceJs = readText("src/features/editor/segment-label-service.js");
@@ -657,6 +658,7 @@ const targetEditControllerUnitTests = readText("tests/unit/target-edit-controlle
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
 const protectedTagInspectionServiceUnitTests = readText("tests/unit/protected-tag-inspection-service.test.cjs");
 const segmentMarkupPresentationServiceUnitTests = readText("tests/unit/segment-markup-presentation-service.test.cjs");
+const segmentRowPresentationServiceUnitTests = readText("tests/unit/segment-row-presentation-service.test.cjs");
 const segmentStatusPresentationServiceUnitTests = readText("tests/unit/segment-status-presentation-service.test.cjs");
 const protectedTextReplacementServiceUnitTests = readText("tests/unit/protected-text-replacement-service.test.cjs");
 const segmentLabelServiceUnitTests = readText("tests/unit/segment-label-service.test.cjs");
@@ -10104,6 +10106,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createSegmentRowPresentationService } from "../features/editor/segment-row-presentation-service.js";',
+  "The application runtime must install the checked segment-row presentation service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentRowPresentationService,",
+  "The application runtime must expose the checked segment-row presentation factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createSegmentStatusPresentationService } from "../features/editor/segment-status-presentation-service.js";',
   "The application runtime must install the checked segment-status presentation service."
 );
@@ -10525,7 +10537,7 @@ assert(
   "TM-match UI must route directly to TargetProducerController while concordance injects its target boundary."
 );
 assert(
-  appJs.split("targetProducerController.insertProtectedTag(").length - 1 === 0 &&
+  appJs.split("targetProducerController.insertProtectedTag(").length - 1 === 1 &&
     segmentMarkupPresentationServiceJs.split("targetProducer.insertProtectedTag(").length - 1 === 2,
   "protected-tag source and tray UI paths must route through SegmentMarkupPresentationService to the injected TargetProducerController."
 );
@@ -10661,15 +10673,15 @@ assertIncludes(
 const segmentMarkupComposition = functionBody(
   appJs,
   "const segmentMarkupPresentationService =",
-  "const segmentActionButtonsController ="
+  "const segmentStatusPresentationService ="
 );
 for (const boundary of [
   "document",
   "protectedTags: protectedTagInspectionService",
   "ranges: termRanges",
   "getProjectTerms: editorSessionStore.getProjectTerms",
-  "navigation: segmentNavigationController",
-  "targetProducer: targetProducerController"
+  "navigation: { select: (...args) => segmentNavigationController.select(...args) }",
+  "targetProducer: { insertProtectedTag: (...args) => targetProducerController.insertProtectedTag(...args) }"
 ]) {
   assertIncludes(
     segmentMarkupComposition,
@@ -10678,9 +10690,10 @@ for (const boundary of [
   );
 }
 assert(
-  appJs.indexOf("segmentNavigationController =") < appJs.indexOf("const segmentMarkupPresentationService =") &&
-    appJs.indexOf("const segmentMarkupPresentationService =") < appJs.indexOf("const segmentActionButtonsController ="),
-  "SegmentMarkupPresentationService must follow stable navigation/producer composition and precede its row consumers."
+  appJs.indexOf("let segmentNavigationController = null") < appJs.indexOf("const segmentMarkupPresentationService =") &&
+    appJs.indexOf("const segmentMarkupPresentationService =") <
+      appJs.indexOf("const segmentStatusPresentationService ="),
+  "SegmentMarkupPresentationService must follow its late-bound navigation declaration and precede status and row consumers."
 );
 for (const [method, count] of [
   ["appendSource", 1],
@@ -10688,7 +10701,7 @@ for (const [method, count] of [
   ["renderTargetPreview", 2]
 ]) {
   assert(
-    (appJs.match(new RegExp(`\\bsegmentMarkupPresentationService\\.${method}\\b`, "g")) || []).length === count,
+    (segmentRowPresentationServiceJs.match(new RegExp(`\\bmarkup\\.${method}\\b`, "g")) || []).length === count,
     `all ${count} segment-markup ${method} consumers must call SegmentMarkupPresentationService directly.`
   );
 }
@@ -10793,7 +10806,7 @@ assertIncludes(
 const segmentStatusComposition = functionBody(
   appJs,
   "const segmentStatusPresentationService =",
-  "const segmentFilterService ="
+  "const segmentRowPresentationService ="
 );
 for (const boundary of [
   "document",
@@ -10811,11 +10824,11 @@ for (const boundary of [
 }
 assert(
   appJs.indexOf("const segmentProvenanceService =") < appJs.indexOf("const segmentStatusPresentationService =") &&
-    appJs.indexOf("const segmentStatusPresentationService =") < appJs.indexOf("const segmentFilterService ="),
+    appJs.indexOf("const segmentStatusPresentationService =") < appJs.indexOf("const segmentRowPresentationService ="),
   "SegmentStatusPresentationService must follow its checked label/provenance owners and precede row consumers."
 );
 assert(
-  (appJs.match(/\bsegmentStatusPresentationService\.render\b/g) || []).length === 2,
+  (segmentRowPresentationServiceJs.match(/\bstatus\.render\b/g) || []).length === 2,
   "both segment-row creation and update consumers must call SegmentStatusPresentationService.render directly."
 );
 assert(
@@ -10877,6 +10890,140 @@ assertIncludes(
   i18nValidateScript,
   '"segment-status-presentation-service.js"',
   "source-catalog validation must scan explicit label keys in the checked segment-status presentation service."
+);
+for (const snippet of [
+  "SegmentRowPresentationService requires template, body, session, application, protected-tag, markup, status, localization, language, target-edit, and navigation boundaries.",
+  "const segment = session.getSegments()[index]",
+  "const row = template.content.firstElementChild.cloneNode(true)",
+  "row.dataset.index = String(index)",
+  'row.classList.toggle("active", index === application.getActiveIndex())',
+  'row.classList.toggle("tag-warning-row", protectedTags.hasIssue(segment))',
+  'row.querySelector(".num-col").textContent = String(index + 1)',
+  'const sourceCell = row.querySelector(".source-cell")',
+  'sourceCell.dir = "auto"',
+  "markup.appendSource(sourceCell, segment)",
+  'textarea.setAttribute(\n      "aria-label",',
+  'localization.source("Target translation for segment {value1}", { value1: index + 1 })',
+  "language.applyTarget(textarea)",
+  'textarea.value = segment.target || ""',
+  "targetEdit.bind({",
+  "markup.renderTargetPreview(row, segment)",
+  "status.render(row, segment)",
+  "markup.renderTagTray(row, segment)",
+  'row.addEventListener("click", () => navigation.select(index))',
+  'const row = body.querySelector(`tr[data-index="${index}"]`)',
+  "if (!row || !segment) return",
+  "return Object.freeze({ create, update })"
+]) {
+  assertIncludes(
+    segmentRowPresentationServiceJs,
+    snippet,
+    `SegmentRowPresentationService must retain characterized row construction/update policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createSegmentRowPresentationService({",
+  "app.js must compose the checked segment-row presentation service."
+);
+const segmentRowComposition = functionBody(
+  appJs,
+  "const segmentRowPresentationService =",
+  "const segmentFilterService ="
+);
+for (const boundary of [
+  "template: els.rowTemplate",
+  "body: els.segmentBody",
+  "session: { getSegments: editorSessionStore.getSegments }",
+  "application: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex }",
+  "protectedTags: protectedTagInspectionService",
+  "markup: segmentMarkupPresentationService",
+  "status: segmentStatusPresentationService",
+  "localization: uiLocalizationService",
+  "language: { applyTarget: projectLanguageContextController.applyTargetLanguage }",
+  "targetEdit: { bind: (...args) => targetEditController.bindTargetEditor(...args) }",
+  "navigation: { select: (...args) => segmentNavigationController.select(...args) }"
+]) {
+  assertIncludes(
+    segmentRowComposition,
+    boundary,
+    `segment-row presentation composition must inject the ${boundary} boundary.`
+  );
+}
+assert(
+  appJs.indexOf("const segmentMarkupPresentationService =") < appJs.indexOf("const segmentRowPresentationService =") &&
+    appJs.indexOf("const segmentStatusPresentationService =") <
+      appJs.indexOf("const segmentRowPresentationService =") &&
+    appJs.indexOf("const segmentRowPresentationService =") < appJs.indexOf("const segmentFilterService ="),
+  "SegmentRowPresentationService must follow checked markup/status composition and precede all row consumers."
+);
+assert(
+  (appJs.match(/\bsegmentRowPresentationService\.create\b/g) || []).length === 1,
+  "segment-grid rendering must call SegmentRowPresentationService.create directly."
+);
+assert(
+  (appJs.match(/\bsegmentRowPresentationService\.update\b/g) || []).length === 9 &&
+    (appWorkflowDriverJs.match(/\bsegmentRowPresentationService\.update\b/g) || []).length === 5,
+  "all application and workflow live-row consumers must call SegmentRowPresentationService.update directly."
+);
+for (const removedHelper of ["renderSegmentRow", "updateRow"]) {
+  assert(
+    !new RegExp(`function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} segment-row helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const removedOwner of [
+  "els.rowTemplate.content.firstElementChild.cloneNode(true)",
+  'row.querySelector(".num-col").textContent',
+  'row.querySelector(".source-cell")',
+  'row.querySelector("textarea")',
+  'row.classList.toggle("tag-warning-row"',
+  'row.addEventListener("click"'
+]) {
+  assert(
+    !appJs.includes(removedOwner),
+    `segment row DOM ownership must not return to the compatibility coordinator: ${removedOwner}`
+  );
+}
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "applicationStore",
+  "protectedTagInspectionService",
+  "segmentMarkupPresentationService",
+  "segmentStatusPresentationService",
+  "uiLocalizationService",
+  "projectLanguageContextController",
+  "targetEditController",
+  "segmentNavigationController",
+  "state.",
+  "els."
+]) {
+  assert(
+    !segmentRowPresentationServiceJs.includes(forbiddenOwner),
+    `SegmentRowPresentationService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "SegmentRowPresentationService preserves full populated row construction and listener order",
+  "SegmentRowPresentationService preserves inactive clean row and empty-target fallback",
+  "SegmentRowPresentationService reads live segment and active state for every fresh row",
+  "SegmentRowPresentationService preserves live update lookup, classes, and preview-before-status order",
+  "SegmentRowPresentationService preserves missing-row and missing-segment no-op timing",
+  "SegmentRowPresentationService preserves representative creation and update failure timing",
+  "SegmentRowPresentationService validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentRowPresentationServiceUnitTests,
+    testName,
+    `focused segment-row presentation tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-row-presentation-service.js"',
+  "source-catalog extraction must scan the checked segment-row presentation service."
 );
 for (const snippet of [
   'const source = String(text || "")',
@@ -13730,8 +13877,8 @@ for (const lateBoundConsumer of [
 }
 for (const directConsumer of [
   "navigation: segmentNavigationController",
-  'row.addEventListener("click", () => segmentNavigationController.select(index))',
   "navigation: { select: (index) => segmentNavigationController.select(index) }",
+  "navigation: { select: (...args) => segmentNavigationController.select(...args) }",
   "await segmentNavigationController.select(first)"
 ]) {
   assertIncludes(
@@ -13741,8 +13888,9 @@ for (const directConsumer of [
   );
 }
 assert(
-  appJs.split("segmentNavigationController.select(").length - 1 === 6,
-  "all six remaining application selection consumers must call SegmentNavigationController directly."
+  appJs.split("segmentNavigationController.select(").length - 1 === 7 &&
+    segmentRowPresentationServiceJs.includes('row.addEventListener("click", () => navigation.select(index))'),
+  "all seven remaining application selection adapters and the checked row listener must route to SegmentNavigationController."
 );
 assert(
   appWorkflowDriverJs.split("segmentNavigationController.select(").length - 1 === 24,

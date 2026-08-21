@@ -1402,7 +1402,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const restoredAiRepairSegment = await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], restoredAiRepairSegment);
       segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
-      updateRow(segmentIndex);
+      segmentRowPresentationService.update(segmentIndex);
     }
 
     const originalAiBatchRepairCompletePrompt = aiRepairProvider.completePrompt;
@@ -1721,7 +1721,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       renderSegments();
       const restoreAiVariantsIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === originalAiVariantsFilters.activeSegmentId);
       if (restoreAiVariantsIndex >= 0) await segmentNavigationController.select(restoreAiVariantsIndex);
-      updateRow(segmentIndex);
+      segmentRowPresentationService.update(segmentIndex);
     }
 
     const aiApplyTermsProvider = aiProviderService.get("ollama");
@@ -1790,7 +1790,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const restoredAiApplyTermsSegment = await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], restoredAiApplyTermsSegment);
       segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
-      updateRow(segmentIndex);
+      segmentRowPresentationService.update(segmentIndex);
     }
 
     const originalAiBatchApplyTermsCompletePrompt = aiApplyTermsProvider.completePrompt;
@@ -2120,7 +2120,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       documentFilterPresentationController.render();
       renderSegments();
       if (Number.isInteger(originalAiPolishFilters.activeIndex) && originalAiPolishFilters.activeIndex >= 0) await segmentNavigationController.select(originalAiPolishFilters.activeIndex);
-      updateRow(segmentIndex);
+      segmentRowPresentationService.update(segmentIndex);
     }
 
     const aiAdaptProvider = aiProviderService.get("ollama");
@@ -2220,7 +2220,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const restoredAiAdaptSegment = await saveSegment(editorSessionStore.getSegments()[segmentIndex]);
       Object.assign(editorSessionStore.getSegments()[segmentIndex], restoredAiAdaptSegment);
       segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
-      updateRow(segmentIndex);
+      segmentRowPresentationService.update(segmentIndex);
     }
 
     const aiBatchAdaptProvider = aiProviderService.get("ollama");

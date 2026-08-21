@@ -157,6 +157,13 @@ const segmentMarkupPresentationServicePath = path.join(
   "editor",
   "segment-markup-presentation-service.js"
 );
+const segmentRowPresentationServicePath = path.join(
+  root,
+  "src",
+  "features",
+  "editor",
+  "segment-row-presentation-service.js"
+);
 const segmentStatusPresentationServicePath = path.join(
   root,
   "src",
@@ -573,6 +580,11 @@ function main() {
     messagesByText,
     segmentMarkupPresentationServicePath,
     "src/features/editor/segment-markup-presentation-service.js"
+  );
+  extractScript(
+    messagesByText,
+    segmentRowPresentationServicePath,
+    "src/features/editor/segment-row-presentation-service.js"
   );
   extractScript(
     messagesByText,

@@ -1380,6 +1380,19 @@ const protectedTextReplacementService = appRuntime.featureFactories.createProtec
 const segmentProvenanceService = appRuntime.featureFactories.createSegmentProvenanceService({
   localization: uiLocalizationService
 });
+let targetEditController = null;
+let segmentNavigationController = null;
+const segmentMarkupPresentationService =
+  appRuntime.featureFactories.createSegmentMarkupPresentationService({
+    document,
+    protectedTags: protectedTagInspectionService,
+    terms: {
+      ranges: termRanges,
+      getProjectTerms: editorSessionStore.getProjectTerms
+    },
+    navigation: { select: (...args) => segmentNavigationController.select(...args) },
+    targetProducer: { insertProtectedTag: (...args) => targetProducerController.insertProtectedTag(...args) }
+  });
 const segmentStatusPresentationService =
   appRuntime.featureFactories.createSegmentStatusPresentationService({
     document,
@@ -1388,6 +1401,20 @@ const segmentStatusPresentationService =
     provenance: segmentProvenanceService,
     localization: uiLocalizationService,
     quality: qualityPresentationService
+  });
+const segmentRowPresentationService =
+  appRuntime.featureFactories.createSegmentRowPresentationService({
+    template: els.rowTemplate,
+    body: els.segmentBody,
+    session: { getSegments: editorSessionStore.getSegments },
+    application: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex },
+    protectedTags: protectedTagInspectionService,
+    markup: segmentMarkupPresentationService,
+    status: segmentStatusPresentationService,
+    localization: uiLocalizationService,
+    language: { applyTarget: projectLanguageContextController.applyTargetLanguage },
+    targetEdit: { bind: (...args) => targetEditController.bindTargetEditor(...args) },
+    navigation: { select: (...args) => segmentNavigationController.select(...args) }
   });
 
 const segmentFilterService = appRuntime.featureFactories.createSegmentFilterService({
@@ -2226,8 +2253,6 @@ const verticalFeatureState = (() => {
 })();
 verticalFeatureState?.inspector?.mount?.();
 
-let targetEditController = null;
-let segmentNavigationController = null;
 const autosaveService = appRuntime.featureFactories.createAutosaveService({
   editorSessionStore,
   repository: {
@@ -2545,7 +2570,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
       segmentCommandRestorationController.restoreSnapshot(segmentId, snapshot, options)
   },
   view: {
-    updateRow,
+    updateRow: segmentRowPresentationService.update,
     renderSegments,
     renderProgress,
     scheduleHistory: scheduleRevisionHistoryRender,
@@ -3193,7 +3218,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
         segment: applicationActiveSegmentService.get(),
         force: Boolean(options.force)
       }),
-    updateRow,
+    updateRow: segmentRowPresentationService.update,
     renderAll: applicationAggregatePresentationController.render,
     refreshSidebar: () => editorContextController.refresh(),
     renderSegments,
@@ -3358,7 +3383,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
     renderAiProgress: aiProviderFormController.renderProgress,
     renderOutput: aiProviderFormController.renderOutput,
     renderSuggestions: aiSuggestionListController.render,
-    updateRow,
+    updateRow: segmentRowPresentationService.update,
     renderAll: applicationAggregatePresentationController.render,
     refreshSidebar: () => editorContextController.refresh()
   },
@@ -3441,7 +3466,7 @@ const aiTerminologyApplicationController =
       renderAiProgress: aiProviderFormController.renderProgress,
       renderOutput: aiProviderFormController.renderOutput,
       renderSuggestions: aiSuggestionListController.render,
-      updateRow,
+      updateRow: segmentRowPresentationService.update,
       renderAll: applicationAggregatePresentationController.render,
       refreshSidebar: () => editorContextController.refresh()
     },
@@ -4074,24 +4099,13 @@ segmentNavigationController = appRuntime.featureFactories.createSegmentNavigatio
   },
   presentation: {
     renderSegments,
-    updateRow,
+    updateRow: segmentRowPresentationService.update,
     renderPrompt: aiPromptPreviewController.render
   },
   context: { refresh: editorContextController.refresh },
   focus: { target: targetEditController.focusActive },
   statusFilter: els.segmentStatusFilter
 });
-const segmentMarkupPresentationService =
-  appRuntime.featureFactories.createSegmentMarkupPresentationService({
-    document,
-    protectedTags: protectedTagInspectionService,
-    terms: {
-      ranges: termRanges,
-      getProjectTerms: editorSessionStore.getProjectTerms
-    },
-    navigation: segmentNavigationController,
-    targetProducer: targetProducerController
-  });
 const segmentActionButtonsController =
   appRuntime.featureFactories.createSegmentActionButtonsController({
     elements: {
@@ -5522,7 +5536,7 @@ const reviewMetadataController = appRuntime.featureFactories.createReviewMetadat
         segment: applicationActiveSegmentService.get(),
         force: Boolean(options.force)
       }),
-    updateRow,
+    updateRow: segmentRowPresentationService.update,
     renderHistory: revisionHistoryPresentationService.render
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
@@ -5572,7 +5586,7 @@ const qualityDecisionController = appRuntime.featureFactories.createQualityDecis
         force: Boolean(options.force)
       }),
     renderWorkbench: qualityWorkbenchController.render,
-    updateRow
+    updateRow: segmentRowPresentationService.update
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
   status: { set: applicationSaveStatusController.set },
@@ -5620,7 +5634,7 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
     syncState: (reviewState) => qualityReviewController?.syncReviewState?.(reviewState),
     renderReview: () =>
       qualityReviewController?.renderReview?.({ segment: applicationActiveSegmentService.get(), force: false }),
-    updateRow,
+    updateRow: segmentRowPresentationService.update,
     renderHistory: revisionHistoryPresentationService.render
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
@@ -5692,35 +5706,6 @@ function spacerRow(height) {
   return row;
 }
 
-function renderSegmentRow(index) {
-  const segment = editorSessionStore.getSegments()[index];
-  const row = els.rowTemplate.content.firstElementChild.cloneNode(true);
-  row.dataset.index = String(index);
-  row.classList.toggle("active", index === applicationStore.getState().navigation.activeIndex);
-  row.classList.toggle("tag-warning-row", protectedTagInspectionService.hasIssue(segment));
-  row.querySelector(".num-col").textContent = String(index + 1);
-  const sourceCell = row.querySelector(".source-cell");
-  sourceCell.textContent = "";
-  sourceCell.dir = "auto";
-  segmentMarkupPresentationService.appendSource(sourceCell, segment);
-  const textarea = row.querySelector("textarea");
-  textarea.dir = "auto";
-  textarea.setAttribute("aria-label", uiLocalizationService.source("Target translation for segment {value1}", { value1: index + 1 }));
-  projectLanguageContextController.applyTargetLanguage(textarea);
-  textarea.value = segment.target || "";
-  targetEditController.bindTargetEditor({
-    textarea,
-    editingCell: row.querySelector(".target-cell"),
-    index,
-    segmentId: segment.id
-  });
-  segmentMarkupPresentationService.renderTargetPreview(row, segment);
-  segmentStatusPresentationService.render(row, segment);
-  segmentMarkupPresentationService.renderTagTray(row, segment);
-  row.addEventListener("click", () => segmentNavigationController.select(index));
-  return row;
-}
-
 function segmentWindow(indexes) {
   return verticalFeatureState.segmentGrid.calculateWindow(indexes);
 }
@@ -5758,7 +5743,7 @@ function renderSegments(options = {}) {
   const bottomHeight = (indexes.length - win.end) * SEGMENT_ROW_HEIGHT;
   const fragment = document.createDocumentFragment();
   if (topHeight) fragment.append(spacerRow(topHeight));
-  win.indexes.forEach((index) => fragment.append(renderSegmentRow(index)));
+  win.indexes.forEach((index) => fragment.append(segmentRowPresentationService.create(index)));
   if (bottomHeight) fragment.append(spacerRow(bottomHeight));
   els.segmentBody.replaceChildren(fragment);
   if (options.preserveScroll && els.segmentGridWrap.scrollTop !== scrollTop) {
@@ -5766,18 +5751,10 @@ function renderSegments(options = {}) {
   }
 }
 
-function updateRow(index) {
-  const row = els.segmentBody.querySelector(`tr[data-index="${index}"]`);
-  const segment = editorSessionStore.getSegments()[index];
-  if (!row || !segment) return;
-  row.classList.toggle("active", index === applicationStore.getState().navigation.activeIndex);
-  row.classList.toggle("tag-warning-row", protectedTagInspectionService.hasIssue(segment));
-  segmentMarkupPresentationService.renderTargetPreview(row, segment);
-  segmentStatusPresentationService.render(row, segment);
-}
-
 function scheduleRowUpdate(index) {
-  verticalFeatureState.segmentGrid.scheduleRowUpdate(index, (indexes) => indexes.forEach(updateRow));
+  verticalFeatureState.segmentGrid.scheduleRowUpdate(index, (indexes) =>
+    indexes.forEach(segmentRowPresentationService.update)
+  );
 }
 
 function scheduleRevisionHistoryRender() {

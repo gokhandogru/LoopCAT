@@ -82,6 +82,7 @@ import { createPanelToggleController } from "../features/editor/panel-toggle-con
 import { createSegmentActionButtonsController } from "../features/editor/segment-action-buttons-controller.js";
 import { createSegmentGridController } from "../features/editor/segment-grid-controller.js";
 import { createSegmentMarkupPresentationService } from "../features/editor/segment-markup-presentation-service.js";
+import { createSegmentRowPresentationService } from "../features/editor/segment-row-presentation-service.js";
 import { createSegmentStatusPresentationService } from "../features/editor/segment-status-presentation-service.js";
 import { createAutosaveService } from "../features/editor/autosave-service.js";
 import { createTargetEditController } from "../features/editor/target-edit-controller.js";
@@ -318,6 +319,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createPanelToggleController,
       createSegmentActionButtonsController,
       createSegmentMarkupPresentationService,
+      createSegmentRowPresentationService,
       createSegmentStatusPresentationService,
       createDeliveryExportController,
       createProjectResourceTransferController,
