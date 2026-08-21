@@ -173,6 +173,7 @@ import { createWorkspacePackageSaveController } from "../features/workspace/work
 import { createWorkspaceBackupExportController } from "../features/workspace/workspace-backup-export-controller.js";
 import { createWorkspaceDirtyStateController } from "../features/workspace/workspace-dirty-state-controller.js";
 import { createWorkspaceHealthRepairController } from "../features/workspace/workspace-health-repair-controller.js";
+import { createWorkspaceRecoveryPresentationService } from "../features/workspace/workspace-recovery-presentation-service.js";
 import { createWorkspaceSyncController } from "../features/workspace/workspace-sync-controller.js";
 import {
   asTrustedHtml,
@@ -305,6 +306,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createWorkspaceBackupExportController,
       createWorkspaceDirtyStateController,
       createWorkspaceHealthRepairController,
+      createWorkspaceRecoveryPresentationService,
       createWorkspaceSyncController,
       createReportDataService,
       createReportDocumentCompositionService,

@@ -80,14 +80,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     const originalStorageDurability = state.storageDurability;
     state.storageDurability = { checked: true, supported: true, persisted: true, requested: true, usageBytes: 10 * 1024 * 1024, quotaBytes: 1000 * 1024 * 1024 };
-    renderWorkspaceStatus();
+    workspaceRecoveryPresentationService.renderStatus();
     assert(
       els.workspaceHealth.textContent.includes("Storage: persistent") &&
         els.workspaceHealth.textContent.includes("10 MB of 1000 MB used"),
       "persistent storage status is visible in workspace health"
     );
     state.storageDurability = { checked: true, supported: true, persisted: false, requested: true, usageBytes: 920 * 1024 * 1024, quotaBytes: 1000 * 1024 * 1024 };
-    renderWorkspaceStatus();
+    workspaceRecoveryPresentationService.renderStatus();
     assert(
       els.workspaceHealth.textContent.includes("Storage: best-effort") &&
         els.workspaceHealth.textContent.includes("export project packages") &&
@@ -95,7 +95,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "best-effort and nearly-full storage states warn before long offline projects grow"
     );
     state.storageDurability = originalStorageDurability;
-    renderWorkspaceStatus();
+    workspaceRecoveryPresentationService.renderStatus();
     let finishLongImport = null;
     const longImportFile = { name: "large-import.docx", size: 12 * 1024 * 1024 };
     const longImportTask = fileImportService.runTask("Project file import", () => new Promise((resolve) => {
@@ -5139,7 +5139,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     state.workspaceStatus = { supported: true, connected: false, mode: "browser-cache", name: "", lastSyncedAt: "", projectCount: 0, resourceCount: 0, backupCount: 0 };
     workspaceDirtyStateController.clearAll();
     workspaceDirtyStateController.mark(project.id);
-    renderWorkspaceStatus();
+    workspaceRecoveryPresentationService.renderStatus();
     const disconnectedBeforeUnloadEvent = new Event("beforeunload", { cancelable: true });
     const disconnectedBeforeUnloadResult = window.dispatchEvent(disconnectedBeforeUnloadEvent);
     assert(!els.workspaceMenuSummary.textContent.includes("unsaved") && disconnectedBeforeUnloadResult && !disconnectedBeforeUnloadEvent.defaultPrevented, "browser-cache dirty recovery marker stays hidden until a workspace is connected");
@@ -5198,7 +5198,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     try {
       state.workspaceRecoveryProjectIds = new Set([project.id]);
       recoveryWorkspaceController.resetRecoveryDismissal();
-      renderWorkspaceStatus();
+      workspaceRecoveryPresentationService.renderStatus();
       assert(
         !els.workspaceRecoveryPanel.classList.contains("hidden") &&
           els.workspaceRecoveryMessage.textContent.includes("saved in LoopCAT") &&

@@ -818,6 +818,7 @@ const applicationActiveSegmentService = appRuntime.featureFactories.createApplic
   segments: { getAll: editorSessionStore.getSegments },
   navigation: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex }
 });
+let workspaceRecoveryPresentationService;
 const workspaceDirtyStateController = appRuntime.featureFactories.createWorkspaceDirtyStateController({
   state: {
     getDirty: () => state.workspaceDirtyProjectIds,
@@ -840,8 +841,8 @@ const workspaceDirtyStateController = appRuntime.featureFactories.createWorkspac
   summary: { markDirty: (projectId) => markProjectSummaryDirty(projectId) },
   recovery: { resetDismissal: () => recoveryWorkspaceController?.resetRecoveryDismissal?.() },
   presentation: {
-    renderStatus: () => renderWorkspaceStatus(),
-    renderRecovery: () => renderWorkspaceRecoveryPanel()
+    renderStatus: () => workspaceRecoveryPresentationService.renderStatus(),
+    renderRecovery: () => workspaceRecoveryPresentationService.renderRecovery()
   }
 });
 
@@ -1287,7 +1288,7 @@ const applicationStorageDurabilityController =
       getApi: () => (typeof navigator === "undefined" ? null : navigator.storage)
     },
     formatting: { fileSize: applicationImportProgressController.formatFileSize },
-    presentation: { renderWorkspaceStatus: () => renderWorkspaceStatus() },
+    presentation: { renderWorkspaceStatus: () => workspaceRecoveryPresentationService.renderStatus() },
     limits: {
       lowSpaceBytes: STORAGE_LOW_SPACE_BYTES,
       highUsageRatio: STORAGE_HIGH_USAGE_RATIO
@@ -3722,7 +3723,7 @@ const uiLocaleOrchestrationController =
     presentation: {
       renderPanels: () => panelToggleController.renderAll(),
       renderFocusMode: () => focusModeController.render(),
-      renderWorkspaceStatus: () => renderWorkspaceStatus(),
+      renderWorkspaceStatus: () => workspaceRecoveryPresentationService.renderStatus(),
       renderProjectStorageStatus: () => renderProjectStorageStatus(),
       renderProjectsView: () => renderProjectsView(),
       renderResourcesView: () => renderResourcesView(),
@@ -3968,7 +3969,7 @@ const applicationStartupController = appRuntime.featureFactories.createApplicati
     assignStatus: (workspaceStatus) => {
       state.workspaceStatus = workspaceStatus;
     },
-    renderStatus: () => renderWorkspaceStatus()
+    renderStatus: () => workspaceRecoveryPresentationService.renderStatus()
   },
   durability: { refresh: applicationStorageDurabilityController.refresh },
   projects: {
@@ -4119,9 +4120,34 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
       "dismiss-backup-reminder": uiLocalizationService.source("Backup reminder could not be dismissed")
     }[context?.phase] || uiLocalizationService.source("Workspace action failed");
     applicationSaveStatusController.set(error?.message || fallback, "dirty");
-    if (context?.phase === "save-recovery") renderWorkspaceRecoveryPanel();
+    if (context?.phase === "save-recovery") workspaceRecoveryPresentationService.renderRecovery();
   }
 });
+workspaceRecoveryPresentationService =
+  appRuntime.featureFactories.createWorkspaceRecoveryPresentationService({
+    available: Boolean(workspaceStorage),
+    state: {
+      getStatus: () => state.workspaceStatus,
+      getDurability: () => state.storageDurability,
+      getImportTask: () => state.importTask,
+      getRecovery: () => state.workspaceRecoveryProjectIds,
+      getDirty: () => state.workspaceDirtyProjectIds,
+      getAutosaving: () => state.workspaceAutosaving
+    },
+    dirty: { visibleCount: workspaceDirtyStateController.visibleCount },
+    projects: {
+      getCurrent: editorSessionStore.getProject,
+      knownById: knownProjectById
+    },
+    durability: {
+      warnings: applicationStorageDurabilityController.warnings,
+      line: applicationStorageDurabilityController.line
+    },
+    recovery: {
+      renderStatus: (viewModel) => recoveryWorkspaceController?.renderStatus?.(viewModel),
+      renderRecovery: (viewModel) => recoveryWorkspaceController?.renderRecovery?.(viewModel)
+    }
+  });
 recoveryWorkspaceController?.mount?.();
 const projectPackagePortabilityService =
   appRuntime.featureFactories.createProjectPackagePortabilityService({
@@ -4188,7 +4214,7 @@ workspaceBackupExportController =
       errorReport: fileImportService.errorReport
     },
     presentation: {
-      renderWorkspaceStatus,
+      renderWorkspaceStatus: workspaceRecoveryPresentationService.renderStatus,
       renderValidation: renderValidationReport
     },
     status: { set: applicationSaveStatusController.set }
@@ -4216,7 +4242,7 @@ workspaceHealthRepairController =
     dirty: { ids: workspaceDirtyStateController.ids },
     presentation: {
       renderValidation: renderValidationReport,
-      renderWorkspaceStatus
+      renderWorkspaceStatus: workspaceRecoveryPresentationService.renderStatus
     },
     status: { set: applicationSaveStatusController.set }
   });
@@ -4290,7 +4316,7 @@ workspacePackageSaveController =
       markDirty: workspaceDirtyStateController.mark,
       hasDirty: () => Boolean(state.workspaceDirtyProjectIds.size),
       dirtyIds: workspaceDirtyStateController.ids,
-      recoveryIds: workspaceRecoveryProjectIds,
+      recoveryIds: workspaceRecoveryPresentationService.ids,
       isAutosaving: () => Boolean(state.workspaceAutosaving),
       setAutosaving: (value) => {
         state.workspaceAutosaving = value;
@@ -4302,10 +4328,10 @@ workspacePackageSaveController =
     },
     validation: { count: reportCount },
     presentation: {
-      renderWorkspaceStatus,
+      renderWorkspaceStatus: workspaceRecoveryPresentationService.renderStatus,
       renderValidation: renderValidationReport,
       renderBackupReminder,
-      renderRecovery: renderWorkspaceRecoveryPanel
+      renderRecovery: workspaceRecoveryPresentationService.renderRecovery
     },
     status: { set: applicationSaveStatusController.set },
     preferences: {
@@ -4363,7 +4389,7 @@ const projectImportRestoreController =
     },
     presentation: {
       renderValidation: renderValidationReport,
-      renderWorkspaceStatus
+      renderWorkspaceStatus: workspaceRecoveryPresentationService.renderStatus
     },
     status: { set: applicationSaveStatusController.set, mode: exportStatusMode },
     localization: {
@@ -4398,7 +4424,7 @@ workspaceSyncController = appRuntime.featureFactories.createWorkspaceSyncControl
     }
   },
   presentation: {
-    renderWorkspaceStatus,
+    renderWorkspaceStatus: workspaceRecoveryPresentationService.renderStatus,
     renderValidation: renderValidationReport
   },
   status: { set: applicationSaveStatusController.set }
@@ -5125,38 +5151,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
   }
 });
 
-function renderWorkspaceStatus() {
-  if (!workspaceStorage) return;
-  const status = state.workspaceStatus || {};
-  const dirtyCount = workspaceDirtyStateController.visibleCount(status);
-  const storageWarnings = applicationStorageDurabilityController.warnings(state.storageDurability);
-  recoveryWorkspaceController?.renderStatus?.({
-    status,
-    dirtyCount,
-    storageLine: applicationStorageDurabilityController.line(state.storageDurability),
-    storageWarnings,
-    importBusy: Boolean(state.importTask),
-    hasProject: Boolean(editorSessionStore.getProject())
-  });
-  renderWorkspaceRecoveryPanel();
-}
-
-function workspaceRecoveryProjectIds() {
-  return Array.from(state.workspaceRecoveryProjectIds).filter((id) => state.workspaceDirtyProjectIds.has(id));
-}
-
-function renderWorkspaceRecoveryPanel() {
-  const ids = workspaceRecoveryProjectIds();
-  recoveryWorkspaceController?.renderRecovery?.({
-    status: state.workspaceStatus || {},
-    projects: ids.map((id) => {
-      const project = knownProjectById(id);
-      return { id, name: project?.name || id };
-    }),
-    autosaving: state.workspaceAutosaving
-  });
-}
-
 function daysBetween(fromIso, toDate = new Date()) {
   const from = new Date(fromIso || 0);
   if (!Number.isFinite(from.getTime())) return Infinity;
@@ -5230,7 +5224,7 @@ function knownProjectById(projectId) {
 async function refreshWorkspaceStatus() {
   if (!workspaceStorage) return;
   state.workspaceStatus = await workspaceStorage.getStatus();
-  renderWorkspaceStatus();
+  workspaceRecoveryPresentationService.renderStatus();
 }
 
 async function markLocalProjectsMissingFromWorkspaceDirty() {
@@ -5555,7 +5549,7 @@ function renderEditor() {
   });
   const hasProject = Boolean(editorSessionStore.getProject());
   void projectLanguageContextController.syncDesktopSpellcheck();
-  renderWorkspaceStatus();
+  workspaceRecoveryPresentationService.renderStatus();
   renderBackupReminder();
   if (verticalFeatureState?.editor) {
     verticalFeatureState.editor.renderShell({ view: applicationStore.getState().navigation.view, hasProject, inspectorOpen: state.inspectorOpen });

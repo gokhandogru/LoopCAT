@@ -290,6 +290,7 @@ const requiredReleaseFiles = [
   "src/features/workspace/workspace-dirty-state-controller.js",
   "src/features/workspace/workspace-health-repair-controller.js",
   "src/features/workspace/workspace-package-save-controller.js",
+  "src/features/workspace/workspace-recovery-presentation-service.js",
   "src/features/workspace/workspace-sync-controller.js",
   "src/i18n/language-input-service.js",
   "src/i18n/ui-locale-controls-controller.js",
@@ -416,6 +417,7 @@ const requiredReleaseFiles = [
   "tests/unit/workspace-dirty-state-controller.test.cjs",
   "tests/unit/workspace-health-repair-controller.test.cjs",
   "tests/unit/workspace-package-save-controller.test.cjs",
+  "tests/unit/workspace-recovery-presentation-service.test.cjs",
   "tests/unit/workspace-sync-controller.test.cjs",
   "tests/unit/language-input-service.test.cjs",
   "tests/unit/ui-locale-controls-controller.test.cjs",
@@ -809,6 +811,12 @@ const workspaceHealthRepairControllerJs = readText("src/features/workspace/works
 const workspaceHealthRepairControllerUnitTests = readText("tests/unit/workspace-health-repair-controller.test.cjs");
 const workspacePackageSaveControllerJs = readText("src/features/workspace/workspace-package-save-controller.js");
 const workspacePackageSaveControllerUnitTests = readText("tests/unit/workspace-package-save-controller.test.cjs");
+const workspaceRecoveryPresentationServiceJs = readText(
+  "src/features/workspace/workspace-recovery-presentation-service.js"
+);
+const workspaceRecoveryPresentationServiceUnitTests = readText(
+  "tests/unit/workspace-recovery-presentation-service.test.cjs"
+);
 const workspaceSyncControllerJs = readText("src/features/workspace/workspace-sync-controller.js");
 const workspaceSyncControllerUnitTests = readText("tests/unit/workspace-sync-controller.test.cjs");
 const importExportControllerJs = readText("src/features/import-export/import-export-controller.js");
@@ -1362,8 +1370,8 @@ for (const boundary of [
   "resources: { links: projectResourceContextService.links }",
   "summary: { markDirty: (projectId) => markProjectSummaryDirty(projectId) }",
   "recovery: { resetDismissal: () => recoveryWorkspaceController?.resetRecoveryDismissal?.() }",
-  "renderStatus: () => renderWorkspaceStatus()",
-  "renderRecovery: () => renderWorkspaceRecoveryPanel()"
+  "renderStatus: () => workspaceRecoveryPresentationService.renderStatus()",
+  "renderRecovery: () => workspaceRecoveryPresentationService.renderRecovery()"
 ]) {
   assertIncludes(appJs, boundary, `workspace dirty-state composition must retain ${boundary}.`);
 }
@@ -1459,6 +1467,135 @@ for (const testName of [
     workspaceDirtyStateControllerUnitTests,
     testName,
     `focused workspace dirty-state tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createWorkspaceRecoveryPresentationService } from "../features/workspace/workspace-recovery-presentation-service.js";',
+  "the application runtime must install the checked workspace recovery-presentation service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createWorkspaceRecoveryPresentationService,",
+  "the application runtime must expose the checked workspace recovery-presentation service factory."
+);
+for (const snippet of [
+  "WorkspaceRecoveryPresentationService requires checked availability, state, dirty-state, project, durability, and recovery boundaries.",
+  "function ids()",
+  "return Array.from(state.getRecovery()).filter((id) => state.getDirty().has(id));",
+  "function renderRecovery()",
+  "const recoveryIds = ids();",
+  "status: state.getStatus() || {}",
+  "projects: recoveryIds.map((id) => {",
+  "const project = projects.knownById(id);",
+  "return { id, name: project?.name || id };",
+  "autosaving: state.getAutosaving()",
+  "function renderStatus()",
+  "if (!available) return;",
+  "const status = state.getStatus() || {};",
+  "const dirtyCount = dirty.visibleCount(status);",
+  "const storageWarnings = durability.warnings(state.getDurability());",
+  "storageLine: durability.line(state.getDurability())",
+  "importBusy: Boolean(state.getImportTask())",
+  "hasProject: Boolean(projects.getCurrent())",
+  "renderRecovery();",
+  "return Object.freeze({ ids, renderStatus, renderRecovery });"
+]) {
+  assertIncludes(
+    workspaceRecoveryPresentationServiceJs,
+    snippet,
+    `WorkspaceRecoveryPresentationService must retain characterized view-model and sequencing policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "let workspaceRecoveryPresentationService;",
+  "appRuntime.featureFactories.createWorkspaceRecoveryPresentationService({",
+  "available: Boolean(workspaceStorage)",
+  "getStatus: () => state.workspaceStatus",
+  "getDurability: () => state.storageDurability",
+  "getImportTask: () => state.importTask",
+  "getRecovery: () => state.workspaceRecoveryProjectIds",
+  "getDirty: () => state.workspaceDirtyProjectIds",
+  "getAutosaving: () => state.workspaceAutosaving",
+  "dirty: { visibleCount: workspaceDirtyStateController.visibleCount }",
+  "getCurrent: editorSessionStore.getProject",
+  "knownById: knownProjectById",
+  "warnings: applicationStorageDurabilityController.warnings",
+  "line: applicationStorageDurabilityController.line",
+  "renderStatus: (viewModel) => recoveryWorkspaceController?.renderStatus?.(viewModel)",
+  "renderRecovery: (viewModel) => recoveryWorkspaceController?.renderRecovery?.(viewModel)"
+]) {
+  assertIncludes(appJs, boundary, `workspace recovery-presentation composition must retain ${boundary}.`);
+}
+for (const [method, appCount, workflowCount] of [
+  ["ids", 1, 0],
+  ["renderStatus", 11, 5],
+  ["renderRecovery", 3, 0]
+]) {
+  assert(
+    (appJs.match(new RegExp(`\\bworkspaceRecoveryPresentationService\\.${method}\\b`, "g")) || []).length ===
+      appCount,
+    `application consumers must retain all ${appCount} direct WorkspaceRecoveryPresentationService.${method} references.`
+  );
+  assert(
+    (appWorkflowDriverJs.match(
+      new RegExp(`\\bworkspaceRecoveryPresentationService\\.${method}\\b`, "g")
+    ) || []).length === workflowCount,
+    `workflow consumers must retain all ${workflowCount} direct WorkspaceRecoveryPresentationService.${method} references.`
+  );
+}
+for (const removedHelper of [
+  "renderWorkspaceStatus",
+  "workspaceRecoveryProjectIds",
+  "renderWorkspaceRecoveryPanel"
+]) {
+  assert(
+    !new RegExp(`function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs) &&
+      !new RegExp(`\\b${removedHelper}\\s*\\(`).test(appJs) &&
+      !new RegExp(`\\b${removedHelper}\\s*\\(`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return as a coordinator/workflow helper or call target.`
+  );
+}
+for (const forbiddenOwner of [
+  "appRuntime",
+  "workspaceStorage",
+  "state.workspace",
+  "editorSessionStore",
+  "workspaceDirtyStateController",
+  "applicationStorageDurabilityController",
+  "recoveryWorkspaceController",
+  "knownProjectById",
+  "document.",
+  "els."
+]) {
+  assert(
+    !workspaceRecoveryPresentationServiceJs.includes(forbiddenOwner),
+    `WorkspaceRecoveryPresentationService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+assert(
+  !appJs.includes("Array.from(state.workspaceRecoveryProjectIds).filter") &&
+    !appJs.includes("const storageWarnings = applicationStorageDurabilityController.warnings") &&
+    !appJs.includes("projects: ids.map((id) =>") &&
+    !appWorkflowDriverJs.includes("Array.from(state.workspaceRecoveryProjectIds).filter"),
+  "workspace recovery selection and view-model orchestration must not return to app.js or the workflow driver."
+);
+for (const testName of [
+  "WorkspaceRecoveryPresentationService preserves recovery Set order and repeated dirty reads",
+  "WorkspaceRecoveryPresentationService preserves partial recovery filtering failure timing",
+  "WorkspaceRecoveryPresentationService preserves the unavailable-workspace status no-op",
+  "WorkspaceRecoveryPresentationService preserves exact status-before-recovery view models and order",
+  "WorkspaceRecoveryPresentationService preserves falsy status, flag, and project-name fallbacks",
+  "WorkspaceRecoveryPresentationService renders recovery directly even when workspace is unavailable",
+  "WorkspaceRecoveryPresentationService stops recovery when status presentation fails",
+  "WorkspaceRecoveryPresentationService preserves durability and recovery failure timing",
+  "WorkspaceRecoveryPresentationService validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    workspaceRecoveryPresentationServiceUnitTests,
+    testName,
+    `focused workspace recovery-presentation tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
@@ -5470,11 +5607,8 @@ assert(
   "the migrated recovery/workspace family must not retain superseded static listeners in app.js."
 );
 assert(
-  !functionBody(appJs, "function renderWorkspaceStatus", "function workspaceRecoveryProjectIds").includes(
-    "replaceSafeHtml"
-  ) &&
-    !functionBody(appJs, "function renderWorkspaceRecoveryPanel", "function daysBetween").includes("replaceSafeHtml"),
-  "workspace health and recovery DOM construction must live in the checked controller rather than app.js."
+  !workspaceRecoveryPresentationServiceJs.includes("replaceSafeHtml"),
+  "workspace status and recovery view-model composition must not own recovery DOM construction."
 );
 assertIncludes(
   recoveryWorkspaceControllerUnitTests,
@@ -10588,10 +10722,10 @@ for (const boundary of [
   "markDirty: workspaceDirtyStateController.mark",
   "hasDirty: () => Boolean(state.workspaceDirtyProjectIds.size)",
   "dirtyIds: workspaceDirtyStateController.ids",
-  "recoveryIds: workspaceRecoveryProjectIds",
+  "recoveryIds: workspaceRecoveryPresentationService.ids",
   "renderValidation: renderValidationReport",
   "renderBackupReminder,",
-  "renderRecovery: renderWorkspaceRecoveryPanel",
+  "renderRecovery: workspaceRecoveryPresentationService.renderRecovery",
   "status: { set: applicationSaveStatusController.set }",
   "saveToFolder: () => Boolean(els.saveProjectToFolderInput?.checked)",
   "clear: (timer) => clearInterval(timer)",
@@ -17987,7 +18121,7 @@ for (const boundary of [
   "restoreDirty: () => workspaceDirtyStateController.restore()",
   "reconnect: workspaceStorage ? () => workspaceStorage.reconnectSavedWorkspace() : null",
   "state.workspaceStatus = workspaceStatus",
-  "renderStatus: () => renderWorkspaceStatus()",
+  "renderStatus: () => workspaceRecoveryPresentationService.renderStatus()",
   "refresh: applicationStorageDurabilityController.refresh",
   "load: (restoreSelection) => loadProjects(restoreSelection)",
   "count: () => editorSessionStore.getProjects().length",
@@ -18245,12 +18379,12 @@ for (const boundary of [
   "state.storageDurability = value",
   'getApi: () => (typeof navigator === "undefined" ? null : navigator.storage)',
   "fileSize: applicationImportProgressController.formatFileSize",
-  "renderWorkspaceStatus: () => renderWorkspaceStatus()",
+  "renderWorkspaceStatus: () => workspaceRecoveryPresentationService.renderStatus()",
   "lowSpaceBytes: STORAGE_LOW_SPACE_BYTES",
   "highUsageRatio: STORAGE_HIGH_USAGE_RATIO",
   "durability: { refresh: applicationStorageDurabilityController.refresh }",
-  "applicationStorageDurabilityController.warnings(state.storageDurability)",
-  "applicationStorageDurabilityController.line(state.storageDurability)"
+  "warnings: applicationStorageDurabilityController.warnings",
+  "line: applicationStorageDurabilityController.line"
 ]) {
   assertIncludes(appJs, boundary, `application storage-durability composition and consumers must retain ${boundary}.`);
 }
