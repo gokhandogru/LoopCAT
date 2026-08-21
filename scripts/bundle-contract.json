@@ -2,23 +2,19 @@
   "mode": "source-test-isolated",
   "productionFiles": [
     "app.js",
+    "src/app/application-composition.js",
     "ai.js",
     "storage.js",
     "workspace-storage.js",
     "project.js"
   ],
   "knownMarkers": {
-    "app.js": {
+    "src/app/application-composition.js": {
       "runAppWorkflowTest": 1,
       "#app-workflow-test": 1,
       "_TEST_FLAG": 76,
       "Simulated ": 32
     }
   },
-  "forbiddenMarkers": [
-    "window.__LOOPCAT_TEST__",
-    "window.__LOOPCAT_DEBUG__",
-    "src/testing/",
-    "tests/app-workflow/"
-  ]
+  "forbiddenMarkers": ["window.__LOOPCAT_TEST__", "window.__LOOPCAT_DEBUG__", "src/testing/", "tests/app-workflow/"]
 }

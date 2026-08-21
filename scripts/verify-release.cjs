@@ -155,6 +155,7 @@ const requiredReleaseFiles = [
   "src/entry/production.js",
   "src/entry/renderer-bootstrap.js",
   "src/entry/test.js",
+  "src/app/application-composition.js",
   "src/app/bootstrap.js",
   "src/app/app-store.js",
   "src/app/application-active-segment-service.js",
@@ -332,6 +333,7 @@ const requiredReleaseFiles = [
   "tests/unit/cohere-provider-adapter.test.cjs",
   "tests/unit/compatibility-module-registry.test.cjs",
   "tests/unit/app-store.test.cjs",
+  "tests/unit/application-composition.test.cjs",
   "tests/unit/application-aggregate-presentation-controller.test.cjs",
   "tests/unit/application-command-buttons-controller.test.cjs",
   "tests/unit/application-command-history-controller.test.cjs",
@@ -507,7 +509,10 @@ const pnpmWorkspace = readText("pnpm-workspace.yaml");
 const manifest = readJson("manifest.webmanifest");
 const indexHtml = readText("index.html");
 const regressionHtml = readText("regression-test.html");
-const appJs = readText("app.js");
+const appEntryJs = readText("app.js");
+const applicationCompositionJs = readText("src/app/application-composition.js");
+const applicationCompositionUnitTests = readText("tests/unit/application-composition.test.cjs");
+const appJs = `${appEntryJs}\n${applicationCompositionJs}`;
 const appWorkflowDriverJs = readText("tests/app-workflow/workflow-driver.inc.js");
 const appBootstrapJs = readText("src/app/bootstrap.js");
 const appStoreJs = readText("src/app/app-store.js");
@@ -6390,6 +6395,82 @@ assertIncludes(
   "app.js must resolve legacy feature APIs through the injected compatibility registry."
 );
 assert(
+  appEntryJs.split(/\r?\n/).length < 300,
+  "app.js must remain below the roadmap's 300-line bootstrap-only target."
+);
+assertIncludes(
+  appEntryJs,
+  'import { installApplicationComposition } from "./src/app/application-composition.js";',
+  "app.js must import the checked ApplicationComposition boundary."
+);
+assertIncludes(
+  applicationCompositionJs,
+  "export function installApplicationComposition({ appRuntime, browserGlobals, compatibilityModules, window })",
+  "ApplicationComposition must expose the explicit runtime, compatibility, and browser boundary."
+);
+for (const forbiddenEntryOwner of [
+  "featureFactories",
+  "document.",
+  "localStorage",
+  "querySelector",
+  "addEventListener",
+  "LOOPCAT_TEST_BUILD",
+  "LOOPCAT_TEST_WORKFLOW_DRIVER",
+  "applicationStartupController",
+  "const state ="
+]) {
+  assert(
+    !appEntryJs.includes(forbiddenEntryOwner),
+    `app.js must remain bootstrap-only and cannot regain ${forbiddenEntryOwner}.`
+  );
+}
+for (const explicitBrowserGlobal of [
+  "Blob",
+  "Date",
+  "Intl",
+  "URL",
+  "caches",
+  "console",
+  "crypto",
+  "document",
+  "fetch",
+  "localStorage",
+  "navigator",
+  "performance",
+  "requestAnimationFrame",
+  "sessionStorage",
+  "setInterval",
+  "setTimeout",
+  "structuredClone"
+]) {
+  assertIncludes(
+    applicationCompositionJs.slice(0, applicationCompositionJs.indexOf("const storageApi")),
+    explicitBrowserGlobal,
+    `ApplicationComposition must receive the ${explicitBrowserGlobal} browser global through its explicit boundary.`
+  );
+}
+assert(
+  !applicationCompositionJs.includes("globalThis") &&
+    !applicationCompositionJs.includes("window.CatHan") &&
+    !appEntryJs.includes("/* LOOPCAT_TEST_WORKFLOW_DRIVER */") &&
+    applicationCompositionJs.includes("/* LOOPCAT_TEST_WORKFLOW_DRIVER */"),
+  "ApplicationComposition must consume explicit inputs and remain the sole lexical workflow-driver insertion boundary."
+);
+for (const testName of [
+  "application entry is a bootstrap-only explicit composition call below 300 lines",
+  "ApplicationComposition receives runtime, compatibility modules, and browser globals explicitly",
+  "ApplicationComposition retains checkpoint, workflow-driver, and startup order",
+  "renderer build injects the external workflow driver only at the composition boundary",
+  "ApplicationComposition preserves explicit browser-global read order and failure identity",
+  "ApplicationComposition propagates the first factory failure without wrapping it"
+]) {
+  assertIncludes(
+    applicationCompositionUnitTests,
+    testName,
+    `focused ApplicationComposition tests must retain characterization: ${testName}`
+  );
+}
+assert(
   !appJs.includes("state.view"),
   "AppStore must remain the only route/view owner; app.js cannot restore a legacy state.view field."
 );
@@ -6636,7 +6717,7 @@ assert(
   "The completed EditorSessionStore migration must not restore the temporary compatibility bridge."
 );
 const appStateStart = appJs.indexOf("const state = {");
-const appStateEnd = appJs.indexOf("\n};", appStateStart);
+const appStateEnd = appJs.indexOf("\n  };", appStateStart);
 const appStateBlock = appJs.slice(appStateStart, appStateEnd);
 for (const field of [
   "projects",
@@ -7092,7 +7173,7 @@ assert(
   "Bundle contract must characterize the isolated source test driver while production renderer checks enforce its exclusion."
 );
 assert(
-  bundleContract.knownMarkers?.["app.js"]?.runAppWorkflowTest === 1,
+  bundleContract.knownMarkers?.["src/app/application-composition.js"]?.runAppWorkflowTest === 1,
   "Bundle contract must lock the characterized workflow-test entry count."
 );
 assert(

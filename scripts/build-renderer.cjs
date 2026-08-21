@@ -6,6 +6,7 @@ const root = path.resolve(__dirname, "..");
 const outputRoot = path.join(root, ".cache", "renderer");
 const productionDir = path.join(outputRoot, "production");
 const testDir = path.join(outputRoot, "test");
+const applicationCompositionFilter = /src[\\/]app[\\/]application-composition\.js$/;
 const testBuildDeclaration = 'const LOOPCAT_TEST_BUILD = window.location.hash === "#app-workflow-test";';
 const workflowDriverMarker = "/* LOOPCAT_TEST_WORKFLOW_DRIVER */";
 const workflowDriverPath = path.join(root, "tests", "app-workflow", "workflow-driver.inc.js");
@@ -20,13 +21,13 @@ function productionSourcePlugin() {
   return {
     name: "loopcat-production-source",
     setup(build) {
-      build.onLoad({ filter: /app\.js$/ }, async (args) => {
+      build.onLoad({ filter: applicationCompositionFilter }, async (args) => {
         const source = await fs.promises.readFile(args.path, "utf8");
         if (!source.includes(testBuildDeclaration)) {
-          throw new Error("app.js is missing the explicit test-build declaration.");
+          throw new Error("Application composition is missing the explicit test-build declaration.");
         }
         if (!source.includes(workflowDriverMarker)) {
-          throw new Error("app.js workflow characterization composition marker is missing.");
+          throw new Error("Application composition workflow characterization marker is missing.");
         }
         return {
           contents: source
@@ -63,13 +64,13 @@ function testSourcePlugin() {
   return {
     name: "loopcat-test-source",
     setup(build) {
-      build.onLoad({ filter: /app\.js$/ }, async (args) => {
+      build.onLoad({ filter: applicationCompositionFilter }, async (args) => {
         const [source, workflowDriver] = await Promise.all([
           fs.promises.readFile(args.path, "utf8"),
           fs.promises.readFile(workflowDriverPath, "utf8")
         ]);
         if (!source.includes(workflowDriverMarker)) {
-          throw new Error("app.js workflow characterization composition marker is missing.");
+          throw new Error("Application composition workflow characterization marker is missing.");
         }
         if (!workflowDriver.includes("async function runAppWorkflowTest()")) {
           throw new Error("The external workflow characterization driver is incomplete.");
