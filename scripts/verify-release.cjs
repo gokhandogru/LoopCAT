@@ -696,6 +696,8 @@ const projectResourceContextServiceJs = readText("src/features/projects/project-
 const projectResourceContextServiceUnitTests = readText("tests/unit/project-resource-context-service.test.cjs");
 const projectSearchTextServiceJs = readText("src/features/projects/project-search-text-service.js");
 const projectSearchTextServiceUnitTests = readText("tests/unit/project-search-text-service.test.cjs");
+const projectSummaryControllerJs = readText("src/features/projects/project-summary-controller.js");
+const projectSummaryControllerUnitTests = readText("tests/unit/project-summary-controller.test.cjs");
 const projectTmMatchServiceJs = readText("src/features/projects/project-tm-match-service.js");
 const projectTmMatchServiceUnitTests = readText("tests/unit/project-tm-match-service.test.cjs");
 const projectLanguagePairShortcutsControllerJs = readText(
@@ -1054,6 +1056,142 @@ for (const testName of [
     projectRecordLookupServiceUnitTests,
     testName,
     `focused project-record lookup tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectSummaryController } from "../features/projects/project-summary-controller.js";',
+  "The application runtime must install the checked project-summary controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectSummaryController,",
+  "The application runtime must expose the checked project-summary controller factory."
+);
+for (const snippet of [
+  "ProjectSummaryController requires project-summary session boundaries.",
+  "ProjectSummaryController requires segment, progress, search, and language boundaries.",
+  "ProjectSummaryController requires Projects presentation boundaries.",
+  "function build(project, projectSegments, summaryRevision = session.getProjectSummaryRevision(project.id))",
+  "const projectProgress = progress.project(projectSegments);",
+  "const projectSearchText = search.build(project);",
+  "...project,",
+  "progress: projectProgress,",
+  "wordCount: projectProgress.words,",
+  "searchText: projectSearchText,",
+  "languagePairKey: language.key(project),",
+  "summaryRevision",
+  "summaryRevision = session.getProjectSummaryRevision(project.id)",
+  "const resolvedSegments = Array.isArray(projectSegments)",
+  ": await segments.list(project.id);",
+  "return build(project, resolvedSegments, summaryRevision);",
+  "const cachedById = new Map(",
+  "session.getProjectSummaries().map((summary) => [summary.id, summary])",
+  "const projectSummaries = await Promise.all(",
+  "session.getProjects().map((project) => {",
+  "const revision = session.getProjectSummaryRevision(project.id);",
+  "const cached = cachedById.get(project.id);",
+  "cached.updatedAt === project.updatedAt && cached.summaryRevision === revision",
+  "...cached,",
+  "progress: cached.progress,",
+  "wordCount: cached.wordCount,",
+  "const inMemorySegments = session.getProject()?.id === project.id ? session.getSegments() : null;",
+  "return summarize(project, inMemorySegments, revision);",
+  "session.replaceProjectSummaries(projectSummaries);",
+  "presentation.renderLanguageFilter();",
+  "presentation.renderProjects();",
+  "return Object.freeze({ build, summarize, refresh });"
+]) {
+  assertIncludes(
+    projectSummaryControllerJs,
+    snippet,
+    `ProjectSummaryController must retain characterized build, cache, lookup, replacement, and presentation policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "const projectSummaryController = appRuntime.featureFactories.createProjectSummaryController({",
+  "getProject: editorSessionStore.getProject",
+  "getProjects: editorSessionStore.getProjects",
+  "getProjectSummaries: editorSessionStore.getProjectSummaries",
+  "getProjectSummaryRevision: editorSessionStore.getProjectSummaryRevision",
+  "getSegments: editorSessionStore.getSegments",
+  "replaceProjectSummaries: editorSessionStore.replaceProjectSummaries",
+  "segments: { list: getProjectSegments }",
+  "progress: { project: segmentProgressService.projectProgress }",
+  "search: { build: projectSearchTextService.build }",
+  "language: { key: projectLanguageContextController.key }",
+  "renderLanguageFilter: renderLanguagePairFilter",
+  "renderProjects: renderProjectsView"
+]) {
+  assertIncludes(appJs, boundary, `project-summary composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/createProjectSummaryController\(/g) || []).length === 1 &&
+    (appJs.match(/\bprojectSummaryController\.refresh\b/g) || []).length === 8,
+  "app.js must compose one project-summary controller and wire all eight refresh consumers directly."
+);
+assert(
+  (appJs.match(/\beditorSessionStore\.markProjectSummaryDirty\b/g) || []).length === 1 &&
+    appJs.includes("summary: { markDirty: editorSessionStore.markProjectSummaryDirty }") &&
+    !/function\s+markProjectSummaryDirty\b/.test(appJs),
+  "workspace dirtiness must use EditorSessionStore summary invalidation directly without a coordinator facade."
+);
+for (const removedHelper of [
+  "projectSummaryRevision",
+  "projectSummaryRecord",
+  "summarizeProject",
+  "refreshProjectSummaries"
+]) {
+  assert(
+    !new RegExp(`\\b${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`\\b${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  !appJs.includes("const cachedById = new Map") &&
+    !appJs.includes("cached.summaryRevision === revision") &&
+    !appJs.includes("const inMemorySegments = editorSessionStore.getProject()?.id"),
+  "project-summary cache and segment-selection orchestration must not return to app.js."
+);
+assert(
+  appJs.indexOf("const projectLanguageContextController =") < appJs.indexOf("const projectSummaryController =") &&
+    appJs.indexOf("const projectSummaryController =") < appJs.indexOf("const projectDomainController ="),
+  "ProjectSummaryController must be composed after its language policy and before its first direct consumer."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "getProjectSegments",
+  "segmentProgressService",
+  "projectSearchTextService",
+  "projectLanguageContextController",
+  "renderLanguagePairFilter",
+  "renderProjectsView",
+  "document.",
+  "els."
+]) {
+  assert(
+    !projectSummaryControllerJs.includes(forbiddenOwner),
+    `ProjectSummaryController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectSummaryController builds a fresh copied record with exact policy order and precedence",
+  "ProjectSummaryController summarizes supplied arrays and asynchronously falls back for every non-array",
+  "ProjectSummaryController reuses the last valid duplicate cache record and retains cached progress",
+  "ProjectSummaryController uses strict updatedAt and revision cache checks",
+  "ProjectSummaryController starts repository fallbacks concurrently and preserves project order",
+  "ProjectSummaryController replaces an empty list before ordered presentation and returns undefined",
+  "ProjectSummaryController preserves default-argument getter timing",
+  "ProjectSummaryController preserves dependency and presentation failure timing",
+  "ProjectSummaryController preserves direct malformed collection and record failures",
+  "ProjectSummaryController validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectSummaryControllerUnitTests,
+    testName,
+    `focused project-summary tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
@@ -1456,7 +1594,7 @@ for (const boundary of [
   "removeItem: (key) => localStorage.removeItem(key)",
   "session: { getProject: editorSessionStore.getProject, getProjects: editorSessionStore.getProjects }",
   "resources: { links: projectResourceContextService.links }",
-  "summary: { markDirty: (projectId) => markProjectSummaryDirty(projectId) }",
+  "summary: { markDirty: editorSessionStore.markProjectSummaryDirty }",
   "recovery: { resetDismissal: () => recoveryWorkspaceController?.resetRecoveryDismissal?.() }",
   "renderStatus: () => workspaceRecoveryPresentationService.renderStatus()",
   "renderRecovery: () => workspaceRecoveryPresentationService.renderRecovery()"
@@ -2187,9 +2325,9 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `project search-text composition must retain ${boundary}.`);
 }
 assert(
-  (appJs.match(/\bprojectSearchTextService\.build\b/g) || []).length === 3 &&
+  (appJs.match(/\bprojectSearchTextService\.build\b/g) || []).length === 2 &&
     !(appWorkflowDriverJs.match(/\bprojectSearchTextService\.build\b/g) || []).length,
-  "all three project-summary and Projects-filter consumers must call ProjectSearchTextService directly."
+  "ProjectSummaryController composition and the Projects-filter fallback must call ProjectSearchTextService directly."
 );
 assert(
   !/function\s+projectResourceSearchText\b/.test(appJs) &&
@@ -7815,7 +7953,7 @@ for (const boundary of [
   "getProjectId: () => editorSessionStore.getProject()?.id || null",
   "getNavigation: () => applicationStore.getState().navigation",
   "presentation: { renderEditor }",
-  "projects: refreshProjectSummaries",
+  "projects: projectSummaryController.refresh",
   "resources: refreshResources",
   'navigate: () => applicationViewController.show("resources")',
   'applicationViewController.show("projects")',
@@ -8986,7 +9124,7 @@ for (const boundary of [
 }
 for (const consumer of [
   "sourceWordCount: segmentProgressService.sourceWordCount",
-  "segmentProgressService.projectProgress(segments)",
+  "progress: { project: segmentProgressService.projectProgress }",
   "segmentProgressService.refresh(options)"
 ]) {
   assertIncludes(appJs, consumer, `segment progress consumers must call the checked service directly: ${consumer}.`);
@@ -9892,7 +10030,7 @@ for (const boundary of [
   "replaceProject: editorSessionStore.replaceProject",
   "replaceProjects: editorSessionStore.replaceProjects",
   "repository: { update: updateProject }",
-  "refreshSummaries: refreshProjectSummaries",
+  "refreshSummaries: projectSummaryController.refresh",
   "renderAll",
   "workspace: { markDirty: workspaceDirtyStateController.mark }",
   "status: { set: applicationSaveStatusController.set }",
@@ -10055,7 +10193,7 @@ for (const boundary of [
   "languageInputService.setInput(els.sourceLangInput, value)",
   "languageInputService.setInput(els.targetLangInput, value)",
   "terms: refreshProjectTerms",
-  "summaries: refreshProjectSummaries",
+  "summaries: projectSummaryController.refresh",
   "editorContext: editorContextController.refresh",
   "renderStorageStatus: workspaceRecoveryPresentationService.renderProjectStorage",
   "logProject: logProjectActivity",
@@ -16986,19 +17124,19 @@ assertIncludes(
   "SegmentProgressService project progress must avoid repeated status filter passes."
 );
 assertIncludes(
-  appJs,
-  "wordCount: progress.words",
-  "app.js project summaries must reuse project progress word totals instead of rescanning segments."
+  projectSummaryControllerJs,
+  "wordCount: projectProgress.words",
+  "ProjectSummaryController must reuse project progress word totals instead of rescanning segments."
 );
 assertIncludes(
-  appJs,
+  projectSummaryControllerJs,
   "searchText: projectSearchText",
-  "app.js project summaries must cache dashboard search text for filtering."
+  "ProjectSummaryController must cache dashboard search text for filtering."
 );
 assertIncludes(
-  appJs,
-  "languagePairKey: projectLanguageContextController.key(project)",
-  "app.js project summaries must cache dashboard language-pair keys for filtering."
+  projectSummaryControllerJs,
+  "languagePairKey: language.key(project)",
+  "ProjectSummaryController must cache dashboard language-pair keys for filtering."
 );
 assertIncludes(
   appJs,

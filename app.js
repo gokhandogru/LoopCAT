@@ -839,7 +839,7 @@ const workspaceDirtyStateController = appRuntime.featureFactories.createWorkspac
   },
   session: { getProject: editorSessionStore.getProject, getProjects: editorSessionStore.getProjects },
   resources: { links: projectResourceContextService.links },
-  summary: { markDirty: (projectId) => markProjectSummaryDirty(projectId) },
+  summary: { markDirty: editorSessionStore.markProjectSummaryDirty },
   recovery: { resetDismissal: () => recoveryWorkspaceController?.resetRecoveryDismissal?.() },
   presentation: {
     renderStatus: () => workspaceRecoveryPresentationService.renderStatus(),
@@ -1371,6 +1371,13 @@ const languageInputService = appRuntime.featureFactories.createLanguageInputServ
   replaceSafeHtml
 });
 
+const projectLanguageContextController = appRuntime.featureFactories.createProjectLanguageContextController({
+  getProject: () => editorSessionStore.getProject(),
+  languageInput: languageInputService,
+  getDesktop: () => window.LoopCATDesktop,
+  warn: (...args) => console.warn(...args)
+});
+
 const textEncodingInputService = appRuntime.featureFactories.createTextEncodingInputService({
   select: els.fileEncodingSelect,
   getOptions: () => encodingApi.TEXT_ENCODING_OPTIONS,
@@ -1425,6 +1432,25 @@ const segmentProgressService = appRuntime.featureFactories.createSegmentProgress
   getProjectId: () => editorSessionStore.getProject()?.id || "",
   getCachedSummary: () => editorSessionStore.getProgressSummary(),
   replaceCachedSummary: (summary) => editorSessionStore.replaceProgressSummary(summary)
+});
+
+const projectSummaryController = appRuntime.featureFactories.createProjectSummaryController({
+  session: {
+    getProject: editorSessionStore.getProject,
+    getProjects: editorSessionStore.getProjects,
+    getProjectSummaries: editorSessionStore.getProjectSummaries,
+    getProjectSummaryRevision: editorSessionStore.getProjectSummaryRevision,
+    getSegments: editorSessionStore.getSegments,
+    replaceProjectSummaries: editorSessionStore.replaceProjectSummaries
+  },
+  segments: { list: getProjectSegments },
+  progress: { project: segmentProgressService.projectProgress },
+  search: { build: projectSearchTextService.build },
+  language: { key: projectLanguageContextController.key },
+  presentation: {
+    renderLanguageFilter: renderLanguagePairFilter,
+    renderProjects: renderProjectsView
+  }
 });
 
 const segmentTargetStateService = appRuntime.featureFactories.createSegmentTargetStateService({
@@ -1522,7 +1548,7 @@ const projectDomainController = appRuntime.featureFactories.createProjectDomainC
     replaceProjects: editorSessionStore.replaceProjects
   },
   repository: { update: updateProject },
-  presentation: { refreshSummaries: refreshProjectSummaries, renderAll },
+  presentation: { refreshSummaries: projectSummaryController.refresh, renderAll },
   workspace: { markDirty: workspaceDirtyStateController.mark },
   status: { set: applicationSaveStatusController.set },
   clone: structuredClone,
@@ -1552,13 +1578,6 @@ const segmentTmSaveController = appRuntime.featureFactories.createSegmentTmSaveC
       }
     }
   }
-});
-
-const projectLanguageContextController = appRuntime.featureFactories.createProjectLanguageContextController({
-  getProject: () => editorSessionStore.getProject(),
-  languageInput: languageInputService,
-  getDesktop: () => window.LoopCATDesktop,
-  warn: (...args) => console.warn(...args)
 });
 
 const projectDocumentManifestService =
@@ -3669,7 +3688,7 @@ const applicationViewController = appRuntime.featureFactories.createApplicationV
   },
   presentation: { renderEditor },
   refresh: {
-    projects: refreshProjectSummaries,
+    projects: projectSummaryController.refresh,
     resources: refreshResources
   }
 });
@@ -4484,7 +4503,7 @@ const projectDocumentImportController =
     histories: { prepare: segmentTargetStateService.prepareHistories },
     progress: { report: applicationImportProgressController.reportProgress },
     ids: { next: () => (crypto.randomUUID ? crypto.randomUUID() : Date.now()) },
-    summaries: { refresh: refreshProjectSummaries },
+    summaries: { refresh: projectSummaryController.refresh },
     navigation: { selectDocument: applicationNavigation.selectDocument },
     activity: {
       log: logOptionalProjectActivity,
@@ -4664,7 +4683,7 @@ const projectDialogSaveController =
     },
     refresh: {
       terms: refreshProjectTerms,
-      summaries: refreshProjectSummaries,
+      summaries: projectSummaryController.refresh,
       editorContext: editorContextController.refresh
     },
     presentation: {
@@ -4975,7 +4994,7 @@ const qualityProfileController = appRuntime.featureFactories.createQualityProfil
   },
   persistence: {
     saveProject: updateProject,
-    refreshSummaries: refreshProjectSummaries
+    refreshSummaries: projectSummaryController.refresh
   },
   activity: {
     log: (qualityProfile) =>
@@ -5181,62 +5200,12 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
   }
 });
 
-function projectSummaryRevision(projectId) {
-  return editorSessionStore.getProjectSummaryRevision(projectId);
-}
-
-function markProjectSummaryDirty(projectId) {
-  editorSessionStore.markProjectSummaryDirty(projectId);
-}
-
-function projectSummaryRecord(project, segments, summaryRevision = projectSummaryRevision(project.id)) {
-  const progress = segmentProgressService.projectProgress(segments);
-  const projectSearchText = projectSearchTextService.build(project);
-  return {
-    ...project,
-    progress,
-    wordCount: progress.words,
-    searchText: projectSearchText,
-    languagePairKey: projectLanguageContextController.key(project),
-    summaryRevision
-  };
-}
-
-async function summarizeProject(project, segments = null, summaryRevision = projectSummaryRevision(project.id)) {
-  const projectSegments = Array.isArray(segments) ? segments : await getProjectSegments(project.id);
-  return projectSummaryRecord(project, projectSegments, summaryRevision);
-}
-
-async function refreshProjectSummaries() {
-  const cachedById = new Map(editorSessionStore.getProjectSummaries().map((summary) => [summary.id, summary]));
-  const projectSummaries = await Promise.all(editorSessionStore.getProjects().map((project) => {
-    const revision = projectSummaryRevision(project.id);
-    const cached = cachedById.get(project.id);
-    if (cached && cached.updatedAt === project.updatedAt && cached.summaryRevision === revision) {
-      return {
-        ...cached,
-        ...project,
-        progress: cached.progress,
-        wordCount: cached.wordCount,
-        searchText: projectSearchTextService.build(project),
-        languagePairKey: projectLanguageContextController.key(project),
-        summaryRevision: revision
-      };
-    }
-    const inMemorySegments = editorSessionStore.getProject()?.id === project.id ? editorSessionStore.getSegments() : null;
-    return summarizeProject(project, inMemorySegments, revision);
-  }));
-  editorSessionStore.replaceProjectSummaries(projectSummaries);
-  renderLanguagePairFilter();
-  renderProjectsView();
-}
-
 async function loadProjects(selectFirst = false) {
   editorSessionStore.replaceProjects(await listProjects());
   const knownProjectIds = new Set(editorSessionStore.getProjects().map((project) => project.id));
   editorSessionStore.pruneProjectSummaryRevisions(knownProjectIds);
   workspaceDirtyStateController.prune();
-  await refreshProjectSummaries();
+  await projectSummaryController.refresh();
   renderProjectList();
   renderEditor();
   void applicationTrashController.renderSummary();
@@ -5816,7 +5785,7 @@ async function confirmDeleteFile(documentInfo) {
       console.warn("File delete activity log failed.", activityError);
       workspaceDirtyStateController.mark();
     }
-    await refreshProjectSummaries();
+    await projectSummaryController.refresh();
     projectHomeController.show();
     applicationSaveStatusController.set(
       fileDeleteActivityFailed ? "File moved to Trash; activity log failed" : "File moved to Trash. Undo is available.",
@@ -5854,7 +5823,7 @@ async function addResourceToCurrentProject(type, resource) {
   editorSessionStore.replaceProject(await updateProject({ ...editorSessionStore.getProject(), resourceLinks: links }));
   editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
   await refreshProjectTerms({ rerender: true });
-  await refreshProjectSummaries();
+  await projectSummaryController.refresh();
   renderAll();
   await editorContextController.refresh();
   renderResourcesView();

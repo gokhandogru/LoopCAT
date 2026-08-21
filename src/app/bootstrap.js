@@ -138,6 +138,7 @@ import { createProjectRecordLookupService } from "../features/projects/project-r
 import { createProjectDocumentManifestService } from "../features/projects/project-document-manifest-service.js";
 import { createProjectResourceContextService } from "../features/projects/project-resource-context-service.js";
 import { createProjectSearchTextService } from "../features/projects/project-search-text-service.js";
+import { createProjectSummaryController } from "../features/projects/project-summary-controller.js";
 import { createProjectTmMatchService } from "../features/projects/project-tm-match-service.js";
 import { createProjectLanguageContextController } from "../features/projects/project-language-context-controller.js";
 import { createProjectDocumentStatisticsService } from "../features/projects/project-document-statistics-service.js";
@@ -331,6 +332,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createProjectDocumentManifestService,
       createProjectResourceContextService,
       createProjectSearchTextService,
+      createProjectSummaryController,
       createProjectTmMatchService,
       createProjectLanguageContextController,
       createProjectLanguagePairShortcutsController,
