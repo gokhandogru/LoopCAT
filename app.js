@@ -1538,6 +1538,22 @@ const projectHomePresentationController =
     }
   });
 
+const documentFilterPresentationController =
+  appRuntime.featureFactories.createDocumentFilterPresentationController({
+    select: els.documentFilter,
+    navigation: {
+      getDocumentId: () => applicationStore.getState().navigation.documentId,
+      selectDocument: (options) => applicationNavigation.selectDocument(options)
+    },
+    documents: { list: () => projectDocumentCatalogService.list() },
+    localization: { source: uiLocalizationService.source },
+    text: { displaySafeText: applicationTextSafetyService.displaySafeText },
+    dom: {
+      createElement: (tagName) => document.createElement(tagName),
+      createDocumentFragment: () => document.createDocumentFragment()
+    }
+  });
+
 const projectTermRefreshController = appRuntime.featureFactories.createProjectTermRefreshController({
   session: {
     getProject: editorSessionStore.getProject,
@@ -1611,7 +1627,7 @@ const applicationAggregatePresentationController =
       renderEditor: editorShellPresentationController.render,
       renderProjectHome: projectHomePresentationController.render,
       renderProjectAnalysis: () => projectAnalysisController.render(),
-      renderDocumentFilter: () => renderDocumentFilter(),
+      renderDocumentFilter: documentFilterPresentationController.render,
       renderSegments: () => renderSegments(),
       renderProgress: () => renderProgress()
     }
@@ -5542,25 +5558,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-function renderDocumentFilter() {
-  const current = applicationStore.getState().navigation.documentId;
-  const documents = projectDocumentCatalogService.list();
-  const fragment = document.createDocumentFragment();
-  const allOption = document.createElement("option");
-  allOption.value = "";
-  allOption.textContent = uiLocalizationService.source("All documents");
-  fragment.append(allOption);
-  documents.forEach((documentInfo) => {
-    const option = document.createElement("option");
-    option.value = documentInfo.id;
-    option.textContent = applicationTextSafetyService.displaySafeText(documentInfo.name);
-    fragment.append(option);
-  });
-  els.documentFilter.replaceChildren(fragment);
-  els.documentFilter.value = documents.some((documentInfo) => documentInfo.id === current) ? current : "";
-  if (els.documentFilter.value !== current) applicationNavigation.selectDocument({ documentId: els.documentFilter.value });
-}
 
 function renderLanguagePairFilter() {
   const current = els.languagePairFilter.value;

@@ -65,6 +65,13 @@ const editorShellPresentationControllerPath = path.join(
   "editor",
   "editor-shell-presentation-controller.js"
 );
+const documentFilterPresentationControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "editor",
+  "document-filter-presentation-controller.js"
+);
 const projectAnalysisControllerPath = path.join(root, "src", "features", "projects", "project-analysis-controller.js");
 const projectListPresentationControllerPath = path.join(
   root,
@@ -472,6 +479,11 @@ function main() {
     messagesByText,
     editorShellPresentationControllerPath,
     "src/features/editor/editor-shell-presentation-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    documentFilterPresentationControllerPath,
+    "src/features/editor/document-filter-presentation-controller.js"
   );
   extractScript(messagesByText, projectAnalysisControllerPath, "src/features/projects/project-analysis-controller.js");
   extractScript(

@@ -190,6 +190,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-action-buttons-controller.js",
   "src/features/editor/editor-session-store.js",
   "src/features/editor/editor-context-controller.js",
+  "src/features/editor/document-filter-presentation-controller.js",
   "src/features/editor/editor-shell-presentation-controller.js",
   "src/features/editor/segment-grid-controller.js",
   "src/features/editor/autosave-service.js",
@@ -357,6 +358,7 @@ const requiredReleaseFiles = [
   "tests/unit/editor-state.test.cjs",
   "tests/unit/editor-session-store.test.cjs",
   "tests/unit/editor-context-controller.test.cjs",
+  "tests/unit/document-filter-presentation-controller.test.cjs",
   "tests/unit/editor-shell-presentation-controller.test.cjs",
   "tests/unit/segment-grid-controller.test.cjs",
   "tests/unit/autosave-service.test.cjs",
@@ -608,6 +610,12 @@ const editorFilterStoreJs = readText("src/features/editor/filter-store.js");
 const editorStateUnitTests = readText("tests/unit/editor-state.test.cjs");
 const editorContextControllerJs = readText("src/features/editor/editor-context-controller.js");
 const editorContextControllerUnitTests = readText("tests/unit/editor-context-controller.test.cjs");
+const documentFilterPresentationControllerJs = readText(
+  "src/features/editor/document-filter-presentation-controller.js"
+);
+const documentFilterPresentationControllerUnitTests = readText(
+  "tests/unit/document-filter-presentation-controller.test.cjs"
+);
 const editorShellPresentationControllerJs = readText("src/features/editor/editor-shell-presentation-controller.js");
 const editorShellPresentationControllerUnitTests = readText("tests/unit/editor-shell-presentation-controller.test.cjs");
 const segmentGridControllerJs = readText("src/features/editor/segment-grid-controller.js");
@@ -18317,9 +18325,9 @@ assertIncludes(
   "ProjectListPresentationController sidebar list must render in one DOM replacement."
 );
 assertIncludes(
-  appJs,
-  "els.documentFilter.replaceChildren(fragment)",
-  "app.js document filter options must render in one DOM replacement."
+  documentFilterPresentationControllerJs,
+  "select.replaceChildren(fragment)",
+  "DocumentFilterPresentationController options must render in one DOM replacement."
 );
 assertIncludes(
   appJs,
@@ -19106,6 +19114,129 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createDocumentFilterPresentationController } from "../features/editor/document-filter-presentation-controller.js";',
+  "the application runtime must install the checked document-filter presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createDocumentFilterPresentationController,",
+  "the application runtime must expose the checked document-filter presentation controller factory."
+);
+for (const snippet of [
+  "DocumentFilterPresentationController requires a document-filter select.",
+  "DocumentFilterPresentationController requires navigation boundaries.",
+  "DocumentFilterPresentationController requires a document catalog boundary.",
+  "DocumentFilterPresentationController requires a localization boundary.",
+  "DocumentFilterPresentationController requires a text-safety boundary.",
+  "DocumentFilterPresentationController requires DOM creation boundaries.",
+  "const current = navigation.getDocumentId();",
+  "const documentRecords = documents.list();",
+  "const fragment = dom.createDocumentFragment();",
+  'const allOption = dom.createElement("option");',
+  'allOption.textContent = localization.source("All documents");',
+  "documentRecords.forEach((documentInfo) => {",
+  "option.value = documentInfo.id;",
+  "option.textContent = text.displaySafeText(documentInfo.name);",
+  "select.replaceChildren(fragment);",
+  "documentRecords.some((documentInfo) => documentInfo.id === current)",
+  "if (select.value !== current) navigation.selectDocument({ documentId: select.value });",
+  "return Object.freeze({ render });"
+]) {
+  assertIncludes(
+    documentFilterPresentationControllerJs,
+    snippet,
+    `DocumentFilterPresentationController must retain characterized option, replacement, and selection policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createDocumentFilterPresentationController({",
+  "select: els.documentFilter",
+  "getDocumentId: () => applicationStore.getState().navigation.documentId",
+  "selectDocument: (options) => applicationNavigation.selectDocument(options)",
+  "documents: { list: () => projectDocumentCatalogService.list() }",
+  "localization: { source: uiLocalizationService.source }",
+  "text: { displaySafeText: applicationTextSafetyService.displaySafeText }",
+  "createElement: (tagName) => document.createElement(tagName)",
+  "createDocumentFragment: () => document.createDocumentFragment()",
+  "renderDocumentFilter: documentFilterPresentationController.render"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `document-filter presentation composition must retain the checked ${boundary} boundary.`
+  );
+}
+assert(
+  (appJs.match(/\bdocumentFilterPresentationController\.render\b/g) || []).length === 1,
+  "the aggregate application consumer must call DocumentFilterPresentationController.render directly."
+);
+assert(
+  (appWorkflowDriverJs.match(/\bdocumentFilterPresentationController\.render\b/g) || []).length === 9,
+  "all nine workflow document-filter presentation consumers must call DocumentFilterPresentationController.render directly."
+);
+assert(
+  !/function\s+renderDocumentFilter\b/.test(appJs) && !/function\s+renderDocumentFilter\b/.test(appWorkflowDriverJs),
+  "renderDocumentFilter must not return as a coordinator or workflow helper."
+);
+for (const removedPolicy of [
+  "els.documentFilter.replaceChildren(fragment)",
+  "els.documentFilter.value = documents.some",
+  "if (els.documentFilter.value !== current)"
+]) {
+  assert(
+    !appJs.includes(removedPolicy) && !appWorkflowDriverJs.includes(removedPolicy),
+    `document-filter option, replacement, and selection policy must not return through ${removedPolicy}.`
+  );
+}
+assert(
+  appJs.indexOf("const documentFilterPresentationController =") <
+    appJs.indexOf("const applicationAggregatePresentationController =") &&
+    appJs.indexOf("const documentFilterPresentationController =") <
+      appJs.indexOf("const projectDocumentCatalogService ="),
+  "DocumentFilterPresentationController must be composed before aggregate rendering and retain a call-time document-catalog adapter."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "applicationStore",
+  "applicationNavigation",
+  "projectDocumentCatalogService",
+  "uiLocalizationService",
+  "applicationTextSafetyService",
+  "document.",
+  "els."
+]) {
+  assert(
+    !documentFilterPresentationControllerJs.includes(forbiddenOwner),
+    `DocumentFilterPresentationController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "DocumentFilterPresentationController preserves current-ID capture before catalog and DOM reads",
+  "DocumentFilterPresentationController preserves stable safe option construction and one replacement",
+  "DocumentFilterPresentationController retains a strict current document without navigation",
+  "DocumentFilterPresentationController falls back strictly and corrects navigation after replacement",
+  "DocumentFilterPresentationController preserves empty fallback and fresh repeated live renders",
+  "DocumentFilterPresentationController preserves every populated failure boundary",
+  "DocumentFilterPresentationController validates every owner and exposes an immutable API"
+]) {
+  assertIncludes(
+    documentFilterPresentationControllerUnitTests,
+    testName,
+    `focused document-filter presentation tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/document-filter-presentation-controller.js"',
+  "source-catalog extraction must scan the checked document-filter presentation controller."
+);
+assertIncludes(
+  i18nValidateScript,
+  '"document-filter-presentation-controller.js"',
+  "source-catalog validation must check explicit keys in the checked document-filter presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createApplicationAggregatePresentationController } from "./application-aggregate-presentation-controller.js";',
   "the application runtime must install the checked aggregate-presentation controller."
 );
@@ -19140,7 +19271,7 @@ for (const boundary of [
   "renderEditor: editorShellPresentationController.render",
   "renderProjectHome: projectHomePresentationController.render",
   "renderProjectAnalysis: () => projectAnalysisController.render()",
-  "renderDocumentFilter: () => renderDocumentFilter()",
+  "renderDocumentFilter: documentFilterPresentationController.render",
   "renderSegments: () => renderSegments()",
   "renderProgress: () => renderProgress()"
 ]) {
