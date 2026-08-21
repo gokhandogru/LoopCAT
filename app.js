@@ -1431,6 +1431,17 @@ const projectDocumentOpenController =
     }
   });
 
+const resourceCatalogRefreshController =
+  appRuntime.featureFactories.createResourceCatalogRefreshController({
+    repository: {
+      listTmEntries,
+      listTerms: () => getAll("terms")
+    },
+    presentation: {
+      setResources: (...args) => resourcesController?.setResources?.(...args)
+    }
+  });
+
 const projectCollectionLoadController =
   appRuntime.featureFactories.createProjectCollectionLoadController({
     repository: { list: listProjects },
@@ -1484,7 +1495,7 @@ const applicationCommandHistoryController =
     resources: {
       markLinkedDirty: (type, name, sourceLang, targetLang) =>
         workspaceDirtyStateController.markProjectsUsingResource(type, name, sourceLang, targetLang),
-      refreshResources: () => refreshResources(),
+      refreshResources: resourceCatalogRefreshController.refresh,
       refreshTerms: (options) => refreshProjectTerms(options),
       refreshSuggestions: () => termSuggestionsController.refresh(),
       refreshEditorContext: () => editorContextController.refresh()
@@ -3759,7 +3770,7 @@ const applicationViewController = appRuntime.featureFactories.createApplicationV
   presentation: { renderEditor },
   refresh: {
     projects: projectSummaryController.refresh,
-    resources: refreshResources
+    resources: resourceCatalogRefreshController.refresh
   }
 });
 const applicationCommandButtonsController =
@@ -4813,7 +4824,7 @@ const projectDialogController = appRuntime.featureFactories.createProjectDialogC
     { element: els.openProjectAiSettingsBtn, mode: "edit", focusAi: true }
   ],
   getProject: () => editorSessionStore.getProject(),
-  refreshResources,
+  refreshResources: resourceCatalogRefreshController.refresh,
   suggestedCreatorName: projectNameService.suggestedCreator,
   cleanCreatorName: projectNameService.cleanCreator,
   setLanguageValue: languageInputService.setInput,
@@ -4888,7 +4899,7 @@ const resourceLibraryImportController =
     resources: {
       markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource,
       open: (...args) => resourcesController?.openResource?.(...args),
-      refresh: refreshResources,
+      refresh: resourceCatalogRefreshController.refresh,
       refreshProjectTerms
     },
     alert: uiLocalizationService.alert,
@@ -4907,7 +4918,7 @@ const resourceMutationController = appRuntime.featureFactories.createResourceMut
   repositories: { updateTmEntry, updateTerm },
   resources: {
     markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource,
-    refresh: refreshResources,
+    refresh: resourceCatalogRefreshController.refresh,
     refreshProjectTerms,
     labelFromKey: resourceCatalogService.labelFromKey,
     items: resourceItems
@@ -5270,11 +5281,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-async function refreshResources() {
-  const [tmEntries, terms] = await Promise.all([listTmEntries(), getAll("terms")]);
-  return resourcesController?.setResources?.({ tmEntries, terms }) || { tmEntries, terms };
-}
 
 async function refreshProjectTerms({ rerender = false } = {}) {
   if (!editorSessionStore.getProject()) {

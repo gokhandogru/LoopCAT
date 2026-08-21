@@ -853,6 +853,8 @@ const resourcesPresentationServiceJs = readText("src/features/resources/resource
 const resourcesPresentationServiceUnitTests = readText("tests/unit/resources-presentation-service.test.cjs");
 const resourceCatalogServiceJs = readText("src/features/resources/resource-catalog-service.js");
 const resourceCatalogServiceUnitTests = readText("tests/unit/resource-catalog-service.test.cjs");
+const resourceCatalogRefreshControllerJs = readText("src/features/resources/resource-catalog-refresh-controller.js");
+const resourceCatalogRefreshControllerUnitTests = readText("tests/unit/resource-catalog-refresh-controller.test.cjs");
 const resourceLibraryExportControllerJs = readText("src/features/resources/resource-library-export-controller.js");
 const resourceLibraryExportControllerUnitTests = readText("tests/unit/resource-library-export-controller.test.cjs");
 const resourceLibraryImportControllerJs = readText("src/features/resources/resource-library-import-controller.js");
@@ -2856,6 +2858,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createResourceCatalogRefreshController } from "../features/resources/resource-catalog-refresh-controller.js";',
+  "The application runtime must install the checked resource-catalog refresh controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createResourceCatalogRefreshController,",
+  "The application runtime must expose the checked resource-catalog refresh factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createResourceLibraryExportController } from "../features/resources/resource-library-export-controller.js";',
   "The application runtime must install the checked resource-library export controller."
 );
@@ -4066,6 +4078,69 @@ for (const testName of [
     `focused resource-catalog tests must retain characterization: ${testName}`
   );
 }
+for (const snippet of [
+  "ResourceCatalogRefreshController requires resource repository boundaries.",
+  "ResourceCatalogRefreshController requires a Resources presentation boundary.",
+  "async function refresh()",
+  "const [tmEntries, terms] = await Promise.all([repository.listTmEntries(), repository.listTerms()]);",
+  "return presentation.setResources({ tmEntries, terms }) || { tmEntries, terms };",
+  "return Object.freeze({ refresh });"
+]) {
+  assertIncludes(
+    resourceCatalogRefreshControllerJs,
+    snippet,
+    `ResourceCatalogRefreshController must retain characterized concurrent-read, replacement, and fallback policy: ${snippet}`
+  );
+}
+for (const boundary of [
+  "const resourceCatalogRefreshController =",
+  "appRuntime.featureFactories.createResourceCatalogRefreshController({",
+  "listTmEntries,",
+  'listTerms: () => getAll("terms")',
+  "setResources: (...args) => resourcesController?.setResources?.(...args)"
+]) {
+  assertIncludes(appJs, boundary, `resource-catalog refresh composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/createResourceCatalogRefreshController\(/g) || []).length === 1 &&
+    (appJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 5 &&
+    (appWorkflowDriverJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 4,
+  "app.js must compose one resource-catalog refresh controller and all five application and four workflow consumers must call it directly."
+);
+assert(
+  !/async\s+function\s+refreshResources\b/.test(appJs) && !/\brefreshResources\s*\(/.test(appWorkflowDriverJs),
+  "refreshResources must not return to app.js or the workflow driver after resource-catalog refresh extraction."
+);
+assert(
+  !appJs.includes('const [tmEntries, terms] = await Promise.all([listTmEntries(), getAll("terms")]);'),
+  "concurrent resource reads and Resources-state replacement must not return to app.js."
+);
+assert(
+  appJs.indexOf("const projectDocumentOpenController =") < appJs.indexOf("const resourceCatalogRefreshController =") &&
+    appJs.indexOf("const resourceCatalogRefreshController =") <
+      appJs.indexOf("const projectCollectionLoadController ="),
+  "ResourceCatalogRefreshController must follow document opening and precede collection loading and its first direct consumer."
+);
+for (const forbiddenOwner of ["appRuntime", "getAll", "resourcesController", "refreshResources", "document.", "els."]) {
+  assert(
+    !resourceCatalogRefreshControllerJs.includes(forbiddenOwner),
+    `ResourceCatalogRefreshController must use injected repository and presentation boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ResourceCatalogRefreshController starts both repository reads in order and presents after both settle",
+  "ResourceCatalogRefreshController preserves every falsy presentation fallback and raw values",
+  "ResourceCatalogRefreshController returns truthy presentation identity and assimilates promise results",
+  "ResourceCatalogRefreshController preserves synchronous repository short circuiting",
+  "ResourceCatalogRefreshController preserves concurrent rejection and presentation failure timing",
+  "ResourceCatalogRefreshController validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    resourceCatalogRefreshControllerUnitTests,
+    testName,
+    `focused resource-catalog refresh tests must retain characterization: ${testName}`
+  );
+}
 assertIncludes(
   i18nExtractScript,
   '"src/features/resources/resource-catalog-service.js"',
@@ -4751,7 +4826,7 @@ for (const boundary of [
   "repositories: { importTmEntries, importTerms }",
   "markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource",
   "open: (...args) => resourcesController?.openResource?.(...args)",
-  "refresh: refreshResources",
+  "refresh: resourceCatalogRefreshController.refresh",
   "refreshProjectTerms",
   "alert: uiLocalizationService.alert",
   "status: { set: applicationSaveStatusController.set }"
@@ -4825,7 +4900,7 @@ for (const boundary of [
   "getProjectId: () => editorSessionStore.getProject()?.id || null",
   "repositories: { updateTmEntry, updateTerm }",
   "markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource",
-  "refresh: refreshResources",
+  "refresh: resourceCatalogRefreshController.refresh",
   "refreshProjectTerms",
   "labelFromKey: resourceCatalogService.labelFromKey",
   "items: resourceItems",
@@ -7168,7 +7243,7 @@ for (const boundary of [
   "clearSelection: () => applicationNavigation.clearSelection()",
   'showProjects: () => applicationViewController.show("projects")',
   "workspaceDirtyStateController.markProjectsUsingResource(type, name, sourceLang, targetLang)",
-  "refreshResources: () => refreshResources()",
+  "refreshResources: resourceCatalogRefreshController.refresh",
   "refreshTerms: (options) => refreshProjectTerms(options)",
   "refreshSuggestions: () => termSuggestionsController.refresh()",
   "refreshEditorContext: () => editorContextController.refresh()",
@@ -8329,7 +8404,7 @@ for (const boundary of [
   "getNavigation: () => applicationStore.getState().navigation",
   "presentation: { renderEditor }",
   "projects: projectSummaryController.refresh",
-  "resources: refreshResources",
+  "resources: resourceCatalogRefreshController.refresh",
   'navigate: () => applicationViewController.show("resources")',
   'applicationViewController.show("projects")',
   "applicationView: applicationViewController"

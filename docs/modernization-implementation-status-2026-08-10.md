@@ -22,6 +22,8 @@ The latest project-document-opening checkpoint also moves current-project guardi
 
 The latest project-dialog direct-launch checkpoint also moves default-mode and call-time active-focus return-target selection into the existing checked ProjectDialogController while removing its final command/workflow compatibility façade.
 
+The latest resource-catalog refresh checkpoint also moves concurrent translation-memory and termbase reads, raw collection identity, Resources-state replacement, exact truthy-result return, fresh falsy-result fallback, and synchronous/awaited failure timing behind a checked controller boundary used directly by all application and workflow consumers.
+
 The latest application-persistence lifecycle checkpoint also moves close-warning and hidden/Page-hide background-save event orchestration behind a checked controller boundary while leaving import-task, autosave-queue, workspace-dirty, package-save, and warning policy in their existing injected owners.
 
 The latest application event-wiring checkpoint also moves startup UI initialization, checkpoint reporting, segment-grid scroll routing, and the exact ordered feature-lifecycle mount sequence behind a checked controller boundary while leaving each feature's listener and domain policy in its existing owner.
@@ -408,6 +410,8 @@ The checked project-document-opening slice is also complete: an immutable Projec
 
 The checked project-dialog direct-launch slice is also complete: ProjectDialogController now owns the default `create` mode, existing edit normalization, explicit opener return-target precedence, call-time active-element fallback only when no return target was supplied, and the exact separation between pre-dialog active-target failures and contained dialog-lifecycle failures. Its factory and mount are required checked composition boundaries; the command catalog and all three workflow launch consumers call its stable `open` method directly; and `openProjectDialog` is removed. Five focused controller tests, 37 combined dialog/save/command/history tests, and the full 1,083-test quality gate characterize create/edit preparation, explicit and active return targets, live focus reads, default/unknown modes, failure timing, listener lifecycle, checked composition, and stable API; release/import, source-isolation, bundle, i18n validation, deep project-create/edit/AI-settings browser workflows, all 15 accessibility states, 81 visual screenshots, web/desktop artifacts, fuses, and GPU-on/off packaged startup pass with no intended user-visible difference.
 
+The checked resource-catalog refresh slice is also complete: an immutable ResourceCatalogRefreshController now owns left-to-right concurrent translation-memory and raw term-store reads, direct collection identity, one fresh Resources presentation record, exact truthy presentation-result identity, a separate fresh raw-data fallback for every synchronous falsy presentation result, promise-result assimilation, and all repository/presentation failure boundaries. ApplicationCommandHistoryController, ApplicationViewController, ProjectDialogController, ResourceLibraryImportController, ResourceMutationController, and all four workflow refresh consumers call its stable `refresh` method directly through a call-time Resources presentation adapter; `refreshResources` is removed. Six focused controller tests, 50 combined Resources/catalog/import/mutation/dialog/view/history tests, and the full 1,089-test quality gate characterize concurrency, ordering, identity, fallback, synchronous short-circuiting, rejection timing, checked composition, and immutable API; release/import, source-isolation, bundle, i18n validation, deep Resources/import/mutation/Trash/project-dialog/navigation browser workflows, all 15 accessibility states, 81 visual screenshots, web/desktop artifacts, fuses, and GPU-on/off packaged startup pass with no intended user-visible difference.
+
 Earlier checkpoint descriptions that say `wireEvents` mounted an individual controller or that top-level startup called `ApplicationEventWiringController` directly record the state at those checkpoints; ApplicationEventWiringController now owns the complete mount sequence, and ApplicationStartupController is its sole top-level startup caller.
 
 1. Reduce the remaining `app.js` compatibility coordinator toward the roadmap's bootstrap-only goal, one characterized feature boundary at a time.
@@ -415,7 +419,7 @@ Earlier checkpoint descriptions that say `wireEvents` mounted an individual cont
 
 ### P2-05 — Performance stretch target
 
-Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The production graph is 2,870,090 bytes across five modules; the hosted/desktop initial app is 1,190,474 bytes (315,482 bytes gzip), and the separate direct-file fallback is 1,435,023 bytes (398,591 bytes gzip). The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 440,474 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
+Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The production graph is 2,871,404 bytes across five modules; the hosted/desktop initial app is 1,191,131 bytes (315,574 bytes gzip), and the separate direct-file fallback is 1,435,680 bytes (398,678 bytes gzip). The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 441,131 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
 
 ## Manual and external release gates still required
 
@@ -446,17 +450,17 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 by extracting concurrent translation-memory/termbase catalog refresh and Resources-state replacement/fallback behavior behind a checked ResourceCatalogRefreshController boundary.
+Continue P1-08 by extracting current-project terminology lookup, EditorSessionStore replacement, filter invalidation, termbase-selector presentation, and optional preserved-scroll segment rerendering behind a checked ProjectTermRefreshController boundary.
 
 Entry criteria:
 
-- Preserve left-to-right concurrent TM-entry and raw term-store reads, direct raw collection identity, immediate rejection timing, one fresh `{ tmEntries, terms }` record for Resources presentation, the exact truthy presentation-result return, a separate fresh raw-data fallback for every falsy presentation result, and all synchronous/awaited failure boundaries.
-- Migrate all five application and four workflow refresh consumers to the checked controller directly, using a call-time presentation adapter because ResourcesController is composed later.
-- Keep IndexedDB/repository reads, ResourcesController view state, resource mutations/imports, presentation, and DOM lifecycle in their existing injected owners.
+- Preserve the live current-project guard, empty project-terms replacement and immediate `undefined` result when no project is selected, repeated live project reads for source/target language, current linked-termbase-name selection, exact terminology query identity, awaited repository result replacement, and all synchronous/awaited failure boundaries.
+- Preserve filter invalidation before termbase-selector rendering, the `rerender = false` default, and the optional `renderSegments({ preserveScroll: true })` branch after the selector presentation.
+- Migrate all nine application and one workflow refresh consumers to the checked controller directly while keeping EditorSessionStore state, terminology persistence/query policy, resource-link policy, filter caching, selector DOM construction, and segment rendering in their existing injected owners.
 
 Exit criteria:
 
-- `refreshResources` is removed from `app.js`; all catalog-refresh consumers call ResourceCatalogRefreshController directly, and release verification prevents repository/presentation sequencing from returning to the coordinator or workflow driver.
-- Focused ResourceCatalogRefreshController concurrency/identity/fallback/failure tests, Resources/import/mutation/dialog/view workflows, all 15 accessibility states, 81 visual screenshots, and FULL-SUITE gates pass with no intended user-visible difference.
+- `refreshProjectTerms` is removed from `app.js`; all project-term refresh consumers call ProjectTermRefreshController directly, and release verification prevents project/query/replacement/invalidation/presentation sequencing from returning to the coordinator or workflow driver.
+- Focused ProjectTermRefreshController guard/live-read/order/identity/failure tests, term form/import/mutation/project-open/dialog/AI/workflow paths, all 15 accessibility states, 81 visual screenshots, and FULL-SUITE gates pass with no intended user-visible difference.
 
 Continue until `app.js` is a bootstrap-only compatibility entry and the façade can be removed without changing mature LoopCAT behavior.

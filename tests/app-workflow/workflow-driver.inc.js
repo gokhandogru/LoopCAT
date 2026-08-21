@@ -4407,7 +4407,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           projectTmxText.includes("[redacted secret]"),
         "project TMX export redacts credential-looking origin metadata"
       );
-      await refreshResources();
+      await resourceCatalogRefreshController.refresh();
       const xmlDownloadsBeforeResourceTmx = statusDownloads.filter((item) => item.type === "application/xml").length;
       resourceLibraryExportController.exportResource("tm", `${projectResourceContextService.mainTm()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
       const resourceTmxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
@@ -4431,7 +4431,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           projectTbxText.includes("Report terminology fixture [redacted secret]"),
         "project TBX export redacts credential-looking termbase notes"
       );
-      await refreshResources();
+      await resourceCatalogRefreshController.refresh();
       const xmlDownloadsBeforeResourceTbx = statusDownloads.filter((item) => item.type === "application/xml").length;
       resourceLibraryExportController.exportResource("tb", `${projectResourceContextService.primaryTermBase()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
       const resourceTbxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
@@ -4506,7 +4506,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       termBaseName: projectResourceContextService.primaryTermBase(),
       isForbidden: false
     });
-    await refreshResources();
+    await resourceCatalogRefreshController.refresh();
     els.resourcesViewBtn.click();
     await applicationImportProgressController.yieldToUi();
     const workflowTmCard = Array.from(els.tmResourceDashboard.querySelectorAll(".resource-card")).find((card) =>
@@ -4751,7 +4751,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       targetLang: editorSessionStore.getProject().targetLang,
       termBaseName: bulkTbName
     });
-    await refreshResources();
+    await resourceCatalogRefreshController.refresh();
     const bulkTmKey = `${bulkTmName}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`;
     const bulkTbKey = `${bulkTbName}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`;
     const atomicConflictTrashId = `workflow-resource-trash-conflict-${Date.now()}`;
