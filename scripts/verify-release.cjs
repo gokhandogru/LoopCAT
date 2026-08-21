@@ -12179,6 +12179,24 @@ for (const testName of [
     `focused AI-settings-persistence tests must characterize ${testName}.`
   );
 }
+const openAiRollbackDirtyAdapters =
+  appJs.match(
+    /markRollbackDirty:\s*\(projectId\)\s*=>\s*\{\s*if\s*\(projectId\)\s*markWorkspaceDirty\(projectId\);\s*\}/g
+  ) || [];
+assert(
+  openAiRollbackDirtyAdapters.length === 2,
+  "both direct OpenAI rollback owners must receive exact call-time guarded workspace-dirty adapters."
+);
+assert(
+  !appJs.includes("markRollbackDirty: markWorkspaceDirty"),
+  "direct OpenAI rollback owners must not receive markWorkspaceDirty directly because its omitted ID defaults to the current project."
+);
+for (const source of [appJs, appWorkflowDriverJs]) {
+  assert(
+    !source.includes("markOpenAiProjectRollbackDirty"),
+    "the direct OpenAI rollback-dirty forwarding facade must not return."
+  );
+}
 assertIncludes(
   segmentCommandsJs,
   "BATCH_RECEIPT_ID_LIMIT",

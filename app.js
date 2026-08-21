@@ -3204,7 +3204,9 @@ const aiOpenAiSuggestionController = appRuntime.featureFactories.createAiOpenAiS
   presentation: { renderEditor },
   workspace: {
     markDirty: markWorkspaceDirty,
-    markRollbackDirty: markOpenAiProjectRollbackDirty
+    markRollbackDirty: (projectId) => {
+      if (projectId) markWorkspaceDirty(projectId);
+    }
   },
   status: { set: applicationSaveStatusController.set },
   defaults: { model: OPENAI_DEFAULT_MODEL },
@@ -3256,7 +3258,9 @@ const aiSettingsPersistenceController =
       markActivityWarningDirty: () => {
         if (editorSessionStore.getProject()?.id) markWorkspaceDirty(editorSessionStore.getProject().id);
       },
-      markRollbackDirty: markOpenAiProjectRollbackDirty
+      markRollbackDirty: (projectId) => {
+        if (projectId) markWorkspaceDirty(projectId);
+      }
     },
     status: { set: applicationSaveStatusController.set },
     defaults: { model: OPENAI_DEFAULT_MODEL },
@@ -4971,10 +4975,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   logger: console
 });
 dialogLifecycleController?.mount?.();
-
-function markOpenAiProjectRollbackDirty(projectId) {
-  if (projectId) markWorkspaceDirty(projectId);
-}
 
 async function waitForOfflineAppShellReady(timeoutMs = 10000) {
   if (!("serviceWorker" in navigator)) return null;
