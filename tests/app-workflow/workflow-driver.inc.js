@@ -706,7 +706,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await projectDocumentOpenController.open(documentInfo.id);
     state.inspectorOpen = true;
     verticalFeatureState?.inspector?.setContext?.({ tab: "ai" });
-    renderEditor();
+    editorShellPresentationController.render();
     els.openProjectAiSettingsBtn.focus();
     els.openProjectAiSettingsBtn.click();
     await waitFor(
@@ -724,7 +724,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "project dialog controller restores the AI settings opener after close"
     );
     verticalFeatureState?.inspector?.setContext?.({ tab: "matches" });
-    renderEditor();
+    editorShellPresentationController.render();
     const segmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentInfo.id);
     const projectToolbarBounds = document.querySelector(".project-toolbar")?.getBoundingClientRect();
     const toolbarActionsBounds = document.querySelector(".project-toolbar .toolbar-actions")?.getBoundingClientRect();
@@ -3001,7 +3001,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (originalSessionOpenAiKey !== null) sessionStorage.setItem(OPENAI_KEY_STORAGE, originalSessionOpenAiKey);
       editorSessionStore.replaceProject(await updateProject({ ...editorSessionStore.getProject(), aiSettings: originalAiSettings }));
       editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((item) => (item.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : item)));
-      renderEditor();
+      editorShellPresentationController.render();
     }
     await segmentNavigationController.select(segmentIndex);
     const producerBeforeTyping = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]);

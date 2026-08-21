@@ -190,6 +190,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-action-buttons-controller.js",
   "src/features/editor/editor-session-store.js",
   "src/features/editor/editor-context-controller.js",
+  "src/features/editor/editor-shell-presentation-controller.js",
   "src/features/editor/segment-grid-controller.js",
   "src/features/editor/autosave-service.js",
   "src/features/editor/segment-confirmation-controller.js",
@@ -355,6 +356,7 @@ const requiredReleaseFiles = [
   "tests/unit/editor-state.test.cjs",
   "tests/unit/editor-session-store.test.cjs",
   "tests/unit/editor-context-controller.test.cjs",
+  "tests/unit/editor-shell-presentation-controller.test.cjs",
   "tests/unit/segment-grid-controller.test.cjs",
   "tests/unit/autosave-service.test.cjs",
   "tests/unit/segment-confirmation-controller.test.cjs",
@@ -604,6 +606,8 @@ const editorFilterStoreJs = readText("src/features/editor/filter-store.js");
 const editorStateUnitTests = readText("tests/unit/editor-state.test.cjs");
 const editorContextControllerJs = readText("src/features/editor/editor-context-controller.js");
 const editorContextControllerUnitTests = readText("tests/unit/editor-context-controller.test.cjs");
+const editorShellPresentationControllerJs = readText("src/features/editor/editor-shell-presentation-controller.js");
+const editorShellPresentationControllerUnitTests = readText("tests/unit/editor-shell-presentation-controller.test.cjs");
 const segmentGridControllerJs = readText("src/features/editor/segment-grid-controller.js");
 const segmentGridControllerUnitTests = readText("tests/unit/segment-grid-controller.test.cjs");
 const autosaveServiceJs = readText("src/features/editor/autosave-service.js");
@@ -1598,7 +1602,7 @@ for (const boundary of [
   "dirty: { prune: workspaceDirtyStateController.prune }",
   "summaries: { refresh: projectSummaryController.refresh }",
   "renderList: projectListPresentationController.render",
-  "renderEditor,",
+  "renderEditor: editorShellPresentationController.render,",
   "renderTrashSummary: () => applicationTrashController.renderSummary()",
   "selection: { open: projectOpenController.open }"
 ]) {
@@ -5802,7 +5806,8 @@ for (const [removedFacade, directAccess] of [
       !new RegExp(`\\b${removedFacade}\\b`).test(appWorkflowDriverJs),
     `${removedFacade} AppStore/FilterStore consumer facade must not return.`
   );
-  assertIncludes(appJs, directAccess, `application consumers must use ${directAccess} directly.`);
+  const directOwner = directAccess === "projectId: navigation.projectId" ? editorShellPresentationControllerJs : appJs;
+  assertIncludes(directOwner, directAccess, `application consumers must use ${directAccess} directly.`);
 }
 assertIncludes(
   appJs,
@@ -5868,11 +5873,14 @@ assertIncludes(
   'navigation.openEditor({ ...context.getNavigation(), view: "editor" })',
   "view routing must pass the current navigation snapshot directly to NavigationController."
 );
-const renderEditorBody = functionBody(appJs, "function renderEditor()", "function renderProjectHome()");
+const renderEditorBody = functionBody(
+  editorShellPresentationControllerJs,
+  "function render()",
+  "return Object.freeze({ render });"
+);
 assert(
-  renderEditorBody.indexOf("applicationNavigation?.syncLegacy?.({") !== -1 &&
-    renderEditorBody.indexOf("applicationNavigation?.syncLegacy?.({") <
-      renderEditorBody.indexOf('type: "interface/locale-changed"'),
+  renderEditorBody.indexOf("application.syncLegacy({") !== -1 &&
+    renderEditorBody.indexOf("application.syncLegacy({") < renderEditorBody.indexOf("application.dispatchLocale("),
   "render-time legacy navigation synchronization must remain before the locale dispatch."
 );
 assertIncludes(
@@ -8923,7 +8931,7 @@ for (const boundary of [
   "getOpen: () => state.inspectorOpen",
   "state.inspectorOpen = inspectorOpen",
   "workspaceLayoutController?.setInspectorOpen?.(inspectorOpen)",
-  "renderEditor",
+  "renderEditor: editorShellPresentationController.render",
   "request: (callback) => requestAnimationFrame(callback)",
   `document.querySelector("[data-inspector-tab][aria-selected='true']")`,
   "inspectorToggle: inspectorToggleController"
@@ -9118,7 +9126,7 @@ for (const boundary of [
   "navigation: applicationNavigation",
   "getProjectId: () => editorSessionStore.getProject()?.id || null",
   "getNavigation: () => applicationStore.getState().navigation",
-  "presentation: { renderEditor }",
+  "presentation: { renderEditor: editorShellPresentationController.render }",
   "projects: projectSummaryController.refresh",
   "resources: resourceCatalogRefreshController.refresh",
   'navigate: () => applicationViewController.show("resources")',
@@ -11768,7 +11776,7 @@ for (const boundary of [
   "count: reportCount",
   "errorReport: fileImportService.errorReport",
   "renderValidation: applicationValidationPresentationController.render",
-  "renderEditor,",
+  "renderEditor: editorShellPresentationController.render,",
   "renderBackupReminder: workspaceBackupReminderService.render",
   "workspace: { markDirty: workspaceDirtyStateController.mark }",
   "status: { set: applicationSaveStatusController.set, mode: projectActivityController.statusMode }",
@@ -18776,6 +18784,173 @@ for (const testName of [
 }
 assertIncludes(
   appBootstrapJs,
+  'import { createEditorShellPresentationController } from "../features/editor/editor-shell-presentation-controller.js";',
+  "the application runtime must install the checked editor-shell presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createEditorShellPresentationController,",
+  "the application runtime must expose the checked editor-shell presentation controller factory."
+);
+for (const snippet of [
+  "EditorShellPresentationController requires elements.${key}.",
+  "EditorShellPresentationController requires project and inspector elements.",
+  "EditorShellPresentationController requires application boundaries.",
+  "EditorShellPresentationController requires session boundaries.",
+  "EditorShellPresentationController requires a vertical-feature boundary.",
+  "EditorShellPresentationController requires localization boundaries.",
+  "EditorShellPresentationController requires language boundaries.",
+  "EditorShellPresentationController requires workspace boundaries.",
+  "EditorShellPresentationController requires a focus boundary.",
+  "EditorShellPresentationController requires resource and document boundaries.",
+  "EditorShellPresentationController requires text-safety boundaries.",
+  "EditorShellPresentationController requires AI settings boundaries.",
+  "EditorShellPresentationController requires presentation boundaries.",
+  "const navigation = application.getNavigation();",
+  "application.syncLegacy({",
+  'application.dispatchLocale(localization.locale() || "");',
+  "const hasProject = Boolean(session.getProject());",
+  "void language.syncDesktopSpellcheck();",
+  "workspace.renderStatus();",
+  "workspace.renderBackupReminder();",
+  "const verticalFeatures = vertical.getState();",
+  "verticalFeatures.editor.renderShell({",
+  "verticalFeatures.inspector.setVisible(",
+  "verticalFeatures.dashboard.setVisible(",
+  'elements.workspace.classList.toggle("projects-mode", application.getNavigation().view !== "editor");',
+  "focus.render();",
+  'elements.inspectorToggleButton.setAttribute("aria-expanded", String(application.getInspectorOpen()));',
+  "if (!session.getProject()) return;",
+  "const resourceSummary = resources.summary();",
+  "elements.projectTitle.textContent = text.displaySafeText(session.getProject().name);",
+  'elements.domainForm.classList.add("clean");',
+  "presentation.replaceSafeHtml(",
+  "const aiSettings = ai.normalizeSettings(session.getProject().aiSettings);",
+  "presentation.renderAiAdministration({",
+  "storedKey: ai.storedKey(),",
+  "rememberKey: Boolean(ai.openAiSnapshot().local),",
+  "presentation.renderAiCommandCentre();",
+  "presentation.renderQualityWorkbench();",
+  "presentation.renderTermbaseSelect();",
+  "return Object.freeze({ render });"
+]) {
+  assertIncludes(
+    editorShellPresentationControllerJs,
+    snippet,
+    `EditorShellPresentationController must retain characterized shell and project presentation policy: ${snippet}`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createEditorShellPresentationController({",
+  "inspectorToggleButton: els.inspectorToggleBtn",
+  "projectInfo: els.projectInfo",
+  "getNavigation: () => applicationStore.getState().navigation",
+  "syncLegacy: (navigation) => applicationNavigation?.syncLegacy?.(navigation)",
+  'type: "interface/locale-changed"',
+  "getInspectorOpen: () => state.inspectorOpen",
+  "getProject: editorSessionStore.getProject",
+  "getSegments: editorSessionStore.getSegments",
+  "getActivityEvents: editorSessionStore.getActivityEvents",
+  "getState: () => verticalFeatureState",
+  "locale: () => uiI18n?.getLocale?.()",
+  "syncDesktopSpellcheck: projectLanguageContextController.syncDesktopSpellcheck",
+  "renderStatus: workspaceRecoveryPresentationService.renderStatus",
+  "renderBackupReminder: () => workspaceBackupReminderService.render()",
+  "render: () => focusModeController.render()",
+  "summary: projectResourceContextService.summary",
+  "list: () => projectDocumentCatalogService.list()",
+  "displaySafeText: applicationTextSafetyService.displaySafeText",
+  "normalizeSettings: (settings) => aiRuntimeSettingsService.normalizeProjectSettings(settings)",
+  "renderAiAdministration: (model) => aiAdministrationController?.renderGlobalSettings?.(model)",
+  "renderAiCommandCentre: () => aiProviderFormController.renderCommandCentre()",
+  "renderQualityWorkbench: () => qualityWorkbenchController.render()",
+  "renderTermbaseSelect: termbaseSelectPresentationController.render"
+]) {
+  assertIncludes(appJs, boundary, `editor-shell composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/\beditorShellPresentationController\.render\b/g) || []).length === 10,
+  "all ten application editor-shell consumers must call EditorShellPresentationController.render directly."
+);
+assert(
+  (appWorkflowDriverJs.match(/\beditorShellPresentationController\.render\b/g) || []).length === 3,
+  "all three workflow editor-shell consumers must call EditorShellPresentationController.render directly."
+);
+assert(
+  !/function\s+renderEditor\b/.test(appJs) && !/function\s+renderEditor\b/.test(appWorkflowDriverJs),
+  "renderEditor must not return as a coordinator or workflow helper."
+);
+assert(
+  !appJs.includes("const hasProject = Boolean(editorSessionStore.getProject());") &&
+    !appJs.includes("if (verticalFeatureState?.editor)") &&
+    !appJs.includes("aiAdministrationController?.renderGlobalSettings?.({"),
+  "editor-shell visibility, project, and AI presentation policy must not return to app.js."
+);
+assert(
+  appJs.indexOf("const termbaseSelectPresentationController =") <
+    appJs.indexOf("const editorShellPresentationController =") &&
+    appJs.indexOf("const editorShellPresentationController =") <
+      appJs.indexOf("const projectTermRefreshController =") &&
+    appJs.indexOf("const editorShellPresentationController =") <
+      appJs.indexOf("const applicationAggregatePresentationController ="),
+  "EditorShellPresentationController must follow its termbase leaf and precede term refresh, aggregate rendering, and every direct consumer."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "applicationStore",
+  "applicationNavigation",
+  "editorSessionStore",
+  "verticalFeatureState",
+  "uiI18n",
+  "uiLocalizationService",
+  "projectLanguageContextController",
+  "workspaceRecoveryPresentationService",
+  "workspaceBackupReminderService",
+  "focusModeController",
+  "projectResourceContextService",
+  "projectDocumentCatalogService",
+  "applicationTextSafetyService",
+  "aiRuntimeSettingsService",
+  "aiCredentialStorageService",
+  "aiAdministrationController",
+  "aiProviderFormController",
+  "qualityWorkbenchController",
+  "termbaseSelectPresentationController",
+  "els."
+]) {
+  assert(
+    !editorShellPresentationControllerJs.includes(forbiddenOwner),
+    `EditorShellPresentationController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "EditorShellPresentationController preserves navigation, locale, workspace, and legacy no-project rendering",
+  "EditorShellPresentationController preserves vertical feature reads and live inspector state",
+  "EditorShellPresentationController preserves the second live project guard",
+  "EditorShellPresentationController preserves safe project metadata and information markup",
+  "EditorShellPresentationController preserves AI, command-centre, quality, and termbase order",
+  "EditorShellPresentationController does not await desktop spellcheck synchronization",
+  "EditorShellPresentationController preserves representative failure short circuiting",
+  "EditorShellPresentationController validates every owner and exposes an immutable API"
+]) {
+  assertIncludes(
+    editorShellPresentationControllerUnitTests,
+    testName,
+    `focused editor-shell presentation tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/editor-shell-presentation-controller.js"',
+  "source-catalog extraction must scan the checked editor-shell presentation controller."
+);
+assertIncludes(
+  i18nValidateScript,
+  '"editor-shell-presentation-controller.js"',
+  "source-catalog validation must check explicit keys in the checked editor-shell presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createApplicationAggregatePresentationController } from "./application-aggregate-presentation-controller.js";',
   "the application runtime must install the checked aggregate-presentation controller."
 );
@@ -18807,7 +18982,7 @@ for (const boundary of [
   "appRuntime.featureFactories.createApplicationAggregatePresentationController({",
   "filters: { invalidate: () => segmentFilterService.invalidate() }",
   "renderProjectList: () => projectListPresentationController.render()",
-  "renderEditor: () => renderEditor()",
+  "renderEditor: editorShellPresentationController.render",
   "renderProjectHome: () => renderProjectHome()",
   "renderProjectAnalysis: () => projectAnalysisController.render()",
   "renderDocumentFilter: () => renderDocumentFilter()",
@@ -18980,9 +19155,9 @@ for (const boundary of [
 }
 for (const [method, count] of [
   ["stableLower", 14],
-  ["escapeHtml", 18],
-  ["displaySafeText", 21],
-  ["displaySafeHtml", 13],
+  ["escapeHtml", 17],
+  ["displaySafeText", 18],
+  ["displaySafeHtml", 7],
   ["escapeRegExp", 1],
   ["fileSafeName", 5],
   ["redactSensitiveText", 18]

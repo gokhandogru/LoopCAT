@@ -58,6 +58,13 @@ const resourcesPresentationServicePath = path.join(
   "resources-presentation-service.js"
 );
 const resourceCatalogServicePath = path.join(root, "src", "features", "resources", "resource-catalog-service.js");
+const editorShellPresentationControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "editor",
+  "editor-shell-presentation-controller.js"
+);
 const projectAnalysisControllerPath = path.join(root, "src", "features", "projects", "project-analysis-controller.js");
 const projectListPresentationControllerPath = path.join(
   root,
@@ -454,6 +461,11 @@ function main() {
     "src/features/resources/resources-presentation-service.js"
   );
   extractScript(messagesByText, resourceCatalogServicePath, "src/features/resources/resource-catalog-service.js");
+  extractScript(
+    messagesByText,
+    editorShellPresentationControllerPath,
+    "src/features/editor/editor-shell-presentation-controller.js"
+  );
   extractScript(messagesByText, projectAnalysisControllerPath, "src/features/projects/project-analysis-controller.js");
   extractScript(
     messagesByText,

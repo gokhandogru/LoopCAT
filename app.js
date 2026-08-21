@@ -1429,6 +1429,77 @@ const termbaseSelectPresentationController =
     text: { displaySafeText: applicationTextSafetyService.displaySafeText }
   });
 
+const editorShellPresentationController =
+  appRuntime.featureFactories.createEditorShellPresentationController({
+    elements: {
+      workspace: els.workspace,
+      sidebar: els.sidebar,
+      projectsView: els.projectsView,
+      resourcesView: els.resourcesView,
+      projectHomeView: els.projectHomeView,
+      emptyState: els.emptyState,
+      editorView: els.editorView,
+      inspectorToggleButton: els.inspectorToggleBtn,
+      projectTitle: els.projectTitle,
+      projectMeta: els.projectMeta,
+      projectDomainEditInput: els.projectDomainEditInput,
+      domainForm: els.domainForm,
+      projectInfo: els.projectInfo
+    },
+    application: {
+      getNavigation: () => applicationStore.getState().navigation,
+      syncLegacy: (navigation) => applicationNavigation?.syncLegacy?.(navigation),
+      dispatchLocale: (locale) =>
+        applicationStore?.dispatch?.({
+          type: "interface/locale-changed",
+          payload: { locale }
+        }),
+      getInspectorOpen: () => state.inspectorOpen
+    },
+    session: {
+      getProject: editorSessionStore.getProject,
+      getSegments: editorSessionStore.getSegments,
+      getActivityEvents: editorSessionStore.getActivityEvents
+    },
+    vertical: { getState: () => verticalFeatureState },
+    localization: {
+      locale: () => uiI18n?.getLocale?.(),
+      source: uiLocalizationService.source,
+      label: uiLocalizationService.label,
+      sourceHtml: uiLocalizationService.sourceHtml,
+      labelHtml: uiLocalizationService.labelHtml
+    },
+    language: {
+      syncDesktopSpellcheck: projectLanguageContextController.syncDesktopSpellcheck,
+      display: projectLanguageContextController.display
+    },
+    workspace: {
+      renderStatus: workspaceRecoveryPresentationService.renderStatus,
+      renderBackupReminder: () => workspaceBackupReminderService.render()
+    },
+    focus: { render: () => focusModeController.render() },
+    resources: { summary: projectResourceContextService.summary },
+    documents: { list: () => projectDocumentCatalogService.list() },
+    text: {
+      displaySafeText: applicationTextSafetyService.displaySafeText,
+      displaySafeHtml: applicationTextSafetyService.displaySafeHtml,
+      escapeHtml: applicationTextSafetyService.escapeHtml
+    },
+    ai: {
+      normalizeSettings: (settings) => aiRuntimeSettingsService.normalizeProjectSettings(settings),
+      storedKey: () => aiCredentialStorageService.storedOpenAiKey(),
+      openAiSnapshot: () => aiCredentialStorageService.openAiSnapshot(),
+      storageLabel: () => aiCredentialStorageService.openAiStorageLabel()
+    },
+    presentation: {
+      replaceSafeHtml,
+      renderAiAdministration: (model) => aiAdministrationController?.renderGlobalSettings?.(model),
+      renderAiCommandCentre: () => aiProviderFormController.renderCommandCentre(),
+      renderQualityWorkbench: () => qualityWorkbenchController.render(),
+      renderTermbaseSelect: termbaseSelectPresentationController.render
+    }
+  });
+
 const projectTermRefreshController = appRuntime.featureFactories.createProjectTermRefreshController({
   session: {
     getProject: editorSessionStore.getProject,
@@ -1499,7 +1570,7 @@ const applicationAggregatePresentationController =
     filters: { invalidate: () => segmentFilterService.invalidate() },
     presentation: {
       renderProjectList: () => projectListPresentationController.render(),
-      renderEditor: () => renderEditor(),
+      renderEditor: editorShellPresentationController.render,
       renderProjectHome: () => renderProjectHome(),
       renderProjectAnalysis: () => projectAnalysisController.render(),
       renderDocumentFilter: () => renderDocumentFilter(),
@@ -1602,7 +1673,7 @@ const projectCollectionLoadController =
     summaries: { refresh: projectSummaryController.refresh },
     presentation: {
       renderList: projectListPresentationController.render,
-      renderEditor,
+      renderEditor: editorShellPresentationController.render,
       renderTrashSummary: () => applicationTrashController.renderSummary()
     },
     selection: { open: projectOpenController.open }
@@ -3559,7 +3630,7 @@ const aiOpenAiSuggestionController = appRuntime.featureFactories.createAiOpenAiS
         "OpenAI suggestion created"
       )
   },
-  presentation: { renderEditor },
+  presentation: { renderEditor: editorShellPresentationController.render },
   workspace: {
     markDirty: workspaceDirtyStateController.mark,
     markRollbackDirty: (projectId) => {
@@ -3610,7 +3681,7 @@ const aiSettingsPersistenceController =
     activity: {
       log: (details) => projectActivityController.log("ai-settings", "AI settings updated", details)
     },
-    presentation: { renderEditor },
+    presentation: { renderEditor: editorShellPresentationController.render },
     workspace: {
       markDirty: workspaceDirtyStateController.mark,
       markActivityWarningDirty: () => {
@@ -3880,7 +3951,7 @@ const filterPresetController = appRuntime?.featureFactories?.createFilterPresetC
     state.inspectorOpen = true;
     void workspaceLayoutController?.setInspectorOpen?.(true);
     verticalFeatureState?.inspector?.setContext?.({ tab });
-    renderEditor();
+    editorShellPresentationController.render();
   }
 });
 const filterPresetReady = filterPresetController?.initialize?.() || Promise.resolve();
@@ -3920,7 +3991,7 @@ const applicationViewController = appRuntime.featureFactories.createApplicationV
     getProjectId: () => editorSessionStore.getProject()?.id || null,
     getNavigation: () => applicationStore.getState().navigation
   },
-  presentation: { renderEditor },
+  presentation: { renderEditor: editorShellPresentationController.render },
   refresh: {
     projects: projectSummaryController.refresh,
     resources: resourceCatalogRefreshController.refresh
@@ -4017,7 +4088,7 @@ const uiLocaleOrchestrationController =
       renderResourcesView: () => renderResourcesView(),
       renderProjectHome: () => renderProjectHome(),
       renderProjectAnalysis: projectAnalysisController.render,
-      renderEditor: () => renderEditor(),
+      renderEditor: editorShellPresentationController.render,
       renderProgress: () => renderProgress(),
       renderReview: () =>
         qualityReviewController?.renderReview?.({ segment: applicationActiveSegmentService.get(), force: false }),
@@ -4131,7 +4202,7 @@ const workspaceLayoutController = appRuntime?.featureFactories?.createWorkspaceL
   preferencesRepository: appRuntime.preferencesRepository,
   onInspectorPreference: (inspectorOpen) => {
     state.inspectorOpen = inspectorOpen;
-    renderEditor();
+    editorShellPresentationController.render();
   }
 });
 const inspectorToggleController = appRuntime.featureFactories.createInspectorToggleController({
@@ -4145,7 +4216,7 @@ const inspectorToggleController = appRuntime.featureFactories.createInspectorTog
   layout: {
     setOpen: (inspectorOpen) => workspaceLayoutController?.setInspectorOpen?.(inspectorOpen)
   },
-  presentation: { renderEditor },
+  presentation: { renderEditor: editorShellPresentationController.render },
   frame: { request: (callback) => requestAnimationFrame(callback) },
   selection: {
     getSelected: () => document.querySelector("[data-inspector-tab][aria-selected='true']")
@@ -4550,7 +4621,7 @@ projectExportController = appRuntime.featureFactories.createProjectExportControl
   },
   presentation: {
     renderValidation: applicationValidationPresentationController.render,
-    renderEditor,
+    renderEditor: editorShellPresentationController.render,
     renderBackupReminder: workspaceBackupReminderService.render
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
@@ -5433,75 +5504,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-function renderEditor() {
-  const navigation = applicationStore.getState().navigation;
-  applicationNavigation?.syncLegacy?.({
-    view: navigation.view,
-    projectId: navigation.projectId,
-    documentId: navigation.documentId,
-    segmentId: navigation.segmentId,
-    activeIndex: navigation.activeIndex
-  });
-  applicationStore?.dispatch?.({
-    type: "interface/locale-changed",
-    payload: { locale: uiI18n?.getLocale?.() || "" }
-  });
-  const hasProject = Boolean(editorSessionStore.getProject());
-  void projectLanguageContextController.syncDesktopSpellcheck();
-  workspaceRecoveryPresentationService.renderStatus();
-  workspaceBackupReminderService.render();
-  if (verticalFeatureState?.editor) {
-    verticalFeatureState.editor.renderShell({ view: applicationStore.getState().navigation.view, hasProject, inspectorOpen: state.inspectorOpen });
-    verticalFeatureState.inspector.setVisible(applicationStore.getState().navigation.view === "editor" && state.inspectorOpen);
-    verticalFeatureState.dashboard.setVisible(applicationStore.getState().navigation.view === "project" && hasProject);
-  } else {
-    els.workspace.classList.toggle("projects-mode", applicationStore.getState().navigation.view !== "editor");
-    els.sidebar.classList.toggle("hidden", applicationStore.getState().navigation.view !== "editor");
-    els.projectsView.classList.toggle("hidden", applicationStore.getState().navigation.view !== "projects");
-    els.resourcesView.classList.toggle("hidden", applicationStore.getState().navigation.view !== "resources");
-    els.projectHomeView.classList.toggle("hidden", applicationStore.getState().navigation.view !== "project" || !hasProject);
-    els.emptyState.classList.toggle("hidden", applicationStore.getState().navigation.view !== "editor" || hasProject);
-    els.editorView.classList.toggle("hidden", applicationStore.getState().navigation.view !== "editor" || !hasProject);
-  }
-  focusModeController.render();
-  if (els.inspectorToggleBtn) {
-    els.inspectorToggleBtn.setAttribute("aria-expanded", String(state.inspectorOpen));
-    els.inspectorToggleBtn.textContent = state.inspectorOpen ? uiLocalizationService.source("Hide inspector") : uiLocalizationService.source("Show inspector");
-  }
-  if (!editorSessionStore.getProject()) return;
-
-  const resources = projectResourceContextService.summary();
-  els.projectTitle.textContent = applicationTextSafetyService.displaySafeText(editorSessionStore.getProject().name);
-  els.projectMeta.textContent = `${projectLanguageContextController.display()} - ${uiLocalizationService.label("mainTm")}: ${applicationTextSafetyService.displaySafeText(resources.mainTm, uiLocalizationService.label("none"))} - ${applicationTextSafetyService.displaySafeText(resources.tmLabel)} - ${applicationTextSafetyService.displaySafeText(resources.tbLabel)}`;
-  els.projectDomainEditInput.value = editorSessionStore.getProject().domain || "";
-  els.domainForm.classList.add("clean");
-  els.domainForm.classList.toggle("hidden", Boolean((editorSessionStore.getProject().domain || "").trim()));
-  replaceSafeHtml(els.projectInfo, `
-    <dt>${uiLocalizationService.labelHtml("name")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(editorSessionStore.getProject().name)}</dd>
-    <dt>${uiLocalizationService.sourceHtml("Creator")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(editorSessionStore.getProject().creatorName || uiLocalizationService.label("notSet"))}</dd>
-    <dt>${uiLocalizationService.sourceHtml("Domain")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(editorSessionStore.getProject().domain || uiLocalizationService.label("notSet"))}</dd>
-    <dt>${uiLocalizationService.labelHtml("languages")}</dt><dd>${applicationTextSafetyService.escapeHtml(projectLanguageContextController.display())}</dd>
-    <dt>${uiLocalizationService.sourceHtml("Workspace")}</dt><dd>${applicationTextSafetyService.escapeHtml(editorSessionStore.getProject().workspaceId || "local-workspace")}</dd>
-    <dt>${uiLocalizationService.labelHtml("sourceFile")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(editorSessionStore.getProject().sourceFileName || uiLocalizationService.label("notImported"))}</dd>
-    <dt>${uiLocalizationService.labelHtml("mainTm")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(resources.mainTm)}</dd>
-    <dt>${uiLocalizationService.labelHtml("linkedTms")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(resources.tmNames.join(", "))}</dd>
-    <dt>${uiLocalizationService.labelHtml("linkedTbs")}</dt><dd>${applicationTextSafetyService.displaySafeHtml(resources.tbNames.join(", "))}</dd>
-    <dt>${uiLocalizationService.sourceHtml("Documents")}</dt><dd>${projectDocumentCatalogService.list().length || 0}</dd>
-    <dt>${uiLocalizationService.labelHtml("segmentsTitle")}</dt><dd>${editorSessionStore.getSegments().length}</dd>
-    <dt>${uiLocalizationService.labelHtml("activity")}</dt><dd>${uiLocalizationService.labelHtml("eventCount", { count: editorSessionStore.getActivityEvents().length })}</dd>
-  `);
-  const ai = aiRuntimeSettingsService.normalizeProjectSettings(editorSessionStore.getProject().aiSettings);
-  aiAdministrationController?.renderGlobalSettings?.({
-    settings: ai,
-    storedKey: aiCredentialStorageService.storedOpenAiKey(),
-    rememberKey: Boolean(aiCredentialStorageService.openAiSnapshot().local),
-    storageText: `OpenAI key: ${aiCredentialStorageService.openAiStorageLabel()}. API keys stay in this browser and are never exported with project packages.`
-  });
-  aiProviderFormController.renderCommandCentre();
-  qualityWorkbenchController.render();
-  termbaseSelectPresentationController.render();
-}
 
 function renderProjectHome() {
   if (!editorSessionStore.getProject()) return;

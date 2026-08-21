@@ -64,6 +64,7 @@ import { createProjectFilterControlsController } from "../features/projects/proj
 import { createProjectHomeController } from "../features/projects/project-home-controller.js";
 import { createProjectListPresentationController } from "../features/projects/project-list-presentation-controller.js";
 import { createEditorController } from "../features/editor/editor-controller.js";
+import { createEditorShellPresentationController } from "../features/editor/editor-shell-presentation-controller.js";
 import { createEditorContextController } from "../features/editor/editor-context-controller.js";
 import { createEditorSessionStore } from "../features/editor/editor-session-store.js";
 import { createEditorFilterControlsController } from "../features/editor/editor-filter-controls-controller.js";
@@ -299,6 +300,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createDiagnosticsService,
       createDialogController,
       createEditorController,
+      createEditorShellPresentationController,
       createEditorContextController,
       createEditorFilterControlsController,
       createFilterStore,
