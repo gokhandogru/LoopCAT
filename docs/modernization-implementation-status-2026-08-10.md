@@ -36,6 +36,8 @@ The latest project-analysis checkpoint also moves private asynchronous render in
 
 The latest project-list presentation checkpoint also moves the first live emptiness guard, second fresh project-list read, strict current-project selection, safe project/language/source-file markup, per-project open listeners, stable fragment assembly, and one-shot root replacement behind a checked controller boundary used directly by project loading and aggregate rendering.
 
+The latest aggregate presentation checkpoint also moves filter invalidation plus the exact project-list/editor/project-home/project-analysis/document-filter/segment-grid/progress rendering sequence behind a checked controller boundary used directly by every application and workflow consumer.
+
 The latest application-persistence lifecycle checkpoint also moves close-warning and hidden/Page-hide background-save event orchestration behind a checked controller boundary while leaving import-task, autosave-queue, workspace-dirty, package-save, and warning policy in their existing injected owners.
 
 The latest application event-wiring checkpoint also moves startup UI initialization, checkpoint reporting, segment-grid scroll routing, and the exact ordered feature-lifecycle mount sequence behind a checked controller boundary while leaving each feature's listener and domain policy in its existing owner.
@@ -436,6 +438,8 @@ The checked project-analysis slice is also complete: an immutable ProjectAnalysi
 
 The checked project-list presentation slice is also complete: an immutable ProjectListPresentationController now owns the first live project-list emptiness read and immediate safe empty-state replacement, the deliberate second fresh list read for non-empty rendering, one fresh current-project read per item with strict ID selection, exact active-class and button markup, safe project-name HTML, escaped language display, truthy source-file safe HTML versus the localized no-file fallback, exact project-ID click closures, stable fragment append order, and one final root replacement. ProjectCollectionLoadController and aggregate rendering call its stable `render` method directly; `renderProjectList` is removed. Eight focused controller tests, 40 combined list/load/open/language/text-safety tests, and the full 1,143-test quality gate characterize empty and drifting live lists, strict IDs, safe markup, no-source fallback, listener identity, stable order, failure timing, checked dependencies, and immutable API; source extraction/validation retain all 57 explicit i18n key references, and release/import, source-isolation, bundle, deep project/navigation browser workflows, all 15 accessibility states, 81 visual screenshots, web/desktop artifacts, fuses, and GPU-on/off packaged startup pass with no intended user-visible difference.
 
+The checked aggregate presentation slice is also complete: an immutable ApplicationAggregatePresentationController now owns the exact synchronous filter-invalidation, project-list, editor-shell, project-home, project-analysis, document-filter, segment-grid, and progress sequence; exact zero-argument calls; ignored step results; deliberately unawaited analysis promises and rejection timing; synchronous failure short-circuiting; and repeated full-sequence invocation through one stable method. All 17 application and five workflow consumers call its `render` method directly; `renderAll` is removed, while every filter and feature presentation remains behind an injected call-time adapter. Six focused controller tests, 39 combined aggregate/open/document/history/resource-selection tests, and the full 1,149-test quality gate characterize order, receivers, direct return, pending and rejected analysis results, re-entry, every failure boundary, checked dependencies, and immutable API; release/import, source-isolation, bundle, i18n validation, deep application/AI/resource/Undo/Redo/project browser workflows, all 15 accessibility states, 81 visual screenshots, web/desktop artifacts, fuses, and GPU-on/off packaged startup pass with no intended user-visible difference.
+
 Earlier checkpoint descriptions that say `wireEvents` mounted an individual controller or that top-level startup called `ApplicationEventWiringController` directly record the state at those checkpoints; ApplicationEventWiringController now owns the complete mount sequence, and ApplicationStartupController is its sole top-level startup caller.
 
 1. Reduce the remaining `app.js` compatibility coordinator toward the roadmap's bootstrap-only goal, one characterized feature boundary at a time.
@@ -443,7 +447,7 @@ Earlier checkpoint descriptions that say `wireEvents` mounted an individual cont
 
 ### P2-05 — Performance stretch target
 
-Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The production graph is 2,888,478 bytes across five modules; the hosted/desktop initial app is 1,199,668 bytes (317,063 bytes gzip), and the separate direct-file fallback is 1,444,217 bytes (400,181 bytes gzip). The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 449,668 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
+Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The production graph is 2,890,636 bytes across five modules; the hosted/desktop initial app is 1,200,747 bytes (317,285 bytes gzip), and the separate direct-file fallback is 1,445,296 bytes (400,392 bytes gzip). The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 450,747 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
 
 ## Manual and external release gates still required
 
@@ -474,18 +478,18 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 by extracting the aggregate editor-shell rendering sequence behind a checked ApplicationAggregatePresentationController boundary.
+Continue P1-08 by extracting current-project termbase selector presentation behind a checked TermbaseSelectPresentationController boundary before extracting its larger editor-shell consumer.
 
 Entry criteria:
 
-- Preserve the exact synchronous order: segment-filter invalidation, project-list presentation, editor shell, project home, unawaited project-analysis rendering, document-filter presentation, segment-grid presentation, and progress presentation.
-- Preserve every direct return and failure boundary, including synchronous propagation before the next step, unobserved asynchronous project-analysis fulfillment/rejection behavior, and fresh call-time reads inside each injected owner.
-- Migrate ApplicationCommandHistoryController, project-resource attachment, and all workflow consumers to the checked controller directly while keeping filtering, feature presentation, DOM ownership, project analysis, and async error behavior in their existing injected owners.
-- Characterize stable callback identities, repeated invocation, exact argument omission, checked dependencies, immutable API, and composition before the earliest direct consumer.
+- Preserve the absent-select immediate `undefined` return before resource reads, the live termbase-name collection, and current selected value read before fragment creation.
+- Preserve stable raw-name option values, safe display text, one fresh option per name, fragment append order, and one final selector replacement.
+- Preserve strict `names.includes(current)` selection retention, lazy primary-termbase fallback only when the current value is absent, direct value assignment, and every dependency/mutation/failure boundary.
+- Migrate project-term refresh, project resource transfer, editor-shell rendering, and both workflow consumers to the checked controller directly while keeping project resource policy, text safety, DOM creation, and selector ownership in their existing injected owners.
 
 Exit criteria:
 
-- `renderAll` is removed from `app.js`; consumers call ApplicationAggregatePresentationController directly, and release verification prevents the aggregate sequence from returning to the coordinator or workflow driver.
-- Focused ApplicationAggregatePresentationController order/re-entry/failure tests, command-history/project-resource/AI restoration workflows, all 15 accessibility states, 81 visual screenshots, and FULL-SUITE gates pass with no intended user-visible difference.
+- `renderTermbaseSelect` is removed from `app.js`; consumers call TermbaseSelectPresentationController directly, and release verification prevents its option/selection/replacement policy from returning to the coordinator or workflow driver.
+- Focused TermbaseSelectPresentationController guard/live-read/option/selection/failure tests, term/resource/editor workflows, all 15 accessibility states, 81 visual screenshots, and FULL-SUITE gates pass with no intended user-visible difference.
 
 Continue until `app.js` is a bootstrap-only compatibility entry and the façade can be removed without changing mature LoopCAT behavior.

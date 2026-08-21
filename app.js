@@ -1480,6 +1480,20 @@ const projectActivityController = appRuntime.featureFactories.createProjectActiv
   }
 });
 
+const applicationAggregatePresentationController =
+  appRuntime.featureFactories.createApplicationAggregatePresentationController({
+    filters: { invalidate: () => segmentFilterService.invalidate() },
+    presentation: {
+      renderProjectList: () => projectListPresentationController.render(),
+      renderEditor: () => renderEditor(),
+      renderProjectHome: () => renderProjectHome(),
+      renderProjectAnalysis: () => projectAnalysisController.render(),
+      renderDocumentFilter: () => renderDocumentFilter(),
+      renderSegments: () => renderSegments(),
+      renderProgress: () => renderProgress()
+    }
+  });
+
 const projectOpenController = appRuntime.featureFactories.createProjectOpenController({
   autosave: { flush: (...args) => autosaveService.flush(...args) },
   session: {
@@ -1508,7 +1522,7 @@ const projectOpenController = appRuntime.featureFactories.createProjectOpenContr
   navigation: {
     open: (...args) => applicationNavigation?.openProject?.(...args)
   },
-  presentation: { renderAll },
+  presentation: { renderAll: applicationAggregatePresentationController.render },
   context: {
     getView: () => applicationStore.getState().navigation.view,
     refreshEditor: (...args) => editorContextController.refresh(...args)
@@ -1544,7 +1558,7 @@ const projectDocumentOpenController =
     navigation: {
       openEditor: (...args) => applicationNavigation?.openEditor?.(...args)
     },
-    presentation: { renderAll },
+    presentation: { renderAll: applicationAggregatePresentationController.render },
     context: {
       refreshEditor: (...args) => editorContextController.refresh(...args)
     }
@@ -1624,7 +1638,7 @@ const applicationCommandHistoryController =
       renderList: () => applicationTrashController.renderList(),
       renderSummary: () => applicationTrashController.renderSummary()
     },
-    presentation: { renderAll: () => renderAll() },
+    presentation: { renderAll: applicationAggregatePresentationController.render },
     status: { set: applicationSaveStatusController.set }
   });
 const applicationTrashController = appRuntime.featureFactories.createApplicationTrashController({
@@ -1748,7 +1762,10 @@ const projectDomainController = appRuntime.featureFactories.createProjectDomainC
     replaceProjects: editorSessionStore.replaceProjects
   },
   repository: { update: updateProject },
-  presentation: { refreshSummaries: projectSummaryController.refresh, renderAll },
+  presentation: {
+    refreshSummaries: projectSummaryController.refresh,
+    renderAll: applicationAggregatePresentationController.render
+  },
   workspace: { markDirty: workspaceDirtyStateController.mark },
   status: { set: applicationSaveStatusController.set },
   clone: structuredClone,
@@ -2014,7 +2031,7 @@ const segmentCommandRestorationController =
       renderSegments,
       renderProgress,
       renderHistory: revisionHistoryPresentationService.render,
-      renderAll,
+      renderAll: applicationAggregatePresentationController.render,
       refreshContext: () => editorContextController.refresh()
     },
     workspace: { markDirty: workspaceDirtyStateController.mark },
@@ -2843,7 +2860,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
   selection: { getActiveSegmentId: () => applicationActiveSegmentService.get()?.id || "" },
   presentation: {
     invalidateFilters: segmentFilterService.invalidate,
-    renderAll,
+    renderAll: applicationAggregatePresentationController.render,
     renderSegments,
     renderProjectProgress: renderProgress,
     renderHistory: revisionHistoryPresentationService.render,
@@ -2932,7 +2949,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
         force: Boolean(options.force)
       }),
     updateRow,
-    renderAll,
+    renderAll: applicationAggregatePresentationController.render,
     refreshSidebar: () => editorContextController.refresh(),
     renderSegments,
     renderProjectProgress: renderProgress,
@@ -3012,7 +3029,7 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
     renderCommandCentre: aiProviderFormController.renderCommandCentre,
     renderAiProgress: aiProviderFormController.renderProgress,
     renderOutput: aiProviderFormController.renderOutput,
-    renderAll,
+    renderAll: applicationAggregatePresentationController.render,
     refreshSidebar: () => editorContextController.refresh()
   },
   activity: {
@@ -3097,7 +3114,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
     renderOutput: aiProviderFormController.renderOutput,
     renderSuggestions: aiSuggestionListController.render,
     updateRow,
-    renderAll,
+    renderAll: applicationAggregatePresentationController.render,
     refreshSidebar: () => editorContextController.refresh()
   },
   activity: {
@@ -3180,7 +3197,7 @@ const aiTerminologyApplicationController =
       renderOutput: aiProviderFormController.renderOutput,
       renderSuggestions: aiSuggestionListController.render,
       updateRow,
-      renderAll,
+      renderAll: applicationAggregatePresentationController.render,
       refreshSidebar: () => editorContextController.refresh()
     },
     activity: {
@@ -3263,7 +3280,7 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
     renderCommandCentre: aiProviderFormController.renderCommandCentre,
     renderAiProgress: aiProviderFormController.renderProgress,
     renderOutput: aiProviderFormController.renderOutput,
-    renderAll,
+    renderAll: applicationAggregatePresentationController.render,
     refreshSidebar: () => editorContextController.refresh()
   },
   activity: {
@@ -3431,7 +3448,7 @@ const aiSuggestionApplicationController =
       renderHistory: revisionHistoryPresentationService.render,
       renderSuggestions: aiSuggestionListController.render,
       refreshSidebar: () => editorContextController.refresh(),
-      renderAll,
+      renderAll: applicationAggregatePresentationController.render,
       focusTarget: targetEditController.focusActive
     },
     workspace: {
@@ -3757,7 +3774,7 @@ const structuralSegmentController = appRuntime.featureFactories.createStructural
   },
   view: {
     invalidateFilters: segmentFilterService.invalidate,
-    renderAll
+    renderAll: applicationAggregatePresentationController.render
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
   status: { set: applicationSaveStatusController.set },
@@ -4023,7 +4040,7 @@ const projectHomeController = appRuntime.featureFactories.createProjectHomeContr
     getSegments: () => editorSessionStore.getSegments()
   },
   navigation: applicationNavigation,
-  presentation: { renderAll },
+  presentation: { renderAll: applicationAggregatePresentationController.render },
   actions: { confirmDelete: confirmDeleteProject }
 });
 const projectFilterControlsController =
@@ -4714,7 +4731,7 @@ const projectDocumentImportController =
     workspace: { markDirty: workspaceDirtyStateController.mark },
     status: { set: applicationSaveStatusController.set, mode: projectActivityController.statusMode },
     presentation: {
-      renderAll,
+      renderAll: applicationAggregatePresentationController.render,
       refreshEditorContext: editorContextController.refresh
     },
     text: {
@@ -4889,7 +4906,7 @@ const projectDialogSaveController =
       editorContext: editorContextController.refresh
     },
     presentation: {
-      renderAll,
+      renderAll: applicationAggregatePresentationController.render,
       renderStorageStatus: workspaceRecoveryPresentationService.renderProjectStorage
     },
     activity: {
@@ -5403,17 +5420,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
   }
 });
 
-function renderAll() {
-  segmentFilterService.invalidate();
-  projectListPresentationController.render();
-  renderEditor();
-  renderProjectHome();
-  projectAnalysisController.render();
-  renderDocumentFilter();
-  renderSegments();
-  renderProgress();
-}
-
 function renderEditor() {
   const navigation = applicationStore.getState().navigation;
   applicationNavigation?.syncLegacy?.({
@@ -5798,7 +5804,7 @@ async function addResourceToCurrentProject(type, resource) {
   editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
   await projectTermRefreshController.refresh({ rerender: true });
   await projectSummaryController.refresh();
-  renderAll();
+  applicationAggregatePresentationController.render();
   await editorContextController.refresh();
   renderResourcesView();
   workspaceDirtyStateController.mark();

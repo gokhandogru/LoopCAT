@@ -1,6 +1,7 @@
 import { createAppStore } from "./app-store.js";
 import { createApplicationEvents } from "./events.js";
 import { createApplicationActiveSegmentService } from "./application-active-segment-service.js";
+import { createApplicationAggregatePresentationController } from "./application-aggregate-presentation-controller.js";
 import { createApplicationCommandCatalogService } from "./application-command-catalog-service.js";
 import { createApplicationDateTimeService } from "./application-date-time-service.js";
 import { createApplicationCommandButtonsController } from "./application-command-buttons-controller.js";
@@ -394,6 +395,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createTermFormController,
       createConcordanceController,
       createApplicationActiveSegmentService,
+      createApplicationAggregatePresentationController,
       createApplicationCommandCatalogService,
       createApplicationDateTimeService,
       createApplicationCommandButtonsController,

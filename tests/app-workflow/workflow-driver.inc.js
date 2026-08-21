@@ -1350,7 +1350,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         activeIndex: restoredBatchReviewActiveIndex,
         segmentId: editorSessionStore.getSegments()[restoredBatchReviewActiveIndex]?.id || ""
       });
-      renderAll();
+      applicationAggregatePresentationController.render();
     }
 
     const aiRepairProvider = aiProviderService.get("ollama");
@@ -1537,7 +1537,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         activeIndex: restoredBatchRepairActiveIndex,
         segmentId: editorSessionStore.getSegments()[restoredBatchRepairActiveIndex]?.id || ""
       });
-      renderAll();
+      applicationAggregatePresentationController.render();
     }
 
     const aiVariantsProvider = aiProviderService.get("ollama");
@@ -1940,7 +1940,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         activeIndex: restoredBatchApplyTermsActiveIndex,
         segmentId: editorSessionStore.getSegments()[restoredBatchApplyTermsActiveIndex]?.id || ""
       });
-      renderAll();
+      applicationAggregatePresentationController.render();
     }
 
     const aiPolishProvider = aiProviderService.get("ollama");
@@ -4315,7 +4315,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           capturedLabelPrompts.push(message);
           return false;
         };
-        renderAll();
+        applicationAggregatePresentationController.render();
         renderProjectsView();
         await confirmDeleteProject(labelProject.id);
         await confirmDeleteFile(projectDocumentCatalogService.list()[0]);
@@ -4369,7 +4369,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
             focus: false
           });
         }
-        renderAll();
+        applicationAggregatePresentationController.render();
         renderProjectsView();
         renderResourcesView();
       }

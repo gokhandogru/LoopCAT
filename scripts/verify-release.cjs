@@ -158,6 +158,7 @@ const requiredReleaseFiles = [
   "src/app/bootstrap.js",
   "src/app/app-store.js",
   "src/app/application-active-segment-service.js",
+  "src/app/application-aggregate-presentation-controller.js",
   "src/app/application-command-catalog-service.js",
   "src/app/application-date-time-service.js",
   "src/app/application-command-buttons-controller.js",
@@ -324,6 +325,7 @@ const requiredReleaseFiles = [
   "tests/unit/cohere-provider-adapter.test.cjs",
   "tests/unit/compatibility-module-registry.test.cjs",
   "tests/unit/app-store.test.cjs",
+  "tests/unit/application-aggregate-presentation-controller.test.cjs",
   "tests/unit/application-command-buttons-controller.test.cjs",
   "tests/unit/application-command-history-controller.test.cjs",
   "tests/unit/application-download-controller.test.cjs",
@@ -498,6 +500,12 @@ const appStoreJs = readText("src/app/app-store.js");
 const appStoreUnitTests = readText("tests/unit/app-store.test.cjs");
 const applicationActiveSegmentServiceJs = readText("src/app/application-active-segment-service.js");
 const applicationActiveSegmentServiceUnitTests = readText("tests/unit/application-active-segment-service.test.cjs");
+const applicationAggregatePresentationControllerJs = readText(
+  "src/app/application-aggregate-presentation-controller.js"
+);
+const applicationAggregatePresentationControllerUnitTests = readText(
+  "tests/unit/application-aggregate-presentation-controller.test.cjs"
+);
 const applicationCommandCatalogServiceJs = readText("src/app/application-command-catalog-service.js");
 const applicationCommandCatalogServiceUnitTests = readText("tests/unit/application-command-catalog-service.test.cjs");
 const applicationDateTimeServiceJs = readText("src/app/application-date-time-service.js");
@@ -1278,7 +1286,7 @@ for (const boundary of [
   "ready: () => filterPresetReady",
   "restore: (projectId) => filterPresetController?.restoreForProject?.(projectId)",
   "open: (...args) => applicationNavigation?.openProject?.(...args)",
-  "presentation: { renderAll }",
+  "presentation: { renderAll: applicationAggregatePresentationController.render }",
   "getView: () => applicationStore.getState().navigation.view",
   "refreshEditor: (...args) => editorContextController.refresh(...args)"
 ]) {
@@ -1381,7 +1389,7 @@ for (const boundary of [
   "getProject: editorSessionStore.getProject",
   "getSegments: editorSessionStore.getSegments",
   "openEditor: (...args) => applicationNavigation?.openEditor?.(...args)",
-  "presentation: { renderAll }",
+  "presentation: { renderAll: applicationAggregatePresentationController.render }",
   "refreshEditor: (...args) => editorContextController.refresh(...args)"
 ]) {
   assertIncludes(appJs, boundary, `project-document-open composition must retain the checked ${boundary} boundary.`);
@@ -4574,7 +4582,8 @@ assert(
 );
 assert(
   appJs.indexOf("const projectAnalysisController =") < appJs.indexOf("const applicationViewController =") &&
-    appJs.indexOf("const projectAnalysisController =") < appJs.indexOf("function renderAll()"),
+    appJs.indexOf("const projectAnalysisController =") <
+      appJs.indexOf("const applicationAggregatePresentationController ="),
   "ProjectAnalysisController must precede ApplicationViewController and aggregate rendering consumers."
 );
 for (const forbiddenOwner of [
@@ -7848,7 +7857,7 @@ for (const boundary of [
   "isOpen: () => Boolean(els.trashDialog?.open)",
   "renderList: () => applicationTrashController.renderList()",
   "renderSummary: () => applicationTrashController.renderSummary()",
-  "presentation: { renderAll: () => renderAll() }",
+  "presentation: { renderAll: applicationAggregatePresentationController.render }",
   "status: { set: applicationSaveStatusController.set }"
 ]) {
   assertIncludes(appJs, boundary, `command-history composition must inject the checked ${boundary} boundary.`);
@@ -18654,6 +18663,98 @@ for (const testName of [
     applicationDownloadControllerUnitTests,
     testName,
     `focused application download tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createApplicationAggregatePresentationController } from "./application-aggregate-presentation-controller.js";',
+  "the application runtime must install the checked aggregate-presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationAggregatePresentationController,",
+  "the application runtime must expose the checked aggregate-presentation controller factory."
+);
+for (const snippet of [
+  "ApplicationAggregatePresentationController requires a filter boundary.",
+  "ApplicationAggregatePresentationController requires presentation.${method}.",
+  "filters.invalidate();",
+  "presentation.renderProjectList();",
+  "presentation.renderEditor();",
+  "presentation.renderProjectHome();",
+  "presentation.renderProjectAnalysis();",
+  "presentation.renderDocumentFilter();",
+  "presentation.renderSegments();",
+  "presentation.renderProgress();",
+  "return Object.freeze({ render });"
+]) {
+  assertIncludes(
+    applicationAggregatePresentationControllerJs,
+    snippet,
+    `ApplicationAggregatePresentationController must retain the characterized aggregate order: ${snippet}`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationAggregatePresentationController({",
+  "filters: { invalidate: () => segmentFilterService.invalidate() }",
+  "renderProjectList: () => projectListPresentationController.render()",
+  "renderEditor: () => renderEditor()",
+  "renderProjectHome: () => renderProjectHome()",
+  "renderProjectAnalysis: () => projectAnalysisController.render()",
+  "renderDocumentFilter: () => renderDocumentFilter()",
+  "renderSegments: () => renderSegments()",
+  "renderProgress: () => renderProgress()"
+]) {
+  assertIncludes(appJs, boundary, `aggregate-presentation composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/\bapplicationAggregatePresentationController\.render\b/g) || []).length === 17,
+  "all 17 application aggregate-presentation consumers must call ApplicationAggregatePresentationController.render directly."
+);
+assert(
+  (appWorkflowDriverJs.match(/\bapplicationAggregatePresentationController\.render\b/g) || []).length === 5,
+  "all five workflow aggregate-presentation consumers must call ApplicationAggregatePresentationController.render directly."
+);
+assert(
+  !/function\s+renderAll\b/.test(appJs) && !/function\s+renderAll\b/.test(appWorkflowDriverJs),
+  "renderAll must not return as a coordinator or workflow helper."
+);
+assert(
+  !/segmentFilterService\.invalidate\(\);\s*projectListPresentationController\.render\(\);\s*renderEditor\(\);/.test(
+    appJs
+  ),
+  "the aggregate rendering sequence must not return to app.js."
+);
+assert(
+  appJs.indexOf("const applicationAggregatePresentationController =") <
+    appJs.indexOf("const projectOpenController =") &&
+    appJs.indexOf("const applicationAggregatePresentationController =") <
+      appJs.indexOf("const projectListPresentationController ="),
+  "ApplicationAggregatePresentationController must be composed before its earliest project-opening and project-list dependencies can invoke it."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "segmentFilterService",
+  "projectListPresentationController",
+  "projectAnalysisController"
+]) {
+  assert(
+    !applicationAggregatePresentationControllerJs.includes(forbiddenOwner),
+    `ApplicationAggregatePresentationController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationAggregatePresentationController preserves the exact synchronous presentation order",
+  "ApplicationAggregatePresentationController ignores every step result without awaiting analysis",
+  "ApplicationAggregatePresentationController preserves unobserved analysis rejection timing",
+  "ApplicationAggregatePresentationController repeats the complete live sequence through one stable method",
+  "ApplicationAggregatePresentationController stops synchronously at every failing boundary",
+  "ApplicationAggregatePresentationController validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    applicationAggregatePresentationControllerUnitTests,
+    testName,
+    `focused aggregate-presentation tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
