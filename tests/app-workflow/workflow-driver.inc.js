@@ -265,7 +265,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         syncedLocalAiSettings.targetLanguage === languageInputService.nameForUi("ca"),
       "local AI language dropdowns keep language names and codes synchronized for prompts"
     );
-    const malformedResourceSummary = projectResourceSummary({
+    const malformedResourceSummary = projectResourceContextService.summary({
       ...editorSessionStore.getProject(),
       resourceLinks: [
         null,
@@ -366,9 +366,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       ...editorSessionStore.getProject(),
       resourceLinks: [
         null,
-        { id: "legacy-dialog-main-tm", type: "tm", name: mainTmName(editorSessionStore.getProject()), role: "main" },
+        { id: "legacy-dialog-main-tm", type: "tm", name: projectResourceContextService.mainTm(editorSessionStore.getProject()), role: "main" },
         { id: "legacy-dialog-invalid-link", type: "glossary", name: "Ignored glossary" },
-        { id: "legacy-dialog-tb", type: "termbase", name: primaryTermBaseName(editorSessionStore.getProject()) }
+        { id: "legacy-dialog-tb", type: "termbase", name: projectResourceContextService.primaryTermBase(editorSessionStore.getProject()) }
       ]
     });
     assert(
@@ -545,7 +545,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
   </body>
 </tmx>`;
     const regionalLocaleTmxOk = await fileImportService.runTask("TMX import", () => projectResourceTransferController.importTmx(new File([regionalLocaleTmx], "workflow-regional.tmx", { type: "application/xml" })));
-    const importedRegionalTmEntries = await listTmEntries({ sourceLang: "en", targetLang: "tr", tmNames: [mainTmName()] });
+    const importedRegionalTmEntries = await listTmEntries({ sourceLang: "en", targetLang: "tr", tmNames: [projectResourceContextService.mainTm()] });
     assert(
       regionalLocaleTmxOk &&
         importedRegionalTmEntries.some((entry) => entry.source === "Hello world." && entry.target === "Merhaba dunya." && entry.sourceLang === "en" && entry.targetLang === "tr") &&
@@ -572,7 +572,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
   </text>
 </tbx>`;
     const regionalLocaleTbxOk = await fileImportService.runTask("TBX import", () => projectResourceTransferController.importTbx(new File([regionalLocaleTbx], "workflow-regional.tbx", { type: "application/xml" })));
-    const importedRegionalTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: projectTermBaseNames() });
+    const importedRegionalTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: projectResourceContextService.termBaseNames() });
     assert(
       regionalLocaleTbxOk &&
         importedRegionalTerms.some((term) => term.sourceTerm === "Hello" && term.targetTerm === "Merhaba" && term.sourceLang === "en" && term.targetLang === "tr") &&
@@ -593,7 +593,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const windows1254CsvTerms = await listTerms({
         sourceLang: "en",
         targetLang: "tr",
-        termBaseNames: projectTermBaseNames()
+        termBaseNames: projectResourceContextService.termBaseNames()
       });
       const windows1254CsvTerm = windows1254CsvTerms.find((term) => term.sourceTerm === "light");
       assert(
@@ -1750,7 +1750,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         notes: "Workflow AI terminology application fixture.",
         sourceLang: editorSessionStore.getProject().sourceLang,
         targetLang: editorSessionStore.getProject().targetLang,
-        termBaseName: primaryTermBaseName()
+        termBaseName: projectResourceContextService.primaryTermBase()
       });
       aiApplyTermsProvider.completePrompt = async (_config, request) => {
         assert(
@@ -1864,7 +1864,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         notes: "Workflow batch AI terminology application fixture.",
         sourceLang: editorSessionStore.getProject().sourceLang,
         targetLang: editorSessionStore.getProject().targetLang,
-        termBaseName: primaryTermBaseName()
+        termBaseName: projectResourceContextService.primaryTermBase()
       }));
       aiBatchApplyTermsSavedTerms.push(await saveTerm({
         sourceTerm: batchApplyFailedTerm,
@@ -1872,7 +1872,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         notes: "Workflow batch AI terminology application failure fixture.",
         sourceLang: editorSessionStore.getProject().sourceLang,
         targetLang: editorSessionStore.getProject().targetLang,
-        termBaseName: primaryTermBaseName()
+        termBaseName: projectResourceContextService.primaryTermBase()
       }));
       aiApplyTermsProvider.completePrompt = async (_config, request) => {
         assert(
@@ -1990,7 +1990,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         notes: "Workflow AI polish fixture.",
         sourceLang: editorSessionStore.getProject().sourceLang,
         targetLang: editorSessionStore.getProject().targetLang,
-        termBaseName: primaryTermBaseName()
+        termBaseName: projectResourceContextService.primaryTermBase()
       });
       aiPolishTmEntry = await saveTmEntry({
         source: editorSessionStore.getSegments()[segmentIndex].source,
@@ -1998,7 +1998,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         sourceLang: editorSessionStore.getProject().sourceLang,
         targetLang: editorSessionStore.getProject().targetLang,
         projectName: editorSessionStore.getProject().name,
-        tmName: mainTmName()
+        tmName: projectResourceContextService.mainTm()
       });
       aiPolishProvider.completePrompt = async (_config, request) => {
         assert(
@@ -2161,7 +2161,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         notes: "Workflow AI adaptation fixture.",
         sourceLang: editorSessionStore.getProject().sourceLang,
         targetLang: editorSessionStore.getProject().targetLang,
-        termBaseName: primaryTermBaseName()
+        termBaseName: projectResourceContextService.primaryTermBase()
       });
       aiAdaptTmEntry = await saveTmEntry({
         source: editorSessionStore.getSegments()[segmentIndex].source,
@@ -2169,7 +2169,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         sourceLang: editorSessionStore.getProject().sourceLang,
         targetLang: editorSessionStore.getProject().targetLang,
         projectName: editorSessionStore.getProject().name,
-        tmName: mainTmName()
+        tmName: projectResourceContextService.mainTm()
       });
       aiAdaptProvider.completePrompt = async (_config, request) => {
         assert(
@@ -3160,7 +3160,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       sourceLang: editorSessionStore.getProject().sourceLang,
       targetLang: editorSessionStore.getProject().targetLang,
       projectName: editorSessionStore.getProject().name,
-      tmName: mainTmName()
+      tmName: projectResourceContextService.mainTm()
     });
     await saveTmEntry({
       source: secondPretranslateSource,
@@ -3168,7 +3168,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       sourceLang: editorSessionStore.getProject().sourceLang,
       targetLang: editorSessionStore.getProject().targetLang,
       projectName: editorSessionStore.getProject().name,
-      tmName: mainTmName()
+      tmName: projectResourceContextService.mainTm()
     });
     await openProjectFile(pretranslateDocument.id);
     const pretranslateSegmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === pretranslateDocument.id);
@@ -3297,7 +3297,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         notes: "Workflow Local AI glossary hint fixture.",
         sourceLang: editorSessionStore.getProject().sourceLang,
         targetLang: editorSessionStore.getProject().targetLang,
-        termBaseName: primaryTermBaseName()
+        termBaseName: projectResourceContextService.primaryTermBase()
       });
       localAiTmEntry = await saveTmEntry({
         source: localAiGlossarySource,
@@ -3305,7 +3305,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         sourceLang: editorSessionStore.getProject().sourceLang,
         targetLang: editorSessionStore.getProject().targetLang,
         projectName: editorSessionStore.getProject().name,
-        tmName: mainTmName()
+        tmName: projectResourceContextService.mainTm()
       });
       await openProjectFile(localAiGlossaryDocument.id);
       const localAiGlossarySegmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource);
@@ -4393,7 +4393,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         sourceLang: editorSessionStore.getProject().sourceLang,
         targetLang: editorSessionStore.getProject().targetLang,
         projectName: "Bearer project-tmx-origin-token-that-must-not-appear",
-        tmName: mainTmName()
+        tmName: projectResourceContextService.mainTm()
       });
       const xmlDownloadsBeforeProjectTmx = statusDownloads.filter((item) => item.type === "application/xml").length;
       await projectResourceTransferController.exportTmx();
@@ -4409,7 +4409,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       await refreshResources();
       const xmlDownloadsBeforeResourceTmx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      resourceLibraryExportController.exportResource("tm", `${mainTmName()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
+      resourceLibraryExportController.exportResource("tm", `${projectResourceContextService.mainTm()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
       const resourceTmxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
       const resourceTmxDownload = resourceTmxDownloads[resourceTmxDownloads.length - 1];
       const resourceTmxText = await resourceTmxDownload.blob.text();
@@ -4433,7 +4433,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       await refreshResources();
       const xmlDownloadsBeforeResourceTbx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      resourceLibraryExportController.exportResource("tb", `${primaryTermBaseName()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
+      resourceLibraryExportController.exportResource("tb", `${projectResourceContextService.primaryTermBase()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
       const resourceTbxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
       const resourceTbxDownload = resourceTbxDownloads[resourceTbxDownloads.length - 1];
       const resourceTbxText = await resourceTbxDownload.blob.text();
@@ -4480,7 +4480,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "project TMX export failure reports visible status");
       await projectResourceTransferController.exportTbx();
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "project TBX export failure reports visible status");
-      resourceLibraryExportController.exportResource("tm", `${mainTmName()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
+      resourceLibraryExportController.exportResource("tm", `${projectResourceContextService.mainTm()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "resource export failure reports visible status");
     } finally {
       URL.createObjectURL = originalStatusCreateObjectUrl;
@@ -4495,7 +4495,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       sourceLang: editorSessionStore.getProject().sourceLang,
       targetLang: editorSessionStore.getProject().targetLang,
       projectName: editorSessionStore.getProject().name,
-      tmName: mainTmName()
+      tmName: projectResourceContextService.mainTm()
     });
     const resourceTerm = await saveTerm({
       sourceTerm: "resource-row-term",
@@ -4503,14 +4503,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       sourceLang: editorSessionStore.getProject().sourceLang,
       targetLang: editorSessionStore.getProject().targetLang,
       notes: "Resource row note",
-      termBaseName: primaryTermBaseName(),
+      termBaseName: projectResourceContextService.primaryTermBase(),
       isForbidden: false
     });
     await refreshResources();
     els.resourcesViewBtn.click();
     await applicationImportProgressController.yieldToUi();
     const workflowTmCard = Array.from(els.tmResourceDashboard.querySelectorAll(".resource-card")).find((card) =>
-      card.textContent.includes(mainTmName())
+      card.textContent.includes(projectResourceContextService.mainTm())
     );
     const workflowTmOpenButton = workflowTmCard?.querySelector('[data-resource-action="open"]');
     workflowTmOpenButton?.click();
@@ -4615,7 +4615,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       source: resourceTmEntry.source,
       sourceLang: editorSessionStore.getProject().sourceLang,
       targetLang: editorSessionStore.getProject().targetLang,
-      tmName: mainTmName()
+      tmName: projectResourceContextService.mainTm()
     });
     assert(
       (await listTmEntries()).some(
@@ -4640,7 +4640,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       notes: "Unsaved resource term note",
       isForbidden: true
     });
-    const failedStoredTerm = (await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
+    const failedStoredTerm = (await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang, termBaseNames: [projectResourceContextService.primaryTermBase()] })).find((term) => term.id === resourceTerm.id);
     assert(
       !failedResourceTermSave &&
         els.saveStatus.textContent.includes("Simulated term resource save failure") &&
@@ -4656,7 +4656,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       notes: "Saved resource term note",
       isForbidden: true
     });
-    const savedStoredTerm = (await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
+    const savedStoredTerm = (await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang, termBaseNames: [projectResourceContextService.primaryTermBase()] })).find((term) => term.id === resourceTerm.id);
     assert(
       successfulResourceTermSave &&
         savedStoredTerm?.targetTerm === "saved-resource-term-target" &&
@@ -4666,7 +4666,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     segmentTargetStateService.setHiddenField(editableTerm, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG, true);
     const failedResourceTermDelete = await resourceMutationController.deleteTerm(editableTerm);
-    const failedDeletedTerm = (await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang, termBaseNames: [primaryTermBaseName()] })).find((term) => term.id === resourceTerm.id);
+    const failedDeletedTerm = (await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang, termBaseNames: [projectResourceContextService.primaryTermBase()] })).find((term) => term.id === resourceTerm.id);
     assert(
       !failedResourceTermDelete &&
         els.saveStatus.textContent.includes("Simulated term resource delete failure") &&
@@ -4681,7 +4681,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     assert(
       successfulResourceTermDelete &&
-        !(await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang, termBaseNames: [primaryTermBaseName()] })).some((term) => term.id === resourceTerm.id) &&
+        !(await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang, termBaseNames: [projectResourceContextService.primaryTermBase()] })).some((term) => term.id === resourceTerm.id) &&
         state.workspaceDirtyProjectIds.has(project.id) &&
         termEntryTrash?.payload?.records?.[0]?.notes === "Saved resource term note" &&
         els.saveStatus.textContent.includes("Undo is available"),
@@ -4692,14 +4692,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await listTerms({
         sourceLang: editorSessionStore.getProject().sourceLang,
         targetLang: editorSessionStore.getProject().targetLang,
-        termBaseNames: [primaryTermBaseName()]
+        termBaseNames: [projectResourceContextService.primaryTermBase()]
       })
     ).find((term) => term.id === resourceTerm.id);
     const restoredTermSuggestions = await findTerms({
       source: resourceTerm.sourceTerm,
       sourceLang: editorSessionStore.getProject().sourceLang,
       targetLang: editorSessionStore.getProject().targetLang,
-      termBaseNames: [primaryTermBaseName()]
+      termBaseNames: [projectResourceContextService.primaryTermBase()]
     });
     assert(
       restoredResourceTerm?.targetTerm === "saved-resource-term-target" &&

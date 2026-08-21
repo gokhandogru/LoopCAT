@@ -248,6 +248,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-resource-selection-controller.js",
   "src/features/projects/project-name-service.js",
   "src/features/projects/project-document-manifest-service.js",
+  "src/features/projects/project-resource-context-service.js",
   "src/features/projects/project-language-pair-shortcuts-controller.js",
   "src/features/projects/project-language-context-controller.js",
   "src/features/projects/project-document-statistics-service.js",
@@ -383,6 +384,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-resource-selection-controller.test.cjs",
   "tests/unit/project-name-service.test.cjs",
   "tests/unit/project-document-manifest-service.test.cjs",
+  "tests/unit/project-resource-context-service.test.cjs",
   "tests/unit/project-language-pair-shortcuts-controller.test.cjs",
   "tests/unit/project-language-context-controller.test.cjs",
   "tests/unit/project-document-statistics-service.test.cjs",
@@ -667,6 +669,10 @@ const projectDocumentManifestServiceJs = readText(
 );
 const projectDocumentManifestServiceUnitTests = readText(
   "tests/unit/project-document-manifest-service.test.cjs"
+);
+const projectResourceContextServiceJs = readText("src/features/projects/project-resource-context-service.js");
+const projectResourceContextServiceUnitTests = readText(
+  "tests/unit/project-resource-context-service.test.cjs"
 );
 const projectLanguagePairShortcutsControllerJs = readText(
   "src/features/projects/project-language-pair-shortcuts-controller.js"
@@ -1036,6 +1042,127 @@ for (const testName of [
     projectNameServiceUnitTests,
     testName,
     `focused project-name tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectResourceContextService } from "../features/projects/project-resource-context-service.js";',
+  "The application runtime must install the checked project resource-context service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectResourceContextService,",
+  "The application runtime must expose the checked project resource-context service factory."
+);
+for (const snippet of [
+  'const RESOURCE_LINK_TYPES = new Set(["tm", "termbase"])',
+  "ProjectResourceContextService requires a current-project boundary.",
+  "ProjectResourceContextService requires project-name boundaries.",
+  "ProjectResourceContextService requires an ID boundary.",
+  "function cleanLinks(resourceLinks = [])",
+  "Array.isArray(resourceLinks) ? resourceLinks : []",
+  'if (!link || typeof link !== "object" || Array.isArray(link)) return null',
+  'const type = String(link.type || "").trim()',
+  'const name = String(link.name || "").trim()',
+  "if (!RESOURCE_LINK_TYPES.has(type) || !name) return null",
+  'id: typeof link.id === "string" && link.id.trim() ? link.id : ""',
+  "function links(project)",
+  "if (!project) return []",
+  'names.clean(project.mainTmName, names.clean(project.tmName, "Default TM"))',
+  "const clean = cleanLinks(project.resourceLinks)",
+  'id: link.id || ids.make("resource-link")',
+  'result.unshift({ id: ids.make("resource-link"), type: "tm", name: main, role: "main" })',
+  "function mainTm(project = session.getProject())",
+  "function tmNames(project = session.getProject())",
+  "function termBaseNames(project = session.getProject())",
+  "function primaryTermBase(project = session.getProject())",
+  "function summary(project = session.getProject())",
+  'tmLabel: `${tmNamesValue.length} TM${tmNamesValue.length === 1 ? "" : "s"}`',
+  'tbLabel: `${termBaseNamesValue.length} TB${termBaseNamesValue.length === 1 ? "" : "s"}`',
+  "return Object.freeze({ cleanLinks, links, mainTm, tmNames, termBaseNames, primaryTermBase, summary })"
+]) {
+  assertIncludes(
+    projectResourceContextServiceJs,
+    snippet,
+    `ProjectResourceContextService must retain characterized policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectResourceContextService({",
+  "session: { getProject: editorSessionStore.getProject }",
+  "names: { clean: projectNameService.clean, unique: projectNameService.unique }",
+  "ids: { make: makeId }",
+  "getLinks: projectResourceContextService.links",
+  "getTmNames: projectResourceContextService.tmNames",
+  "getTermBaseNames: projectResourceContextService.termBaseNames",
+  "summarize: projectResourceContextService.summary",
+  "mainTmName: projectResourceContextService.mainTm",
+  "primaryTermBaseName: projectResourceContextService.primaryTermBase"
+]) {
+  assertIncludes(appJs, boundary, `project resource-context composition must retain ${boundary}.`);
+}
+for (const [method, appCount, workflowCount] of [
+  ["links", 4, 0],
+  ["mainTm", 4, 13],
+  ["tmNames", 11, 0],
+  ["termBaseNames", 15, 2],
+  ["primaryTermBase", 5, 15],
+  ["summary", 5, 1]
+]) {
+  assert(
+    (appJs.match(new RegExp(`\\bprojectResourceContextService\\.${method}\\b`, "g")) || []).length ===
+      appCount &&
+      (appWorkflowDriverJs.match(new RegExp(`\\bprojectResourceContextService\\.${method}\\b`, "g")) || [])
+        .length === workflowCount,
+    `all application and workflow project-resource ${method} consumers must call ProjectResourceContextService directly.`
+  );
+}
+for (const removedOwner of [
+  "RESOURCE_LINK_TYPES",
+  "cleanProjectResourceLinks",
+  "projectResourceLinks",
+  "mainTmName",
+  "projectTmNames",
+  "projectTermBaseNames",
+  "primaryTermBaseName",
+  "projectResourceSummary"
+]) {
+  const forbidden =
+    removedOwner === "RESOURCE_LINK_TYPES"
+      ? appJs.includes(removedOwner) || appWorkflowDriverJs.includes(removedOwner)
+      : new RegExp(`function\\s+${removedOwner}\\b`).test(appJs) ||
+        new RegExp(`function\\s+${removedOwner}\\b`).test(appWorkflowDriverJs);
+  assert(!forbidden, `${removedOwner} must not return to app.js or the workflow driver.`);
+}
+for (const forbiddenOwner of [
+  "editorSessionStore",
+  "projectNameService",
+  "makeId",
+  "appRuntime",
+  "window.",
+  "document."
+]) {
+  assert(
+    !projectResourceContextServiceJs.includes(forbiddenOwner),
+    `ProjectResourceContextService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectResourceContextService cleans array records with exact type, name, ID, and metadata policy",
+  "ProjectResourceContextService builds exact legacy defaults and keeps a missing project inert",
+  "ProjectResourceContextService gives clean links precedence and normalizes roles and duplicates",
+  "ProjectResourceContextService completes missing main-TM and termbase links in exact ID order",
+  "ProjectResourceContextService preserves live main-TM defaults and explicit project selection",
+  "ProjectResourceContextService preserves main-first TM names, termbase order, and primary fallback",
+  "ProjectResourceContextService preserves exact singular and plural summary shapes",
+  "ProjectResourceContextService creates fresh normalized links per call without mutating project records",
+  "ProjectResourceContextService preserves conversion, cleanup, ID, unique, and session failure timing",
+  "ProjectResourceContextService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectResourceContextServiceUnitTests,
+    testName,
+    `focused project resource-context tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
@@ -2023,9 +2150,9 @@ for (const boundary of [
   "getProject: editorSessionStore.getProject",
   "getSegments: editorSessionStore.getSegments",
   "autosave: autosaveService",
-  "getTmNames: projectTmNames",
-  "getTermBaseNames: projectTermBaseNames",
-  "summarize: projectResourceSummary",
+  "getTmNames: projectResourceContextService.tmNames",
+  "getTermBaseNames: projectResourceContextService.termBaseNames",
+  "summarize: projectResourceContextService.summary",
   "getAllByIndex, listTerms, listActivityEvents",
   "sanitize: sanitizePortableValue",
   "validateExportReadiness, analyzeProject, runQaChecks, buildQualityPassportData",
@@ -2298,7 +2425,7 @@ for (const boundary of [
   "parseTermList",
   "parseTermWorkbook",
   "repositories: { importTmEntries, importTerms, getAllByIndex, listTerms }",
-  "selectedTermBaseName: () => els.termBaseSelect.value || primaryTermBaseName()",
+  "selectedTermBaseName: () => els.termBaseSelect.value || projectResourceContextService.primaryTermBase()",
   "markProjectsUsingDirty: markProjectsUsingResourceDirty",
   "tmMatches: tmMatchesController.refresh",
   "projectTerms: refreshProjectTerms",
@@ -2472,10 +2599,10 @@ for (const boundary of [
   "getMode: () => projectDialogController?.getMode?.() || null",
   "normalizeLanguageValue: languageInputService.normalizeInput",
   "normalizeLanguageInput: languageInputService.normalizeElement",
-  "tmNames: projectTmNames",
-  "termBaseNames: projectTermBaseNames",
-  "mainTmName",
-  "links: projectResourceLinks",
+  "tmNames: projectResourceContextService.tmNames",
+  "termBaseNames: projectResourceContextService.termBaseNames",
+  "mainTmName: projectResourceContextService.mainTm",
+  "links: projectResourceContextService.links",
   "catalog: resourceCatalogService",
   "localization: uiLocalizationService",
   "names: { unique: projectNameService.unique, clean: projectNameService.clean }",
@@ -8090,7 +8217,7 @@ assertIncludes(
 for (const boundary of [
   "session: { getProject: editorSessionStore.getProject }",
   "selection: { getActiveSegment: applicationActiveSegmentService.get }",
-  "tm: { saveEntry: saveTmEntry, mainName: mainTmName, refreshMatches: tmMatchesController.refresh }",
+  "mainName: projectResourceContextService.mainTm",
   "workspace: { markDirty: markWorkspaceDirty }",
   "status: { set: applicationSaveStatusController.set }",
   "if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG])"
@@ -8182,7 +8309,7 @@ for (const boundary of [
   "root: els.tmMatches",
   "getProject: editorSessionStore.getProject",
   "getActiveSegment: applicationActiveSegmentService.get",
-  "getNames: projectTmNames",
+  "getNames: projectResourceContextService.tmNames",
   "findMatches: findProjectTmMatches",
   "localization: uiLocalizationService",
   "text: { escapeHtml: applicationTextSafetyService.escapeHtml }",
@@ -8283,7 +8410,7 @@ for (const boundary of [
   "root: els.termSuggestions",
   "getProject: editorSessionStore.getProject",
   "getActiveSegment: applicationActiveSegmentService.get",
-  "getNames: projectTermBaseNames",
+  "getNames: projectResourceContextService.termBaseNames",
   "find: findTerms",
   "localization: uiLocalizationService",
   "text: { escapeHtml: applicationTextSafetyService.escapeHtml }",
@@ -8388,7 +8515,7 @@ for (const boundary of [
   "termbase: els.termBaseSelect",
   "forbidden: els.termForbiddenInput",
   "getProject: editorSessionStore.getProject",
-  "primaryName: primaryTermBaseName",
+  "primaryName: projectResourceContextService.primaryTermBase",
   "markProjectsUsingDirty: markProjectsUsingResourceDirty",
   "repository: { save: saveTerm }",
   "renderTermbaseSelect,",
@@ -8505,7 +8632,7 @@ for (const boundary of [
   "getProject: editorSessionStore.getProject",
   "replaceQaChecks: editorSessionStore.replaceQaChecks",
   "replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue",
-  "terms: { list: listTerms, getNames: projectTermBaseNames }",
+  "terms: { list: listTerms, getNames: projectResourceContextService.termBaseNames }",
   "currentSegments: projectDocumentCatalogService.currentSegments",
   "sourceTags: protectedTagInspectionService.sourceTags",
   "missing: protectedTagInspectionService.missing",
@@ -8773,9 +8900,9 @@ for (const boundary of [
   "close: () => els.projectDialog.close()",
   "mode: { get: () => projectDialogController?.getMode?.() || null }",
   "collect: projectResourceSelectionController.collect",
-  "mainTmName,",
-  "tmNames: projectTmNames",
-  "termBaseNames: projectTermBaseNames",
+  "mainTmName: projectResourceContextService.mainTm",
+  "tmNames: projectResourceContextService.tmNames",
+  "termBaseNames: projectResourceContextService.termBaseNames",
   "session: editorSessionStore",
   "update: updateProject",
   "create: createProject",
@@ -9024,9 +9151,9 @@ for (const boundary of [
   "listTerms,",
   "listActivityEvents,",
   "exportAllData",
-  "getLinks: projectResourceLinks",
-  "getTmNames: projectTmNames",
-  "getTermBaseNames: projectTermBaseNames",
+  "getLinks: projectResourceContextService.links",
+  "getTmNames: projectResourceContextService.tmNames",
+  "getTermBaseNames: projectResourceContextService.termBaseNames",
   "documents: { manifest: projectDocumentManifestService.manifest }",
   "normalizeProjectSettings: aiRuntimeSettingsService.normalizeProjectSettings",
   "createContext: createPortableSanitizerContext",
@@ -10136,8 +10263,8 @@ for (const boundary of [
   "results: els.concordanceResults",
   "session: { getProject: editorSessionStore.getProject }",
   "navigation: { getView: () => applicationStore.getState().navigation.view }",
-  "tm: { listEntries: listTmEntries, getNames: projectTmNames }",
-  "resources: { summary: projectResourceSummary }",
+  "tm: { listEntries: listTmEntries, getNames: projectResourceContextService.tmNames }",
+  "resources: { summary: projectResourceContextService.summary }",
   "languages: { display: projectLanguageContextController.display }",
   "localization: uiLocalizationService",
   "normalizeCase: applicationTextSafetyService.stableLower",
@@ -19053,9 +19180,9 @@ assertIncludes(
   "storage.js must normalize malformed legacy project document manifests during local migrations."
 );
 assertIncludes(
-  appJs,
-  "function cleanProjectResourceLinks",
-  "app.js must clean malformed legacy resource links before UI summaries or package builds."
+  projectResourceContextServiceJs,
+  "function cleanLinks(resourceLinks = [])",
+  "ProjectResourceContextService must clean malformed legacy resource links before UI summaries or package builds."
 );
 assertIncludes(
   projectDocumentManifestServiceJs,

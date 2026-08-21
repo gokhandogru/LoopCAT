@@ -179,7 +179,6 @@ const LOCALIZATION_EXPORT_TYPES = new Set([
   "php", "properties", "ts", "resx", "wix", "strings",
   "srt", "vtt", "sbv", "txt"
 ]);
-const RESOURCE_LINK_TYPES = new Set(["tm", "termbase"]);
 // Bundled language/locales for offline use.
 const LOOPCAT_LANGUAGE_CATALOG_ENTRIES = [
   ["ace-ID", "Acehnese"],
@@ -790,6 +789,11 @@ const state = {
   }
 };
 const editorSessionStore = appRuntime.editorSession;
+const projectResourceContextService = appRuntime.featureFactories.createProjectResourceContextService({
+  session: { getProject: editorSessionStore.getProject },
+  names: { clean: projectNameService.clean, unique: projectNameService.unique },
+  ids: { make: makeId }
+});
 const applicationActiveSegmentService = appRuntime.featureFactories.createApplicationActiveSegmentService({
   segments: { getAll: editorSessionStore.getSegments },
   navigation: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex }
@@ -1363,7 +1367,7 @@ const tmMatchesController = appRuntime.featureFactories.createTmMatchesControlle
     getActiveSegment: applicationActiveSegmentService.get
   },
   tm: {
-    getNames: projectTmNames,
+    getNames: projectResourceContextService.tmNames,
     findMatches: findProjectTmMatches
   },
   localization: uiLocalizationService,
@@ -1383,7 +1387,7 @@ const termSuggestionsController = appRuntime.featureFactories.createTermSuggesti
     getActiveSegment: applicationActiveSegmentService.get
   },
   terms: {
-    getNames: projectTermBaseNames,
+    getNames: projectResourceContextService.termBaseNames,
     find: findTerms
   },
   localization: uiLocalizationService,
@@ -1407,7 +1411,7 @@ const termFormController = appRuntime.featureFactories.createTermFormController(
   },
   session: { getProject: editorSessionStore.getProject },
   resources: {
-    primaryName: primaryTermBaseName,
+    primaryName: projectResourceContextService.primaryTermBase,
     markProjectsUsingDirty: markProjectsUsingResourceDirty
   },
   repository: { save: saveTerm },
@@ -1452,7 +1456,11 @@ const projectDomainController = appRuntime.featureFactories.createProjectDomainC
 const segmentTmSaveController = appRuntime.featureFactories.createSegmentTmSaveController({
   session: { getProject: editorSessionStore.getProject },
   selection: { getActiveSegment: applicationActiveSegmentService.get },
-  tm: { saveEntry: saveTmEntry, mainName: mainTmName, refreshMatches: tmMatchesController.refresh },
+  tm: {
+    saveEntry: saveTmEntry,
+    mainName: projectResourceContextService.mainTm,
+    refreshMatches: tmMatchesController.refresh
+  },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: applicationSaveStatusController.set },
   testHooks: {
@@ -1719,9 +1727,9 @@ const reportDataService = appRuntime.featureFactories.createReportDataService({
   },
   autosave: autosaveService,
   resources: {
-    getTmNames: projectTmNames,
-    getTermBaseNames: projectTermBaseNames,
-    summarize: projectResourceSummary
+    getTmNames: projectResourceContextService.tmNames,
+    getTermBaseNames: projectResourceContextService.termBaseNames,
+    summarize: projectResourceContextService.summary
   },
   repositories: { getAllByIndex, listTerms, listActivityEvents },
   portable: { sanitize: sanitizePortableValue },
@@ -1780,7 +1788,7 @@ projectQaController = appRuntime.featureFactories.createProjectQaController({
     replaceQaChecks: editorSessionStore.replaceQaChecks,
     replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue
   },
-  terms: { list: listTerms, getNames: projectTermBaseNames },
+  terms: { list: listTerms, getNames: projectResourceContextService.termBaseNames },
   documents: { currentSegments: projectDocumentCatalogService.currentSegments },
   tags: {
     sourceTags: protectedTagInspectionService.sourceTags,
@@ -1909,11 +1917,11 @@ const projectResourceTransferController =
     },
     repositories: { importTmEntries, importTerms, getAllByIndex, listTerms },
     resources: {
-      mainTmName,
-      projectTmNames,
-      selectedTermBaseName: () => els.termBaseSelect.value || primaryTermBaseName(),
-      primaryTermBaseName,
-      projectTermBaseNames,
+      mainTmName: projectResourceContextService.mainTm,
+      projectTmNames: projectResourceContextService.tmNames,
+      selectedTermBaseName: () => els.termBaseSelect.value || projectResourceContextService.primaryTermBase(),
+      primaryTermBaseName: projectResourceContextService.primaryTermBase,
+      projectTermBaseNames: projectResourceContextService.termBaseNames,
       markProjectsUsingDirty: markProjectsUsingResourceDirty
     },
     refresh: {
@@ -2086,8 +2094,8 @@ const concordanceController = appRuntime.featureFactories.createConcordanceContr
   },
   session: { getProject: editorSessionStore.getProject },
   navigation: { getView: () => applicationStore.getState().navigation.view },
-  tm: { listEntries: listTmEntries, getNames: projectTmNames },
-  resources: { summary: projectResourceSummary },
+  tm: { listEntries: listTmEntries, getNames: projectResourceContextService.tmNames },
+  resources: { summary: projectResourceContextService.summary },
   languages: { display: projectLanguageContextController.display },
   localization: uiLocalizationService,
   text: {
@@ -2186,7 +2194,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
     }
   },
   tm: {
-    getNames: projectTmNames,
+    getNames: projectResourceContextService.tmNames,
     findMatchesBatch: findProjectTmMatchesBatch
   },
   commands: {
@@ -2314,8 +2322,8 @@ const aiSegmentContextService = appRuntime.featureFactories.createAiSegmentConte
     normalizeAiSettings: aiRuntimeSettingsService.normalizeProjectSettings
   },
   resources: {
-    getTermBaseNames: projectTermBaseNames,
-    getTmNames: projectTmNames
+    getTermBaseNames: projectResourceContextService.termBaseNames,
+    getTmNames: projectResourceContextService.tmNames
   },
   lookup: {
     findTerms,
@@ -2585,7 +2593,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
   consent: { externalShare: externalAiConsentService.confirmShare },
   context: {
     findTerms,
-    getTermBaseNames: projectTermBaseNames
+    getTermBaseNames: projectResourceContextService.termBaseNames
   },
   domain: {
     reviewSegment: (options) => aiCommandService.reviewSegment(options),
@@ -2749,7 +2757,7 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
         source: segment.source,
         sourceLang: project.sourceLang,
         targetLang: project.targetLang,
-        termBaseNames: projectTermBaseNames()
+        termBaseNames: projectResourceContextService.termBaseNames()
       }),
     batchTerms: aiSegmentContextService.glossaryTermsForSegment
   },
@@ -2983,7 +2991,7 @@ const aiTerminologyExtractionController =
       getSegments: aiScopeSelectionService.terminologySegments
     },
     termbase: {
-      getSelectedName: () => els.termBaseSelect?.value || primaryTermBaseName(),
+      getSelectedName: () => els.termBaseSelect?.value || projectResourceContextService.primaryTermBase(),
       saveCandidates: (terms, termBaseName) =>
         aiTermCandidatePersistenceService.saveCandidates(terms, termBaseName)
     },
@@ -3057,7 +3065,7 @@ const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBrie
       listTerms({
         sourceLang: project.sourceLang,
         targetLang: project.targetLang,
-        termBaseNames: projectTermBaseNames()
+        termBaseNames: projectResourceContextService.termBaseNames()
       })
   },
   domain: {
@@ -4092,9 +4100,9 @@ const projectExportBuildService =
       exportAllData
     },
     resources: {
-      getLinks: projectResourceLinks,
-      getTmNames: projectTmNames,
-      getTermBaseNames: projectTermBaseNames
+      getLinks: projectResourceContextService.links,
+      getTmNames: projectResourceContextService.tmNames,
+      getTermBaseNames: projectResourceContextService.termBaseNames
     },
     documents: { manifest: projectDocumentManifestService.manifest },
     ai: { normalizeProjectSettings: aiRuntimeSettingsService.normalizeProjectSettings },
@@ -4483,10 +4491,10 @@ const projectResourceSelectionController =
     normalizeLanguageValue: languageInputService.normalizeInput,
     normalizeLanguageInput: languageInputService.normalizeElement,
     projectResources: {
-      tmNames: projectTmNames,
-      termBaseNames: projectTermBaseNames,
-      mainTmName,
-      links: projectResourceLinks
+      tmNames: projectResourceContextService.tmNames,
+      termBaseNames: projectResourceContextService.termBaseNames,
+      mainTmName: projectResourceContextService.mainTm,
+      links: projectResourceContextService.links
     },
     catalog: resourceCatalogService,
     localization: uiLocalizationService,
@@ -4535,9 +4543,9 @@ const projectDialogSaveController =
     mode: { get: () => projectDialogController?.getMode?.() || null },
     resources: {
       collect: projectResourceSelectionController.collect,
-      mainTmName,
-      tmNames: projectTmNames,
-      termBaseNames: projectTermBaseNames
+      mainTmName: projectResourceContextService.mainTm,
+      tmNames: projectResourceContextService.tmNames,
+      termBaseNames: projectResourceContextService.termBaseNames
     },
     session: editorSessionStore,
     projects: {
@@ -5028,102 +5036,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
 });
 dialogLifecycleController?.mount?.();
 
-function cleanProjectResourceLinks(resourceLinks = []) {
-  return (Array.isArray(resourceLinks) ? resourceLinks : [])
-    .map((link) => {
-      if (!link || typeof link !== "object" || Array.isArray(link)) return null;
-      const type = String(link.type || "").trim();
-      const name = String(link.name || "").trim();
-      if (!RESOURCE_LINK_TYPES.has(type) || !name) return null;
-      return {
-        ...link,
-        id: typeof link.id === "string" && link.id.trim() ? link.id : "",
-        type,
-        name
-      };
-    })
-    .filter(Boolean);
-}
-
-function projectResourceLinks(project) {
-  if (!project) return [];
-  const main = projectNameService.clean(
-    project.mainTmName,
-    projectNameService.clean(project.tmName, "Default TM")
-  );
-  const cleanLinks = cleanProjectResourceLinks(project.resourceLinks);
-  const rawLinks = cleanLinks.length
-    ? cleanLinks
-    : [
-      { type: "tm", name: main, role: "main" },
-      { type: "termbase", name: projectNameService.clean(project.termBaseName, "Default TB") }
-    ];
-  const links = [];
-  rawLinks.forEach((link) => {
-    if (links.some((item) => item.type === link.type && item.name === link.name)) return;
-    links.push({
-      id: link.id || makeId("resource-link"),
-      type: link.type,
-      name: link.name,
-      role: link.type === "tm" && link.name === main ? "main" : link.type === "tm" ? "reference" : link.role
-    });
-  });
-  if (!links.some((link) => link.type === "tm" && link.name === main)) {
-    links.unshift({ id: makeId("resource-link"), type: "tm", name: main, role: "main" });
-  }
-  if (!links.some((link) => link.type === "termbase")) {
-    links.push({
-      id: makeId("resource-link"),
-      type: "termbase",
-      name: projectNameService.clean(project.termBaseName, "Default TB")
-    });
-  }
-  return links;
-}
-
-function mainTmName(project = editorSessionStore.getProject()) {
-  return (
-    projectResourceLinks(project).find((link) => link.type === "tm" && link.role === "main")?.name ||
-    projectNameService.clean(
-      project?.mainTmName,
-      projectNameService.clean(project?.tmName, "Default TM")
-    )
-  );
-}
-
-function projectTmNames(project = editorSessionStore.getProject()) {
-  return projectNameService.unique([
-    mainTmName(project),
-    ...projectResourceLinks(project)
-      .filter((link) => link.type === "tm")
-      .map((link) => link.name)
-  ]);
-}
-
-function projectTermBaseNames(project = editorSessionStore.getProject()) {
-  return projectNameService.unique(
-    projectResourceLinks(project)
-      .filter((link) => link.type === "termbase")
-      .map((link) => link.name)
-  );
-}
-
-function primaryTermBaseName(project = editorSessionStore.getProject()) {
-  return projectTermBaseNames(project)[0] || projectNameService.clean(project?.termBaseName, "Default TB");
-}
-
-function projectResourceSummary(project = editorSessionStore.getProject()) {
-  const tmNames = projectTmNames(project);
-  const tbNames = projectTermBaseNames(project);
-  return {
-    mainTm: mainTmName(project),
-    tmNames,
-    tbNames,
-    tmLabel: `${tmNames.length} TM${tmNames.length === 1 ? "" : "s"}`,
-    tbLabel: `${tbNames.length} TB${tbNames.length === 1 ? "" : "s"}`
-  };
-}
-
 async function rankTmMatchesFromEntries(entries, options) {
   const fallback = () => Promise.resolve(scoreTmEntries(entries, options));
   if (!workerClient?.findTmMatches) return fallback();
@@ -5152,7 +5064,7 @@ async function findProjectTmMatchesBatch(optionsList) {
 }
 
 function projectResourceSearchText(project) {
-  const summary = projectResourceSummary(project);
+  const summary = projectResourceContextService.summary(project);
   return [...summary.tmNames, ...summary.tbNames].join(" ");
 }
 
@@ -5330,7 +5242,7 @@ function projectUsesResource(project, type, name, sourceLang = "", targetLang = 
   if (!project || !type || !name) return false;
   if (sourceLang && project.sourceLang !== sourceLang) return false;
   if (targetLang && project.targetLang !== targetLang) return false;
-  return projectResourceLinks(project).some((link) => link.type === type && link.name === name);
+  return projectResourceContextService.links(project).some((link) => link.type === type && link.name === name);
 }
 
 function markProjectsUsingResourceDirty(type, name, sourceLang = "", targetLang = "") {
@@ -5569,7 +5481,7 @@ async function refreshProjectTerms({ rerender = false } = {}) {
   editorSessionStore.replaceProjectTerms(await listTerms({
     sourceLang: editorSessionStore.getProject().sourceLang,
     targetLang: editorSessionStore.getProject().targetLang,
-    termBaseNames: projectTermBaseNames()
+    termBaseNames: projectResourceContextService.termBaseNames()
   }));
   segmentFilterService.invalidate();
   renderTermbaseSelect();
@@ -5581,7 +5493,7 @@ async function projectTermsForValidation() {
   return listTerms({
     sourceLang: editorSessionStore.getProject().sourceLang,
     targetLang: editorSessionStore.getProject().targetLang,
-    termBaseNames: projectTermBaseNames()
+    termBaseNames: projectResourceContextService.termBaseNames()
   });
 }
 
@@ -5704,7 +5616,7 @@ async function renderProjectAnalysis() {
   const segments = editorSessionStore.getSegments();
   const tmEntries = await getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`);
   if (run !== state.projectAnalysisRun || applicationStore.getState().navigation.view !== "project" || editorSessionStore.getProject()?.id !== project.id) return;
-  const tmNames = new Set(projectTmNames(project));
+  const tmNames = new Set(projectResourceContextService.tmNames(project));
   const analysis = analyzeProject(project, segments, tmEntries.filter((entry) => tmNames.has(entry.tmName)));
   const ai = analysis.ai || {};
   els.analysisMeta.textContent = uiLocalizationService.label("generatedAt", { date: formatDate(analysis.generatedAt) });
@@ -5818,7 +5730,7 @@ function renderEditor() {
   }
   if (!editorSessionStore.getProject()) return;
 
-  const resources = projectResourceSummary();
+  const resources = projectResourceContextService.summary();
   els.projectTitle.textContent = applicationTextSafetyService.displaySafeText(editorSessionStore.getProject().name);
   els.projectMeta.textContent = `${projectLanguageContextController.display()} - ${uiLocalizationService.label("mainTm")}: ${applicationTextSafetyService.displaySafeText(resources.mainTm, uiLocalizationService.label("none"))} - ${applicationTextSafetyService.displaySafeText(resources.tmLabel)} - ${applicationTextSafetyService.displaySafeText(resources.tbLabel)}`;
   els.projectDomainEditInput.value = editorSessionStore.getProject().domain || "";
@@ -5852,7 +5764,7 @@ function renderEditor() {
 
 function renderTermbaseSelect() {
   if (!els.termBaseSelect) return;
-  const names = projectTermBaseNames();
+  const names = projectResourceContextService.termBaseNames();
   const current = els.termBaseSelect.value;
   const fragment = document.createDocumentFragment();
   names.forEach((name) => {
@@ -5862,7 +5774,7 @@ function renderTermbaseSelect() {
     fragment.append(option);
   });
   els.termBaseSelect.replaceChildren(fragment);
-  els.termBaseSelect.value = names.includes(current) ? current : primaryTermBaseName();
+  els.termBaseSelect.value = names.includes(current) ? current : projectResourceContextService.primaryTermBase();
 }
 
 function renderProjectHome() {
@@ -5871,7 +5783,7 @@ function renderProjectHome() {
   const documentStatsById = projectDocumentStatisticsService.byDocument(documents);
   const total = projectDocumentStatisticsService.aggregate(documentStatsById);
   const sourceWords = total.words;
-  const resources = projectResourceSummary();
+  const resources = projectResourceContextService.summary();
   els.projectHomeTitle.textContent = applicationTextSafetyService.displaySafeText(
     editorSessionStore.getProject().name
   );
@@ -6148,13 +6060,14 @@ function renderResourcesView() {
 function canAddResourceToCurrentProject(type, resource) {
   if (!editorSessionStore.getProject()) return false;
   if (resource.sourceLang !== editorSessionStore.getProject().sourceLang || resource.targetLang !== editorSessionStore.getProject().targetLang) return false;
-  const names = type === "tm" ? projectTmNames() : projectTermBaseNames();
+  const names =
+    type === "tm" ? projectResourceContextService.tmNames() : projectResourceContextService.termBaseNames();
   return !names.includes(resource.name);
 }
 
 async function addResourceToCurrentProject(type, resource) {
   if (!editorSessionStore.getProject() || !canAddResourceToCurrentProject(type, resource)) return;
-  const links = projectResourceLinks(editorSessionStore.getProject());
+  const links = projectResourceContextService.links(editorSessionStore.getProject());
   links.push({
     id: makeId("resource-link"),
     type: type === "tm" ? "tm" : "termbase",
