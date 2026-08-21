@@ -159,6 +159,7 @@ const requiredReleaseFiles = [
   "src/app/app-store.js",
   "src/app/application-command-buttons-controller.js",
   "src/app/application-command-history-controller.js",
+  "src/app/application-download-controller.js",
   "src/app/application-event-wiring-controller.js",
   "src/app/application-import-progress-controller.js",
   "src/app/application-menu-controller.js",
@@ -304,6 +305,7 @@ const requiredReleaseFiles = [
   "tests/unit/app-store.test.cjs",
   "tests/unit/application-command-buttons-controller.test.cjs",
   "tests/unit/application-command-history-controller.test.cjs",
+  "tests/unit/application-download-controller.test.cjs",
   "tests/unit/application-event-wiring-controller.test.cjs",
   "tests/unit/application-import-progress-controller.test.cjs",
   "tests/unit/application-menu-controller.test.cjs",
@@ -481,6 +483,8 @@ const applicationCommandHistoryControllerJs = readText("src/app/application-comm
 const applicationCommandHistoryControllerUnitTests = readText(
   "tests/unit/application-command-history-controller.test.cjs"
 );
+const applicationDownloadControllerJs = readText("src/app/application-download-controller.js");
+const applicationDownloadControllerUnitTests = readText("tests/unit/application-download-controller.test.cjs");
 const applicationEventWiringControllerJs = readText("src/app/application-event-wiring-controller.js");
 const applicationEventWiringControllerUnitTests = readText("tests/unit/application-event-wiring-controller.test.cjs");
 const applicationImportProgressControllerJs = readText("src/app/application-import-progress-controller.js");
@@ -5742,7 +5746,7 @@ for (const boundary of [
   "renderProjectAnalysis: () => renderProjectAnalysis()",
   "renderReview: () => qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false })",
   "refreshEditorContext: () => editorContextController.refresh()",
-  "write: (filename, content, type) => download(filename, content, type)",
+  "write: applicationDownloadController.download",
   "set: applicationSaveStatusController.set",
   "now: () => new Date()",
   "refresh: uiLocaleOrchestrationController.refresh",
@@ -8809,7 +8813,7 @@ for (const boundary of [
   "listActivityEvents",
   "draft: draftProjectActivityEvent",
   "appendWarning: appendActivityWarning",
-  "files: { safeName: fileSafeName, download }",
+  "files: { safeName: fileSafeName, download: applicationDownloadController.download }",
   "count: reportCount",
   "errorReport: fileImportService.errorReport",
   "renderValidation: renderValidationReport",
@@ -15671,25 +15675,124 @@ assertIncludes(
   "app workflow test must verify manual legacy encoding override for term-list imports."
 );
 assertIncludes(
-  appJs,
-  "safeDownloadFilename(filename)",
-  "app.js must sanitize export filenames before assigning download attributes."
+  appBootstrapJs,
+  'import { createApplicationDownloadController } from "./application-download-controller.js";',
+  "the application runtime must install the checked application download controller."
 );
 assertIncludes(
-  appJs,
-  "RESERVED_WINDOWS_FILENAME_PATTERN",
-  "app.js must guard exported filenames against Windows reserved device names."
+  appBootstrapJs,
+  "createApplicationDownloadController,",
+  "the application runtime must expose the checked application download controller factory."
 );
-assertIncludes(
-  appJs,
-  "link.download = safeDownloadFilename(filename)",
-  "app.js must route every browser download through the safe filename helper."
+for (const snippet of [
+  "ApplicationDownloadController requires a checked redaction boundary.",
+  "ApplicationDownloadController requires a checked Blob boundary.",
+  "ApplicationDownloadController requires checked object-URL boundaries.",
+  "ApplicationDownloadController requires checked download-link boundaries.",
+  "ApplicationDownloadController requires a checked timer boundary.",
+  "const RESERVED_WINDOWS_FILENAME_PATTERN",
+  'sanitize(fallback || "loopcat-export")',
+  "const raw = redaction",
+  '.replaceAll("\\\\", "/")',
+  'const lastPathPart = raw.split("/").filter(Boolean).pop() || fallbackName',
+  'if (!clean || clean === "." || clean === "..") clean = fallbackName',
+  "if (RESERVED_WINDOWS_FILENAME_PATTERN.test(clean))",
+  "if (clean.length > 180)",
+  'const extension = clean.match(/\\.[^.]{1,16}$/)?.[0] || ""',
+  "const stemLength = Math.max(1, 180 - extension.length)",
+  'function download(filename, content, type = "application/octet-stream")',
+  "const blob = blobs.create([content], { type })",
+  "const url = urls.create(blob)",
+  "const link = dom.createLink()",
+  "link.href = url",
+  "link.download = safeFilename(filename)",
+  "link.hidden = true",
+  "dom.append(link)",
+  "let clickAccepted = false",
+  "urls.revoke(url)",
+  "link.click()",
+  "clickAccepted = true",
+  "link.remove()",
+  "clickAccepted ? scheduler.timer(revokeDownloadUrl, 1000) : revokeDownloadUrl()",
+  "return Object.freeze({ safeFilename, download })"
+]) {
+  assertIncludes(
+    applicationDownloadControllerJs,
+    snippet,
+    `ApplicationDownloadController must retain characterized filename and download-lifecycle policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationDownloadController({",
+  "sanitize: (value) => redactSensitiveText(value)",
+  "create: (parts, options) => new Blob(parts, options)",
+  "create: (blob) => URL.createObjectURL(blob)",
+  "revoke: (url) => URL.revokeObjectURL(url)",
+  'createLink: () => document.createElement("a")',
+  "append: (link) => document.body.append(link)",
+  "timer: (callback, delay) => setTimeout(callback, delay)",
+  "downloads: { write: applicationDownloadController.download }",
+  "download: (text, filename, type) => applicationDownloadController.download(filename, text, type)"
+]) {
+  assertIncludes(appJs, boundary, `application download composition and consumers must retain ${boundary}.`);
+}
+for (const workflowConsumer of [
+  'applicationDownloadController.download("../CON.txt"',
+  '"unsafe:name/target?.xlf"',
+  '"Bearer download-label-token-that-must-not-appear.txt"'
+]) {
+  assertIncludes(
+    appWorkflowDriverJs,
+    workflowConsumer,
+    `workflow download consumers must remain direct: ${workflowConsumer}.`
+  );
+}
+assert(
+  (appJs.match(/\bapplicationDownloadController\.download\b/g) || []).length === 7 &&
+    (appWorkflowDriverJs.match(/\bapplicationDownloadController\.download\b/g) || []).length === 3,
+  "all application and workflow browser-download consumers must call ApplicationDownloadController directly or through the exact argument-order adapter."
 );
-assertIncludes(
-  appJs,
-  'redactSensitiveText(filename || "")',
-  "app.js must redact credential-looking text before assigning browser download filenames."
+for (const removedHelper of ["safeDownloadFilename", "download"]) {
+  assert(
+    !new RegExp(`function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return as a coordinator or workflow helper.`
+  );
+}
+assert(
+  !appJs.includes("RESERVED_WINDOWS_FILENAME_PATTERN"),
+  "the Windows reserved-filename policy must remain owned by ApplicationDownloadController."
 );
+for (const forbiddenOwner of [
+  "appRuntime",
+  "redactSensitiveText",
+  "new Blob",
+  "URL.",
+  "document.",
+  "setTimeout",
+  "window."
+]) {
+  assert(
+    !applicationDownloadControllerJs.includes(forbiddenOwner),
+    `ApplicationDownloadController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationDownloadController preserves every safe filename branch and immutable API",
+  "ApplicationDownloadController redacts fallback and requested names before normalization",
+  "ApplicationDownloadController preserves exact accepted-click construction and delayed cleanup",
+  "ApplicationDownloadController preserves default MIME type and synchronous timer callback",
+  "ApplicationDownloadController immediately cleans failed clicks and preserves the click error",
+  "ApplicationDownloadController preserves removal and timer failure precedence",
+  "ApplicationDownloadController preserves every pre-click primary failure boundary",
+  "ApplicationDownloadController validates every injected owner"
+]) {
+  assertIncludes(
+    applicationDownloadControllerUnitTests,
+    testName,
+    `focused application download tests must retain characterization: ${testName}.`
+  );
+}
 assertIncludes(
   appJs,
   "function displaySafeText",
@@ -15729,16 +15832,6 @@ assertIncludes(
   projectImportRestoreControllerJs,
   "localization.alert(validation.alertText(packageValidation",
   "ProjectImportRestoreController project-package validation alerts must use sanitized validation text."
-);
-assertIncludes(
-  functionBody(appJs, "function download", "function escapeHtml"),
-  "finally",
-  "app.js download helper must clean up temporary links even when the browser rejects the download click."
-);
-assertIncludes(
-  functionBody(appJs, "function download", "function escapeHtml"),
-  "clickAccepted ? setTimeout(revokeDownloadUrl, 1000) : revokeDownloadUrl()",
-  "app.js download helper must immediately revoke temporary object URLs when the click handoff fails."
 );
 assertIncludes(
   appJs,

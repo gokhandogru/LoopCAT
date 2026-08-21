@@ -1228,6 +1228,19 @@ const applicationStorageDurabilityController =
       highUsageRatio: STORAGE_HIGH_USAGE_RATIO
     }
   });
+const applicationDownloadController = appRuntime.featureFactories.createApplicationDownloadController({
+  redaction: { sanitize: (value) => redactSensitiveText(value) },
+  blobs: { create: (parts, options) => new Blob(parts, options) },
+  urls: {
+    create: (blob) => URL.createObjectURL(blob),
+    revoke: (url) => URL.revokeObjectURL(url)
+  },
+  dom: {
+    createLink: () => document.createElement("a"),
+    append: (link) => document.body.append(link)
+  },
+  scheduler: { timer: (callback, delay) => setTimeout(callback, delay) }
+});
 
 const revisionHistoryPresentationService =
   appRuntime.featureFactories.createRevisionHistoryPresentationService({
@@ -1787,7 +1800,7 @@ const reportExportController = appRuntime.featureFactories.createReportExportCon
   documents: reportDocumentCompositionService,
   finalizeDocument: finalizeReportDocument,
   fileSafeName,
-  download,
+  download: applicationDownloadController.download,
   presentation: {
     renderQaResults: qaResultsController.render,
     renderQualityWorkbench: qualityWorkbenchController.render,
@@ -1842,7 +1855,7 @@ const deliveryExportController = appRuntime.featureFactories.createDeliveryExpor
     xliffMimeType
   },
   fileSafeName,
-  download,
+  download: applicationDownloadController.download,
   presentation: { renderValidationReport, renderQaResults: qaResultsController.render },
   activity: { logOptionalProject: logOptionalProjectActivity },
   status: {
@@ -1883,7 +1896,7 @@ const projectResourceTransferController =
     },
     builders: { buildTmx, buildTbx },
     fileSafeName,
-    download,
+    download: applicationDownloadController.download,
     activity: { logOptionalProject: logOptionalProjectActivity },
     status: {
       appendActivityWarning,
@@ -3576,7 +3589,7 @@ const uiLocaleOrchestrationController =
       renderQaResults: () => qaResultsController.render(),
       refreshEditorContext: () => editorContextController.refresh()
     },
-    downloads: { write: (filename, content, type) => download(filename, content, type) },
+    downloads: { write: applicationDownloadController.download },
     status: { set: applicationSaveStatusController.set },
     clock: { now: () => new Date() }
   });
@@ -3859,7 +3872,7 @@ const diagnosticsController = appRuntime?.featureFactories?.createDiagnosticsCon
   hardwareButton: els.diagnosticsHardwareBtn,
   service: diagnosticsService,
   platform: appRuntime.platform,
-  download: (text, filename, type) => download(filename, text, type),
+  download: (text, filename, type) => applicationDownloadController.download(filename, text, type),
   translate: uiLocalizationService.source
 });
 
@@ -4071,7 +4084,7 @@ projectExportController = appRuntime.featureFactories.createProjectExportControl
     draft: draftProjectActivityEvent,
     appendWarning: appendActivityWarning
   },
-  files: { safeName: fileSafeName, download },
+  files: { safeName: fileSafeName, download: applicationDownloadController.download },
   validation: {
     count: reportCount,
     errorReport: fileImportService.errorReport
@@ -4586,7 +4599,7 @@ const resourceLibraryExportController =
     resources: { labelFromKey: resourceCatalogService.labelFromKey, items: resourceItems },
     builders: { buildTmx, buildTbx },
     fileSafeName,
-    download,
+    download: applicationDownloadController.download,
     status: { set: applicationSaveStatusController.set }
   });
 const resourceMutationController = appRuntime.featureFactories.createResourceMutationController({
@@ -4912,56 +4925,6 @@ dialogLifecycleController?.mount?.();
 
 function stableLower(value) {
   return String(value || "").toLowerCase();
-}
-
-const RESERVED_WINDOWS_FILENAME_PATTERN = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
-
-function safeDownloadFilename(filename, fallback = "loopcat-export") {
-  const fallbackName = redactSensitiveText(fallback || "loopcat-export")
-    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, "_")
-    .replace(/[. ]+$/g, "")
-    .trim() || "loopcat-export";
-  const raw = redactSensitiveText(filename || "").trim().replaceAll("\\", "/");
-  const lastPathPart = raw.split("/").filter(Boolean).pop() || fallbackName;
-  let clean = lastPathPart
-    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, "_")
-    .replace(/\s+/g, " ")
-    .replace(/_+/g, "_")
-    .replace(/^[. ]+|[. ]+$/g, "")
-    .trim();
-  if (!clean || clean === "." || clean === "..") clean = fallbackName;
-  if (RESERVED_WINDOWS_FILENAME_PATTERN.test(clean)) clean = `loopcat_${clean}`;
-  if (clean.length > 180) {
-    const extension = clean.match(/\.[^.]{1,16}$/)?.[0] || "";
-    const stemLength = Math.max(1, 180 - extension.length);
-    clean = `${clean.slice(0, stemLength).replace(/[. ]+$/g, "")}${extension}`;
-  }
-  return clean || fallbackName;
-}
-
-function download(filename, content, type = "application/octet-stream") {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = safeDownloadFilename(filename);
-  link.hidden = true;
-  document.body.append(link);
-  let clickAccepted = false;
-  const revokeDownloadUrl = () => {
-    try {
-      URL.revokeObjectURL(url);
-    } catch {
-      // Best-effort cleanup; the original download failure is more useful to report.
-    }
-  };
-  try {
-    link.click();
-    clickAccepted = true;
-  } finally {
-    link.remove();
-    clickAccepted ? setTimeout(revokeDownloadUrl, 1000) : revokeDownloadUrl();
-  }
 }
 
 function localizationDownloadMimeType(ext, structure = null) {

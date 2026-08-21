@@ -4183,9 +4183,17 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       return true;
     };
     try {
-      download("../CON.txt", "unsafe filename fixture", "text/plain");
-      download("unsafe:name/target?.xlf", "unsafe filename fixture", "application/x-xliff+xml");
-      download("Bearer download-label-token-that-must-not-appear.txt", "unsafe filename fixture", "text/plain");
+      applicationDownloadController.download("../CON.txt", "unsafe filename fixture", "text/plain");
+      applicationDownloadController.download(
+        "unsafe:name/target?.xlf",
+        "unsafe filename fixture",
+        "application/x-xliff+xml"
+      );
+      applicationDownloadController.download(
+        "Bearer download-label-token-that-must-not-appear.txt",
+        "unsafe filename fixture",
+        "text/plain"
+      );
       assert(
         statusDownloadNames.includes("loopcat_CON.txt") &&
           statusDownloadNames.includes("target_.xlf") &&

@@ -2,6 +2,7 @@ import { createAppStore } from "./app-store.js";
 import { createApplicationEvents } from "./events.js";
 import { createApplicationCommandButtonsController } from "./application-command-buttons-controller.js";
 import { createApplicationCommandHistoryController } from "./application-command-history-controller.js";
+import { createApplicationDownloadController } from "./application-download-controller.js";
 import { createApplicationEventWiringController } from "./application-event-wiring-controller.js";
 import { createApplicationImportProgressController } from "./application-import-progress-controller.js";
 import { createApplicationMenuController } from "./application-menu-controller.js";
@@ -343,6 +344,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createConcordanceController,
       createApplicationCommandButtonsController,
       createApplicationCommandHistoryController,
+      createApplicationDownloadController,
       createApplicationEventWiringController,
       createApplicationImportProgressController,
       createApplicationMenuController,
