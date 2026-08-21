@@ -1800,8 +1800,8 @@ for (const boundary of [
 }
 assert(
   (appJs.match(/createProjectSummaryController\(/g) || []).length === 1 &&
-    (appJs.match(/\bprojectSummaryController\.refresh\b/g) || []).length === 8,
-  "app.js must compose one project-summary controller and wire all eight refresh consumers directly."
+    (appJs.match(/\bprojectSummaryController\.refresh\b/g) || []).length === 7,
+  "app.js must compose one project-summary controller and wire all seven refresh consumers directly."
 );
 assert(
   (appJs.match(/\beditorSessionStore\.markProjectSummaryDirty\b/g) || []).length === 1 &&
@@ -2603,7 +2603,7 @@ for (const [method, appCount, workflowCount] of [
   ["clearMemory", 0, 1],
   ["hasUnsaved", 1, 0],
   ["ids", 2, 0],
-  ["mark", 38, 6],
+  ["mark", 37, 6],
   ["markProjects", 2, 0],
   ["markProjectsUsingResource", 6, 1],
   ["prune", 1, 1],
@@ -3224,10 +3224,10 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `project resource-context composition must retain ${boundary}.`);
 }
 for (const [method, appCount, workflowCount] of [
-  ["links", 4, 0],
+  ["links", 3, 0],
   ["mainTm", 4, 13],
-  ["tmNames", 11, 0],
-  ["termBaseNames", 15, 2],
+  ["tmNames", 10, 0],
+  ["termBaseNames", 14, 2],
   ["primaryTermBase", 5, 15],
   ["summary", 4, 1]
 ]) {
@@ -4865,9 +4865,9 @@ for (const boundary of [
 }
 assert(
   (appJs.match(/createProjectTermRefreshController\(/g) || []).length === 1 &&
-    (appJs.match(/\bprojectTermRefreshController\.refresh\b/g) || []).length === 9 &&
+    (appJs.match(/\bprojectTermRefreshController\.refresh\b/g) || []).length === 8 &&
     (appWorkflowDriverJs.match(/\bprojectTermRefreshController\.refresh\b/g) || []).length === 1,
-  "app.js must compose one project-term refresh controller and all nine application and one workflow consumers must call it directly."
+  "app.js must compose one project-term refresh controller and all eight application and one workflow consumers must call it directly."
 );
 assert(
   !/async\s+function\s+refreshProjectTerms\b/.test(appJs) && !/\brefreshProjectTerms\s*\(/.test(appWorkflowDriverJs),
@@ -5911,7 +5911,7 @@ for (const boundary of [
   "document",
   "summarizeResources: resourceCatalogService.summarize",
   "labelFromKey: resourceCatalogService.labelFromKey",
-  "items: resourceItems",
+  "items: (type, key) => resourcesController?.getItems?.(type, key) || []",
   "localization: uiLocalizationService",
   "languagePairDisplay",
   "formatDate: applicationDateTimeService.date",
@@ -5984,7 +5984,8 @@ assertIncludes(
   "app.js must compose the checked resource-library export controller."
 );
 for (const boundary of [
-  "resources: { labelFromKey: resourceCatalogService.labelFromKey, items: resourceItems }",
+  "labelFromKey: resourceCatalogService.labelFromKey",
+  "items: (type, key) => resourcesController?.getItems?.(type, key) || []",
   "builders: { buildTmx, buildTbx }",
   "fileSafeName",
   "download",
@@ -6149,7 +6150,7 @@ for (const boundary of [
   "refresh: resourceCatalogRefreshController.refresh",
   "refreshProjectTerms: projectTermRefreshController.refresh",
   "labelFromKey: resourceCatalogService.labelFromKey",
-  "items: resourceItems",
+  "items: (type, key) => resourcesController?.getItems?.(type, key) || []",
   "execute: (...args) => appRuntime.commands.bus.execute(...args)",
   "createDeleteEntry: appRuntime.commands.createDeleteResourceEntryCommand",
   "createDeleteResource: appRuntime.commands.createDeleteResourceCommand",
@@ -6664,7 +6665,7 @@ assert(
 );
 assertIncludes(
   appJs,
-  "await editorContextController.refresh();",
+  "refreshEditorContext: editorContextController.refresh",
   "application consumers composed after EditorContextController must refresh context directly."
 );
 assert(!appJs.includes("async function refreshSidebar"), "the editor-context refresh consumer facade must not return.");
@@ -7584,6 +7585,31 @@ assertIncludes(
   appJs,
   "createResourcesController",
   "app.js must compose the checked Resources controller with injected domain actions."
+);
+assert(
+  appJs.split("resourcesController?.render?.()").length - 1 === 1 &&
+    appWorkflowDriverJs.split("resourcesController?.render?.()").length - 1 === 2,
+  "UI-locale and workflow Resources rendering must use the late checked ResourcesController receiver directly."
+);
+assert(
+  appJs.split("resourcesController?.getItems?.(type, key) || []").length - 1 === 3 &&
+    appWorkflowDriverJs.split('resourcesController?.getItems?.("tm", bulkTmKey) || []').length - 1 === 1,
+  "resource export, mutation, presentation, and workflow lookup must call ResourcesController directly with the original empty fallback."
+);
+assert(
+  !/function\s+renderResourcesView\b/.test(appJs) &&
+    !appWorkflowDriverJs.includes("renderResourcesView();") &&
+    !/function\s+resourceItems\b/.test(appJs) &&
+    !appWorkflowDriverJs.includes("resourceItems(") &&
+    !appJs.includes("canAddResourceToCurrentProject") &&
+    !appJs.includes("addResourceToCurrentProject") &&
+    !appWorkflowDriverJs.includes("canAddResourceToCurrentProject") &&
+    !appWorkflowDriverJs.includes("addResourceToCurrentProject"),
+  "removed Resources rendering/item facades and unreachable project-attachment helpers must not return to app.js or the workflow driver."
+);
+assert(
+  !appJs.includes("added to project") && !appJs.includes('makeId("resource-link")'),
+  "unreachable current-project resource attachment orchestration must not return to app.js."
 );
 assert(
   !functionBody(appJs, "const state = {", "const els = {").includes('  resourceType: "tm",') &&
@@ -19796,8 +19822,8 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `aggregate-presentation composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  (appJs.match(/\bapplicationAggregatePresentationController\.render\b/g) || []).length === 17,
-  "all 17 application aggregate-presentation consumers must call ApplicationAggregatePresentationController.render directly."
+  (appJs.match(/\bapplicationAggregatePresentationController\.render\b/g) || []).length === 16,
+  "all 16 application aggregate-presentation consumers must call ApplicationAggregatePresentationController.render directly."
 );
 assert(
   (appWorkflowDriverJs.match(/\bapplicationAggregatePresentationController\.render\b/g) || []).length === 5,

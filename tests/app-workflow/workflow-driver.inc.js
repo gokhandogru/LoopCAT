@@ -4347,7 +4347,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }], terms: originalLabelResourceState.terms }, false);
-        renderResourcesView();
+        resourcesController?.render?.();
         assert(
           els.tmResourceDashboard.textContent.includes("[redacted secret]") &&
             !els.tmResourceDashboard.textContent.includes("ui-resource-label-token-that-must-not-appear"),
@@ -4371,7 +4371,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         }
         applicationAggregatePresentationController.render();
         projectsViewPresentationController.render();
-        renderResourcesView();
+        resourcesController?.render?.();
       }
       await deliveryExportController.exportTargetText();
       assert(els.saveStatus.textContent.startsWith("Target TXT exported") && statusDownloads.some((item) => item.type === "text/plain"), "target TXT export reports success");
@@ -4778,7 +4778,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         languagePair: `${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`,
         label: bulkTmName,
         deletedAt: new Date().toISOString(),
-        payload: { records: resourceItems("tm", bulkTmKey) }
+        payload: { records: resourcesController?.getItems?.("tm", bulkTmKey) || [] }
       });
     } catch (error) {
       atomicResourceTrashFailure = error;

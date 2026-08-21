@@ -4236,7 +4236,7 @@ const uiLocaleOrchestrationController =
       renderWorkspaceStatus: () => workspaceRecoveryPresentationService.renderStatus(),
       renderProjectStorageStatus: workspaceRecoveryPresentationService.renderProjectStorage,
       renderProjectsView: projectsViewPresentationController.render,
-      renderResourcesView: () => renderResourcesView(),
+      renderResourcesView: () => resourcesController?.render?.(),
       renderProjectHome: projectHomePresentationController.render,
       renderProjectAnalysis: projectAnalysisController.render,
       renderEditor: editorShellPresentationController.render,
@@ -5281,7 +5281,10 @@ const resourceLibraryImportController =
   });
 const resourceLibraryExportController =
   appRuntime.featureFactories.createResourceLibraryExportController({
-    resources: { labelFromKey: resourceCatalogService.labelFromKey, items: resourceItems },
+    resources: {
+      labelFromKey: resourceCatalogService.labelFromKey,
+      items: (type, key) => resourcesController?.getItems?.(type, key) || []
+    },
     builders: { buildTmx, buildTbx },
     fileSafeName: applicationTextSafetyService.fileSafeName,
     download: applicationDownloadController.download,
@@ -5295,7 +5298,7 @@ const resourceMutationController = appRuntime.featureFactories.createResourceMut
     refresh: resourceCatalogRefreshController.refresh,
     refreshProjectTerms: projectTermRefreshController.refresh,
     labelFromKey: resourceCatalogService.labelFromKey,
-    items: resourceItems
+    items: (type, key) => resourcesController?.getItems?.(type, key) || []
   },
   commands: {
     execute: (...args) => appRuntime.commands.bus.execute(...args),
@@ -5350,7 +5353,7 @@ const resourcesPresentationService = appRuntime?.featureFactories?.createResourc
   document,
   summarizeResources: resourceCatalogService.summarize,
   labelFromKey: resourceCatalogService.labelFromKey,
-  items: resourceItems,
+  items: (type, key) => resourcesController?.getItems?.(type, key) || [],
   localization: uiLocalizationService,
   languagePairDisplay: languageInputService.pairDisplay,
   formatDate: applicationDateTimeService.date,
@@ -5655,42 +5658,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-function renderResourcesView() {
-  resourcesController?.render?.();
-}
-
-function canAddResourceToCurrentProject(type, resource) {
-  if (!editorSessionStore.getProject()) return false;
-  if (resource.sourceLang !== editorSessionStore.getProject().sourceLang || resource.targetLang !== editorSessionStore.getProject().targetLang) return false;
-  const names =
-    type === "tm" ? projectResourceContextService.tmNames() : projectResourceContextService.termBaseNames();
-  return !names.includes(resource.name);
-}
-
-async function addResourceToCurrentProject(type, resource) {
-  if (!editorSessionStore.getProject() || !canAddResourceToCurrentProject(type, resource)) return;
-  const links = projectResourceContextService.links(editorSessionStore.getProject());
-  links.push({
-    id: makeId("resource-link"),
-    type: type === "tm" ? "tm" : "termbase",
-    name: resource.name,
-    role: type === "tm" ? "reference" : undefined
-  });
-  editorSessionStore.replaceProject(await updateProject({ ...editorSessionStore.getProject(), resourceLinks: links }));
-  editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((project) => (project.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : project)));
-  await projectTermRefreshController.refresh({ rerender: true });
-  await projectSummaryController.refresh();
-  applicationAggregatePresentationController.render();
-  await editorContextController.refresh();
-  renderResourcesView();
-  workspaceDirtyStateController.mark();
-  applicationSaveStatusController.set(`${type === "tm" ? "TM" : "TB"} added to project`, "saved");
-}
-
-function resourceItems(type, key) {
-  return resourcesController?.getItems?.(type, key) || [];
-}
 
 function appendTextWithTags(container, text, tags, options = {}) {
   const ordered = [...tags].sort((a, b) => a.index - b.index || b.text.length - a.text.length);
