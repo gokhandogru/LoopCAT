@@ -3565,6 +3565,7 @@ const filterPresetController = appRuntime?.featureFactories?.createFilterPresetC
 });
 const filterPresetReady = filterPresetController?.initialize?.() || Promise.resolve();
 
+let applicationCommandCatalogService;
 const paletteController = appRuntime?.featureFactories?.createPaletteController?.({
   overlay: els.commandPaletteOverlay,
   input: els.commandPaletteInput,
@@ -3572,7 +3573,7 @@ const paletteController = appRuntime?.featureFactories?.createPaletteController?
   closeButton: els.closeCommandPaletteBtn,
   triggerButton: els.commandPaletteBtn,
   appShell: document.querySelector(".app-shell"),
-  getCommands: commandList,
+  getCommands: () => applicationCommandCatalogService.list(),
   translate: uiLocalizationService.source,
   focusController,
   preferencesRepository: appRuntime.preferencesRepository,
@@ -5051,61 +5052,47 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
 });
 dialogLifecycleController?.mount?.();
 
-function commandList() {
-  const commandProjectId = state.commandProjectId || editorSessionStore.getProject()?.id || null;
-  const commands = [
-    { id: "undo", label: "Undo last action", run: applicationCommandHistoryController.undo, enabled: Boolean(appRuntime?.commands?.bus?.canUndo?.(commandProjectId)) },
-    { id: "redo", label: "Redo last action", run: applicationCommandHistoryController.redo, enabled: Boolean(appRuntime?.commands?.bus?.canRedo?.(commandProjectId)) },
-    { id: "trash", label: "Open Trash", run: applicationTrashController.open, enabled: Boolean(appRuntime?.trashRepository) },
-    { id: "confirm", label: "Confirm segment", run: segmentConfirmationController.confirm, enabled: Boolean(applicationActiveSegmentService.get()?.target?.trim()) },
-    { id: "next-open", label: "Next open segment", run: segmentNavigationController.nextOpen, enabled: Boolean(editorSessionStore.getSegments().length) },
-    { id: "focus-mode", label: applicationStore.getState().interface.focusMode ? "Exit Focus view" : "Enter Focus view", run: focusModeController.toggle, enabled: Boolean(applicationStore.getState().navigation.view === "editor" && editorSessionStore.getProject()) },
-    { id: "copy-source", label: "Copy source", run: targetProducerController.copySourceToTarget, enabled: Boolean(applicationActiveSegmentService.get()) },
-    { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: structuralSegmentController.split, enabled: Boolean(applicationActiveSegmentService.get() && structuralSegmentController.canSplit(applicationActiveSegmentService.get())) },
-    { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: structuralSegmentController.merge, enabled: Boolean(applicationActiveSegmentService.get() && structuralSegmentController.canMerge(applicationActiveSegmentService.get(), structuralSegmentController.nextForMerge(applicationActiveSegmentService.get()))) },
-    { id: "save-tm", label: "Save segment to TM", run: segmentTmSaveController.saveActive, enabled: Boolean(applicationActiveSegmentService.get()?.target?.trim()) },
-    { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "qa", label: "Run QA checks", run: projectQaController.run, enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "quality-passport", label: "Export Quality Passport", run: reportExportController.exportQualityPassport, enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "next-quality-risk", label: "Next quality risk", run: qualityWorkbenchController.nextRisk, enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "concordance", label: "Open concordance", run: concordanceController.open, enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "replace-target", label: "Find and replace target text", run: targetReplacementController.open, enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "preset-translate", label: "Use Translate filter preset", group: "Filters", keywords: ["open", "segments", "matches"], run: () => filterPresetController?.applyPreset?.("translate"), enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "preset-review", label: "Use Review filter preset", group: "Filters", keywords: ["needs review", "comments"], run: () => filterPresetController?.applyPreset?.("review"), enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "preset-qa-fixes", label: "Use QA fixes filter preset", group: "Filters", keywords: ["quality", "blocked", "fixes"], run: () => filterPresetController?.applyPreset?.("qa-fixes"), enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "preset-ai-review", label: "Use AI review filter preset", group: "Filters", keywords: ["AI", "risk", "suggestions"], run: () => filterPresetController?.applyPreset?.("ai-review"), enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "project-report", label: "Export project report", run: reportExportController.exportProjectReport, enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "anonymized-report", label: "Export anonymized report", run: reportExportController.exportAnonymizedReport, enabled: Boolean(editorSessionStore.getProject()) },
-    { id: "local-ai-pretranslate", label: "Local AI pre-translate", run: aiPretranslationController.pretranslate, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running) },
-    { id: "local-ai-review", label: "AI review active segment", run: aiReviewController.reviewActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-review-batch", label: "AI QA batch", run: aiReviewController.reviewBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-tag-repair", label: "Suggest AI tag repair", run: aiTagRepairController.repairActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-tag-repair-batch", label: "Repair AI tags batch", run: aiTagRepairController.repairBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-polish-draft", label: "Polish active draft with AI", run: aiDraftEditingController.polishActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-polish-batch", label: "Polish AI drafts batch", run: aiDraftEditingController.polishBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-adapt-draft", label: "Adapt active draft with AI", run: aiDraftEditingController.adaptActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-adapt-batch", label: "Adapt AI drafts batch", run: aiDraftEditingController.adaptBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-variants", label: "Suggest AI alternatives", run: aiAlternativesController.suggestActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-variants-batch", label: "Suggest AI alternatives batch", run: aiAlternativesController.suggestBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-apply-terms", label: "Apply AI terminology", run: aiTerminologyApplicationController.applyActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-apply-terms-batch", label: "Apply AI terminology batch", run: aiTerminologyApplicationController.applyBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-terms", label: "Extract AI terms", run: aiTerminologyExtractionController.extractActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-terms-batch", label: "Extract AI terms batch", run: aiTerminologyExtractionController.extractBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-project-brief", label: "Generate AI project brief", run: aiProjectBriefController.generate, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "openai-ai", label: "Create OpenAI suggestion", run: aiOpenAiSuggestionController.create, enabled: Boolean(applicationActiveSegmentService.get()) }
-  ];
-  const shortcuts = {
-    undo: "Ctrl/Cmd+Z",
-    redo: "Ctrl/Cmd+Shift+Z",
-    concordance: "Ctrl/Cmd+Alt+K",
-    "focus-mode": "Ctrl/Cmd+Shift+F"
-  };
-  return commands.map((command) => ({
-    ...command,
-    shortcut: shortcuts[command.id] || "",
-    disabledReason: command.enabled ? "" : "Unavailable in the current context."
-  }));
-}
+applicationCommandCatalogService = appRuntime.featureFactories.createApplicationCommandCatalogService({
+  command: { getProjectId: () => state.commandProjectId },
+  history: {
+    canUndo: (projectId) => appRuntime?.commands?.bus?.canUndo?.(projectId),
+    canRedo: (projectId) => appRuntime?.commands?.bus?.canRedo?.(projectId)
+  },
+  trash: { isAvailable: () => Boolean(appRuntime?.trashRepository) },
+  session: {
+    getProject: editorSessionStore.getProject,
+    getSegments: editorSessionStore.getSegments
+  },
+  application: { getState: applicationStore.getState },
+  selection: { getActiveSegment: applicationActiveSegmentService.get },
+  ai: { getState: () => state.localAi },
+  features: {
+    history: applicationCommandHistoryController,
+    trash: applicationTrashController,
+    confirmation: segmentConfirmationController,
+    navigation: segmentNavigationController,
+    focus: focusModeController,
+    targetProducer: targetProducerController,
+    structural: structuralSegmentController,
+    tm: segmentTmSaveController,
+    projectDialog: openProjectDialog,
+    qa: projectQaController,
+    reports: reportExportController,
+    quality: qualityWorkbenchController,
+    concordance: concordanceController,
+    replacement: targetReplacementController,
+    filterPreset: { apply: (preset) => filterPresetController?.applyPreset?.(preset) },
+    aiPretranslation: aiPretranslationController,
+    aiReview: aiReviewController,
+    aiTagRepair: aiTagRepairController,
+    aiDraftEditing: aiDraftEditingController,
+    aiAlternatives: aiAlternativesController,
+    aiTerminologyApplication: aiTerminologyApplicationController,
+    aiTerminologyExtraction: aiTerminologyExtractionController,
+    aiProjectBrief: aiProjectBriefController,
+    aiOpenAiSuggestion: aiOpenAiSuggestionController
+  }
+});
 
 function formatDate(value) {
   if (!value) return uiLocalizationService.source("Never");

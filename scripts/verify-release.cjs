@@ -158,6 +158,7 @@ const requiredReleaseFiles = [
   "src/app/bootstrap.js",
   "src/app/app-store.js",
   "src/app/application-active-segment-service.js",
+  "src/app/application-command-catalog-service.js",
   "src/app/application-command-buttons-controller.js",
   "src/app/application-command-history-controller.js",
   "src/app/application-download-controller.js",
@@ -319,6 +320,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-download-controller.test.cjs",
   "tests/unit/application-event-wiring-controller.test.cjs",
   "tests/unit/application-import-progress-controller.test.cjs",
+  "tests/unit/application-command-catalog-service.test.cjs",
   "tests/unit/application-menu-controller.test.cjs",
   "tests/unit/application-offline-shell-controller.test.cjs",
   "tests/unit/application-persistence-lifecycle-controller.test.cjs",
@@ -478,6 +480,8 @@ const appStoreJs = readText("src/app/app-store.js");
 const appStoreUnitTests = readText("tests/unit/app-store.test.cjs");
 const applicationActiveSegmentServiceJs = readText("src/app/application-active-segment-service.js");
 const applicationActiveSegmentServiceUnitTests = readText("tests/unit/application-active-segment-service.test.cjs");
+const applicationCommandCatalogServiceJs = readText("src/app/application-command-catalog-service.js");
+const applicationCommandCatalogServiceUnitTests = readText("tests/unit/application-command-catalog-service.test.cjs");
 const navigationControllerJs = readText("src/app/navigation-controller.js");
 const languageInputServiceJs = readText("src/i18n/language-input-service.js");
 const languageInputServiceUnitTests = readText("tests/unit/language-input-service.test.cjs");
@@ -1046,6 +1050,156 @@ for (const testName of [
     projectNameServiceUnitTests,
     testName,
     `focused project-name tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createApplicationCommandCatalogService } from "./application-command-catalog-service.js";',
+  "the application runtime must install the checked command-catalog service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationCommandCatalogService,",
+  "the application runtime must expose the checked command-catalog service factory."
+);
+for (const snippet of [
+  "ApplicationCommandCatalogService requires checked state, capability, and action boundaries.",
+  "function list()",
+  "const commandProjectId = command.getProjectId() || session.getProject()?.id || null;",
+  'label: application.getState().interface.focusMode ? "Exit Focus view" : "Enter Focus view"',
+  "selection.getActiveSegment() && features.structural.canSplit(selection.getActiveSegment())",
+  "features.structural.nextForMerge(selection.getActiveSegment())",
+  'run: () => features.projectDialog("edit")',
+  'run: () => features.filterPreset.apply("translate")',
+  'undo: "Ctrl/Cmd+Z"',
+  'redo: "Ctrl/Cmd+Shift+Z"',
+  'concordance: "Ctrl/Cmd+Alt+K"',
+  '"focus-mode": "Ctrl/Cmd+Shift+F"',
+  'disabledReason: entry.enabled ? "" : "Unavailable in the current context."',
+  "return Object.freeze({ list });"
+]) {
+  assertIncludes(
+    applicationCommandCatalogServiceJs,
+    snippet,
+    `ApplicationCommandCatalogService must retain characterized catalog policy: ${snippet}.`
+  );
+}
+const applicationCommandCatalogIds = Array.from(
+  applicationCommandCatalogServiceJs.matchAll(/\bid:\s*"([^"]+)"/g),
+  (match) => match[1]
+);
+assert(
+  JSON.stringify(applicationCommandCatalogIds) ===
+    JSON.stringify([
+      "undo",
+      "redo",
+      "trash",
+      "confirm",
+      "next-open",
+      "focus-mode",
+      "copy-source",
+      "split-segment",
+      "merge-segments",
+      "save-tm",
+      "project-settings",
+      "qa",
+      "quality-passport",
+      "next-quality-risk",
+      "concordance",
+      "replace-target",
+      "preset-translate",
+      "preset-review",
+      "preset-qa-fixes",
+      "preset-ai-review",
+      "project-report",
+      "anonymized-report",
+      "local-ai-pretranslate",
+      "local-ai-review",
+      "local-ai-review-batch",
+      "local-ai-tag-repair",
+      "local-ai-tag-repair-batch",
+      "local-ai-polish-draft",
+      "local-ai-polish-batch",
+      "local-ai-adapt-draft",
+      "local-ai-adapt-batch",
+      "local-ai-variants",
+      "local-ai-variants-batch",
+      "local-ai-apply-terms",
+      "local-ai-apply-terms-batch",
+      "local-ai-terms",
+      "local-ai-terms-batch",
+      "local-ai-project-brief",
+      "openai-ai"
+    ]),
+  "ApplicationCommandCatalogService must retain all 39 command IDs in exact order."
+);
+for (const boundary of [
+  "let applicationCommandCatalogService;",
+  "getCommands: () => applicationCommandCatalogService.list()",
+  "appRuntime.featureFactories.createApplicationCommandCatalogService({",
+  "command: { getProjectId: () => state.commandProjectId }",
+  "canUndo: (projectId) => appRuntime?.commands?.bus?.canUndo?.(projectId)",
+  "canRedo: (projectId) => appRuntime?.commands?.bus?.canRedo?.(projectId)",
+  "isAvailable: () => Boolean(appRuntime?.trashRepository)",
+  "getProject: editorSessionStore.getProject",
+  "getSegments: editorSessionStore.getSegments",
+  "application: { getState: applicationStore.getState }",
+  "selection: { getActiveSegment: applicationActiveSegmentService.get }",
+  "ai: { getState: () => state.localAi }",
+  "history: applicationCommandHistoryController",
+  "trash: applicationTrashController",
+  "confirmation: segmentConfirmationController",
+  "navigation: segmentNavigationController",
+  "focus: focusModeController",
+  "targetProducer: targetProducerController",
+  "structural: structuralSegmentController",
+  "tm: segmentTmSaveController",
+  "projectDialog: openProjectDialog",
+  "qa: projectQaController",
+  "reports: reportExportController",
+  "quality: qualityWorkbenchController",
+  "concordance: concordanceController",
+  "replacement: targetReplacementController",
+  "filterPreset: { apply: (preset) => filterPresetController?.applyPreset?.(preset) }"
+]) {
+  assertIncludes(appJs, boundary, `command-catalog composition must retain ${boundary}.`);
+}
+assert(
+  (appJs.match(/\bapplicationCommandCatalogService\.list\b/g) || []).length === 1,
+  "PaletteController must be the sole application command-catalog consumer."
+);
+assert(
+  !/function\s+commandList\b/.test(appJs) && !/function\s+commandList\b/.test(appWorkflowDriverJs),
+  "commandList must not return to app.js or the workflow driver."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "applicationStore",
+  "applicationActiveSegmentService",
+  "Controller.",
+  "document.",
+  "window."
+]) {
+  assert(
+    !applicationCommandCatalogServiceJs.includes(forbiddenOwner),
+    `ApplicationCommandCatalogService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationCommandCatalogService preserves all 39 command records in exact order",
+  "ApplicationCommandCatalogService preserves direct action identities and wrapper arguments",
+  "ApplicationCommandCatalogService preserves command-project fallback and capability query order",
+  "ApplicationCommandCatalogService preserves repeated active-segment structural reads and short circuits",
+  "ApplicationCommandCatalogService derives live focus, project, and AI enablement",
+  "ApplicationCommandCatalogService returns fresh records while retaining direct actions",
+  "ApplicationCommandCatalogService preserves lookup and capability failure timing",
+  "ApplicationCommandCatalogService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    applicationCommandCatalogServiceUnitTests,
+    testName,
+    `focused application command-catalog tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
@@ -1874,7 +2028,7 @@ for (const consumer of [
   "buildRiskQueue: qualityWorkbenchController.buildQueue",
   "renderWorkbench: qualityWorkbenchController.render",
   "risk: { buildQueue: qualityWorkbenchController.buildQueue }",
-  "run: qualityWorkbenchController.nextRisk, enabled: Boolean(editorSessionStore.getProject())",
+  "quality: qualityWorkbenchController",
   "editorSessionStore.replaceQualityRiskQueue(qualityWorkbenchController.buildQueue());"
 ]) {
   const source = consumer.endsWith("buildQueue());") ? appWorkflowDriverJs : appJs;
@@ -5933,7 +6087,7 @@ for (const boundary of [
   "renderSummary: () => applicationTrashController.renderSummary()",
   "emptyTrash: applicationTrashController.empty",
   "beforeOpen: applicationTrashController.renderList",
-  "run: applicationTrashController.open, enabled: Boolean(appRuntime?.trashRepository)",
+  "trash: applicationTrashController",
   "void applicationTrashController.renderSummary()"
 ]) {
   assertIncludes(appJs, boundary, `application Trash composition and consumers must retain ${boundary}.`);
@@ -6627,7 +6781,7 @@ for (const boundary of [
   "focusActive: () => targetEditController.focusActive()",
   "toggle: focusModeController.toggle",
   "disable: () => focusModeController.set(false)",
-  "run: focusModeController.toggle",
+  "focus: focusModeController",
   "focusModeController.render()",
   "focusMode: focusModeController"
 ]) {
@@ -6656,7 +6810,7 @@ assert(
 assert(
   (applicationEventWiringControllerJs.match(/\blifecycles\.focusMode\.mount\b/g) || []).length === 1 &&
     (appJs.match(/\bfocusModeController\.render\b/g) || []).length === 2 &&
-    (appJs.match(/\bfocusModeController\.toggle\b/g) || []).length === 2 &&
+    (appJs.match(/\bfocusModeController\.toggle\b/g) || []).length === 1 &&
     (appJs.match(/\bfocusModeController\.set\b/g) || []).length === 1 &&
     (appWorkflowDriverJs.match(/\bfocusModeController\.set\b/g) || []).length === 2,
   "application and workflow consumers must retain exact checked Focus-mode controller calls."
@@ -7152,7 +7306,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "run: segmentConfirmationController.confirm",
+  "confirmation: segmentConfirmationController",
   "the command palette must route confirmation directly to SegmentConfirmationController."
 );
 assertIncludes(
@@ -7723,7 +7877,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "run: targetProducerController.copySourceToTarget",
+  "targetProducer: targetProducerController",
   "the command palette must route Copy Source directly to TargetProducerController."
 );
 assert(
@@ -8927,7 +9081,7 @@ for (const boundary of [
 }
 assert(
   (applicationEventWiringControllerJs.match(/\blifecycles\.projectQa\.mount\b/g) || []).length === 1 &&
-    (appJs.match(/\bprojectQaController\.run\b/g) || []).length === 2 &&
+    (appJs.match(/\bprojectQaController\.run\b/g) || []).length === 1 &&
     (appWorkflowDriverJs.match(/\bprojectQaController\.run\b/g) || []).length === 3,
   "the Run QA lifecycle must mount once and EditorContext, palette, and all three workflow consumers must call ProjectQaController directly."
 );
@@ -10549,7 +10703,7 @@ for (const boundary of [
 ]) {
   assertIncludes(appJs, boundary, `concordance composition must inject the checked ${boundary} boundary.`);
 }
-for (const directConsumer of ["concordanceController.mount()", "run: concordanceController.open"]) {
+for (const directConsumer of ["concordanceController.mount()", "concordance: concordanceController"]) {
   assertIncludes(appJs, directConsumer, `concordance consumers must call the controller directly: ${directConsumer}.`);
 }
 for (const directConsumer of ["concordance.open()", "concordance.close()"]) {
@@ -10683,7 +10837,7 @@ for (const lateBoundConsumer of [
   );
 }
 for (const directConsumer of [
-  "run: segmentNavigationController.nextOpen",
+  "navigation: segmentNavigationController",
   "segmentNavigationController.select(rowIndex)",
   'row.addEventListener("click", () => segmentNavigationController.select(index))',
   "navigation: { select: (index) => segmentNavigationController.select(index) }",
@@ -10858,7 +11012,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "run: targetReplacementController.open",
+  "replacement: targetReplacementController",
   "the command-palette replacement action must call TargetReplacementController directly."
 );
 assertIncludes(
@@ -11368,26 +11522,18 @@ assertIncludes(
   "retryConnection: aiProviderAdministrationOperationsController.testConnection",
   "OPUS-CAT retry must route directly to checked provider administration."
 );
-for (const delegation of [
-  "aiPretranslationController.pretranslate",
-  "aiReviewController.reviewActive",
-  "aiReviewController.reviewBatch",
-  "aiTagRepairController.repairActive",
-  "aiTagRepairController.repairBatch",
-  "aiDraftEditingController.polishActive",
-  "aiDraftEditingController.polishBatch",
-  "aiDraftEditingController.adaptActive",
-  "aiDraftEditingController.adaptBatch",
-  "aiAlternativesController.suggestActive",
-  "aiAlternativesController.suggestBatch",
-  "aiTerminologyApplicationController.applyActive",
-  "aiTerminologyApplicationController.applyBatch",
-  "aiTerminologyExtractionController.extractActive",
-  "aiTerminologyExtractionController.extractBatch",
-  "aiProjectBriefController.generate",
-  "aiOpenAiSuggestionController.create"
+for (const [owner, delegation] of [
+  ["aiPretranslation", "aiPretranslationController"],
+  ["aiReview", "aiReviewController"],
+  ["aiTagRepair", "aiTagRepairController"],
+  ["aiDraftEditing", "aiDraftEditingController"],
+  ["aiAlternatives", "aiAlternativesController"],
+  ["aiTerminologyApplication", "aiTerminologyApplicationController"],
+  ["aiTerminologyExtraction", "aiTerminologyExtractionController"],
+  ["aiProjectBrief", "aiProjectBriefController"],
+  ["aiOpenAiSuggestion", "aiOpenAiSuggestionController"]
 ]) {
-  assertIncludes(appJs, `run: ${delegation}`, `the command palette must route directly to ${delegation}.`);
+  assertIncludes(appJs, `${owner}: ${delegation}`, `the command palette must route directly to ${delegation}.`);
 }
 for (const delegation of [
   "aiSettingsPersistenceController.save",
@@ -12989,8 +13135,8 @@ assertIncludes(
   "SplitSegment Undo/Redo must use the controller-owned atomic restoration boundary."
 );
 assertIncludes(
-  appJs,
-  '{ id: "split-segment", label: "Split segment"',
+  applicationCommandCatalogServiceJs,
+  'id: "split-segment"',
   "the command palette and segment button must route through the same split action."
 );
 assertIncludes(
@@ -13009,8 +13155,8 @@ assertIncludes(
   "MergeSegment Undo/Redo must use the controller-owned atomic restoration boundary."
 );
 assertIncludes(
-  appJs,
-  '{ id: "merge-segments", label: "Merge with next segment"',
+  applicationCommandCatalogServiceJs,
+  'id: "merge-segments"',
   "the command palette and segment button must route through the same merge action."
 );
 assertIncludes(
@@ -13023,15 +13169,20 @@ assertIncludes(
   "structuralSegmentController.mount()",
   "app.js must delegate structural segment button lifecycle to StructuralSegmentController."
 );
+assertIncludes(
+  appJs,
+  "structural: structuralSegmentController",
+  "the command catalog must receive StructuralSegmentController directly."
+);
 for (const directCommandConsumer of [
-  "run: structuralSegmentController.split",
-  "structuralSegmentController.canSplit(applicationActiveSegmentService.get())",
-  "run: structuralSegmentController.merge",
-  "structuralSegmentController.canMerge(",
-  "structuralSegmentController.nextForMerge(applicationActiveSegmentService.get())"
+  "run: features.structural.split",
+  "features.structural.canSplit(selection.getActiveSegment())",
+  "run: features.structural.merge",
+  "features.structural.canMerge(",
+  "features.structural.nextForMerge(selection.getActiveSegment())"
 ]) {
   assertIncludes(
-    appJs,
+    applicationCommandCatalogServiceJs,
     directCommandConsumer,
     `the command palette must call StructuralSegmentController directly: ${directCommandConsumer}.`
   );
@@ -13799,7 +13950,11 @@ assertIncludes(
   "function set(enabled)",
   "the checked Focus-mode controller must manage Focus view through explicit editor state."
 );
-assertIncludes(appJs, "Enter Focus view", "Command palette must expose the Focus view toggle.");
+assertIncludes(
+  applicationCommandCatalogServiceJs,
+  "Enter Focus view",
+  "Command palette must expose the Focus view toggle."
+);
 assertIncludes(
   readText("styles.css"),
   ".workspace.focus-mode .sidebar",
@@ -16591,14 +16746,13 @@ for (const boundary of [
   "navigation: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex }",
   "getSegment: applicationActiveSegmentService.get",
   "getActiveSegment: applicationActiveSegmentService.get",
-  "applicationActiveSegmentService.get()?.id",
-  "applicationActiveSegmentService.get()?.target?.trim()"
+  "applicationActiveSegmentService.get()?.id"
 ]) {
   assertIncludes(appJs, boundary, `application active-segment composition and consumers must retain ${boundary}.`);
 }
 assert(
-  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 42,
-  "all 42 application active-segment consumers must call ApplicationActiveSegmentService directly."
+  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 27,
+  "all 27 application active-segment consumers must call ApplicationActiveSegmentService directly."
 );
 assert(
   (appWorkflowDriverJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 9,
