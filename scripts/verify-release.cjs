@@ -631,6 +631,7 @@ const segmentConfirmationControllerJs = readText("src/features/editor/segment-co
 const targetEditControllerJs = readText("src/features/editor/target-edit-controller.js");
 const targetProducerControllerJs = readText("src/features/editor/target-producer-controller.js");
 const protectedTagInspectionServiceJs = readText("src/features/editor/protected-tag-inspection-service.js");
+const segmentMarkupPresentationServiceJs = readText("src/features/editor/segment-markup-presentation-service.js");
 const protectedTextReplacementServiceJs = readText("src/features/editor/protected-text-replacement-service.js");
 const segmentLabelServiceJs = readText("src/features/editor/segment-label-service.js");
 const segmentProvenanceServiceJs = readText("src/features/editor/segment-provenance-service.js");
@@ -654,6 +655,7 @@ const segmentConfirmationControllerUnitTests = readText("tests/unit/segment-conf
 const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
 const protectedTagInspectionServiceUnitTests = readText("tests/unit/protected-tag-inspection-service.test.cjs");
+const segmentMarkupPresentationServiceUnitTests = readText("tests/unit/segment-markup-presentation-service.test.cjs");
 const protectedTextReplacementServiceUnitTests = readText("tests/unit/protected-text-replacement-service.test.cjs");
 const segmentLabelServiceUnitTests = readText("tests/unit/segment-label-service.test.cjs");
 const segmentProvenanceServiceUnitTests = readText("tests/unit/segment-provenance-service.test.cjs");
@@ -10089,6 +10091,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createSegmentMarkupPresentationService } from "../features/editor/segment-markup-presentation-service.js";',
+  "The application runtime must install the checked segment-markup presentation service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentMarkupPresentationService,",
+  "The application runtime must expose the checked segment-markup presentation factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createProtectedTextReplacementService } from "../features/editor/protected-text-replacement-service.js";',
   "The application runtime must install the checked protected-text replacement service."
 );
@@ -10498,8 +10510,9 @@ assert(
   "TM-match UI must route directly to TargetProducerController while concordance injects its target boundary."
 );
 assert(
-  appJs.split("targetProducerController.insertProtectedTag(").length - 1 === 3,
-  "all three protected-tag UI paths must route directly to TargetProducerController."
+  appJs.split("targetProducerController.insertProtectedTag(").length - 1 === 0 &&
+    segmentMarkupPresentationServiceJs.split("targetProducer.insertProtectedTag(").length - 1 === 2,
+  "protected-tag source and tray UI paths must route through SegmentMarkupPresentationService to the injected TargetProducerController."
 );
 for (const directWorkflowCall of [
   "targetProducerController.copySourceToTarget()",
@@ -10568,8 +10581,8 @@ assertIncludes(
 );
 for (const method of ["sourceTags", "displayText", "missing", "targetTags", "hasIssue"]) {
   assertIncludes(
-    appJs,
-    `protectedTagInspectionService.${method}`,
+    method === "targetTags" ? segmentMarkupPresentationServiceJs : appJs,
+    method === "targetTags" ? "protectedTags.targetTags" : `protectedTagInspectionService.${method}`,
     `protected-tag inspection consumers must call ProtectedTagInspectionService.${method} directly.`
   );
 }
@@ -10598,6 +10611,134 @@ assertIncludes(
   i18nExtractScript,
   '"src/features/editor/protected-tag-inspection-service.js"',
   "source-catalog extraction must scan the checked protected-tag inspection service."
+);
+for (const snippet of [
+  "SegmentMarkupPresentationService requires DOM, protected-tag, terminology, navigation, and target-producer boundaries.",
+  "function insertAfterSelection(container, text, event)",
+  "event.stopPropagation()",
+  'Number(container.closest("tr")?.dataset.index)',
+  "Number.isInteger(rowIndex) ? navigation.select(rowIndex) : Promise.resolve()",
+  "ready.then(() => targetProducer.insertProtectedTag(text))",
+  "[...tags].sort((a, b) => a.index - b.index || b.text.length - a.text.length)",
+  'typeof tag.index === "number" && tag.index >= offset ? tag.index : text.indexOf(tag.text, offset)',
+  "terms.getProjectTerms()",
+  ".filter((range) => !tagMarkers.some((tagMarker) => rangesOverlap(range, tagMarker)))",
+  '(left, right) => left.index - right.index || (left.type === "tag" ? -1 : 1)',
+  'mark.className = "term-highlight"',
+  "Termbase: ${marker.range.term.sourceTerm} -> ${marker.range.term.targetTerm}",
+  'targetCell?.classList.toggle("has-target-preview", Boolean(tags.length))',
+  'preview.classList.toggle("hidden", !tags.length)',
+  'targetCell?.classList.add("editing")',
+  'row.querySelector("textarea")?.focus()',
+  "return Object.freeze({ appendSource, renderTagTray, renderTargetPreview })"
+]) {
+  assertIncludes(
+    segmentMarkupPresentationServiceJs,
+    snippet,
+    `SegmentMarkupPresentationService must retain characterized tag/term DOM policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createSegmentMarkupPresentationService({",
+  "app.js must compose the checked segment-markup presentation service."
+);
+const segmentMarkupComposition = functionBody(
+  appJs,
+  "const segmentMarkupPresentationService =",
+  "const segmentActionButtonsController ="
+);
+for (const boundary of [
+  "document",
+  "protectedTags: protectedTagInspectionService",
+  "ranges: termRanges",
+  "getProjectTerms: editorSessionStore.getProjectTerms",
+  "navigation: segmentNavigationController",
+  "targetProducer: targetProducerController"
+]) {
+  assertIncludes(
+    segmentMarkupComposition,
+    boundary,
+    `segment-markup presentation composition must inject the ${boundary} boundary.`
+  );
+}
+assert(
+  appJs.indexOf("segmentNavigationController =") < appJs.indexOf("const segmentMarkupPresentationService =") &&
+    appJs.indexOf("const segmentMarkupPresentationService =") < appJs.indexOf("const segmentActionButtonsController ="),
+  "SegmentMarkupPresentationService must follow stable navigation/producer composition and precede its row consumers."
+);
+for (const [method, count] of [
+  ["appendSource", 1],
+  ["renderTagTray", 1],
+  ["renderTargetPreview", 2]
+]) {
+  assert(
+    (appJs.match(new RegExp(`\\bsegmentMarkupPresentationService\\.${method}\\b`, "g")) || []).length === count,
+    `all ${count} segment-markup ${method} consumers must call SegmentMarkupPresentationService directly.`
+  );
+}
+for (const removedHelper of [
+  "appendTextWithTags",
+  "sourceTagMarkers",
+  "rangesOverlap",
+  "appendTextWithSourceMarkup",
+  "renderTagTray",
+  "renderTargetTagPreview"
+]) {
+  assert(
+    !new RegExp(`function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} segment-markup helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const removedOwner of [
+  "tag-chip-",
+  "term-highlight",
+  'closest("tr")',
+  "Insert protected text:",
+  "Protected text:",
+  "Termbase:"
+]) {
+  assert(
+    !appJs.includes(removedOwner) && !appWorkflowDriverJs.includes(removedOwner),
+    `segment tag/term DOM ownership must not return to the compatibility coordinator or workflow driver: ${removedOwner}`
+  );
+}
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "protectedTagInspectionService",
+  "segmentNavigationController",
+  "targetProducerController",
+  "termRanges",
+  "els.",
+  "state."
+]) {
+  assert(
+    !segmentMarkupPresentationServiceJs.includes(forbiddenOwner),
+    `SegmentMarkupPresentationService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "SegmentMarkupPresentationService preserves protected-tag and nonoverlapping term source markup",
+  "SegmentMarkupPresentationService preserves source tag fallback ordering and trailing text",
+  "SegmentMarkupPresentationService selects an integer closest row before inserting a source tag",
+  "SegmentMarkupPresentationService preserves noninteger row fallback and selection failure timing",
+  "SegmentMarkupPresentationService preserves tag tray guard, order, identity, and insertion",
+  "SegmentMarkupPresentationService preserves target preview tag DOM, classes, and editing focus",
+  "SegmentMarkupPresentationService preserves missing-preview and empty-tag branches",
+  "SegmentMarkupPresentationService preserves source failure boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentMarkupPresentationServiceUnitTests,
+    testName,
+    `focused segment-markup presentation tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-markup-presentation-service.js"',
+  "source-catalog extraction must scan the checked segment-markup presentation service."
 );
 for (const snippet of [
   'const source = String(text || "")',
@@ -13451,7 +13592,6 @@ for (const lateBoundConsumer of [
 }
 for (const directConsumer of [
   "navigation: segmentNavigationController",
-  "segmentNavigationController.select(rowIndex)",
   'row.addEventListener("click", () => segmentNavigationController.select(index))',
   "navigation: { select: (index) => segmentNavigationController.select(index) }",
   "await segmentNavigationController.select(first)"
@@ -13463,8 +13603,8 @@ for (const directConsumer of [
   );
 }
 assert(
-  appJs.split("segmentNavigationController.select(").length - 1 === 8,
-  "all eight remaining application selection consumers must call SegmentNavigationController directly."
+  appJs.split("segmentNavigationController.select(").length - 1 === 6,
+  "all six remaining application selection consumers must call SegmentNavigationController directly."
 );
 assert(
   appWorkflowDriverJs.split("segmentNavigationController.select(").length - 1 === 24,

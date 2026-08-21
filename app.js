@@ -4072,6 +4072,17 @@ segmentNavigationController = appRuntime.featureFactories.createSegmentNavigatio
   focus: { target: targetEditController.focusActive },
   statusFilter: els.segmentStatusFilter
 });
+const segmentMarkupPresentationService =
+  appRuntime.featureFactories.createSegmentMarkupPresentationService({
+    document,
+    protectedTags: protectedTagInspectionService,
+    terms: {
+      ranges: termRanges,
+      getProjectTerms: editorSessionStore.getProjectTerms
+    },
+    navigation: segmentNavigationController,
+    targetProducer: targetProducerController
+  });
 const segmentActionButtonsController =
   appRuntime.featureFactories.createSegmentActionButtonsController({
     elements: {
@@ -5659,117 +5670,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
   }
 });
 
-function appendTextWithTags(container, text, tags, options = {}) {
-  const ordered = [...tags].sort((a, b) => a.index - b.index || b.text.length - a.text.length);
-  let offset = 0;
-  ordered.forEach((tag) => {
-    const index = typeof tag.index === "number" && tag.index >= offset ? tag.index : text.indexOf(tag.text, offset);
-    if (index === -1) return;
-    if (index > offset) container.append(document.createTextNode(text.slice(offset, index)));
-    const chip = document.createElement(options.interactive ? "button" : "span");
-    if (options.interactive) chip.type = "button";
-    chip.className = `tag-chip tag-chip-${tag.type || "placeholder"}${options.interactive ? " tag-chip-action" : ""}`;
-    chip.textContent = protectedTagInspectionService.displayText(tag);
-    chip.title = options.interactive ? `Insert protected text: ${tag.text}` : `Protected text: ${tag.text}`;
-    if (options.interactive) {
-      chip.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const rowIndex = Number(container.closest("tr")?.dataset.index);
-        const ready = Number.isInteger(rowIndex) ? segmentNavigationController.select(rowIndex) : Promise.resolve();
-        ready.then(() => targetProducerController.insertProtectedTag(tag.text));
-      });
-    }
-    container.append(chip);
-    offset = index + tag.text.length;
-  });
-  if (offset < text.length) container.append(document.createTextNode(text.slice(offset)));
-}
-
-function sourceTagMarkers(text, tags) {
-  const ordered = [...tags].sort((a, b) => a.index - b.index || b.text.length - a.text.length);
-  let offset = 0;
-  return ordered.flatMap((tag) => {
-    const index = typeof tag.index === "number" && tag.index >= offset ? tag.index : text.indexOf(tag.text, offset);
-    if (index === -1) return [];
-    offset = index + tag.text.length;
-    return [{ type: "tag", index, length: tag.text.length, tag }];
-  });
-}
-
-function rangesOverlap(a, b) {
-  return a.index < b.index + b.length && b.index < a.index + a.length;
-}
-
-function appendTextWithSourceMarkup(container, segment) {
-  const text = segment.source || "";
-  const tagMarkers = sourceTagMarkers(text, protectedTagInspectionService.sourceTags(segment));
-  const termMarkers = termRanges(text, editorSessionStore.getProjectTerms())
-    .filter((range) => !tagMarkers.some((tagMarker) => rangesOverlap(range, tagMarker)))
-    .map((range) => ({ type: "term", index: range.index, length: range.length, range }));
-  const markers = [...tagMarkers, ...termMarkers].sort((a, b) => a.index - b.index || (a.type === "tag" ? -1 : 1));
-  let offset = 0;
-  markers.forEach((marker) => {
-    if (marker.index < offset) return;
-    if (marker.index > offset) container.append(document.createTextNode(text.slice(offset, marker.index)));
-    if (marker.type === "tag") {
-      const chip = document.createElement("button");
-      chip.type = "button";
-      chip.className = `tag-chip tag-chip-${marker.tag.type || "placeholder"} tag-chip-action`;
-      chip.textContent = protectedTagInspectionService.displayText(marker.tag);
-      chip.title = `Insert protected text: ${marker.tag.text}`;
-      chip.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const rowIndex = Number(container.closest("tr")?.dataset.index);
-        const ready = Number.isInteger(rowIndex) ? segmentNavigationController.select(rowIndex) : Promise.resolve();
-        ready.then(() => targetProducerController.insertProtectedTag(marker.tag.text));
-      });
-      container.append(chip);
-    } else {
-      const mark = document.createElement("mark");
-      mark.className = "term-highlight";
-      mark.textContent = text.slice(marker.index, marker.index + marker.length);
-      mark.title = `Termbase: ${marker.range.term.sourceTerm} -> ${marker.range.term.targetTerm}`;
-      container.append(mark);
-    }
-    offset = marker.index + marker.length;
-  });
-  if (offset < text.length) container.append(document.createTextNode(text.slice(offset)));
-}
-
-function renderTagTray(row, segment) {
-  const tags = protectedTagInspectionService.sourceTags(segment);
-  if (!tags.length) return;
-  const tray = document.createElement("div");
-  tray.className = "tag-tray";
-  tags.forEach((tag) => {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = `tag-chip tag-chip-${tag.type || "placeholder"} tag-chip-action`;
-    chip.textContent = protectedTagInspectionService.displayText(tag);
-    chip.title = `Insert protected text: ${tag.text}`;
-    chip.addEventListener("click", () => targetProducerController.insertProtectedTag(tag.text));
-    tray.append(chip);
-  });
-  const targetCell = row.querySelector(".target-cell");
-  targetCell.append(tray);
-}
-
-function renderTargetTagPreview(row, segment) {
-  const preview = row.querySelector(".target-tag-preview");
-  const targetCell = row.querySelector(".target-cell");
-  if (!preview) return;
-  const tags = protectedTagInspectionService.targetTags(segment);
-  preview.textContent = "";
-  targetCell?.classList.toggle("has-target-preview", Boolean(tags.length));
-  preview.classList.toggle("hidden", !tags.length);
-  if (!tags.length) return;
-  appendTextWithTags(preview, segment.target || "", tags);
-  preview.onclick = () => {
-    targetCell?.classList.add("editing");
-    row.querySelector("textarea")?.focus();
-  };
-}
-
 function spacerRow(height) {
   const row = document.createElement("tr");
   row.className = "segment-spacer-row";
@@ -5793,7 +5693,7 @@ function renderSegmentRow(index) {
   const sourceCell = row.querySelector(".source-cell");
   sourceCell.textContent = "";
   sourceCell.dir = "auto";
-  appendTextWithSourceMarkup(sourceCell, segment);
+  segmentMarkupPresentationService.appendSource(sourceCell, segment);
   const textarea = row.querySelector("textarea");
   textarea.dir = "auto";
   textarea.setAttribute("aria-label", uiLocalizationService.source("Target translation for segment {value1}", { value1: index + 1 }));
@@ -5805,9 +5705,9 @@ function renderSegmentRow(index) {
     index,
     segmentId: segment.id
   });
-  renderTargetTagPreview(row, segment);
+  segmentMarkupPresentationService.renderTargetPreview(row, segment);
   renderStatusCell(row, segment);
-  renderTagTray(row, segment);
+  segmentMarkupPresentationService.renderTagTray(row, segment);
   row.addEventListener("click", () => segmentNavigationController.select(index));
   return row;
 }
@@ -5929,7 +5829,7 @@ function updateRow(index) {
   if (!row || !segment) return;
   row.classList.toggle("active", index === applicationStore.getState().navigation.activeIndex);
   row.classList.toggle("tag-warning-row", protectedTagInspectionService.hasIssue(segment));
-  renderTargetTagPreview(row, segment);
+  segmentMarkupPresentationService.renderTargetPreview(row, segment);
   renderStatusCell(row, segment);
 }
 
