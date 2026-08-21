@@ -179,6 +179,7 @@ import { createProjectQaController } from "../features/quality/project-qa-contro
 import { createQualityPresentationService } from "../features/quality/quality-presentation-service.js";
 import { createQualityWorkbenchController } from "../features/quality/quality-workbench-controller.js";
 import { createRevisionHistoryPresentationService } from "../features/quality/revision-history-presentation-service.js";
+import { createRevisionHistoryRenderScheduler } from "../features/quality/revision-history-render-scheduler.js";
 import { createQualityProfileController } from "../features/quality/quality-profile-controller.js";
 import { createQualityDecisionController } from "../features/quality/quality-decision-controller.js";
 import { createReviewStateController } from "../features/quality/review-state-controller.js";
@@ -393,6 +394,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createQualityPresentationService,
       createQualityWorkbenchController,
       createRevisionHistoryPresentationService,
+      createRevisionHistoryRenderScheduler,
       createQualityProfileController,
       createQualityDecisionController,
       createReviewMetadataController,

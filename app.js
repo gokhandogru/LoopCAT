@@ -781,7 +781,6 @@ const editorFilterStore = appRuntime.featureFactories.createFilterStore();
 const state = {
   inspectorOpen: true,
   importTask: "",
-  revisionHistoryFrame: 0,
   workspaceAutosaveTimer: 0,
   workspaceAutosaving: false,
   lastValidationReport: null,
@@ -1315,6 +1314,11 @@ const revisionHistoryPresentationService =
     formatDateTime: applicationDateTimeService.dateTime,
     escapeHtml: applicationTextSafetyService.escapeHtml,
     replaceSafeHtml
+  });
+const revisionHistoryRenderScheduler =
+  appRuntime.featureFactories.createRevisionHistoryRenderScheduler({
+    requestFrame: (callback) => requestAnimationFrame(callback),
+    presentation: { render: revisionHistoryPresentationService.render }
   });
 
 const languageInputService = appRuntime.featureFactories.createLanguageInputService({
@@ -2600,7 +2604,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
     updateRow: segmentRowPresentationService.update,
     renderSegments: segmentGridPresentationController.render,
     renderProgress: segmentProgressPresentationService.render,
-    scheduleHistory: scheduleRevisionHistoryRender,
+    scheduleHistory: revisionHistoryRenderScheduler.schedule,
     renderHistory: revisionHistoryPresentationService.render
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
@@ -2637,7 +2641,7 @@ const segmentDraftApplicationService = appRuntime.featureFactories.createSegment
     scheduleRowUpdate: segmentGridPresentationController.scheduleRowUpdate,
     cancelRowUpdate: segmentGridPresentationController.cancelRowUpdate,
     renderProgress: segmentProgressPresentationService.render,
-    scheduleHistory: scheduleRevisionHistoryRender
+    scheduleHistory: revisionHistoryRenderScheduler.schedule
   },
   workspace: { markDirty: workspaceDirtyStateController.mark }
 });
@@ -5722,14 +5726,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-function scheduleRevisionHistoryRender() {
-  if (state.revisionHistoryFrame) return;
-  state.revisionHistoryFrame = requestAnimationFrame(() => {
-    state.revisionHistoryFrame = 0;
-    revisionHistoryPresentationService.render();
-  });
-}
 
 /* LOOPCAT_TEST_WORKFLOW_DRIVER */
 

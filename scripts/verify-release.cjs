@@ -748,6 +748,8 @@ const revisionHistoryPresentationServiceJs = readText("src/features/quality/revi
 const revisionHistoryPresentationServiceUnitTests = readText(
   "tests/unit/revision-history-presentation-service.test.cjs"
 );
+const revisionHistoryRenderSchedulerJs = readText("src/features/quality/revision-history-render-scheduler.js");
+const revisionHistoryRenderSchedulerUnitTests = readText("tests/unit/revision-history-render-scheduler.test.cjs");
 const qualityDecisionControllerJs = readText("src/features/quality/quality-decision-controller.js");
 const qualityDecisionControllerUnitTests = readText("tests/unit/quality-decision-controller.test.cjs");
 const reviewMetadataControllerJs = readText("src/features/quality/review-metadata-controller.js");
@@ -4157,11 +4159,15 @@ for (const boundary of [
 }
 for (const consumer of [
   "onSaved: revisionHistoryPresentationService.render",
-  "renderHistory: revisionHistoryPresentationService.render",
-  "revisionHistoryPresentationService.render();"
+  "renderHistory: revisionHistoryPresentationService.render"
 ]) {
   assertIncludes(appJs, consumer, `revision-history consumers must call the checked service directly: ${consumer}.`);
 }
+assertIncludes(
+  revisionHistoryRenderSchedulerJs,
+  "presentation.render()",
+  "scheduled revision-history presentation must call the checked render boundary directly."
+);
 assert(
   (appJs.match(/\brevisionHistoryPresentationService\.render\b/g) || []).length === 15,
   "all fifteen autosave, command, editor-context, refresh, scheduled, and presentation consumers must call RevisionHistoryPresentationService directly."
@@ -4205,6 +4211,95 @@ assertIncludes(
   '"src/features/quality/revision-history-presentation-service.js"',
   "source-catalog extraction must scan the checked revision-history presentation service."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createRevisionHistoryRenderScheduler } from "../features/quality/revision-history-render-scheduler.js";',
+  "the application runtime must install the checked revision-history render scheduler."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createRevisionHistoryRenderScheduler,",
+  "the application runtime must expose the checked revision-history render scheduler factory."
+);
+for (const snippet of [
+  "RevisionHistoryRenderScheduler requires frame and presentation boundaries.",
+  "let frame = 0",
+  "if (frame) return",
+  "frame = requestFrame(() =>",
+  "frame = 0",
+  "presentation.render()",
+  "return Object.freeze({ schedule })"
+]) {
+  assertIncludes(
+    revisionHistoryRenderSchedulerJs,
+    snippet,
+    `RevisionHistoryRenderScheduler must retain characterized frame policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createRevisionHistoryRenderScheduler({",
+  "app.js must compose the checked revision-history render scheduler."
+);
+const revisionHistoryRenderSchedulerComposition = functionBody(
+  appJs,
+  "const revisionHistoryRenderScheduler =",
+  "const languageInputService ="
+);
+for (const boundary of [
+  "requestFrame: (callback) => requestAnimationFrame(callback)",
+  "presentation: { render: revisionHistoryPresentationService.render }"
+]) {
+  assertIncludes(
+    revisionHistoryRenderSchedulerComposition,
+    boundary,
+    `revision-history scheduler composition must inject the ${boundary} boundary.`
+  );
+}
+assert(
+  appJs.indexOf("const revisionHistoryPresentationService =") <
+    appJs.indexOf("const revisionHistoryRenderScheduler =") &&
+    appJs.indexOf("const revisionHistoryRenderScheduler =") < appJs.indexOf("const languageInputService ="),
+  "RevisionHistoryRenderScheduler must follow checked presentation composition and precede its consumers."
+);
+assert(
+  (appJs.match(/\brevisionHistoryRenderScheduler\.schedule\b/g) || []).length === 2,
+  "both confirmation and draft-application history consumers must call RevisionHistoryRenderScheduler.schedule directly."
+);
+assert(
+  !/function\s+scheduleRevisionHistoryRender\b/.test(appJs) &&
+    !/function\s+scheduleRevisionHistoryRender\b/.test(appWorkflowDriverJs) &&
+    !appJs.includes("revisionHistoryFrame"),
+  "revision-history frame state and scheduling helpers must not return to the coordinator or workflow driver."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "revisionHistoryPresentationService",
+  "requestAnimationFrame",
+  "window.",
+  "document.",
+  "state.",
+  "els."
+]) {
+  assert(
+    !revisionHistoryRenderSchedulerJs.includes(forbiddenOwner),
+    `RevisionHistoryRenderScheduler must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "RevisionHistoryRenderScheduler queues one frame and coalesces repeated scheduling",
+  "RevisionHistoryRenderScheduler clears the marker before rendering and accepts a later frame",
+  "RevisionHistoryRenderScheduler permits reentrant scheduling from presentation",
+  "RevisionHistoryRenderScheduler preserves falsy frame-handle scheduling behavior",
+  "RevisionHistoryRenderScheduler preserves request and render failure recovery timing",
+  "RevisionHistoryRenderScheduler validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    revisionHistoryRenderSchedulerUnitTests,
+    testName,
+    `focused revision-history scheduler tests must retain characterization: ${testName}`
+  );
+}
 for (const removedFacade of ["reportLocale", "reportDir", "reportText", "reportHtml"]) {
   assert(
     !new RegExp(`\\b${removedFacade}\\b`).test(appJs) &&
@@ -14237,7 +14332,7 @@ for (const boundary of [
   "scheduleRowUpdate: segmentGridPresentationController.scheduleRowUpdate",
   "cancelRowUpdate: segmentGridPresentationController.cancelRowUpdate",
   "renderProgress,",
-  "scheduleHistory: scheduleRevisionHistoryRender",
+  "scheduleHistory: revisionHistoryRenderScheduler.schedule",
   "workspace: { markDirty: workspaceDirtyStateController.mark }",
   "applyDraft: segmentDraftApplicationService.apply"
 ]) {
