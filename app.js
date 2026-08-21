@@ -141,11 +141,6 @@ const {
 const CREATOR_NAME_STORAGE = "loopcat.creatorName";
 const WORKSPACE_DIRTY_STORAGE = "loopcat.workspace.dirtyProjectIds";
 const BACKUP_REMINDER_STORAGE = "loopcat.backupReminder.dismissedUntil";
-const OFFLINE_APP_SHELL_CACHE_PREFIX = "loopcat-offline-";
-let offlineUpdateController = null;
-const OFFLINE_APP_SHELL_WARMUP_ASSETS = Object.freeze(
-  (window.LoopCATProductionAssets?.offlineAssets || []).map((asset) => `./${asset}`)
-);
 
 const SEGMENT_ROW_HEIGHT = 118;
 const SEGMENT_ROW_BUFFER = 8;
@@ -3580,6 +3575,43 @@ const applicationCommandButtonsController =
       redo: applicationCommandHistoryController.redo
     }
   });
+const applicationOfflineShellController =
+  appRuntime.featureFactories.createApplicationOfflineShellController({
+    browser: {
+      hasServiceWorker: () => "serviceWorker" in navigator,
+      getServiceWorker: () => navigator.serviceWorker,
+      hasCacheStorage: () => "caches" in window,
+      getCacheStorage: () => caches,
+      fetchAsset: (asset) => fetch(asset),
+      location: window.location,
+      setTimeout: (callback, timeoutMs) => setTimeout(callback, timeoutMs)
+    },
+    updates: {
+      create: (options) => appRuntime?.featureFactories?.createUpdateController?.(options),
+      trustScriptUrl: appRuntime.safeHtml.trustedScriptUrl
+    },
+    assets: {
+      cachePrefix: "loopcat-offline-",
+      warmup: (window.LoopCATProductionAssets?.offlineAssets || []).map((asset) => `./${asset}`)
+    },
+    persistence: {
+      flush: () => autosaveService.flush(),
+      shouldSaveRecovery: () => Boolean(state.workspaceStatus?.connected && state.workspaceDirtyProjectIds.size),
+      saveRecovery: () => workspacePackageSaveController.saveRecovery()
+    },
+    presentation: {
+      elements: {
+        banner: els.updateReadyBanner,
+        title: els.updateReadyTitle,
+        message: els.updateReadyMessage,
+        reloadButton: els.reloadUpdateBtn,
+        deferButton: els.deferUpdateBtn
+      },
+      localize: (value) => uiLocalizationService.source(value),
+      setStatus: applicationSaveStatusController.set
+    },
+    logger: console
+  });
 const applicationUpdateControlsController =
   appRuntime.featureFactories.createApplicationUpdateControlsController({
     elements: {
@@ -3587,8 +3619,8 @@ const applicationUpdateControlsController =
       deferButton: els.deferUpdateBtn
     },
     actions: {
-      activate: () => offlineUpdateController?.activate?.(),
-      defer: () => offlineUpdateController?.defer?.()
+      activate: applicationOfflineShellController.activate,
+      defer: applicationOfflineShellController.defer
     }
   });
 const uiLocaleOrchestrationController =
@@ -3873,7 +3905,7 @@ const applicationStartupController = appRuntime.featureFactories.createApplicati
     layout: workspaceLayoutController
   },
   workflow: { run: () => (LOOPCAT_TEST_BUILD ? runAppWorkflowTest() : undefined) },
-  offline: { register: () => registerOfflineAppShell() },
+  offline: { register: applicationOfflineShellController.register },
   errors: {
     log: (error) => console.error(error),
     setStatus: applicationSaveStatusController.set
@@ -4975,116 +5007,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   logger: console
 });
 dialogLifecycleController?.mount?.();
-
-async function waitForOfflineAppShellReady(timeoutMs = 10000) {
-  if (!("serviceWorker" in navigator)) return null;
-  try {
-    return await Promise.race([
-      navigator.serviceWorker.ready,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out waiting for offline app shell")), timeoutMs))
-    ]);
-  } catch {
-    return null;
-  }
-}
-
-async function waitForOfflineAppShellController(timeoutMs = 10000) {
-  if (!("serviceWorker" in navigator)) return false;
-  if (navigator.serviceWorker.controller) return true;
-  try {
-    await Promise.race([
-      new Promise((resolve) => {
-        navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out waiting for offline app shell control")), timeoutMs))
-    ]);
-  } catch {
-    return false;
-  }
-  return Boolean(navigator.serviceWorker.controller);
-}
-
-async function warmOfflineAppShellCache() {
-  if (!("serviceWorker" in navigator) || !("caches" in window)) return;
-  try {
-    await waitForOfflineAppShellReady();
-    await waitForOfflineAppShellController();
-    const cacheName = (await caches.keys()).find((name) => name.startsWith(OFFLINE_APP_SHELL_CACHE_PREFIX));
-    if (!cacheName) return;
-    const cache = await caches.open(cacheName);
-    await Promise.all(OFFLINE_APP_SHELL_WARMUP_ASSETS.map(async (asset) => {
-      try {
-        if (await cache.match(asset)) return;
-        const response = await fetch(asset);
-        if (!response) return;
-        await cache.put(asset, response.clone());
-      } catch (error) {
-        console.warn("Offline app shell warmup failed.", asset, error);
-      }
-    }));
-  } catch (error) {
-    console.warn("Offline app shell warmup failed.", error);
-  }
-}
-
-function renderOfflineUpdateState(update) {
-  if (!els.updateReadyBanner) return;
-  const hidden = !update || update.state === "deferred";
-  els.updateReadyBanner.classList.toggle("hidden", hidden);
-  if (hidden) return;
-  const messages = {
-    ready: ["Update ready", "Reload when convenient. LoopCAT will save pending local work first."],
-    saving: ["Saving before update", "Pending segment and workspace changes are being saved locally."],
-    activating: ["Applying update", "The new offline app shell is ready. LoopCAT will reload shortly."],
-    reloading: ["Reloading LoopCAT", "Your saved project and workspace state will be restored."],
-    error: ["Update paused", update.message || "Your current version is still active and your work was preserved."]
-  };
-  const [title, message] = messages[update.state] || messages.ready;
-  els.updateReadyTitle.textContent = uiLocalizationService.source(title);
-  els.updateReadyMessage.textContent = uiLocalizationService.source(message);
-  const busy = ["saving", "activating", "reloading"].includes(update.state);
-  els.reloadUpdateBtn.disabled = busy;
-  els.deferUpdateBtn.disabled = busy;
-  els.reloadUpdateBtn.textContent = update.state === "error" ? uiLocalizationService.source("Try again") : uiLocalizationService.source("Reload now");
-}
-
-function registerOfflineAppShell() {
-  if (!("serviceWorker" in navigator)) return;
-  if (window.location.protocol === "loopcat:") {
-    navigator.serviceWorker.getRegistrations?.()
-      .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
-      .catch((error) => {
-        console.warn("Desktop service worker cleanup failed.", error);
-      });
-    return;
-  }
-  if (!["http:", "https:"].includes(window.location.protocol)) return;
-  offlineUpdateController = appRuntime?.featureFactories?.createUpdateController?.({
-    serviceWorker: navigator.serviceWorker,
-    location: window.location,
-    trustScriptUrl: appRuntime.safeHtml.trustedScriptUrl,
-    beforeActivate: async () => {
-      await autosaveService.flush();
-      if (state.workspaceStatus?.connected && state.workspaceDirtyProjectIds.size) {
-        await workspacePackageSaveController.saveRecovery();
-      }
-    },
-    onStateChange: renderOfflineUpdateState,
-    onError: (error) =>
-      applicationSaveStatusController.set(
-        error?.message || "Offline update failed; current version remains active",
-        "dirty"
-      )
-  });
-  offlineUpdateController
-    ?.initialize?.("./service-worker.js")
-    .then(async (registration) => {
-      await warmOfflineAppShellCache();
-    })
-    .catch((error) => {
-      console.warn("Offline app shell registration failed.", error);
-    });
-}
 
 function uniqueNames(values) {
   return Array.from(new Set((Array.isArray(values) ? values : []).map((value) => String(value || "").trim()).filter(Boolean)));

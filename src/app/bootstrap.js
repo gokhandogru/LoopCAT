@@ -7,6 +7,7 @@ import { createApplicationDownloadController } from "./application-download-cont
 import { createApplicationEventWiringController } from "./application-event-wiring-controller.js";
 import { createApplicationImportProgressController } from "./application-import-progress-controller.js";
 import { createApplicationMenuController } from "./application-menu-controller.js";
+import { createApplicationOfflineShellController } from "./application-offline-shell-controller.js";
 import { createApplicationPersistenceLifecycleController } from "./application-persistence-lifecycle-controller.js";
 import { createApplicationSaveStatusController } from "./application-save-status-controller.js";
 import { createApplicationStorageDurabilityController } from "./application-storage-durability-controller.js";
@@ -354,6 +355,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createApplicationEventWiringController,
       createApplicationImportProgressController,
       createApplicationMenuController,
+      createApplicationOfflineShellController,
       createApplicationPersistenceLifecycleController,
       createApplicationSaveStatusController,
       createApplicationStorageDurabilityController,

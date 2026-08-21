@@ -164,6 +164,7 @@ const requiredReleaseFiles = [
   "src/app/application-event-wiring-controller.js",
   "src/app/application-import-progress-controller.js",
   "src/app/application-menu-controller.js",
+  "src/app/application-offline-shell-controller.js",
   "src/app/application-persistence-lifecycle-controller.js",
   "src/app/application-save-status-controller.js",
   "src/app/application-storage-durability-controller.js",
@@ -313,6 +314,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-event-wiring-controller.test.cjs",
   "tests/unit/application-import-progress-controller.test.cjs",
   "tests/unit/application-menu-controller.test.cjs",
+  "tests/unit/application-offline-shell-controller.test.cjs",
   "tests/unit/application-persistence-lifecycle-controller.test.cjs",
   "tests/unit/application-save-status-controller.test.cjs",
   "tests/unit/application-storage-durability-controller.test.cjs",
@@ -520,6 +522,10 @@ const localizationDownloadMimeTypeServiceUnitTests = readText(
 );
 const applicationTrashControllerJs = readText("src/app/application-trash-controller.js");
 const applicationTrashControllerUnitTests = readText("tests/unit/application-trash-controller.test.cjs");
+const applicationOfflineShellControllerJs = readText("src/app/application-offline-shell-controller.js");
+const applicationOfflineShellControllerUnitTests = readText(
+  "tests/unit/application-offline-shell-controller.test.cjs"
+);
 const applicationUpdateControlsControllerJs = readText("src/app/application-update-controls-controller.js");
 const applicationUpdateControlsControllerUnitTests = readText(
   "tests/unit/application-update-controls-controller.test.cjs"
@@ -5485,6 +5491,137 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createApplicationOfflineShellController } from "./application-offline-shell-controller.js";',
+  "the application runtime must install the checked offline-shell controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationOfflineShellController,",
+  "the application runtime must expose the checked offline-shell controller factory."
+);
+for (const snippet of [
+  "ApplicationOfflineShellController requires checked browser boundaries.",
+  "ApplicationOfflineShellController requires update-controller boundaries.",
+  "ApplicationOfflineShellController requires offline cache assets.",
+  "ApplicationOfflineShellController requires persistence boundaries.",
+  "ApplicationOfflineShellController requires presentation and logger boundaries.",
+  "const warmupAssets = Object.freeze([...assets.warmup])",
+  "async function waitForReady(timeoutMs = 10000)",
+  "async function waitForController(timeoutMs = 10000)",
+  "return await Promise.race([",
+  'serviceWorker.addEventListener("controllerchange", resolve, { once: true })',
+  "const cacheName = (await cacheStorage.keys()).find((name) => name.startsWith(assets.cachePrefix))",
+  "await Promise.all(",
+  "if (await cache.match(asset)) return",
+  "const response = await browser.fetchAsset(asset)",
+  "await cache.put(asset, response.clone())",
+  'logger.warn("Offline app shell warmup failed.", asset, error)',
+  'if (browser.location.protocol === "loopcat:")',
+  "Promise.all(registrations.map((registration) => registration.unregister()))",
+  'if (!["http:", "https:"].includes(browser.location.protocol)) return',
+  "const hidden = !update || update.state === \"deferred\"",
+  'ready: ["Update ready", "Reload when convenient. LoopCAT will save pending local work first."]',
+  'error: ["Update paused", update.message || "Your current version is still active and your work was preserved."]',
+  'const busy = ["saving", "activating", "reloading"].includes(update.state)',
+  "await persistence.flush()",
+  "if (persistence.shouldSaveRecovery()) await persistence.saveRecovery()",
+  '?.initialize?.("./service-worker.js")',
+  'logger.warn("Offline app shell registration failed.", error)',
+  "return updateController?.activate?.()",
+  "return updateController?.defer?.()",
+  "return Object.freeze({ activate, defer, register })"
+]) {
+  assertIncludes(
+    applicationOfflineShellControllerJs,
+    snippet,
+    `ApplicationOfflineShellController must retain characterized orchestration: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationOfflineShellController({",
+  'hasServiceWorker: () => "serviceWorker" in navigator',
+  "getServiceWorker: () => navigator.serviceWorker",
+  'hasCacheStorage: () => "caches" in window',
+  "getCacheStorage: () => caches",
+  "fetchAsset: (asset) => fetch(asset)",
+  "location: window.location",
+  "setTimeout: (callback, timeoutMs) => setTimeout(callback, timeoutMs)",
+  "create: (options) => appRuntime?.featureFactories?.createUpdateController?.(options)",
+  "trustScriptUrl: appRuntime.safeHtml.trustedScriptUrl",
+  'cachePrefix: "loopcat-offline-"',
+  "warmup: (window.LoopCATProductionAssets?.offlineAssets || []).map((asset) => `./${asset}`)",
+  "flush: () => autosaveService.flush()",
+  "shouldSaveRecovery: () => Boolean(state.workspaceStatus?.connected && state.workspaceDirtyProjectIds.size)",
+  "saveRecovery: () => workspacePackageSaveController.saveRecovery()",
+  "banner: els.updateReadyBanner",
+  "title: els.updateReadyTitle",
+  "message: els.updateReadyMessage",
+  "localize: (value) => uiLocalizationService.source(value)",
+  "setStatus: applicationSaveStatusController.set",
+  "activate: applicationOfflineShellController.activate",
+  "defer: applicationOfflineShellController.defer",
+  "offline: { register: applicationOfflineShellController.register }"
+]) {
+  assertIncludes(appJs, boundary, `offline-shell composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/createApplicationOfflineShellController\(/g) || []).length === 1,
+  "app.js must compose exactly one checked offline-shell controller."
+);
+for (const removedOwner of [
+  "OFFLINE_APP_SHELL_CACHE_PREFIX",
+  "OFFLINE_APP_SHELL_WARMUP_ASSETS",
+  "offlineUpdateController",
+  "waitForOfflineAppShellReady",
+  "waitForOfflineAppShellController",
+  "warmOfflineAppShellCache",
+  "renderOfflineUpdateState",
+  "registerOfflineAppShell"
+]) {
+  assert(
+    !appJs.includes(removedOwner) && !appWorkflowDriverJs.includes(removedOwner),
+    `${removedOwner} must not return to app.js or the workflow driver after offline-shell extraction.`
+  );
+}
+for (const forbiddenOwner of [
+  "navigator",
+  "window.",
+  "appRuntime",
+  "autosaveService",
+  "workspacePackageSaveController",
+  "uiLocalizationService",
+  "applicationSaveStatusController",
+  "els.",
+  "state."
+]) {
+  assert(
+    !applicationOfflineShellControllerJs.includes(forbiddenOwner),
+    `ApplicationOfflineShellController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationOfflineShellController preserves unsupported and non-web registration guards with immutable no-op actions",
+  "ApplicationOfflineShellController preserves desktop service-worker cleanup and warning containment",
+  "ApplicationOfflineShellController composes one update controller and preserves late actions and activation persistence",
+  "ApplicationOfflineShellController preserves exact update-banner state copy and busy policy",
+  "ApplicationOfflineShellController warms the first matching cache with ordered concurrent asset policy",
+  "ApplicationOfflineShellController preserves cache guards, absent responses, and timeout continuation",
+  "ApplicationOfflineShellController contains per-asset, outer warmup, and registration failures exactly",
+  "ApplicationOfflineShellController preserves persistence failures and validates every injected boundary"
+]) {
+  assertIncludes(
+    applicationOfflineShellControllerUnitTests,
+    testName,
+    `focused offline-shell tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/app/application-offline-shell-controller.js"',
+  "source-catalog extraction must scan the checked offline-shell controller."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createApplicationUpdateControlsController } from "./application-update-controls-controller.js";',
   "the application runtime must install the checked application update-controls controller."
 );
@@ -5516,8 +5653,8 @@ for (const boundary of [
   "appRuntime.featureFactories.createApplicationUpdateControlsController({",
   "reloadButton: els.reloadUpdateBtn",
   "deferButton: els.deferUpdateBtn",
-  "activate: () => offlineUpdateController?.activate?.()",
-  "defer: () => offlineUpdateController?.defer?.()",
+  "activate: applicationOfflineShellController.activate",
+  "defer: applicationOfflineShellController.defer",
   "updateControls: applicationUpdateControlsController"
 ]) {
   assertIncludes(
@@ -15621,11 +15758,15 @@ assertIncludes(
 
 assertIncludes(appJs, '"serviceWorker" in navigator', "app.js must guard service worker registration.");
 assertIncludes(
-  appJs,
-  'window.location.protocol === "loopcat:"',
-  "app.js must clean up stale desktop service workers without relying on unsupported loopcat Cache Storage."
+  applicationOfflineShellControllerJs,
+  'browser.location.protocol === "loopcat:"',
+  "the checked offline-shell controller must clean up stale desktop service workers without relying on unsupported loopcat Cache Storage."
 );
-assertIncludes(appJs, '"http:", "https:"', "app.js must limit service worker registration to browser HTTP(S) origins.");
+assertIncludes(
+  applicationOfflineShellControllerJs,
+  '["http:", "https:"]',
+  "the checked offline-shell controller must limit service worker registration to browser HTTP(S) origins."
+);
 assertIncludes(
   updateControllerJs,
   "serviceWorker.register(trustedScriptUrl)",
@@ -16850,7 +16991,7 @@ for (const boundary of [
   "theme: themeController",
   "layout: workspaceLayoutController",
   "run: () => (LOOPCAT_TEST_BUILD ? runAppWorkflowTest() : undefined)",
-  "register: () => registerOfflineAppShell()",
+  "register: applicationOfflineShellController.register",
   "log: (error) => console.error(error)",
   "setStatus: applicationSaveStatusController.set",
   "applicationStartupController.start()"

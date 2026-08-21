@@ -15,6 +15,12 @@ const applicationStorageDurabilityControllerPath = path.join(
   "application-storage-durability-controller.js"
 );
 const applicationTrashControllerPath = path.join(root, "src", "app", "application-trash-controller.js");
+const applicationOfflineShellControllerPath = path.join(
+  root,
+  "src",
+  "app",
+  "application-offline-shell-controller.js"
+);
 const deliveryExportControllerPath = path.join(
   root,
   "src",
@@ -392,6 +398,11 @@ function main() {
     "src/app/application-storage-durability-controller.js"
   );
   extractScript(messagesByText, applicationTrashControllerPath, "src/app/application-trash-controller.js");
+  extractScript(
+    messagesByText,
+    applicationOfflineShellControllerPath,
+    "src/app/application-offline-shell-controller.js"
+  );
   extractScript(messagesByText, qaPath, "qa.js");
   extractScript(
     messagesByText,
