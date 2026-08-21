@@ -7,6 +7,12 @@ const sourcePath = path.join(root, "i18n", "source.en-US.json");
 const indexPath = path.join(root, "index.html");
 const appPath = path.join(root, "app.js");
 const qaPath = path.join(root, "qa.js");
+const applicationValidationPresentationControllerPath = path.join(
+  root,
+  "src",
+  "app",
+  "application-validation-presentation-controller.js"
+);
 const applicationSaveStatusControllerPath = path.join(root, "src", "app", "application-save-status-controller.js");
 const applicationStorageDurabilityControllerPath = path.join(
   root,
@@ -15,12 +21,7 @@ const applicationStorageDurabilityControllerPath = path.join(
   "application-storage-durability-controller.js"
 );
 const applicationTrashControllerPath = path.join(root, "src", "app", "application-trash-controller.js");
-const applicationOfflineShellControllerPath = path.join(
-  root,
-  "src",
-  "app",
-  "application-offline-shell-controller.js"
-);
+const applicationOfflineShellControllerPath = path.join(root, "src", "app", "application-offline-shell-controller.js");
 const deliveryExportControllerPath = path.join(
   root,
   "src",
@@ -391,6 +392,11 @@ function main() {
   const messagesByText = new Map();
   extractHtml(messagesByText);
   extractScript(messagesByText, appPath, "app.js");
+  extractScript(
+    messagesByText,
+    applicationValidationPresentationControllerPath,
+    "src/app/application-validation-presentation-controller.js"
+  );
   extractScript(messagesByText, applicationSaveStatusControllerPath, "src/app/application-save-status-controller.js");
   extractScript(
     messagesByText,

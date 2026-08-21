@@ -17,6 +17,7 @@ import { createApplicationStartupController } from "./application-startup-contro
 import { createApplicationTextSafetyService } from "./application-text-safety-service.js";
 import { createApplicationTrashController } from "./application-trash-controller.js";
 import { createApplicationUpdateControlsController } from "./application-update-controls-controller.js";
+import { createApplicationValidationPresentationController } from "./application-validation-presentation-controller.js";
 import { createApplicationViewController } from "./application-view-controller.js";
 import { createNavigationController } from "./navigation-controller.js";
 import { createGlobalKeyboardController } from "./global-keyboard-controller.js";
@@ -405,6 +406,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createApplicationTextSafetyService,
       createApplicationTrashController,
       createApplicationUpdateControlsController,
+      createApplicationValidationPresentationController,
       createApplicationViewController,
       createGlobalKeyboardController,
       createLocalizationDownloadMimeTypeService,

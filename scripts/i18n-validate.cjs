@@ -7,6 +7,12 @@ const sourcePath = path.join(i18nDir, "source.en-US.json");
 const localeDir = path.join(i18nDir, "locales");
 const indexPath = path.join(root, "index.html");
 const appPath = path.join(root, "app.js");
+const applicationValidationPresentationControllerPath = path.join(
+  root,
+  "src",
+  "app",
+  "application-validation-presentation-controller.js"
+);
 const applicationSaveStatusControllerPath = path.join(root, "src", "app", "application-save-status-controller.js");
 const focusModeControllerPath = path.join(root, "src", "features", "editor", "focus-mode-controller.js");
 
@@ -46,7 +52,7 @@ function collectCodeKeys(js) {
     keys.push(match[1]);
   }
   for (const match of js.matchAll(
-    /\b(?:uiLabel(?:Html)?|uiLocalizationService\.label(?:Html)?)\(\s*["']([^"']+)["']/g
+    /\b(?:uiLabel(?:Html)?|uiLocalizationService\.label(?:Html)?|localization\.label(?:Html)?)\(\s*["']([^"']+)["']/g
   )) {
     keys.push(`ui.label.${match[1]}`);
   }
@@ -92,6 +98,11 @@ function validate() {
   const referencedKeys = [
     ...collectDataKeys(fs.existsSync(indexPath) ? fs.readFileSync(indexPath, "utf8") : ""),
     ...collectCodeKeys(fs.existsSync(appPath) ? fs.readFileSync(appPath, "utf8") : ""),
+    ...collectCodeKeys(
+      fs.existsSync(applicationValidationPresentationControllerPath)
+        ? fs.readFileSync(applicationValidationPresentationControllerPath, "utf8")
+        : ""
+    ),
     ...collectCodeKeys(
       fs.existsSync(applicationSaveStatusControllerPath)
         ? fs.readFileSync(applicationSaveStatusControllerPath, "utf8")

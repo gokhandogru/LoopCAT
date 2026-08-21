@@ -98,6 +98,21 @@ const uiLocalizationService = appRuntime.featureFactories.createUiLocalizationSe
   confirm: (message) => window.confirm(message),
   alert: (message) => window.alert(message)
 });
+let importExportController;
+const applicationValidationPresentationController =
+  appRuntime.featureFactories.createApplicationValidationPresentationController({
+    redaction: { sanitize: applicationTextSafetyService.redactSensitiveText },
+    reports: { summary: reportSummary, count: reportCount },
+    state: {
+      setLast: (report) => {
+        state.lastValidationReport = report;
+      }
+    },
+    localization: uiLocalizationService,
+    presentation: {
+      render: (model) => importExportController?.renderValidation?.(model)
+    }
+  });
 const applicationDateTimeService = appRuntime.featureFactories.createApplicationDateTimeService({
   localization: uiLocalizationService,
   locale: { get: () => uiI18n?.getLocale?.() },
@@ -139,7 +154,7 @@ const reportDocumentCompositionService = appRuntime.featureFactories.createRepor
   escapeHtml: applicationTextSafetyService.escapeHtml,
   redactSensitiveText: applicationTextSafetyService.redactSensitiveText,
   defaultQualityProfile,
-  sanitizeValidationReportForDisplay,
+  sanitizeValidationReportForDisplay: applicationValidationPresentationController.sanitize,
   languagePairDisplay: (...args) => languageInputService.pairDisplay(...args),
   formatDateTime: applicationDateTimeService.dateTime,
   qualityLabel: qualityPresentationService.profile,
@@ -1329,7 +1344,7 @@ const fileImportService = appRuntime.featureFactories.createFileImportService({
   text: { lower: applicationTextSafetyService.stableLower },
   presentation: {
     renderBusy: applicationImportProgressController.renderBusy,
-    renderValidation: renderValidationReport
+    renderValidation: applicationValidationPresentationController.render
   },
   status: { set: applicationSaveStatusController.set },
   durability: { refresh: applicationStorageDurabilityController.refresh }
@@ -2082,7 +2097,7 @@ const reportExportController = appRuntime.featureFactories.createReportExportCon
   presentation: {
     renderQaResults: qaResultsController.render,
     renderQualityWorkbench: qualityWorkbenchController.render,
-    renderValidationReport
+    renderValidationReport: applicationValidationPresentationController.render
   },
   validation: { reportCount },
   activity: { logOptionalProject: projectActivityController.logOptional },
@@ -2139,7 +2154,10 @@ const deliveryExportController = appRuntime.featureFactories.createDeliveryExpor
   },
   fileSafeName: applicationTextSafetyService.fileSafeName,
   download: applicationDownloadController.download,
-  presentation: { renderValidationReport, renderQaResults: qaResultsController.render },
+  presentation: {
+    renderValidationReport: applicationValidationPresentationController.render,
+    renderQaResults: qaResultsController.render
+  },
   activity: { logOptionalProject: projectActivityController.logOptional },
   status: {
     appendActivityWarning: projectActivityController.appendWarning,
@@ -4410,7 +4428,7 @@ workspaceBackupExportController =
     },
     presentation: {
       renderWorkspaceStatus: workspaceRecoveryPresentationService.renderStatus,
-      renderValidation: renderValidationReport
+      renderValidation: applicationValidationPresentationController.render
     },
     status: { set: applicationSaveStatusController.set }
   });
@@ -4436,7 +4454,7 @@ workspaceHealthRepairController =
     session: editorSessionStore,
     dirty: { ids: workspaceDirtyStateController.ids },
     presentation: {
-      renderValidation: renderValidationReport,
+      renderValidation: applicationValidationPresentationController.render,
       renderWorkspaceStatus: workspaceRecoveryPresentationService.renderStatus
     },
     status: { set: applicationSaveStatusController.set }
@@ -4462,7 +4480,7 @@ projectExportController = appRuntime.featureFactories.createProjectExportControl
     errorReport: fileImportService.errorReport
   },
   presentation: {
-    renderValidation: renderValidationReport,
+    renderValidation: applicationValidationPresentationController.render,
     renderEditor,
     renderBackupReminder: workspaceBackupReminderService.render
   },
@@ -4524,7 +4542,7 @@ workspacePackageSaveController =
     validation: { count: reportCount },
     presentation: {
       renderWorkspaceStatus: workspaceRecoveryPresentationService.renderStatus,
-      renderValidation: renderValidationReport,
+      renderValidation: applicationValidationPresentationController.render,
       renderBackupReminder: workspaceBackupReminderService.render,
       renderRecovery: workspaceRecoveryPresentationService.renderRecovery
     },
@@ -4580,10 +4598,10 @@ const projectImportRestoreController =
     },
     validation: {
       count: reportCount,
-      alertText: validationAlertText
+      alertText: applicationValidationPresentationController.alertText
     },
     presentation: {
-      renderValidation: renderValidationReport,
+      renderValidation: applicationValidationPresentationController.render,
       renderWorkspaceStatus: workspaceRecoveryPresentationService.renderStatus
     },
     status: { set: applicationSaveStatusController.set, mode: projectActivityController.statusMode },
@@ -4620,7 +4638,7 @@ workspaceSyncController = appRuntime.featureFactories.createWorkspaceSyncControl
   },
   presentation: {
     renderWorkspaceStatus: workspaceRecoveryPresentationService.renderStatus,
-    renderValidation: renderValidationReport
+    renderValidation: applicationValidationPresentationController.render
   },
   status: { set: applicationSaveStatusController.set }
 });
@@ -4667,7 +4685,7 @@ const projectDocumentImportController =
     },
     confirm: uiLocalizationService.confirm
   });
-const importExportController = appRuntime?.featureFactories?.createImportExportController?.({
+importExportController = appRuntime?.featureFactories?.createImportExportController?.({
   elements: {
     projectFileImportButton: els.projectFileImportBtn,
     projectsImportProjectButton: els.projectsImportProjectBtn,
@@ -5346,47 +5364,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-function sanitizeValidationReportForDisplay(report) {
-  if (!report) return null;
-  const clean = { ...report };
-  ["errors", "risky", "warnings", "simplified", "skipped", "preserved"].forEach((key) => {
-    clean[key] = Array.isArray(report[key])
-      ? report[key]
-          .map((message) => applicationTextSafetyService.redactSensitiveText(message || "").trim())
-          .filter(Boolean)
-      : [];
-  });
-  clean.ok = clean.errors.length === 0;
-  return clean;
-}
-
-function validationAlertText(report, fallback = "Validation failed.") {
-  const clean = sanitizeValidationReportForDisplay(report);
-  const errors = Array.isArray(clean?.errors) ? clean.errors : [];
-  return errors.length ? errors.join("\n") : applicationTextSafetyService.redactSensitiveText(fallback);
-}
-
-function renderValidationReport(report) {
-  const displayReport = sanitizeValidationReportForDisplay(report);
-  state.lastValidationReport = displayReport;
-  importExportController?.renderValidation?.({
-    report: displayReport,
-    summary: displayReport ? reportSummary(displayReport) : "",
-    groups: [
-      { key: "errors", label: uiLocalizationService.label("errors") },
-      { key: "risky", label: uiLocalizationService.label("risk") },
-      { key: "warnings", label: uiLocalizationService.source("Warnings") },
-      { key: "simplified", label: uiLocalizationService.label("simplified") },
-      { key: "skipped", label: uiLocalizationService.label("skipped") },
-      { key: "preserved", label: uiLocalizationService.label("preserved") }
-    ],
-    dismissLabel: uiLocalizationService.source("Dismiss validation report"),
-    dismissText: uiLocalizationService.source("Dismiss"),
-    emptyLabel: uiLocalizationService.source("No validation issues."),
-    autoDismissMs: displayReport?.ok ? (reportCount(displayReport) ? 12000 : 7000) : 0
-  });
-}
 
 async function renderProjectAnalysis() {
   const run = (state.projectAnalysisRun += 1);

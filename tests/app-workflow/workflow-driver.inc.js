@@ -4220,7 +4220,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         Reflect.deleteProperty(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG);
       }
       els.focusModeBtn.focus();
-      renderValidationReport({
+      applicationValidationPresentationController.render({
         ok: true,
         errors: [],
         risky: [],
@@ -5588,7 +5588,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await projectImportRestoreController.restoreBackupFile(new File(["{not valid json"], "broken-backup.json", { type: "application/json" }));
     } catch (error) {
       malformedBackupRejected = error.message === "Backup file is not valid JSON.";
-      renderValidationReport(fileImportService.errorReport(error.message));
+      applicationValidationPresentationController.render(fileImportService.errorReport(error.message));
       applicationSaveStatusController.set(error.message, "dirty");
     }
     assert(malformedBackupRejected && state.lastValidationReport?.errors?.[0] === "Backup file is not valid JSON.", "malformed backup JSON fails with validation report");
@@ -5601,7 +5601,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await projectImportRestoreController.restoreBackupFile(new File([new Blob([new Uint8Array(MAX_PORTABLE_JSON_BYTES + 1)])], "huge-backup.json", { type: "application/json" }));
     } catch (error) {
       oversizedBackupRejected = error.message.includes("too large");
-      renderValidationReport(fileImportService.errorReport(error.message));
+      applicationValidationPresentationController.render(fileImportService.errorReport(error.message));
       applicationSaveStatusController.set(error.message, "dirty");
     }
     assert(oversizedBackupRejected && state.lastValidationReport?.errors?.[0]?.includes("too large"), "oversized backup JSON fails before restore");
@@ -5611,7 +5611,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await projectImportRestoreController.importProjectPackage(new File(["{broken package"], "broken.loopcat.json", { type: "application/json" }));
     } catch (error) {
       malformedPackageRejected = error.message === "Project package is not valid JSON.";
-      renderValidationReport(fileImportService.errorReport(error.message));
+      applicationValidationPresentationController.render(fileImportService.errorReport(error.message));
       applicationSaveStatusController.set(error.message, "dirty");
     }
     assert(malformedPackageRejected && state.lastValidationReport?.errors?.[0] === "Project package is not valid JSON.", "malformed project package JSON fails with validation report");
@@ -5621,7 +5621,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await projectImportRestoreController.importProjectPackage(new File([new Blob([new Uint8Array(MAX_PORTABLE_JSON_BYTES + 1)])], "huge.loopcat.json", { type: "application/json" }));
     } catch (error) {
       oversizedPackageRejected = error.message.includes("too large");
-      renderValidationReport(fileImportService.errorReport(error.message));
+      applicationValidationPresentationController.render(fileImportService.errorReport(error.message));
       applicationSaveStatusController.set(error.message, "dirty");
     }
     assert(oversizedPackageRejected && state.lastValidationReport?.errors?.[0]?.includes("too large"), "oversized project package JSON fails before import");

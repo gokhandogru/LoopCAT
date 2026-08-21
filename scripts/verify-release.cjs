@@ -174,6 +174,7 @@ const requiredReleaseFiles = [
   "src/app/application-text-safety-service.js",
   "src/app/application-trash-controller.js",
   "src/app/application-update-controls-controller.js",
+  "src/app/application-validation-presentation-controller.js",
   "src/app/application-view-controller.js",
   "src/app/global-keyboard-controller.js",
   "src/app/localization-download-mime-type-service.js",
@@ -335,6 +336,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-storage-durability-controller.test.cjs",
   "tests/unit/application-startup-controller.test.cjs",
   "tests/unit/application-text-safety-service.test.cjs",
+  "tests/unit/application-validation-presentation-controller.test.cjs",
   "tests/unit/application-trash-controller.test.cjs",
   "tests/unit/application-update-controls-controller.test.cjs",
   "tests/unit/application-view-controller.test.cjs",
@@ -546,6 +548,12 @@ const applicationStartupControllerJs = readText("src/app/application-startup-con
 const applicationStartupControllerUnitTests = readText("tests/unit/application-startup-controller.test.cjs");
 const applicationTextSafetyServiceJs = readText("src/app/application-text-safety-service.js");
 const applicationTextSafetyServiceUnitTests = readText("tests/unit/application-text-safety-service.test.cjs");
+const applicationValidationPresentationControllerJs = readText(
+  "src/app/application-validation-presentation-controller.js"
+);
+const applicationValidationPresentationControllerUnitTests = readText(
+  "tests/unit/application-validation-presentation-controller.test.cjs"
+);
 const localizationDownloadMimeTypeServiceJs = readText("src/app/localization-download-mime-type-service.js");
 const localizationDownloadMimeTypeServiceUnitTests = readText(
   "tests/unit/localization-download-mime-type-service.test.cjs"
@@ -6940,10 +6948,10 @@ assert(
   "the migrated import/export/report family must not retain superseded static listeners in app.js."
 );
 assert(
-  !functionBody(appJs, "function renderValidationReport", "async function renderProjectAnalysis").includes(
-    "replaceSafeHtml"
-  ),
-  "validation-report DOM construction must live in the checked controller rather than app.js."
+  !applicationValidationPresentationControllerJs.includes("replaceSafeHtml") &&
+    !applicationValidationPresentationControllerJs.includes("innerHTML") &&
+    !applicationValidationPresentationControllerJs.includes("document."),
+  "validation-report DOM construction must remain in ImportExportController rather than validation presentation policy."
 );
 assertIncludes(
   importExportControllerUnitTests,
@@ -11104,7 +11112,7 @@ for (const boundary of [
   "state.importTask = value",
   "text: { lower: applicationTextSafetyService.stableLower }",
   "renderBusy: applicationImportProgressController.renderBusy",
-  "renderValidation: renderValidationReport",
+  "renderValidation: applicationValidationPresentationController.render",
   "status: { set: applicationSaveStatusController.set }",
   "durability: { refresh: applicationStorageDurabilityController.refresh }"
 ]) {
@@ -11371,7 +11379,7 @@ for (const boundary of [
   "safeName: applicationTextSafetyService.fileSafeName",
   "count: reportCount",
   "errorReport: fileImportService.errorReport",
-  "renderValidation: renderValidationReport",
+  "renderValidation: applicationValidationPresentationController.render",
   "renderEditor,",
   "renderBackupReminder: workspaceBackupReminderService.render",
   "workspace: { markDirty: workspaceDirtyStateController.mark }",
@@ -11530,8 +11538,8 @@ for (const boundary of [
   "markDirty: workspaceDirtyStateController.mark",
   "clearDirtyMarkers: workspaceDirtyStateController.clearAll",
   "markProjectsDirty: workspaceDirtyStateController.markProjects",
-  "alertText: validationAlertText",
-  "renderValidation: renderValidationReport",
+  "alertText: applicationValidationPresentationController.alertText",
+  "renderValidation: applicationValidationPresentationController.render",
   "renderWorkspaceStatus",
   "status: { set: applicationSaveStatusController.set, mode: projectActivityController.statusMode }",
   "alert: uiLocalizationService.alert",
@@ -11638,7 +11646,7 @@ for (const boundary of [
   'listTerms: () => getAll("terms")',
   "session: editorSessionStore",
   "dirty: { ids: workspaceDirtyStateController.ids }",
-  "renderValidation: renderValidationReport",
+  "renderValidation: applicationValidationPresentationController.render",
   "status: { set: applicationSaveStatusController.set }",
   "repairWorkspace: (...args) => workspaceHealthRepairController.repair(...args)"
 ]) {
@@ -11724,7 +11732,7 @@ for (const boundary of [
   "state.workspaceStatus = workspaceStatus",
   "count: reportCount",
   "errorReport: fileImportService.errorReport",
-  "renderValidation: renderValidationReport",
+  "renderValidation: applicationValidationPresentationController.render",
   "status: { set: applicationSaveStatusController.set }",
   "exportWorkspaceBackup: (...args) => workspaceBackupExportController.exportBackup(...args)"
 ]) {
@@ -11842,7 +11850,7 @@ for (const boundary of [
   "projects: { load: projectCollectionLoadController.load }",
   "getStatus: () => workspaceStorage.getStatus()",
   "state.workspaceStatus = workspaceStatus",
-  "renderValidation: renderValidationReport",
+  "renderValidation: applicationValidationPresentationController.render",
   "status: { set: applicationSaveStatusController.set }",
   'syncWorkspace: () => fileImportService.runTask("Workspace sync", () => workspaceSyncController.sync())'
 ]) {
@@ -11988,7 +11996,7 @@ for (const boundary of [
   "hasDirty: () => Boolean(state.workspaceDirtyProjectIds.size)",
   "dirtyIds: workspaceDirtyStateController.ids",
   "recoveryIds: workspaceRecoveryPresentationService.ids",
-  "renderValidation: renderValidationReport",
+  "renderValidation: applicationValidationPresentationController.render",
   "renderBackupReminder: workspaceBackupReminderService.render,",
   "renderRecovery: workspaceRecoveryPresentationService.renderRecovery",
   "status: { set: applicationSaveStatusController.set }",
@@ -18493,7 +18501,7 @@ for (const [method, count] of [
   ["displaySafeHtml", 14],
   ["escapeRegExp", 1],
   ["fileSafeName", 5],
-  ["redactSensitiveText", 19]
+  ["redactSensitiveText", 18]
 ]) {
   assert(
     (appJs.match(new RegExp(`\\bapplicationTextSafetyService\\.${method}\\b`, "g")) || []).length === count,
@@ -18701,19 +18709,149 @@ assertIncludes(
   "ApplicationSaveStatusController must redact credential-looking text before displaying save/status messages."
 );
 assertIncludes(
-  appJs,
-  "function sanitizeValidationReportForDisplay",
-  "app.js must centralize redaction for validation report display messages."
+  appBootstrapJs,
+  'import { createApplicationValidationPresentationController } from "./application-validation-presentation-controller.js";',
+  "the application runtime must install the checked validation-presentation controller."
 );
 assertIncludes(
-  functionBody(appJs, "function sanitizeValidationReportForDisplay", "function renderValidationReport"),
-  'applicationTextSafetyService.redactSensitiveText(message || "")',
-  "app.js must redact credential-looking validation report messages before display."
+  appBootstrapJs,
+  "createApplicationValidationPresentationController,",
+  "the application runtime must expose the checked validation-presentation controller factory."
+);
+for (const snippet of [
+  "ApplicationValidationPresentationController requires a redaction boundary.",
+  "ApplicationValidationPresentationController requires report summary and count boundaries.",
+  "ApplicationValidationPresentationController requires a validation-state boundary.",
+  "ApplicationValidationPresentationController requires localization boundaries.",
+  "ApplicationValidationPresentationController requires a presentation boundary.",
+  '"errors",',
+  '"risky",',
+  '"warnings",',
+  '"simplified",',
+  '"skipped",',
+  '"preserved"',
+  "if (!report) return null;",
+  "const clean = { ...report };",
+  "VALIDATION_GROUP_KEYS.forEach((key) => {",
+  'redaction.sanitize(message || "").trim()',
+  ".filter(Boolean)",
+  "clean.ok = clean.errors.length === 0;",
+  'function alertText(report, fallback = "Validation failed.")',
+  "const errors = Array.isArray(clean?.errors) ? clean.errors : [];",
+  'return errors.length ? errors.join("\\n") : redaction.sanitize(fallback);',
+  "const displayReport = sanitize(report);",
+  "state.setLast(displayReport);",
+  'summary: displayReport ? reports.summary(displayReport) : ""',
+  '{ key: "errors", label: localization.label("errors") }',
+  '{ key: "risky", label: localization.label("risk") }',
+  '{ key: "warnings", label: localization.source("Warnings") }',
+  '{ key: "simplified", label: localization.label("simplified") }',
+  '{ key: "skipped", label: localization.label("skipped") }',
+  '{ key: "preserved", label: localization.label("preserved") }',
+  'dismissLabel: localization.source("Dismiss validation report")',
+  'dismissText: localization.source("Dismiss")',
+  'emptyLabel: localization.source("No validation issues.")',
+  "autoDismissMs: displayReport?.ok ? (reports.count(displayReport) ? 12000 : 7000) : 0",
+  "return Object.freeze({ sanitize, alertText, render });"
+]) {
+  assertIncludes(
+    applicationValidationPresentationControllerJs,
+    snippet,
+    `ApplicationValidationPresentationController must retain characterized sanitization, alert, state, localization, and dismissal policy: ${snippet}`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationValidationPresentationController({",
+  "redaction: { sanitize: applicationTextSafetyService.redactSensitiveText }",
+  "reports: { summary: reportSummary, count: reportCount }",
+  "state.lastValidationReport = report;",
+  "localization: uiLocalizationService",
+  "render: (model) => importExportController?.renderValidation?.(model)",
+  "sanitizeValidationReportForDisplay: applicationValidationPresentationController.sanitize",
+  "alertText: applicationValidationPresentationController.alertText"
+]) {
+  assertIncludes(appJs, boundary, `validation-presentation composition must retain the checked ${boundary} boundary.`);
+}
+for (const [method, appCount, workflowCount] of [
+  ["sanitize", 1, 0],
+  ["alertText", 1, 0],
+  ["render", 9, 5]
+]) {
+  assert(
+    (appJs.match(new RegExp(`\\bapplicationValidationPresentationController\\.${method}\\b`, "g")) || []).length ===
+      appCount,
+    `all ${appCount} application validation consumers must call ApplicationValidationPresentationController.${method} directly.`
+  );
+  assert(
+    (appWorkflowDriverJs.match(new RegExp(`\\bapplicationValidationPresentationController\\.${method}\\b`, "g")) || [])
+      .length === workflowCount,
+    `all ${workflowCount} workflow validation consumers must call ApplicationValidationPresentationController.${method} directly.`
+  );
+}
+for (const removedHelper of ["sanitizeValidationReportForDisplay", "validationAlertText", "renderValidationReport"]) {
+  assert(
+    !new RegExp(`function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return to app.js or the workflow driver after validation-presentation extraction.`
+  );
+}
+assert(
+  !appJs.includes("VALIDATION_GROUP_KEYS") &&
+    !appJs.includes("clean.ok = clean.errors.length === 0") &&
+    !appJs.includes("autoDismissMs: displayReport?.ok"),
+  "validation sanitization, group, and auto-dismiss policy must not return to app.js."
+);
+assert(
+  appJs.indexOf("let importExportController;") < appJs.indexOf("const applicationValidationPresentationController =") &&
+    appJs.indexOf("const applicationValidationPresentationController =") <
+      appJs.indexOf("const reportDocumentCompositionService =") &&
+    appJs.indexOf("const applicationValidationPresentationController =") <
+      appJs.indexOf("importExportController = appRuntime?.featureFactories?.createImportExportController?.({"),
+  "ApplicationValidationPresentationController must use a declared late presentation adapter and precede report composition and all consumers."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "applicationTextSafetyService",
+  "uiLocalizationService",
+  "lastValidationReport",
+  "reportSummary",
+  "reportCount",
+  "importExportController",
+  "document.",
+  "els."
+]) {
+  assert(
+    !applicationValidationPresentationControllerJs.includes(forbiddenOwner),
+    `ApplicationValidationPresentationController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationValidationPresentationController preserves every falsy report as null without effects",
+  "ApplicationValidationPresentationController sanitizes all ordered groups without mutating the source",
+  "ApplicationValidationPresentationController recomputes ok from sanitized errors",
+  "ApplicationValidationPresentationController builds alert text from sanitized errors",
+  "ApplicationValidationPresentationController preserves default and explicit alert fallbacks",
+  "ApplicationValidationPresentationController renders null reports with exact localized model order",
+  "ApplicationValidationPresentationController preserves successful report summary and 12-second dismissal",
+  "ApplicationValidationPresentationController preserves empty-success and error persistence policies",
+  "ApplicationValidationPresentationController preserves sanitizer, alert, and render failure timing",
+  "ApplicationValidationPresentationController validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    applicationValidationPresentationControllerUnitTests,
+    testName,
+    `focused application validation-presentation tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/app/application-validation-presentation-controller.js"',
+  "source-catalog extraction must scan the checked validation-presentation controller."
 );
 assertIncludes(
-  appJs,
-  "function validationAlertText",
-  "app.js must sanitize project-package validation alert text before display."
+  i18nValidateScript,
+  '"application-validation-presentation-controller.js"',
+  "source-catalog validation must check explicit keys in the checked validation-presentation controller."
 );
 assertIncludes(
   projectImportRestoreControllerJs,
@@ -18971,12 +19109,12 @@ assertIncludes(
   "FileImportService must retain the checked application import busy-state boundary."
 );
 assertIncludes(
-  functionBody(appJs, "const importExportController", "const projectDialogController"),
+  functionBody(appJs, "importExportController =", "const projectDialogController"),
   "runImportTask: fileImportService.runTask",
   "app.js must inject the shared import busy-state guard into the checked import/export controller."
 );
 assertIncludes(
-  functionBody(appJs, "const importExportController", "const projectDialogController"),
+  functionBody(appJs, "importExportController =", "const projectDialogController"),
   "await autosaveService.flush();",
   "app.js must flush pending edits before checked package-import and backup-restore boundaries."
 );
