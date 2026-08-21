@@ -820,6 +820,7 @@ const applicationActiveSegmentService = appRuntime.featureFactories.createApplic
   navigation: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex }
 });
 let workspaceRecoveryPresentationService;
+let workspaceBackupReminderService;
 const workspaceDirtyStateController = appRuntime.featureFactories.createWorkspaceDirtyStateController({
   state: {
     getDirty: () => state.workspaceDirtyProjectIds,
@@ -1396,6 +1397,54 @@ const projectTermQueryService = appRuntime.featureFactories.createProjectTermQue
   session: { getProject: editorSessionStore.getProject },
   repository: { listTerms },
   resources: { termBaseNames: projectResourceContextService.termBaseNames }
+});
+
+const projectActivityController = appRuntime.featureFactories.createProjectActivityController({
+  session: {
+    getProject: editorSessionStore.getProject,
+    prependActivityEvent: editorSessionStore.prependActivityEvent,
+    replaceActivityEvents: editorSessionStore.replaceActivityEvents
+  },
+  repository: { record: recordActivityEvent, list: listActivityEvents },
+  workspace: { mark: workspaceDirtyStateController.mark },
+  reminder: { render: () => workspaceBackupReminderService.render() },
+  ids: { make: makeId },
+  defaults: {
+    workspaceId: () => storageConstants?.LOCAL_WORKSPACE_ID,
+    userId: () => storageConstants?.LOCAL_USER_ID
+  },
+  clock: { iso: () => new Date().toISOString() },
+  portable: { sanitize: sanitizePortableValue },
+  logger: console,
+  testHooks: {
+    beforeOptionalCurrent: (type) => {
+      if (
+        LOOPCAT_TEST_BUILD &&
+        ["export", "resource-export"].includes(type) &&
+        editorSessionStore.getProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]
+      ) {
+        throw new Error("Simulated export activity log failure");
+      }
+      if (
+        LOOPCAT_TEST_BUILD &&
+        ["import", "resource-import"].includes(type) &&
+        (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] ||
+          editorSessionStore.getProject()?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])
+      ) {
+        throw new Error("Simulated import activity log failure");
+      }
+    },
+    beforeOptionalProject: (type) => {
+      if (
+        LOOPCAT_TEST_BUILD &&
+        ["import", "resource-import"].includes(type) &&
+        (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] ||
+          editorSessionStore.getProject()?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])
+      ) {
+        throw new Error("Simulated import activity log failure");
+      }
+    }
+  }
 });
 
 const projectOpenController = appRuntime.featureFactories.createProjectOpenController({
@@ -2002,7 +2051,7 @@ projectQaController = appRuntime.featureFactories.createProjectQaController({
     renderWorkbench: qualityWorkbenchController.render
   },
   navigation: { getDocumentId: () => applicationStore.getState().navigation.documentId },
-  activity: { log: logProjectActivity },
+  activity: { log: projectActivityController.log },
   status: { set: applicationSaveStatusController.set },
   logger: console,
   testHooks: {
@@ -2036,10 +2085,10 @@ const reportExportController = appRuntime.featureFactories.createReportExportCon
     renderValidationReport
   },
   validation: { reportCount },
-  activity: { logOptionalProject: logOptionalProjectActivity },
+  activity: { logOptionalProject: projectActivityController.logOptional },
   status: {
-    appendActivityWarning,
-    exportMode: exportStatusMode,
+    appendActivityWarning: projectActivityController.appendWarning,
+    exportMode: projectActivityController.statusMode,
     set: applicationSaveStatusController.set
   }
 });
@@ -2091,10 +2140,10 @@ const deliveryExportController = appRuntime.featureFactories.createDeliveryExpor
   fileSafeName: applicationTextSafetyService.fileSafeName,
   download: applicationDownloadController.download,
   presentation: { renderValidationReport, renderQaResults: qaResultsController.render },
-  activity: { logOptionalProject: logOptionalProjectActivity },
+  activity: { logOptionalProject: projectActivityController.logOptional },
   status: {
-    appendActivityWarning,
-    exportMode: exportStatusMode,
+    appendActivityWarning: projectActivityController.appendWarning,
+    exportMode: projectActivityController.statusMode,
     set: applicationSaveStatusController.set
   }
 });
@@ -2131,10 +2180,10 @@ const projectResourceTransferController =
     builders: { buildTmx, buildTbx },
     fileSafeName: applicationTextSafetyService.fileSafeName,
     download: applicationDownloadController.download,
-    activity: { logOptionalProject: logOptionalProjectActivity },
+    activity: { logOptionalProject: projectActivityController.logOptional },
     status: {
-      appendActivityWarning,
-      exportMode: exportStatusMode,
+      appendActivityWarning: projectActivityController.appendWarning,
+      exportMode: projectActivityController.statusMode,
       set: applicationSaveStatusController.set
     }
   });
@@ -2166,7 +2215,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
     save: saveSegment,
     saveToTm: segmentTmSaveController.save,
     logActivity: (segment, project) =>
-      logProjectActivity(
+      projectActivityController.log(
         "confirm-segment",
         "Segment confirmed",
         { segmentId: segment.id, documentId: segment.documentId },
@@ -2362,7 +2411,7 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
     renderHistory: revisionHistoryPresentationService.render
   },
   activity: {
-    log: (details) => logProjectActivity("replace-target", "Target text replaced", details)
+    log: (details) => projectActivityController.log("replace-target", "Target text replaced", details)
   },
   status: { set: applicationSaveStatusController.set },
   testHooks: {
@@ -2428,7 +2477,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
     refreshSidebar: () => editorContextController.refresh()
   },
   activity: {
-    log: (details) => logProjectActivity("pretranslate", "TM pretranslation applied", details)
+    log: (details) => projectActivityController.log("pretranslate", "TM pretranslation applied", details)
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
   status: { set: applicationSaveStatusController.set },
@@ -2748,7 +2797,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
   },
   activity: {
     log: (details) =>
-      logProjectActivity("ai-pretranslate", "Local AI pretranslation applied", details)
+      projectActivityController.log("ai-pretranslate", "Local AI pretranslation applied", details)
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
   status: { set: applicationSaveStatusController.set },
@@ -2835,9 +2884,9 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
   },
   activity: {
     logActive: (details) =>
-      logProjectActivity("ai-review", "AI segment review created", details),
+      projectActivityController.log("ai-review", "AI segment review created", details),
     logBatch: (details) =>
-      logProjectActivity("ai-batch-review", "Batch AI QA completed", details)
+      projectActivityController.log("ai-batch-review", "Batch AI QA completed", details)
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
   status: { set: applicationSaveStatusController.set },
@@ -2912,7 +2961,7 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
   },
   activity: {
     logBatch: (details) =>
-      logProjectActivity(
+      projectActivityController.log(
         "ai-tag-repair-batch",
         "Batch AI tag repair suggestions created",
         details
@@ -2997,9 +3046,9 @@ const aiAlternativesController = appRuntime.featureFactories.createAiAlternative
   },
   activity: {
     logActive: (details) =>
-      logProjectActivity("ai-target-variants", "AI target alternatives created", details),
+      projectActivityController.log("ai-target-variants", "AI target alternatives created", details),
     logBatch: (details) =>
-      logProjectActivity(
+      projectActivityController.log(
         "ai-target-variants-batch",
         "Batch AI target alternatives created",
         details
@@ -3080,7 +3129,7 @@ const aiTerminologyApplicationController =
     },
     activity: {
       logBatch: (details) =>
-        logProjectActivity(
+        projectActivityController.log(
           "ai-apply-terminology-batch",
           "Batch AI terminology suggestions created",
           details
@@ -3164,8 +3213,8 @@ const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditin
   activity: {
     logBatch: (operation, details) =>
       operation === "adapt"
-        ? logProjectActivity("ai-adapt-batch", "Batch AI adaptation suggestions created", details)
-        : logProjectActivity("ai-polish-batch", "Batch AI polish suggestions created", details)
+        ? projectActivityController.log("ai-adapt-batch", "Batch AI adaptation suggestions created", details)
+        : projectActivityController.log("ai-polish-batch", "Batch AI polish suggestions created", details)
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
   status: { set: applicationSaveStatusController.set },
@@ -3221,9 +3270,9 @@ const aiTerminologyExtractionController =
     },
     activity: {
       logActive: (details) =>
-        logProjectActivity("ai-term-extraction", "AI term candidates extracted", details),
+        projectActivityController.log("ai-term-extraction", "AI term candidates extracted", details),
       logBatch: (details) =>
-        logProjectActivity(
+        projectActivityController.log(
           "ai-term-extraction-batch",
           "Batch AI term candidates extracted",
           details
@@ -3283,7 +3332,7 @@ const aiProjectBriefController = appRuntime.featureFactories.createAiProjectBrie
   },
   activity: {
     log: (details) =>
-      logProjectActivity("ai-project-brief", "AI project brief generated", details)
+      projectActivityController.log("ai-project-brief", "AI project brief generated", details)
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
   status: { set: applicationSaveStatusController.set },
@@ -3318,7 +3367,7 @@ const aiSuggestionApplicationController =
     },
     activity: {
       log: (details) =>
-        logProjectActivity("ai-apply-suggestion", "AI suggestion applied to target", details)
+        projectActivityController.log("ai-apply-suggestion", "AI suggestion applied to target", details)
     },
     presentation: {
       renderSegments,
@@ -3364,7 +3413,7 @@ const aiSuggestionPersistenceController =
       clearPending: autosaveService.clear,
       save: saveSegment
     },
-    activity: { log: logProjectActivity },
+    activity: { log: projectActivityController.log },
     presentation: {
       renderSuggestions: aiSuggestionListController.render,
       renderHistory: revisionHistoryPresentationService.render
@@ -3472,7 +3521,7 @@ const aiSettingsPersistenceController =
     },
     persistence: { updateProject },
     activity: {
-      log: (details) => logProjectActivity("ai-settings", "AI settings updated", details)
+      log: (details) => projectActivityController.log("ai-settings", "AI settings updated", details)
     },
     presentation: { renderEditor },
     workspace: {
@@ -4221,7 +4270,6 @@ let workspacePackageSaveController;
 let workspaceSyncController;
 let workspaceBackupExportController;
 let workspaceHealthRepairController;
-let workspaceBackupReminderService;
 const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecoveryWorkspaceController?.({
   elements: {
     menu: els.workspaceMenu,
@@ -4402,8 +4450,8 @@ projectExportController = appRuntime.featureFactories.createProjectExportControl
     listActivityEvents
   },
   activity: {
-    draft: draftProjectActivityEvent,
-    appendWarning: appendActivityWarning
+    draft: projectActivityController.draft,
+    appendWarning: projectActivityController.appendWarning
   },
   files: {
     safeName: applicationTextSafetyService.fileSafeName,
@@ -4419,7 +4467,7 @@ projectExportController = appRuntime.featureFactories.createProjectExportControl
     renderBackupReminder: workspaceBackupReminderService.render
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
-  status: { set: applicationSaveStatusController.set, mode: exportStatusMode },
+  status: { set: applicationSaveStatusController.set, mode: projectActivityController.statusMode },
   clock: {
     now: () => new Date().toISOString(),
     nowMs: () => Date.now()
@@ -4449,7 +4497,7 @@ workspacePackageSaveController =
       list: listProjects
     },
     activity: {
-      draft: draftProjectActivityEvent,
+      draft: projectActivityController.draft,
       bulkPut,
       list: listActivityEvents
     },
@@ -4512,8 +4560,8 @@ const projectImportRestoreController =
       rebuildTerms: rebuildAllTermIndexes
     },
     activity: {
-      logForProject: logOptionalActivityForProject,
-      appendWarning: appendActivityWarning
+      logForProject: projectActivityController.logOptionalForProject,
+      appendWarning: projectActivityController.appendWarning
     },
     navigation: {
       openProjects: applicationNavigation.openProjects,
@@ -4538,7 +4586,7 @@ const projectImportRestoreController =
       renderValidation: renderValidationReport,
       renderWorkspaceStatus: workspaceRecoveryPresentationService.renderStatus
     },
-    status: { set: applicationSaveStatusController.set, mode: exportStatusMode },
+    status: { set: applicationSaveStatusController.set, mode: projectActivityController.statusMode },
     localization: {
       alert: uiLocalizationService.alert,
       confirm: uiLocalizationService.confirm
@@ -4604,11 +4652,11 @@ const projectDocumentImportController =
     summaries: { refresh: projectSummaryController.refresh },
     navigation: { selectDocument: applicationNavigation.selectDocument },
     activity: {
-      log: logOptionalProjectActivity,
-      appendWarning: appendActivityWarning
+      log: projectActivityController.logOptional,
+      appendWarning: projectActivityController.appendWarning
     },
     workspace: { markDirty: workspaceDirtyStateController.mark },
-    status: { set: applicationSaveStatusController.set, mode: exportStatusMode },
+    status: { set: applicationSaveStatusController.set, mode: projectActivityController.statusMode },
     presentation: {
       renderAll,
       refreshEditorContext: editorContextController.refresh
@@ -4789,7 +4837,7 @@ const projectDialogSaveController =
       renderStorageStatus: workspaceRecoveryPresentationService.renderProjectStorage
     },
     activity: {
-      logProject: logProjectActivity,
+      logProject: projectActivityController.log,
       record: recordActivityEvent
     },
     workspace: {
@@ -5097,7 +5145,7 @@ const qualityProfileController = appRuntime.featureFactories.createQualityProfil
   },
   activity: {
     log: (qualityProfile) =>
-      logOptionalProjectActivity(
+      projectActivityController.logOptional(
         "quality-profile",
         "Quality profile saved",
         {
@@ -5131,7 +5179,7 @@ const reviewMetadataController = appRuntime.featureFactories.createReviewMetadat
   },
   activity: {
     log: (segment) =>
-      logProjectActivity("review", "Review metadata saved", {
+      projectActivityController.log("review", "Review metadata saved", {
         segmentId: segment.id,
         reviewState: segment.reviewState
       })
@@ -5177,7 +5225,7 @@ const qualityDecisionController = appRuntime.featureFactories.createQualityDecis
   risk: { buildQueue: qualityWorkbenchController.buildQueue },
   activity: {
     log: (segment, _project, { category, severity }) =>
-      logOptionalProjectActivity(
+      projectActivityController.logOptional(
         "quality-decision",
         "Quality decision saved",
         { segmentId: segment.id, category, severity },
@@ -5231,7 +5279,7 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   },
   activity: {
     log: (segment, _project, summary) =>
-      logProjectActivity("review", summary, {
+      projectActivityController.log("review", summary, {
         segmentId: segment.id,
         reviewState: segment.reviewState
       })
@@ -5298,77 +5346,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-async function logProjectActivity(type, summary, detail = {}, project = editorSessionStore.getProject()) {
-  if (!project) return null;
-  const event = await recordActivityEvent({ projectId: project.id, type, summary, detail });
-  if (event && editorSessionStore.getProject()?.id === project.id) {
-    editorSessionStore.prependActivityEvent(event);
-    workspaceBackupReminderService.render();
-  }
-  workspaceDirtyStateController.mark(project.id);
-  return event;
-}
-
-function draftProjectActivityEvent(project, type, summary, detail = {}) {
-  const now = new Date().toISOString();
-  const event = {
-    id: makeId("activity"),
-    workspaceId: project?.workspaceId || storageConstants?.LOCAL_WORKSPACE_ID || "local-workspace",
-    ownerId: project?.ownerId || storageConstants?.LOCAL_USER_ID || "local-user",
-    projectId: project?.id || "",
-    type,
-    summary: summary || type,
-    detail,
-    createdBy: project?.updatedBy || storageConstants?.LOCAL_USER_ID || "local-user",
-    createdAt: now
-  };
-  return sanitizePortableValue(event);
-}
-
-async function logOptionalProjectActivity(type, summary, detail = {}, label = summary || type) {
-  try {
-    if (LOOPCAT_TEST_BUILD && ["export", "resource-export"].includes(type) && editorSessionStore.getProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG]) {
-      throw new Error("Simulated export activity log failure");
-    }
-    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || editorSessionStore.getProject()?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
-      throw new Error("Simulated import activity log failure");
-    }
-    await logProjectActivity(type, summary, detail);
-    return true;
-  } catch (activityError) {
-    console.warn(`${label} activity log failed.`, activityError);
-    if (editorSessionStore.getProject()?.id) workspaceDirtyStateController.mark(editorSessionStore.getProject().id);
-    return false;
-  }
-}
-
-async function logOptionalActivityForProject(projectId, type, summary, detail = {}, label = summary || type) {
-  try {
-    if (LOOPCAT_TEST_BUILD && ["import", "resource-import"].includes(type) && (state[IMPORT_ACTIVITY_FAILURE_TEST_FLAG] || editorSessionStore.getProject()?.[IMPORT_ACTIVITY_FAILURE_TEST_FLAG])) {
-      throw new Error("Simulated import activity log failure");
-    }
-    const event = await recordActivityEvent({ projectId, type, summary, detail });
-    if (editorSessionStore.getProject()?.id === projectId) {
-      editorSessionStore.replaceActivityEvents(await listActivityEvents(projectId));
-      workspaceBackupReminderService.render();
-    }
-    workspaceDirtyStateController.mark(projectId);
-    return { ok: true, event };
-  } catch (activityError) {
-    console.warn(`${label} activity log failed.`, activityError);
-    if (projectId) workspaceDirtyStateController.mark(projectId);
-    return { ok: false, event: null };
-  }
-}
-
-function appendActivityWarning(message, activityLogged) {
-  return activityLogged ? message : `${message}; activity log failed`;
-}
-
-function exportStatusMode(mode, activityLogged) {
-  return activityLogged ? mode : "dirty";
-}
 
 function sanitizeValidationReportForDisplay(report) {
   if (!report) return null;
@@ -5803,7 +5780,10 @@ async function confirmDeleteFile(documentInfo) {
     let fileDeleteActivityFailed = false;
     try {
       if (LOOPCAT_TEST_BUILD && documentInfo[FILE_DELETE_ACTIVITY_FAILURE_TEST_FLAG]) throw new Error("Simulated file delete activity failure");
-      await logProjectActivity("delete-file", "Project file deleted", { documentId: documentInfo.id, fileName: documentInfo.name });
+      await projectActivityController.log("delete-file", "Project file deleted", {
+        documentId: documentInfo.id,
+        fileName: documentInfo.name
+      });
     } catch (activityError) {
       fileDeleteActivityFailed = true;
       console.warn("File delete activity log failed.", activityError);

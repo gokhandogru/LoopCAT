@@ -28,6 +28,8 @@ The latest project-term refresh checkpoint also moves the no-project empty repla
 
 The latest project-term query checkpoint also moves the remaining delivery-validation terminology guard, repeated live project-language reads, linked-termbase selection, fresh query identity, and raw repository result/promise assimilation behind a checked service boundary.
 
+The latest project-activity checkpoint also moves call-time default-project selection, exact persisted and portable activity payloads, active-session prepend-or-reload behavior, backup-reminder sequencing, workspace dirtiness, optional failure containment and test hooks, and shared activity-warning/status policy behind a checked controller boundary used directly by every application and workflow consumer.
+
 The latest application-persistence lifecycle checkpoint also moves close-warning and hidden/Page-hide background-save event orchestration behind a checked controller boundary while leaving import-task, autosave-queue, workspace-dirty, package-save, and warning policy in their existing injected owners.
 
 The latest application event-wiring checkpoint also moves startup UI initialization, checkpoint reporting, segment-grid scroll routing, and the exact ordered feature-lifecycle mount sequence behind a checked controller boundary while leaving each feature's listener and domain policy in its existing owner.
@@ -420,6 +422,8 @@ The checked project-term refresh slice is also complete: an immutable ProjectTer
 
 The checked project-term query slice is also complete: an immutable ProjectTermQueryService now owns the live current-project guard, fresh empty-array result, repeated live source/target project reads, current linked-termbase names, fresh terminology-query identity, and exact asynchronous repository fulfillment/rejection assimilation without an added `await`. DeliveryExportController receives its stable `listForValidation` method directly, and `projectTermsForValidation` is removed. Six focused service tests, 22 combined query/resource-context/delivery-export tests, and the full 1,103-test quality gate characterize no-project fresh identity, live read drift, raw result identity, promise and synchronous failures, checked composition, and immutable API; release/import, source-isolation, bundle, i18n validation, deep delivery validation/export browser workflows, all 15 accessibility states, 81 visual screenshots, web/desktop artifacts, fuses, and GPU-on/off packaged startup pass with no intended user-visible difference.
 
+The checked project-activity slice is also complete: an immutable ProjectActivityController now owns call-time default-project evaluation, null no-project behavior, exact record payload and event identity, strict active-project refresh branching, prepend-versus-reload behavior, backup-reminder and workspace-dirty sequencing, portable event drafting with one timestamp and workspace/owner/creator/summary fallbacks, optional current/explicit-project failure containment, checked test-only failure hooks, warning logging and dirty fallback timing, and shared activity-warning/status truthiness policy. Project, import/restore, export, report/delivery, AI, review, QA, resource, workspace, and all workflow consumers call its stable methods directly; `logProjectActivity`, `draftProjectActivityEvent`, `logOptionalProjectActivity`, `logOptionalActivityForProject`, `appendActivityWarning`, and `exportStatusMode` are removed. Twelve focused controller tests, 100 combined activity/QA/report/delivery/import/export/workspace/dialog/review tests, and the full 1,115-test quality gate characterize every guard, payload, identity, ordering, fallback, failure boundary, checked dependency, and immutable API; release/import, source-isolation, bundle, i18n validation, deep application/browser workflows, all 15 accessibility states, 81 visual screenshots, web/desktop artifacts, fuses, and GPU-on/off packaged startup pass with no intended user-visible difference.
+
 Earlier checkpoint descriptions that say `wireEvents` mounted an individual controller or that top-level startup called `ApplicationEventWiringController` directly record the state at those checkpoints; ApplicationEventWiringController now owns the complete mount sequence, and ApplicationStartupController is its sole top-level startup caller.
 
 1. Reduce the remaining `app.js` compatibility coordinator toward the roadmap's bootstrap-only goal, one characterized feature boundary at a time.
@@ -427,7 +431,7 @@ Earlier checkpoint descriptions that say `wireEvents` mounted an individual cont
 
 ### P2-05 — Performance stretch target
 
-Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The production graph is 2,875,036 bytes across five modules; the hosted/desktop initial app is 1,192,947 bytes (315,822 bytes gzip), and the separate direct-file fallback is 1,437,496 bytes (398,911 bytes gzip). The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 442,947 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
+Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The production graph is 2,879,578 bytes across five modules; the hosted/desktop initial app is 1,195,218 bytes (316,242 bytes gzip), and the separate direct-file fallback is 1,439,767 bytes (399,310 bytes gzip). The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 445,218 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
 
 ## Manual and external release gates still required
 
@@ -458,18 +462,18 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 by extracting project activity recording, portable event drafting, optional failure containment, active-project activity refresh, workspace dirtiness, backup-reminder presentation, and shared activity-warning/status policy behind a checked ProjectActivityController boundary.
+Continue P1-08 by extracting validation-report sanitization, alert-text construction, last-report replacement, localized group/copy composition, auto-dismiss policy, and ImportExportController presentation dispatch behind a checked ApplicationValidationPresentationController boundary.
 
 Entry criteria:
 
-- Preserve call-time default-project evaluation, null no-project behavior, exact activity payloads, event identity, active-project strict-ID refresh branches, prepend-versus-reload behavior, backup-reminder order, workspace dirtiness, and every synchronous/awaited failure boundary.
-- Preserve portable draft IDs, one ISO timestamp, workspace/owner/creator fallbacks, summary fallback, exact detail identity before sanitization, and existing portable-value cleanup.
-- Preserve test-only import/export failure injection, warning copy and logging, optional current/explicit-project result shapes, dirty fallback timing, and the pure activity-warning and status-mode policies.
-- Migrate all application and workflow activity consumers to the checked controller directly while keeping activity persistence, EditorSessionStore state, test flags, clock/ID generation, portable sanitization, workspace dirty state, backup-reminder presentation, status presentation, and domain operations in their existing injected owners.
+- Preserve null-report behavior, shallow report copying, the exact ordered `errors`/`risky`/`warnings`/`simplified`/`skipped`/`preserved` array policy, falsy-message normalization, redaction-before-trimming, empty-message filtering, and `ok` recomputation from sanitized errors.
+- Preserve alert default-argument timing, newline-joined sanitized errors, redacted fallback identity, and all sanitizer/fallback failure boundaries.
+- Preserve last-validation-report replacement before optional presentation dispatch, summary and localized group order/copy, optional-controller behavior, and exact success/count-based 12-second, 7-second, or persistent auto-dismiss policy.
+- Migrate report composition, import/export/report/delivery/workspace/project consumers and workflow characterization to the checked controller directly while keeping ApplicationTextSafetyService, localization, report counting/summary, application state, ImportExportController DOM presentation, and domain validation in their existing injected owners.
 
 Exit criteria:
 
-- `logProjectActivity`, `draftProjectActivityEvent`, `logOptionalProjectActivity`, `logOptionalActivityForProject`, `appendActivityWarning`, and `exportStatusMode` are removed from `app.js`; consumers call ProjectActivityController directly, and release verification prevents their orchestration and policy from returning to the coordinator or workflow driver.
-- Focused ProjectActivityController record/draft/optional/failure/policy tests, project/import/export/report/AI/review/QA/workspace workflows, all 15 accessibility states, 81 visual screenshots, and FULL-SUITE gates pass with no intended user-visible difference.
+- `sanitizeValidationReportForDisplay`, `validationAlertText`, and `renderValidationReport` are removed from `app.js`; consumers call ApplicationValidationPresentationController directly, and release verification prevents their orchestration and policy from returning to the coordinator or workflow driver.
+- Focused ApplicationValidationPresentationController sanitization/alert/render/failure tests, validation/import/export/report/delivery/workspace workflows, all 15 accessibility states, 81 visual screenshots, and FULL-SUITE gates pass with no intended user-visible difference.
 
 Continue until `app.js` is a bootstrap-only compatibility entry and the façade can be removed without changing mature LoopCAT behavior.

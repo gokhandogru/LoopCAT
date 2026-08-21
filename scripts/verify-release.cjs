@@ -632,6 +632,8 @@ const projectDomainControllerJs = readText("src/features/projects/project-domain
 const projectDomainControllerUnitTests = readText("tests/unit/project-domain-controller.test.cjs");
 const projectDialogSaveControllerJs = readText("src/features/projects/project-dialog-save-controller.js");
 const projectDialogSaveControllerUnitTests = readText("tests/unit/project-dialog-save-controller.test.cjs");
+const projectActivityControllerJs = readText("src/features/projects/project-activity-controller.js");
+const projectActivityControllerUnitTests = readText("tests/unit/project-activity-controller.test.cjs");
 const projectFilterControlsControllerJs = readText("src/features/projects/project-filter-controls-controller.js");
 const projectFilterControlsControllerUnitTests = readText("tests/unit/project-filter-controls-controller.test.cjs");
 const projectHomeControllerJs = readText("src/features/projects/project-home-controller.js");
@@ -1939,7 +1941,7 @@ for (const [method, appCount, workflowCount] of [
   ["clearMemory", 0, 1],
   ["hasUnsaved", 1, 0],
   ["ids", 2, 0],
-  ["mark", 42, 6],
+  ["mark", 39, 6],
   ["markProjects", 2, 0],
   ["markProjectsUsingResource", 6, 1],
   ["prune", 1, 1],
@@ -2319,7 +2321,7 @@ for (const boundary of [
 }
 for (const [method, appCount, workflowCount] of [
   ["dismiss", 1, 0],
-  ["render", 5, 2]
+  ["render", 4, 2]
 ]) {
   assert(
     (appJs.match(new RegExp(`\\bworkspaceBackupReminderService\\.${method}\\b`, "g")) || []).length === appCount,
@@ -3789,9 +3791,9 @@ for (const boundary of [
   "renderQualityWorkbench: qualityWorkbenchController.render",
   "renderValidationReport",
   "validation: { reportCount }",
-  "logOptionalProject: logOptionalProjectActivity",
-  "appendActivityWarning",
-  "exportMode: exportStatusMode",
+  "logOptionalProject: projectActivityController.logOptional",
+  "appendActivityWarning: projectActivityController.appendWarning",
+  "exportMode: projectActivityController.statusMode",
   "set: applicationSaveStatusController.set"
 ]) {
   assertIncludes(appJs, boundary, `report-export composition must inject the ${boundary} boundary.`);
@@ -3876,7 +3878,7 @@ for (const boundary of [
   "buildXliff22",
   "localizationMimeType: localizationDownloadMimeTypeService.forExtension",
   "xliffMimeType",
-  "logOptionalProject: logOptionalProjectActivity",
+  "logOptionalProject: projectActivityController.logOptional",
   "set: applicationSaveStatusController.set"
 ]) {
   assertIncludes(appJs, boundary, `delivery-export composition must inject the ${boundary} boundary.`);
@@ -3994,7 +3996,7 @@ for (const boundary of [
   "projectTerms: projectTermRefreshController.refresh",
   "terms: termSuggestionsController.refresh",
   "builders: { buildTmx, buildTbx }",
-  "logOptionalProject: logOptionalProjectActivity",
+  "logOptionalProject: projectActivityController.logOptional",
   "set: applicationSaveStatusController.set"
 ]) {
   assertIncludes(appJs, boundary, `project-resource transfer composition must inject the ${boundary} boundary.`);
@@ -4319,6 +4321,164 @@ for (const testName of [
     projectTermQueryServiceUnitTests,
     testName,
     `focused project-term query tests must retain characterization: ${testName}`
+  );
+}
+for (const snippet of [
+  "ProjectActivityController requires project session boundaries.",
+  "ProjectActivityController requires activity repository boundaries.",
+  "ProjectActivityController requires workspace and reminder boundaries.",
+  "ProjectActivityController requires portable activity policy boundaries.",
+  "ProjectActivityController requires an activity logger boundary.",
+  "ProjectActivityController requires optional-activity test boundaries.",
+  "async function log(type, summary, detail = {}, project = session.getProject())",
+  "if (!project) return null;",
+  "const event = await repository.record({ projectId: project.id, type, summary, detail });",
+  "if (event && session.getProject()?.id === project.id) {",
+  "session.prependActivityEvent(event);",
+  "reminder.render();",
+  "workspace.mark(project.id);",
+  "const now = clock.iso();",
+  'id: ids.make("activity")',
+  'workspaceId: project?.workspaceId || defaults.workspaceId() || "local-workspace"',
+  'ownerId: project?.ownerId || defaults.userId() || "local-user"',
+  "summary: summary || type",
+  'createdBy: project?.updatedBy || defaults.userId() || "local-user"',
+  "return portable.sanitize(event);",
+  "testHooks.beforeOptionalCurrent(type);",
+  "await log(type, summary, detail);",
+  "logger.warn(`${label} activity log failed.`, activityError);",
+  "if (session.getProject()?.id) workspace.mark(session.getProject().id);",
+  "testHooks.beforeOptionalProject(type);",
+  "session.replaceActivityEvents(await repository.list(projectId));",
+  "return { ok: true, event };",
+  "return { ok: false, event: null };",
+  "return activityLogged ? message : `${message}; activity log failed`;",
+  'return activityLogged ? mode : "dirty";',
+  "return Object.freeze({ log, draft, logOptional, logOptionalForProject, appendWarning, statusMode });"
+]) {
+  assertIncludes(
+    projectActivityControllerJs,
+    snippet,
+    `ProjectActivityController must retain characterized record/draft/optional/refresh/warning/status policy: ${snippet}`
+  );
+}
+for (const boundary of [
+  "const projectActivityController = appRuntime.featureFactories.createProjectActivityController({",
+  "getProject: editorSessionStore.getProject",
+  "prependActivityEvent: editorSessionStore.prependActivityEvent",
+  "replaceActivityEvents: editorSessionStore.replaceActivityEvents",
+  "repository: { record: recordActivityEvent, list: listActivityEvents }",
+  "workspace: { mark: workspaceDirtyStateController.mark }",
+  "reminder: { render: () => workspaceBackupReminderService.render() }",
+  "ids: { make: makeId }",
+  "workspaceId: () => storageConstants?.LOCAL_WORKSPACE_ID",
+  "userId: () => storageConstants?.LOCAL_USER_ID",
+  "clock: { iso: () => new Date().toISOString() }",
+  "portable: { sanitize: sanitizePortableValue }",
+  "logger: console",
+  "beforeOptionalCurrent: (type) =>",
+  "beforeOptionalProject: (type) =>",
+  "EXPORT_ACTIVITY_FAILURE_TEST_FLAG",
+  "IMPORT_ACTIVITY_FAILURE_TEST_FLAG"
+]) {
+  assertIncludes(appJs, boundary, `project-activity composition must retain the checked ${boundary} boundary.`);
+}
+const projectActivityAppCounts = {
+  log: 23,
+  draft: 2,
+  logOptional: 6,
+  logOptionalForProject: 1,
+  appendWarning: 6,
+  statusMode: 6
+};
+const projectActivityWorkflowCounts = { log: 4, draft: 1 };
+assert(
+  (appJs.match(/createProjectActivityController\(/g) || []).length === 1,
+  "app.js must compose one ProjectActivityController."
+);
+for (const [method, expected] of Object.entries(projectActivityAppCounts)) {
+  assert(
+    (appJs.match(new RegExp(`\\bprojectActivityController\\.${method}\\b`, "g")) || []).length === expected,
+    `all ${expected} application activity consumers must call ProjectActivityController.${method} directly.`
+  );
+}
+for (const [method, expected] of Object.entries(projectActivityWorkflowCounts)) {
+  assert(
+    (appWorkflowDriverJs.match(new RegExp(`\\bprojectActivityController\\.${method}\\b`, "g")) || []).length ===
+      expected,
+    `all ${expected} workflow activity consumers must call ProjectActivityController.${method} directly.`
+  );
+}
+for (const removedHelper of [
+  "logProjectActivity",
+  "draftProjectActivityEvent",
+  "logOptionalProjectActivity",
+  "logOptionalActivityForProject",
+  "appendActivityWarning",
+  "exportStatusMode"
+]) {
+  const directHelper = new RegExp(`(?:async\\s+)?function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} must not return to app.js or the workflow driver after project-activity extraction.`
+  );
+}
+assert(
+  !appJs.includes("const event = await recordActivityEvent({ projectId: project.id, type, summary, detail });") &&
+    !appJs.includes('return activityLogged ? mode : "dirty";'),
+  "project activity recording and shared status policy must not return to app.js."
+);
+assert(
+  appJs.indexOf("let workspaceBackupReminderService;") < appJs.indexOf("const projectActivityController =") &&
+    appJs.indexOf("const projectTermQueryService =") < appJs.indexOf("const projectActivityController =") &&
+    appJs.indexOf("const projectActivityController =") < appJs.indexOf("const projectOpenController =") &&
+    appJs.indexOf("const projectActivityController =") <
+      appJs.indexOf(
+        "workspaceBackupReminderService = appRuntime.featureFactories.createWorkspaceBackupReminderService({"
+      ),
+  "ProjectActivityController must use a declared late reminder adapter, follow project-term queries, and precede project opening and all consumers."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "recordActivityEvent",
+  "listActivityEvents",
+  "workspaceDirtyStateController",
+  "workspaceBackupReminderService",
+  "storageConstants",
+  "makeId",
+  "sanitizePortableValue",
+  "LOOPCAT_TEST_BUILD",
+  "EXPORT_ACTIVITY_FAILURE_TEST_FLAG",
+  "IMPORT_ACTIVITY_FAILURE_TEST_FLAG",
+  "console.",
+  "new Date",
+  "document.",
+  "els."
+]) {
+  assert(
+    !projectActivityControllerJs.includes(forbiddenOwner),
+    `ProjectActivityController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectActivityController preserves default-project no-op and exact active recording sequence",
+  "ProjectActivityController preserves explicit, inactive, and falsy-event recording branches",
+  "ProjectActivityController preserves every primary recording failure boundary",
+  "ProjectActivityController drafts exact portable activity records and preserves fallbacks",
+  "ProjectActivityController draft uses project identity before defaults and returns sanitizer identity",
+  "ProjectActivityController optional current logging preserves hook, success, and default-label behavior",
+  "ProjectActivityController optional current logging preserves catch failure timing",
+  "ProjectActivityController logs explicit project activity and reloads the active session",
+  "ProjectActivityController preserves inactive explicit logging and contained failures",
+  "ProjectActivityController contains late explicit refresh failures and preserves dirty timing",
+  "ProjectActivityController preserves shared warning and status truthiness policy",
+  "ProjectActivityController validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectActivityControllerUnitTests,
+    testName,
+    `focused project-activity tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(
@@ -9217,6 +9377,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectActivityController } from "../features/projects/project-activity-controller.js";',
+  "The application runtime must install the checked project-activity controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectActivityController,",
+  "The application runtime must expose the checked project-activity controller factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createProjectDocumentImportController } from "../features/import-export/project-document-import-controller.js";',
   "The application runtime must install the checked project-document import controller."
 );
@@ -10554,7 +10724,7 @@ for (const boundary of [
   "buildRiskQueue: qualityWorkbenchController.buildQueue",
   "renderWorkbench: qualityWorkbenchController.render",
   "getDocumentId: () => applicationStore.getState().navigation.documentId",
-  "activity: { log: logProjectActivity }",
+  "activity: { log: projectActivityController.log }",
   "status: { set: applicationSaveStatusController.set }",
   "logger: console",
   "beforeRun: () =>",
@@ -10826,7 +10996,7 @@ for (const boundary of [
   "summaries: projectSummaryController.refresh",
   "editorContext: editorContextController.refresh",
   "renderStorageStatus: workspaceRecoveryPresentationService.renderProjectStorage",
-  "logProject: logProjectActivity",
+  "logProject: projectActivityController.log",
   "record: recordActivityEvent",
   "isSupported: () => Boolean(workspaceStorage?.isSupported())",
   "chooseFolder: workspacePackageSaveController.chooseFolder",
@@ -11196,8 +11366,8 @@ for (const boundary of [
   "updateProject,",
   "bulkPut,",
   "listActivityEvents",
-  "draft: draftProjectActivityEvent",
-  "appendWarning: appendActivityWarning",
+  "draft: projectActivityController.draft",
+  "appendWarning: projectActivityController.appendWarning",
   "safeName: applicationTextSafetyService.fileSafeName",
   "count: reportCount",
   "errorReport: fileImportService.errorReport",
@@ -11205,7 +11375,7 @@ for (const boundary of [
   "renderEditor,",
   "renderBackupReminder: workspaceBackupReminderService.render",
   "workspace: { markDirty: workspaceDirtyStateController.mark }",
-  "status: { set: applicationSaveStatusController.set, mode: exportStatusMode }",
+  "status: { set: applicationSaveStatusController.set, mode: projectActivityController.statusMode }",
   "now: () => new Date().toISOString()",
   "nowMs: () => Date.now()",
   "Boolean(LOOPCAT_TEST_BUILD && editorSessionStore.getProject()?.[EXPORT_ACTIVITY_FAILURE_TEST_FLAG])",
@@ -11350,8 +11520,8 @@ for (const boundary of [
   "importAllData",
   "rebuildTm: rebuildAllTmIndexes",
   "rebuildTerms: rebuildAllTermIndexes",
-  "logForProject: logOptionalActivityForProject",
-  "appendWarning: appendActivityWarning",
+  "logForProject: projectActivityController.logOptionalForProject",
+  "appendWarning: projectActivityController.appendWarning",
   "openProjects: applicationNavigation.openProjects",
   "clearSelection: applicationNavigation.clearSelection",
   "load: projectCollectionLoadController.load",
@@ -11363,7 +11533,7 @@ for (const boundary of [
   "alertText: validationAlertText",
   "renderValidation: renderValidationReport",
   "renderWorkspaceStatus",
-  "status: { set: applicationSaveStatusController.set, mode: exportStatusMode }",
+  "status: { set: applicationSaveStatusController.set, mode: projectActivityController.statusMode }",
   "alert: uiLocalizationService.alert",
   "confirm: uiLocalizationService.confirm",
   "text: { safe: applicationTextSafetyService.displaySafeText }"
@@ -11809,7 +11979,7 @@ for (const boundary of [
   "build: projectExportBuildService",
   "knownById: projectRecordLookupService.findById",
   "list: listProjects",
-  "draft: draftProjectActivityEvent",
+  "draft: projectActivityController.draft",
   "bulkPut,",
   "list: listActivityEvents",
   "markMissingLocalDirty: workspaceProjectCoverageService.markMissingLocalDirty",
@@ -11952,10 +12122,10 @@ for (const boundary of [
   "histories: { prepare: segmentTargetStateService.prepareHistories }",
   "progress: { report: applicationImportProgressController.reportProgress }",
   "navigation: { selectDocument: applicationNavigation.selectDocument }",
-  "log: logOptionalProjectActivity",
-  "appendWarning: appendActivityWarning",
+  "log: projectActivityController.logOptional",
+  "appendWarning: projectActivityController.appendWarning",
   "workspace: { markDirty: workspaceDirtyStateController.mark }",
-  "status: { set: applicationSaveStatusController.set, mode: exportStatusMode }",
+  "status: { set: applicationSaveStatusController.set, mode: projectActivityController.statusMode }",
   "refreshEditorContext: editorContextController.refresh",
   "lower: applicationTextSafetyService.stableLower",
   "safe: applicationTextSafetyService.displaySafeText",
@@ -22180,9 +22350,9 @@ assertIncludes(
   "The direct-OpenAI controller must check offline state before saving keys or settings."
 );
 assertIncludes(
-  appJs,
-  "return sanitizePortableValue(event);",
-  "app.js draft project activity events must use the safe portable activity shape before direct package/workspace storage."
+  projectActivityControllerJs,
+  "return portable.sanitize(event);",
+  "ProjectActivityController draft events must use the injected safe portable activity shape before direct package/workspace storage."
 );
 assertIncludes(
   appJs,
@@ -22395,13 +22565,13 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "logOptionalProjectActivity(type, summary, detail = {}, label = summary || type)",
-  "app.js must route export activity logging through an optional helper."
+  "projectActivityController.logOptional",
+  "app.js must route optional activity logging through ProjectActivityController."
 );
 assertIncludes(
   appJs,
-  "appendActivityWarning(message, activityLogged)",
-  "app.js must append a warning when an export succeeds but activity logging fails."
+  "projectActivityController.appendWarning",
+  "app.js must append activity warnings through ProjectActivityController."
 );
 assertIncludes(
   appJs,

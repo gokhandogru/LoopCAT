@@ -2557,7 +2557,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         !savedAiSuggestionActivityJson.includes("workflow-response-id-that-must-not-store"),
       "AI suggestion save strips provider trace metadata before local storage"
     );
-    const draftedPackageActivity = draftProjectActivityEvent(project, "export", "Package export Bearer workflow-draft-activity-summary-token-that-must-not-store", {
+    const draftedPackageActivity = projectActivityController.draft(project, "export", "Package export Bearer workflow-draft-activity-summary-token-that-must-not-store", {
       filename: "Bearer workflow-draft-activity-file-token-that-must-not-store.loopcat.json",
       prompt: "Draft activity prompt trace must not be stored.",
       promptTemplate: "Draft activity prompt template must not be stored.",
@@ -3995,17 +3995,17 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     HTMLAnchorElement.prototype.click = function noopReportDownloadClick() {};
     try {
       workspaceDirtyStateController.clearAll();
-      await logProjectActivity("ai-action", "Sensitive AI prompt trace must not appear in report", {
+      await projectActivityController.log("ai-action", "Sensitive AI prompt trace must not appear in report", {
         provider: "OpenAI",
         configuredProvider: "OpenAI",
         prompt: "Report activity prompt trace must not appear.",
         responseId: "report-response-id-that-must-not-appear",
         customEndpoint: "https://ai.example.invalid/responses"
       });
-      await logProjectActivity("qa-run", "Unsafe report Bearer report-summary-token-that-must-not-appear", {
+      await projectActivityController.log("qa-run", "Unsafe report Bearer report-summary-token-that-must-not-appear", {
         issueCount: 0
       });
-      await logProjectActivity("Bearer report-activity-type-token-that-must-not-appear", "Activity type privacy fixture", {
+      await projectActivityController.log("Bearer report-activity-type-token-that-must-not-appear", "Activity type privacy fixture", {
         issueCount: 0
       });
       editorSessionStore.replaceProject(await updateProject({
@@ -5338,7 +5338,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       workspaceStorage.saveProjectPackage = originalWorkspaceWriteFailureSave;
       workspaceDirtyStateController.clearAll();
     }
-    await logProjectActivity("qa-run", "Activity dirty regression", { source: "workflow-test" });
+    await projectActivityController.log("qa-run", "Activity dirty regression", { source: "workflow-test" });
     assert(state.workspaceDirtyProjectIds.has(project.id), "activity events mark linked project package dirty");
 
     const invalidWorkspaceProject = await createProject({
