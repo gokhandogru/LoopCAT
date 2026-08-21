@@ -51,6 +51,13 @@ const languagePairFilterPresentationControllerPath = path.join(
   "projects",
   "language-pair-filter-presentation-controller.js"
 );
+const projectsViewPresentationControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "projects",
+  "projects-view-presentation-controller.js"
+);
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -171,6 +178,11 @@ function validate() {
     ...collectCodeKeys(
       fs.existsSync(languagePairFilterPresentationControllerPath)
         ? fs.readFileSync(languagePairFilterPresentationControllerPath, "utf8")
+        : ""
+    ),
+    ...collectCodeKeys(
+      fs.existsSync(projectsViewPresentationControllerPath)
+        ? fs.readFileSync(projectsViewPresentationControllerPath, "utf8")
         : ""
     )
   ];

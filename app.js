@@ -1411,6 +1411,38 @@ const languagePairFilterPresentationController =
     }
   });
 
+const projectsViewPresentationController =
+  appRuntime.featureFactories.createProjectsViewPresentationController({
+    elements: {
+      dashboard: els.projectDashboard,
+      searchInput: els.projectSearchInput,
+      languagePairFilter: els.languagePairFilter
+    },
+    session: { getProjectSummaries: editorSessionStore.getProjectSummaries },
+    search: { build: projectSearchTextService.build },
+    language: {
+      key: projectLanguageContextController.key,
+      display: projectLanguageContextController.display
+    },
+    text: {
+      stableLower: applicationTextSafetyService.stableLower,
+      displaySafeHtml: applicationTextSafetyService.displaySafeHtml,
+      displaySafeText: applicationTextSafetyService.displaySafeText,
+      escapeHtml: applicationTextSafetyService.escapeHtml
+    },
+    localization: uiLocalizationService,
+    date: { format: applicationDateTimeService.date },
+    dom: { createElement: (tagName) => document.createElement(tagName) },
+    presentation: { replaceSafeHtml },
+    vertical: { getProjects: () => verticalFeatureState?.projects },
+    actions: {
+      deleteProject: (...args) => confirmDeleteProject(...args),
+      open: (...args) => projectOpenController.open(...args),
+      clearFilters: (...args) => projectFilterControlsController.clear(...args),
+      importPackage: (...args) => els.projectPackageImportInput.click(...args)
+    }
+  });
+
 const projectSummaryController = appRuntime.featureFactories.createProjectSummaryController({
   session: {
     getProject: editorSessionStore.getProject,
@@ -1426,7 +1458,7 @@ const projectSummaryController = appRuntime.featureFactories.createProjectSummar
   language: { key: projectLanguageContextController.key },
   presentation: {
     renderLanguageFilter: languagePairFilterPresentationController.render,
-    renderProjects: renderProjectsView
+    renderProjects: projectsViewPresentationController.render
   }
 });
 
@@ -4153,7 +4185,7 @@ const uiLocaleOrchestrationController =
       renderFocusMode: () => focusModeController.render(),
       renderWorkspaceStatus: () => workspaceRecoveryPresentationService.renderStatus(),
       renderProjectStorageStatus: workspaceRecoveryPresentationService.renderProjectStorage,
-      renderProjectsView: () => renderProjectsView(),
+      renderProjectsView: projectsViewPresentationController.render,
       renderResourcesView: () => renderResourcesView(),
       renderProjectHome: projectHomePresentationController.render,
       renderProjectAnalysis: projectAnalysisController.render,
@@ -4203,7 +4235,7 @@ const projectFilterControlsController =
       searchInput: els.projectSearchInput,
       languagePairFilter: els.languagePairFilter
     },
-    presentation: { render: renderProjectsView }
+    presentation: { render: projectsViewPresentationController.render }
   });
 const focusModeController = appRuntime.featureFactories.createFocusModeController({
   elements: {
@@ -5573,92 +5605,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-function createProjectTile(project) {
-  const tile = document.createElement("article");
-  tile.className = "project-tile";
-  replaceSafeHtml(tile, `
-    <header>
-      <div>
-        <h3>${applicationTextSafetyService.displaySafeHtml(project.name)}</h3>
-        <p>${applicationTextSafetyService.displaySafeHtml(project.domain ? `${project.domain} - ${project.sourceFileName || uiLocalizationService.label("noSourceFileImported")}` : project.sourceFileName || uiLocalizationService.label("noSourceFileImported"))}</p>
-      </div>
-      <span class="language-badge">${applicationTextSafetyService.escapeHtml(projectLanguageContextController.display(project))}</span>
-    </header>
-    <div class="project-stats">
-      <div><strong>${project.progress.percent}%</strong><span>${uiLocalizationService.labelHtml("confirmed")}</span></div>
-      <div><strong>${project.progress.total}</strong><span>${uiLocalizationService.labelHtml("segments")}</span></div>
-      <div><strong>${project.wordCount}</strong><span>${uiLocalizationService.labelHtml("words")}</span></div>
-    </div>
-    <div class="progress-bar"><div style="width:${project.progress.percent}%"></div></div>
-    <footer>
-      <span>${uiLocalizationService.labelHtml("updatedAt", { date: applicationDateTimeService.date(project.updatedAt) })}</span>
-    </footer>
-  `);
-  tile.querySelector(".progress-bar > div").style.width = `${project.progress.percent}%`;
-  const deleteButton = document.createElement("button");
-  const projectLabel = applicationTextSafetyService.displaySafeText(
-    project.name,
-    uiLocalizationService.source("project")
-  );
-  deleteButton.className = "danger-small";
-  deleteButton.type = "button";
-  deleteButton.textContent = uiLocalizationService.source("Delete");
-  deleteButton.setAttribute("aria-label", uiLocalizationService.source("Delete project {value1}", { value1: projectLabel }));
-  deleteButton.addEventListener("click", () => confirmDeleteProject(project.id));
-  const openButton = document.createElement("button");
-  openButton.className = "primary";
-  openButton.type = "button";
-  openButton.textContent = uiLocalizationService.source("Open");
-  openButton.setAttribute("aria-label", uiLocalizationService.source("Open project {value1}", { value1: projectLabel }));
-  openButton.addEventListener("click", () => projectOpenController.open(project.id));
-  tile.querySelector("footer").append(deleteButton, openButton);
-  return tile;
-}
-
-function projectEmptyState({ hasProjects }) {
-  const empty = document.createElement("div");
-  empty.className = "actionable-empty-state";
-  const heading = document.createElement("h3");
-  const message = document.createElement("p");
-  const action = document.createElement("button");
-  action.type = "button";
-  if (hasProjects) {
-    heading.textContent = uiLocalizationService.source("No matching projects");
-    message.textContent = uiLocalizationService.source("Clear the search and language filters to see every local project.");
-    action.textContent = uiLocalizationService.source("Clear filters");
-    action.addEventListener("click", projectFilterControlsController.clear);
-  } else {
-    heading.textContent = uiLocalizationService.source("Start your first translation");
-    message.textContent = uiLocalizationService.source("Choose New project above, or bring in an existing LoopCAT project package.");
-    action.textContent = uiLocalizationService.source("Import project package");
-    action.addEventListener("click", () => els.projectPackageImportInput.click());
-  }
-  empty.append(heading, message, action);
-  return empty;
-}
-
-function renderProjectsView() {
-  const query = applicationTextSafetyService.stableLower(els.projectSearchInput.value.trim());
-  const pair = els.languagePairFilter.value;
-  const summaries = editorSessionStore.getProjectSummaries().map((project) => ({
-    ...project,
-    searchText: project.searchText || projectSearchTextService.build(project),
-    languagePairKey: project.languagePairKey || projectLanguageContextController.key(project)
-  }));
-  if (verticalFeatureState?.projects) {
-    verticalFeatureState.projects.render({
-      projects: summaries,
-      query,
-      languagePair: pair,
-      createItem: createProjectTile,
-      createEmptyState: projectEmptyState
-    });
-    return;
-  }
-  const visible = summaries.filter((project) => (!query || project.searchText.includes(query)) && (!pair || project.languagePairKey === pair));
-  els.projectDashboard.replaceChildren(...(visible.length ? visible.map(createProjectTile) : [projectEmptyState({ hasProjects: summaries.length > 0 })]));
-}
 
 async function confirmDeleteProject(projectId = editorSessionStore.getProject()?.id) {
   const project = editorSessionStore.getProjects().find((item) => item.id === projectId);

@@ -256,6 +256,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-home-controller.js",
   "src/features/projects/project-home-presentation-controller.js",
   "src/features/projects/language-pair-filter-presentation-controller.js",
+  "src/features/projects/projects-view-presentation-controller.js",
   "src/features/projects/project-list-presentation-controller.js",
   "src/features/projects/project-resource-selection-controller.js",
   "src/features/projects/project-name-service.js",
@@ -387,6 +388,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-home-controller.test.cjs",
   "tests/unit/project-home-presentation-controller.test.cjs",
   "tests/unit/language-pair-filter-presentation-controller.test.cjs",
+  "tests/unit/projects-view-presentation-controller.test.cjs",
   "tests/unit/project-list-presentation-controller.test.cjs",
   "tests/unit/project-document-import-controller.test.cjs",
   "tests/unit/file-import-service.test.cjs",
@@ -690,6 +692,10 @@ const languagePairFilterPresentationControllerJs = readText(
 );
 const languagePairFilterPresentationControllerUnitTests = readText(
   "tests/unit/language-pair-filter-presentation-controller.test.cjs"
+);
+const projectsViewPresentationControllerJs = readText("src/features/projects/projects-view-presentation-controller.js");
+const projectsViewPresentationControllerUnitTests = readText(
+  "tests/unit/projects-view-presentation-controller.test.cjs"
 );
 const projectDocumentImportControllerJs = readText("src/features/import-export/project-document-import-controller.js");
 const projectDocumentImportControllerUnitTests = readText("tests/unit/project-document-import-controller.test.cjs");
@@ -1353,6 +1359,180 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectsViewPresentationController } from "../features/projects/projects-view-presentation-controller.js";',
+  "the application runtime must install the checked Projects view presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectsViewPresentationController,",
+  "the application runtime must expose the checked Projects view presentation controller factory."
+);
+for (const snippet of [
+  "ProjectsViewPresentationController requires Projects view elements.",
+  "ProjectsViewPresentationController requires a project-summary boundary.",
+  "ProjectsViewPresentationController requires a project-search boundary.",
+  "ProjectsViewPresentationController requires language boundaries.",
+  "ProjectsViewPresentationController requires text-safety boundaries.",
+  "ProjectsViewPresentationController requires localization boundaries.",
+  "ProjectsViewPresentationController requires a date boundary.",
+  "ProjectsViewPresentationController requires a DOM creation boundary.",
+  "ProjectsViewPresentationController requires presentation boundaries.",
+  "ProjectsViewPresentationController requires action boundaries.",
+  'const tile = dom.createElement("article");',
+  'tile.className = "project-tile";',
+  "text.displaySafeHtml(project.name)",
+  "text.escapeHtml(language.display(project))",
+  'localization.labelHtml("updatedAt", { date: date.format(project.updatedAt) })',
+  'tile.querySelector(".progress-bar > div").style.width = `${project.progress.percent}%`;',
+  'const projectLabel = text.displaySafeText(project.name, localization.source("project"));',
+  'deleteButton.addEventListener("click", () => actions.deleteProject(project.id));',
+  'openButton.addEventListener("click", () => actions.open(project.id));',
+  'tile.querySelector("footer").append(deleteButton, openButton);',
+  'empty.className = "actionable-empty-state";',
+  'heading.textContent = localization.source("No matching projects");',
+  'action.addEventListener("click", actions.clearFilters);',
+  'heading.textContent = localization.source("Start your first translation");',
+  'action.addEventListener("click", actions.importPackage);',
+  "empty.append(heading, message, action);",
+  "const query = text.stableLower(elements.searchInput.value.trim());",
+  "const pair = elements.languagePairFilter.value;",
+  "const summaries = session.getProjectSummaries().map((project) => ({",
+  "searchText: project.searchText || search.build(project),",
+  "languagePairKey: project.languagePairKey || language.key(project)",
+  "const projectsRenderer = vertical.getProjects();",
+  "projectsRenderer.render({",
+  "createItem: createProjectTile,",
+  "createEmptyState: projectEmptyState",
+  "const visible = summaries.filter(",
+  "(!query || project.searchText.includes(query)) && (!pair || project.languagePairKey === pair)",
+  "...(visible.length ? visible.map(createProjectTile) : [projectEmptyState({ hasProjects: summaries.length > 0 })])",
+  "return Object.freeze({ render });"
+]) {
+  assertIncludes(
+    projectsViewPresentationControllerJs,
+    snippet,
+    `ProjectsViewPresentationController must retain characterized mapping, routing, tile, empty-state, filter, action, and replacement policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectsViewPresentationController({",
+  "dashboard: els.projectDashboard",
+  "searchInput: els.projectSearchInput",
+  "languagePairFilter: els.languagePairFilter",
+  "session: { getProjectSummaries: editorSessionStore.getProjectSummaries }",
+  "search: { build: projectSearchTextService.build }",
+  "key: projectLanguageContextController.key",
+  "display: projectLanguageContextController.display",
+  "stableLower: applicationTextSafetyService.stableLower",
+  "displaySafeHtml: applicationTextSafetyService.displaySafeHtml",
+  "displaySafeText: applicationTextSafetyService.displaySafeText",
+  "escapeHtml: applicationTextSafetyService.escapeHtml",
+  "localization: uiLocalizationService",
+  "date: { format: applicationDateTimeService.date }",
+  "dom: { createElement: (tagName) => document.createElement(tagName) }",
+  "presentation: { replaceSafeHtml }",
+  "vertical: { getProjects: () => verticalFeatureState?.projects }",
+  "deleteProject: (...args) => confirmDeleteProject(...args)",
+  "open: (...args) => projectOpenController.open(...args)",
+  "clearFilters: (...args) => projectFilterControlsController.clear(...args)",
+  "importPackage: (...args) => els.projectPackageImportInput.click(...args)",
+  "renderProjects: projectsViewPresentationController.render",
+  "renderProjectsView: projectsViewPresentationController.render",
+  "presentation: { render: projectsViewPresentationController.render }"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `Projects view presentation composition must retain the checked ${boundary} boundary.`
+  );
+}
+assert(
+  (appJs.match(/\bprojectsViewPresentationController\.render\b/g) || []).length === 3 &&
+    (appWorkflowDriverJs.match(/\bprojectsViewPresentationController\.render\b/g) || []).length === 2,
+  "ProjectSummaryController, UiLocaleOrchestrationController, ProjectFilterControlsController, and both workflow consumers must call ProjectsViewPresentationController directly."
+);
+for (const removedHelper of ["createProjectTile", "projectEmptyState", "renderProjectsView"]) {
+  assert(
+    !new RegExp(`function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return as a coordinator or workflow helper.`
+  );
+}
+for (const removedPolicy of [
+  "els.projectDashboard.replaceChildren",
+  "verticalFeatureState.projects.render",
+  "visible.map(createProjectTile)",
+  'action.addEventListener("click", projectFilterControlsController.clear)',
+  "applicationTextSafetyService.displaySafeHtml(project.name)"
+]) {
+  assert(
+    !appJs.includes(removedPolicy) && !appWorkflowDriverJs.includes(removedPolicy),
+    `Projects summary mapping, routing, tile, empty-state, filter, action, and replacement policy must not return through ${removedPolicy}.`
+  );
+}
+assert(
+  !appJs.includes("editorSessionStore.getProjectSummaries().map"),
+  "Projects summary mapping policy must not return to app.js."
+);
+assert(
+  appJs.indexOf("const projectSearchTextService =") < appJs.indexOf("const projectsViewPresentationController =") &&
+    appJs.indexOf("const projectLanguageContextController =") <
+      appJs.indexOf("const projectsViewPresentationController =") &&
+    appJs.indexOf("const projectsViewPresentationController =") < appJs.indexOf("const projectSummaryController =") &&
+    appJs.indexOf("const projectsViewPresentationController =") < appJs.indexOf("const verticalFeatureState =") &&
+    appJs.indexOf("const projectsViewPresentationController =") < appJs.indexOf("const projectOpenController =") &&
+    appJs.indexOf("const projectsViewPresentationController =") <
+      appJs.indexOf("const projectFilterControlsController ="),
+  "ProjectsViewPresentationController must be composed after stable policy and before its direct and late-bound consumers."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "projectSearchTextService",
+  "projectLanguageContextController",
+  "applicationTextSafetyService",
+  "uiLocalizationService",
+  "applicationDateTimeService",
+  "verticalFeatureState",
+  "projectOpenController",
+  "projectFilterControlsController",
+  "confirmDeleteProject",
+  "document.",
+  "els."
+]) {
+  assert(
+    !projectsViewPresentationControllerJs.includes(forbiddenOwner),
+    `ProjectsViewPresentationController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectsViewPresentationController preserves read order fresh mapping and truthy cache precedence",
+  "ProjectsViewPresentationController preserves the vertical renderer receiver callbacks and early return",
+  "ProjectsViewPresentationController preserves fallback filtering strict pairs stable order and replacement",
+  "ProjectsViewPresentationController preserves safe tile markup progress actions labels and IDs",
+  "ProjectsViewPresentationController preserves source metadata fallback branches",
+  "ProjectsViewPresentationController preserves both actionable empty states and direct listener identities",
+  "ProjectsViewPresentationController preserves populated failure boundaries",
+  "ProjectsViewPresentationController validates every owner and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectsViewPresentationControllerUnitTests,
+    testName,
+    `focused Projects view presentation tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/projects-view-presentation-controller.js"',
+  "source-catalog extraction must scan the checked Projects view presentation controller."
+);
+assertIncludes(
+  i18nValidateScript,
+  '"projects-view-presentation-controller.js"',
+  "source-catalog validation must check explicit keys in the checked Projects view presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createProjectSummaryController } from "../features/projects/project-summary-controller.js";',
   "The application runtime must install the checked project-summary controller."
 );
@@ -1414,7 +1594,7 @@ for (const boundary of [
   "search: { build: projectSearchTextService.build }",
   "language: { key: projectLanguageContextController.key }",
   "renderLanguageFilter: languagePairFilterPresentationController.render",
-  "renderProjects: renderProjectsView"
+  "renderProjects: projectsViewPresentationController.render"
 ]) {
   assertIncludes(appJs, boundary, `project-summary composition must retain the checked ${boundary} boundary.`);
 }
@@ -2091,11 +2271,15 @@ for (const boundary of [
   "date: { create: (value) => new Date(value) }",
   "formatDateTime: applicationDateTimeService.dateTime",
   "date: { format: applicationDateTimeService.date }",
-  "formatDate: applicationDateTimeService.date",
-  "applicationDateTimeService.date(project.updatedAt)"
+  "formatDate: applicationDateTimeService.date"
 ]) {
   assertIncludes(appJs, boundary, `application date-time composition and consumers must retain ${boundary}.`);
 }
+assertIncludes(
+  projectsViewPresentationControllerJs,
+  "date.format(project.updatedAt)",
+  "ProjectsViewPresentationController must use the injected shared application date policy."
+);
 assert(
   (appJs.match(/\bapplicationDateTimeService\.dateTime\b/g) || []).length === 4,
   "all four application date-time consumers must call ApplicationDateTimeService directly."
@@ -7630,8 +7814,7 @@ for (const boundary of [
   "appRuntime.featureFactories.createProjectFilterControlsController({",
   "searchInput: els.projectSearchInput",
   "languagePairFilter: els.languagePairFilter",
-  "presentation: { render: renderProjectsView }",
-  'action.addEventListener("click", projectFilterControlsController.clear)',
+  "presentation: { render: projectsViewPresentationController.render }",
   "projectFilterControls: projectFilterControlsController"
 ]) {
   assertIncludes(appJs, boundary, `project-filter composition must retain the checked ${boundary} boundary.`);
@@ -18455,6 +18638,11 @@ assertIncludes(
   "ProjectListPresentationController sidebar list must render in one DOM replacement."
 );
 assertIncludes(
+  projectsViewPresentationControllerJs,
+  "elements.dashboard.replaceChildren(",
+  "ProjectsViewPresentationController fallback dashboard must render in one DOM replacement."
+);
+assertIncludes(
   documentFilterPresentationControllerJs,
   "select.replaceChildren(fragment)",
   "DocumentFilterPresentationController options must render in one DOM replacement."
@@ -18485,9 +18673,9 @@ assertIncludes(
   "ProjectSummaryController must cache dashboard language-pair keys for filtering."
 );
 assertIncludes(
-  appJs,
-  "project.searchText ||",
-  "app.js project dashboard filtering must reuse cached project search text."
+  projectsViewPresentationControllerJs,
+  "project.searchText || search.build(project)",
+  "ProjectsViewPresentationController must reuse cached project search text before its fallback."
 );
 assertIncludes(
   readText("src/features/projects/projects-controller.js"),
@@ -19573,7 +19761,7 @@ for (const [method, count] of [
   ["stableLower", 14],
   ["escapeHtml", 17],
   ["displaySafeText", 13],
-  ["displaySafeHtml", 7],
+  ["displaySafeHtml", 6],
   ["escapeRegExp", 1],
   ["fileSafeName", 5],
   ["redactSensitiveText", 18]

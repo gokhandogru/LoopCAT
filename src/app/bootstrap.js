@@ -65,6 +65,7 @@ import { createProjectHomeController } from "../features/projects/project-home-c
 import { createProjectHomePresentationController } from "../features/projects/project-home-presentation-controller.js";
 import { createLanguagePairFilterPresentationController } from "../features/projects/language-pair-filter-presentation-controller.js";
 import { createProjectListPresentationController } from "../features/projects/project-list-presentation-controller.js";
+import { createProjectsViewPresentationController } from "../features/projects/projects-view-presentation-controller.js";
 import { createEditorController } from "../features/editor/editor-controller.js";
 import { createDocumentFilterPresentationController } from "../features/editor/document-filter-presentation-controller.js";
 import { createEditorShellPresentationController } from "../features/editor/editor-shell-presentation-controller.js";
@@ -349,6 +350,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createProjectHomePresentationController,
       createLanguagePairFilterPresentationController,
       createProjectListPresentationController,
+      createProjectsViewPresentationController,
       createDocumentFilterPresentationController,
       createProjectDocumentCatalogService,
       createProjectDocumentStatisticsService,

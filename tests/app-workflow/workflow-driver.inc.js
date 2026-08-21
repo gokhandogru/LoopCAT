@@ -4316,7 +4316,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           return false;
         };
         applicationAggregatePresentationController.render();
-        renderProjectsView();
+        projectsViewPresentationController.render();
         await confirmDeleteProject(labelProject.id);
         await confirmDeleteFile(projectDocumentCatalogService.list()[0]);
         projectDocumentImportController.confirmDuplicate(new File(["duplicate"], labelDocumentName, { type: "text/plain" }));
@@ -4370,7 +4370,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           });
         }
         applicationAggregatePresentationController.render();
-        renderProjectsView();
+        projectsViewPresentationController.render();
         renderResourcesView();
       }
       await deliveryExportController.exportTargetText();
