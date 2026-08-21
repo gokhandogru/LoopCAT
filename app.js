@@ -1415,6 +1415,20 @@ const projectSummaryController = appRuntime.featureFactories.createProjectSummar
   }
 });
 
+const termbaseSelectPresentationController =
+  appRuntime.featureFactories.createTermbaseSelectPresentationController({
+    select: els.termBaseSelect,
+    resources: {
+      termBaseNames: projectResourceContextService.termBaseNames,
+      primaryTermBase: projectResourceContextService.primaryTermBase
+    },
+    dom: {
+      createElement: (tagName) => document.createElement(tagName),
+      createDocumentFragment: () => document.createDocumentFragment()
+    },
+    text: { displaySafeText: applicationTextSafetyService.displaySafeText }
+  });
+
 const projectTermRefreshController = appRuntime.featureFactories.createProjectTermRefreshController({
   session: {
     getProject: editorSessionStore.getProject,
@@ -1423,7 +1437,7 @@ const projectTermRefreshController = appRuntime.featureFactories.createProjectTe
   repository: { listTerms },
   resources: { termBaseNames: projectResourceContextService.termBaseNames },
   filters: { invalidate: segmentFilterService.invalidate },
-  presentation: { renderTermbaseSelect, renderSegments }
+  presentation: { renderTermbaseSelect: termbaseSelectPresentationController.render, renderSegments }
 });
 
 const projectTermQueryService = appRuntime.featureFactories.createProjectTermQueryService({
@@ -1738,7 +1752,7 @@ const termFormController = appRuntime.featureFactories.createTermFormController(
   },
   repository: { save: saveTerm },
   presentation: {
-    renderTermbaseSelect,
+    renderTermbaseSelect: termbaseSelectPresentationController.render,
     refreshProjectTerms: projectTermRefreshController.refresh,
     refreshSuggestions: termSuggestionsController.refresh
   },
@@ -5486,22 +5500,7 @@ function renderEditor() {
   });
   aiProviderFormController.renderCommandCentre();
   qualityWorkbenchController.render();
-  renderTermbaseSelect();
-}
-
-function renderTermbaseSelect() {
-  if (!els.termBaseSelect) return;
-  const names = projectResourceContextService.termBaseNames();
-  const current = els.termBaseSelect.value;
-  const fragment = document.createDocumentFragment();
-  names.forEach((name) => {
-    const option = document.createElement("option");
-    option.value = name;
-    option.textContent = applicationTextSafetyService.displaySafeText(name);
-    fragment.append(option);
-  });
-  els.termBaseSelect.replaceChildren(fragment);
-  els.termBaseSelect.value = names.includes(current) ? current : projectResourceContextService.primaryTermBase();
+  termbaseSelectPresentationController.render();
 }
 
 function renderProjectHome() {

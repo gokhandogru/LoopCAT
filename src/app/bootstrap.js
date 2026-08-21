@@ -98,6 +98,7 @@ import { createSegmentDraftApplicationService } from "../features/editor/segment
 import { createTargetReplacementController } from "../features/editor/target-replacement-controller.js";
 import { createTmPretranslationController } from "../features/editor/tm-pretranslation-controller.js";
 import { createStructuralSegmentController } from "../features/editor/structural-segment-controller.js";
+import { createTermbaseSelectPresentationController } from "../features/editor/termbase-select-presentation-controller.js";
 import { createPaletteController } from "../features/palette/palette-controller.js";
 import { createWorkspaceLayoutController } from "../features/workspace/workspace-layout-controller.js";
 import { createUpdateController } from "../features/update/update-controller.js";
@@ -379,6 +380,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createResourcesPresentationService,
       createSegmentConfirmationController,
       createStructuralSegmentController,
+      createTermbaseSelectPresentationController,
       createTargetProducerController,
       createProtectedTagInspectionService,
       createProtectedTextReplacementService,

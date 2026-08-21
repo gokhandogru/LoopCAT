@@ -209,6 +209,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-navigation-controller.js",
   "src/features/editor/segment-draft-application-service.js",
   "src/features/editor/structural-segment-controller.js",
+  "src/features/editor/termbase-select-presentation-controller.js",
   "src/features/palette/palette-controller.js",
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -391,6 +392,7 @@ const requiredReleaseFiles = [
   "tests/unit/target-replacement-controller.test.cjs",
   "tests/unit/tm-pretranslation-controller.test.cjs",
   "tests/unit/structural-segment-controller.test.cjs",
+  "tests/unit/termbase-select-presentation-controller.test.cjs",
   "tests/app-workflow/workflow-driver.inc.js",
   "tests/unit/gemini-provider-adapter.test.cjs",
   "tests/unit/groq-provider-adapter.test.cjs",
@@ -624,6 +626,9 @@ const segmentDraftApplicationServiceJs = readText("src/features/editor/segment-d
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
 const tmPretranslationControllerJs = readText("src/features/editor/tm-pretranslation-controller.js");
 const structuralSegmentControllerJs = readText("src/features/editor/structural-segment-controller.js");
+const termbaseSelectPresentationControllerJs = readText(
+  "src/features/editor/termbase-select-presentation-controller.js"
+);
 const autosaveServiceUnitTests = readText("tests/unit/autosave-service.test.cjs");
 const segmentConfirmationControllerUnitTests = readText("tests/unit/segment-confirmation-controller.test.cjs");
 const targetEditControllerUnitTests = readText("tests/unit/target-edit-controller.test.cjs");
@@ -682,6 +687,9 @@ const segmentDraftApplicationServiceUnitTests = readText("tests/unit/segment-dra
 const targetReplacementControllerUnitTests = readText("tests/unit/target-replacement-controller.test.cjs");
 const tmPretranslationControllerUnitTests = readText("tests/unit/tm-pretranslation-controller.test.cjs");
 const structuralSegmentControllerUnitTests = readText("tests/unit/structural-segment-controller.test.cjs");
+const termbaseSelectPresentationControllerUnitTests = readText(
+  "tests/unit/termbase-select-presentation-controller.test.cjs"
+);
 const qualityProfileControllerJs = readText("src/features/quality/quality-profile-controller.js");
 const qualityProfileControllerUnitTests = readText("tests/unit/quality-profile-controller.test.cjs");
 const qualityPresentationServiceJs = readText("src/features/quality/quality-presentation-service.js");
@@ -1030,6 +1038,107 @@ assertIncludes(
   "createProjectRecordLookupService,",
   "The application runtime must expose the checked project-record lookup service factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createTermbaseSelectPresentationController } from "../features/editor/termbase-select-presentation-controller.js";',
+  "the application runtime must install the checked termbase-select presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createTermbaseSelectPresentationController,",
+  "the application runtime must expose the checked termbase-select presentation controller factory."
+);
+for (const snippet of [
+  "TermbaseSelectPresentationController requires resource boundaries.",
+  "TermbaseSelectPresentationController requires DOM creation boundaries.",
+  "TermbaseSelectPresentationController requires a text-safety boundary.",
+  "if (!select) return;",
+  "const names = resources.termBaseNames();",
+  "const current = select.value;",
+  "const fragment = dom.createDocumentFragment();",
+  "names.forEach((name) => {",
+  'const option = dom.createElement("option");',
+  "option.value = name;",
+  "option.textContent = text.displaySafeText(name);",
+  "fragment.append(option);",
+  "select.replaceChildren(fragment);",
+  "select.value = names.includes(current) ? current : resources.primaryTermBase();",
+  "return Object.freeze({ render });"
+]) {
+  assertIncludes(
+    termbaseSelectPresentationControllerJs,
+    snippet,
+    `TermbaseSelectPresentationController must retain characterized option and selection policy: ${snippet}`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createTermbaseSelectPresentationController({",
+  "select: els.termBaseSelect",
+  "termBaseNames: projectResourceContextService.termBaseNames",
+  "primaryTermBase: projectResourceContextService.primaryTermBase",
+  "createElement: (tagName) => document.createElement(tagName)",
+  "createDocumentFragment: () => document.createDocumentFragment()",
+  "displaySafeText: applicationTextSafetyService.displaySafeText",
+  "renderTermbaseSelect: termbaseSelectPresentationController.render"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `termbase-select presentation composition must retain the checked ${boundary} boundary.`
+  );
+}
+assert(
+  (appJs.match(/\btermbaseSelectPresentationController\.render\b/g) || []).length === 3,
+  "all three application termbase-select consumers must call TermbaseSelectPresentationController.render directly."
+);
+assert(
+  (appWorkflowDriverJs.match(/\btermbaseSelectPresentationController\.render\b/g) || []).length === 2,
+  "both workflow termbase-select consumers must call TermbaseSelectPresentationController.render directly."
+);
+assert(
+  !/function\s+renderTermbaseSelect\b/.test(appJs) && !/function\s+renderTermbaseSelect\b/.test(appWorkflowDriverJs),
+  "renderTermbaseSelect must not return as a coordinator or workflow helper."
+);
+assert(
+  !appJs.includes("const names = projectResourceContextService.termBaseNames();") &&
+    !appJs.includes("els.termBaseSelect.replaceChildren(fragment);") &&
+    !appJs.includes("names.includes(current) ? current : projectResourceContextService.primaryTermBase()"),
+  "termbase option, replacement, and selection policy must not return to app.js."
+);
+assert(
+  appJs.indexOf("const projectSummaryController =") < appJs.indexOf("const termbaseSelectPresentationController =") &&
+    appJs.indexOf("const termbaseSelectPresentationController =") <
+      appJs.indexOf("const projectTermRefreshController ="),
+  "TermbaseSelectPresentationController must follow project summary and precede its first term-refresh consumer."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "els.",
+  "document.",
+  "projectResourceContextService",
+  "applicationTextSafetyService",
+  "renderTermbaseSelect"
+]) {
+  assert(
+    !termbaseSelectPresentationControllerJs.includes(forbiddenOwner),
+    `TermbaseSelectPresentationController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "TermbaseSelectPresentationController preserves the absent-select immediate return",
+  "TermbaseSelectPresentationController preserves live names and stable safe option construction",
+  "TermbaseSelectPresentationController retains the strict current selection after replacement",
+  "TermbaseSelectPresentationController resolves the primary fallback lazily after replacement",
+  "TermbaseSelectPresentationController preserves empty names and fresh repeated renders",
+  "TermbaseSelectPresentationController preserves every populated failure boundary",
+  "TermbaseSelectPresentationController validates every owner and exposes an immutable API"
+]) {
+  assertIncludes(
+    termbaseSelectPresentationControllerUnitTests,
+    testName,
+    `focused termbase-select presentation tests must retain characterization: ${testName}.`
+  );
+}
 for (const snippet of [
   "ProjectRecordLookupService requires current-project, project-list, and project-summary boundaries.",
   "function findById(projectId)",
@@ -4220,7 +4329,7 @@ for (const boundary of [
   "repository: { listTerms }",
   "resources: { termBaseNames: projectResourceContextService.termBaseNames }",
   "filters: { invalidate: segmentFilterService.invalidate }",
-  "presentation: { renderTermbaseSelect, renderSegments }"
+  "presentation: { renderTermbaseSelect: termbaseSelectPresentationController.render, renderSegments }"
 ]) {
   assertIncludes(appJs, boundary, `project-term refresh composition must retain the checked ${boundary} boundary.`);
 }
@@ -5759,7 +5868,7 @@ assertIncludes(
   'navigation.openEditor({ ...context.getNavigation(), view: "editor" })',
   "view routing must pass the current navigation snapshot directly to NavigationController."
 );
-const renderEditorBody = functionBody(appJs, "function renderEditor()", "function renderTermbaseSelect()");
+const renderEditorBody = functionBody(appJs, "function renderEditor()", "function renderProjectHome()");
 assert(
   renderEditorBody.indexOf("applicationNavigation?.syncLegacy?.({") !== -1 &&
     renderEditorBody.indexOf("applicationNavigation?.syncLegacy?.({") <
@@ -10886,7 +10995,7 @@ for (const boundary of [
   "primaryName: projectResourceContextService.primaryTermBase",
   "markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource",
   "repository: { save: saveTerm }",
-  "renderTermbaseSelect,",
+  "renderTermbaseSelect: termbaseSelectPresentationController.render,",
   "refreshProjectTerms: projectTermRefreshController.refresh",
   "refreshSuggestions: termSuggestionsController.refresh",
   "status: { set: applicationSaveStatusController.set }",
@@ -18181,9 +18290,9 @@ assertIncludes(
   "app.js project home rendering must avoid a second full segment pass for overall stats."
 );
 assertIncludes(
-  appJs,
-  "els.termBaseSelect.replaceChildren(fragment)",
-  "app.js termbase selector options must render in one DOM replacement."
+  termbaseSelectPresentationControllerJs,
+  "select.replaceChildren(fragment)",
+  "TermbaseSelectPresentationController options must render in one DOM replacement."
 );
 assertIncludes(
   appJs,

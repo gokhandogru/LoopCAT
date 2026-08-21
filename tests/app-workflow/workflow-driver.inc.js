@@ -2387,7 +2387,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
       if (els.localAiBaseUrlInput) els.localAiBaseUrlInput.value = OLLAMA_DEFAULT_BASE_URL;
       if (els.localAiModelInput) els.localAiModelInput.value = "workflow-terms-model";
-      renderTermbaseSelect();
+      termbaseSelectPresentationController.render();
       if (els.termBaseSelect) els.termBaseSelect.value = "Workflow TB";
       aiTermsProvider.completePrompt = async (_config, request) => {
         aiTermsPromptCount += 1;
@@ -5541,7 +5541,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const termSuggestionSegmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentInfo.id && (segment.source || segment.text || "").includes("Hello"));
     assert(termSuggestionSegmentIndex >= 0, "term suggestion regression has source segment");
     await segmentNavigationController.select(termSuggestionSegmentIndex);
-    renderTermbaseSelect();
+    termbaseSelectPresentationController.render();
     els.termBaseSelect.value = "Workflow TB";
     els.sourceTermInput.value = "unsaved sidebar term";
     els.targetTermInput.value = "kaydedilmeyen yan panel terimi";
