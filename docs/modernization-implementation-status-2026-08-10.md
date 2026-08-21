@@ -26,6 +26,8 @@ The latest resource-catalog refresh checkpoint also moves concurrent translation
 
 The latest project-term refresh checkpoint also moves the no-project empty replacement, repeated live language reads, linked-termbase query, raw result replacement, filter invalidation, termbase-selector presentation, and optional preserved-scroll segment rerender behind a checked controller boundary used directly by every application and workflow consumer.
 
+The latest project-term query checkpoint also moves the remaining delivery-validation terminology guard, repeated live project-language reads, linked-termbase selection, fresh query identity, and raw repository result/promise assimilation behind a checked service boundary.
+
 The latest application-persistence lifecycle checkpoint also moves close-warning and hidden/Page-hide background-save event orchestration behind a checked controller boundary while leaving import-task, autosave-queue, workspace-dirty, package-save, and warning policy in their existing injected owners.
 
 The latest application event-wiring checkpoint also moves startup UI initialization, checkpoint reporting, segment-grid scroll routing, and the exact ordered feature-lifecycle mount sequence behind a checked controller boundary while leaving each feature's listener and domain policy in its existing owner.
@@ -416,6 +418,8 @@ The checked resource-catalog refresh slice is also complete: an immutable Resour
 
 The checked project-term refresh slice is also complete: an immutable ProjectTermRefreshController now owns the live current-project guard, fresh empty project-terms replacement and immediate no-effect return, exact repeated source/target project reads, current linked-termbase names, terminology query and raw result identity, awaited replacement, filter invalidation before termbase-selector presentation, the `rerender = false` default, and optional preserved-scroll segment rendering. Project opening, command history, term-form save, project resource transfer, AI terminology extraction, project-dialog save, resource-library import, resource mutation, current-project resource attachment, and the workflow cleanup path call its stable `refresh` method directly; `refreshProjectTerms` is removed. Eight focused controller tests, 87 combined project/resource/term/filter/AI consumer tests, and the full 1,097-test quality gate characterize no-project behavior, live read drift, query and replacement identity, awaited ordering, default/truthy rerendering, option destructuring, every failure boundary, checked composition, and immutable API; release/import, source-isolation, bundle, i18n validation, deep project-open/term/resource/AI/dialog/workspace browser workflows, all 15 accessibility states, 81 visual screenshots, web/desktop artifacts, fuses, and GPU-on/off packaged startup pass with no intended user-visible difference.
 
+The checked project-term query slice is also complete: an immutable ProjectTermQueryService now owns the live current-project guard, fresh empty-array result, repeated live source/target project reads, current linked-termbase names, fresh terminology-query identity, and exact asynchronous repository fulfillment/rejection assimilation without an added `await`. DeliveryExportController receives its stable `listForValidation` method directly, and `projectTermsForValidation` is removed. Six focused service tests, 22 combined query/resource-context/delivery-export tests, and the full 1,103-test quality gate characterize no-project fresh identity, live read drift, raw result identity, promise and synchronous failures, checked composition, and immutable API; release/import, source-isolation, bundle, i18n validation, deep delivery validation/export browser workflows, all 15 accessibility states, 81 visual screenshots, web/desktop artifacts, fuses, and GPU-on/off packaged startup pass with no intended user-visible difference.
+
 Earlier checkpoint descriptions that say `wireEvents` mounted an individual controller or that top-level startup called `ApplicationEventWiringController` directly record the state at those checkpoints; ApplicationEventWiringController now owns the complete mount sequence, and ApplicationStartupController is its sole top-level startup caller.
 
 1. Reduce the remaining `app.js` compatibility coordinator toward the roadmap's bootstrap-only goal, one characterized feature boundary at a time.
@@ -423,7 +427,7 @@ Earlier checkpoint descriptions that say `wireEvents` mounted an individual cont
 
 ### P2-05 — Performance stretch target
 
-Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The production graph is 2,873,802 bytes across five modules; the hosted/desktop initial app is 1,192,330 bytes (315,786 bytes gzip), and the separate direct-file fallback is 1,436,879 bytes (398,885 bytes gzip). The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 442,330 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
+Lazy locale chunks, production/test graph separation, minification, update lifecycle, and offline asset generation are delivered. The production graph is 2,875,036 bytes across five modules; the hosted/desktop initial app is 1,192,947 bytes (315,822 bytes gzip), and the separate direct-file fallback is 1,437,496 bytes (398,911 bytes gzip). The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 442,947 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from the P1-08 feature extractions and lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
 
 ## Manual and external release gates still required
 
@@ -454,17 +458,18 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P1-08 by extracting the remaining read-only current-project terminology lookup used by delivery validation behind a checked ProjectTermQueryService boundary.
+Continue P1-08 by extracting project activity recording, portable event drafting, optional failure containment, active-project activity refresh, workspace dirtiness, backup-reminder presentation, and shared activity-warning/status policy behind a checked ProjectActivityController boundary.
 
 Entry criteria:
 
-- Preserve the live current-project guard and a fresh empty-array result without repository/resource reads when no project is selected.
-- Preserve repeated live project reads for source and target language, current linked-termbase-name selection, the exact fresh terminology-query record, raw repository return/promise assimilation, and all synchronous/awaited failure boundaries.
-- Migrate the DeliveryExportController composition to the checked service directly while keeping EditorSessionStore state, terminology persistence/query implementation, resource-link policy, delivery validation, and presentation in their existing injected owners.
+- Preserve call-time default-project evaluation, null no-project behavior, exact activity payloads, event identity, active-project strict-ID refresh branches, prepend-versus-reload behavior, backup-reminder order, workspace dirtiness, and every synchronous/awaited failure boundary.
+- Preserve portable draft IDs, one ISO timestamp, workspace/owner/creator fallbacks, summary fallback, exact detail identity before sanitization, and existing portable-value cleanup.
+- Preserve test-only import/export failure injection, warning copy and logging, optional current/explicit-project result shapes, dirty fallback timing, and the pure activity-warning and status-mode policies.
+- Migrate all application and workflow activity consumers to the checked controller directly while keeping activity persistence, EditorSessionStore state, test flags, clock/ID generation, portable sanitization, workspace dirty state, backup-reminder presentation, status presentation, and domain operations in their existing injected owners.
 
 Exit criteria:
 
-- `projectTermsForValidation` is removed from `app.js`; DeliveryExportController receives ProjectTermQueryService directly, and release verification prevents the guarded terminology query from returning to the coordinator.
-- Focused ProjectTermQueryService guard/live-read/query/identity/failure tests, delivery validation/export workflows, all 15 accessibility states, 81 visual screenshots, and FULL-SUITE gates pass with no intended user-visible difference.
+- `logProjectActivity`, `draftProjectActivityEvent`, `logOptionalProjectActivity`, `logOptionalActivityForProject`, `appendActivityWarning`, and `exportStatusMode` are removed from `app.js`; consumers call ProjectActivityController directly, and release verification prevents their orchestration and policy from returning to the coordinator or workflow driver.
+- Focused ProjectActivityController record/draft/optional/failure/policy tests, project/import/export/report/AI/review/QA/workspace workflows, all 15 accessibility states, 81 visual screenshots, and FULL-SUITE gates pass with no intended user-visible difference.
 
 Continue until `app.js` is a bootstrap-only compatibility entry and the façade can be removed without changing mature LoopCAT behavior.

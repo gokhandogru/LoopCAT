@@ -857,6 +857,8 @@ const resourceCatalogRefreshControllerJs = readText("src/features/resources/reso
 const resourceCatalogRefreshControllerUnitTests = readText("tests/unit/resource-catalog-refresh-controller.test.cjs");
 const projectTermRefreshControllerJs = readText("src/features/resources/project-term-refresh-controller.js");
 const projectTermRefreshControllerUnitTests = readText("tests/unit/project-term-refresh-controller.test.cjs");
+const projectTermQueryServiceJs = readText("src/features/resources/project-term-query-service.js");
+const projectTermQueryServiceUnitTests = readText("tests/unit/project-term-query-service.test.cjs");
 const resourceLibraryExportControllerJs = readText("src/features/resources/resource-library-export-controller.js");
 const resourceLibraryExportControllerUnitTests = readText("tests/unit/resource-library-export-controller.test.cjs");
 const resourceLibraryImportControllerJs = readText("src/features/resources/resource-library-import-controller.js");
@@ -2880,6 +2882,16 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectTermQueryService } from "../features/resources/project-term-query-service.js";',
+  "The application runtime must install the checked project-term query service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectTermQueryService,",
+  "The application runtime must expose the checked project-term query factory."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createResourceLibraryExportController } from "../features/resources/resource-library-export-controller.js";',
   "The application runtime must install the checked resource-library export controller."
 );
@@ -3849,7 +3861,7 @@ for (const boundary of [
   "getDocumentId: () => applicationStore.getState().navigation.documentId",
   "autosave: autosaveService",
   "documents: { list: projectDocumentCatalogService.list, type: projectDocumentCatalogService.type }",
-  "listForValidation: projectTermsForValidation",
+  "listForValidation: projectTermQueryService.listForValidation",
   "plan: planDeliveryExport",
   "validate: validateExportReadiness",
   "source: uiLocalizationService.source",
@@ -4235,6 +4247,78 @@ for (const testName of [
     projectTermRefreshControllerUnitTests,
     testName,
     `focused project-term refresh tests must retain characterization: ${testName}`
+  );
+}
+for (const snippet of [
+  "ProjectTermQueryService requires a project session boundary.",
+  "ProjectTermQueryService requires terminology repository and resource boundaries.",
+  "async function listForValidation()",
+  "if (!session.getProject()) return [];",
+  "return repository.listTerms({",
+  "sourceLang: session.getProject().sourceLang,",
+  "targetLang: session.getProject().targetLang,",
+  "termBaseNames: resources.termBaseNames()",
+  "return Object.freeze({ listForValidation });"
+]) {
+  assertIncludes(
+    projectTermQueryServiceJs,
+    snippet,
+    `ProjectTermQueryService must retain characterized guarded terminology-query policy: ${snippet}`
+  );
+}
+for (const boundary of [
+  "const projectTermQueryService = appRuntime.featureFactories.createProjectTermQueryService({",
+  "session: { getProject: editorSessionStore.getProject }",
+  "repository: { listTerms }",
+  "resources: { termBaseNames: projectResourceContextService.termBaseNames }",
+  "terms: { listForValidation: projectTermQueryService.listForValidation }"
+]) {
+  assertIncludes(appJs, boundary, `project-term query composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/createProjectTermQueryService\(/g) || []).length === 1 &&
+    (appJs.match(/\bprojectTermQueryService\.listForValidation\b/g) || []).length === 1,
+  "app.js must compose one project-term query service and its delivery-validation consumer must call it directly."
+);
+assert(
+  !/async\s+function\s+projectTermsForValidation\b/.test(appJs) &&
+    !/\bprojectTermsForValidation\b/.test(appWorkflowDriverJs),
+  "projectTermsForValidation must not return to app.js or the workflow driver after project-term query extraction."
+);
+assert(
+  !appJs.includes("return listTerms({\n    sourceLang: editorSessionStore.getProject().sourceLang"),
+  "guarded delivery-validation terminology queries must not return to app.js."
+);
+assert(
+  appJs.indexOf("const projectTermRefreshController =") < appJs.indexOf("const projectTermQueryService =") &&
+    appJs.indexOf("const projectTermQueryService =") < appJs.indexOf("const projectOpenController ="),
+  "ProjectTermQueryService must follow project-term refresh and precede project opening and its later direct consumer."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "projectResourceContextService",
+  "projectTermsForValidation",
+  "document.",
+  "els."
+]) {
+  assert(
+    !projectTermQueryServiceJs.includes(forbiddenOwner),
+    `ProjectTermQueryService must use injected session, repository, and resource boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectTermQueryService returns fresh empty validation terms when no project is selected",
+  "ProjectTermQueryService preserves live project reads and exact query identity",
+  "ProjectTermQueryService assimilates repository fulfillment and rejection",
+  "ProjectTermQueryService preserves live-read and resource failure short circuiting",
+  "ProjectTermQueryService preserves synchronous session and repository failures",
+  "ProjectTermQueryService validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectTermQueryServiceUnitTests,
+    testName,
+    `focused project-term query tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(

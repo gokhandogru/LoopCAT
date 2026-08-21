@@ -152,6 +152,7 @@ import { createResourcesPresentationService } from "../features/resources/resour
 import { createResourceCatalogService } from "../features/resources/resource-catalog-service.js";
 import { createResourceCatalogRefreshController } from "../features/resources/resource-catalog-refresh-controller.js";
 import { createProjectTermRefreshController } from "../features/resources/project-term-refresh-controller.js";
+import { createProjectTermQueryService } from "../features/resources/project-term-query-service.js";
 import { createResourceLibraryImportController } from "../features/resources/resource-library-import-controller.js";
 import { createResourceLibraryExportController } from "../features/resources/resource-library-export-controller.js";
 import { createResourceMutationController } from "../features/resources/resource-mutation-controller.js";
@@ -351,6 +352,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createResourceCatalogService,
       createResourceCatalogRefreshController,
       createProjectTermRefreshController,
+      createProjectTermQueryService,
       createResourceLibraryExportController,
       createResourceLibraryImportController,
       createResourceMutationController,

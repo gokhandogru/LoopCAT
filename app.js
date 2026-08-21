@@ -1392,6 +1392,12 @@ const projectTermRefreshController = appRuntime.featureFactories.createProjectTe
   presentation: { renderTermbaseSelect, renderSegments }
 });
 
+const projectTermQueryService = appRuntime.featureFactories.createProjectTermQueryService({
+  session: { getProject: editorSessionStore.getProject },
+  repository: { listTerms },
+  resources: { termBaseNames: projectResourceContextService.termBaseNames }
+});
+
 const projectOpenController = appRuntime.featureFactories.createProjectOpenController({
   autosave: { flush: (...args) => autosaveService.flush(...args) },
   session: {
@@ -2054,7 +2060,7 @@ const deliveryExportController = appRuntime.featureFactories.createDeliveryExpor
   },
   autosave: autosaveService,
   documents: { list: projectDocumentCatalogService.list, type: projectDocumentCatalogService.type },
-  terms: { listForValidation: projectTermsForValidation },
+  terms: { listForValidation: projectTermQueryService.listForValidation },
   delivery: {
     plan: planDeliveryExport,
     validate: validateExportReadiness,
@@ -5292,15 +5298,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-async function projectTermsForValidation() {
-  if (!editorSessionStore.getProject()) return [];
-  return listTerms({
-    sourceLang: editorSessionStore.getProject().sourceLang,
-    targetLang: editorSessionStore.getProject().targetLang,
-    termBaseNames: projectResourceContextService.termBaseNames()
-  });
-}
 
 async function logProjectActivity(type, summary, detail = {}, project = editorSessionStore.getProject()) {
   if (!project) return null;
