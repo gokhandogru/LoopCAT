@@ -4210,7 +4210,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       state[OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG] = "Bearer ai-connection-status-token-that-must-not-appear";
       try {
-        clearOpenAiKey();
+        aiCredentialClearController.clearOpenAi();
         assert(
           els.aiConnectionStatus.textContent.includes("[redacted secret]") &&
             !els.aiConnectionStatus.textContent.includes("ai-connection-status-token-that-must-not-appear"),

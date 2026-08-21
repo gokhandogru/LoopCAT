@@ -2360,6 +2360,20 @@ const aiProviderPresentationService =
       model: DEFAULT_LOCAL_AI_MODEL
     }
   });
+const aiCredentialClearController = appRuntime.featureFactories.createAiCredentialClearController({
+  settings: { readLocal: aiRuntimeSettingsService.localSettingsFromForm },
+  credentials: {
+    saveOpenAi: aiCredentialStorageService.saveOpenAiKey,
+    saveLocal: aiCredentialStorageService.saveLocalAiKey
+  },
+  redaction: { sanitize: applicationTextSafetyService.redactSensitiveText },
+  presentation: {
+    clearOpenSecret: () => aiAdministrationController?.clearOpenAiSecret?.(),
+    renderOpenStatus: (value) => aiAdministrationController?.renderGlobalConnectionStatus?.(value),
+    clearLocalSecret: () => aiAdministrationController?.clearLocalAiSecret?.(),
+    renderLocalStatus: (...args) => aiProviderFormController.setStatus(...args)
+  }
+});
 const aiProviderFormController =
   appRuntime.featureFactories.createAiProviderFormController({
     administration: aiAdministrationController,
@@ -2394,7 +2408,10 @@ const aiProviderFormController =
       previewRequest: (...args) => aiPromptPreviewController.createRequest(...args)
     },
     help: { hideOpusCat: () => opusCatHelpController?.setVisible?.(false) },
-    keys: { clearLocal: clearLocalAiKey, clearOpenAi: clearOpenAiKey },
+    keys: {
+      clearLocal: aiCredentialClearController.clearLocal,
+      clearOpenAi: aiCredentialClearController.clearOpenAi
+    },
     state: {
       read: () => state.localAi,
       clearModels: () => {
@@ -4954,38 +4971,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   logger: console
 });
 dialogLifecycleController?.mount?.();
-
-function clearOpenAiKey() {
-  try {
-    aiCredentialStorageService.saveOpenAiKey("", false);
-  } catch (error) {
-    aiAdministrationController?.renderGlobalConnectionStatus?.(
-      applicationTextSafetyService.redactSensitiveText(error.message || "OpenAI key could not be cleared.")
-    );
-    return false;
-  }
-  aiAdministrationController?.clearOpenAiSecret?.();
-  aiAdministrationController?.renderGlobalConnectionStatus?.(
-    "OpenAI key: Not saved. API keys stay in this browser and are never exported with project packages."
-  );
-  return true;
-}
-
-function clearLocalAiKey() {
-  const settings = aiRuntimeSettingsService.localSettingsFromForm();
-  try {
-    aiCredentialStorageService.saveLocalAiKey("", false, settings);
-  } catch (error) {
-    aiProviderFormController.setStatus(
-      "error",
-      applicationTextSafetyService.redactSensitiveText(error.message || "Local AI key could not be cleared.")
-    );
-    return false;
-  }
-  aiAdministrationController?.clearLocalAiSecret?.();
-  aiProviderFormController.setStatus("disconnected", "Local AI key cleared for this provider");
-  return true;
-}
 
 function markOpenAiProjectRollbackDirty(projectId) {
   if (projectId) markWorkspaceDirty(projectId);

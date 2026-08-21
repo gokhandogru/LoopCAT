@@ -221,6 +221,7 @@ const requiredReleaseFiles = [
   "src/commands/edit-target-session.js",
   "src/ui/dialog-controller.js",
   "src/features/ai/ai-administration-controller.js",
+  "src/features/ai/ai-credential-clear-controller.js",
   "src/features/ai/ai-provider-administration-operations-controller.js",
   "src/features/ai/ai-provider-presentation-service.js",
   "src/features/ai/ai-prompt-test-controller.js",
@@ -668,6 +669,8 @@ const tmPretranslationDialogControllerJs = readText("src/features/resources/tm-p
 const dialogIntentControllerUnitTests = readText("tests/unit/dialog-intent-controllers.test.cjs");
 const aiAdministrationControllerJs = readText("src/features/ai/ai-administration-controller.js");
 const aiAdministrationControllerUnitTests = readText("tests/unit/ai-administration-controller.test.cjs");
+const aiCredentialClearControllerJs = readText("src/features/ai/ai-credential-clear-controller.js");
+const aiCredentialClearControllerUnitTests = readText("tests/unit/ai-credential-clear-controller.test.cjs");
 const aiProviderAdministrationOperationsControllerJs = readText(
   "src/features/ai/ai-provider-administration-operations-controller.js"
 );
@@ -15929,7 +15932,7 @@ for (const [method, count] of [
   ["displaySafeHtml", 14],
   ["escapeRegExp", 1],
   ["fileSafeName", 5],
-  ["redactSensitiveText", 20]
+  ["redactSensitiveText", 19]
 ]) {
   assert(
     (appJs.match(new RegExp(`\\bapplicationTextSafetyService\\.${method}\\b`, "g")) || []).length === count,
@@ -16044,14 +16047,97 @@ for (const testName of [
   );
 }
 assertIncludes(
+  appBootstrapJs,
+  'import { createAiCredentialClearController } from "../features/ai/ai-credential-clear-controller.js";',
+  "the application runtime must install the checked AI credential-clear controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createAiCredentialClearController,",
+  "the application runtime must expose the checked AI credential-clear controller factory."
+);
+for (const snippet of [
+  "AiCredentialClearController requires checked settings, credential, redaction, and presentation boundaries.",
+  'credentials.saveOpenAi("", false)',
+  'redaction.sanitize(error.message || "OpenAI key could not be cleared.")',
+  "presentation.clearOpenSecret?.()",
+  "OpenAI key: Not saved. API keys stay in this browser and are never exported with project packages.",
+  "const localSettings = settings.readLocal()",
+  'credentials.saveLocal("", false, localSettings)',
+  'redaction.sanitize(error.message || "Local AI key could not be cleared.")',
+  "presentation.clearLocalSecret?.()",
+  'presentation.renderLocalStatus("disconnected", "Local AI key cleared for this provider")',
+  "return Object.freeze({ clearOpenAi, clearLocal })"
+]) {
+  assertIncludes(
+    aiCredentialClearControllerJs,
+    snippet,
+    `AiCredentialClearController must retain characterized clearing policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createAiCredentialClearController({",
+  "settings: { readLocal: aiRuntimeSettingsService.localSettingsFromForm }",
+  "saveOpenAi: aiCredentialStorageService.saveOpenAiKey",
+  "saveLocal: aiCredentialStorageService.saveLocalAiKey",
+  "redaction: { sanitize: applicationTextSafetyService.redactSensitiveText }",
+  "clearOpenSecret: () => aiAdministrationController?.clearOpenAiSecret?.()",
+  "renderOpenStatus: (value) => aiAdministrationController?.renderGlobalConnectionStatus?.(value)",
+  "clearLocalSecret: () => aiAdministrationController?.clearLocalAiSecret?.()",
+  "renderLocalStatus: (...args) => aiProviderFormController.setStatus(...args)",
+  "clearLocal: aiCredentialClearController.clearLocal",
+  "clearOpenAi: aiCredentialClearController.clearOpenAi"
+]) {
+  assertIncludes(appJs, boundary, `AI credential-clear composition must retain ${boundary}.`);
+}
+assert(
+  (appJs.match(/\baiCredentialClearController\.clearOpenAi\b/g) || []).length === 1 &&
+    (appJs.match(/\baiCredentialClearController\.clearLocal\b/g) || []).length === 1,
+  "AiProviderFormController must receive both AI credential-clear actions directly."
+);
+assert(
+  (appWorkflowDriverJs.match(/\baiCredentialClearController\.clearOpenAi\b/g) || []).length === 1,
+  "the workflow key-clear consumer must call AiCredentialClearController directly."
+);
+for (const removedHelper of ["clearOpenAiKey", "clearLocalAiKey"]) {
+  assert(
+    !new RegExp(`function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return as a coordinator or workflow helper.`
+  );
+}
+for (const forbiddenOwner of [
+  "appRuntime",
+  "aiCredentialStorageService",
+  "aiRuntimeSettingsService",
+  "aiAdministrationController",
+  "aiProviderFormController",
+  "applicationTextSafetyService"
+]) {
+  assert(
+    !aiCredentialClearControllerJs.includes(forbiddenOwner),
+    `AiCredentialClearController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "AiCredentialClearController preserves the exact OpenAI success sequence and immutable API",
+  "AiCredentialClearController redacts OpenAI storage failures and returns false",
+  "AiCredentialClearController preserves absent optional OpenAI presentation branches",
+  "AiCredentialClearController preserves settings-first local credential clearing",
+  "AiCredentialClearController redacts local storage failures and preserves live settings identity",
+  "AiCredentialClearController preserves primary and downstream failure timing",
+  "AiCredentialClearController validates every injected boundary"
+]) {
+  assertIncludes(
+    aiCredentialClearControllerUnitTests,
+    testName,
+    `focused AI credential-clear tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
   applicationSaveStatusControllerJs,
   'redaction.sanitize(text || "")',
   "ApplicationSaveStatusController must redact credential-looking text before displaying save/status messages."
-);
-assertIncludes(
-  functionBody(appJs, "function clearOpenAiKey", "function clearLocalAiKey"),
-  'applicationTextSafetyService.redactSensitiveText(error.message || "OpenAI key could not be cleared.")',
-  "app.js must redact credential-looking text from AI key-storage status errors."
 );
 assertIncludes(
   appJs,
