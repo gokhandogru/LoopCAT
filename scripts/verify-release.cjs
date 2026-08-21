@@ -159,6 +159,7 @@ const requiredReleaseFiles = [
   "src/app/app-store.js",
   "src/app/application-active-segment-service.js",
   "src/app/application-command-catalog-service.js",
+  "src/app/application-date-time-service.js",
   "src/app/application-command-buttons-controller.js",
   "src/app/application-command-history-controller.js",
   "src/app/application-download-controller.js",
@@ -321,6 +322,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-event-wiring-controller.test.cjs",
   "tests/unit/application-import-progress-controller.test.cjs",
   "tests/unit/application-command-catalog-service.test.cjs",
+  "tests/unit/application-date-time-service.test.cjs",
   "tests/unit/application-menu-controller.test.cjs",
   "tests/unit/application-offline-shell-controller.test.cjs",
   "tests/unit/application-persistence-lifecycle-controller.test.cjs",
@@ -482,6 +484,8 @@ const applicationActiveSegmentServiceJs = readText("src/app/application-active-s
 const applicationActiveSegmentServiceUnitTests = readText("tests/unit/application-active-segment-service.test.cjs");
 const applicationCommandCatalogServiceJs = readText("src/app/application-command-catalog-service.js");
 const applicationCommandCatalogServiceUnitTests = readText("tests/unit/application-command-catalog-service.test.cjs");
+const applicationDateTimeServiceJs = readText("src/app/application-date-time-service.js");
+const applicationDateTimeServiceUnitTests = readText("tests/unit/application-date-time-service.test.cjs");
 const navigationControllerJs = readText("src/app/navigation-controller.js");
 const languageInputServiceJs = readText("src/i18n/language-input-service.js");
 const languageInputServiceUnitTests = readText("tests/unit/language-input-service.test.cjs");
@@ -1200,6 +1204,91 @@ for (const testName of [
     applicationCommandCatalogServiceUnitTests,
     testName,
     `focused application command-catalog tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createApplicationDateTimeService } from "./application-date-time-service.js";',
+  "the application runtime must install the checked date-time service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationDateTimeService,",
+  "the application runtime must expose the checked date-time service factory."
+);
+for (const snippet of [
+  "ApplicationDateTimeService requires checked localization, locale, formatter, and date boundaries.",
+  "function formatDate(value)",
+  'if (!value) return localization.source("Never");',
+  'formatter.create(locale.get() || undefined, { dateStyle: "medium" })',
+  "return instance.format(date.create(value));",
+  "function formatDateTime(value)",
+  'formatter.create(locale.get() || undefined, { dateStyle: "medium", timeStyle: "short" })',
+  "return Object.freeze({ date: formatDate, dateTime: formatDateTime });"
+]) {
+  assertIncludes(
+    applicationDateTimeServiceJs,
+    snippet,
+    `ApplicationDateTimeService must retain characterized date policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationDateTimeService({",
+  "localization: uiLocalizationService",
+  "locale: { get: () => uiI18n?.getLocale?.() }",
+  "formatter: { create: (locale, options) => new Intl.DateTimeFormat(locale, options) }",
+  "date: { create: (value) => new Date(value) }",
+  "formatDateTime: applicationDateTimeService.dateTime",
+  "date: { format: applicationDateTimeService.date }",
+  "formatDate: applicationDateTimeService.date",
+  'applicationDateTimeService.date(analysis.generatedAt)',
+  "applicationDateTimeService.date(project.updatedAt)"
+]) {
+  assertIncludes(appJs, boundary, `application date-time composition and consumers must retain ${boundary}.`);
+}
+assert(
+  (appJs.match(/\bapplicationDateTimeService\.dateTime\b/g) || []).length === 4,
+  "all four application date-time consumers must call ApplicationDateTimeService directly."
+);
+assert(
+  (appJs.match(/\bapplicationDateTimeService\.date\b/g) || []).length === 5,
+  "all five application date-only consumers must call ApplicationDateTimeService directly."
+);
+for (const removedHelper of ["formatDate", "formatDateTime"]) {
+  const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
+  assert(
+    !directHelper.test(appJs) && !directHelper.test(appWorkflowDriverJs),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+for (const forbiddenOwner of [
+  "appRuntime",
+  "uiLocalizationService",
+  "uiI18n",
+  "Intl.",
+  "new Date",
+  "document.",
+  "window."
+]) {
+  assert(
+    !applicationDateTimeServiceJs.includes(forbiddenOwner),
+    `ApplicationDateTimeService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationDateTimeService preserves every falsy Never fallback without consulting date dependencies",
+  "ApplicationDateTimeService preserves medium-date options, call order, raw value, and formatter receiver",
+  "ApplicationDateTimeService preserves medium-date short-time options and fresh formatter inputs",
+  "ApplicationDateTimeService preserves falsy locale fallback and live per-call locale reads",
+  "ApplicationDateTimeService returns localization and formatter values without normalization",
+  "ApplicationDateTimeService preserves dependency failure timing and short circuits",
+  "ApplicationDateTimeService keeps date and date-time policy independent",
+  "ApplicationDateTimeService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    applicationDateTimeServiceUnitTests,
+    testName,
+    `focused application date-time tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
@@ -2249,7 +2338,7 @@ for (const boundary of [
   "getSegment: applicationActiveSegmentService.get",
   "localization: uiLocalizationService",
   "statusLabel: segmentLabelService.status",
-  "formatDateTime",
+  "formatDateTime: applicationDateTimeService.dateTime",
   "escapeHtml",
   "replaceSafeHtml"
 ]) {
@@ -2424,7 +2513,7 @@ for (const boundary of [
   "defaultQualityProfile",
   "sanitizeValidationReportForDisplay",
   "languagePairDisplay",
-  "formatDateTime",
+  "formatDateTime: applicationDateTimeService.dateTime",
   "qualityLabel: qualityPresentationService.profile",
   "qualityCategoryName: qualityPresentationService.category",
   "qualityRiskLevelLabel: qualityPresentationService.riskLevel"
@@ -3406,7 +3495,7 @@ for (const boundary of [
   "items: resourceItems",
   "localization: uiLocalizationService",
   "languagePairDisplay",
-  "formatDate",
+  "formatDate: applicationDateTimeService.date",
   "displaySafeHtml",
   "displaySafeText",
   "escapeHtml",
@@ -6079,7 +6168,7 @@ for (const boundary of [
   "source: (value, variables) => uiLocalizationService.source(value, variables)",
   "confirm: (value) => uiLocalizationService.confirm(value)",
   "text: { safe: applicationTextSafetyService.displaySafeText }",
-  "date: { format: (value) => formatDate(value) }",
+  "date: { format: applicationDateTimeService.date }",
   "createElement: (tagName) => document.createElement(tagName)",
   "createFragment: () => document.createDocumentFragment()",
   "status: { set: applicationSaveStatusController.set }",

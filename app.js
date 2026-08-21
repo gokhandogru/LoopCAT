@@ -98,6 +98,12 @@ const uiLocalizationService = appRuntime.featureFactories.createUiLocalizationSe
   confirm: (message) => window.confirm(message),
   alert: (message) => window.alert(message)
 });
+const applicationDateTimeService = appRuntime.featureFactories.createApplicationDateTimeService({
+  localization: uiLocalizationService,
+  locale: { get: () => uiI18n?.getLocale?.() },
+  formatter: { create: (locale, options) => new Intl.DateTimeFormat(locale, options) },
+  date: { create: (value) => new Date(value) }
+});
 const qualityPresentationService = appRuntime.featureFactories.createQualityPresentationService({
   localization: uiLocalizationService,
   baseCategoryLabel: baseQualityCategoryLabel
@@ -135,7 +141,7 @@ const reportDocumentCompositionService = appRuntime.featureFactories.createRepor
   defaultQualityProfile,
   sanitizeValidationReportForDisplay,
   languagePairDisplay: (...args) => languageInputService.pairDisplay(...args),
-  formatDateTime,
+  formatDateTime: applicationDateTimeService.dateTime,
   qualityLabel: qualityPresentationService.profile,
   qualityCategoryName: qualityPresentationService.category,
   qualityRiskLevelLabel: qualityPresentationService.riskLevel
@@ -1220,7 +1226,7 @@ const applicationTrashController = appRuntime.featureFactories.createApplication
     confirm: (value) => uiLocalizationService.confirm(value)
   },
   text: { safe: applicationTextSafetyService.displaySafeText },
-  date: { format: (value) => formatDate(value) },
+  date: { format: applicationDateTimeService.date },
   dom: {
     createElement: (tagName) => document.createElement(tagName),
     createFragment: () => document.createDocumentFragment()
@@ -1282,7 +1288,7 @@ const revisionHistoryPresentationService =
     getSegment: applicationActiveSegmentService.get,
     localization: uiLocalizationService,
     statusLabel: segmentLabelService.status,
-    formatDateTime,
+    formatDateTime: applicationDateTimeService.dateTime,
     escapeHtml: applicationTextSafetyService.escapeHtml,
     replaceSafeHtml
   });
@@ -2477,7 +2483,7 @@ const aiSuggestionListController =
     apply: (...args) => aiSuggestionApplicationController.apply(...args),
     source: uiLocalizationService.source,
     label: uiLocalizationService.label,
-    formatDateTime
+    formatDateTime: applicationDateTimeService.dateTime
   });
 const aiCommandLifecycleCoordinator =
   appRuntime.featureFactories.createAiCommandLifecycleCoordinator({
@@ -4064,7 +4070,7 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
   translate: uiLocalizationService.translate,
   source: uiLocalizationService.source,
   label: uiLocalizationService.label,
-  formatDateTime,
+  formatDateTime: applicationDateTimeService.dateTime,
   safeText: applicationTextSafetyService.displaySafeText,
   chooseWorkspace: (...args) => workspacePackageSaveController.chooseFolder(...args),
   saveProject: (...args) => workspacePackageSaveController.saveCurrent(...args),
@@ -4791,7 +4797,7 @@ const resourcesPresentationService = appRuntime?.featureFactories?.createResourc
   items: resourceItems,
   localization: uiLocalizationService,
   languagePairDisplay: languageInputService.pairDisplay,
-  formatDate,
+  formatDate: applicationDateTimeService.date,
   displaySafeHtml: applicationTextSafetyService.displaySafeHtml,
   displaySafeText: applicationTextSafetyService.displaySafeText,
   escapeHtml: applicationTextSafetyService.escapeHtml,
@@ -4867,7 +4873,7 @@ qualityReviewController = appRuntime?.featureFactories?.createQualityReviewContr
   profileLabel: qualityPresentationService.profile,
   categoryLabel: qualityPresentationService.category,
   riskLevelLabel: qualityPresentationService.riskLevel,
-  formatDate,
+  formatDate: applicationDateTimeService.date,
   saveReview: (values) => reviewMetadataController.save(values),
   saveProfile: (values) => qualityProfileController.save(values),
   saveDecision: (values) => qualityDecisionController.save(values),
@@ -5093,16 +5099,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-function formatDate(value) {
-  if (!value) return uiLocalizationService.source("Never");
-  return new Intl.DateTimeFormat(uiI18n?.getLocale?.() || undefined, { dateStyle: "medium" }).format(new Date(value));
-}
-
-function formatDateTime(value) {
-  if (!value) return uiLocalizationService.source("Never");
-  return new Intl.DateTimeFormat(uiI18n?.getLocale?.() || undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
 
 function workspaceDirtyIds() {
   return Array.from(state.workspaceDirtyProjectIds);
@@ -5556,7 +5552,7 @@ async function renderProjectAnalysis() {
   const tmNames = new Set(projectResourceContextService.tmNames(project));
   const analysis = analyzeProject(project, segments, tmEntries.filter((entry) => tmNames.has(entry.tmName)));
   const ai = analysis.ai || {};
-  els.analysisMeta.textContent = uiLocalizationService.label("generatedAt", { date: formatDate(analysis.generatedAt) });
+  els.analysisMeta.textContent = uiLocalizationService.label("generatedAt", { date: applicationDateTimeService.date(analysis.generatedAt) });
   replaceSafeHtml(els.projectAnalysis, `
     <div><strong>${analysis.totals.confirmedPercent}%</strong><span>${uiLocalizationService.labelHtml("confirmed")}</span></div>
     <div><strong>${analysis.totals.untranslated}</strong><span>${uiLocalizationService.sourceHtml("empty targets")}</span></div>
@@ -5838,7 +5834,7 @@ function createProjectTile(project) {
     </div>
     <div class="progress-bar"><div style="width:${project.progress.percent}%"></div></div>
     <footer>
-      <span>${uiLocalizationService.labelHtml("updatedAt", { date: formatDate(project.updatedAt) })}</span>
+      <span>${uiLocalizationService.labelHtml("updatedAt", { date: applicationDateTimeService.date(project.updatedAt) })}</span>
     </footer>
   `);
   tile.querySelector(".progress-bar > div").style.width = `${project.progress.percent}%`;
