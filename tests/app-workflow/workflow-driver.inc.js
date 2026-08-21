@@ -146,7 +146,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const splitFixtureIndex = structuralSegmentController.mappedSourceSplitIndex(splitFixture, "Hedef metin burada daha uzun olabilir.", 16);
     assert(splitFixtureIndex > 0 && splitFixtureIndex < splitFixture.length && !structuralSegmentController.splitProtectedRanges(splitFixture).some((range) => splitFixtureIndex > range.start && splitFixtureIndex < range.end), "segment split maps target cursor to safe source boundary");
     els.newProjectBtn.focus();
-    await openProjectDialog("create");
+    await projectDialogController.open("create");
     assert(
       projectDialogController?.getMode?.() === "create" &&
         els.projectDialogTitle.textContent === "New project" &&
@@ -334,7 +334,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.projectDomainEditInput.value = "Workflow saved domain";
     const successfulDomainSave = await projectDomainController.save();
     assert(successfulDomainSave && editorSessionStore.getProject().domain === "Workflow saved domain", "project domain save persists metadata");
-    await openProjectDialog("edit");
+    await projectDialogController.open("edit");
     assert(
       projectDialogController?.isEditing?.() &&
         els.projectDialogTitle.textContent === "Project settings" &&
@@ -4993,7 +4993,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(firstProjectSegments.some((segment) => segment.target === switchText), "project switch flushes pending segment edits");
 
     await projectOpenController.open(project.id);
-    openProjectDialog("create");
+    projectDialogController.open("create");
     document.querySelector("#projectNameInput").value = `Workflow Create Activity ${Date.now()}`;
     document.querySelector("#projectDomainInput").value = "Creation warning";
     document.querySelector("#sourceLangInput").value = "en";

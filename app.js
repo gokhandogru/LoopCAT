@@ -4780,7 +4780,7 @@ const projectDialogSaveController =
     },
     logger: console
   });
-const projectDialogController = appRuntime?.featureFactories?.createProjectDialogController?.({
+const projectDialogController = appRuntime.featureFactories.createProjectDialogController({
   dialogLifecycle: dialogLifecycleController,
   elements: {
     dialog: els.projectDialog,
@@ -4824,11 +4824,12 @@ const projectDialogController = appRuntime?.featureFactories?.createProjectDialo
   save: projectDialogSaveController.save,
   chooseWorkspace: workspacePackageSaveController.chooseFolder,
   workspaceSupported: () => Boolean(workspaceStorage?.isSupported()),
+  getActiveElement: () => document.activeElement,
   translate: uiLocalizationService.source,
   scheduleFrame: requestAnimationFrame,
   onError: (error) => applicationSaveStatusController.set(error?.message || "Dialog could not be opened.", "dirty")
 });
-projectDialogController?.mount?.();
+projectDialogController.mount();
 const tmPretranslationDialogController = appRuntime?.featureFactories?.createTmPretranslationDialogController?.({
   dialogLifecycle: dialogLifecycleController,
   elements: {
@@ -5251,7 +5252,7 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     targetProducer: targetProducerController,
     structural: structuralSegmentController,
     tm: segmentTmSaveController,
-    projectDialog: openProjectDialog,
+    projectDialog: projectDialogController.open,
     qa: projectQaController,
     reports: reportExportController,
     quality: qualityWorkbenchController,
@@ -5269,10 +5270,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-function openProjectDialog(mode = "create") {
-  return projectDialogController?.open?.(mode, { returnTarget: document.activeElement }) || Promise.resolve(false);
-}
 
 async function refreshResources() {
   const [tmEntries, terms] = await Promise.all([listTmEntries(), getAll("terms")]);

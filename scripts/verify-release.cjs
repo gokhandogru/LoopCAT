@@ -1722,7 +1722,7 @@ for (const boundary of [
   "targetProducer: targetProducerController",
   "structural: structuralSegmentController",
   "tm: segmentTmSaveController",
-  "projectDialog: openProjectDialog",
+  "projectDialog: projectDialogController.open",
   "qa: projectQaController",
   "reports: reportExportController",
   "quality: qualityWorkbenchController",
@@ -6017,6 +6017,43 @@ assertIncludes(
   "options.renderResourcePickers?.(project)",
   "project resource rendering must remain an injected feature boundary."
 );
+for (const snippet of [
+  'typeof options.getActiveElement === "function" ? options.getActiveElement : () => null',
+  'async function open(nextMode = "create", openOptions = {})',
+  'const hasReturnTarget = Object.prototype.hasOwnProperty.call(openOptions, "returnTarget");',
+  "const activeReturnTarget = hasReturnTarget ? null : getActiveElement() || null;",
+  "returnTarget: hasReturnTarget ? openOptions.returnTarget || null : activeReturnTarget"
+]) {
+  assertIncludes(
+    projectDialogControllerJs,
+    snippet,
+    `ProjectDialogController must retain characterized direct-launch focus policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "const projectDialogController = appRuntime.featureFactories.createProjectDialogController({",
+  "getActiveElement: () => document.activeElement",
+  "projectDialogController.mount();",
+  "projectDialog: projectDialogController.open"
+]) {
+  assertIncludes(appJs, boundary, `project-dialog direct-launch composition must retain ${boundary}.`);
+}
+assert(
+  (appJs.match(/\bprojectDialogController\.open\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bprojectDialogController\.open\b/g) || []).length === 3,
+  "the command catalog and all three workflow project-dialog launches must call ProjectDialogController directly."
+);
+assert(
+  !/\bopenProjectDialog\b/.test(appJs) && !/\bopenProjectDialog\b/.test(appWorkflowDriverJs),
+  "openProjectDialog must not return to app.js or the workflow driver."
+);
+assert(
+  !appJs.includes("appRuntime?.featureFactories?.createProjectDialogController?.(") &&
+    !appJs.includes("projectDialogController?.mount?.()") &&
+    !appJs.includes("{ returnTarget: document.activeElement }") &&
+    !appWorkflowDriverJs.includes("{ returnTarget: document.activeElement }"),
+  "project-dialog factory ownership and active-focus launch policy must remain inside checked direct boundaries."
+);
 assert(
   !appJs.includes('els.newProjectBtn.addEventListener("click"') &&
     !appJs.includes('els.projectChooseWorkspaceBtn.addEventListener("click"') &&
@@ -6029,6 +6066,18 @@ assertIncludes(
   "ProjectDialogController prepares create mode asynchronously and delegates form save",
   "focused tests must characterize async create preparation and persistence delegation."
 );
+for (const testName of [
+  "ProjectDialogController prepares edit mode and opens the requested AI settings context",
+  "ProjectDialogController preserves default mode and call-time active return targets",
+  "ProjectDialogController preserves active-target and dialog failure timing",
+  "ProjectDialogController owns delegated language, resource, workspace, and Enter-key events"
+]) {
+  assertIncludes(
+    projectDialogControllerUnitTests,
+    testName,
+    `focused project-dialog tests must retain characterization: ${testName}.`
+  );
+}
 assertIncludes(
   appJs,
   "project dialog controller opens the requested AI settings context",

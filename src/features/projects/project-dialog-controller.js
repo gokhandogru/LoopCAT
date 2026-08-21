@@ -27,6 +27,7 @@ function normalizeMode(mode) {
  *   save?: () => Promise<unknown>,
  *   chooseWorkspace?: () => Promise<unknown>,
  *   workspaceSupported?: () => boolean,
+ *   getActiveElement?: () => any,
  *   translate?: (value: string) => string,
  *   scheduleFrame?: (callback: () => void) => unknown,
  *   onError?: (error: unknown, context: { phase: string }) => void
@@ -46,6 +47,7 @@ export function createProjectDialogController(options) {
   const targetLanguageInput = requireElement(elements.targetLanguageInput, "the target language input");
   const openers = (options.openers || []).filter((item) => item?.element?.addEventListener);
   const getProject = typeof options.getProject === "function" ? options.getProject : () => null;
+  const getActiveElement = typeof options.getActiveElement === "function" ? options.getActiveElement : () => null;
   const translate = typeof options.translate === "function" ? options.translate : (value) => value;
   const scheduleFrame = typeof options.scheduleFrame === "function" ? options.scheduleFrame : (callback) => callback();
   const onError = typeof options.onError === "function" ? options.onError : () => {};
@@ -103,10 +105,12 @@ export function createProjectDialogController(options) {
   async function open(nextMode = "create", openOptions = {}) {
     mode = normalizeMode(nextMode);
     focusAiAfterOpen = Boolean(openOptions.focusAi && mode === "edit" && getProject());
+    const hasReturnTarget = Object.prototype.hasOwnProperty.call(openOptions, "returnTarget");
+    const activeReturnTarget = hasReturnTarget ? null : getActiveElement() || null;
     try {
       return await dialogLifecycle.open("project", {
         initialFocus: nameInput,
-        returnTarget: openOptions.returnTarget || null
+        returnTarget: hasReturnTarget ? openOptions.returnTarget || null : activeReturnTarget
       });
     } catch (error) {
       onError(error, { phase: "open" });

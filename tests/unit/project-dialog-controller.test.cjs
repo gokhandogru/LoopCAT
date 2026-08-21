@@ -114,6 +114,9 @@ test("ProjectDialogController prepares create mode asynchronously and delegates 
     dialogLifecycle,
     elements,
     openers: [{ element: opener, mode: "create" }],
+    getActiveElement: () => {
+      throw new Error("explicit opener must take precedence");
+    },
     refreshResources: () => {
       calls.push("refresh");
       return Promise.resolve();
@@ -173,6 +176,7 @@ test("ProjectDialogController prepares edit mode and opens the requested AI sett
     targetLang: "tr"
   };
   let renderedProject = null;
+  const activeElement = fakeElement({ tagName: "BUTTON" });
   const controller = createProjectDialogController({
     dialogLifecycle,
     elements,
@@ -186,6 +190,7 @@ test("ProjectDialogController prepares edit mode and opens the requested AI sett
       renderedProject = value;
     },
     workspaceSupported: () => true,
+    getActiveElement: () => activeElement,
     scheduleFrame: (callback) => callback()
   });
 
@@ -203,6 +208,77 @@ test("ProjectDialogController prepares edit mode and opens the requested AI sett
   assert.equal(elements.aiPresetSelect.focused, true);
   assert.equal(elements.saveToFolderInput.checked, true);
   assert.equal(renderedProject, project);
+  assert.equal(dialogLifecycle.openCalls[0].options.returnTarget, activeElement);
+});
+
+test("ProjectDialogController preserves default mode and call-time active return targets", async () => {
+  const { createProjectDialogController } = await moduleAt("src/features/projects/project-dialog-controller.js");
+  const elements = projectElements();
+  const dialogLifecycle = fakeDialogLifecycle();
+  const firstActive = fakeElement({ tagName: "BUTTON" });
+  const secondActive = fakeElement({ tagName: "BUTTON" });
+  const explicit = fakeElement({ tagName: "BUTTON" });
+  let activeElement = firstActive;
+  let activeReads = 0;
+  const controller = createProjectDialogController({
+    dialogLifecycle,
+    elements,
+    getActiveElement: () => {
+      activeReads += 1;
+      return activeElement;
+    }
+  });
+
+  assert.equal(await controller.open(), true);
+  assert.equal(controller.getMode(), "create");
+  assert.equal(dialogLifecycle.openCalls[0].options.returnTarget, firstActive);
+
+  activeElement = secondActive;
+  assert.equal(await controller.open("unknown"), true);
+  assert.equal(controller.getMode(), "create");
+  assert.equal(dialogLifecycle.openCalls[1].options.returnTarget, secondActive);
+
+  assert.equal(await controller.open("edit", { returnTarget: explicit }), true);
+  assert.equal(controller.getMode(), "edit");
+  assert.equal(dialogLifecycle.openCalls[2].options.returnTarget, explicit);
+  assert.equal(activeReads, 2);
+
+  assert.equal(await controller.open("edit", { returnTarget: null }), true);
+  assert.equal(dialogLifecycle.openCalls[3].options.returnTarget, null);
+  assert.equal(activeReads, 2);
+});
+
+test("ProjectDialogController preserves active-target and dialog failure timing", async () => {
+  const { createProjectDialogController } = await moduleAt("src/features/projects/project-dialog-controller.js");
+  const activeError = new Error("active target failed");
+  const activeLifecycle = fakeDialogLifecycle();
+  let activeReported = false;
+  const activeFailure = createProjectDialogController({
+    dialogLifecycle: activeLifecycle,
+    elements: projectElements(),
+    getActiveElement: () => {
+      throw activeError;
+    },
+    onError: () => {
+      activeReported = true;
+    }
+  });
+  await assert.rejects(activeFailure.open(), activeError);
+  assert.equal(activeLifecycle.openCalls.length, 0);
+  assert.equal(activeReported, false);
+
+  const dialogError = new Error("dialog failed");
+  const dialogLifecycle = fakeDialogLifecycle();
+  dialogLifecycle.open = () => Promise.reject(dialogError);
+  const reports = [];
+  const dialogFailure = createProjectDialogController({
+    dialogLifecycle,
+    elements: projectElements(),
+    getActiveElement: () => null,
+    onError: (error, context) => reports.push([error, context])
+  });
+  assert.equal(await dialogFailure.open(), false);
+  assert.deepEqual(reports, [[dialogError, { phase: "open" }]]);
 });
 
 test("ProjectDialogController owns delegated language, resource, workspace, and Enter-key events", async () => {
