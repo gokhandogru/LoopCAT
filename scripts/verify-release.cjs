@@ -157,6 +157,7 @@ const requiredReleaseFiles = [
   "src/entry/test.js",
   "src/app/bootstrap.js",
   "src/app/app-store.js",
+  "src/app/application-active-segment-service.js",
   "src/app/application-command-buttons-controller.js",
   "src/app/application-command-history-controller.js",
   "src/app/application-download-controller.js",
@@ -460,6 +461,8 @@ const appWorkflowDriverJs = readText("tests/app-workflow/workflow-driver.inc.js"
 const appBootstrapJs = readText("src/app/bootstrap.js");
 const appStoreJs = readText("src/app/app-store.js");
 const appStoreUnitTests = readText("tests/unit/app-store.test.cjs");
+const applicationActiveSegmentServiceJs = readText("src/app/application-active-segment-service.js");
+const applicationActiveSegmentServiceUnitTests = readText("tests/unit/application-active-segment-service.test.cjs");
 const navigationControllerJs = readText("src/app/navigation-controller.js");
 const languageInputServiceJs = readText("src/i18n/language-input-service.js");
 const languageInputServiceUnitTests = readText("tests/unit/language-input-service.test.cjs");
@@ -1331,7 +1334,7 @@ for (const boundary of [
   "getQualityRiskQueue: editorSessionStore.getQualityRiskQueue",
   "replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue",
   "currentSegments: projectDocumentCatalogService.currentSegments",
-  "getSegment: currentSegment",
+  "getSegment: applicationActiveSegmentService.get",
   "getActiveIndex: () => applicationStore.getState().navigation.activeIndex",
   "quality: { buildRiskQueue, scoreSegment }",
   "getSelectedId: () => applicationStore.getState().navigation.documentId",
@@ -1573,7 +1576,7 @@ for (const snippet of [
 for (const boundary of [
   "appRuntime.featureFactories.createRevisionHistoryPresentationService({",
   "list: els.revisionHistoryList",
-  "getSegment: currentSegment",
+  "getSegment: applicationActiveSegmentService.get",
   "localization: uiLocalizationService",
   "statusLabel: segmentStatusLabel",
   "formatDateTime",
@@ -4441,8 +4444,9 @@ for (const directSaveAdapter of [
   );
 }
 for (const renderAdapter of [
-  "qualityReviewController?.renderReview?.({ segment: currentSegment(), force: Boolean(options.force) })",
-  "qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false })"
+  "segment: applicationActiveSegmentService.get()",
+  "force: Boolean(options.force)",
+  "force: false"
 ]) {
   assertIncludes(
     appJs,
@@ -5753,7 +5757,7 @@ for (const boundary of [
   "renderPanels: () => panelToggleController.renderAll()",
   "renderFocusMode: () => focusModeController.render()",
   "renderProjectAnalysis: () => renderProjectAnalysis()",
-  "renderReview: () => qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false })",
+  "qualityReviewController?.renderReview?.({ segment: applicationActiveSegmentService.get(), force: false })",
   "refreshEditorContext: () => editorContextController.refresh()",
   "write: applicationDownloadController.download",
   "set: applicationSaveStatusController.set",
@@ -7580,7 +7584,7 @@ for (const boundary of [
   "targetState: segmentTargetStateService",
   "autosave: { clear: autosaveService.clear }",
   "persistence: { save: saveSegment, saveMany: saveSegments }",
-  "getActiveSegment: currentSegment",
+  "getActiveSegment: applicationActiveSegmentService.get",
   "applicationNavigation.selectSegment({ activeIndex: index, segmentId })",
   "verticalFeatureState?.segmentGrid?.selectSegment(index, segmentId)",
   "verticalFeatureState?.inspector?.setContext({ segmentId })",
@@ -7751,7 +7755,7 @@ assertIncludes(
 );
 for (const boundary of [
   "session: { getProject: editorSessionStore.getProject }",
-  "selection: { getActiveSegment: currentSegment }",
+  "selection: { getActiveSegment: applicationActiveSegmentService.get }",
   "tm: { saveEntry: saveTmEntry, mainName: mainTmName, refreshMatches: tmMatchesController.refresh }",
   "workspace: { markDirty: markWorkspaceDirty }",
   "status: { set: applicationSaveStatusController.set }",
@@ -7843,7 +7847,7 @@ for (const boundary of [
   "appRuntime.featureFactories.createTmMatchesController({",
   "root: els.tmMatches",
   "getProject: editorSessionStore.getProject",
-  "getActiveSegment: currentSegment",
+  "getActiveSegment: applicationActiveSegmentService.get",
   "getNames: projectTmNames",
   "findMatches: findProjectTmMatches",
   "localization: uiLocalizationService",
@@ -7944,7 +7948,7 @@ for (const boundary of [
   "appRuntime.featureFactories.createTermSuggestionsController({",
   "root: els.termSuggestions",
   "getProject: editorSessionStore.getProject",
-  "getActiveSegment: currentSegment",
+  "getActiveSegment: applicationActiveSegmentService.get",
   "getNames: projectTermBaseNames",
   "find: findTerms",
   "localization: uiLocalizationService",
@@ -11463,7 +11467,7 @@ for (const boundary of [
 for (const consumer of [
   "appRuntime.featureFactories.createAiSuggestionListController({",
   "root: els.aiSuggestionList",
-  "getSegment: currentSegment",
+  "getSegment: applicationActiveSegmentService.get",
   "apply: (...args) => aiSuggestionApplicationController.apply(...args)",
   "renderSuggestions: aiSuggestionListController.render",
   "renderAi: aiSuggestionListController.render"
@@ -12273,10 +12277,10 @@ assertIncludes(
 );
 for (const directCommandConsumer of [
   "run: structuralSegmentController.split",
-  "structuralSegmentController.canSplit(currentSegment())",
+  "structuralSegmentController.canSplit(applicationActiveSegmentService.get())",
   "run: structuralSegmentController.merge",
   "structuralSegmentController.canMerge(",
-  "structuralSegmentController.nextForMerge(currentSegment())"
+  "structuralSegmentController.nextForMerge(applicationActiveSegmentService.get())"
 ]) {
   assertIncludes(
     appJs,
@@ -15803,6 +15807,73 @@ for (const testName of [
     applicationDownloadControllerUnitTests,
     testName,
     `focused application download tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createApplicationActiveSegmentService } from "./application-active-segment-service.js";',
+  "the application runtime must install the checked active-segment service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createApplicationActiveSegmentService,",
+  "the application runtime must expose the checked active-segment service factory."
+);
+for (const snippet of [
+  "ApplicationActiveSegmentService requires checked segment and navigation boundaries.",
+  "const { segments, navigation } = dependencies || {};",
+  'typeof segments?.getAll !== "function"',
+  'typeof navigation?.getActiveIndex !== "function"',
+  "return segments.getAll()[navigation.getActiveIndex()] || null;",
+  "return Object.freeze({ get });"
+]) {
+  assertIncludes(
+    applicationActiveSegmentServiceJs,
+    snippet,
+    `ApplicationActiveSegmentService must retain characterized live selection policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createApplicationActiveSegmentService({",
+  "segments: { getAll: editorSessionStore.getSegments }",
+  "navigation: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex }",
+  "getSegment: applicationActiveSegmentService.get",
+  "getActiveSegment: applicationActiveSegmentService.get",
+  "applicationActiveSegmentService.get()?.id",
+  "applicationActiveSegmentService.get()?.target?.trim()"
+]) {
+  assertIncludes(appJs, boundary, `application active-segment composition and consumers must retain ${boundary}.`);
+}
+assert(
+  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 43,
+  "all 43 application active-segment consumers must call ApplicationActiveSegmentService directly."
+);
+assert(
+  (appWorkflowDriverJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 9,
+  "all nine workflow active-segment consumers must call ApplicationActiveSegmentService directly."
+);
+assert(
+  !/function\s+currentSegment\b/.test(appJs) && !/function\s+currentSegment\b/.test(appWorkflowDriverJs),
+  "currentSegment must not return as a coordinator or workflow helper."
+);
+for (const forbiddenOwner of ["appRuntime", "editorSessionStore", "applicationStore"]) {
+  assert(
+    !applicationActiveSegmentServiceJs.includes(forbiddenOwner),
+    `ApplicationActiveSegmentService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ApplicationActiveSegmentService preserves empty sparse and out-of-range fallbacks",
+  "ApplicationActiveSegmentService returns the exact selected record reference",
+  "ApplicationActiveSegmentService preserves the exact falsy-record fallback",
+  "ApplicationActiveSegmentService performs fresh ordered reads on every invocation",
+  "ApplicationActiveSegmentService preserves dependency and indexed-access failure timing",
+  "ApplicationActiveSegmentService validates every injected boundary"
+]) {
+  assertIncludes(
+    applicationActiveSegmentServiceUnitTests,
+    testName,
+    `focused application active-segment tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(

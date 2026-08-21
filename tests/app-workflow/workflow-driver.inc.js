@@ -3934,11 +3934,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.qualitySummary.textContent.includes("risk items") &&
         els.qualityRiskList.textContent.length > 0 &&
         qualityReviewController.getState().projectId === editorSessionStore.getProject().id &&
-        qualityReviewController.getState().segmentId === currentSegment()?.id &&
+        qualityReviewController.getState().segmentId === applicationActiveSegmentService.get()?.id &&
         qualityReviewController.getState().riskCount === editorSessionStore.getQualityRiskQueue().totalRiskItems,
       "checked quality/review controller owns workbench rendering and redacted view state"
     );
-    const qualityDecisionSegment = currentSegment();
+    const qualityDecisionSegment = applicationActiveSegmentService.get();
     const qualityDecisionCommentCount = qualityDecisionSegment?.comments?.length || 0;
     els.qualityIssueCategorySelect.value = "accuracy";
     els.qualityIssueSeveritySelect.value = "high";
@@ -3946,7 +3946,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const qualityDecisionSubmitEvent = new Event("submit", { bubbles: true, cancelable: true });
     const qualityDecisionSubmitResult = els.qualityDecisionForm.dispatchEvent(qualityDecisionSubmitEvent);
     await waitFor(
-      () => (currentSegment()?.comments || []).length === qualityDecisionCommentCount + 1,
+      () => (applicationActiveSegmentService.get()?.comments || []).length === qualityDecisionCommentCount + 1,
       "checked quality decision form submit"
     );
     const storedQualityDecisionSegment = (await getProjectSegments(project.id)).find((segment) => segment.id === qualityDecisionSegment?.id);
@@ -5926,7 +5926,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         splitAppliedVisible.length === 4 &&
         splitSuccessStored.length === 4 &&
         splitAppliedVisible.every((segment, index) => segment.documentIndex === index) &&
-        currentSegment()?.id === splitCreatedSegment?.id,
+        applicationActiveSegmentService.get()?.id === splitCreatedSegment?.id,
       "segment split saves one redacted structural command with contiguous order and stable focus"
     );
 
@@ -5945,7 +5945,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         splitUndoOriginal?.source === structuralSplitOriginalSource &&
         splitUndoOriginal?.target === structuralSplitOriginalTarget &&
         splitUndoVisible.every((segment, index) => segment.documentIndex === index) &&
-        currentSegment()?.id === structuralSegmentsBefore[0].id &&
+        applicationActiveSegmentService.get()?.id === structuralSegmentsBefore[0].id &&
         document.activeElement === splitUndoTextarea,
       "SplitSegment Undo atomically restores the original segment, order, persistence, and focus"
     );
@@ -5969,7 +5969,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         Number(splitRedoOriginal?.revision || 0) > splitUndoOriginalRevision &&
         Number(splitRedoCreated?.revision || 0) > Number(splitAppliedRevisionById.get(splitCreatedSegment?.id) || 0) &&
         splitRedoVisible.every((segment, index) => segment.documentIndex === index) &&
-        currentSegment()?.id === splitCreatedSegment?.id &&
+        applicationActiveSegmentService.get()?.id === splitCreatedSegment?.id &&
         document.activeElement === splitRedoTextarea,
       "SplitSegment Redo recreates the stable segment, order, targets, monotonic revisions, persistence, and focus"
     );
@@ -6041,7 +6041,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         !mergeSuccessStored.some((segment) => segment.id === mergeSecondBefore.id) &&
         mergeAppliedVisible.every((item, index) => item.documentIndex === index) &&
         editorSessionStore.getSegments().every((item, index) => item.index === index) &&
-        currentSegment()?.id === mergeFirstBefore.id &&
+        applicationActiveSegmentService.get()?.id === mergeFirstBefore.id &&
         document.activeElement === mergeAppliedTextarea,
       "MergeSegment persists one redacted atomic command with contiguous order, history, and focus"
     );
@@ -6069,7 +6069,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         Number(mergeUndoSecond?.revision || 0) > Number(mergeSecondBefore.revision || 0) &&
         mergeUndoVisible.every((item, index) => item.documentIndex === index) &&
         editorSessionStore.getSegments().every((item, index) => item.index === index) &&
-        currentSegment()?.id === mergeFirstBefore.id &&
+        applicationActiveSegmentService.get()?.id === mergeFirstBefore.id &&
         document.activeElement === mergeUndoTextarea,
       "MergeSegment Undo atomically restores both stable segment IDs, order, history, persistence, and focus"
     );
@@ -6093,7 +6093,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         !mergeRedoStored.some((segment) => segment.id === mergeSecondBefore.id) &&
         mergeRedoVisible.every((item, index) => item.documentIndex === index) &&
         editorSessionStore.getSegments().every((item, index) => item.index === index) &&
-        currentSegment()?.id === mergeFirstBefore.id &&
+        applicationActiveSegmentService.get()?.id === mergeFirstBefore.id &&
         document.activeElement === mergeRedoTextarea,
       "MergeSegment Redo recreates the merge with monotonic revisions and deletes only the merged-away segment"
     );

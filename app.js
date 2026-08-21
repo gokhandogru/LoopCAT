@@ -782,6 +782,10 @@ const state = {
   }
 };
 const editorSessionStore = appRuntime.editorSession;
+const applicationActiveSegmentService = appRuntime.featureFactories.createApplicationActiveSegmentService({
+  segments: { getAll: editorSessionStore.getSegments },
+  navigation: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex }
+});
 
 const els = {
   saveStatus: document.querySelector("#saveStatus"),
@@ -1248,7 +1252,7 @@ const applicationDownloadController = appRuntime.featureFactories.createApplicat
 const revisionHistoryPresentationService =
   appRuntime.featureFactories.createRevisionHistoryPresentationService({
     list: els.revisionHistoryList,
-    getSegment: currentSegment,
+    getSegment: applicationActiveSegmentService.get,
     localization: uiLocalizationService,
     statusLabel: segmentStatusLabel,
     formatDateTime,
@@ -1348,7 +1352,7 @@ const tmMatchesController = appRuntime.featureFactories.createTmMatchesControlle
   root: els.tmMatches,
   session: {
     getProject: editorSessionStore.getProject,
-    getActiveSegment: currentSegment
+    getActiveSegment: applicationActiveSegmentService.get
   },
   tm: {
     getNames: projectTmNames,
@@ -1368,7 +1372,7 @@ const termSuggestionsController = appRuntime.featureFactories.createTermSuggesti
   root: els.termSuggestions,
   session: {
     getProject: editorSessionStore.getProject,
-    getActiveSegment: currentSegment
+    getActiveSegment: applicationActiveSegmentService.get
   },
   terms: {
     getNames: projectTermBaseNames,
@@ -1439,7 +1443,7 @@ const projectDomainController = appRuntime.featureFactories.createProjectDomainC
 
 const segmentTmSaveController = appRuntime.featureFactories.createSegmentTmSaveController({
   session: { getProject: editorSessionStore.getProject },
-  selection: { getActiveSegment: currentSegment },
+  selection: { getActiveSegment: applicationActiveSegmentService.get },
   tm: { saveEntry: saveTmEntry, mainName: mainTmName, refreshMatches: tmMatchesController.refresh },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: applicationSaveStatusController.set },
@@ -1672,7 +1676,7 @@ const segmentCommandRestorationController =
     autosave: { clear: autosaveService.clear },
     persistence: { save: saveSegment, saveMany: saveSegments },
     selection: {
-      getActiveSegment: currentSegment,
+      getActiveSegment: applicationActiveSegmentService.get,
       select: (index, segmentId) =>
         applicationNavigation.selectSegment({ activeIndex: index, segmentId }),
       selectGrid: (index, segmentId) => verticalFeatureState?.segmentGrid?.selectSegment(index, segmentId),
@@ -1724,7 +1728,7 @@ const qualityWorkbenchController = appRuntime.featureFactories.createQualityWork
   },
   scope: { currentSegments: projectDocumentCatalogService.currentSegments },
   selection: {
-    getSegment: currentSegment,
+    getSegment: applicationActiveSegmentService.get,
     getActiveIndex: () => applicationStore.getState().navigation.activeIndex
   },
   quality: { buildRiskQueue, scoreSegment },
@@ -2126,7 +2130,7 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
   },
   restoration: { restoreSnapshots: segmentCommandRestorationController.restoreSnapshots },
   selection: {
-    getActiveSegmentId: () => currentSegment()?.id || "",
+    getActiveSegmentId: () => applicationActiveSegmentService.get()?.id || "",
     focusTarget: targetEditController.focusActive
   },
   presentation: {
@@ -2191,7 +2195,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
   },
   restoration: { restorePatches: segmentCommandRestorationController.restorePatches },
   selection: {
-    getActiveSegmentId: () => currentSegment()?.id || "",
+    getActiveSegmentId: () => applicationActiveSegmentService.get()?.id || "",
     focusTarget: targetEditController.focusActive
   },
   presentation: {
@@ -2312,7 +2316,7 @@ const aiScopeSelectionService = appRuntime.featureFactories.createAiScopeSelecti
   segments: {
     getAll: editorSessionStore.getSegments,
     getDocument: projectDocumentCatalogService.currentSegments,
-    getActive: currentSegment
+    getActive: applicationActiveSegmentService.get
   },
   filters: { getVisibleIndexes: segmentFilterService.visibleIndexes }
 });
@@ -2363,7 +2367,7 @@ const aiProviderFormController =
       readForm: aiRuntimeSettingsService.localSettingsFromForm,
       readProject: (project) => localAISettingsStore.projectSettings(project)
     },
-    project: { get: editorSessionStore.getProject, getSegment: currentSegment },
+    project: { get: editorSessionStore.getProject, getSegment: applicationActiveSegmentService.get },
     providers: {
       get: (providerId) => aiProviderService.get(providerId),
       presets: LOCAL_AI_PROVIDER_PRESETS,
@@ -2414,7 +2418,7 @@ const aiProviderFormController =
 const aiSuggestionListController =
   appRuntime.featureFactories.createAiSuggestionListController({
     root: els.aiSuggestionList,
-    getSegment: currentSegment,
+    getSegment: applicationActiveSegmentService.get,
     apply: (...args) => aiSuggestionApplicationController.apply(...args),
     source: uiLocalizationService.source,
     label: uiLocalizationService.label,
@@ -2492,7 +2496,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
     prepareHistories: segmentTargetStateService.prepareHistories
   },
   restoration: { restorePatches: segmentCommandRestorationController.restorePatches },
-  selection: { getActiveSegmentId: () => currentSegment()?.id || "" },
+  selection: { getActiveSegmentId: () => applicationActiveSegmentService.get()?.id || "" },
   presentation: {
     invalidateFilters: segmentFilterService.invalidate,
     renderAll,
@@ -2524,7 +2528,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
 const aiReviewController = appRuntime.featureFactories.createAiReviewController({
   editorSessionStore,
   selection: {
-    getActiveSegment: currentSegment,
+    getActiveSegment: applicationActiveSegmentService.get,
     getActiveIndex: () => applicationStore.getState().navigation.activeIndex
   },
   scope: {
@@ -2579,7 +2583,10 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
     renderAiProgress: aiProviderFormController.renderProgress,
     renderOutput: aiProviderFormController.renderOutput,
     renderReview: (options = {}) =>
-      qualityReviewController?.renderReview?.({ segment: currentSegment(), force: Boolean(options.force) }),
+      qualityReviewController?.renderReview?.({
+        segment: applicationActiveSegmentService.get(),
+        force: Boolean(options.force)
+      }),
     updateRow,
     renderAll,
     refreshSidebar: () => editorContextController.refresh(),
@@ -2603,7 +2610,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
 });
 const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairController({
   editorSessionStore,
-  selection: { getActiveSegment: currentSegment },
+  selection: { getActiveSegment: applicationActiveSegmentService.get },
   scope: {
     getVisibleSegments: () =>
       segmentFilterService.visibleIndexes()
@@ -2680,7 +2687,7 @@ const aiTagRepairController = appRuntime.featureFactories.createAiTagRepairContr
 const aiAlternativesController = appRuntime.featureFactories.createAiAlternativesController({
   editorSessionStore,
   selection: {
-    getActiveSegment: currentSegment,
+    getActiveSegment: applicationActiveSegmentService.get,
     getActiveIndex: () => applicationStore.getState().navigation.activeIndex
   },
   scope: {
@@ -2768,7 +2775,7 @@ const aiTerminologyApplicationController =
   appRuntime.featureFactories.createAiTerminologyApplicationController({
     editorSessionStore,
     selection: {
-      getActiveSegment: currentSegment,
+      getActiveSegment: applicationActiveSegmentService.get,
       getActiveIndex: () => applicationStore.getState().navigation.activeIndex
     },
     scope: {
@@ -2847,7 +2854,7 @@ const aiTerminologyApplicationController =
   });
 const aiDraftEditingController = appRuntime.featureFactories.createAiDraftEditingController({
   editorSessionStore,
-  selection: { getActiveSegment: currentSegment },
+  selection: { getActiveSegment: applicationActiveSegmentService.get },
   scope: {
     getVisibleSegments: () =>
       segmentFilterService.visibleIndexes()
@@ -2939,7 +2946,7 @@ const aiTermCandidatePersistenceService =
 const aiTerminologyExtractionController =
   appRuntime.featureFactories.createAiTerminologyExtractionController({
     editorSessionStore,
-    selection: { getActiveSegment: currentSegment },
+    selection: { getActiveSegment: applicationActiveSegmentService.get },
     scope: {
       getSegments: aiScopeSelectionService.terminologySegments
     },
@@ -3307,7 +3314,7 @@ const aiPromptPreviewController = appRuntime.featureFactories.createAiPromptPrev
   settings: { read: aiRuntimeSettingsService.localSettingsFromForm },
   project: {
     get: editorSessionStore.getProject,
-    getActiveSegment: currentSegment,
+    getActiveSegment: applicationActiveSegmentService.get,
     getTerms: editorSessionStore.getProjectTerms,
     getDocuments: projectDocumentCatalogService.list,
     getSampleSegments: aiScopeSelectionService.projectBriefSampleSegments,
@@ -3427,10 +3434,10 @@ structuralSegmentController.mount();
 const editorContextController = appRuntime?.featureFactories?.createEditorContextController?.({
   getContext: () => ({
     projectId: editorSessionStore.getProject()?.id || "",
-    segmentId: currentSegment()?.id || ""
+    segmentId: applicationActiveSegmentService.get()?.id || ""
   }),
   renderReview: () =>
-    qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false }),
+    qualityReviewController?.renderReview?.({ segment: applicationActiveSegmentService.get(), force: false }),
   renderHistory: revisionHistoryPresentationService.render,
   renderAi: aiSuggestionListController.render,
   renderQuality: qualityWorkbenchController.render,
@@ -3595,7 +3602,8 @@ const uiLocaleOrchestrationController =
       renderProjectAnalysis: () => renderProjectAnalysis(),
       renderEditor: () => renderEditor(),
       renderProgress: () => renderProgress(),
-      renderReview: () => qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false }),
+      renderReview: () =>
+        qualityReviewController?.renderReview?.({ segment: applicationActiveSegmentService.get(), force: false }),
       renderWorkbench: () => qualityWorkbenchController.render(),
       renderRevisionHistory: () => revisionHistoryPresentationService.render(),
       renderQaResults: () => qaResultsController.render(),
@@ -4828,7 +4836,10 @@ const reviewMetadataController = appRuntime.featureFactories.createReviewMetadat
   },
   presentation: {
     renderReview: (options = {}) =>
-      qualityReviewController?.renderReview?.({ segment: currentSegment(), force: Boolean(options.force) }),
+      qualityReviewController?.renderReview?.({
+        segment: applicationActiveSegmentService.get(),
+        force: Boolean(options.force)
+      }),
     updateRow,
     renderHistory: revisionHistoryPresentationService.render
   },
@@ -4874,7 +4885,10 @@ const qualityDecisionController = appRuntime.featureFactories.createQualityDecis
   presentation: {
     clearNote: () => qualityReviewController?.clearDecisionNote?.(),
     renderReview: (options = {}) =>
-      qualityReviewController?.renderReview?.({ segment: currentSegment(), force: Boolean(options.force) }),
+      qualityReviewController?.renderReview?.({
+        segment: applicationActiveSegmentService.get(),
+        force: Boolean(options.force)
+      }),
     renderWorkbench: qualityWorkbenchController.render,
     updateRow
   },
@@ -4923,7 +4937,7 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   presentation: {
     syncState: (reviewState) => qualityReviewController?.syncReviewState?.(reviewState),
     renderReview: () =>
-      qualityReviewController?.renderReview?.({ segment: currentSegment(), force: false }),
+      qualityReviewController?.renderReview?.({ segment: applicationActiveSegmentService.get(), force: false }),
     updateRow,
     renderHistory: revisionHistoryPresentationService.render
   },
@@ -4940,10 +4954,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   logger: console
 });
 dialogLifecycleController?.mount?.();
-
-function currentSegment() {
-  return editorSessionStore.getSegments()[applicationStore.getState().navigation.activeIndex] || null;
-}
 
 function clearOpenAiKey() {
   try {
@@ -5274,7 +5284,7 @@ function selectedEditorText() {
   }
   const pageSelection = window.getSelection()?.toString().trim();
   if (pageSelection) return pageSelection;
-  return currentSegment()?.source || "";
+  return applicationActiveSegmentService.get()?.source || "";
 }
 
 function reviewLabel(value) {
@@ -5299,13 +5309,13 @@ function commandList() {
     { id: "undo", label: "Undo last action", run: applicationCommandHistoryController.undo, enabled: Boolean(appRuntime?.commands?.bus?.canUndo?.(commandProjectId)) },
     { id: "redo", label: "Redo last action", run: applicationCommandHistoryController.redo, enabled: Boolean(appRuntime?.commands?.bus?.canRedo?.(commandProjectId)) },
     { id: "trash", label: "Open Trash", run: applicationTrashController.open, enabled: Boolean(appRuntime?.trashRepository) },
-    { id: "confirm", label: "Confirm segment", run: segmentConfirmationController.confirm, enabled: Boolean(currentSegment()?.target?.trim()) },
+    { id: "confirm", label: "Confirm segment", run: segmentConfirmationController.confirm, enabled: Boolean(applicationActiveSegmentService.get()?.target?.trim()) },
     { id: "next-open", label: "Next open segment", run: segmentNavigationController.nextOpen, enabled: Boolean(editorSessionStore.getSegments().length) },
     { id: "focus-mode", label: applicationStore.getState().interface.focusMode ? "Exit Focus view" : "Enter Focus view", run: focusModeController.toggle, enabled: Boolean(applicationStore.getState().navigation.view === "editor" && editorSessionStore.getProject()) },
-    { id: "copy-source", label: "Copy source", run: targetProducerController.copySourceToTarget, enabled: Boolean(currentSegment()) },
-    { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: structuralSegmentController.split, enabled: Boolean(currentSegment() && structuralSegmentController.canSplit(currentSegment())) },
-    { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: structuralSegmentController.merge, enabled: Boolean(currentSegment() && structuralSegmentController.canMerge(currentSegment(), structuralSegmentController.nextForMerge(currentSegment()))) },
-    { id: "save-tm", label: "Save segment to TM", run: segmentTmSaveController.saveActive, enabled: Boolean(currentSegment()?.target?.trim()) },
+    { id: "copy-source", label: "Copy source", run: targetProducerController.copySourceToTarget, enabled: Boolean(applicationActiveSegmentService.get()) },
+    { id: "split-segment", label: "Split segment", group: "Segment", keywords: ["divide", "cursor", "structure"], run: structuralSegmentController.split, enabled: Boolean(applicationActiveSegmentService.get() && structuralSegmentController.canSplit(applicationActiveSegmentService.get())) },
+    { id: "merge-segments", label: "Merge with next segment", group: "Segment", keywords: ["join", "combine", "structure"], run: structuralSegmentController.merge, enabled: Boolean(applicationActiveSegmentService.get() && structuralSegmentController.canMerge(applicationActiveSegmentService.get(), structuralSegmentController.nextForMerge(applicationActiveSegmentService.get()))) },
+    { id: "save-tm", label: "Save segment to TM", run: segmentTmSaveController.saveActive, enabled: Boolean(applicationActiveSegmentService.get()?.target?.trim()) },
     { id: "project-settings", label: "Project settings", run: () => openProjectDialog("edit"), enabled: Boolean(editorSessionStore.getProject()) },
     { id: "qa", label: "Run QA checks", run: projectQaController.run, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "quality-passport", label: "Export Quality Passport", run: reportExportController.exportQualityPassport, enabled: Boolean(editorSessionStore.getProject()) },
@@ -5319,22 +5329,22 @@ function commandList() {
     { id: "project-report", label: "Export project report", run: reportExportController.exportProjectReport, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "anonymized-report", label: "Export anonymized report", run: reportExportController.exportAnonymizedReport, enabled: Boolean(editorSessionStore.getProject()) },
     { id: "local-ai-pretranslate", label: "Local AI pre-translate", run: aiPretranslationController.pretranslate, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running) },
-    { id: "local-ai-review", label: "AI review active segment", run: aiReviewController.reviewActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-review", label: "AI review active segment", run: aiReviewController.reviewActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-review-batch", label: "AI QA batch", run: aiReviewController.reviewBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-tag-repair", label: "Suggest AI tag repair", run: aiTagRepairController.repairActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-tag-repair", label: "Suggest AI tag repair", run: aiTagRepairController.repairActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-tag-repair-batch", label: "Repair AI tags batch", run: aiTagRepairController.repairBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-polish-draft", label: "Polish active draft with AI", run: aiDraftEditingController.polishActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-polish-draft", label: "Polish active draft with AI", run: aiDraftEditingController.polishActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-polish-batch", label: "Polish AI drafts batch", run: aiDraftEditingController.polishBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-adapt-draft", label: "Adapt active draft with AI", run: aiDraftEditingController.adaptActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-adapt-draft", label: "Adapt active draft with AI", run: aiDraftEditingController.adaptActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-adapt-batch", label: "Adapt AI drafts batch", run: aiDraftEditingController.adaptBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-variants", label: "Suggest AI alternatives", run: aiAlternativesController.suggestActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-variants", label: "Suggest AI alternatives", run: aiAlternativesController.suggestActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-variants-batch", label: "Suggest AI alternatives batch", run: aiAlternativesController.suggestBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-apply-terms", label: "Apply AI terminology", run: aiTerminologyApplicationController.applyActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-apply-terms", label: "Apply AI terminology", run: aiTerminologyApplicationController.applyActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-apply-terms-batch", label: "Apply AI terminology batch", run: aiTerminologyApplicationController.applyBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "local-ai-terms", label: "Extract AI terms", run: aiTerminologyExtractionController.extractActive, enabled: Boolean(currentSegment() && !state.localAi.running && !state.localAi.promptBusy) },
+    { id: "local-ai-terms", label: "Extract AI terms", run: aiTerminologyExtractionController.extractActive, enabled: Boolean(applicationActiveSegmentService.get() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-terms-batch", label: "Extract AI terms batch", run: aiTerminologyExtractionController.extractBatch, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
     { id: "local-ai-project-brief", label: "Generate AI project brief", run: aiProjectBriefController.generate, enabled: Boolean(editorSessionStore.getProject() && !state.localAi.running && !state.localAi.promptBusy) },
-    { id: "openai-ai", label: "Create OpenAI suggestion", run: aiOpenAiSuggestionController.create, enabled: Boolean(currentSegment()) }
+    { id: "openai-ai", label: "Create OpenAI suggestion", run: aiOpenAiSuggestionController.create, enabled: Boolean(applicationActiveSegmentService.get()) }
   ];
   const shortcuts = {
     undo: "Ctrl/Cmd+Z",
