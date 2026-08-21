@@ -220,6 +220,8 @@ const requiredReleaseFiles = [
   "src/ai/providers/groq-provider-adapter.js",
   "src/ai/providers/hosted-provider-adapters.js",
   "src/ai/providers/install-extracted-providers.js",
+  "src/ai/providers/install-extracted-providers-eager.js",
+  "src/ai/providers/install-lazy-provider-adapters.js",
   "src/ai/providers/native-chat-provider-adapters.js",
   "src/ai/providers/native-openai-provider-adapters.js",
   "src/ai/providers/openai-compatible-hosted-provider-adapter.js",
@@ -332,6 +334,7 @@ const requiredReleaseFiles = [
   "tests/unit/anthropic-provider-adapter.test.cjs",
   "tests/unit/cohere-provider-adapter.test.cjs",
   "tests/unit/compatibility-module-registry.test.cjs",
+  "tests/unit/lazy-provider-adapters.test.cjs",
   "tests/unit/app-store.test.cjs",
   "tests/unit/application-composition.test.cjs",
   "tests/unit/application-aggregate-presentation-controller.test.cjs",
@@ -890,6 +893,9 @@ const ollamaProviderAdapterJs = readText("src/ai/providers/ollama-provider-adapt
 const opusCatProviderAdapterJs = readText("src/ai/providers/opus-cat-provider-adapter.js");
 const perplexityProviderAdapterJs = readText("src/ai/providers/perplexity-provider-adapter.js");
 const extractedProviderInstallerJs = readText("src/ai/providers/install-extracted-providers.js");
+const eagerProviderInstallerJs = readText("src/ai/providers/install-extracted-providers-eager.js");
+const lazyProviderInstallerJs = readText("src/ai/providers/install-lazy-provider-adapters.js");
+const lazyProviderInstallerUnitTests = readText("tests/unit/lazy-provider-adapters.test.cjs");
 const anthropicProviderAdapterUnitTests = readText("tests/unit/anthropic-provider-adapter.test.cjs");
 const cohereProviderAdapterUnitTests = readText("tests/unit/cohere-provider-adapter.test.cjs");
 const geminiProviderAdapterUnitTests = readText("tests/unit/gemini-provider-adapter.test.cjs");
@@ -18300,19 +18306,56 @@ assertIncludes(
 );
 assertIncludes(
   productionEntryJs,
-  'import "../ai/providers/install-extracted-providers.js"',
-  "The production renderer must install extracted providers before app bootstrap."
+  'import "../ai/providers/install-lazy-provider-adapters.js"',
+  "The production renderer must install lightweight provider descriptors before app bootstrap."
 );
 assert(
   productionEntryJs.indexOf('import "../../ai.js"') <
-    productionEntryJs.indexOf('import "../ai/providers/install-extracted-providers.js"'),
-  "The production renderer must load the AI façade before installing extracted providers."
+    productionEntryJs.indexOf('import "../ai/providers/install-lazy-provider-adapters.js"'),
+  "The production renderer must load the AI façade before installing lazy provider descriptors."
 );
 assertIncludes(
   regressionHtml,
-  'import "./src/ai/providers/install-extracted-providers.js"',
-  "The standalone regression harness must install extracted providers through the production adapter boundary."
+  'import "./src/ai/providers/install-extracted-providers-eager.js"',
+  "The standalone regression harness must install extracted providers through the explicit eager test boundary."
 );
+assertIncludes(
+  eagerProviderInstallerJs,
+  "installExtractedProviderAdapters(globalThis.window?.CatHan?.ai)",
+  "The standalone regression boundary must eagerly install the extracted provider implementations."
+);
+assertIncludes(
+  lazyProviderInstallerJs,
+  'import("./install-extracted-providers.js")',
+  "The production provider boundary must load implementations through one dynamic import."
+);
+assertIncludes(
+  lazyProviderInstallerJs,
+  "loadPromise = null",
+  "The lazy provider boundary must permit retry after loading or installation failure."
+);
+assertIncludes(
+  lazyProviderInstallerJs,
+  "provider === lazyProvider",
+  "The lazy provider boundary must reject a completed load that failed to replace its placeholder."
+);
+assert(
+  !productionEntryJs.includes('import "../ai/providers/install-extracted-providers.js"'),
+  "The production renderer must not eagerly import extracted provider implementations."
+);
+for (const testName of [
+  "lazy provider adapters preserve all registry positions, descriptors, capabilities, and compatibility exports",
+  "lazy provider adapters share one concurrent load and preserve delegate receiver, arguments, and results",
+  "lazy provider adapters propagate load failure identity and retry the next first use",
+  "lazy provider adapters reject incomplete installation and permit a repaired retry",
+  "lazy provider adapters validate registry, preset, and loader boundaries"
+]) {
+  assertIncludes(
+    lazyProviderInstallerUnitTests,
+    testName,
+    `focused lazy-provider tests must retain characterization: ${testName}`
+  );
+}
 assertIncludes(
   regressionHtml,
   'providerIds.indexOf("openai") === providerIds.indexOf("ollama") + 1',

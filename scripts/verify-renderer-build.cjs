@@ -5,6 +5,7 @@ const root = path.resolve(__dirname, "..");
 const rendererRoot = path.join(root, ".cache", "renderer");
 const productionAssets = JSON.parse(fs.readFileSync(path.join(rendererRoot, "production", "assets.json"), "utf8"));
 const testAssets = JSON.parse(fs.readFileSync(path.join(rendererRoot, "test", "assets.json"), "utf8"));
+const rendererMetafile = JSON.parse(fs.readFileSync(path.join(rendererRoot, "metafile.json"), "utf8"));
 const readGraph = (variant, assets) =>
   assets.map((asset) => fs.readFileSync(path.join(rendererRoot, variant, asset), "utf8")).join("\n");
 const production = readGraph("production", productionAssets);
@@ -19,6 +20,29 @@ const forbiddenProductionMarkers = [
   "Simulated autosave save failure",
   "Simulated AI apply save failure",
   "APP WORKFLOW TEST"
+];
+const normalizePath = (value) => String(value || "").replaceAll("\\", "/");
+const productionOutputs = Object.entries(rendererMetafile.production?.outputs || {});
+const productionEntryOutput = productionOutputs.find(
+  ([, output]) => normalizePath(output.entryPoint) === "src/entry/production.js"
+);
+const providerInstallerOutput = productionOutputs.find(
+  ([, output]) => normalizePath(output.entryPoint) === "src/ai/providers/install-extracted-providers.js"
+);
+const eagerProviderImplementationSources = [
+  "src/ai/providers/anthropic-provider-adapter.js",
+  "src/ai/providers/cohere-provider-adapter.js",
+  "src/ai/providers/gemini-provider-adapter.js",
+  "src/ai/providers/groq-provider-adapter.js",
+  "src/ai/providers/hosted-provider-adapters.js",
+  "src/ai/providers/native-chat-provider-adapters.js",
+  "src/ai/providers/native-openai-provider-adapters.js",
+  "src/ai/providers/ollama-provider-adapter.js",
+  "src/ai/providers/openai-compatible-hosted-provider-adapter.js",
+  "src/ai/providers/openai-compatible-provider-adapter.js",
+  "src/ai/providers/openai-responses-provider-adapter.js",
+  "src/ai/providers/opus-cat-provider-adapter.js",
+  "src/ai/providers/perplexity-provider-adapter.js"
 ];
 
 const failures = [];
@@ -40,6 +64,32 @@ if (!testIndex.includes('<script type="module" src="/renderer-test/app.js"></scr
   failures.push("Test index does not load the isolated test renderer entry.");
 if (!productionAssets.some((asset) => asset.startsWith("chunks/") && asset.endsWith(".js")))
   failures.push("Production renderer is missing lazy ES-module chunks.");
+if (!productionEntryOutput) {
+  failures.push("Production renderer metafile is missing the hosted application entry.");
+} else {
+  const [, output] = productionEntryOutput;
+  const providerChunkImport = (output.imports || []).find(
+    (entry) =>
+      entry.kind === "dynamic-import" && normalizePath(entry.path).includes("/chunks/install-extracted-providers-")
+  );
+  if (!providerChunkImport) failures.push("Hosted startup entry does not lazy-load the extracted AI provider chunk.");
+  for (const source of eagerProviderImplementationSources) {
+    if (Object.hasOwn(output.inputs || {}, source))
+      failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
+  }
+}
+if (!providerInstallerOutput) {
+  failures.push("Production renderer metafile is missing the extracted AI provider chunk entry.");
+} else {
+  const [outputPath, output] = providerInstallerOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("Extracted AI provider chunk is missing from the production asset manifest.");
+  for (const source of eagerProviderImplementationSources) {
+    if (!Object.hasOwn(output.inputs || {}, source))
+      failures.push(`Extracted AI provider chunk is missing implementation source: ${source}`);
+  }
+}
 for (const requiredAsset of ["app.js", "app-file.js", "bootstrap.js"]) {
   if (!productionAssets.includes(requiredAsset)) failures.push(`Production renderer is missing ${requiredAsset}.`);
 }

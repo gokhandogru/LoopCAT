@@ -496,7 +496,11 @@ P1-08 is complete. Continue preserving its release guards and full behavior gate
 
 ### P2-05 — Performance stretch target
 
-Lazy locale chunks, production/test graph separation, minification, update lifecycle, offline asset generation, and the bootstrap-only application entry are delivered. The production graph is 2,930,614 bytes across five modules; the hosted/desktop initial app is 1,220,736 bytes (320,071 bytes gzip), and the separate direct-file fallback is 1,465,285 bytes (403,221 bytes gzip). The hosted/desktop initial bundle meets the relative-reduction and 250 KiB-class gzip targets but remains 470,736 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently. Further reduction should come from measured lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
+Lazy locale chunks, production/test graph separation, minification, update lifecycle, offline asset generation, the bootstrap-only application entry, and the first measured provider-adapter lazy-load boundary are delivered. The production graph is 2,935,612 bytes across seven modules; the hosted/desktop initial app is 1,165,385 bytes (311,863 bytes gzip), the extracted provider implementation chunk is 57,117 bytes (10,113 bytes gzip), and the separate direct-file fallback is 1,468,065 bytes (405,530 bytes gzip). Compared with the completed P1-08 checkpoint, the hosted/desktop initial app is 55,351 bytes smaller (8,208 bytes smaller gzip) and now remains 415,385 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently.
+
+The checked lazy provider-adapter slice preserves the exact 18-provider registry order, descriptors, defaults, capabilities, compatibility exports, mutable provider-object behavior, receiver identity, arguments, results, concurrent first-use sharing, original failure identity, and retry after load or incomplete-install failure. Production installs lightweight synchronous placeholders and dynamically imports the existing implementations on the first provider method call; the standalone regression harness retains an explicit eager test boundary. Renderer verification proves all 13 implementation modules are absent from the hosted startup entry, the extracted installer is a dynamic chunk, and that chunk remains in the production asset manifest for offline packaging. Five focused tests and the full 1,256-test quality gate pass, together with release/import/source-isolation/bundle checks, the full eight-phase Electron browser suite, all 15 accessibility states, 81 visual screenshots, the regenerated 27-asset web package and smoke test, Windows desktop packaging, artifact inspection, fuses, and GPU-on/off packaged startup, with no intended user-visible difference.
+
+Further reduction should come from measured lazy loading of the remaining uncommon feature families, not from removing offline capability or mature format support.
 
 ## Manual and external release gates still required
 
@@ -527,7 +531,7 @@ Lazy locale chunks, production/test graph separation, minification, update lifec
 
 ## Recommended next implementation task
 
-Continue P2-05 by measuring the initial production graph by feature family, then lazily load uncommon feature families in the smallest behavior-preserving order needed to approach the 750 KB minified hosted-entry stretch target.
+Continue P2-05 with the report-generation family, currently led by the 18,962-byte ReportDocumentCompositionService contribution plus its report-data and export orchestration. Establish one recoverable first-export boundary, then remeasure before considering uncommon format parsers or broader AI command modules.
 
 Entry criteria:
 

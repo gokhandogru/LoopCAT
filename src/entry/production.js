@@ -13,7 +13,7 @@ import "../../validation.js";
 import "../../analysis.js";
 import "../../quality.js";
 import "../../ai.js";
-import "../ai/providers/install-extracted-providers.js";
+import "../ai/providers/install-lazy-provider-adapters.js";
 import "../../worker-client.js";
 import "../../project.js";
 import "../../i18n.js";
