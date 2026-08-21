@@ -247,6 +247,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-home-controller.js",
   "src/features/projects/project-resource-selection-controller.js",
   "src/features/projects/project-name-service.js",
+  "src/features/projects/project-document-manifest-service.js",
   "src/features/projects/project-language-pair-shortcuts-controller.js",
   "src/features/projects/project-language-context-controller.js",
   "src/features/projects/project-document-statistics-service.js",
@@ -381,6 +382,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-dialog-controller.test.cjs",
   "tests/unit/project-resource-selection-controller.test.cjs",
   "tests/unit/project-name-service.test.cjs",
+  "tests/unit/project-document-manifest-service.test.cjs",
   "tests/unit/project-language-pair-shortcuts-controller.test.cjs",
   "tests/unit/project-language-context-controller.test.cjs",
   "tests/unit/project-document-statistics-service.test.cjs",
@@ -660,6 +662,12 @@ const projectResourceSelectionControllerUnitTests = readText(
 );
 const projectNameServiceJs = readText("src/features/projects/project-name-service.js");
 const projectNameServiceUnitTests = readText("tests/unit/project-name-service.test.cjs");
+const projectDocumentManifestServiceJs = readText(
+  "src/features/projects/project-document-manifest-service.js"
+);
+const projectDocumentManifestServiceUnitTests = readText(
+  "tests/unit/project-document-manifest-service.test.cjs"
+);
 const projectLanguagePairShortcutsControllerJs = readText(
   "src/features/projects/project-language-pair-shortcuts-controller.js"
 );
@@ -1028,6 +1036,88 @@ for (const testName of [
     projectNameServiceUnitTests,
     testName,
     `focused project-name tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectDocumentManifestService } from "../features/projects/project-document-manifest-service.js";',
+  "The application runtime must install the checked project document-manifest service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectDocumentManifestService,",
+  "The application runtime must expose the checked project document-manifest service factory."
+);
+for (const snippet of [
+  "ProjectDocumentManifestService requires a current-project boundary.",
+  "ProjectDocumentManifestService requires a project-name cleanup boundary.",
+  "ProjectDocumentManifestService requires a stable text-normalization boundary.",
+  "function manifest(project = session.getProject())",
+  "const seen = new Set()",
+  "Array.isArray(project?.documents) ? project.documents : []",
+  'if (!documentInfo || typeof documentInfo !== "object" || Array.isArray(documentInfo)) return null',
+  "const id = names.clean(documentInfo.id)",
+  "if (!id || seen.has(id)) return null",
+  "seen.add(id)",
+  "...documentInfo",
+  'name: names.clean(documentInfo.name, project?.sourceFileName || "Document")',
+  'type: text.lower(names.clean(documentInfo.type, "file")) || "file"',
+  ".filter(Boolean)",
+  "return Object.freeze({ manifest })"
+]) {
+  assertIncludes(
+    projectDocumentManifestServiceJs,
+    snippet,
+    `ProjectDocumentManifestService must retain characterized policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectDocumentManifestService({",
+  "session: { getProject: editorSessionStore.getProject }",
+  "names: { clean: projectNameService.clean }",
+  "text: { lower: applicationTextSafetyService.stableLower }",
+  "getManifest: projectDocumentManifestService.manifest",
+  "documents: { manifest: projectDocumentManifestService.manifest }"
+]) {
+  assertIncludes(appJs, boundary, `project document-manifest composition must retain ${boundary}.`);
+}
+assert(
+  (appJs.match(/\bprojectDocumentManifestService\.manifest\b/g) || []).length === 3 &&
+    (appWorkflowDriverJs.match(/\bprojectDocumentManifestService\.manifest\b/g) || []).length === 2,
+  "all application and workflow document-manifest consumers must call ProjectDocumentManifestService directly."
+);
+assert(
+  !/function\s+projectDocumentManifest\b/.test(appJs) &&
+    !/function\s+projectDocumentManifest\b/.test(appWorkflowDriverJs),
+  "projectDocumentManifest must not return to app.js or the workflow driver."
+);
+for (const forbiddenOwner of [
+  "editorSessionStore",
+  "applicationTextSafetyService",
+  "projectNameService",
+  "appRuntime",
+  "window.",
+  "document."
+]) {
+  assert(
+    !projectDocumentManifestServiceJs.includes(forbiddenOwner),
+    `ProjectDocumentManifestService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectDocumentManifestService preserves live defaults, explicit projects, and array-only input",
+  "ProjectDocumentManifestService rejects malformed records and preserves stable first-ID order",
+  "ProjectDocumentManifestService preserves exact source-name fallback identity and access timing",
+  "ProjectDocumentManifestService preserves cleaned lowercasing and the final file fallback",
+  "ProjectDocumentManifestService preserves enumerable metadata without mutating source records",
+  "ProjectDocumentManifestService skips duplicate and empty IDs before later record effects",
+  "ProjectDocumentManifestService preserves project, cleanup, spread, and normalization failure timing",
+  "ProjectDocumentManifestService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectDocumentManifestServiceUnitTests,
+    testName,
+    `focused project document-manifest tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
@@ -2688,7 +2778,7 @@ assertIncludes(
 );
 for (const boundary of [
   "getProject: () => editorSessionStore.getProject()",
-  "getManifest: projectDocumentManifest",
+  "getManifest: projectDocumentManifestService.manifest",
   "getSegments: () => editorSessionStore.getSegments()",
   "getSelectedDocumentId: () => applicationStore.getState().navigation.documentId",
   "normalizeType: applicationTextSafetyService.stableLower"
@@ -8937,7 +9027,7 @@ for (const boundary of [
   "getLinks: projectResourceLinks",
   "getTmNames: projectTmNames",
   "getTermBaseNames: projectTermBaseNames",
-  "documents: { manifest: projectDocumentManifest }",
+  "documents: { manifest: projectDocumentManifestService.manifest }",
   "normalizeProjectSettings: aiRuntimeSettingsService.normalizeProjectSettings",
   "createContext: createPortableSanitizerContext",
   "sanitize: sanitizePortableValue",
@@ -9812,7 +9902,7 @@ for (const boundary of [
   "appRuntime.featureFactories.createProjectDocumentImportController({",
   "session: editorSessionStore",
   "list: projectDocumentCatalogService.list",
-  "manifest: projectDocumentManifest",
+  "manifest: projectDocumentManifestService.manifest",
   "assertSize: fileImportService.assertSize",
   "maxBytes: MAX_PROJECT_IMPORT_BYTES",
   "extractDocx: extractDocxSegments",
@@ -17461,9 +17551,9 @@ assertIncludes(
   "ProjectDocumentCatalogService document lists must include saved project document metadata even when a document has no segment rows."
 );
 assertIncludes(
-  functionBody(appJs, "function projectDocumentManifest", "function cleanProjectResourceLinks"),
-  "applicationTextSafetyService.stableLower(projectNameService.clean(documentInfo.type",
-  "app.js document metadata types must be normalized before export selection."
+  functionBody(projectDocumentManifestServiceJs, "function manifest", "return Object.freeze"),
+  'type: text.lower(names.clean(documentInfo.type, "file")) || "file"',
+  "ProjectDocumentManifestService document metadata types must be normalized before export selection."
 );
 assertIncludes(
   appJs,
@@ -18968,9 +19058,9 @@ assertIncludes(
   "app.js must clean malformed legacy resource links before UI summaries or package builds."
 );
 assertIncludes(
-  appJs,
-  "function projectDocumentManifest",
-  "app.js must clean malformed legacy document manifests before UI views or package builds."
+  projectDocumentManifestServiceJs,
+  "function manifest(project = session.getProject())",
+  "ProjectDocumentManifestService must clean malformed legacy document manifests before UI views or package builds."
 );
 assertIncludes(
   validationJs,

@@ -1471,9 +1471,16 @@ const projectLanguageContextController = appRuntime.featureFactories.createProje
   warn: (...args) => console.warn(...args)
 });
 
+const projectDocumentManifestService =
+  appRuntime.featureFactories.createProjectDocumentManifestService({
+    session: { getProject: editorSessionStore.getProject },
+    names: { clean: projectNameService.clean },
+    text: { lower: applicationTextSafetyService.stableLower }
+  });
+
 const projectDocumentCatalogService = appRuntime.featureFactories.createProjectDocumentCatalogService({
   getProject: () => editorSessionStore.getProject(),
-  getManifest: projectDocumentManifest,
+  getManifest: projectDocumentManifestService.manifest,
   getSegments: () => editorSessionStore.getSegments(),
   getSelectedDocumentId: () => applicationStore.getState().navigation.documentId,
   normalizeType: applicationTextSafetyService.stableLower
@@ -4089,7 +4096,7 @@ const projectExportBuildService =
       getTmNames: projectTmNames,
       getTermBaseNames: projectTermBaseNames
     },
-    documents: { manifest: projectDocumentManifest },
+    documents: { manifest: projectDocumentManifestService.manifest },
     ai: { normalizeProjectSettings: aiRuntimeSettingsService.normalizeProjectSettings },
     portable: {
       createContext: createPortableSanitizerContext,
@@ -4346,7 +4353,7 @@ const projectDocumentImportController =
     session: editorSessionStore,
     catalog: {
       list: projectDocumentCatalogService.list,
-      manifest: projectDocumentManifest
+      manifest: projectDocumentManifestService.manifest
     },
     files: {
       assertSize: fileImportService.assertSize,
@@ -5020,25 +5027,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   logger: console
 });
 dialogLifecycleController?.mount?.();
-
-function projectDocumentManifest(project = editorSessionStore.getProject()) {
-  const seen = new Set();
-  return (Array.isArray(project?.documents) ? project.documents : [])
-    .map((documentInfo) => {
-      if (!documentInfo || typeof documentInfo !== "object" || Array.isArray(documentInfo)) return null;
-      const id = projectNameService.clean(documentInfo.id);
-      if (!id || seen.has(id)) return null;
-      seen.add(id);
-      return {
-        ...documentInfo,
-        id,
-        name: projectNameService.clean(documentInfo.name, project?.sourceFileName || "Document"),
-        type:
-          applicationTextSafetyService.stableLower(projectNameService.clean(documentInfo.type, "file")) || "file"
-      };
-    })
-    .filter(Boolean);
-}
 
 function cleanProjectResourceLinks(resourceLinks = []) {
   return (Array.isArray(resourceLinks) ? resourceLinks : [])

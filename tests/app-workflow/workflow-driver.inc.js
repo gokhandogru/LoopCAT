@@ -293,7 +293,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         delimiterResourceInfo.targetLang === "tr",
       "resource keys preserve names containing double-colon delimiters"
     );
-    const legacyDocumentManifest = projectDocumentManifest({
+    const legacyDocumentManifest = projectDocumentManifestService.manifest({
       ...editorSessionStore.getProject(),
       sourceFileName: "legacy-source.html",
       documents: [
@@ -4294,7 +4294,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const originalLabelProjectSummaries = editorSessionStore.getProjectSummaries();
       const originalLabelResourceState = resourcesController.getState();
       const originalLabelConfirm = window.confirm;
-      const originalDocuments = projectDocumentManifest(editorSessionStore.getProject());
+      const originalDocuments = projectDocumentManifestService.manifest(editorSessionStore.getProject());
       const labelDocumentName = "Bearer ui-document-label-token-that-must-not-appear";
       const labelProject = {
         ...editorSessionStore.getProject(),
