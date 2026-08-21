@@ -287,6 +287,7 @@ const requiredReleaseFiles = [
   "src/features/import-export/import-export-controller.js",
   "src/features/workspace/recovery-workspace-controller.js",
   "src/features/workspace/workspace-backup-export-controller.js",
+  "src/features/workspace/workspace-dirty-state-controller.js",
   "src/features/workspace/workspace-health-repair-controller.js",
   "src/features/workspace/workspace-package-save-controller.js",
   "src/features/workspace/workspace-sync-controller.js",
@@ -412,6 +413,7 @@ const requiredReleaseFiles = [
   "tests/unit/import-export-controller.test.cjs",
   "tests/unit/recovery-workspace-controller.test.cjs",
   "tests/unit/workspace-backup-export-controller.test.cjs",
+  "tests/unit/workspace-dirty-state-controller.test.cjs",
   "tests/unit/workspace-health-repair-controller.test.cjs",
   "tests/unit/workspace-package-save-controller.test.cjs",
   "tests/unit/workspace-sync-controller.test.cjs",
@@ -801,6 +803,8 @@ const recoveryWorkspaceControllerJs = readText("src/features/workspace/recovery-
 const recoveryWorkspaceControllerUnitTests = readText("tests/unit/recovery-workspace-controller.test.cjs");
 const workspaceBackupExportControllerJs = readText("src/features/workspace/workspace-backup-export-controller.js");
 const workspaceBackupExportControllerUnitTests = readText("tests/unit/workspace-backup-export-controller.test.cjs");
+const workspaceDirtyStateControllerJs = readText("src/features/workspace/workspace-dirty-state-controller.js");
+const workspaceDirtyStateControllerUnitTests = readText("tests/unit/workspace-dirty-state-controller.test.cjs");
 const workspaceHealthRepairControllerJs = readText("src/features/workspace/workspace-health-repair-controller.js");
 const workspaceHealthRepairControllerUnitTests = readText("tests/unit/workspace-health-repair-controller.test.cjs");
 const workspacePackageSaveControllerJs = readText("src/features/workspace/workspace-package-save-controller.js");
@@ -1289,6 +1293,172 @@ for (const testName of [
     applicationDateTimeServiceUnitTests,
     testName,
     `focused application date-time tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createWorkspaceDirtyStateController } from "../features/workspace/workspace-dirty-state-controller.js";',
+  "the application runtime must install the checked workspace dirty-state controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createWorkspaceDirtyStateController,",
+  "the application runtime must expose the checked workspace dirty-state controller factory."
+);
+for (const snippet of [
+  'const WORKSPACE_DIRTY_STORAGE = "loopcat.workspace.dirtyProjectIds";',
+  "WorkspaceDirtyStateController requires checked state, storage, session, resource, summary, recovery, and presentation boundaries.",
+  "function ids()",
+  "return Array.from(state.getDirty());",
+  'JSON.parse(storage.getItem(WORKSPACE_DIRTY_STORAGE) || "[]")',
+  'parsed.filter((id) => typeof id === "string" && id.trim())',
+  "storage.removeItem(WORKSPACE_DIRTY_STORAGE);",
+  "function persist()",
+  "if (projectIds.length) storage.setItem(WORKSPACE_DIRTY_STORAGE, JSON.stringify(projectIds));",
+  "Dirty-state persistence is a recovery aid; in-memory warnings still work if storage is unavailable.",
+  "state.setDirty(new Set(projectIds));",
+  "state.setRecovery(new Set(projectIds));",
+  "recovery.resetDismissal();",
+  "function prune()",
+  ".map((project) => project.id)",
+  "const nextIds = ids().filter((id) => knownIds.has(id));",
+  "(id) => knownIds.has(id) && nextIds.includes(id)",
+  "const dirtyChanged = nextIds.length !== state.getDirty().size;",
+  "if (!dirtyChanged && !recoveryChanged) return;",
+  "presentation.renderRecovery();",
+  "return Boolean(state.getStatus()?.connected && state.getDirty().size);",
+  "return status?.connected ? state.getDirty().size : 0;",
+  "function mark(projectId = session.getProject()?.id)",
+  "const changed = !state.getDirty().has(projectId);",
+  "summary.markDirty(projectId);",
+  "function markProjects(projectIds = [])",
+  "function usesResource(project, type, name, sourceLang = \"\", targetLang = \"\")",
+  "return resources.links(project).some((link) => link.type === type && link.name === name);",
+  "function markProjectsUsingResource(type, name, sourceLang = \"\", targetLang = \"\")",
+  "markProjects(projectIds);",
+  "return projectIds.length;",
+  "function clear(projectId = session.getProject()?.id)",
+  "function clearAll()",
+  "function clearMemory()",
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    workspaceDirtyStateControllerJs,
+    snippet,
+    `WorkspaceDirtyStateController must retain characterized state and persistence policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createWorkspaceDirtyStateController({",
+  "getDirty: () => state.workspaceDirtyProjectIds",
+  "state.workspaceDirtyProjectIds = value",
+  "getRecovery: () => state.workspaceRecoveryProjectIds",
+  "state.workspaceRecoveryProjectIds = value",
+  "getStatus: () => state.workspaceStatus",
+  "getItem: (key) => localStorage.getItem(key)",
+  "setItem: (key, value) => localStorage.setItem(key, value)",
+  "removeItem: (key) => localStorage.removeItem(key)",
+  "session: { getProject: editorSessionStore.getProject, getProjects: editorSessionStore.getProjects }",
+  "resources: { links: projectResourceContextService.links }",
+  "summary: { markDirty: (projectId) => markProjectSummaryDirty(projectId) }",
+  "recovery: { resetDismissal: () => recoveryWorkspaceController?.resetRecoveryDismissal?.() }",
+  "renderStatus: () => renderWorkspaceStatus()",
+  "renderRecovery: () => renderWorkspaceRecoveryPanel()"
+]) {
+  assertIncludes(appJs, boundary, `workspace dirty-state composition must retain ${boundary}.`);
+}
+for (const [method, appCount, workflowCount] of [
+  ["clear", 3, 5],
+  ["clearAll", 1, 33],
+  ["clearMemory", 0, 1],
+  ["hasUnsaved", 1, 0],
+  ["ids", 2, 0],
+  ["mark", 42, 6],
+  ["markProjects", 2, 0],
+  ["markProjectsUsingResource", 6, 1],
+  ["prune", 1, 1],
+  ["readStored", 0, 2],
+  ["restore", 1, 2],
+  ["visibleCount", 1, 0]
+]) {
+  assert(
+    (appJs.match(new RegExp(`\\bworkspaceDirtyStateController\\.${method}\\b`, "g")) || []).length === appCount,
+    `application consumers must retain all ${appCount} direct WorkspaceDirtyStateController.${method} references.`
+  );
+  assert(
+    (appWorkflowDriverJs.match(new RegExp(`\\bworkspaceDirtyStateController\\.${method}\\b`, "g")) || []).length ===
+      workflowCount,
+    `workflow consumers must retain all ${workflowCount} direct WorkspaceDirtyStateController.${method} references.`
+  );
+}
+for (const removedHelper of [
+  "workspaceDirtyIds",
+  "readStoredWorkspaceDirtyIds",
+  "persistWorkspaceDirtyIds",
+  "restoreWorkspaceDirtyIds",
+  "pruneWorkspaceDirtyProjectIds",
+  "hasUnsavedWorkspacePackages",
+  "visibleWorkspaceDirtyCount",
+  "markWorkspaceDirty",
+  "markWorkspaceProjectsDirty",
+  "projectUsesResource",
+  "markProjectsUsingResourceDirty",
+  "clearWorkspaceDirty",
+  "clearWorkspaceDirtyMarkers",
+  "clearWorkspaceDirtyMemoryOnly"
+]) {
+  const checkedAppSource =
+    removedHelper === "markProjectsUsingResourceDirty"
+      ? appJs.replace(
+          "markProjectsUsingResourceDirty: workspaceDirtyStateController.markProjectsUsingResource",
+          ""
+        )
+      : appJs;
+  assert(
+    !checkedAppSource.includes(removedHelper) && !appWorkflowDriverJs.includes(removedHelper),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  !appJs.includes("WORKSPACE_DIRTY_STORAGE") &&
+    appWorkflowDriverJs.includes('localStorage.setItem("loopcat.workspace.dirtyProjectIds"'),
+  "workspace dirty storage-key policy must stay controller-owned while the workflow retains its explicit corruption fixture."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "state.workspace",
+  "localStorage",
+  "editorSessionStore",
+  "projectResourceContextService",
+  "markProjectSummaryDirty",
+  "recoveryWorkspaceController",
+  "renderWorkspace",
+  "els."
+]) {
+  assert(
+    !workspaceDirtyStateControllerJs.includes(forbiddenOwner),
+    `WorkspaceDirtyStateController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "WorkspaceDirtyStateController preserves insertion-order IDs and connected visibility policy",
+  "WorkspaceDirtyStateController preserves stored JSON filtering, duplicates, and exact storage key",
+  "WorkspaceDirtyStateController cleans malformed storage and preserves cleanup failure timing",
+  "WorkspaceDirtyStateController persists ordered IDs or removes empty state while containing failures",
+  "WorkspaceDirtyStateController restores fresh dirty and recovery Sets before resetting dismissal",
+  "WorkspaceDirtyStateController prunes unknown dirty and recovery IDs with exact effects",
+  "WorkspaceDirtyStateController marks the current project and repeats only summary invalidation",
+  "WorkspaceDirtyStateController marks project lists with stable deduplication and one changed effect pair",
+  "WorkspaceDirtyStateController preserves resource guards, language matching, and link failures",
+  "WorkspaceDirtyStateController marks every matching resource project and returns the uncollapsed count",
+  "WorkspaceDirtyStateController preserves clear, clear-all, and memory-only effect sequencing",
+  "WorkspaceDirtyStateController preserves mutation before reset and presentation failures",
+  "WorkspaceDirtyStateController validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    workspaceDirtyStateControllerUnitTests,
+    testName,
+    `focused workspace dirty-state tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
@@ -2855,7 +3025,7 @@ for (const boundary of [
   "parseTermWorkbook",
   "repositories: { importTmEntries, importTerms, getAllByIndex, listTerms }",
   "selectedTermBaseName: () => els.termBaseSelect.value || projectResourceContextService.primaryTermBase()",
-  "markProjectsUsingDirty: markProjectsUsingResourceDirty",
+  "markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource",
   "tmMatches: tmMatchesController.refresh",
   "projectTerms: refreshProjectTerms",
   "terms: termSuggestionsController.refresh",
@@ -3651,7 +3821,7 @@ for (const boundary of [
   "parseTmx: parseTmxAsync",
   "parseTbx: parseTbxAsync",
   "repositories: { importTmEntries, importTerms }",
-  "markProjectsUsingDirty: markProjectsUsingResourceDirty",
+  "markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource",
   "open: (...args) => resourcesController?.openResource?.(...args)",
   "refresh: refreshResources",
   "refreshProjectTerms",
@@ -3726,7 +3896,7 @@ assertIncludes(
 for (const boundary of [
   "getProjectId: () => editorSessionStore.getProject()?.id || null",
   "repositories: { updateTmEntry, updateTerm }",
-  "markProjectsUsingDirty: markProjectsUsingResourceDirty",
+  "markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource",
   "refresh: refreshResources",
   "refreshProjectTerms",
   "labelFromKey: resourceCatalogService.labelFromKey",
@@ -6023,7 +6193,7 @@ for (const boundary of [
   "selectSegment: (selection) => applicationNavigation.selectSegment(selection)",
   "clearSelection: () => applicationNavigation.clearSelection()",
   'showProjects: () => applicationViewController.show("projects")',
-  "markProjectsUsingResourceDirty(type, name, sourceLang, targetLang)",
+  "workspaceDirtyStateController.markProjectsUsingResource(type, name, sourceLang, targetLang)",
   "refreshResources: () => refreshResources()",
   "refreshTerms: (options) => refreshProjectTerms(options)",
   "refreshSuggestions: () => termSuggestionsController.refresh()",
@@ -8567,7 +8737,7 @@ for (const boundary of [
   "filters: { invalidate: segmentFilterService.invalidate }",
   "renderHistory: revisionHistoryPresentationService.render",
   "refreshContext: () => editorContextController.refresh()",
-  "workspace: { markDirty: markWorkspaceDirty }",
+  "workspace: { markDirty: workspaceDirtyStateController.mark }",
   "clone: structuredClone",
   "now: () => new Date().toISOString()"
 ]) {
@@ -8730,7 +8900,7 @@ for (const boundary of [
   "session: { getProject: editorSessionStore.getProject }",
   "selection: { getActiveSegment: applicationActiveSegmentService.get }",
   "mainName: projectResourceContextService.mainTm",
-  "workspace: { markDirty: markWorkspaceDirty }",
+  "workspace: { markDirty: workspaceDirtyStateController.mark }",
   "status: { set: applicationSaveStatusController.set }",
   "if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG])"
 ]) {
@@ -9028,7 +9198,7 @@ for (const boundary of [
   "forbidden: els.termForbiddenInput",
   "getProject: editorSessionStore.getProject",
   "primaryName: projectResourceContextService.primaryTermBase",
-  "markProjectsUsingDirty: markProjectsUsingResourceDirty",
+  "markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource",
   "repository: { save: saveTerm }",
   "renderTermbaseSelect,",
   "refreshProjectTerms: (options) => refreshProjectTerms(options)",
@@ -9263,7 +9433,7 @@ for (const boundary of [
   "repository: { update: updateProject }",
   "refreshSummaries: refreshProjectSummaries",
   "renderAll",
-  "workspace: { markDirty: markWorkspaceDirty }",
+  "workspace: { markDirty: workspaceDirtyStateController.mark }",
   "status: { set: applicationSaveStatusController.set }",
   "clone: structuredClone",
   "beforeSave: () =>",
@@ -9431,7 +9601,7 @@ for (const boundary of [
   "record: recordActivityEvent",
   "isSupported: () => Boolean(workspaceStorage?.isSupported())",
   "chooseFolder: workspacePackageSaveController.chooseFolder",
-  "markDirty: markWorkspaceDirty",
+  "markDirty: workspaceDirtyStateController.mark",
   "maybeSaveFromSettings: workspacePackageSaveController.maybeSaveFromSettings",
   "status: { set: applicationSaveStatusController.set }",
   "Boolean(LOOPCAT_TEST_BUILD && els.projectForm[PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG])",
@@ -9805,7 +9975,7 @@ for (const boundary of [
   "renderValidation: renderValidationReport",
   "renderEditor,",
   "renderBackupReminder",
-  "workspace: { markDirty: markWorkspaceDirty }",
+  "workspace: { markDirty: workspaceDirtyStateController.mark }",
   "status: { set: applicationSaveStatusController.set, mode: exportStatusMode }",
   "now: () => new Date().toISOString()",
   "nowMs: () => Date.now()",
@@ -9957,10 +10127,10 @@ for (const boundary of [
   "clearSelection: applicationNavigation.clearSelection",
   "load: loadProjects",
   "open: openProject",
-  "clearDirty: clearWorkspaceDirty",
-  "markDirty: markWorkspaceDirty",
-  "clearDirtyMarkers: clearWorkspaceDirtyMarkers",
-  "markProjectsDirty: markWorkspaceProjectsDirty",
+  "clearDirty: workspaceDirtyStateController.clear",
+  "markDirty: workspaceDirtyStateController.mark",
+  "clearDirtyMarkers: workspaceDirtyStateController.clearAll",
+  "markProjectsDirty: workspaceDirtyStateController.markProjects",
   "alertText: validationAlertText",
   "renderValidation: renderValidationReport",
   "renderWorkspaceStatus",
@@ -10068,7 +10238,7 @@ for (const boundary of [
   "listTmEntries,",
   'listTerms: () => getAll("terms")',
   "session: editorSessionStore",
-  "dirty: { ids: workspaceDirtyIds }",
+  "dirty: { ids: workspaceDirtyStateController.ids }",
   "renderValidation: renderValidationReport",
   "status: { set: applicationSaveStatusController.set }",
   "repairWorkspace: (...args) => workspaceHealthRepairController.repair(...args)"
@@ -10414,10 +10584,10 @@ for (const boundary of [
   "bulkPut,",
   "list: listActivityEvents",
   "markMissingLocalDirty: markLocalProjectsMissingFromWorkspaceDirty",
-  "clearDirty: clearWorkspaceDirty",
-  "markDirty: markWorkspaceDirty",
+  "clearDirty: workspaceDirtyStateController.clear",
+  "markDirty: workspaceDirtyStateController.mark",
   "hasDirty: () => Boolean(state.workspaceDirtyProjectIds.size)",
-  "dirtyIds: workspaceDirtyIds",
+  "dirtyIds: workspaceDirtyStateController.ids",
   "recoveryIds: workspaceRecoveryProjectIds",
   "renderValidation: renderValidationReport",
   "renderBackupReminder,",
@@ -10555,7 +10725,7 @@ for (const boundary of [
   "navigation: { selectDocument: applicationNavigation.selectDocument }",
   "log: logOptionalProjectActivity",
   "appendWarning: appendActivityWarning",
-  "workspace: { markDirty: markWorkspaceDirty }",
+  "workspace: { markDirty: workspaceDirtyStateController.mark }",
   "status: { set: applicationSaveStatusController.set, mode: exportStatusMode }",
   "refreshEditorContext: editorContextController.refresh",
   "lower: applicationTextSafetyService.stableLower",
@@ -11022,7 +11192,7 @@ for (const boundary of [
   "cancelRowUpdate: (index) => verticalFeatureState.segmentGrid.cancelRowUpdate(index)",
   "renderProgress,",
   "scheduleHistory: scheduleRevisionHistoryRender",
-  "workspace: { markDirty: markWorkspaceDirty }",
+  "workspace: { markDirty: workspaceDirtyStateController.mark }",
   "applyDraft: segmentDraftApplicationService.apply"
 ]) {
   assertIncludes(
@@ -13143,7 +13313,7 @@ for (const testName of [
 }
 const openAiRollbackDirtyAdapters =
   appJs.match(
-    /markRollbackDirty:\s*\(projectId\)\s*=>\s*\{\s*if\s*\(projectId\)\s*markWorkspaceDirty\(projectId\);\s*\}/g
+    /markRollbackDirty:\s*\(projectId\)\s*=>\s*\{\s*if\s*\(projectId\)\s*workspaceDirtyStateController\.mark\(projectId\);\s*\}/g
   ) || [];
 assert(
   openAiRollbackDirtyAdapters.length === 2,
@@ -13151,7 +13321,7 @@ assert(
 );
 assert(
   !appJs.includes("markRollbackDirty: markWorkspaceDirty"),
-  "direct OpenAI rollback owners must not receive markWorkspaceDirty directly because its omitted ID defaults to the current project."
+  "direct OpenAI rollback owners must not receive an unguarded dirty-state action because its omitted ID defaults to the current project."
 );
 for (const source of [appJs, appWorkflowDriverJs]) {
   assert(
@@ -17456,7 +17626,7 @@ for (const boundary of [
   "hasImport: () => Boolean(state.importTask)",
   "size: () => autosaveService.size()",
   "flush: () => autosaveService.flush()",
-  "hasUnsaved: hasUnsavedWorkspacePackages",
+  "hasUnsaved: workspaceDirtyStateController.hasUnsaved",
   "workspacePackageSaveController.autosaveDirty()",
   "logger: { warn: (error) => console.warn(error) }",
   "applicationPersistence: applicationPersistenceLifecycleController"
@@ -17814,7 +17984,7 @@ for (const boundary of [
   "renderLocaleOptions: uiLocaleOrchestrationController.renderOptions",
   "wiring: applicationEventWiringController",
   "startAutosave: () => workspacePackageSaveController.startAutosave()",
-  "restoreDirty: () => restoreWorkspaceDirtyIds()",
+  "restoreDirty: () => workspaceDirtyStateController.restore()",
   "reconnect: workspaceStorage ? () => workspaceStorage.reconnectSavedWorkspace() : null",
   "state.workspaceStatus = workspaceStatus",
   "renderStatus: () => renderWorkspaceStatus()",

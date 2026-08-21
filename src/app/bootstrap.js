@@ -171,6 +171,7 @@ import { createProjectPackagePortabilityService } from "../features/import-expor
 import { createTextEncodingInputService } from "../features/import-export/text-encoding-input-service.js";
 import { createWorkspacePackageSaveController } from "../features/workspace/workspace-package-save-controller.js";
 import { createWorkspaceBackupExportController } from "../features/workspace/workspace-backup-export-controller.js";
+import { createWorkspaceDirtyStateController } from "../features/workspace/workspace-dirty-state-controller.js";
 import { createWorkspaceHealthRepairController } from "../features/workspace/workspace-health-repair-controller.js";
 import { createWorkspaceSyncController } from "../features/workspace/workspace-sync-controller.js";
 import {
@@ -302,6 +303,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createTextEncodingInputService,
       createWorkspacePackageSaveController,
       createWorkspaceBackupExportController,
+      createWorkspaceDirtyStateController,
       createWorkspaceHealthRepairController,
       createWorkspaceSyncController,
       createReportDataService,

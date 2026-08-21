@@ -1042,7 +1042,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.replaceFindInput.value = "Aninda";
     els.replaceWithInput.value = "AnÄ±nda";
     const targetBeforeReplaceCommand = editorSessionStore.getSegments()[segmentIndex].target;
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const replaceResult = await targetReplacementController.replace("visible");
     assert(editorSessionStore.getSegments()[segmentIndex].targetHistory?.some((entry) => entry.reason === "replace"), "replace records target revision history");
     assert(replaceResult.replacementCount === 1 && editorSessionStore.getSegments()[segmentIndex].target.startsWith("AnÄ±nda"), "visible target replace updates matching segment");
@@ -2454,7 +2454,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (Number.isInteger(originalAiTermsActiveIndex) && originalAiTermsActiveIndex >= 0) await segmentNavigationController.select(originalAiTermsActiveIndex);
       if (aiExtractedTermIds.length) {
         await deleteTerms(aiExtractedTermIds);
-        markProjectsUsingResourceDirty("termbase", "Workflow TB", editorSessionStore.getProject().sourceLang, editorSessionStore.getProject().targetLang);
+        workspaceDirtyStateController.markProjectsUsingResource("termbase", "Workflow TB", editorSessionStore.getProject().sourceLang, editorSessionStore.getProject().targetLang);
         await refreshProjectTerms({ rerender: true });
         await termSuggestionsController.refresh();
       }
@@ -2661,7 +2661,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const successfulQaRun = await projectQaController.run();
     assert(Array.isArray(successfulQaRun) && els.saveStatus.textContent.startsWith("QA found"), "QA run reports visible result status");
 
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     await segmentNavigationController.select(segmentIndex);
     const originalWindowConfirm = window.confirm;
     const originalFetch = window.fetch;
@@ -3011,7 +3011,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       appRuntime.commands.editTargetSessions.has(editorSessionStore.getSegments()[segmentIndex].id),
       "non-typing target producer starts with a pending EditTarget session"
     );
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const copySourceCommand = await targetProducerController.copySourceToTarget();
     const copiedSourcePatch = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]);
     assert(
@@ -3052,7 +3052,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "copy-source Redo restores target history and persistence with a monotonic revision"
     );
 
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     await segmentNavigationController.select(segmentIndex);
     const beforeTmInsert = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]);
     const tmInsertedTarget = `TM inserted target ${Date.now()}`;
@@ -3994,7 +3994,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     };
     HTMLAnchorElement.prototype.click = function noopReportDownloadClick() {};
     try {
-      clearWorkspaceDirtyMarkers();
+      workspaceDirtyStateController.clearAll();
       await logProjectActivity("ai-action", "Sensitive AI prompt trace must not appear in report", {
         provider: "OpenAI",
         configuredProvider: "OpenAI",
@@ -4575,7 +4575,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "TM resource row save failure reports visible status without changing stored entry"
     );
     Reflect.deleteProperty(editableTmEntry, RESOURCE_TM_SAVE_FAILURE_TEST_FLAG);
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const successfulResourceTmSave = await resourceMutationController.saveTmEntry(editableTmEntry, {
       source: resourceTmEntry.source,
       target: "Saved TM resource target"
@@ -4597,7 +4597,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "TM resource row delete failure reports visible status without deleting stored entry"
     );
     Reflect.deleteProperty(editableTmEntry, RESOURCE_TM_DELETE_FAILURE_TEST_FLAG);
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const successfulResourceTmDelete = await resourceMutationController.deleteTmEntry(editableTmEntry);
     const tmEntryTrash = (await appRuntime.trashRepository.list()).find(
       (entry) => entry.entityType === "tm-entry" && entry.entityId === resourceTmEntry.id
@@ -4649,7 +4649,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "term resource row save failure reports visible status without changing stored term"
     );
     Reflect.deleteProperty(editableTerm, RESOURCE_TERM_SAVE_FAILURE_TEST_FLAG);
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const successfulResourceTermSave = await resourceMutationController.saveTerm(editableTerm, {
       sourceTerm: resourceTerm.sourceTerm,
       targetTerm: "saved-resource-term-target",
@@ -4674,7 +4674,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "term resource row delete failure reports visible status without deleting stored term"
     );
     Reflect.deleteProperty(editableTerm, RESOURCE_TERM_DELETE_FAILURE_TEST_FLAG);
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const successfulResourceTermDelete = await resourceMutationController.deleteTerm(editableTerm);
     const termEntryTrash = (await appRuntime.trashRepository.list()).find(
       (entry) => entry.entityType === "term" && entry.entityId === resourceTerm.id
@@ -5012,7 +5012,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     Reflect.deleteProperty(els.projectForm, CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG);
     await deleteProject(createActivityProject.id);
-    clearWorkspaceDirty(createActivityProject.id);
+    workspaceDirtyStateController.clear(createActivityProject.id);
     await loadProjects(false);
     await openProject(project.id);
 
@@ -5129,7 +5129,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(!deletedFileSegments.length && !autosaveService.pendingRecords(deleteFileFixture.id).length, "file delete clears pending saves without orphan segments");
     await appRuntime.trashRepository.emptyAll();
     await deleteProject(deleteFileFixture.id);
-    clearWorkspaceDirty(deleteFileFixture.id);
+    workspaceDirtyStateController.clear(deleteFileFixture.id);
     editorSessionStore.replaceProject(null);
     editorSessionStore.replaceSegments([]);
     applicationNavigation.openProjects();
@@ -5137,8 +5137,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await loadProjects(false);
 
     state.workspaceStatus = { supported: true, connected: false, mode: "browser-cache", name: "", lastSyncedAt: "", projectCount: 0, resourceCount: 0, backupCount: 0 };
-    clearWorkspaceDirtyMarkers();
-    markWorkspaceDirty(project.id);
+    workspaceDirtyStateController.clearAll();
+    workspaceDirtyStateController.mark(project.id);
     renderWorkspaceStatus();
     const disconnectedBeforeUnloadEvent = new Event("beforeunload", { cancelable: true });
     const disconnectedBeforeUnloadResult = window.dispatchEvent(disconnectedBeforeUnloadEvent);
@@ -5148,7 +5148,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const originalConnectListWorkspacePackages = workspaceStorage.listProjectPackages;
     try {
       state.workspaceStatus = { supported: true, connected: false, mode: "browser-cache", name: "", lastSyncedAt: "", projectCount: 0, resourceCount: 0, backupCount: 0 };
-      clearWorkspaceDirtyMarkers();
+      workspaceDirtyStateController.clearAll();
       workspaceStorage.chooseWorkspaceFolder = async () => ({ supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 1, resourceCount: 0, backupCount: 0 });
       workspaceStorage.listProjectPackages = async () => [{ id: "other-project", name: "Other Project", packagePath: "projects/other/project.loopcat.json" }];
       await workspacePackageSaveController.chooseFolder();
@@ -5159,7 +5159,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           els.saveStatus.textContent.includes("to be saved"),
         "workspace folder connection marks local projects missing from the folder dirty"
       );
-      clearWorkspaceDirtyMarkers();
+      workspaceDirtyStateController.clearAll();
       workspaceStorage.listProjectPackages = async () => [{ id: project.id, name: project.name, packagePath: `projects/${project.id}/project.loopcat.json` }];
       await workspacePackageSaveController.chooseFolder();
       assert(
@@ -5169,19 +5169,19 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } finally {
       workspaceStorage.chooseWorkspaceFolder = originalConnectChooseWorkspaceFolder;
       workspaceStorage.listProjectPackages = originalConnectListWorkspacePackages;
-      clearWorkspaceDirtyMarkers();
+      workspaceDirtyStateController.clearAll();
     }
 
     state.workspaceStatus = { supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 0, resourceCount: 0, backupCount: 0 };
-    clearWorkspaceDirtyMarkers();
-    markWorkspaceDirty(project.id);
-    assert(readStoredWorkspaceDirtyIds().includes(project.id), "workspace dirty package marker persists for reload recovery");
-    clearWorkspaceDirtyMemoryOnly();
-    restoreWorkspaceDirtyIds();
+    workspaceDirtyStateController.clearAll();
+    workspaceDirtyStateController.mark(project.id);
+    assert(workspaceDirtyStateController.readStored().includes(project.id), "workspace dirty package marker persists for reload recovery");
+    workspaceDirtyStateController.clearMemory();
+    workspaceDirtyStateController.restore();
     assert(state.workspaceDirtyProjectIds.has(project.id), "workspace dirty package marker restores after reload");
-    localStorage.setItem(WORKSPACE_DIRTY_STORAGE, JSON.stringify([project.id, "missing-project"]));
-    restoreWorkspaceDirtyIds();
-    pruneWorkspaceDirtyProjectIds();
+    localStorage.setItem("loopcat.workspace.dirtyProjectIds", JSON.stringify([project.id, "missing-project"]));
+    workspaceDirtyStateController.restore();
+    workspaceDirtyStateController.prune();
     assert(state.workspaceDirtyProjectIds.has(project.id) && !state.workspaceDirtyProjectIds.has("missing-project"), "workspace dirty recovery prunes missing projects");
     const beforeUnloadEvent = new Event("beforeunload", { cancelable: true });
     const beforeUnloadResult = window.dispatchEvent(beforeUnloadEvent);
@@ -5233,18 +5233,18 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       els.workspaceRecoverySaveBtn.click();
       await waitFor(() => !state.workspaceDirtyProjectIds.has(project.id), "workspace recovery panel save");
       assert(els.workspaceRecoveryPanel.classList.contains("hidden"), "workspace recovery panel hides after saved packages are written");
-      markWorkspaceDirty(project.id);
+      workspaceDirtyStateController.mark(project.id);
       await workspacePackageSaveController.autosaveDirty();
     } finally {
       workspaceStorage.saveProjectPackage = originalSaveProjectPackage;
       workspaceStorage.getStatus = originalGetWorkspaceStatus;
     }
     assert(savedWorkspacePackages.some((pkg) => pkg.project.id === project.id && pkg.segments.some((segment) => segment.target === switchText)) && !state.workspaceDirtyProjectIds.has(project.id), "background workspace autosave saves dirty inactive project packages");
-    assert(!readStoredWorkspaceDirtyIds().includes(project.id), "workspace autosave clears persisted dirty marker");
+    assert(!workspaceDirtyStateController.readStored().includes(project.id), "workspace autosave clears persisted dirty marker");
 
     await openProject(project.id);
     state.workspaceStatus = { supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 0, resourceCount: 0, backupCount: 0 };
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const pendingWorkspaceAutosavePackages = [];
     const originalPendingWorkspaceAutosaveSave = workspaceStorage.saveProjectPackage;
     const originalPendingWorkspaceAutosaveStatus = workspaceStorage.getStatus;
@@ -5279,7 +5279,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } finally {
       workspaceStorage.saveProjectPackage = originalPendingWorkspaceAutosaveSave;
       workspaceStorage.getStatus = originalPendingWorkspaceAutosaveStatus;
-      clearWorkspaceDirtyMarkers();
+      workspaceDirtyStateController.clearAll();
     }
 
     const cleanBeforeUnloadEvent = new Event("beforeunload", { cancelable: true });
@@ -5287,7 +5287,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(cleanBeforeUnloadResult && !cleanBeforeUnloadEvent.defaultPrevented, "clean workspace does not warn before closing");
 
     await openProject(project.id);
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const workspaceSaveActivityPackages = [];
     const originalWorkspaceSaveActivitySave = workspaceStorage.saveProjectPackage;
     const originalWorkspaceSaveActivityStatus = workspaceStorage.getStatus;
@@ -5309,11 +5309,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       Reflect.deleteProperty(state, WORKSPACE_SAVE_ACTIVITY_FAILURE_TEST_FLAG);
       workspaceStorage.saveProjectPackage = originalWorkspaceSaveActivitySave;
       workspaceStorage.getStatus = originalWorkspaceSaveActivityStatus;
-      clearWorkspaceDirtyMarkers();
+      workspaceDirtyStateController.clearAll();
     }
 
     await openProject(project.id);
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const workspaceWriteFailureActivityCount = (await listActivityEvents(project.id))
       .filter((event) => event.type === "workspace-save" && event.summary === "Project package saved to workspace folder").length;
     const originalWorkspaceWriteFailureSave = workspaceStorage.saveProjectPackage;
@@ -5336,7 +5336,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
     } finally {
       workspaceStorage.saveProjectPackage = originalWorkspaceWriteFailureSave;
-      clearWorkspaceDirtyMarkers();
+      workspaceDirtyStateController.clearAll();
     }
     await logProjectActivity("qa-run", "Activity dirty regression", { source: "workflow-test" });
     assert(state.workspaceDirtyProjectIds.has(project.id), "activity events mark linked project package dirty");
@@ -5350,8 +5350,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     });
     await bulkPut("projects", [{ ...invalidWorkspaceProject, qaSettings: null }]);
     await loadProjects(false);
-    clearWorkspaceDirtyMarkers();
-    markWorkspaceDirty(invalidWorkspaceProject.id);
+    workspaceDirtyStateController.clearAll();
+    workspaceDirtyStateController.mark(invalidWorkspaceProject.id);
     const invalidPackageSaves = [];
     const originalInvalidSaveProjectPackage = workspaceStorage.saveProjectPackage;
     const originalInvalidGetWorkspaceStatus = workspaceStorage.getStatus;
@@ -5369,7 +5369,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       }
       assert(invalidWorkspaceSaveRejected, "workspace package save rejects invalid generated packages");
       assert(!invalidPackageSaves.length && state.workspaceDirtyProjectIds.has(invalidWorkspaceProject.id), "invalid workspace package is not written or marked clean");
-      markWorkspaceDirty(project.id);
+      workspaceDirtyStateController.mark(project.id);
       const expectedAutosaveWarnings = [];
       const originalConsoleWarn = console.warn;
       console.warn = (...args) => {
@@ -5397,7 +5397,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       workspaceStorage.saveProjectPackage = originalInvalidSaveProjectPackage;
       workspaceStorage.getStatus = originalInvalidGetWorkspaceStatus;
       await deleteProject(invalidWorkspaceProject.id);
-      clearWorkspaceDirty(invalidWorkspaceProject.id);
+      workspaceDirtyStateController.clear(invalidWorkspaceProject.id);
       await loadProjects(false);
     }
 
@@ -5441,16 +5441,16 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } finally {
       workspaceStorage.exportFullBackup = originalInvalidWorkspaceBackupExport;
       await deleteProject(invalidWorkspaceBackupProject.id);
-      clearWorkspaceDirty(invalidWorkspaceBackupProject.id);
+      workspaceDirtyStateController.clear(invalidWorkspaceBackupProject.id);
       await loadProjects(false);
     }
 
     const restoreDirtyBackup = await exportAllData();
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const restoreDirtyResult = await projectImportRestoreController.restoreBackupData(restoreDirtyBackup);
     assert(restoreDirtyResult && restoreDirtyBackup.projects.every((item) => state.workspaceDirtyProjectIds.has(item.id)) && state.lastValidationReport?.risky?.some((item) => item.includes("must be saved to the workspace folder")), "manual backup restore marks connected workspace packages dirty");
 
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     els.tmResourceNameInput.value = "Workflow TM";
     els.tmResourceSourceLangInput.value = languageInputService.optionValue("en");
     els.tmResourceTargetLangInput.value = languageInputService.optionValue("tr");
@@ -5468,7 +5468,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         els.tmResourceTargetLangInput.value === languageInputService.optionValue("tr"),
       "linked TM resource import normalizes friendly language labels before memory lookup"
     );
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const linkedTmRow = Array.from(els.tmResourceDetail.querySelectorAll("[data-resource-row]")).find(
       (row) => row.dataset.resourceId === linkedTmEntry.id
     );
@@ -5478,7 +5478,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await waitFor(() => state.workspaceDirtyProjectIds.has(project.id), "linked TM row save dirty marker");
     assert(state.workspaceDirtyProjectIds.has(project.id), "TM resource row save marks linked project package dirty");
 
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     els.tbResourceNameInput.value = "Workflow TB";
     els.tbResourceSourceLangInput.value = languageInputService.optionValue("en");
     els.tbResourceTargetLangInput.value = languageInputService.optionValue("tr");
@@ -5501,7 +5501,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 </tbx>`;
     await resourceLibraryImportController.importTbx(new File([linkedResourceTbx], "linked-resource.tbx", { type: "application/xml" }));
     assert(state.workspaceDirtyProjectIds.has(project.id), "TBX resource import marks linked project package dirty");
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const linkedResourceCsv = [
       "source,target,notes,forbidden",
       "linked csv term,bagli csv terimi,CSV resource import,no",
@@ -5526,7 +5526,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(linkedSensitiveTerm?.notes === "[redacted secret]", "TBX resource import redacts credential-looking termbase notes");
     const linkedCsvTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] });
     assert(linkedCsvTerms.some((term) => term.sourceTerm === "linked csv term") && linkedCsvTerms.some((term) => term.sourceTerm === "linked forbidden csv term" && term.isForbidden), "CSV term resource import creates editable approved and forbidden terms");
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const linkedTermRow = Array.from(els.tbResourceDetail.querySelectorAll("[data-resource-row]")).find(
       (row) => row.dataset.resourceId === linkedTerm.id
     );
@@ -5560,7 +5560,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.sourceTermInput.value = "Hello";
     els.targetTermInput.value = "Merhaba";
     els.termNotesInput.value = "Suggestion dirty regression";
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const savedTermFromForm = await termFormController.save();
     assert(savedTermFromForm && state.workspaceDirtyProjectIds.has(project.id), "term form save marks linked project package dirty");
     await waitFor(() => Array.from(els.termSuggestions.querySelectorAll(".term-card")).some((card) => card.textContent.includes("Hello")), "term suggestion card");
@@ -5574,14 +5574,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         (await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] })).some((term) => term.id === helloTermForDeleteFailure.id),
       "term suggestion delete failure reports visible status without deleting stored term"
     );
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const suggestionCard = Array.from(els.termSuggestions.querySelectorAll(".term-card")).find((card) => card.textContent.includes("Hello"));
     const suggestionDeleteButton = suggestionCard?.querySelector("button");
     assert(Boolean(suggestionDeleteButton), "term suggestion delete button renders");
     suggestionDeleteButton.click();
     await waitFor(() => state.workspaceDirtyProjectIds.has(project.id), "term suggestion delete dirty marker");
     assert(state.workspaceDirtyProjectIds.has(project.id), "term suggestion delete marks linked project package dirty");
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
 
     let malformedBackupRejected = false;
     try {
@@ -5731,7 +5731,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       workspaceStorage.readProjectPackage = originalWarningSyncReadWorkspacePackage;
       state.workspaceStatus = originalWarningSyncWorkspaceStatus;
       await deleteProject(workspaceWarningPackage.project.id);
-      clearWorkspaceDirty(workspaceWarningPackage.project.id);
+      workspaceDirtyStateController.clear(workspaceWarningPackage.project.id);
       await loadProjects(false);
     }
 
@@ -5745,8 +5745,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       return { app: "LoopCAT", type: "project-package", version: 1 };
     };
     state.workspaceStatus = { supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 1, resourceCount: 0, backupCount: 0 };
-    clearWorkspaceDirtyMarkers();
-    markWorkspaceDirty(project.id);
+    workspaceDirtyStateController.clearAll();
+    workspaceDirtyStateController.mark(project.id);
     try {
       await workspaceSyncController.sync();
       assert(
@@ -6113,7 +6113,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     taggedTextarea?.focus();
     taggedTextarea?.setSelectionRange(0, 0);
     const beforeProtectedTagInsert = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[taggedIndex]);
-    clearWorkspaceDirtyMarkers();
+    workspaceDirtyStateController.clearAll();
     const protectedTagCommand = await targetProducerController.insertProtectedTag("<strong>");
     await autosaveService.flush(project.id);
     const protectedTagApplied = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[taggedIndex]);
@@ -6413,7 +6413,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (untranslatedForDelivery.length) await saveSegments(editorSessionStore.getSegments());
       applicationNavigation.selectDocument({ documentId: "" });
       renderDocumentFilter();
-      clearWorkspaceDirtyMarkers();
+      workspaceDirtyStateController.clearAll();
       await deliveryExportController.exportXliff12();
       const activityAfterDeliveryExport = await listActivityEvents(project.id);
       assert(
