@@ -246,6 +246,7 @@ const requiredReleaseFiles = [
   "src/features/ai/opus-cat-help-controller.js",
   "src/features/projects/project-dialog-controller.js",
   "src/features/projects/project-dialog-save-controller.js",
+  "src/features/projects/project-analysis-controller.js",
   "src/features/projects/project-domain-controller.js",
   "src/features/projects/project-filter-controls-controller.js",
   "src/features/projects/project-home-controller.js",
@@ -371,6 +372,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-qa-controller.test.cjs",
   "tests/unit/project-domain-controller.test.cjs",
   "tests/unit/project-dialog-save-controller.test.cjs",
+  "tests/unit/project-analysis-controller.test.cjs",
   "tests/unit/project-filter-controls-controller.test.cjs",
   "tests/unit/project-home-controller.test.cjs",
   "tests/unit/project-document-import-controller.test.cjs",
@@ -642,6 +644,8 @@ const projectDialogSaveControllerJs = readText("src/features/projects/project-di
 const projectDialogSaveControllerUnitTests = readText("tests/unit/project-dialog-save-controller.test.cjs");
 const projectActivityControllerJs = readText("src/features/projects/project-activity-controller.js");
 const projectActivityControllerUnitTests = readText("tests/unit/project-activity-controller.test.cjs");
+const projectAnalysisControllerJs = readText("src/features/projects/project-analysis-controller.js");
+const projectAnalysisControllerUnitTests = readText("tests/unit/project-analysis-controller.test.cjs");
 const projectFilterControlsControllerJs = readText("src/features/projects/project-filter-controls-controller.js");
 const projectFilterControlsControllerUnitTests = readText("tests/unit/project-filter-controls-controller.test.cjs");
 const projectHomeControllerJs = readText("src/features/projects/project-home-controller.js");
@@ -1821,7 +1825,6 @@ for (const boundary of [
   "formatDateTime: applicationDateTimeService.dateTime",
   "date: { format: applicationDateTimeService.date }",
   "formatDate: applicationDateTimeService.date",
-  "applicationDateTimeService.date(analysis.generatedAt)",
   "applicationDateTimeService.date(project.updatedAt)"
 ]) {
   assertIncludes(appJs, boundary, `application date-time composition and consumers must retain ${boundary}.`);
@@ -4489,6 +4492,133 @@ for (const testName of [
     `focused project-activity tests must retain characterization: ${testName}`
   );
 }
+for (const snippet of [
+  "ProjectAnalysisController requires project session boundaries.",
+  "ProjectAnalysisController requires a navigation boundary.",
+  "ProjectAnalysisController requires TM and resource boundaries.",
+  "ProjectAnalysisController requires analysis and date boundaries.",
+  "ProjectAnalysisController requires localization boundaries.",
+  "ProjectAnalysisController requires presentation boundaries.",
+  "let analysisRun = 0;",
+  "const run = (analysisRun += 1);",
+  "const project = session.getProject();",
+  'if (!project || navigation.getView() !== "project" || !presentation.hasRoot()) return;',
+  "const segments = session.getSegments();",
+  'tm.listByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`)',
+  'if (run !== analysisRun || navigation.getView() !== "project" || session.getProject()?.id !== project.id) return;',
+  "const tmNames = new Set(resources.tmNames(project));",
+  "const result = analysis.build(",
+  "tmEntries.filter((entry) => tmNames.has(entry.tmName))",
+  "const ai = result.ai || {};",
+  'localization.label("generatedAt", {',
+  "date: date.format(result.generatedAt)",
+  "result.totals.confirmedPercent",
+  "result.totals.untranslated",
+  "result.totals.repetitions",
+  "result.leverage.exact",
+  "result.leverage.fuzzy95 + result.leverage.fuzzy85",
+  "result.totals.segments - result.totals.confirmed",
+  "result.totals.files",
+  "result.totals.words",
+  "ai.drafts || 0",
+  "ai.suggestionSegments || 0",
+  "ai.highRisk || 0",
+  "return Object.freeze({ render });"
+]) {
+  assertIncludes(
+    projectAnalysisControllerJs,
+    snippet,
+    `ProjectAnalysisController must retain characterized guard/query/staleness/filtering/analysis/presentation policy: ${snippet}`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectAnalysisController({",
+  "getProject: editorSessionStore.getProject",
+  "getSegments: editorSessionStore.getSegments",
+  "getView: () => applicationStore.getState().navigation.view",
+  "tm: { listByIndex: getAllByIndex }",
+  "resources: { tmNames: projectResourceContextService.tmNames }",
+  "analysis: { build: analyzeProject }",
+  "date: { format: applicationDateTimeService.date }",
+  "localization: uiLocalizationService",
+  "hasRoot: () => Boolean(els.projectAnalysis)",
+  "els.analysisMeta.textContent = text;",
+  "replace: (html) => replaceSafeHtml(els.projectAnalysis, html)",
+  "renderProjectAnalysis: projectAnalysisController.render"
+]) {
+  assertIncludes(appJs, boundary, `project-analysis composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/\bprojectAnalysisController\.render\b/g) || []).length === 2,
+  "ApplicationViewController and aggregate rendering must call ProjectAnalysisController.render directly."
+);
+assert(
+  (appWorkflowDriverJs.match(/\bprojectAnalysisController\.render\b/g) || []).length === 0,
+  "workflow characterization must not require a project-analysis compatibility facade."
+);
+assert(
+  !/async\s+function\s+renderProjectAnalysis\b/.test(appJs) &&
+    !/async\s+function\s+renderProjectAnalysis\b/.test(appWorkflowDriverJs) &&
+    !appJs.includes("projectAnalysisRun"),
+  "renderProjectAnalysis and coordinator-owned projectAnalysisRun must not return after project-analysis extraction."
+);
+assert(
+  !appJs.includes("tmEntries.filter((entry) => tmNames.has(entry.tmName))") &&
+    !appJs.includes("result.leverage.fuzzy95 + result.leverage.fuzzy85") &&
+    !appJs.includes("ai.highRisk || 0"),
+  "project-analysis filtering and metric-composition policy must not return to app.js."
+);
+assert(
+  appJs.indexOf("const projectAnalysisController =") < appJs.indexOf("const applicationViewController =") &&
+    appJs.indexOf("const projectAnalysisController =") < appJs.indexOf("function renderAll()"),
+  "ProjectAnalysisController must precede ApplicationViewController and aggregate rendering consumers."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "applicationStore",
+  "getAllByIndex",
+  "projectResourceContextService",
+  "analyzeProject",
+  "applicationDateTimeService",
+  "uiLocalizationService",
+  "replaceSafeHtml",
+  "state.",
+  "els."
+]) {
+  assert(
+    !projectAnalysisControllerJs.includes(forbiddenOwner),
+    `ProjectAnalysisController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectAnalysisController preserves no-project, view, and root guard order",
+  "ProjectAnalysisController captures segments and performs the exact language-pair TM query",
+  "ProjectAnalysisController invalidates a pending render before every early guard",
+  "ProjectAnalysisController suppresses post-query view and strict project identity drift",
+  "ProjectAnalysisController preserves linked-TM filtering and captured input identities",
+  "ProjectAnalysisController composes the exact localized analysis metrics",
+  "ProjectAnalysisController preserves absent and falsy AI metric fallbacks",
+  "ProjectAnalysisController preserves query rejection and pre-analysis failure timing",
+  "ProjectAnalysisController preserves post-query analysis and presentation failure timing",
+  "ProjectAnalysisController validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectAnalysisControllerUnitTests,
+    testName,
+    `focused project-analysis tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/project-analysis-controller.js"',
+  "source-catalog extraction must scan the checked project-analysis controller."
+);
+assertIncludes(
+  i18nValidateScript,
+  '"project-analysis-controller.js"',
+  "source-catalog validation must check explicit keys in the checked project-analysis controller."
+);
 assertIncludes(
   i18nExtractScript,
   '"src/features/resources/resource-catalog-service.js"',
@@ -8213,7 +8343,7 @@ for (const boundary of [
   "getProject: () => editorSessionStore.getProject()",
   "renderPanels: () => panelToggleController.renderAll()",
   "renderFocusMode: () => focusModeController.render()",
-  "renderProjectAnalysis: () => renderProjectAnalysis()",
+  "renderProjectAnalysis: projectAnalysisController.render",
   "qualityReviewController?.renderReview?.({ segment: applicationActiveSegmentService.get(), force: false })",
   "refreshEditorContext: () => editorContextController.refresh()",
   "write: applicationDownloadController.download",
@@ -9392,6 +9522,16 @@ assertIncludes(
   appBootstrapJs,
   "createProjectActivityController,",
   "The application runtime must expose the checked project-activity controller factory."
+);
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectAnalysisController } from "../features/projects/project-analysis-controller.js";',
+  "The application runtime must install the checked project-analysis controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectAnalysisController,",
+  "The application runtime must expose the checked project-analysis controller factory."
 );
 assertIncludes(
   appBootstrapJs,
@@ -17029,8 +17169,8 @@ assertIncludes(
   "app workflow test must verify project reports expose AI triage counts without segment text."
 );
 assertIncludes(
-  appJs,
-  'uiLocalizationService.labelHtml("highAiRisk")',
+  projectAnalysisControllerJs,
+  'localization.labelHtml("highAiRisk")',
   "Project analysis must surface high-risk AI review counts."
 );
 assertIncludes(
@@ -18001,16 +18141,20 @@ assertIncludes(
   "root.replaceChildren(fragment)",
   "TermSuggestionsController cards must render in one DOM replacement."
 );
-assertIncludes(appJs, "projectAnalysisRun", "app.js must guard async project analysis renders against stale updates.");
 assertIncludes(
-  appJs,
-  'applicationStore.getState().navigation.view !== "project"',
-  "app.js must skip project analysis work when AppStore reports that the project home panel is not visible."
+  projectAnalysisControllerJs,
+  "let analysisRun = 0;",
+  "ProjectAnalysisController must guard async project analysis renders against stale updates."
 );
 assertIncludes(
-  appJs,
-  "run !== state.projectAnalysisRun",
-  "app.js must ignore stale project analysis results after navigation."
+  projectAnalysisControllerJs,
+  'navigation.getView() !== "project"',
+  "ProjectAnalysisController must skip project analysis work when AppStore reports that the project home panel is not visible."
+);
+assertIncludes(
+  projectAnalysisControllerJs,
+  "run !== analysisRun",
+  "ProjectAnalysisController must ignore stale project analysis results after navigation."
 );
 assertIncludes(
   browserRunnerScript,

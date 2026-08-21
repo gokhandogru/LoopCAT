@@ -57,6 +57,7 @@ import { createProjectsController } from "../features/projects/projects-controll
 import { createProjectDialogController } from "../features/projects/project-dialog-controller.js";
 import { createProjectDialogSaveController } from "../features/projects/project-dialog-save-controller.js";
 import { createProjectActivityController } from "../features/projects/project-activity-controller.js";
+import { createProjectAnalysisController } from "../features/projects/project-analysis-controller.js";
 import { createProjectDomainController } from "../features/projects/project-domain-controller.js";
 import { createProjectFilterControlsController } from "../features/projects/project-filter-controls-controller.js";
 import { createProjectHomeController } from "../features/projects/project-home-controller.js";
@@ -333,6 +334,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createProjectDialogController,
       createProjectDialogSaveController,
       createProjectActivityController,
+      createProjectAnalysisController,
       createProjectDomainController,
       createProjectFilterControlsController,
       createProjectHomeController,

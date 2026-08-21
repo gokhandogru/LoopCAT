@@ -779,7 +779,6 @@ const editorFilterStore = appRuntime.featureFactories.createFilterStore();
 
 const state = {
   inspectorOpen: true,
-  projectAnalysisRun: 0,
   importTask: "",
   revisionHistoryFrame: 0,
   workspaceAutosaveTimer: 0,
@@ -1285,6 +1284,25 @@ const applicationDownloadController = appRuntime.featureFactories.createApplicat
     append: (link) => document.body.append(link)
   },
   scheduler: { timer: (callback, delay) => setTimeout(callback, delay) }
+});
+const projectAnalysisController = appRuntime.featureFactories.createProjectAnalysisController({
+  session: {
+    getProject: editorSessionStore.getProject,
+    getSegments: editorSessionStore.getSegments
+  },
+  navigation: { getView: () => applicationStore.getState().navigation.view },
+  tm: { listByIndex: getAllByIndex },
+  resources: { tmNames: projectResourceContextService.tmNames },
+  analysis: { build: analyzeProject },
+  date: { format: applicationDateTimeService.date },
+  localization: uiLocalizationService,
+  presentation: {
+    hasRoot: () => Boolean(els.projectAnalysis),
+    setMeta: (text) => {
+      els.analysisMeta.textContent = text;
+    },
+    replace: (html) => replaceSafeHtml(els.projectAnalysis, html)
+  }
 });
 
 const revisionHistoryPresentationService =
@@ -3947,7 +3965,7 @@ const uiLocaleOrchestrationController =
       renderProjectsView: () => renderProjectsView(),
       renderResourcesView: () => renderResourcesView(),
       renderProjectHome: () => renderProjectHome(),
-      renderProjectAnalysis: () => renderProjectAnalysis(),
+      renderProjectAnalysis: projectAnalysisController.render,
       renderEditor: () => renderEditor(),
       renderProgress: () => renderProgress(),
       renderReview: () =>
@@ -5365,32 +5383,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
   }
 });
 
-async function renderProjectAnalysis() {
-  const run = (state.projectAnalysisRun += 1);
-  const project = editorSessionStore.getProject();
-  if (!project || applicationStore.getState().navigation.view !== "project" || !els.projectAnalysis) return;
-  const segments = editorSessionStore.getSegments();
-  const tmEntries = await getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`);
-  if (run !== state.projectAnalysisRun || applicationStore.getState().navigation.view !== "project" || editorSessionStore.getProject()?.id !== project.id) return;
-  const tmNames = new Set(projectResourceContextService.tmNames(project));
-  const analysis = analyzeProject(project, segments, tmEntries.filter((entry) => tmNames.has(entry.tmName)));
-  const ai = analysis.ai || {};
-  els.analysisMeta.textContent = uiLocalizationService.label("generatedAt", { date: applicationDateTimeService.date(analysis.generatedAt) });
-  replaceSafeHtml(els.projectAnalysis, `
-    <div><strong>${analysis.totals.confirmedPercent}%</strong><span>${uiLocalizationService.labelHtml("confirmed")}</span></div>
-    <div><strong>${analysis.totals.untranslated}</strong><span>${uiLocalizationService.sourceHtml("empty targets")}</span></div>
-    <div><strong>${analysis.totals.repetitions}</strong><span>${uiLocalizationService.labelHtml("repetitions")}</span></div>
-    <div><strong>${analysis.leverage.exact}</strong><span>${uiLocalizationService.labelHtml("exactTm")}</span></div>
-    <div><strong>${analysis.leverage.fuzzy95 + analysis.leverage.fuzzy85}</strong><span>${uiLocalizationService.labelHtml("strongFuzzy")}</span></div>
-    <div><strong>${analysis.totals.segments - analysis.totals.confirmed}</strong><span>${uiLocalizationService.labelHtml("openSegments")}</span></div>
-    <div><strong>${analysis.totals.files}</strong><span>${uiLocalizationService.labelHtml("files")}</span></div>
-    <div><strong>${analysis.totals.words}</strong><span>${uiLocalizationService.labelHtml("sourceWords")}</span></div>
-    <div><strong>${ai.drafts || 0}</strong><span>${uiLocalizationService.sourceHtml("AI initiated")}</span></div>
-    <div><strong>${ai.suggestionSegments || 0}</strong><span>${uiLocalizationService.labelHtml("aiSuggestionRows")}</span></div>
-    <div><strong>${ai.highRisk || 0}</strong><span>${uiLocalizationService.labelHtml("highAiRisk")}</span></div>
-  `);
-}
-
 function renderProjectList() {
   if (!editorSessionStore.getProjects().length) {
     replaceSafeHtml(els.projectList, `<div class="muted">${uiLocalizationService.sourceHtml("No projects yet.")}</div>`);
@@ -5415,7 +5407,7 @@ function renderAll() {
   renderProjectList();
   renderEditor();
   renderProjectHome();
-  renderProjectAnalysis();
+  projectAnalysisController.render();
   renderDocumentFilter();
   renderSegments();
   renderProgress();
