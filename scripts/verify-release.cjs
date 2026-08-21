@@ -193,6 +193,7 @@ const requiredReleaseFiles = [
   "src/features/editor/target-producer-controller.js",
   "src/features/editor/protected-tag-inspection-service.js",
   "src/features/editor/protected-text-replacement-service.js",
+  "src/features/editor/segment-label-service.js",
   "src/features/editor/segment-provenance-service.js",
   "src/features/editor/segment-filter-service.js",
   "src/features/editor/segment-progress-service.js",
@@ -345,6 +346,7 @@ const requiredReleaseFiles = [
   "tests/unit/target-producer-controller.test.cjs",
   "tests/unit/protected-tag-inspection-service.test.cjs",
   "tests/unit/protected-text-replacement-service.test.cjs",
+  "tests/unit/segment-label-service.test.cjs",
   "tests/unit/segment-provenance-service.test.cjs",
   "tests/unit/segment-filter-service.test.cjs",
   "tests/unit/segment-progress-service.test.cjs",
@@ -570,6 +572,7 @@ const targetEditControllerJs = readText("src/features/editor/target-edit-control
 const targetProducerControllerJs = readText("src/features/editor/target-producer-controller.js");
 const protectedTagInspectionServiceJs = readText("src/features/editor/protected-tag-inspection-service.js");
 const protectedTextReplacementServiceJs = readText("src/features/editor/protected-text-replacement-service.js");
+const segmentLabelServiceJs = readText("src/features/editor/segment-label-service.js");
 const segmentProvenanceServiceJs = readText("src/features/editor/segment-provenance-service.js");
 const segmentFilterServiceJs = readText("src/features/editor/segment-filter-service.js");
 const segmentProgressServiceJs = readText("src/features/editor/segment-progress-service.js");
@@ -589,6 +592,7 @@ const targetEditControllerUnitTests = readText("tests/unit/target-edit-controlle
 const targetProducerControllerUnitTests = readText("tests/unit/target-producer-controller.test.cjs");
 const protectedTagInspectionServiceUnitTests = readText("tests/unit/protected-tag-inspection-service.test.cjs");
 const protectedTextReplacementServiceUnitTests = readText("tests/unit/protected-text-replacement-service.test.cjs");
+const segmentLabelServiceUnitTests = readText("tests/unit/segment-label-service.test.cjs");
 const segmentProvenanceServiceUnitTests = readText("tests/unit/segment-provenance-service.test.cjs");
 const segmentFilterServiceUnitTests = readText("tests/unit/segment-filter-service.test.cjs");
 const segmentProgressServiceUnitTests = readText("tests/unit/segment-progress-service.test.cjs");
@@ -2090,7 +2094,7 @@ for (const boundary of [
   "list: els.revisionHistoryList",
   "getSegment: applicationActiveSegmentService.get",
   "localization: uiLocalizationService",
-  "statusLabel: segmentStatusLabel",
+  "statusLabel: segmentLabelService.status",
   "formatDateTime",
   "escapeHtml",
   "replaceSafeHtml"
@@ -7356,6 +7360,89 @@ assertIncludes(
   "createProtectedTextReplacementService,",
   "The application runtime must expose the checked protected-text replacement factory."
 );
+assertIncludes(
+  appBootstrapJs,
+  'import { createSegmentLabelService } from "../features/editor/segment-label-service.js";',
+  "The application runtime must install the checked segment-label service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentLabelService,",
+  "The application runtime must expose the checked segment-label service factory."
+);
+for (const snippet of [
+  "SegmentLabelService requires localization boundaries.",
+  "function review(value)",
+  '"needs-review": localization.source("Needs review")',
+  'reviewed: localization.source("Reviewed")',
+  'blocked: localization.source("Blocked")',
+  '}[value] || ""',
+  "function status(value)",
+  'empty: localization.label("empty")',
+  'draft: localization.label("draft")',
+  'confirmed: localization.label("confirmed")',
+  "}[value] || localization.source(value)",
+  "return Object.freeze({ review, status })"
+]) {
+  assertIncludes(
+    segmentLabelServiceJs,
+    snippet,
+    `SegmentLabelService must retain characterized eager localization and mapping policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createSegmentLabelService({",
+  "localization: uiLocalizationService",
+  "segmentLabelService.review(reviewState)",
+  "segmentLabelService.status(segment.status)",
+  "segmentLabelService.review(segment.reviewState)"
+]) {
+  assertIncludes(appJs, boundary, `segment-label composition and consumers must retain ${boundary}.`);
+}
+for (const [method, appCount, workflowCount] of [
+  ["review", 2, 0],
+  ["status", 2, 0]
+]) {
+  assert(
+    (appJs.match(new RegExp(`\\bsegmentLabelService\\.${method}\\b`, "g")) || []).length === appCount &&
+      (appWorkflowDriverJs.match(new RegExp(`\\bsegmentLabelService\\.${method}\\b`, "g")) || []).length ===
+        workflowCount,
+    `all application and workflow segment-label ${method} consumers must call SegmentLabelService directly.`
+  );
+}
+for (const removedOwner of ["selectedEditorText", "reviewLabel", "segmentStatusLabel"]) {
+  assert(
+    !new RegExp(`function\\s+${removedOwner}\\b`).test(appJs) &&
+      !new RegExp(`function\\s+${removedOwner}\\b`).test(appWorkflowDriverJs),
+    `${removedOwner} must not return to app.js or the workflow driver.`
+  );
+}
+for (const forbiddenOwner of [
+  "uiLocalizationService",
+  "applicationActiveSegmentService",
+  "appRuntime",
+  "window.",
+  "document."
+]) {
+  assert(
+    !segmentLabelServiceJs.includes(forbiddenOwner),
+    `SegmentLabelService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "SegmentLabelService preserves eager review localization order and exact mappings",
+  "SegmentLabelService preserves falsy review translations and inherited-key lookup",
+  "SegmentLabelService preserves eager status localization order and exact mappings",
+  "SegmentLabelService preserves status source fallback, falsy mappings, and inherited keys",
+  "SegmentLabelService preserves localization failure timing",
+  "SegmentLabelService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentLabelServiceUnitTests,
+    testName,
+    `focused segment-label tests must retain characterization: ${testName}.`
+  );
+}
 assertIncludes(
   appBootstrapJs,
   'import { createSegmentProvenanceService } from "../features/editor/segment-provenance-service.js";',
@@ -16510,8 +16597,8 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `application active-segment composition and consumers must retain ${boundary}.`);
 }
 assert(
-  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 43,
-  "all 43 application active-segment consumers must call ApplicationActiveSegmentService directly."
+  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 42,
+  "all 42 application active-segment consumers must call ApplicationActiveSegmentService directly."
 );
 assert(
   (appWorkflowDriverJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 9,

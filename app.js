@@ -789,6 +789,9 @@ const state = {
   }
 };
 const editorSessionStore = appRuntime.editorSession;
+const segmentLabelService = appRuntime.featureFactories.createSegmentLabelService({
+  localization: uiLocalizationService
+});
 const projectResourceContextService = appRuntime.featureFactories.createProjectResourceContextService({
   session: { getProject: editorSessionStore.getProject },
   names: { clean: projectNameService.clean, unique: projectNameService.unique },
@@ -1278,7 +1281,7 @@ const revisionHistoryPresentationService =
     list: els.revisionHistoryList,
     getSegment: applicationActiveSegmentService.get,
     localization: uiLocalizationService,
-    statusLabel: segmentStatusLabel,
+    statusLabel: segmentLabelService.status,
     formatDateTime,
     escapeHtml: applicationTextSafetyService.escapeHtml,
     replaceSafeHtml
@@ -5036,7 +5039,7 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   },
   workspace: { markDirty: markWorkspaceDirty },
   status: { set: applicationSaveStatusController.set },
-  describeState: (reviewState) => applicationTextSafetyService.stableLower(reviewLabel(reviewState)),
+  describeState: (reviewState) => applicationTextSafetyService.stableLower(segmentLabelService.review(reviewState)),
   testHooks: {
     beforeSave: (segment) => {
       if (LOOPCAT_TEST_BUILD && segment[REVIEW_STATE_SAVE_FAILURE_TEST_FLAG]) {
@@ -5047,34 +5050,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   logger: console
 });
 dialogLifecycleController?.mount?.();
-
-function selectedEditorText() {
-  const active = document.activeElement;
-  if (active?.tagName === "TEXTAREA" || active?.tagName === "INPUT") {
-    const value = active.value || "";
-    const selected = value.slice(active.selectionStart || 0, active.selectionEnd || 0).trim();
-    if (selected) return selected;
-  }
-  const pageSelection = window.getSelection()?.toString().trim();
-  if (pageSelection) return pageSelection;
-  return applicationActiveSegmentService.get()?.source || "";
-}
-
-function reviewLabel(value) {
-  return {
-    "needs-review": uiLocalizationService.source("Needs review"),
-    reviewed: uiLocalizationService.source("Reviewed"),
-    blocked: uiLocalizationService.source("Blocked")
-  }[value] || "";
-}
-
-function segmentStatusLabel(status) {
-  return {
-    empty: uiLocalizationService.label("empty"),
-    draft: uiLocalizationService.label("draft"),
-    confirmed: uiLocalizationService.label("confirmed")
-  }[status] || uiLocalizationService.source(status);
-}
 
 function commandList() {
   const commandProjectId = state.commandProjectId || editorSessionStore.getProject()?.id || null;
@@ -6217,7 +6192,7 @@ function renderStatusCell(row, segment) {
   const statusCell = row.querySelector(".status-col");
   const pill = row.querySelector(".status-pill");
   pill.className = `status-pill ${segment.status}`;
-  pill.textContent = segmentStatusLabel(segment.status);
+  pill.textContent = segmentLabelService.status(segment.status);
   statusCell.querySelectorAll(".tag-warning, .review-pill, .comment-marker, .tm-match-badge, .ai-segment-badge").forEach((item) => item.remove());
   if (segmentProvenanceService.hasTmPretranslation(segment)) {
     const item = segmentProvenanceService.tmBadge(segment);
@@ -6241,7 +6216,7 @@ function renderStatusCell(row, segment) {
   if (segment.reviewState) {
     const review = document.createElement("div");
     review.className = `review-pill ${segment.reviewState}`;
-    review.textContent = reviewLabel(segment.reviewState);
+    review.textContent = segmentLabelService.review(segment.reviewState);
     statusCell.append(review);
   }
   const commentCount = (segment.comments || []).length + ((segment.reviewNote || "").trim() ? 1 : 0);
