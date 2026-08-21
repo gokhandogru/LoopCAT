@@ -172,6 +172,7 @@ const requiredReleaseFiles = [
   "src/app/application-update-controls-controller.js",
   "src/app/application-view-controller.js",
   "src/app/global-keyboard-controller.js",
+  "src/app/localization-download-mime-type-service.js",
   "src/app/navigation-controller.js",
   "src/app/compatibility-module-registry.js",
   "src/app/install-runtime.js",
@@ -509,6 +510,10 @@ const applicationStartupControllerJs = readText("src/app/application-startup-con
 const applicationStartupControllerUnitTests = readText("tests/unit/application-startup-controller.test.cjs");
 const applicationTextSafetyServiceJs = readText("src/app/application-text-safety-service.js");
 const applicationTextSafetyServiceUnitTests = readText("tests/unit/application-text-safety-service.test.cjs");
+const localizationDownloadMimeTypeServiceJs = readText("src/app/localization-download-mime-type-service.js");
+const localizationDownloadMimeTypeServiceUnitTests = readText(
+  "tests/unit/localization-download-mime-type-service.test.cjs"
+);
 const applicationTrashControllerJs = readText("src/app/application-trash-controller.js");
 const applicationTrashControllerUnitTests = readText("tests/unit/application-trash-controller.test.cjs");
 const applicationUpdateControlsControllerJs = readText("src/app/application-update-controls-controller.js");
@@ -1973,7 +1978,7 @@ for (const boundary of [
   "buildLocalizationFile",
   "buildXliff12: buildXliff",
   "buildXliff22",
-  "localizationMimeType: localizationDownloadMimeType",
+  "localizationMimeType: localizationDownloadMimeTypeService.forExtension",
   "xliffMimeType",
   "logOptionalProject: logOptionalProjectActivity",
   "set: applicationSaveStatusController.set"
@@ -15895,6 +15900,76 @@ for (const testName of [
     applicationTextSafetyServiceUnitTests,
     testName,
     `focused application text-safety tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createLocalizationDownloadMimeTypeService } from "./localization-download-mime-type-service.js";',
+  "the application runtime must install the checked localization-download MIME-type service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createLocalizationDownloadMimeTypeService,",
+  "the application runtime must expose the checked localization-download MIME-type service factory."
+);
+for (const snippet of [
+  "LocalizationDownloadMimeTypeService requires checked normalization and XLIFF boundaries.",
+  "const { normalizeExtension, xliff } = dependencies || {};",
+  "const value = normalizeExtension(extension);",
+  'if (xliff.documentTypes.has(value)) return xliff.mimeType(structure?.version || "1.2");',
+  'return "text/html"',
+  'return "application/xhtml+xml"',
+  'return "text/markdown"',
+  'return "text/csv"',
+  'return "text/tab-separated-values"',
+  'return "application/xml"',
+  'return "application/vnd.adobe.indesign-idml-package"',
+  'return "application/vnd.openxmlformats-officedocument"',
+  'return "application/vnd.oasis.opendocument"',
+  'return "text/plain"',
+  "return Object.freeze({ forExtension });"
+]) {
+  assertIncludes(
+    localizationDownloadMimeTypeServiceJs,
+    snippet,
+    `LocalizationDownloadMimeTypeService must retain characterized format policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createLocalizationDownloadMimeTypeService({",
+  "normalizeExtension: applicationTextSafetyService.stableLower",
+  "xliff: { documentTypes: XLIFF_DOCUMENT_TYPES, mimeType: xliffMimeType }",
+  "localizationMimeType: localizationDownloadMimeTypeService.forExtension"
+]) {
+  assertIncludes(appJs, boundary, `localization-download MIME composition must retain ${boundary}.`);
+}
+assert(
+  (appJs.match(/\blocalizationDownloadMimeTypeService\.forExtension\b/g) || []).length === 1,
+  "DeliveryExportController must be the sole localization-download MIME-type service consumer."
+);
+assert(
+  !/function\s+localizationDownloadMimeType\b/.test(appJs) &&
+    !/function\s+localizationDownloadMimeType\b/.test(appWorkflowDriverJs),
+  "localizationDownloadMimeType must not return as a coordinator or workflow helper."
+);
+for (const forbiddenOwner of ["appRuntime", "applicationTextSafetyService", "XLIFF_DOCUMENT_TYPES", "xliffMimeType"]) {
+  assert(
+    !localizationDownloadMimeTypeServiceJs.includes(forbiddenOwner),
+    `LocalizationDownloadMimeTypeService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "LocalizationDownloadMimeTypeService normalizes every input and exposes an immutable API",
+  "LocalizationDownloadMimeTypeService preserves every non-XLIFF format mapping",
+  "LocalizationDownloadMimeTypeService preserves XLIFF versions and fallback arguments",
+  "LocalizationDownloadMimeTypeService retains live XLIFF type-set ownership",
+  "LocalizationDownloadMimeTypeService preserves normalization and resolver failure timing",
+  "LocalizationDownloadMimeTypeService validates every injected boundary"
+]) {
+  assertIncludes(
+    localizationDownloadMimeTypeServiceUnitTests,
+    testName,
+    `focused localization-download MIME tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(

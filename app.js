@@ -1817,6 +1817,11 @@ const reportExportController = appRuntime.featureFactories.createReportExportCon
     set: applicationSaveStatusController.set
   }
 });
+const localizationDownloadMimeTypeService =
+  appRuntime.featureFactories.createLocalizationDownloadMimeTypeService({
+    normalizeExtension: applicationTextSafetyService.stableLower,
+    xliff: { documentTypes: XLIFF_DOCUMENT_TYPES, mimeType: xliffMimeType }
+  });
 const deliveryExportController = appRuntime.featureFactories.createDeliveryExportController({
   session: {
     getProject: editorSessionStore.getProject,
@@ -1854,7 +1859,7 @@ const deliveryExportController = appRuntime.featureFactories.createDeliveryExpor
     buildLocalizationFile,
     buildXliff12: buildXliff,
     buildXliff22,
-    localizationMimeType: localizationDownloadMimeType,
+    localizationMimeType: localizationDownloadMimeTypeService.forExtension,
     xliffMimeType
   },
   fileSafeName: applicationTextSafetyService.fileSafeName,
@@ -4935,23 +4940,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   logger: console
 });
 dialogLifecycleController?.mount?.();
-
-function localizationDownloadMimeType(ext, structure = null) {
-  const value = applicationTextSafetyService.stableLower(ext);
-  if (XLIFF_DOCUMENT_TYPES.has(value)) return xliffMimeType(structure?.version || "1.2");
-  if (["html", "htm"].includes(value)) return "text/html";
-  if (value === "xhtml") return "application/xhtml+xml";
-  if (value === "md") return "text/markdown";
-  if (value === "csv") return "text/csv";
-  if (value === "tsv") return "text/tab-separated-values";
-  if (["xml", "dita", "txml", "ttx", "xini", "resx", "wix", "ts", "icml"].includes(value)) return "application/xml";
-  if (value === "idml") return "application/vnd.adobe.indesign-idml-package";
-  if (["docm", "dotx", "dotm", "xlsx", "xlsm", "xltx", "xltm", "pptx", "pptm", "ppsx", "ppsm", "potx", "potm"].includes(value)) {
-    return "application/vnd.openxmlformats-officedocument";
-  }
-  if (["odt", "ott", "ods", "ots", "odp", "otp"].includes(value)) return "application/vnd.oasis.opendocument";
-  return "text/plain";
-}
 
 function currentSegment() {
   return editorSessionStore.getSegments()[applicationStore.getState().navigation.activeIndex] || null;

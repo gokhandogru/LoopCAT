@@ -16,6 +16,7 @@ import { createApplicationUpdateControlsController } from "./application-update-
 import { createApplicationViewController } from "./application-view-controller.js";
 import { createNavigationController } from "./navigation-controller.js";
 import { createGlobalKeyboardController } from "./global-keyboard-controller.js";
+import { createLocalizationDownloadMimeTypeService } from "./localization-download-mime-type-service.js";
 import { createProjectRepository } from "../data/project-repository.js";
 import { createPreferencesRepository } from "../data/preferences-repository.js";
 import { createStorageRepository } from "../data/storage-repository.js";
@@ -358,6 +359,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createApplicationUpdateControlsController,
       createApplicationViewController,
       createGlobalKeyboardController,
+      createLocalizationDownloadMimeTypeService,
       createSegmentNavigationController,
       createSegmentDraftApplicationService,
       createTargetReplacementController,
