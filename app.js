@@ -846,6 +846,15 @@ const workspaceDirtyStateController = appRuntime.featureFactories.createWorkspac
     renderRecovery: () => workspaceRecoveryPresentationService.renderRecovery()
   }
 });
+const workspaceProjectCoverageService = appRuntime.featureFactories.createWorkspaceProjectCoverageService({
+  workspace: {
+    canListPackages: () => workspaceStorage?.listProjectPackages,
+    isConnected: () => state.workspaceStatus?.connected,
+    listPackages: () => workspaceStorage.listProjectPackages()
+  },
+  projects: { list: listProjects },
+  dirty: { markProjects: workspaceDirtyStateController.markProjects }
+});
 
 const els = {
   saveStatus: document.querySelector("#saveStatus"),
@@ -4332,7 +4341,7 @@ workspacePackageSaveController =
       setStatus: (status) => {
         state.workspaceStatus = status;
       },
-      markMissingLocalDirty: markLocalProjectsMissingFromWorkspaceDirty,
+      markMissingLocalDirty: workspaceProjectCoverageService.markMissingLocalDirty,
       clearDirty: workspaceDirtyStateController.clear,
       markDirty: workspaceDirtyStateController.mark,
       hasDirty: () => Boolean(state.workspaceDirtyProjectIds.size),
@@ -5171,21 +5180,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-async function refreshWorkspaceStatus() {
-  if (!workspaceStorage) return;
-  state.workspaceStatus = await workspaceStorage.getStatus();
-  workspaceRecoveryPresentationService.renderStatus();
-}
-
-async function markLocalProjectsMissingFromWorkspaceDirty() {
-  if (!workspaceStorage?.listProjectPackages || !state.workspaceStatus?.connected) return 0;
-  const [projects, refs] = await Promise.all([listProjects(), workspaceStorage.listProjectPackages()]);
-  const workspaceProjectIds = new Set((refs || []).map((ref) => ref.id).filter(Boolean));
-  const missingProjectIds = (projects || []).map((project) => project.id).filter((id) => id && !workspaceProjectIds.has(id));
-  workspaceDirtyStateController.markProjects(missingProjectIds);
-  return missingProjectIds.length;
-}
 
 function renderProjectStorageStatus() {
   if (!workspaceStorage) return;

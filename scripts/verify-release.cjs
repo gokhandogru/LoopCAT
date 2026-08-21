@@ -292,6 +292,7 @@ const requiredReleaseFiles = [
   "src/features/workspace/workspace-dirty-state-controller.js",
   "src/features/workspace/workspace-health-repair-controller.js",
   "src/features/workspace/workspace-package-save-controller.js",
+  "src/features/workspace/workspace-project-coverage-service.js",
   "src/features/workspace/workspace-recovery-presentation-service.js",
   "src/features/workspace/workspace-sync-controller.js",
   "src/i18n/language-input-service.js",
@@ -421,6 +422,7 @@ const requiredReleaseFiles = [
   "tests/unit/workspace-dirty-state-controller.test.cjs",
   "tests/unit/workspace-health-repair-controller.test.cjs",
   "tests/unit/workspace-package-save-controller.test.cjs",
+  "tests/unit/workspace-project-coverage-service.test.cjs",
   "tests/unit/workspace-recovery-presentation-service.test.cjs",
   "tests/unit/workspace-sync-controller.test.cjs",
   "tests/unit/language-input-service.test.cjs",
@@ -819,6 +821,8 @@ const workspaceHealthRepairControllerJs = readText("src/features/workspace/works
 const workspaceHealthRepairControllerUnitTests = readText("tests/unit/workspace-health-repair-controller.test.cjs");
 const workspacePackageSaveControllerJs = readText("src/features/workspace/workspace-package-save-controller.js");
 const workspacePackageSaveControllerUnitTests = readText("tests/unit/workspace-package-save-controller.test.cjs");
+const workspaceProjectCoverageServiceJs = readText("src/features/workspace/workspace-project-coverage-service.js");
+const workspaceProjectCoverageServiceUnitTests = readText("tests/unit/workspace-project-coverage-service.test.cjs");
 const workspaceRecoveryPresentationServiceJs = readText(
   "src/features/workspace/workspace-recovery-presentation-service.js"
 );
@@ -1552,6 +1556,95 @@ for (const testName of [
 }
 assertIncludes(
   appBootstrapJs,
+  'import { createWorkspaceProjectCoverageService } from "../features/workspace/workspace-project-coverage-service.js";',
+  "the application runtime must install the checked workspace project-coverage service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createWorkspaceProjectCoverageService,",
+  "the application runtime must expose the checked workspace project-coverage service factory."
+);
+for (const snippet of [
+  "WorkspaceProjectCoverageService requires workspace, project-list, and dirty-marker boundaries.",
+  "async function markMissingLocalDirty()",
+  "if (!workspace.canListPackages() || !workspace.isConnected()) return 0;",
+  "const [localProjects, refs] = await Promise.all([projects.list(), workspace.listPackages()]);",
+  "const workspaceProjectIds = new Set((refs || []).map((ref) => ref.id).filter(Boolean));",
+  "const missingProjectIds = (localProjects || [])",
+  ".map((project) => project.id)",
+  ".filter((id) => id && !workspaceProjectIds.has(id));",
+  "dirty.markProjects(missingProjectIds);",
+  "return missingProjectIds.length;",
+  "return Object.freeze({ markMissingLocalDirty });"
+]) {
+  assertIncludes(
+    workspaceProjectCoverageServiceJs,
+    snippet,
+    `WorkspaceProjectCoverageService must retain characterized guard, concurrency, coverage, and dirty-marker policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "const workspaceProjectCoverageService = appRuntime.featureFactories.createWorkspaceProjectCoverageService({",
+  "canListPackages: () => workspaceStorage?.listProjectPackages",
+  "isConnected: () => state.workspaceStatus?.connected",
+  "listPackages: () => workspaceStorage.listProjectPackages()",
+  "projects: { list: listProjects }",
+  "dirty: { markProjects: workspaceDirtyStateController.markProjects }",
+  "markMissingLocalDirty: workspaceProjectCoverageService.markMissingLocalDirty"
+]) {
+  assertIncludes(appJs, boundary, `workspace project-coverage composition must retain ${boundary}.`);
+}
+assert(
+  (appJs.match(/createWorkspaceProjectCoverageService\(/g) || []).length === 1 &&
+    (appJs.match(/workspaceProjectCoverageService\.markMissingLocalDirty/g) || []).length === 1,
+  "app.js must compose one workspace project-coverage service and wire its only direct consumer."
+);
+for (const removedHelper of ["refreshWorkspaceStatus", "markLocalProjectsMissingFromWorkspaceDirty"]) {
+  assert(
+    !new RegExp(`\\b${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`\\b${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return to app.js or the workflow driver.`
+  );
+}
+assert(
+  !appJs.includes("const workspaceProjectIds = new Set") &&
+    !appJs.includes("const missingProjectIds = (projects || [])"),
+  "workspace project/package coverage calculation must not return to app.js."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "workspaceStorage",
+  "state.workspace",
+  "listProjects",
+  "workspaceDirtyStateController",
+  "workspacePackageSaveController",
+  "document.",
+  "els."
+]) {
+  assert(
+    !workspaceProjectCoverageServiceJs.includes(forbiddenOwner),
+    `WorkspaceProjectCoverageService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "WorkspaceProjectCoverageService preserves capability and connection guard order",
+  "WorkspaceProjectCoverageService starts local and workspace reads concurrently in order",
+  "WorkspaceProjectCoverageService preserves strict IDs, stable order, duplicates, and truthy filtering",
+  "WorkspaceProjectCoverageService preserves nullish-list fallbacks and empty dirty marking",
+  "WorkspaceProjectCoverageService reads every boundary live on repeated runs",
+  "WorkspaceProjectCoverageService preserves direct list and record access failures",
+  "WorkspaceProjectCoverageService preserves dependency and dirty-mark failure timing",
+  "WorkspaceProjectCoverageService preserves concurrent rejection and waits for neither later result",
+  "WorkspaceProjectCoverageService validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    workspaceProjectCoverageServiceUnitTests,
+    testName,
+    `focused workspace project-coverage tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
   'import { createWorkspaceRecoveryPresentationService } from "../features/workspace/workspace-recovery-presentation-service.js";',
   "the application runtime must install the checked workspace recovery-presentation service."
 );
@@ -1610,7 +1703,7 @@ for (const boundary of [
 }
 for (const [method, appCount, workflowCount] of [
   ["ids", 1, 0],
-  ["renderStatus", 11, 5],
+  ["renderStatus", 10, 5],
   ["renderRecovery", 3, 0]
 ]) {
   assert(
@@ -10940,7 +11033,7 @@ for (const boundary of [
   "draft: draftProjectActivityEvent",
   "bulkPut,",
   "list: listActivityEvents",
-  "markMissingLocalDirty: markLocalProjectsMissingFromWorkspaceDirty",
+  "markMissingLocalDirty: workspaceProjectCoverageService.markMissingLocalDirty",
   "clearDirty: workspaceDirtyStateController.clear",
   "markDirty: workspaceDirtyStateController.mark",
   "hasDirty: () => Boolean(state.workspaceDirtyProjectIds.size)",

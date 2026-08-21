@@ -175,6 +175,7 @@ import { createWorkspaceBackupExportController } from "../features/workspace/wor
 import { createWorkspaceBackupReminderService } from "../features/workspace/workspace-backup-reminder-service.js";
 import { createWorkspaceDirtyStateController } from "../features/workspace/workspace-dirty-state-controller.js";
 import { createWorkspaceHealthRepairController } from "../features/workspace/workspace-health-repair-controller.js";
+import { createWorkspaceProjectCoverageService } from "../features/workspace/workspace-project-coverage-service.js";
 import { createWorkspaceRecoveryPresentationService } from "../features/workspace/workspace-recovery-presentation-service.js";
 import { createWorkspaceSyncController } from "../features/workspace/workspace-sync-controller.js";
 import {
@@ -309,6 +310,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createWorkspaceBackupReminderService,
       createWorkspaceDirtyStateController,
       createWorkspaceHealthRepairController,
+      createWorkspaceProjectCoverageService,
       createWorkspaceRecoveryPresentationService,
       createWorkspaceSyncController,
       createReportDataService,
