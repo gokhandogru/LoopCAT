@@ -217,7 +217,7 @@ import { createSaveStore } from "../status/save-store.js";
 import { createStatusController } from "../status/status-controller.js";
 import { createAiProviderService } from "../ai/providers/legacy-registry-adapter.js";
 import { finalizeReportDocument } from "../reports/report-document.js";
-import { createReportDocumentCompositionService } from "../reports/report-document-composition-service.js";
+import { createLazyReportDocumentCompositionService as createReportDocumentCompositionService } from "../reports/lazy-report-document-composition-service.js";
 import { createReportDataService } from "../reports/report-data-service.js";
 import { createReportExportController } from "../reports/report-export-controller.js";
 import { createReportPresentationService } from "../reports/report-presentation-service.js";

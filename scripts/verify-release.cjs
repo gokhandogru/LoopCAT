@@ -543,6 +543,10 @@ const reportExportControllerJs = readText("src/reports/report-export-controller.
 const reportExportControllerUnitTests = readText("tests/unit/report-export-controller.test.cjs");
 const reportDocumentCompositionServiceJs = readText("src/reports/report-document-composition-service.js");
 const reportDocumentCompositionServiceUnitTests = readText("tests/unit/report-document-composition-service.test.cjs");
+const lazyReportDocumentCompositionServiceJs = readText("src/reports/lazy-report-document-composition-service.js");
+const lazyReportDocumentCompositionServiceUnitTests = readText(
+  "tests/unit/lazy-report-document-composition-service.test.cjs"
+);
 const reportPresentationServiceJs = readText("src/reports/report-presentation-service.js");
 const reportPresentationServiceUnitTests = readText("tests/unit/report-presentation-service.test.cjs");
 const i18nExtractScript = readText("scripts/i18n-extract.cjs");
@@ -1039,8 +1043,14 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
-  'import { createReportDocumentCompositionService } from "../reports/report-document-composition-service.js";',
-  "The application runtime must install the checked report-document composition service."
+  'import { createLazyReportDocumentCompositionService as createReportDocumentCompositionService } from "../reports/lazy-report-document-composition-service.js";',
+  "The application runtime must install the lazy report-document composition boundary."
+);
+assert(
+  !appBootstrapJs.includes(
+    'import { createReportDocumentCompositionService } from "../reports/report-document-composition-service.js";'
+  ),
+  "The application runtime must not eagerly import report-document composition."
 );
 assertIncludes(
   appBootstrapJs,
@@ -1128,6 +1138,20 @@ for (const snippet of [
     termbaseSelectPresentationControllerJs,
     snippet,
     `TermbaseSelectPresentationController must retain characterized option and selection policy: ${snippet}`
+  );
+}
+for (const snippet of [
+  'import("./report-document-composition-service.js")',
+  "const dependencies = captureDependencies(options);",
+  "let servicePromise = null;",
+  "servicePromise = null;",
+  "const service = await loadService();",
+  "return Object.freeze({ projectReportHtml, qualityPassportHtml });"
+]) {
+  assertIncludes(
+    lazyReportDocumentCompositionServiceJs,
+    snippet,
+    `lazy ReportDocumentCompositionService must retain first-use policy: ${snippet}`
   );
 }
 for (const boundary of [
@@ -4417,6 +4441,20 @@ for (const snippet of [
     `ReportDocumentCompositionService must retain characterized document policy: ${snippet}`
   );
 }
+for (const snippet of [
+  'import("./report-document-composition-service.js")',
+  "const dependencies = captureDependencies(options);",
+  "let servicePromise = null;",
+  "servicePromise = null;",
+  "const service = await loadService();",
+  "return Object.freeze({ projectReportHtml, qualityPassportHtml });"
+]) {
+  assertIncludes(
+    lazyReportDocumentCompositionServiceJs,
+    snippet,
+    `lazy ReportDocumentCompositionService must retain first-use policy: ${snippet}`
+  );
+}
 assertIncludes(
   appJs,
   "createReportDocumentCompositionService({",
@@ -4450,9 +4488,19 @@ for (const method of ["projectReportHtml", "qualityPassportHtml"]) {
   );
 }
 assertIncludes(
+  reportExportControllerJs,
+  "const reportDocument = await documents.projectReportHtml(reportData, { anonymized });",
+  "Project Report export must await lazy document composition before finalization."
+);
+assertIncludes(
+  reportExportControllerJs,
+  "const reportDocument = await documents.qualityPassportHtml(reportData);",
+  "Quality Passport export must await lazy document composition before finalization."
+);
+assertIncludes(
   appWorkflowDriverJs,
-  "reportDocumentCompositionService.projectReportHtml({",
-  "workflow characterization must call the checked Project Report composer directly."
+  "await reportDocumentCompositionService.projectReportHtml({",
+  "workflow characterization must await the checked lazy Project Report composer directly."
 );
 for (const testName of [
   "ReportDocumentCompositionService preserves complete normal and anonymized Project Report documents",
@@ -4463,6 +4511,19 @@ for (const testName of [
     reportDocumentCompositionServiceUnitTests,
     testName,
     `focused report-document tests must retain characterization: ${testName}`
+  );
+}
+for (const testName of [
+  "lazy report documents preserve synchronous validation, captured dependencies, and the frozen two-method API",
+  "lazy report documents share one concurrent load and preserve delegate receivers, arguments, and results",
+  "lazy report documents propagate load failure identity and retry the next first use",
+  "lazy report documents reject incomplete installation and permit a repaired retry",
+  "lazy report documents validate the loader boundary"
+]) {
+  assertIncludes(
+    lazyReportDocumentCompositionServiceUnitTests,
+    testName,
+    `focused lazy report-document tests must retain characterization: ${testName}`
   );
 }
 for (const hash of [
@@ -4544,8 +4605,9 @@ for (const snippet of [
   "session.replaceQaChecks(reportData.qaChecks);",
   "session.replaceQualityRiskQueue(reportData.qualityPassport.riskQueue);",
   "presentation.renderQualityWorkbench();",
-  "finalizeDocument(documents.qualityPassportHtml(reportData))",
-  "finalizeDocument(documents.projectReportHtml(reportData, { anonymized }))",
+  "const reportDocument = await documents.qualityPassportHtml(reportData);",
+  "const reportDocument = await documents.projectReportHtml(reportData, { anonymized });",
+  "finalizeDocument(reportDocument)",
   '"Quality Passport exported"',
   '"Anonymized project report exported"',
   "status.appendActivityWarning",

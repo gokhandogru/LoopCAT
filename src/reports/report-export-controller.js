@@ -81,11 +81,8 @@ export function createReportExportController(options) {
       presentation.renderQualityWorkbench();
       presentation.renderValidationReport(reportData.validation);
       const base = fileSafeName(session.getProject().name || "project");
-      download(
-        `${base}_quality-passport.html`,
-        finalizeDocument(documents.qualityPassportHtml(reportData)),
-        "text/html"
-      );
+      const reportDocument = await documents.qualityPassportHtml(reportData);
+      download(`${base}_quality-passport.html`, finalizeDocument(reportDocument), "text/html");
       const activityLogged = await activity.logOptionalProject(
         "export",
         "Quality Passport exported",
@@ -125,9 +122,10 @@ export function createReportExportController(options) {
       presentation.renderQaResults();
       presentation.renderValidationReport(reportData.validation);
       const base = fileSafeName(session.getProject().name || "project");
+      const reportDocument = await documents.projectReportHtml(reportData, { anonymized });
       download(
         `${base}_${anonymized ? "anonymized-" : ""}project-report.html`,
-        finalizeDocument(documents.projectReportHtml(reportData, { anonymized })),
+        finalizeDocument(reportDocument),
         "text/html"
       );
       const label = anonymized ? "Anonymized report" : "Project report";

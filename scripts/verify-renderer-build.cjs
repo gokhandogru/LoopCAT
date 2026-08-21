@@ -29,6 +29,9 @@ const productionEntryOutput = productionOutputs.find(
 const providerInstallerOutput = productionOutputs.find(
   ([, output]) => normalizePath(output.entryPoint) === "src/ai/providers/install-extracted-providers.js"
 );
+const reportDocumentOutput = productionOutputs.find(
+  ([, output]) => normalizePath(output.entryPoint) === "src/reports/report-document-composition-service.js"
+);
 const eagerProviderImplementationSources = [
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -73,10 +76,29 @@ if (!productionEntryOutput) {
       entry.kind === "dynamic-import" && normalizePath(entry.path).includes("/chunks/install-extracted-providers-")
   );
   if (!providerChunkImport) failures.push("Hosted startup entry does not lazy-load the extracted AI provider chunk.");
+  const reportDocumentChunkImport = (output.imports || []).find(
+    (entry) =>
+      entry.kind === "dynamic-import" &&
+      normalizePath(entry.path).includes("/chunks/report-document-composition-service-")
+  );
+  if (!reportDocumentChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the report-document composition chunk.");
+  if (Object.hasOwn(output.inputs || {}, "src/reports/report-document-composition-service.js"))
+    failures.push("Hosted startup entry eagerly contains report-document composition.");
   for (const source of eagerProviderImplementationSources) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
   }
+}
+if (!reportDocumentOutput) {
+  failures.push("Production renderer metafile is missing the report-document composition chunk entry.");
+} else {
+  const [outputPath, output] = reportDocumentOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("Report-document composition chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "src/reports/report-document-composition-service.js"))
+    failures.push("Report-document composition chunk is missing its implementation source.");
 }
 if (!providerInstallerOutput) {
   failures.push("Production renderer metafile is missing the extracted AI provider chunk entry.");
