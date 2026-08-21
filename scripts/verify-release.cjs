@@ -690,6 +690,8 @@ const projectNameServiceJs = readText("src/features/projects/project-name-servic
 const projectNameServiceUnitTests = readText("tests/unit/project-name-service.test.cjs");
 const projectRecordLookupServiceJs = readText("src/features/projects/project-record-lookup-service.js");
 const projectRecordLookupServiceUnitTests = readText("tests/unit/project-record-lookup-service.test.cjs");
+const projectDocumentOpenControllerJs = readText("src/features/projects/project-document-open-controller.js");
+const projectDocumentOpenControllerUnitTests = readText("tests/unit/project-document-open-controller.test.cjs");
 const projectOpenControllerJs = readText("src/features/projects/project-open-controller.js");
 const projectOpenControllerUnitTests = readText("tests/unit/project-open-controller.test.cjs");
 const projectCollectionLoadControllerJs = readText("src/features/projects/project-collection-load-controller.js");
@@ -1316,6 +1318,98 @@ for (const testName of [
     projectOpenControllerUnitTests,
     testName,
     `focused project-open tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectDocumentOpenController } from "../features/projects/project-document-open-controller.js";',
+  "The application runtime must install the checked project-document-open controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectDocumentOpenController,",
+  "The application runtime must expose the checked project-document-open controller factory."
+);
+for (const snippet of [
+  "ProjectDocumentOpenController requires project session boundaries.",
+  "ProjectDocumentOpenController requires navigation, presentation, and context boundaries.",
+  "async function open(documentId)",
+  "if (!session.getProject()) return;",
+  "const first = session.getSegments().findIndex((segment) => segment.documentId === documentId);",
+  "navigation.openEditor({",
+  "projectId: session.getProject().id,",
+  "documentId,",
+  'segmentId: session.getSegments()[first]?.id || "",',
+  "activeIndex: first",
+  "presentation.renderAll();",
+  "await context.refreshEditor();",
+  "return Object.freeze({ open });"
+]) {
+  assertIncludes(
+    projectDocumentOpenControllerJs,
+    snippet,
+    `ProjectDocumentOpenController must retain characterized guard, selection, navigation, presentation, and context policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "const projectDocumentOpenController =",
+  "appRuntime.featureFactories.createProjectDocumentOpenController({",
+  "getProject: editorSessionStore.getProject",
+  "getSegments: editorSessionStore.getSegments",
+  "openEditor: (...args) => applicationNavigation?.openEditor?.(...args)",
+  "presentation: { renderAll }",
+  "refreshEditor: (...args) => editorContextController.refresh(...args)"
+]) {
+  assertIncludes(appJs, boundary, `project-document-open composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/createProjectDocumentOpenController\(/g) || []).length === 1 &&
+    (appJs.match(/\bprojectDocumentOpenController\.open\b/g) || []).length === 1 &&
+    (appWorkflowDriverJs.match(/\bprojectDocumentOpenController\.open\b/g) || []).length === 13,
+  "app.js must compose one project-document-open controller and the application and all thirteen workflow consumers must call it directly."
+);
+assert(
+  !/\bopenProjectFile\b/.test(appJs) && !/\bopenProjectFile\b/.test(appWorkflowDriverJs),
+  "openProjectFile must not return to app.js or the workflow driver after project-document-open extraction."
+);
+assert(
+  !appJs.includes(
+    "const first = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);"
+  ) && !appJs.includes('segmentId: editorSessionStore.getSegments()[first]?.id || ""'),
+  "project-document selection and navigation identity orchestration must not return to app.js."
+);
+assert(
+  appJs.indexOf("const projectOpenController =") < appJs.indexOf("const projectDocumentOpenController =") &&
+    appJs.indexOf("const projectDocumentOpenController =") < appJs.indexOf("const projectCollectionLoadController ="),
+  "ProjectDocumentOpenController must follow project opening and precede collection loading and its direct consumers."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "applicationNavigation",
+  "editorContextController",
+  "openProjectFile",
+  "document.",
+  "els."
+]) {
+  assert(
+    !projectDocumentOpenControllerJs.includes(forbiddenOwner),
+    `ProjectDocumentOpenController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectDocumentOpenController preserves the absent-project guard",
+  "ProjectDocumentOpenController preserves the first matching segment and live navigation reads",
+  "ProjectDocumentOpenController preserves strict lookup, missing-document index, and empty segment identity",
+  "ProjectDocumentOpenController does not await navigation and awaits context after presentation",
+  "ProjectDocumentOpenController preserves malformed collections and live-project drift failures",
+  "ProjectDocumentOpenController preserves every injected dependency failure boundary",
+  "ProjectDocumentOpenController validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectDocumentOpenControllerUnitTests,
+    testName,
+    `focused project-document-open tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(

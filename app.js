@@ -1416,6 +1416,21 @@ const projectOpenController = appRuntime.featureFactories.createProjectOpenContr
   }
 });
 
+const projectDocumentOpenController =
+  appRuntime.featureFactories.createProjectDocumentOpenController({
+    session: {
+      getProject: editorSessionStore.getProject,
+      getSegments: editorSessionStore.getSegments
+    },
+    navigation: {
+      openEditor: (...args) => applicationNavigation?.openEditor?.(...args)
+    },
+    presentation: { renderAll },
+    context: {
+      refreshEditor: (...args) => editorContextController.refresh(...args)
+    }
+  });
+
 const projectCollectionLoadController =
   appRuntime.featureFactories.createProjectCollectionLoadController({
     repository: { list: listProjects },
@@ -5445,19 +5460,6 @@ function renderProjectList() {
   els.projectList.replaceChildren(fragment);
 }
 
-async function openProjectFile(documentId) {
-  if (!editorSessionStore.getProject()) return;
-  const first = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentId);
-  applicationNavigation?.openEditor?.({
-    projectId: editorSessionStore.getProject().id,
-    documentId,
-    segmentId: editorSessionStore.getSegments()[first]?.id || "",
-    activeIndex: first
-  });
-  renderAll();
-  await editorContextController.refresh();
-}
-
 function renderAll() {
   segmentFilterService.invalidate();
   renderProjectList();
@@ -5614,7 +5616,7 @@ function renderProjectHome() {
     openButton.type = "button";
     openButton.textContent = uiLocalizationService.source("Open");
     openButton.setAttribute("aria-label", uiLocalizationService.source("Open file {value1}", { value1: fileLabel }));
-    openButton.addEventListener("click", () => openProjectFile(documentInfo.id));
+    openButton.addEventListener("click", () => projectDocumentOpenController.open(documentInfo.id));
     card.querySelector(".file-card-actions").append(deleteButton, openButton);
     fragment.append(card);
   });

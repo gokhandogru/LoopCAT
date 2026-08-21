@@ -703,7 +703,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
     targetEditController.updateDraft(importActivityFailureSegmentIndex, "İçe aktarma etkinlik uyarısı hedefi");
     await autosaveService.flush(project.id);
-    await openProjectFile(documentInfo.id);
+    await projectDocumentOpenController.open(documentInfo.id);
     state.inspectorOpen = true;
     verticalFeatureState?.inspector?.setContext?.({ tab: "ai" });
     renderEditor();
@@ -796,7 +796,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         analysisToggle?.getAttribute("aria-label")?.startsWith(uiLocalizationService.source("Minimize")),
       "Project analysis can be expanded"
     );
-    await openProjectFile(documentInfo.id);
+    await projectDocumentOpenController.open(documentInfo.id);
     const activeTargetEditor = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
     assert(
       activeTargetEditor?.getAttribute("aria-label") === uiLocalizationService.source("Target translation for segment {value1}", { value1: segmentIndex + 1 }),
@@ -1624,7 +1624,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       await projectDocumentImportController.importLocalization(new File(["<!doctype html><html><body><p>Workflow batch variants alpha source.</p><p>Workflow batch variants beta source.</p><p>Workflow batch variants failure source.</p><p>Workflow batch variants locked source.</p></body></html>"], "workflow-ai-batch-variants.html", { type: "text/html" }));
       const aiBatchVariantsDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-ai-batch-variants.html");
-      await openProjectFile(aiBatchVariantsDocument.id);
+      await projectDocumentOpenController.open(aiBatchVariantsDocument.id);
       editorFilterStore.update({
         query: "",
         scope: "both",
@@ -2051,7 +2051,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       await projectDocumentImportController.importLocalization(new File(["<!doctype html><html><body><p>Workflow batch polish alpha source.</p><p>Workflow batch polish beta source.</p></body></html>"], "workflow-ai-batch-polish.html", { type: "text/html" }));
       const aiBatchPolishDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-ai-batch-polish.html");
-      await openProjectFile(aiBatchPolishDocument.id);
+      await projectDocumentOpenController.open(aiBatchPolishDocument.id);
       editorFilterStore.update({
         query: "",
         scope: "both",
@@ -2253,7 +2253,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((item) => (item.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : item)));
       await projectDocumentImportController.importLocalization(new File(["<!doctype html><html><body><p>Workflow batch adapt alpha source.</p><p>Workflow batch adapt beta source.</p><p>Workflow batch adapt failure source.</p><p>Workflow batch adapt locked source.</p></body></html>"], "workflow-ai-batch-adapt.html", { type: "text/html" }));
       const aiBatchAdaptDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-ai-batch-adapt.html");
-      await openProjectFile(aiBatchAdaptDocument.id);
+      await projectDocumentOpenController.open(aiBatchAdaptDocument.id);
       editorFilterStore.update({
         query: "",
         scope: "both",
@@ -2432,7 +2432,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       await projectDocumentImportController.importLocalization(new File(["<!doctype html><html><body><p>Workflow batch source alpha.</p><p>Workflow batch source beta.</p></body></html>"], "workflow-ai-batch-terms.html", { type: "text/html" }));
       const aiBatchTermsDocument = editorSessionStore.getProject().documents.find((item) => item.name === "workflow-ai-batch-terms.html");
-      await openProjectFile(aiBatchTermsDocument.id);
+      await projectDocumentOpenController.open(aiBatchTermsDocument.id);
       if (els.localAiModeSelect) els.localAiModeSelect.value = "visible";
       const batchTermsResult = await aiTerminologyExtractionController.extractBatch();
       const aiBatchTermsStored = (await listTerms({ sourceLang: editorSessionStore.getProject().sourceLang, targetLang: editorSessionStore.getProject().targetLang, termBaseNames: ["Workflow TB"] }))
@@ -3170,7 +3170,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       projectName: editorSessionStore.getProject().name,
       tmName: projectResourceContextService.mainTm()
     });
-    await openProjectFile(pretranslateDocument.id);
+    await projectDocumentOpenController.open(pretranslateDocument.id);
     const pretranslateSegmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === pretranslateDocument.id);
     const secondPretranslateSegmentIndex = editorSessionStore.getSegments().findIndex(
       (segment) => segment.documentId === pretranslateDocument.id && segment.source === secondPretranslateSource
@@ -3307,7 +3307,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         projectName: editorSessionStore.getProject().name,
         tmName: projectResourceContextService.mainTm()
       });
-      await openProjectFile(localAiGlossaryDocument.id);
+      await projectDocumentOpenController.open(localAiGlossaryDocument.id);
       const localAiGlossarySegmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === localAiGlossaryDocument.id && segment.source === localAiGlossarySource);
       await segmentNavigationController.select(localAiGlossarySegmentIndex);
       if (els.localAiProviderSelect) els.localAiProviderSelect.value = "ollama";
@@ -3764,7 +3764,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       safeRestoreLocalAiKeySnapshot(unsupportedCompatibleKeySnapshot);
       renderLocalAiProviderControls(localAiSettingsFromForm());
     }
-    await openProjectFile(documentInfo.id);
+    await projectDocumentOpenController.open(documentInfo.id);
     await segmentNavigationController.select(segmentIndex);
     confirmRollbackSegment = editorSessionStore.getSegments()[segmentIndex];
 
@@ -5537,7 +5537,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(state.workspaceDirtyProjectIds.has(project.id), "TB resource row save marks linked project package dirty");
 
     await projectOpenController.open(project.id);
-    await openProjectFile(documentInfo.id);
+    await projectDocumentOpenController.open(documentInfo.id);
     const termSuggestionSegmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentInfo.id && (segment.source || segment.text || "").includes("Hello"));
     assert(termSuggestionSegmentIndex >= 0, "term suggestion regression has source segment");
     await segmentNavigationController.select(termSuggestionSegmentIndex);
@@ -5885,7 +5885,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     editorSessionStore.replaceProject(await updateProject({ ...editorSessionStore.getProject(), documents: [...(editorSessionStore.getProject().documents || []), structuralDocument] }));
     editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((item) => (item.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : item)));
     editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
-    await openProjectFile(structuralDocument.id);
+    await projectDocumentOpenController.open(structuralDocument.id);
     const structuralSegmentsBefore = editorSessionStore.getSegments().filter((segment) => segment.documentId === structuralDocument.id);
     assert(structuralSegmentsBefore.length === 3, "plain structural edit fixture has three segments");
     const structuralSplitOriginalSource = structuralSegmentsBefore[0].source;
@@ -5975,7 +5975,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
 
     editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
-    await openProjectFile(structuralDocument.id);
+    await projectDocumentOpenController.open(structuralDocument.id);
     let mergeCandidates = editorSessionStore.getSegments()
       .map((segment, index) => ({ segment, index }))
       .filter((item) => item.segment.documentId === structuralDocument.id)
@@ -6008,7 +6008,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "MergeSegment transaction failure leaves no missing, duplicate, reordered, or partially persisted segment"
     );
     editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
-    await openProjectFile(structuralDocument.id);
+    await projectDocumentOpenController.open(structuralDocument.id);
     mergeCandidates = editorSessionStore.getSegments()
       .map((segment, index) => ({ segment, index }))
       .filter((item) => item.segment.documentId === structuralDocument.id)
