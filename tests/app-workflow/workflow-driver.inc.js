@@ -1197,7 +1197,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const aiReviewStored = (await getProjectSegments(project.id)).find((segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id);
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = "ai-review-risk";
       editorFilterStore.update({ aiState: "ai-review-risk" });
-      renderSegments();
+      segmentGridPresentationController.render();
       assert(
         aiReviewSaved &&
           aiReviewStored?.reviewState === "needs-review" &&
@@ -1218,7 +1218,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       aiReviewProvider.completePrompt = originalAiReviewCompletePrompt;
       editorFilterStore.update({ aiState: originalAiReviewSegmentFilter });
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalAiReviewSegmentFilter;
-      renderSegments();
+      segmentGridPresentationController.render();
     }
 
     const originalAiBatchReviewCompletePrompt = aiReviewProvider.completePrompt;
@@ -1294,7 +1294,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const storedLockedSegment = batchReviewStored.find((segment) => segment.id === lockedSegment.id);
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = "high-ai-risk";
       editorFilterStore.update({ aiState: "high-ai-risk" });
-      renderSegments();
+      segmentGridPresentationController.render();
       assert(
         batchReviewSummary?.commented === 1 &&
           batchReviewSummary?.failed === 1 &&
@@ -1718,7 +1718,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       Object.assign(editorSessionStore.getSegments()[segmentIndex], restoredAiVariantsSegment);
       segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       documentFilterPresentationController.render();
-      renderSegments();
+      segmentGridPresentationController.render();
       const restoreAiVariantsIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === originalAiVariantsFilters.activeSegmentId);
       if (restoreAiVariantsIndex >= 0) await segmentNavigationController.select(restoreAiVariantsIndex);
       segmentRowPresentationService.update(segmentIndex);
@@ -2118,7 +2118,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       Object.assign(editorSessionStore.getSegments()[segmentIndex], restoredAiPolishSegment);
       segmentTargetStateService.prepareHistory(editorSessionStore.getSegments()[segmentIndex]);
       documentFilterPresentationController.render();
-      renderSegments();
+      segmentGridPresentationController.render();
       if (Number.isInteger(originalAiPolishFilters.activeIndex) && originalAiPolishFilters.activeIndex >= 0) await segmentNavigationController.select(originalAiPolishFilters.activeIndex);
       segmentRowPresentationService.update(segmentIndex);
     }
@@ -2371,7 +2371,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((item) => (item.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : item)));
       editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
       documentFilterPresentationController.render();
-      renderSegments();
+      segmentGridPresentationController.render();
       const restoreBatchAdaptIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === originalAiBatchAdaptFilters.activeSegmentId);
       if (restoreBatchAdaptIndex >= 0) await segmentNavigationController.select(restoreBatchAdaptIndex);
     }
@@ -2450,7 +2450,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       if (els.localAiModeSelect) els.localAiModeSelect.value = originalAiTermsMode;
       applicationNavigation.selectDocument({ documentId: originalAiTermsDocumentFilter });
       documentFilterPresentationController.render();
-      renderSegments();
+      segmentGridPresentationController.render();
       if (Number.isInteger(originalAiTermsActiveIndex) && originalAiTermsActiveIndex >= 0) await segmentNavigationController.select(originalAiTermsActiveIndex);
       if (aiExtractedTermIds.length) {
         await deleteTerms(aiExtractedTermIds);
@@ -3458,7 +3458,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = "ai-draft";
       editorFilterStore.update({ aiState: "ai-draft" });
-      renderSegments();
+      segmentGridPresentationController.render();
       assert(
         localAiGlossaryRequest?.segment?.id === localAiGlossarySegment?.id &&
           localAiGlossaryStored?.target === "Workflow context-informed AI target" &&
@@ -3476,7 +3476,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const localAiConfirmedPreviousReviewState = localAiGlossarySegment.reviewState;
       localAiGlossarySegment.status = "confirmed";
       localAiGlossarySegment.reviewState = "";
-      renderSegments();
+      segmentGridPresentationController.render();
       const localAiGlossaryRow = els.segmentBody.querySelector(`tr[data-index="${editorSessionStore.getSegments().findIndex((segment) => segment.id === localAiGlossarySegment.id)}"]`);
       assert(
         localAiGlossaryRow?.textContent.includes("AI initiated") &&
@@ -3488,7 +3488,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       localAiGlossarySegment.reviewState = localAiConfirmedPreviousReviewState;
       editorFilterStore.update({ aiState: originalLocalAiGlossaryAiFilter });
       if (els.aiSegmentFilter) els.aiSegmentFilter.value = originalLocalAiGlossaryAiFilter;
-      renderSegments();
+      segmentGridPresentationController.render();
       segmentTargetStateService.setTarget(localAiGlossarySegment, "", "draft", "ai-cancel-fixture");
       Reflect.deleteProperty(localAiGlossarySegment, "aiPretranslation");
       localAiGlossarySegment.reviewState = "";
@@ -3790,7 +3790,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
     await segmentConfirmationController.confirm();
     await segmentNavigationController.select(segmentIndex);
-    renderSegments();
+    segmentGridPresentationController.render();
     const confirmedReviewedAiSegment = editorSessionStore.getSegments()[segmentIndex];
     const persistedConfirmedReviewedAiSegment = (await getProjectSegments(project.id)).find((segment) => segment.id === confirmedReviewedAiSegment.id);
     const confirmedReviewedAiRow = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"]`);
@@ -6104,7 +6104,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(Boolean(taggedDocument), "tagged HTML fixture imported");
     applicationNavigation.selectDocument({ documentId: taggedDocument.id });
     const taggedIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === taggedDocument.id);
-    renderSegments();
+    segmentGridPresentationController.render();
     const taggedRow = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"]`);
     const sourceChipLabels = Array.from(taggedRow?.querySelectorAll(".source-cell .tag-chip") || []).map((chip) => chip.textContent);
     assert(sourceChipLabels.includes("<b>") && sourceChipLabels.includes("</b>") && !sourceChipLabels.includes("<strong>"), "editor displays semantic inline tag labels for HTML formatting");
@@ -6234,7 +6234,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const structuredMergeDocument = editorSessionStore.getProject().documents.find((item) => item.name === "structured-merge.html");
     assert(Boolean(structuredMergeDocument), "structured merge fixture imported");
     applicationNavigation.selectDocument({ documentId: structuredMergeDocument.id });
-    renderSegments();
+    segmentGridPresentationController.render();
     const structuredMergeIndexes = editorSessionStore.getSegments()
       .map((segment, index) => ({ segment, index }))
       .filter((item) => item.segment.documentId === structuredMergeDocument.id)
@@ -6300,7 +6300,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(Boolean(scopedEmptyDocument) && editorSessionStore.getSegments().some((segment) => segment.documentId === scopedEmptyDocument.id && !String(segment.target || "").trim()), "scoped export unfinished fixture imported");
     applicationNavigation.selectDocument({ documentId: scopedCompleteDocument.id });
     documentFilterPresentationController.render();
-    renderSegments();
+    segmentGridPresentationController.render();
     const scopedExportDownloads = [];
     const originalScopedCreateObjectUrl = URL.createObjectURL.bind(URL);
     const originalScopedAnchorClick = HTMLAnchorElement.prototype.click;
@@ -6336,7 +6336,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
       applicationNavigation.selectDocument({ documentId: scopedEmptyDocument.id });
       documentFilterPresentationController.render();
-      renderSegments();
+      segmentGridPresentationController.render();
       const scopedEmptySegment = editorSessionStore.getSegments().find((segment) => segment.documentId === scopedEmptyDocument.id);
       const emptyTargetBeforeExports = scopedEmptySegment.target;
       const emptyStatusBeforeExports = scopedEmptySegment.status;

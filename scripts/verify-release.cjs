@@ -626,6 +626,8 @@ const editorShellPresentationControllerJs = readText("src/features/editor/editor
 const editorShellPresentationControllerUnitTests = readText("tests/unit/editor-shell-presentation-controller.test.cjs");
 const segmentGridControllerJs = readText("src/features/editor/segment-grid-controller.js");
 const segmentGridControllerUnitTests = readText("tests/unit/segment-grid-controller.test.cjs");
+const segmentGridPresentationControllerJs = readText("src/features/editor/segment-grid-presentation-controller.js");
+const segmentGridPresentationControllerUnitTests = readText("tests/unit/segment-grid-presentation-controller.test.cjs");
 const autosaveServiceJs = readText("src/features/editor/autosave-service.js");
 const segmentConfirmationControllerJs = readText("src/features/editor/segment-confirmation-controller.js");
 const targetEditControllerJs = readText("src/features/editor/target-edit-controller.js");
@@ -4033,7 +4035,7 @@ for (const boundary of [
   "escapeHtml",
   "replaceSafeHtml: (...args) => appRuntime.safeHtml.replace(...args)",
   "navigation: { select: (index) => segmentNavigationController.select(index) }",
-  "presentation: { renderSegments }",
+  "presentation: { renderSegments: (...args) => segmentGridPresentationController.render(...args) }",
   "focus: { target: () => targetEditController.focusActive() }"
 ]) {
   assertIncludes(appJs, boundary, `QA-results composition must inject the checked ${boundary} boundary.`);
@@ -4866,7 +4868,8 @@ for (const boundary of [
   "repository: { listTerms }",
   "resources: { termBaseNames: projectResourceContextService.termBaseNames }",
   "filters: { invalidate: segmentFilterService.invalidate }",
-  "presentation: { renderTermbaseSelect: termbaseSelectPresentationController.render, renderSegments }"
+  "renderTermbaseSelect: termbaseSelectPresentationController.render",
+  "renderSegments: (...args) => segmentGridPresentationController.render(...args)"
 ]) {
   assertIncludes(appJs, boundary, `project-term refresh composition must retain the checked ${boundary} boundary.`);
 }
@@ -6575,6 +6578,150 @@ for (const method of [
 ]) {
   assertIncludes(segmentGridControllerJs, method, `The segment grid must retain checked ${method} ownership.`);
 }
+assertIncludes(
+  appBootstrapJs,
+  'import { createSegmentGridPresentationController } from "../features/editor/segment-grid-presentation-controller.js";',
+  "The application runtime must install the checked segment-grid presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createSegmentGridPresentationController,",
+  "The application runtime must expose the checked segment-grid presentation factory."
+);
+for (const snippet of [
+  "SegmentGridPresentationController requires DOM, viewport, filter, application, virtual-grid, row, localization, and positive row-height boundaries.",
+  "function spacerRow(height)",
+  'row.className = "segment-spacer-row"',
+  'row.setAttribute("aria-hidden", "true")',
+  "cell.colSpan = 4",
+  "cell.style.height = `${Math.max(0, height)}px`",
+  "const indexes = filters.visibleIndexes()",
+  "const scrollTop = viewport?.scrollTop || 0",
+  "grid.resetWindow()",
+  'localization.source("No segments match this view.")',
+  "body.replaceChildren(row)",
+  "const win = grid.calculateWindow(indexes)",
+  "const previousWindow = grid.getWindow()",
+  "win.start === previousWindow.start",
+  "const activeElement = ownerDocument.activeElement",
+  "viewport.contains(activeElement)",
+  "!win.indexes.includes(application.getActiveIndex())",
+  "activeElement.blur()",
+  "grid.commitWindow(win)",
+  "const topHeight = win.start * rowHeight",
+  "const bottomHeight = (indexes.length - win.end) * rowHeight",
+  "const fragment = ownerDocument.createDocumentFragment()",
+  "win.indexes.forEach((index) => fragment.append(rows.create(index)))",
+  "body.replaceChildren(fragment)",
+  "options.preserveScroll && viewport.scrollTop !== scrollTop",
+  "viewport.scrollTop = scrollTop",
+  "grid.scheduleRowUpdate(index, (indexes) => indexes.forEach(rows.update))",
+  "return grid.cancelRowUpdate(index)",
+  "return Object.freeze({ render, scheduleRowUpdate, cancelRowUpdate })"
+]) {
+  assertIncludes(
+    segmentGridPresentationControllerJs,
+    snippet,
+    `SegmentGridPresentationController must retain characterized virtual-grid presentation policy: ${snippet}`
+  );
+}
+assertIncludes(
+  appJs,
+  "createSegmentGridPresentationController({",
+  "app.js must compose the checked segment-grid presentation controller."
+);
+const segmentGridPresentationComposition = functionBody(
+  appJs,
+  "segmentGridPresentationController =",
+  "const autosaveService ="
+);
+for (const boundary of [
+  "document",
+  "body: els.segmentBody",
+  "viewport: els.segmentGridWrap",
+  "filters: { visibleIndexes: segmentFilterService.visibleIndexes }",
+  "application: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex }",
+  "grid: verticalFeatureState.segmentGrid",
+  "rows: segmentRowPresentationService",
+  "localization: uiLocalizationService",
+  "rowHeight: SEGMENT_ROW_HEIGHT"
+]) {
+  assertIncludes(
+    segmentGridPresentationComposition,
+    boundary,
+    `segment-grid presentation composition must inject the ${boundary} boundary.`
+  );
+}
+assert(
+  appJs.indexOf("const verticalFeatureState =") < appJs.lastIndexOf("segmentGridPresentationController =") &&
+    appJs.lastIndexOf("segmentGridPresentationController =") < appJs.indexOf("const autosaveService ="),
+  "SegmentGridPresentationController must follow virtual feature creation and precede all direct controller consumers."
+);
+assert(
+  (appJs.match(/\bsegmentGridPresentationController\.render\b/g) || []).length === 18 &&
+    (appWorkflowDriverJs.match(/\bsegmentGridPresentationController\.render\b/g) || []).length === 15 &&
+    (appJs.match(/\bsegmentGridPresentationController\.scheduleRowUpdate\b/g) || []).length === 1 &&
+    (appJs.match(/\bsegmentGridPresentationController\.cancelRowUpdate\b/g) || []).length === 1,
+  "all application and workflow grid render/scheduling consumers must call SegmentGridPresentationController directly."
+);
+for (const removedHelper of ["spacerRow", "segmentWindow", "renderSegments", "scheduleRowUpdate"]) {
+  assert(
+    !new RegExp(`function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs),
+    `${removedHelper} virtual-grid helper must not return to app.js or the workflow driver.`
+  );
+}
+for (const removedOwner of [
+  'className = "segment-spacer-row"',
+  'textContent = uiLocalizationService.source("No segments match this view.")',
+  "verticalFeatureState.segmentGrid.calculateWindow(indexes)",
+  "verticalFeatureState.segmentGrid.commitWindow(win)",
+  "els.segmentBody.replaceChildren(fragment)",
+  "els.segmentGridWrap.contains(activeElement)"
+]) {
+  assert(
+    !appJs.includes(removedOwner),
+    `segment-grid DOM/window ownership must not return to the compatibility coordinator: ${removedOwner}`
+  );
+}
+for (const forbiddenOwner of [
+  "appRuntime",
+  "verticalFeatureState",
+  "segmentFilterService",
+  "segmentRowPresentationService",
+  "uiLocalizationService",
+  "applicationStore",
+  "SEGMENT_ROW_HEIGHT",
+  "document.",
+  "els.",
+  "state."
+]) {
+  assert(
+    !segmentGridPresentationControllerJs.includes(forbiddenOwner),
+    `SegmentGridPresentationController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "SegmentGridPresentationController preserves empty-view reset and localized row replacement",
+  "SegmentGridPresentationController preserves virtual rows, spacer semantics, and stable order",
+  "SegmentGridPresentationController preserves unchanged scroll-window early return",
+  "SegmentGridPresentationController preserves off-window active-editor blur before commit",
+  "SegmentGridPresentationController preserves active-window focus and optional scroll restoration",
+  "SegmentGridPresentationController preserves scheduled row batch order and cancellation results",
+  "SegmentGridPresentationController preserves representative primary and downstream failure timing",
+  "SegmentGridPresentationController validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    segmentGridPresentationControllerUnitTests,
+    testName,
+    `focused segment-grid presentation tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/editor/segment-grid-presentation-controller.js"',
+  "source-catalog extraction must scan the checked segment-grid presentation controller."
+);
 for (const snippet of [
   "let scrollFrame = 0",
   "let scrollListener = null",
@@ -6603,7 +6750,7 @@ for (const snippet of [
 }
 for (const boundary of [
   "mountScroll: (listener) => verticalFeatureState.segmentGrid.mountScroll(listener)",
-  "renderSegments: (options) => renderSegments(options)"
+  "renderSegments: segmentGridPresentationController.render"
 ]) {
   assertIncludes(appJs, boundary, `segment-grid scroll composition must retain the checked ${boundary} boundary.`);
 }
@@ -9367,7 +9514,7 @@ for (const boundary of [
   "translate: (key) => uiLocalizationService.translate(key)",
   "menu: applicationMenuController",
   "request: (callback) => requestAnimationFrame(callback)",
-  "renderSegments: (options) => renderSegments(options)",
+  "renderSegments: segmentGridPresentationController.render",
   "focusActive: () => targetEditController.focusActive()",
   "toggle: focusModeController.toggle",
   "disable: () => focusModeController.set(false)",
@@ -10958,11 +11105,12 @@ assert(
   "SegmentRowPresentationService must follow checked markup/status composition and precede all row consumers."
 );
 assert(
-  (appJs.match(/\bsegmentRowPresentationService\.create\b/g) || []).length === 1,
+  (segmentGridPresentationControllerJs.match(/\brows\.create\b/g) || []).length === 1,
   "segment-grid rendering must call SegmentRowPresentationService.create directly."
 );
 assert(
-  (appJs.match(/\bsegmentRowPresentationService\.update\b/g) || []).length === 9 &&
+  (appJs.match(/\bsegmentRowPresentationService\.update\b/g) || []).length === 8 &&
+    (segmentGridPresentationControllerJs.match(/\brows\.update\b/g) || []).length === 1 &&
     (appWorkflowDriverJs.match(/\bsegmentRowPresentationService\.update\b/g) || []).length === 5,
   "all application and workflow live-row consumers must call SegmentRowPresentationService.update directly."
 );
@@ -13968,8 +14116,8 @@ for (const boundary of [
   "touch: segmentTargetStateService.touch",
   "capturePatch: segmentTargetStateService.capturePatch",
   "filters: { matches: segmentFilterService.matches }",
-  "scheduleRowUpdate,",
-  "cancelRowUpdate: (index) => verticalFeatureState.segmentGrid.cancelRowUpdate(index)",
+  "scheduleRowUpdate: segmentGridPresentationController.scheduleRowUpdate",
+  "cancelRowUpdate: segmentGridPresentationController.cancelRowUpdate",
   "renderProgress,",
   "scheduleHistory: scheduleRevisionHistoryRender",
   "workspace: { markDirty: workspaceDirtyStateController.mark }",
@@ -20242,7 +20390,7 @@ for (const boundary of [
   "renderProjectHome: projectHomePresentationController.render",
   "renderProjectAnalysis: () => projectAnalysisController.render()",
   "renderDocumentFilter: documentFilterPresentationController.render",
-  "renderSegments: () => renderSegments()",
+  "renderSegments: () => segmentGridPresentationController.render()",
   "renderProgress: () => renderProgress()"
 ]) {
   assertIncludes(appJs, boundary, `aggregate-presentation composition must retain the checked ${boundary} boundary.`);
@@ -21203,7 +21351,7 @@ for (const boundary of [
   "renderLanguageDatalists: () => languageInputService.renderDatalists()",
   "renderTextEncodingOptions: () => textEncodingInputService.renderOptions()",
   "mountScroll: (listener) => verticalFeatureState.segmentGrid.mountScroll(listener)",
-  "renderSegments: (options) => renderSegments(options)",
+  "renderSegments: segmentGridPresentationController.render",
   "applicationMenu: applicationMenuController",
   "globalKeyboard: globalKeyboardController",
   "applicationView: applicationViewController",

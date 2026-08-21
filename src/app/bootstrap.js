@@ -81,6 +81,7 @@ import { createInspectorToggleController } from "../features/editor/inspector-to
 import { createPanelToggleController } from "../features/editor/panel-toggle-controller.js";
 import { createSegmentActionButtonsController } from "../features/editor/segment-action-buttons-controller.js";
 import { createSegmentGridController } from "../features/editor/segment-grid-controller.js";
+import { createSegmentGridPresentationController } from "../features/editor/segment-grid-presentation-controller.js";
 import { createSegmentMarkupPresentationService } from "../features/editor/segment-markup-presentation-service.js";
 import { createSegmentRowPresentationService } from "../features/editor/segment-row-presentation-service.js";
 import { createSegmentStatusPresentationService } from "../features/editor/segment-status-presentation-service.js";
@@ -318,6 +319,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createInspectorToggleController,
       createPanelToggleController,
       createSegmentActionButtonsController,
+      createSegmentGridPresentationController,
       createSegmentMarkupPresentationService,
       createSegmentRowPresentationService,
       createSegmentStatusPresentationService,

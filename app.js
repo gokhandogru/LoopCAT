@@ -99,6 +99,7 @@ const uiLocalizationService = appRuntime.featureFactories.createUiLocalizationSe
   alert: (message) => window.alert(message)
 });
 let importExportController;
+let segmentGridPresentationController = null;
 const applicationValidationPresentationController =
   appRuntime.featureFactories.createApplicationValidationPresentationController({
     redaction: { sanitize: applicationTextSafetyService.redactSensitiveText },
@@ -137,7 +138,7 @@ const qaResultsController = appRuntime.featureFactories.createQaResultsControlle
   escapeHtml: applicationTextSafetyService.escapeHtml,
   replaceSafeHtml: (...args) => appRuntime.safeHtml.replace(...args),
   navigation: { select: (index) => segmentNavigationController.select(index) },
-  presentation: { renderSegments },
+  presentation: { renderSegments: (...args) => segmentGridPresentationController.render(...args) },
   focus: { target: () => targetEditController.focusActive() }
 });
 const reportPresentationService = appRuntime.featureFactories.createReportPresentationService({
@@ -1695,7 +1696,10 @@ const projectTermRefreshController = appRuntime.featureFactories.createProjectTe
   repository: { listTerms },
   resources: { termBaseNames: projectResourceContextService.termBaseNames },
   filters: { invalidate: segmentFilterService.invalidate },
-  presentation: { renderTermbaseSelect: termbaseSelectPresentationController.render, renderSegments }
+  presentation: {
+    renderTermbaseSelect: termbaseSelectPresentationController.render,
+    renderSegments: (...args) => segmentGridPresentationController.render(...args)
+  }
 });
 
 const projectTermQueryService = appRuntime.featureFactories.createProjectTermQueryService({
@@ -1761,7 +1765,7 @@ const applicationAggregatePresentationController =
       renderProjectHome: projectHomePresentationController.render,
       renderProjectAnalysis: () => projectAnalysisController.render(),
       renderDocumentFilter: documentFilterPresentationController.render,
-      renderSegments: () => renderSegments(),
+      renderSegments: () => segmentGridPresentationController.render(),
       renderProgress: () => renderProgress()
     }
   });
@@ -2253,6 +2257,19 @@ const verticalFeatureState = (() => {
 })();
 verticalFeatureState?.inspector?.mount?.();
 
+segmentGridPresentationController =
+  appRuntime.featureFactories.createSegmentGridPresentationController({
+    document,
+    body: els.segmentBody,
+    viewport: els.segmentGridWrap,
+    filters: { visibleIndexes: segmentFilterService.visibleIndexes },
+    application: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex },
+    grid: verticalFeatureState.segmentGrid,
+    rows: segmentRowPresentationService,
+    localization: uiLocalizationService,
+    rowHeight: SEGMENT_ROW_HEIGHT
+  });
+
 const autosaveService = appRuntime.featureFactories.createAutosaveService({
   editorSessionStore,
   repository: {
@@ -2298,7 +2315,7 @@ const segmentCommandRestorationController =
     },
     filters: { invalidate: segmentFilterService.invalidate },
     presentation: {
-      renderSegments,
+      renderSegments: segmentGridPresentationController.render,
       renderProgress,
       renderHistory: revisionHistoryPresentationService.render,
       renderAll: applicationAggregatePresentationController.render,
@@ -2363,7 +2380,7 @@ const qualityWorkbenchController = appRuntime.featureFactories.createQualityWork
   qa: { run: (...args) => projectQaController.run(...args) },
   navigation: { select: (index) => segmentNavigationController.select(index) },
   presentation: {
-    renderSegments,
+    renderSegments: segmentGridPresentationController.render,
     renderWorkbench: (viewModel) => qualityReviewController?.renderQuality?.(viewModel)
   },
   focus: { target: () => targetEditController.focusActive() },
@@ -2571,7 +2588,7 @@ const segmentConfirmationController = appRuntime.featureFactories.createSegmentC
   },
   view: {
     updateRow: segmentRowPresentationService.update,
-    renderSegments,
+    renderSegments: segmentGridPresentationController.render,
     renderProgress,
     scheduleHistory: scheduleRevisionHistoryRender,
     renderHistory: revisionHistoryPresentationService.render
@@ -2606,9 +2623,9 @@ const segmentDraftApplicationService = appRuntime.featureFactories.createSegment
   },
   filters: { matches: segmentFilterService.matches },
   presentation: {
-    renderSegments,
-    scheduleRowUpdate,
-    cancelRowUpdate: (index) => verticalFeatureState.segmentGrid.cancelRowUpdate(index),
+    renderSegments: segmentGridPresentationController.render,
+    scheduleRowUpdate: segmentGridPresentationController.scheduleRowUpdate,
+    cancelRowUpdate: segmentGridPresentationController.cancelRowUpdate,
     renderProgress,
     scheduleHistory: scheduleRevisionHistoryRender
   },
@@ -2668,7 +2685,7 @@ const targetProducerController = appRuntime.featureFactories.createTargetProduce
   },
   restoration: { restorePatch: segmentCommandRestorationController.restorePatch },
   view: {
-    renderSegments,
+    renderSegments: segmentGridPresentationController.render,
     renderProgress,
     renderHistory: revisionHistoryPresentationService.render
   },
@@ -2748,7 +2765,7 @@ const targetReplacementController = appRuntime.featureFactories.createTargetRepl
     focusTarget: targetEditController.focusActive
   },
   presentation: {
-    renderSegments,
+    renderSegments: segmentGridPresentationController.render,
     renderProgress,
     refreshSidebar: () => editorContextController.refresh(),
     renderHistory: revisionHistoryPresentationService.render
@@ -2814,7 +2831,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
   },
   presentation: {
     yieldToUi: applicationImportProgressController.yieldToUi,
-    renderSegments,
+    renderSegments: segmentGridPresentationController.render,
     renderProgress,
     renderHistory: revisionHistoryPresentationService.render,
     refreshSidebar: () => editorContextController.refresh()
@@ -3131,7 +3148,7 @@ const aiPretranslationController = appRuntime.featureFactories.createAiPretransl
   presentation: {
     invalidateFilters: segmentFilterService.invalidate,
     renderAll: applicationAggregatePresentationController.render,
-    renderSegments,
+    renderSegments: segmentGridPresentationController.render,
     renderProjectProgress: renderProgress,
     renderHistory: revisionHistoryPresentationService.render,
     renderAiProgress: aiProviderFormController.renderProgress,
@@ -3221,7 +3238,7 @@ const aiReviewController = appRuntime.featureFactories.createAiReviewController(
     updateRow: segmentRowPresentationService.update,
     renderAll: applicationAggregatePresentationController.render,
     refreshSidebar: () => editorContextController.refresh(),
-    renderSegments,
+    renderSegments: segmentGridPresentationController.render,
     renderProjectProgress: renderProgress,
     renderHistory: revisionHistoryPresentationService.render
   },
@@ -3713,7 +3730,7 @@ const aiSuggestionApplicationController =
         projectActivityController.log("ai-apply-suggestion", "AI suggestion applied to target", details)
     },
     presentation: {
-      renderSegments,
+      renderSegments: segmentGridPresentationController.render,
       renderProgress,
       renderHistory: revisionHistoryPresentationService.render,
       renderSuggestions: aiSuggestionListController.render,
@@ -4098,7 +4115,7 @@ segmentNavigationController = appRuntime.featureFactories.createSegmentNavigatio
     resetStatus: () => editorFilterStore.update({ status: "all" })
   },
   presentation: {
-    renderSegments,
+    renderSegments: segmentGridPresentationController.render,
     updateRow: segmentRowPresentationService.update,
     renderPrompt: aiPromptPreviewController.render
   },
@@ -4128,7 +4145,7 @@ const filterPresetController = appRuntime?.featureFactories?.createFilterPresetC
     if (els.reviewStateFilter) els.reviewStateFilter.value = preset.reviewState;
     if (els.aiSegmentFilter) els.aiSegmentFilter.value = preset.aiState;
     segmentFilterService.invalidate();
-    renderSegments();
+    segmentGridPresentationController.render();
     const first = segmentFilterService.firstVisible();
     if (first !== -1) await segmentNavigationController.select(first);
   },
@@ -4334,7 +4351,7 @@ const focusModeController = appRuntime.featureFactories.createFocusModeControlle
   menu: applicationMenuController,
   frame: { request: (callback) => requestAnimationFrame(callback) },
   editor: {
-    renderSegments: (options) => renderSegments(options),
+    renderSegments: segmentGridPresentationController.render,
     focusActive: () => targetEditController.focusActive()
   }
 });
@@ -4438,7 +4455,7 @@ const editorFilterControlsController =
     navigation: applicationNavigation,
     store: editorFilterStore,
     filters: { firstVisible: segmentFilterService.firstVisible },
-    presentation: { renderSegments, renderProgress },
+    presentation: { renderSegments: segmentGridPresentationController.render, renderProgress },
     preset: { markCustom: () => filterPresetController?.markCustom?.() },
     selection: { select: (index) => segmentNavigationController.select(index) }
   });
@@ -4468,7 +4485,7 @@ const applicationEventWiringController =
     },
     segmentGrid: {
       mountScroll: (listener) => verticalFeatureState.segmentGrid.mountScroll(listener),
-      renderSegments: (options) => renderSegments(options)
+      renderSegments: segmentGridPresentationController.render
     },
     lifecycles: {
       applicationMenu: applicationMenuController,
@@ -5692,70 +5709,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-function spacerRow(height) {
-  const row = document.createElement("tr");
-  row.className = "segment-spacer-row";
-  row.setAttribute("aria-hidden", "true");
-  const cell = document.createElement("td");
-  cell.colSpan = 4;
-  cell.style.height = `${Math.max(0, height)}px`;
-  cell.style.padding = "0";
-  cell.style.border = "0";
-  row.append(cell);
-  return row;
-}
-
-function segmentWindow(indexes) {
-  return verticalFeatureState.segmentGrid.calculateWindow(indexes);
-}
-
-function renderSegments(options = {}) {
-  const indexes = segmentFilterService.visibleIndexes();
-  const scrollTop = els.segmentGridWrap?.scrollTop || 0;
-  if (!indexes.length) {
-    verticalFeatureState.segmentGrid.resetWindow();
-    const row = document.createElement("tr");
-    const cell = document.createElement("td");
-    cell.colSpan = 4;
-    cell.className = "muted";
-    cell.textContent = uiLocalizationService.source("No segments match this view.");
-    row.append(cell);
-    els.segmentBody.replaceChildren(row);
-    return;
-  }
-  const win = segmentWindow(indexes);
-  const previousWindow = verticalFeatureState.segmentGrid.getWindow();
-  if (
-    options.fromScroll &&
-    win.start === previousWindow.start &&
-    win.end === previousWindow.end &&
-    win.total === previousWindow.total
-  ) {
-    return;
-  }
-  const activeElement = document.activeElement;
-  if (options.fromScroll && els.segmentGridWrap.contains(activeElement) && !win.indexes.includes(applicationStore.getState().navigation.activeIndex)) {
-    activeElement.blur();
-  }
-  verticalFeatureState.segmentGrid.commitWindow(win);
-  const topHeight = win.start * SEGMENT_ROW_HEIGHT;
-  const bottomHeight = (indexes.length - win.end) * SEGMENT_ROW_HEIGHT;
-  const fragment = document.createDocumentFragment();
-  if (topHeight) fragment.append(spacerRow(topHeight));
-  win.indexes.forEach((index) => fragment.append(segmentRowPresentationService.create(index)));
-  if (bottomHeight) fragment.append(spacerRow(bottomHeight));
-  els.segmentBody.replaceChildren(fragment);
-  if (options.preserveScroll && els.segmentGridWrap.scrollTop !== scrollTop) {
-    els.segmentGridWrap.scrollTop = scrollTop;
-  }
-}
-
-function scheduleRowUpdate(index) {
-  verticalFeatureState.segmentGrid.scheduleRowUpdate(index, (indexes) =>
-    indexes.forEach(segmentRowPresentationService.update)
-  );
-}
 
 function scheduleRevisionHistoryRender() {
   if (state.revisionHistoryFrame) return;

@@ -150,6 +150,13 @@ const protectedTagInspectionServicePath = path.join(
   "editor",
   "protected-tag-inspection-service.js"
 );
+const segmentGridPresentationControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "editor",
+  "segment-grid-presentation-controller.js"
+);
 const segmentMarkupPresentationServicePath = path.join(
   root,
   "src",
@@ -575,6 +582,11 @@ function main() {
     messagesByText,
     protectedTagInspectionServicePath,
     "src/features/editor/protected-tag-inspection-service.js"
+  );
+  extractScript(
+    messagesByText,
+    segmentGridPresentationControllerPath,
+    "src/features/editor/segment-grid-presentation-controller.js"
   );
   extractScript(
     messagesByText,
