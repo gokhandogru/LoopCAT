@@ -248,7 +248,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       termBaseName: "Workflow TB"
     });
     await projectCollectionLoadController.load(false);
-    await openProject(project.id);
+    await projectOpenController.open(project.id);
     assert(editorSessionStore.getProject()?.id === project.id, "real app project creation");
     els.localAiSourceCodeInput.value = "en";
     els.localAiSourceLangInput.value = languageInputService.optionValue("es");
@@ -4988,11 +4988,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       termBaseName: "Workflow TB"
     });
     await projectCollectionLoadController.load(false);
-    await openProject(secondProject.id);
+    await projectOpenController.open(secondProject.id);
     const firstProjectSegments = await getProjectSegments(project.id);
     assert(firstProjectSegments.some((segment) => segment.target === switchText), "project switch flushes pending segment edits");
 
-    await openProject(project.id);
+    await projectOpenController.open(project.id);
     openProjectDialog("create");
     document.querySelector("#projectNameInput").value = `Workflow Create Activity ${Date.now()}`;
     document.querySelector("#projectDomainInput").value = "Creation warning";
@@ -5014,7 +5014,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await deleteProject(createActivityProject.id);
     workspaceDirtyStateController.clear(createActivityProject.id);
     await projectCollectionLoadController.load(false);
-    await openProject(project.id);
+    await projectOpenController.open(project.id);
 
     const deleteProjectFixture = await createProject({
       name: `Workflow Delete ${Date.now()}`,
@@ -5029,7 +5029,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       documentType: "text"
     });
     await projectCollectionLoadController.load(false);
-    await openProject(deleteProjectFixture.id);
+    await projectOpenController.open(deleteProjectFixture.id);
     const deleteText = `Silme oncesi hedef ${Date.now()}`;
     targetEditController.updateDraft(0, deleteText);
     assert(autosaveService.size() > 0, "pending save exists before project delete");
@@ -5078,7 +5078,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       termBaseName: "Workflow TB"
     });
     await projectCollectionLoadController.load(false);
-    await openProject(deleteFileFixture.id);
+    await projectOpenController.open(deleteFileFixture.id);
     await projectDocumentImportController.importLocalization(new File(["<!doctype html><html><body><p>Delete file after typing.</p></body></html>"], "delete-file.html", { type: "text/html" }));
     const deleteFileDocument = editorSessionStore.getProject().documents.find((item) => item.name === "delete-file.html");
     const deleteFileText = `Silinen dosya hedefi ${Date.now()}`;
@@ -5242,7 +5242,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(savedWorkspacePackages.some((pkg) => pkg.project.id === project.id && pkg.segments.some((segment) => segment.target === switchText)) && !state.workspaceDirtyProjectIds.has(project.id), "background workspace autosave saves dirty inactive project packages");
     assert(!workspaceDirtyStateController.readStored().includes(project.id), "workspace autosave clears persisted dirty marker");
 
-    await openProject(project.id);
+    await projectOpenController.open(project.id);
     state.workspaceStatus = { supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 0, resourceCount: 0, backupCount: 0 };
     workspaceDirtyStateController.clearAll();
     const pendingWorkspaceAutosavePackages = [];
@@ -5286,7 +5286,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const cleanBeforeUnloadResult = window.dispatchEvent(cleanBeforeUnloadEvent);
     assert(cleanBeforeUnloadResult && !cleanBeforeUnloadEvent.defaultPrevented, "clean workspace does not warn before closing");
 
-    await openProject(project.id);
+    await projectOpenController.open(project.id);
     workspaceDirtyStateController.clearAll();
     const workspaceSaveActivityPackages = [];
     const originalWorkspaceSaveActivitySave = workspaceStorage.saveProjectPackage;
@@ -5312,7 +5312,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       workspaceDirtyStateController.clearAll();
     }
 
-    await openProject(project.id);
+    await projectOpenController.open(project.id);
     workspaceDirtyStateController.clearAll();
     const workspaceWriteFailureActivityCount = (await listActivityEvents(project.id))
       .filter((event) => event.type === "workspace-save" && event.summary === "Project package saved to workspace folder").length;
@@ -5536,7 +5536,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await waitFor(() => state.workspaceDirtyProjectIds.has(project.id), "linked TB row save dirty marker");
     assert(state.workspaceDirtyProjectIds.has(project.id), "TB resource row save marks linked project package dirty");
 
-    await openProject(project.id);
+    await projectOpenController.open(project.id);
     await openProjectFile(documentInfo.id);
     const termSuggestionSegmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentInfo.id && (segment.source || segment.text || "").includes("Hello"));
     assert(termSuggestionSegmentIndex >= 0, "term suggestion regression has source segment");
@@ -5762,7 +5762,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     }
 
     await projectCollectionLoadController.load(false);
-    await openProject(project.id);
+    await projectOpenController.open(project.id);
     const packageSourceSegments = await getProjectSegments(project.id);
     const originalSegmentIds = new Set(packageSourceSegments.map((segment) => segment.id));
     const collisionTm = {
@@ -5848,7 +5848,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "project package import activity belongs to the imported project"
     );
 
-    await openProject(project.id);
+    await projectOpenController.open(project.id);
     const documentCountBeforeBadImport = editorSessionStore.getProject().documents.length;
     const badProjectImportOk = await fileImportService.runTask("Project file import", () => projectDocumentImportController.importFile(new File(["{ broken json"], "broken.json", { type: "application/json" })));
     assert(!badProjectImportOk && editorSessionStore.getProject().documents.length === documentCountBeforeBadImport && state.lastValidationReport?.errors?.[0]?.startsWith("Project file import failed:"), "damaged project file import reports failure without changing project documents");

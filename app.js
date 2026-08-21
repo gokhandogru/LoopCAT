@@ -1381,6 +1381,41 @@ const projectSummaryController = appRuntime.featureFactories.createProjectSummar
   }
 });
 
+const projectOpenController = appRuntime.featureFactories.createProjectOpenController({
+  autosave: { flush: (...args) => autosaveService.flush(...args) },
+  session: {
+    getProject: editorSessionStore.getProject,
+    getProjects: editorSessionStore.getProjects,
+    getSegments: editorSessionStore.getSegments,
+    replaceProject: editorSessionStore.replaceProject,
+    replaceSegments: editorSessionStore.replaceSegments,
+    replaceActivityEvents: editorSessionStore.replaceActivityEvents
+  },
+  command: {
+    setProjectId: (projectId) => {
+      state.commandProjectId = projectId;
+    }
+  },
+  repository: {
+    listSegments: getProjectSegments,
+    listActivity: listActivityEvents
+  },
+  histories: { prepare: (...args) => segmentTargetStateService.prepareHistories(...args) },
+  terms: { refresh: (...args) => refreshProjectTerms(...args) },
+  filters: {
+    ready: () => filterPresetReady,
+    restore: (projectId) => filterPresetController?.restoreForProject?.(projectId)
+  },
+  navigation: {
+    open: (...args) => applicationNavigation?.openProject?.(...args)
+  },
+  presentation: { renderAll },
+  context: {
+    getView: () => applicationStore.getState().navigation.view,
+    refreshEditor: (...args) => editorContextController.refresh(...args)
+  }
+});
+
 const projectCollectionLoadController =
   appRuntime.featureFactories.createProjectCollectionLoadController({
     repository: { list: listProjects },
@@ -1397,7 +1432,7 @@ const projectCollectionLoadController =
       renderEditor,
       renderTrashSummary: () => applicationTrashController.renderSummary()
     },
-    selection: { open: openProject }
+    selection: { open: projectOpenController.open }
   });
 
 const applicationCommandHistoryController =
@@ -1421,7 +1456,7 @@ const applicationCommandHistoryController =
     session: editorSessionStore,
     projects: {
       load: projectCollectionLoadController.load,
-      open: (projectId) => openProject(projectId),
+      open: projectOpenController.open,
       readSegments: (projectId) => getProjectSegments(projectId),
       prepareHistories: (segments) => segmentTargetStateService.prepareHistories(segments)
     },
@@ -4443,7 +4478,7 @@ const projectImportRestoreController =
     },
     projects: {
       load: projectCollectionLoadController.load,
-      open: openProject
+      open: projectOpenController.open
     },
     workspace: {
       isConnected: () => Boolean(state.workspaceStatus?.connected),
@@ -4694,7 +4729,7 @@ const projectDialogSaveController =
       update: updateProject,
       create: createProject,
       load: projectCollectionLoadController.load,
-      open: openProject
+      open: projectOpenController.open
     },
     creator: { remember: projectNameService.rememberCreator },
     language: {
@@ -5404,25 +5439,10 @@ function renderProjectList() {
       button,
       `<strong>${applicationTextSafetyService.displaySafeHtml(project.name)}</strong><span>${applicationTextSafetyService.escapeHtml(projectLanguageContextController.display(project))}</span><span>${project.sourceFileName ? applicationTextSafetyService.displaySafeHtml(project.sourceFileName) : uiLocalizationService.labelHtml("noSourceFile")}</span>`
     );
-    button.addEventListener("click", () => openProject(project.id));
+    button.addEventListener("click", () => projectOpenController.open(project.id));
     fragment.append(button);
   });
   els.projectList.replaceChildren(fragment);
-}
-
-async function openProject(projectId) {
-  await autosaveService.flush();
-  editorSessionStore.replaceProject(editorSessionStore.getProjects().find((project) => project.id === projectId) || null);
-  state.commandProjectId = editorSessionStore.getProject()?.id || projectId || "";
-  editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(editorSessionStore.getProject() ? await getProjectSegments(projectId) : []));
-  editorSessionStore.replaceActivityEvents(editorSessionStore.getProject() ? await listActivityEvents(projectId) : []);
-  await refreshProjectTerms();
-  const activeIndex = editorSessionStore.getSegments().length ? 0 : -1;
-  await filterPresetReady;
-  await filterPresetController?.restoreForProject?.(editorSessionStore.getProject()?.id || projectId);
-  applicationNavigation?.openProject?.(editorSessionStore.getProject()?.id || projectId, activeIndex);
-  renderAll();
-  if (applicationStore.getState().navigation.view === "editor") await editorContextController.refresh();
 }
 
 async function openProjectFile(documentId) {
@@ -5676,7 +5696,7 @@ function createProjectTile(project) {
   openButton.type = "button";
   openButton.textContent = uiLocalizationService.source("Open");
   openButton.setAttribute("aria-label", uiLocalizationService.source("Open project {value1}", { value1: projectLabel }));
-  openButton.addEventListener("click", () => openProject(project.id));
+  openButton.addEventListener("click", () => projectOpenController.open(project.id));
   tile.querySelector("footer").append(deleteButton, openButton);
   return tile;
 }

@@ -690,6 +690,8 @@ const projectNameServiceJs = readText("src/features/projects/project-name-servic
 const projectNameServiceUnitTests = readText("tests/unit/project-name-service.test.cjs");
 const projectRecordLookupServiceJs = readText("src/features/projects/project-record-lookup-service.js");
 const projectRecordLookupServiceUnitTests = readText("tests/unit/project-record-lookup-service.test.cjs");
+const projectOpenControllerJs = readText("src/features/projects/project-open-controller.js");
+const projectOpenControllerUnitTests = readText("tests/unit/project-open-controller.test.cjs");
 const projectCollectionLoadControllerJs = readText("src/features/projects/project-collection-load-controller.js");
 const projectCollectionLoadControllerUnitTests = readText("tests/unit/project-collection-load-controller.test.cjs");
 const projectDocumentManifestServiceJs = readText("src/features/projects/project-document-manifest-service.js");
@@ -1198,6 +1200,126 @@ for (const testName of [
 }
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectOpenController } from "../features/projects/project-open-controller.js";',
+  "The application runtime must install the checked project-open controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectOpenController,",
+  "The application runtime must expose the checked project-open controller factory."
+);
+for (const snippet of [
+  "ProjectOpenController requires an autosave boundary.",
+  "ProjectOpenController requires project session boundaries.",
+  "ProjectOpenController requires command, repository, history, and term boundaries.",
+  "ProjectOpenController requires filter, navigation, presentation, and context boundaries.",
+  "async function open(projectId)",
+  "await autosave.flush();",
+  "session.replaceProject(session.getProjects().find((project) => project.id === projectId) || null);",
+  'command.setProjectId(session.getProject()?.id || projectId || "");',
+  "session.getProject() ? await repository.listSegments(projectId) : []",
+  "session.replaceSegments(histories.prepare(",
+  "session.replaceActivityEvents(session.getProject() ? await repository.listActivity(projectId) : []);",
+  "await terms.refresh();",
+  "const activeIndex = session.getSegments().length ? 0 : -1;",
+  "await filters.ready();",
+  "await filters.restore(session.getProject()?.id || projectId);",
+  "navigation.open(session.getProject()?.id || projectId, activeIndex);",
+  "presentation.renderAll();",
+  'if (context.getView() === "editor") await context.refreshEditor();',
+  "return Object.freeze({ open });"
+]) {
+  assertIncludes(
+    projectOpenControllerJs,
+    snippet,
+    `ProjectOpenController must retain characterized selection, loading, restoration, navigation, and presentation policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "const projectOpenController = appRuntime.featureFactories.createProjectOpenController({",
+  "autosave: { flush: (...args) => autosaveService.flush(...args) }",
+  "getProject: editorSessionStore.getProject",
+  "getProjects: editorSessionStore.getProjects",
+  "getSegments: editorSessionStore.getSegments",
+  "replaceProject: editorSessionStore.replaceProject",
+  "replaceSegments: editorSessionStore.replaceSegments",
+  "replaceActivityEvents: editorSessionStore.replaceActivityEvents",
+  "state.commandProjectId = projectId",
+  "listSegments: getProjectSegments",
+  "listActivity: listActivityEvents",
+  "histories: { prepare: (...args) => segmentTargetStateService.prepareHistories(...args) }",
+  "terms: { refresh: (...args) => refreshProjectTerms(...args) }",
+  "ready: () => filterPresetReady",
+  "restore: (projectId) => filterPresetController?.restoreForProject?.(projectId)",
+  "open: (...args) => applicationNavigation?.openProject?.(...args)",
+  "presentation: { renderAll }",
+  "getView: () => applicationStore.getState().navigation.view",
+  "refreshEditor: (...args) => editorContextController.refresh(...args)"
+]) {
+  assertIncludes(appJs, boundary, `project-open composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/createProjectOpenController\(/g) || []).length === 1 &&
+    (appJs.match(/\bprojectOpenController\.open\b/g) || []).length === 6 &&
+    (appWorkflowDriverJs.match(/\bprojectOpenController\.open\b/g) || []).length === 12,
+  "app.js must compose one project-open controller and all six application and twelve workflow consumers must call it directly."
+);
+const appWithoutInjectedNavigationOpen = appJs.replace("applicationNavigation?.openProject?.(...args)", "");
+assert(
+  !/\bopenProject\b/.test(appWithoutInjectedNavigationOpen) && !/\bopenProject\b/.test(appWorkflowDriverJs),
+  "openProject must not return to app.js or the workflow driver after project-open extraction."
+);
+assert(
+  !appJs.includes("editorSessionStore.replaceProject(editorSessionStore.getProjects().find") &&
+    !appJs.includes("editorSessionStore.replaceActivityEvents(editorSessionStore.getProject()") &&
+    !appJs.includes("await filterPresetReady;"),
+  "project selection, contextual loading, and filter restoration orchestration must not return to app.js."
+);
+assert(
+  appJs.indexOf("const projectSummaryController =") < appJs.indexOf("const projectOpenController =") &&
+    appJs.indexOf("const projectOpenController =") < appJs.indexOf("const projectCollectionLoadController ="),
+  "ProjectOpenController must follow project-summary policy and precede collection loading and its direct consumers."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "autosaveService",
+  "editorSessionStore",
+  "state.commandProjectId",
+  "getProjectSegments",
+  "listActivityEvents",
+  "segmentTargetStateService",
+  "refreshProjectTerms",
+  "filterPreset",
+  "applicationNavigation",
+  "applicationStore",
+  "editorContextController",
+  "document.",
+  "els."
+]) {
+  assert(
+    !projectOpenControllerJs.includes(forbiddenOwner),
+    `ProjectOpenController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectOpenController preserves the complete selected-project sequence and identities",
+  "ProjectOpenController preserves missing-project empty replacements and fallback IDs",
+  "ProjectOpenController preserves strict first-match lookup and direct malformed failures",
+  "ProjectOpenController loads segments before activity and prepares before replacement",
+  "ProjectOpenController awaits readiness and restoration with live project-ID reads",
+  "ProjectOpenController does not await navigation and skips editor context outside the editor",
+  "ProjectOpenController preserves falsy selected-ID precedence",
+  "ProjectOpenController preserves every dependency and late presentation failure boundary",
+  "ProjectOpenController validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectOpenControllerUnitTests,
+    testName,
+    `focused project-open tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
   'import { createProjectCollectionLoadController } from "../features/projects/project-collection-load-controller.js";',
   "The application runtime must install the checked project-collection load controller."
 );
@@ -1243,7 +1365,7 @@ for (const boundary of [
   "renderList: renderProjectList",
   "renderEditor,",
   "renderTrashSummary: () => applicationTrashController.renderSummary()",
-  "selection: { open: openProject }"
+  "selection: { open: projectOpenController.open }"
 ]) {
   assertIncludes(appJs, boundary, `project-collection load composition must retain the checked ${boundary} boundary.`);
 }
@@ -6895,7 +7017,7 @@ for (const boundary of [
   "focusActive: (selection) => targetEditController.focusActive(selection)",
   "session: editorSessionStore",
   "load: projectCollectionLoadController.load",
-  "open: (projectId) => openProject(projectId)",
+  "open: projectOpenController.open",
   "readSegments: (projectId) => getProjectSegments(projectId)",
   "prepareHistories: (segments) => segmentTargetStateService.prepareHistories(segments)",
   "getActiveIndex: () => applicationStore.getState().navigation.activeIndex",
@@ -10298,7 +10420,7 @@ for (const boundary of [
   "update: updateProject",
   "create: createProject",
   "load: projectCollectionLoadController.load",
-  "open: openProject",
+  "open: projectOpenController.open",
   "creator: { remember: projectNameService.rememberCreator }",
   "languageInputService.setInput(els.sourceLangInput, value)",
   "languageInputService.setInput(els.targetLangInput, value)",
@@ -10835,7 +10957,7 @@ for (const boundary of [
   "openProjects: applicationNavigation.openProjects",
   "clearSelection: applicationNavigation.clearSelection",
   "load: projectCollectionLoadController.load",
-  "open: openProject",
+  "open: projectOpenController.open",
   "clearDirty: workspaceDirtyStateController.clear",
   "markDirty: workspaceDirtyStateController.mark",
   "clearDirtyMarkers: workspaceDirtyStateController.clearAll",
