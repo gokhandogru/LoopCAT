@@ -794,6 +794,14 @@ const projectResourceContextService = appRuntime.featureFactories.createProjectR
   names: { clean: projectNameService.clean, unique: projectNameService.unique },
   ids: { make: makeId }
 });
+const projectTmMatchService = appRuntime.featureFactories.createProjectTmMatchService({
+  candidates: {
+    single: getTmMatchCandidates,
+    batch: getTmMatchCandidateBatches
+  },
+  scoring: { score: scoreTmEntries },
+  worker: workerClient
+});
 const applicationActiveSegmentService = appRuntime.featureFactories.createApplicationActiveSegmentService({
   segments: { getAll: editorSessionStore.getSegments },
   navigation: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex }
@@ -1368,7 +1376,7 @@ const tmMatchesController = appRuntime.featureFactories.createTmMatchesControlle
   },
   tm: {
     getNames: projectResourceContextService.tmNames,
-    findMatches: findProjectTmMatches
+    findMatches: projectTmMatchService.find
   },
   localization: uiLocalizationService,
   text: { escapeHtml: applicationTextSafetyService.escapeHtml },
@@ -2195,7 +2203,7 @@ const tmPretranslationController = appRuntime.featureFactories.createTmPretransl
   },
   tm: {
     getNames: projectResourceContextService.tmNames,
-    findMatchesBatch: findProjectTmMatchesBatch
+    findMatchesBatch: projectTmMatchService.findBatch
   },
   commands: {
     bus: appRuntime.commands.bus,
@@ -2327,7 +2335,7 @@ const aiSegmentContextService = appRuntime.featureFactories.createAiSegmentConte
   },
   lookup: {
     findTerms,
-    findTmMatches: findProjectTmMatches
+    findTmMatches: projectTmMatchService.find
   },
   settings: { read: () => aiRuntimeSettingsService.localSettingsFromForm() },
   segments: { getAll: editorSessionStore.getSegments },
@@ -5035,33 +5043,6 @@ const reviewStateController = appRuntime.featureFactories.createReviewStateContr
   logger: console
 });
 dialogLifecycleController?.mount?.();
-
-async function rankTmMatchesFromEntries(entries, options) {
-  const fallback = () => Promise.resolve(scoreTmEntries(entries, options));
-  if (!workerClient?.findTmMatches) return fallback();
-  return workerClient.findTmMatches({ entries, options, fallback });
-}
-
-async function findProjectTmMatches(options) {
-  const entries = await getTmMatchCandidates(options);
-  return rankTmMatchesFromEntries(entries, options);
-}
-
-async function rankTmMatchBatches(candidateBatches, optionsList) {
-  const fallback = () => Promise.resolve(candidateBatches.map((entries, index) => scoreTmEntries(entries, optionsList[index] || {})));
-  if (!workerClient?.findTmMatchesBatch) return fallback();
-  return workerClient.findTmMatchesBatch({ entries: candidateBatches, options: optionsList, fallback });
-}
-
-async function findProjectTmMatchesBatch(optionsList) {
-  const requests = Array.isArray(optionsList) ? optionsList : [];
-  if (!requests.length) return [];
-  if (!getTmMatchCandidateBatches) {
-    return Promise.all(requests.map((options) => findProjectTmMatches(options)));
-  }
-  const candidateBatches = await getTmMatchCandidateBatches(requests);
-  return rankTmMatchBatches(candidateBatches, requests);
-}
 
 function projectResourceSearchText(project) {
   const summary = projectResourceContextService.summary(project);

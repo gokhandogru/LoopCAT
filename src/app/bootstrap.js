@@ -133,6 +133,7 @@ import { createProjectLanguagePairShortcutsController } from "../features/projec
 import { createProjectNameService } from "../features/projects/project-name-service.js";
 import { createProjectDocumentManifestService } from "../features/projects/project-document-manifest-service.js";
 import { createProjectResourceContextService } from "../features/projects/project-resource-context-service.js";
+import { createProjectTmMatchService } from "../features/projects/project-tm-match-service.js";
 import { createProjectLanguageContextController } from "../features/projects/project-language-context-controller.js";
 import { createProjectDocumentStatisticsService } from "../features/projects/project-document-statistics-service.js";
 import { createProjectDocumentCatalogService } from "../features/projects/project-document-catalog-service.js";
@@ -316,6 +317,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createProjectDocumentStatisticsService,
       createProjectDocumentManifestService,
       createProjectResourceContextService,
+      createProjectTmMatchService,
       createProjectLanguageContextController,
       createProjectLanguagePairShortcutsController,
       createProjectNameService,

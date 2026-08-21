@@ -249,6 +249,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-name-service.js",
   "src/features/projects/project-document-manifest-service.js",
   "src/features/projects/project-resource-context-service.js",
+  "src/features/projects/project-tm-match-service.js",
   "src/features/projects/project-language-pair-shortcuts-controller.js",
   "src/features/projects/project-language-context-controller.js",
   "src/features/projects/project-document-statistics-service.js",
@@ -385,6 +386,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-name-service.test.cjs",
   "tests/unit/project-document-manifest-service.test.cjs",
   "tests/unit/project-resource-context-service.test.cjs",
+  "tests/unit/project-tm-match-service.test.cjs",
   "tests/unit/project-language-pair-shortcuts-controller.test.cjs",
   "tests/unit/project-language-context-controller.test.cjs",
   "tests/unit/project-document-statistics-service.test.cjs",
@@ -529,9 +531,7 @@ const localizationDownloadMimeTypeServiceUnitTests = readText(
 const applicationTrashControllerJs = readText("src/app/application-trash-controller.js");
 const applicationTrashControllerUnitTests = readText("tests/unit/application-trash-controller.test.cjs");
 const applicationOfflineShellControllerJs = readText("src/app/application-offline-shell-controller.js");
-const applicationOfflineShellControllerUnitTests = readText(
-  "tests/unit/application-offline-shell-controller.test.cjs"
-);
+const applicationOfflineShellControllerUnitTests = readText("tests/unit/application-offline-shell-controller.test.cjs");
 const applicationUpdateControlsControllerJs = readText("src/app/application-update-controls-controller.js");
 const applicationUpdateControlsControllerUnitTests = readText(
   "tests/unit/application-update-controls-controller.test.cjs"
@@ -664,16 +664,12 @@ const projectResourceSelectionControllerUnitTests = readText(
 );
 const projectNameServiceJs = readText("src/features/projects/project-name-service.js");
 const projectNameServiceUnitTests = readText("tests/unit/project-name-service.test.cjs");
-const projectDocumentManifestServiceJs = readText(
-  "src/features/projects/project-document-manifest-service.js"
-);
-const projectDocumentManifestServiceUnitTests = readText(
-  "tests/unit/project-document-manifest-service.test.cjs"
-);
+const projectDocumentManifestServiceJs = readText("src/features/projects/project-document-manifest-service.js");
+const projectDocumentManifestServiceUnitTests = readText("tests/unit/project-document-manifest-service.test.cjs");
 const projectResourceContextServiceJs = readText("src/features/projects/project-resource-context-service.js");
-const projectResourceContextServiceUnitTests = readText(
-  "tests/unit/project-resource-context-service.test.cjs"
-);
+const projectResourceContextServiceUnitTests = readText("tests/unit/project-resource-context-service.test.cjs");
+const projectTmMatchServiceJs = readText("src/features/projects/project-tm-match-service.js");
+const projectTmMatchServiceUnitTests = readText("tests/unit/project-tm-match-service.test.cjs");
 const projectLanguagePairShortcutsControllerJs = readText(
   "src/features/projects/project-language-pair-shortcuts-controller.js"
 );
@@ -1046,6 +1042,113 @@ for (const testName of [
 }
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectTmMatchService } from "../features/projects/project-tm-match-service.js";',
+  "The application runtime must install the checked project TM-match service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectTmMatchService,",
+  "The application runtime must expose the checked project TM-match service factory."
+);
+for (const snippet of [
+  "ProjectTmMatchService requires a TM candidate boundary.",
+  "ProjectTmMatchService requires a TM scoring boundary.",
+  "const findCandidates = candidates.single",
+  "const score = scoring.score",
+  "async function rank(entries, matchOptions)",
+  "const fallback = () => Promise.resolve(score(entries, matchOptions))",
+  "if (!worker?.findTmMatches) return fallback()",
+  "return worker.findTmMatches({ entries, options: matchOptions, fallback })",
+  "async function find(matchOptions)",
+  "const entries = await findCandidates(matchOptions)",
+  "return rank(entries, matchOptions)",
+  "async function rankBatch(candidateBatches, optionsList)",
+  "candidateBatches.map((entries, index) => score(entries, optionsList[index] || {}))",
+  "if (!worker?.findTmMatchesBatch) return fallback()",
+  "return worker.findTmMatchesBatch({ entries: candidateBatches, options: optionsList, fallback })",
+  "async function findBatch(optionsList)",
+  "const requests = Array.isArray(optionsList) ? optionsList : []",
+  "if (!requests.length) return []",
+  "const findCandidateBatches = candidates.batch",
+  "return Promise.all(requests.map((matchOptions) => find(matchOptions)))",
+  "const candidateBatches = await findCandidateBatches(requests)",
+  "return rankBatch(candidateBatches, requests)",
+  "return Object.freeze({ rank, find, rankBatch, findBatch })"
+]) {
+  assertIncludes(
+    projectTmMatchServiceJs,
+    snippet,
+    `ProjectTmMatchService must retain characterized orchestration: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectTmMatchService({",
+  "single: getTmMatchCandidates",
+  "batch: getTmMatchCandidateBatches",
+  "scoring: { score: scoreTmEntries }",
+  "worker: workerClient"
+]) {
+  assertIncludes(appJs, boundary, `project TM-match composition must retain ${boundary}.`);
+}
+for (const [method, appCount, workflowCount] of [
+  ["find", 2, 0],
+  ["findBatch", 1, 0]
+]) {
+  assert(
+    (appJs.match(new RegExp(`\\bprojectTmMatchService\\.${method}\\b`, "g")) || []).length === appCount &&
+      (appWorkflowDriverJs.match(new RegExp(`\\bprojectTmMatchService\\.${method}\\b`, "g")) || []).length ===
+        workflowCount,
+    `all application and workflow project TM-match ${method} consumers must call ProjectTmMatchService directly.`
+  );
+}
+for (const removedOwner of [
+  "rankTmMatchesFromEntries",
+  "findProjectTmMatches",
+  "rankTmMatchBatches",
+  "findProjectTmMatchesBatch"
+]) {
+  assert(
+    !new RegExp(`function\\s+${removedOwner}\\b`).test(appJs) &&
+      !new RegExp(`function\\s+${removedOwner}\\b`).test(appWorkflowDriverJs),
+    `${removedOwner} must not return to app.js or the workflow driver.`
+  );
+}
+for (const forbiddenOwner of [
+  "getTmMatchCandidates",
+  "getTmMatchCandidateBatches",
+  "scoreTmEntries",
+  "workerClient",
+  "compatibilityModules",
+  "appRuntime",
+  "window.",
+  "document."
+]) {
+  assert(
+    !projectTmMatchServiceJs.includes(forbiddenOwner),
+    `ProjectTmMatchService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectTmMatchService preserves local single ranking as a resolved promise",
+  "ProjectTmMatchService preserves exact single worker requests and lazy fallback",
+  "ProjectTmMatchService preserves candidate lookup before single ranking and rejection",
+  "ProjectTmMatchService preserves local batch ranking order and per-index option fallbacks",
+  "ProjectTmMatchService preserves exact batch worker requests and lazy fallback",
+  "ProjectTmMatchService preserves array-only and empty batch short circuits",
+  "ProjectTmMatchService preserves concurrent per-request fallback and result ordering",
+  "ProjectTmMatchService preserves batched candidate lookup before ordered ranking",
+  "ProjectTmMatchService preserves live optional worker and batch availability",
+  "ProjectTmMatchService preserves scoring, worker, and candidate failure timing",
+  "ProjectTmMatchService validates boundaries and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectTmMatchServiceUnitTests,
+    testName,
+    `focused project TM-match tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
   'import { createProjectResourceContextService } from "../features/projects/project-resource-context-service.js";',
   "The application runtime must install the checked project resource-context service."
 );
@@ -1110,10 +1213,9 @@ for (const [method, appCount, workflowCount] of [
   ["summary", 5, 1]
 ]) {
   assert(
-    (appJs.match(new RegExp(`\\bprojectResourceContextService\\.${method}\\b`, "g")) || []).length ===
-      appCount &&
-      (appWorkflowDriverJs.match(new RegExp(`\\bprojectResourceContextService\\.${method}\\b`, "g")) || [])
-        .length === workflowCount,
+    (appJs.match(new RegExp(`\\bprojectResourceContextService\\.${method}\\b`, "g")) || []).length === appCount &&
+      (appWorkflowDriverJs.match(new RegExp(`\\bprojectResourceContextService\\.${method}\\b`, "g")) || []).length ===
+        workflowCount,
     `all application and workflow project-resource ${method} consumers must call ProjectResourceContextService directly.`
   );
 }
@@ -5840,7 +5942,7 @@ for (const snippet of [
   'if (browser.location.protocol === "loopcat:")',
   "Promise.all(registrations.map((registration) => registration.unregister()))",
   'if (!["http:", "https:"].includes(browser.location.protocol)) return',
-  "const hidden = !update || update.state === \"deferred\"",
+  'const hidden = !update || update.state === "deferred"',
   'ready: ["Update ready", "Reload when convenient. LoopCAT will save pending local work first."]',
   'error: ["Update paused", update.message || "Your current version is still active and your work was preserved."]',
   'const busy = ["saving", "activating", "reloading"].includes(update.state)',
@@ -8310,7 +8412,7 @@ for (const boundary of [
   "getProject: editorSessionStore.getProject",
   "getActiveSegment: applicationActiveSegmentService.get",
   "getNames: projectResourceContextService.tmNames",
-  "findMatches: findProjectTmMatches",
+  "findMatches: projectTmMatchService.find",
   "localization: uiLocalizationService",
   "text: { escapeHtml: applicationTextSafetyService.escapeHtml }",
   "safeHtml: { replace: replaceSafeHtml }",
