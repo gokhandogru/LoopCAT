@@ -1664,6 +1664,8 @@ for (const snippet of [
   "const project = projects.knownById(id);",
   "return { id, name: project?.name || id };",
   "autosaving: state.getAutosaving()",
+  "function renderProjectStorage()",
+  "recovery.renderProjectStorage({ status: state.getStatus() || {} });",
   "function renderStatus()",
   "if (!available) return;",
   "const status = state.getStatus() || {};",
@@ -1673,7 +1675,7 @@ for (const snippet of [
   "importBusy: Boolean(state.getImportTask())",
   "hasProject: Boolean(projects.getCurrent())",
   "renderRecovery();",
-  "return Object.freeze({ ids, renderStatus, renderRecovery });"
+  "return Object.freeze({ ids, renderStatus, renderRecovery, renderProjectStorage });"
 ]) {
   assertIncludes(
     workspaceRecoveryPresentationServiceJs,
@@ -1697,14 +1699,16 @@ for (const boundary of [
   "warnings: applicationStorageDurabilityController.warnings",
   "line: applicationStorageDurabilityController.line",
   "renderStatus: (viewModel) => recoveryWorkspaceController?.renderStatus?.(viewModel)",
-  "renderRecovery: (viewModel) => recoveryWorkspaceController?.renderRecovery?.(viewModel)"
+  "renderRecovery: (viewModel) => recoveryWorkspaceController?.renderRecovery?.(viewModel)",
+  "renderProjectStorage: (viewModel) => recoveryWorkspaceController?.renderProjectStorage?.(viewModel)"
 ]) {
   assertIncludes(appJs, boundary, `workspace recovery-presentation composition must retain ${boundary}.`);
 }
 for (const [method, appCount, workflowCount] of [
   ["ids", 1, 0],
   ["renderStatus", 10, 5],
-  ["renderRecovery", 3, 0]
+  ["renderRecovery", 3, 0],
+  ["renderProjectStorage", 3, 0]
 ]) {
   assert(
     (appJs.match(new RegExp(`\\bworkspaceRecoveryPresentationService\\.${method}\\b`, "g")) || []).length === appCount,
@@ -1716,7 +1720,12 @@ for (const [method, appCount, workflowCount] of [
     `workflow consumers must retain all ${workflowCount} direct WorkspaceRecoveryPresentationService.${method} references.`
   );
 }
-for (const removedHelper of ["renderWorkspaceStatus", "workspaceRecoveryProjectIds", "renderWorkspaceRecoveryPanel"]) {
+for (const removedHelper of [
+  "renderWorkspaceStatus",
+  "workspaceRecoveryProjectIds",
+  "renderWorkspaceRecoveryPanel",
+  "renderProjectStorageStatus"
+]) {
   assert(
     !new RegExp(`function\\s+${removedHelper}\\b`).test(appJs) &&
       !new RegExp(`function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs) &&
@@ -1753,6 +1762,8 @@ for (const testName of [
   "WorkspaceRecoveryPresentationService preserves recovery Set order and repeated dirty reads",
   "WorkspaceRecoveryPresentationService preserves partial recovery filtering failure timing",
   "WorkspaceRecoveryPresentationService preserves the unavailable-workspace status no-op",
+  "WorkspaceRecoveryPresentationService preserves live project-storage view models and fallback",
+  "WorkspaceRecoveryPresentationService preserves project-storage failure timing",
   "WorkspaceRecoveryPresentationService preserves exact status-before-recovery view models and order",
   "WorkspaceRecoveryPresentationService preserves falsy status, flag, and project-name fallbacks",
   "WorkspaceRecoveryPresentationService renders recovery directly even when workspace is unavailable",
@@ -10046,7 +10057,7 @@ for (const boundary of [
   "terms: refreshProjectTerms",
   "summaries: refreshProjectSummaries",
   "editorContext: editorContextController.refresh",
-  "renderStorageStatus: renderProjectStorageStatus",
+  "renderStorageStatus: workspaceRecoveryPresentationService.renderProjectStorage",
   "logProject: logProjectActivity",
   "record: recordActivityEvent",
   "isSupported: () => Boolean(workspaceStorage?.isSupported())",

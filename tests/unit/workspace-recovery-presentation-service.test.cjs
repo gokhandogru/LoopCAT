@@ -13,7 +13,7 @@ function loadFactory() {
 
 function createHarness(createWorkspaceRecoveryPresentationService, overrides = {}) {
   const calls = [];
-  const rendered = { status: [], recovery: [] };
+  const rendered = { status: [], recovery: [], projectStorage: [] };
   const model = {
     status: Object.hasOwn(overrides, "status") ? overrides.status : { supported: true, connected: true },
     durability: Object.hasOwn(overrides, "durability") ? overrides.durability : { checked: true, persisted: true },
@@ -113,6 +113,12 @@ function createHarness(createWorkspaceRecoveryPresentationService, overrides = {
         rendered.recovery.push(viewModel);
         if (overrides.renderRecoveryError) throw overrides.renderRecoveryError;
         return overrides.renderRecoveryResult;
+      },
+      renderProjectStorage(viewModel) {
+        calls.push(["renderProjectStorage"]);
+        rendered.projectStorage.push(viewModel);
+        if (overrides.renderProjectStorageError) throw overrides.renderProjectStorageError;
+        return overrides.renderProjectStorageResult;
       }
     }
   };
@@ -165,8 +171,49 @@ test("WorkspaceRecoveryPresentationService preserves the unavailable-workspace s
   const { createWorkspaceRecoveryPresentationService } = await loadFactory();
   const harness = createHarness(createWorkspaceRecoveryPresentationService, { available: false });
   assert.equal(harness.service.renderStatus(), undefined);
+  assert.equal(harness.service.renderProjectStorage(), undefined);
   assert.deepEqual(harness.calls, []);
-  assert.deepEqual(harness.rendered, { status: [], recovery: [] });
+  assert.deepEqual(harness.rendered, { status: [], recovery: [], projectStorage: [] });
+});
+
+test("WorkspaceRecoveryPresentationService preserves live project-storage view models and fallback", async () => {
+  const { createWorkspaceRecoveryPresentationService } = await loadFactory();
+  const status = { supported: true, connected: true };
+  const harness = createHarness(createWorkspaceRecoveryPresentationService, {
+    statusReads: [status, null],
+    renderProjectStorageResult: "ignored"
+  });
+
+  assert.equal(harness.service.renderProjectStorage(), undefined);
+  assert.equal(harness.service.renderProjectStorage(), undefined);
+  assert.deepEqual(harness.rendered.projectStorage, [{ status }, { status: {} }]);
+  assert.notStrictEqual(harness.rendered.projectStorage[0], harness.rendered.projectStorage[1]);
+  assert.deepEqual(
+    harness.calls.map((entry) => entry[0]),
+    ["getStatus", "renderProjectStorage", "getStatus", "renderProjectStorage"]
+  );
+});
+
+test("WorkspaceRecoveryPresentationService preserves project-storage failure timing", async () => {
+  const { createWorkspaceRecoveryPresentationService } = await loadFactory();
+  const statusFailure = new Error("status failed");
+  const statusHarness = createHarness(createWorkspaceRecoveryPresentationService, {
+    getStatusError: statusFailure
+  });
+  assert.throws(() => statusHarness.service.renderProjectStorage(), statusFailure);
+  assert.deepEqual(statusHarness.calls, [["getStatus"]]);
+  assert.deepEqual(statusHarness.rendered.projectStorage, []);
+
+  const renderFailure = new Error("project storage failed");
+  const renderHarness = createHarness(createWorkspaceRecoveryPresentationService, {
+    renderProjectStorageError: renderFailure
+  });
+  assert.throws(() => renderHarness.service.renderProjectStorage(), renderFailure);
+  assert.deepEqual(
+    renderHarness.calls.map((entry) => entry[0]),
+    ["getStatus", "renderProjectStorage"]
+  );
+  assert.equal(renderHarness.rendered.projectStorage.length, 1);
 });
 
 test("WorkspaceRecoveryPresentationService preserves exact status-before-recovery view models and order", async () => {
@@ -368,7 +415,8 @@ test("WorkspaceRecoveryPresentationService validates every boundary and exposes 
     ["durability", "warnings"],
     ["durability", "line"],
     ["recovery", "renderStatus"],
-    ["recovery", "renderRecovery"]
+    ["recovery", "renderRecovery"],
+    ["recovery", "renderProjectStorage"]
   ];
   for (const [owner, method] of required) {
     const dependencies = { ...valid, [owner]: { ...valid[owner], [method]: undefined } };
@@ -383,7 +431,7 @@ test("WorkspaceRecoveryPresentationService validates every boundary and exposes 
   );
   const service = createWorkspaceRecoveryPresentationService(valid);
   assert.equal(Object.isFrozen(service), true);
-  assert.deepEqual(Object.keys(service), ["ids", "renderStatus", "renderRecovery"]);
+  assert.deepEqual(Object.keys(service), ["ids", "renderStatus", "renderRecovery", "renderProjectStorage"]);
   assert.equal(
     Reflect.set(service, "ids", () => []),
     false

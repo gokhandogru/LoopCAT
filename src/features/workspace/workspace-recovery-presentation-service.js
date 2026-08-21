@@ -25,7 +25,8 @@ export function createWorkspaceRecoveryPresentationService({
     typeof durability?.warnings !== "function" ||
     typeof durability?.line !== "function" ||
     typeof recovery?.renderStatus !== "function" ||
-    typeof recovery?.renderRecovery !== "function"
+    typeof recovery?.renderRecovery !== "function" ||
+    typeof recovery?.renderProjectStorage !== "function"
   ) {
     throw new TypeError(
       "WorkspaceRecoveryPresentationService requires checked availability, state, dirty-state, project, durability, and recovery boundaries."
@@ -48,6 +49,11 @@ export function createWorkspaceRecoveryPresentationService({
     });
   }
 
+  function renderProjectStorage() {
+    if (!available) return;
+    recovery.renderProjectStorage({ status: state.getStatus() || {} });
+  }
+
   function renderStatus() {
     if (!available) return;
     const status = state.getStatus() || {};
@@ -64,5 +70,5 @@ export function createWorkspaceRecoveryPresentationService({
     renderRecovery();
   }
 
-  return Object.freeze({ ids, renderStatus, renderRecovery });
+  return Object.freeze({ ids, renderStatus, renderRecovery, renderProjectStorage });
 }
