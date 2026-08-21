@@ -287,6 +287,7 @@ const requiredReleaseFiles = [
   "src/features/import-export/import-export-controller.js",
   "src/features/workspace/recovery-workspace-controller.js",
   "src/features/workspace/workspace-backup-export-controller.js",
+  "src/features/workspace/workspace-backup-reminder-service.js",
   "src/features/workspace/workspace-dirty-state-controller.js",
   "src/features/workspace/workspace-health-repair-controller.js",
   "src/features/workspace/workspace-package-save-controller.js",
@@ -414,6 +415,7 @@ const requiredReleaseFiles = [
   "tests/unit/import-export-controller.test.cjs",
   "tests/unit/recovery-workspace-controller.test.cjs",
   "tests/unit/workspace-backup-export-controller.test.cjs",
+  "tests/unit/workspace-backup-reminder-service.test.cjs",
   "tests/unit/workspace-dirty-state-controller.test.cjs",
   "tests/unit/workspace-health-repair-controller.test.cjs",
   "tests/unit/workspace-package-save-controller.test.cjs",
@@ -805,6 +807,10 @@ const recoveryWorkspaceControllerJs = readText("src/features/workspace/recovery-
 const recoveryWorkspaceControllerUnitTests = readText("tests/unit/recovery-workspace-controller.test.cjs");
 const workspaceBackupExportControllerJs = readText("src/features/workspace/workspace-backup-export-controller.js");
 const workspaceBackupExportControllerUnitTests = readText("tests/unit/workspace-backup-export-controller.test.cjs");
+const workspaceBackupReminderServiceJs = readText("src/features/workspace/workspace-backup-reminder-service.js");
+const workspaceBackupReminderServiceUnitTests = readText(
+  "tests/unit/workspace-backup-reminder-service.test.cjs"
+);
 const workspaceDirtyStateControllerJs = readText("src/features/workspace/workspace-dirty-state-controller.js");
 const workspaceDirtyStateControllerUnitTests = readText("tests/unit/workspace-dirty-state-controller.test.cjs");
 const workspaceHealthRepairControllerJs = readText("src/features/workspace/workspace-health-repair-controller.js");
@@ -1596,6 +1602,154 @@ for (const testName of [
     workspaceRecoveryPresentationServiceUnitTests,
     testName,
     `focused workspace recovery-presentation tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createWorkspaceBackupReminderService } from "../features/workspace/workspace-backup-reminder-service.js";',
+  "the application runtime must install the checked workspace backup-reminder service."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createWorkspaceBackupReminderService,",
+  "the application runtime must expose the checked workspace backup-reminder service factory."
+);
+for (const snippet of [
+  'const BACKUP_REMINDER_STORAGE = "loopcat.backupReminder.dismissedUntil";',
+  "const BACKUP_REMINDER_PROJECT_DAYS = 7;",
+  "const BACKUP_REMINDER_EXPORT_DAYS = 7;",
+  "const BACKUP_REMINDER_ACTIVITY_COUNT = 25;",
+  "const BACKUP_REMINDER_ACTIVITY_SINCE_EXPORT = 10;",
+  "const BACKUP_REMINDER_DISMISS_HOURS = 24;",
+  "WorkspaceBackupReminderService requires checked session, storage, clock, and recovery boundaries.",
+  "function daysBetween(fromIso, toDate = clock.now())",
+  "const from = clock.create(fromIso || 0);",
+  "if (!Number.isFinite(from.getTime())) return Infinity;",
+  "Math.max(0, Math.floor((toDate.getTime() - from.getTime()) / 86400000))",
+  "function dismissals()",
+  'JSON.parse(storage.getItem(BACKUP_REMINDER_STORAGE) || "{}")',
+  "parsed && typeof parsed === \"object\" && !Array.isArray(parsed) ? parsed : {}",
+  "storage.removeItem(BACKUP_REMINDER_STORAGE);",
+  "function isDismissed(projectId, now = clock.now())",
+  "return until ? clock.create(until).getTime() > now.getTime() : false;",
+  "function dismiss(projectId = session.getProject()?.id, hours = BACKUP_REMINDER_DISMISS_HOURS)",
+  "clock.create(clock.nowMs() + hours * 60 * 60 * 1000).toISOString()",
+  "storage.setItem(BACKUP_REMINDER_STORAGE, JSON.stringify(dismissed));",
+  "failing to persist dismissal should not interrupt editing",
+  "function latestExport(project = session.getProject())",
+  '(entry) => entry.type === "project-package" && entry.createdAt',
+  "clock.create(b.createdAt || 0) - clock.create(a.createdAt || 0)",
+  "function info(project = session.getProject(), activityEvents = session.getActivityEvents(), now = clock.now())",
+  "if (!project || isDismissed(project.id, now)) return null;",
+  "const daysSinceExport = latest ? daysBetween(latest.createdAt, now) : Infinity;",
+  "(event) => clock.create(event.createdAt || 0).getTime() > exportTime",
+  "projectAgeDays >= BACKUP_REMINDER_PROJECT_DAYS",
+  "daysSinceExport >= BACKUP_REMINDER_EXPORT_DAYS",
+  "activitiesSinceExport >= BACKUP_REMINDER_ACTIVITY_SINCE_EXPORT",
+  "This project is ${projectAgeDays} day${projectAgeDays === 1 ? \"\" : \"s\"} old and has no project package export yet.",
+  "project activit${activitiesSinceExport === 1 ? \"y has\" : \"ies have\"} happened since the last project package export.",
+  "recovery.render({ info: reminderInfo });",
+  "return Object.freeze({ daysBetween, dismissals, isDismissed, dismiss, latestExport, info, render });"
+]) {
+  assertIncludes(
+    workspaceBackupReminderServiceJs,
+    snippet,
+    `WorkspaceBackupReminderService must retain characterized date, storage, threshold, copy, and presentation policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "let workspaceBackupReminderService;",
+  "appRuntime.featureFactories.createWorkspaceBackupReminderService({",
+  "getProject: editorSessionStore.getProject",
+  "getActivityEvents: editorSessionStore.getActivityEvents",
+  "getItem: (key) => localStorage.getItem(key)",
+  "setItem: (key, value) => localStorage.setItem(key, value)",
+  "removeItem: (key) => localStorage.removeItem(key)",
+  "now: () => new Date()",
+  "nowMs: () => Date.now()",
+  "create: (value) => new Date(value)",
+  "render: (viewModel) => recoveryWorkspaceController?.renderBackupReminder?.(viewModel)",
+  "dismissBackupReminder: () => workspaceBackupReminderService.dismiss()",
+  "renderBackupReminder: workspaceBackupReminderService.render"
+]) {
+  assertIncludes(appJs, boundary, `workspace backup-reminder composition must retain ${boundary}.`);
+}
+for (const [method, appCount, workflowCount] of [
+  ["dismiss", 1, 0],
+  ["render", 5, 2]
+]) {
+  assert(
+    (appJs.match(new RegExp(`\\bworkspaceBackupReminderService\\.${method}\\b`, "g")) || []).length === appCount,
+    `application consumers must retain all ${appCount} direct WorkspaceBackupReminderService.${method} references.`
+  );
+  assert(
+    (appWorkflowDriverJs.match(new RegExp(`\\bworkspaceBackupReminderService\\.${method}\\b`, "g")) || [])
+      .length === workflowCount,
+    `workflow consumers must retain all ${workflowCount} direct WorkspaceBackupReminderService.${method} references.`
+  );
+}
+for (const removedHelper of [
+  "daysBetween",
+  "backupReminderDismissals",
+  "isBackupReminderDismissed",
+  "dismissBackupReminder",
+  "latestProjectPackageExport",
+  "backupReminderInfo",
+  "renderBackupReminder"
+]) {
+  assert(
+    !new RegExp(`function\\s+${removedHelper}\\b`).test(appJs) &&
+      !new RegExp(`function\\s+${removedHelper}\\b`).test(appWorkflowDriverJs) &&
+      !new RegExp(`\\b${removedHelper}\\s*\\(`).test(appJs) &&
+      !new RegExp(`\\b${removedHelper}\\s*\\(`).test(appWorkflowDriverJs),
+    `${removedHelper} must not return as a coordinator/workflow helper or call target.`
+  );
+}
+assert(
+  !appJs.includes("BACKUP_REMINDER_") &&
+    !appWorkflowDriverJs.includes("BACKUP_REMINDER_") &&
+    appWorkflowDriverJs.includes('localStorage.removeItem("loopcat.backupReminder.dismissedUntil")'),
+  "backup-reminder constants must stay service-owned while workflow expiry fixtures retain the explicit storage key."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "localStorage",
+  "recoveryWorkspaceController",
+  "new Date",
+  "Date.now",
+  "state.",
+  "els."
+]) {
+  assert(
+    !workspaceBackupReminderServiceJs.includes(forbiddenOwner),
+    `WorkspaceBackupReminderService must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+assert(
+  !appJs.includes("activitiesSinceExport = (activityEvents || []).filter") &&
+    !appJs.includes("project?.exportHistory || []") &&
+    !appJs.includes("loopcat.backupReminder.dismissedUntil") &&
+    !appWorkflowDriverJs.includes("function backupReminderInfo"),
+  "backup-reminder date, storage, threshold, and copy orchestration must not return to app.js or the workflow driver."
+);
+for (const testName of [
+  "WorkspaceBackupReminderService preserves exact day arithmetic and invalid-date policy",
+  "WorkspaceBackupReminderService preserves dismissal JSON shapes and fresh records",
+  "WorkspaceBackupReminderService cleans malformed dismissal storage with exact failure timing",
+  "WorkspaceBackupReminderService preserves dismissal expiry and default-clock order",
+  "WorkspaceBackupReminderService dismisses the current project for 24 hours then rerenders",
+  "WorkspaceBackupReminderService preserves dismiss guards, custom hours, and contained writes",
+  "WorkspaceBackupReminderService selects the latest valid package export without mutating history",
+  "WorkspaceBackupReminderService preserves info default reads, project guard, and dismissal short circuit",
+  "WorkspaceBackupReminderService preserves every threshold and exact reminder copy",
+  "WorkspaceBackupReminderService renders the exact live info and preserves presentation failures",
+  "WorkspaceBackupReminderService validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    workspaceBackupReminderServiceUnitTests,
+    testName,
+    `focused workspace backup-reminder tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
@@ -10108,7 +10262,7 @@ for (const boundary of [
   "errorReport: fileImportService.errorReport",
   "renderValidation: renderValidationReport",
   "renderEditor,",
-  "renderBackupReminder",
+  "renderBackupReminder: workspaceBackupReminderService.render",
   "workspace: { markDirty: workspaceDirtyStateController.mark }",
   "status: { set: applicationSaveStatusController.set, mode: exportStatusMode }",
   "now: () => new Date().toISOString()",
@@ -10724,7 +10878,7 @@ for (const boundary of [
   "dirtyIds: workspaceDirtyStateController.ids",
   "recoveryIds: workspaceRecoveryPresentationService.ids",
   "renderValidation: renderValidationReport",
-  "renderBackupReminder,",
+  "renderBackupReminder: workspaceBackupReminderService.render,",
   "renderRecovery: workspaceRecoveryPresentationService.renderRecovery",
   "status: { set: applicationSaveStatusController.set }",
   "saveToFolder: () => Boolean(els.saveProjectToFolderInput?.checked)",

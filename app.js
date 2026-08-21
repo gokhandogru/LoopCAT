@@ -158,7 +158,6 @@ const {
   openAi: OPENAI_KEY_STORAGE,
   localAiLegacy: LOCAL_AI_KEY_STORAGE
 } = appRuntime.featureFactories.aiCredentialStorageKeys;
-const BACKUP_REMINDER_STORAGE = "loopcat.backupReminder.dismissedUntil";
 
 const SEGMENT_ROW_HEIGHT = 118;
 const SEGMENT_ROW_BUFFER = 8;
@@ -166,11 +165,6 @@ const TM_PRETRANSLATE_BATCH_SIZE = 100;
 const MAX_PORTABLE_JSON_BYTES = 50 * 1024 * 1024;
 const MAX_PROJECT_IMPORT_BYTES = 100 * 1024 * 1024;
 const MAX_RESOURCE_IMPORT_BYTES = 100 * 1024 * 1024;
-const BACKUP_REMINDER_PROJECT_DAYS = 7;
-const BACKUP_REMINDER_EXPORT_DAYS = 7;
-const BACKUP_REMINDER_ACTIVITY_COUNT = 25;
-const BACKUP_REMINDER_ACTIVITY_SINCE_EXPORT = 10;
-const BACKUP_REMINDER_DISMISS_HOURS = 24;
 const STORAGE_LOW_SPACE_BYTES = 250 * 1024 * 1024;
 const STORAGE_HIGH_USAGE_RATIO = 0.9;
 const XLIFF_DOCUMENT_TYPES = new Set(["xlf", "xliff", "sdlxliff"]);
@@ -4069,6 +4063,7 @@ let workspacePackageSaveController;
 let workspaceSyncController;
 let workspaceBackupExportController;
 let workspaceHealthRepairController;
+let workspaceBackupReminderService;
 const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecoveryWorkspaceController?.({
   elements: {
     menu: els.workspaceMenu,
@@ -4105,7 +4100,7 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
   repairWorkspace: (...args) => workspaceHealthRepairController.repair(...args),
   saveRecovery: (...args) => workspacePackageSaveController.saveRecovery(...args),
   exportRecoveryCopy: (...args) => projectExportController.exportProjectPackage(...args),
-  dismissBackupReminder: () => dismissBackupReminder(),
+  dismissBackupReminder: () => workspaceBackupReminderService.dismiss(),
   scheduleFrame: requestAnimationFrame,
   onError: (error, context) => {
     if (error?.name === "AbortError" && context?.phase === "choose-workspace") return;
@@ -4121,6 +4116,25 @@ const recoveryWorkspaceController = appRuntime?.featureFactories?.createRecovery
     }[context?.phase] || uiLocalizationService.source("Workspace action failed");
     applicationSaveStatusController.set(error?.message || fallback, "dirty");
     if (context?.phase === "save-recovery") workspaceRecoveryPresentationService.renderRecovery();
+  }
+});
+workspaceBackupReminderService = appRuntime.featureFactories.createWorkspaceBackupReminderService({
+  session: {
+    getProject: editorSessionStore.getProject,
+    getActivityEvents: editorSessionStore.getActivityEvents
+  },
+  storage: {
+    getItem: (key) => localStorage.getItem(key),
+    setItem: (key, value) => localStorage.setItem(key, value),
+    removeItem: (key) => localStorage.removeItem(key)
+  },
+  clock: {
+    now: () => new Date(),
+    nowMs: () => Date.now(),
+    create: (value) => new Date(value)
+  },
+  recovery: {
+    render: (viewModel) => recoveryWorkspaceController?.renderBackupReminder?.(viewModel)
   }
 });
 workspaceRecoveryPresentationService =
@@ -4269,7 +4283,7 @@ projectExportController = appRuntime.featureFactories.createProjectExportControl
   presentation: {
     renderValidation: renderValidationReport,
     renderEditor,
-    renderBackupReminder
+    renderBackupReminder: workspaceBackupReminderService.render
   },
   workspace: { markDirty: workspaceDirtyStateController.mark },
   status: { set: applicationSaveStatusController.set, mode: exportStatusMode },
@@ -4330,7 +4344,7 @@ workspacePackageSaveController =
     presentation: {
       renderWorkspaceStatus: workspaceRecoveryPresentationService.renderStatus,
       renderValidation: renderValidationReport,
-      renderBackupReminder,
+      renderBackupReminder: workspaceBackupReminderService.render,
       renderRecovery: workspaceRecoveryPresentationService.renderRecovery
     },
     status: { set: applicationSaveStatusController.set },
@@ -5151,70 +5165,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
   }
 });
 
-function daysBetween(fromIso, toDate = new Date()) {
-  const from = new Date(fromIso || 0);
-  if (!Number.isFinite(from.getTime())) return Infinity;
-  return Math.max(0, Math.floor((toDate.getTime() - from.getTime()) / 86400000));
-}
-
-function backupReminderDismissals() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(BACKUP_REMINDER_STORAGE) || "{}");
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    localStorage.removeItem(BACKUP_REMINDER_STORAGE);
-    return {};
-  }
-}
-
-function isBackupReminderDismissed(projectId, now = new Date()) {
-  const until = backupReminderDismissals()[projectId];
-  return until ? new Date(until).getTime() > now.getTime() : false;
-}
-
-function dismissBackupReminder(projectId = editorSessionStore.getProject()?.id, hours = BACKUP_REMINDER_DISMISS_HOURS) {
-  if (!projectId) return;
-  const dismissed = backupReminderDismissals();
-  dismissed[projectId] = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
-  try {
-    localStorage.setItem(BACKUP_REMINDER_STORAGE, JSON.stringify(dismissed));
-  } catch {
-    // The reminder is advisory; failing to persist dismissal should not interrupt editing.
-  }
-  renderBackupReminder();
-}
-
-function latestProjectPackageExport(project = editorSessionStore.getProject()) {
-  const history = (project?.exportHistory || []).filter((entry) => entry.type === "project-package" && entry.createdAt);
-  return history.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0] || null;
-}
-
-function backupReminderInfo(project = editorSessionStore.getProject(), activityEvents = editorSessionStore.getActivityEvents(), now = new Date()) {
-  if (!project || isBackupReminderDismissed(project.id, now)) return null;
-  const latestExport = latestProjectPackageExport(project);
-  const projectAgeDays = daysBetween(project.createdAt, now);
-  const daysSinceExport = latestExport ? daysBetween(latestExport.createdAt, now) : Infinity;
-  const exportTime = latestExport ? new Date(latestExport.createdAt).getTime() : 0;
-  const activitiesSinceExport = (activityEvents || []).filter((event) => new Date(event.createdAt || 0).getTime() > exportTime).length;
-  const isLongRunning = projectAgeDays >= BACKUP_REMINDER_PROJECT_DAYS || (activityEvents || []).length >= BACKUP_REMINDER_ACTIVITY_COUNT;
-  const needsBackup = !latestExport || daysSinceExport >= BACKUP_REMINDER_EXPORT_DAYS || activitiesSinceExport >= BACKUP_REMINDER_ACTIVITY_SINCE_EXPORT;
-  if (!isLongRunning || !needsBackup) return null;
-  const reason = !latestExport
-    ? `This project is ${projectAgeDays} day${projectAgeDays === 1 ? "" : "s"} old and has no project package export yet.`
-    : `${activitiesSinceExport} project activit${activitiesSinceExport === 1 ? "y has" : "ies have"} happened since the last project package export.`;
-  return {
-    reason,
-    projectAgeDays,
-    daysSinceExport,
-    activitiesSinceExport
-  };
-}
-
-function renderBackupReminder() {
-  const info = backupReminderInfo();
-  recoveryWorkspaceController?.renderBackupReminder?.({ info });
-}
-
 function knownProjectById(projectId) {
   return editorSessionStore.getProject()?.id === projectId
     ? editorSessionStore.getProject()
@@ -5343,7 +5293,7 @@ async function logProjectActivity(type, summary, detail = {}, project = editorSe
   const event = await recordActivityEvent({ projectId: project.id, type, summary, detail });
   if (event && editorSessionStore.getProject()?.id === project.id) {
     editorSessionStore.prependActivityEvent(event);
-    renderBackupReminder();
+    workspaceBackupReminderService.render();
   }
   workspaceDirtyStateController.mark(project.id);
   return event;
@@ -5390,7 +5340,7 @@ async function logOptionalActivityForProject(projectId, type, summary, detail = 
     const event = await recordActivityEvent({ projectId, type, summary, detail });
     if (editorSessionStore.getProject()?.id === projectId) {
       editorSessionStore.replaceActivityEvents(await listActivityEvents(projectId));
-      renderBackupReminder();
+      workspaceBackupReminderService.render();
     }
     workspaceDirtyStateController.mark(projectId);
     return { ok: true, event };
@@ -5550,7 +5500,7 @@ function renderEditor() {
   const hasProject = Boolean(editorSessionStore.getProject());
   void projectLanguageContextController.syncDesktopSpellcheck();
   workspaceRecoveryPresentationService.renderStatus();
-  renderBackupReminder();
+  workspaceBackupReminderService.render();
   if (verticalFeatureState?.editor) {
     verticalFeatureState.editor.renderShell({ view: applicationStore.getState().navigation.view, hasProject, inspectorOpen: state.inspectorOpen });
     verticalFeatureState.inspector.setVisible(applicationStore.getState().navigation.view === "editor" && state.inspectorOpen);

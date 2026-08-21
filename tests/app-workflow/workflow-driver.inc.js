@@ -4919,13 +4919,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const oldCreatedAt = new Date(Date.now() - 10 * 86400000).toISOString();
       editorSessionStore.replaceProject(await updateProject({ ...editorSessionStore.getProject(), createdAt: oldCreatedAt, exportHistory: [] }));
       editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((item) => (item.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : item)));
-      localStorage.removeItem(BACKUP_REMINDER_STORAGE);
-      renderBackupReminder();
+      localStorage.removeItem("loopcat.backupReminder.dismissedUntil");
+      workspaceBackupReminderService.render();
       assert(!els.backupReminderPanel.classList.contains("hidden") && els.backupReminderMessage.textContent.includes("no project package export"), "long-running project without package export shows backup reminder");
       els.backupReminderDismissBtn.click();
       assert(els.backupReminderPanel.classList.contains("hidden"), "backup reminder can be dismissed temporarily");
-      localStorage.removeItem(BACKUP_REMINDER_STORAGE);
-      renderBackupReminder();
+      localStorage.removeItem("loopcat.backupReminder.dismissedUntil");
+      workspaceBackupReminderService.render();
       assert(!els.backupReminderPanel.classList.contains("hidden"), "backup reminder returns after dismissal window is cleared");
       const packageExportActivityCountBeforeFailure = editorSessionStore.getActivityEvents().filter((event) => event.type === "export" && event.summary === "Project package exported").length;
       const packageFlushFailureText = `Paket dis aktarimi oncesi bekleyen hata ${Date.now()}`;
