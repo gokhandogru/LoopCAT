@@ -247,7 +247,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       tmName: "Workflow TM",
       termBaseName: "Workflow TB"
     });
-    await loadProjects(false);
+    await projectCollectionLoadController.load(false);
     await openProject(project.id);
     assert(editorSessionStore.getProject()?.id === project.id, "real app project creation");
     els.localAiSourceCodeInput.value = "en";
@@ -4987,7 +4987,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       tmName: "Workflow TM",
       termBaseName: "Workflow TB"
     });
-    await loadProjects(false);
+    await projectCollectionLoadController.load(false);
     await openProject(secondProject.id);
     const firstProjectSegments = await getProjectSegments(project.id);
     assert(firstProjectSegments.some((segment) => segment.target === switchText), "project switch flushes pending segment edits");
@@ -5013,7 +5013,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     Reflect.deleteProperty(els.projectForm, CREATE_PROJECT_ACTIVITY_FAILURE_TEST_FLAG);
     await deleteProject(createActivityProject.id);
     workspaceDirtyStateController.clear(createActivityProject.id);
-    await loadProjects(false);
+    await projectCollectionLoadController.load(false);
     await openProject(project.id);
 
     const deleteProjectFixture = await createProject({
@@ -5028,7 +5028,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       documentName: "delete.txt",
       documentType: "text"
     });
-    await loadProjects(false);
+    await projectCollectionLoadController.load(false);
     await openProject(deleteProjectFixture.id);
     const deleteText = `Silme oncesi hedef ${Date.now()}`;
     targetEditController.updateDraft(0, deleteText);
@@ -5077,7 +5077,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       tmName: "Workflow TM",
       termBaseName: "Workflow TB"
     });
-    await loadProjects(false);
+    await projectCollectionLoadController.load(false);
     await openProject(deleteFileFixture.id);
     await projectDocumentImportController.importLocalization(new File(["<!doctype html><html><body><p>Delete file after typing.</p></body></html>"], "delete-file.html", { type: "text/html" }));
     const deleteFileDocument = editorSessionStore.getProject().documents.find((item) => item.name === "delete-file.html");
@@ -5134,7 +5134,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     editorSessionStore.replaceSegments([]);
     applicationNavigation.openProjects();
     applicationNavigation.clearSelection();
-    await loadProjects(false);
+    await projectCollectionLoadController.load(false);
 
     state.workspaceStatus = { supported: true, connected: false, mode: "browser-cache", name: "", lastSyncedAt: "", projectCount: 0, resourceCount: 0, backupCount: 0 };
     workspaceDirtyStateController.clearAll();
@@ -5349,7 +5349,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       termBaseName: "Workflow TB"
     });
     await bulkPut("projects", [{ ...invalidWorkspaceProject, qaSettings: null }]);
-    await loadProjects(false);
+    await projectCollectionLoadController.load(false);
     workspaceDirtyStateController.clearAll();
     workspaceDirtyStateController.mark(invalidWorkspaceProject.id);
     const invalidPackageSaves = [];
@@ -5398,7 +5398,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       workspaceStorage.getStatus = originalInvalidGetWorkspaceStatus;
       await deleteProject(invalidWorkspaceProject.id);
       workspaceDirtyStateController.clear(invalidWorkspaceProject.id);
-      await loadProjects(false);
+      await projectCollectionLoadController.load(false);
     }
 
     let invalidBackupWriteRejected = false;
@@ -5417,7 +5417,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       termBaseName: "Workflow TB"
     });
     await bulkPut("projects", [{ ...invalidWorkspaceBackupProject, documents: {} }]);
-    await loadProjects(false);
+    await projectCollectionLoadController.load(false);
     const originalInvalidWorkspaceBackupExport = workspaceStorage.exportFullBackup;
     const invalidWorkspaceBackupWrites = [];
     workspaceStorage.exportFullBackup = async (backup) => {
@@ -5442,7 +5442,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       workspaceStorage.exportFullBackup = originalInvalidWorkspaceBackupExport;
       await deleteProject(invalidWorkspaceBackupProject.id);
       workspaceDirtyStateController.clear(invalidWorkspaceBackupProject.id);
-      await loadProjects(false);
+      await projectCollectionLoadController.load(false);
     }
 
     const restoreDirtyBackup = await exportAllData();
@@ -5732,7 +5732,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       state.workspaceStatus = originalWarningSyncWorkspaceStatus;
       await deleteProject(workspaceWarningPackage.project.id);
       workspaceDirtyStateController.clear(workspaceWarningPackage.project.id);
-      await loadProjects(false);
+      await projectCollectionLoadController.load(false);
     }
 
     const originalDirtySyncListWorkspacePackages = workspaceStorage.listProjectPackages;
@@ -5761,7 +5761,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       state.workspaceStatus = originalDirtySyncWorkspaceStatus;
     }
 
-    await loadProjects(false);
+    await projectCollectionLoadController.load(false);
     await openProject(project.id);
     const packageSourceSegments = await getProjectSegments(project.id);
     const originalSegmentIds = new Set(packageSourceSegments.map((segment) => segment.id));

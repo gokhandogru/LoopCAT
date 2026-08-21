@@ -690,6 +690,8 @@ const projectNameServiceJs = readText("src/features/projects/project-name-servic
 const projectNameServiceUnitTests = readText("tests/unit/project-name-service.test.cjs");
 const projectRecordLookupServiceJs = readText("src/features/projects/project-record-lookup-service.js");
 const projectRecordLookupServiceUnitTests = readText("tests/unit/project-record-lookup-service.test.cjs");
+const projectCollectionLoadControllerJs = readText("src/features/projects/project-collection-load-controller.js");
+const projectCollectionLoadControllerUnitTests = readText("tests/unit/project-collection-load-controller.test.cjs");
 const projectDocumentManifestServiceJs = readText("src/features/projects/project-document-manifest-service.js");
 const projectDocumentManifestServiceUnitTests = readText("tests/unit/project-document-manifest-service.test.cjs");
 const projectResourceContextServiceJs = readText("src/features/projects/project-resource-context-service.js");
@@ -1192,6 +1194,114 @@ for (const testName of [
     projectSummaryControllerUnitTests,
     testName,
     `focused project-summary tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appBootstrapJs,
+  'import { createProjectCollectionLoadController } from "../features/projects/project-collection-load-controller.js";',
+  "The application runtime must install the checked project-collection load controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectCollectionLoadController,",
+  "The application runtime must expose the checked project-collection load controller factory."
+);
+for (const snippet of [
+  "ProjectCollectionLoadController requires a project-list repository boundary.",
+  "ProjectCollectionLoadController requires project session boundaries.",
+  "ProjectCollectionLoadController requires dirty-state and summary boundaries.",
+  "ProjectCollectionLoadController requires presentation and selection boundaries.",
+  "async function load(selectFirst = false)",
+  "session.replaceProjects(await repository.list());",
+  "const knownProjectIds = new Set(session.getProjects().map((project) => project.id));",
+  "session.pruneProjectSummaryRevisions(knownProjectIds);",
+  "dirty.prune();",
+  "await summaries.refresh();",
+  "presentation.renderList();",
+  "presentation.renderEditor();",
+  "void presentation.renderTrashSummary();",
+  "if (selectFirst && !session.getProject() && session.getProjects()[0])",
+  "await selection.open(session.getProjects()[0].id);",
+  "return Object.freeze({ load });"
+]) {
+  assertIncludes(
+    projectCollectionLoadControllerJs,
+    snippet,
+    `ProjectCollectionLoadController must retain characterized repository, pruning, presentation, and selection policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "const projectCollectionLoadController =",
+  "appRuntime.featureFactories.createProjectCollectionLoadController({",
+  "repository: { list: listProjects }",
+  "getProject: editorSessionStore.getProject",
+  "getProjects: editorSessionStore.getProjects",
+  "replaceProjects: editorSessionStore.replaceProjects",
+  "pruneProjectSummaryRevisions: editorSessionStore.pruneProjectSummaryRevisions",
+  "dirty: { prune: workspaceDirtyStateController.prune }",
+  "summaries: { refresh: projectSummaryController.refresh }",
+  "renderList: renderProjectList",
+  "renderEditor,",
+  "renderTrashSummary: () => applicationTrashController.renderSummary()",
+  "selection: { open: openProject }"
+]) {
+  assertIncludes(appJs, boundary, `project-collection load composition must retain the checked ${boundary} boundary.`);
+}
+assert(
+  (appJs.match(/createProjectCollectionLoadController\(/g) || []).length === 1 &&
+    (appJs.match(/\bprojectCollectionLoadController\.load\b/g) || []).length === 7 &&
+    (appWorkflowDriverJs.match(/\bprojectCollectionLoadController\.load\b/g) || []).length === 12,
+  "app.js must compose one project-collection load controller and all seven application and twelve workflow consumers must call it directly."
+);
+assert(
+  !/\bloadProjects\b/.test(appJs) && !/\bloadProjects\b/.test(appWorkflowDriverJs),
+  "loadProjects must not return to app.js or the workflow driver."
+);
+assert(
+  !appJs.includes("editorSessionStore.replaceProjects(await listProjects())") &&
+    !appJs.includes("const knownProjectIds = new Set(editorSessionStore.getProjects()") &&
+    !appJs.includes("await projectSummaryController.refresh();\n  renderProjectList();\n  renderEditor();"),
+  "project collection loading, pruning, summary refresh, and initial presentation must not return to app.js."
+);
+assert(
+  appJs.indexOf("const projectSummaryController =") < appJs.indexOf("const projectCollectionLoadController =") &&
+    appJs.indexOf("const projectCollectionLoadController =") <
+      appJs.indexOf("const applicationCommandHistoryController =") &&
+    appJs.indexOf("const applicationCommandHistoryController =") < appJs.indexOf("const applicationTrashController ="),
+  "ProjectCollectionLoadController must follow summary policy and precede its first direct consumers."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "listProjects",
+  "editorSessionStore",
+  "workspaceDirtyStateController",
+  "projectSummaryController",
+  "applicationTrashController",
+  "openProject",
+  "renderProjectList",
+  "document.",
+  "els."
+]) {
+  assert(
+    !projectCollectionLoadControllerJs.includes(forbiddenOwner),
+    `ProjectCollectionLoadController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectCollectionLoadController preserves the default full load and presentation sequence",
+  "ProjectCollectionLoadController preserves strict stable Set construction without filtering IDs",
+  "ProjectCollectionLoadController awaits summary refresh before any presentation",
+  "ProjectCollectionLoadController invokes but does not await Trash summary rendering",
+  "ProjectCollectionLoadController preserves current-project and empty-list selection guards",
+  "ProjectCollectionLoadController preserves repeated live reads and awaits the selected project",
+  "ProjectCollectionLoadController preserves each primary dependency failure boundary",
+  "ProjectCollectionLoadController preserves malformed records and selection failure timing",
+  "ProjectCollectionLoadController validates every boundary and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectCollectionLoadControllerUnitTests,
+    testName,
+    `focused project-collection load tests must retain characterization: ${testName}.`
   );
 }
 assertIncludes(
@@ -6784,7 +6894,7 @@ for (const boundary of [
   "finalizeAll: () => targetEditController.finalizeAll()",
   "focusActive: (selection) => targetEditController.focusActive(selection)",
   "session: editorSessionStore",
-  "load: (selectFirst) => loadProjects(selectFirst)",
+  "load: projectCollectionLoadController.load",
   "open: (projectId) => openProject(projectId)",
   "readSegments: (projectId) => getProjectSegments(projectId)",
   "prepareHistories: (segments) => segmentTargetStateService.prepareHistories(segments)",
@@ -6930,7 +7040,7 @@ for (const boundary of [
   "list: els.trashList",
   "emptyButton: els.emptyTrashBtn",
   "repository: appRuntime?.trashRepository",
-  "projects: { load: (selectFirst) => loadProjects(selectFirst) }",
+  "projects: { load: projectCollectionLoadController.load }",
   "synchronize: applicationCommandHistoryController.synchronize",
   "render: applicationCommandHistoryController.render",
   'dialog: { open: () => dialogLifecycleController?.open?.("trash") || false }',
@@ -6946,7 +7056,7 @@ for (const boundary of [
   "emptyTrash: applicationTrashController.empty",
   "beforeOpen: applicationTrashController.renderList",
   "trash: applicationTrashController",
-  "void applicationTrashController.renderSummary()"
+  "renderTrashSummary: () => applicationTrashController.renderSummary()"
 ]) {
   assertIncludes(appJs, boundary, `application Trash composition and consumers must retain ${boundary}.`);
 }
@@ -10187,7 +10297,7 @@ for (const boundary of [
   "session: editorSessionStore",
   "update: updateProject",
   "create: createProject",
-  "load: loadProjects",
+  "load: projectCollectionLoadController.load",
   "open: openProject",
   "creator: { remember: projectNameService.rememberCreator }",
   "languageInputService.setInput(els.sourceLangInput, value)",
@@ -10724,7 +10834,7 @@ for (const boundary of [
   "appendWarning: appendActivityWarning",
   "openProjects: applicationNavigation.openProjects",
   "clearSelection: applicationNavigation.clearSelection",
-  "load: loadProjects",
+  "load: projectCollectionLoadController.load",
   "open: openProject",
   "clearDirty: workspaceDirtyStateController.clear",
   "markDirty: workspaceDirtyStateController.mark",
@@ -11039,7 +11149,7 @@ for (const boundary of [
   "session: editorSessionStore",
   "openProjects: applicationNavigation.openProjects",
   "clearSelection: applicationNavigation.clearSelection",
-  "projects: { load: loadProjects }",
+  "projects: { load: projectCollectionLoadController.load }",
   "getStatus: () => workspaceStorage.getStatus()",
   "state.workspaceStatus = workspaceStatus",
   "renderValidation: renderValidationReport",
@@ -18588,7 +18698,7 @@ for (const boundary of [
   "state.workspaceStatus = workspaceStatus",
   "renderStatus: () => workspaceRecoveryPresentationService.renderStatus()",
   "refresh: applicationStorageDurabilityController.refresh",
-  "load: (restoreSelection) => loadProjects(restoreSelection)",
+  "load: projectCollectionLoadController.load",
   "count: () => editorSessionStore.getProjects().length",
   "theme: themeController",
   "layout: workspaceLayoutController",

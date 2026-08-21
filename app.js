@@ -1197,78 +1197,6 @@ const applicationSaveStatusController =
       clear: (timer) => clearTimeout(timer)
     }
   });
-const applicationCommandHistoryController =
-  appRuntime.featureFactories.createApplicationCommandHistoryController({
-    controls: { undo: els.undoBtn, redo: els.redoBtn },
-    context: {
-      getProjectId: () => state.commandProjectId || editorSessionStore.getProject()?.id || null,
-      getView: () => applicationStore.getState().navigation.view
-    },
-    commands: {
-      canUndo: (projectId) => appRuntime?.commands?.bus?.canUndo?.(projectId),
-      canRedo: (projectId) => appRuntime?.commands?.bus?.canRedo?.(projectId),
-      undo: (projectId) => appRuntime?.commands?.bus?.undo?.(projectId),
-      redo: (projectId) => appRuntime?.commands?.bus?.redo?.(projectId)
-    },
-    edits: {
-      finalizeProject: (projectId) => targetEditController.finalizeProject(projectId),
-      finalizeAll: () => targetEditController.finalizeAll(),
-      focusActive: (selection) => targetEditController.focusActive(selection)
-    },
-    session: editorSessionStore,
-    projects: {
-      load: (selectFirst) => loadProjects(selectFirst),
-      open: (projectId) => openProject(projectId),
-      readSegments: (projectId) => getProjectSegments(projectId),
-      prepareHistories: (segments) => segmentTargetStateService.prepareHistories(segments)
-    },
-    navigation: {
-      getActiveIndex: () => applicationStore.getState().navigation.activeIndex,
-      selectSegment: (selection) => applicationNavigation.selectSegment(selection),
-      clearSelection: () => applicationNavigation.clearSelection(),
-      showProjects: () => applicationViewController.show("projects")
-    },
-    resources: {
-      markLinkedDirty: (type, name, sourceLang, targetLang) =>
-        workspaceDirtyStateController.markProjectsUsingResource(type, name, sourceLang, targetLang),
-      refreshResources: () => refreshResources(),
-      refreshTerms: (options) => refreshProjectTerms(options),
-      refreshSuggestions: () => termSuggestionsController.refresh(),
-      refreshEditorContext: () => editorContextController.refresh()
-    },
-    trash: {
-      isOpen: () => Boolean(els.trashDialog?.open),
-      renderList: () => applicationTrashController.renderList(),
-      renderSummary: () => applicationTrashController.renderSummary()
-    },
-    presentation: { renderAll: () => renderAll() },
-    status: { set: applicationSaveStatusController.set }
-  });
-const applicationTrashController = appRuntime.featureFactories.createApplicationTrashController({
-  elements: {
-    summaryButton: els.trashBtn,
-    list: els.trashList,
-    emptyButton: els.emptyTrashBtn
-  },
-  repository: appRuntime?.trashRepository,
-  projects: { load: (selectFirst) => loadProjects(selectFirst) },
-  commandHistory: {
-    synchronize: applicationCommandHistoryController.synchronize,
-    render: applicationCommandHistoryController.render
-  },
-  dialog: { open: () => dialogLifecycleController?.open?.("trash") || false },
-  localization: {
-    source: (value, variables) => uiLocalizationService.source(value, variables),
-    confirm: (value) => uiLocalizationService.confirm(value)
-  },
-  text: { safe: applicationTextSafetyService.displaySafeText },
-  date: { format: applicationDateTimeService.date },
-  dom: {
-    createElement: (tagName) => document.createElement(tagName),
-    createFragment: () => document.createDocumentFragment()
-  },
-  status: { set: applicationSaveStatusController.set }
-});
 const applicationImportProgressController =
   appRuntime.featureFactories.createApplicationImportProgressController({
     context: {
@@ -1451,6 +1379,98 @@ const projectSummaryController = appRuntime.featureFactories.createProjectSummar
     renderLanguageFilter: renderLanguagePairFilter,
     renderProjects: renderProjectsView
   }
+});
+
+const projectCollectionLoadController =
+  appRuntime.featureFactories.createProjectCollectionLoadController({
+    repository: { list: listProjects },
+    session: {
+      getProject: editorSessionStore.getProject,
+      getProjects: editorSessionStore.getProjects,
+      replaceProjects: editorSessionStore.replaceProjects,
+      pruneProjectSummaryRevisions: editorSessionStore.pruneProjectSummaryRevisions
+    },
+    dirty: { prune: workspaceDirtyStateController.prune },
+    summaries: { refresh: projectSummaryController.refresh },
+    presentation: {
+      renderList: renderProjectList,
+      renderEditor,
+      renderTrashSummary: () => applicationTrashController.renderSummary()
+    },
+    selection: { open: openProject }
+  });
+
+const applicationCommandHistoryController =
+  appRuntime.featureFactories.createApplicationCommandHistoryController({
+    controls: { undo: els.undoBtn, redo: els.redoBtn },
+    context: {
+      getProjectId: () => state.commandProjectId || editorSessionStore.getProject()?.id || null,
+      getView: () => applicationStore.getState().navigation.view
+    },
+    commands: {
+      canUndo: (projectId) => appRuntime?.commands?.bus?.canUndo?.(projectId),
+      canRedo: (projectId) => appRuntime?.commands?.bus?.canRedo?.(projectId),
+      undo: (projectId) => appRuntime?.commands?.bus?.undo?.(projectId),
+      redo: (projectId) => appRuntime?.commands?.bus?.redo?.(projectId)
+    },
+    edits: {
+      finalizeProject: (projectId) => targetEditController.finalizeProject(projectId),
+      finalizeAll: () => targetEditController.finalizeAll(),
+      focusActive: (selection) => targetEditController.focusActive(selection)
+    },
+    session: editorSessionStore,
+    projects: {
+      load: projectCollectionLoadController.load,
+      open: (projectId) => openProject(projectId),
+      readSegments: (projectId) => getProjectSegments(projectId),
+      prepareHistories: (segments) => segmentTargetStateService.prepareHistories(segments)
+    },
+    navigation: {
+      getActiveIndex: () => applicationStore.getState().navigation.activeIndex,
+      selectSegment: (selection) => applicationNavigation.selectSegment(selection),
+      clearSelection: () => applicationNavigation.clearSelection(),
+      showProjects: () => applicationViewController.show("projects")
+    },
+    resources: {
+      markLinkedDirty: (type, name, sourceLang, targetLang) =>
+        workspaceDirtyStateController.markProjectsUsingResource(type, name, sourceLang, targetLang),
+      refreshResources: () => refreshResources(),
+      refreshTerms: (options) => refreshProjectTerms(options),
+      refreshSuggestions: () => termSuggestionsController.refresh(),
+      refreshEditorContext: () => editorContextController.refresh()
+    },
+    trash: {
+      isOpen: () => Boolean(els.trashDialog?.open),
+      renderList: () => applicationTrashController.renderList(),
+      renderSummary: () => applicationTrashController.renderSummary()
+    },
+    presentation: { renderAll: () => renderAll() },
+    status: { set: applicationSaveStatusController.set }
+  });
+const applicationTrashController = appRuntime.featureFactories.createApplicationTrashController({
+  elements: {
+    summaryButton: els.trashBtn,
+    list: els.trashList,
+    emptyButton: els.emptyTrashBtn
+  },
+  repository: appRuntime?.trashRepository,
+  projects: { load: projectCollectionLoadController.load },
+  commandHistory: {
+    synchronize: applicationCommandHistoryController.synchronize,
+    render: applicationCommandHistoryController.render
+  },
+  dialog: { open: () => dialogLifecycleController?.open?.("trash") || false },
+  localization: {
+    source: (value, variables) => uiLocalizationService.source(value, variables),
+    confirm: (value) => uiLocalizationService.confirm(value)
+  },
+  text: { safe: applicationTextSafetyService.displaySafeText },
+  date: { format: applicationDateTimeService.date },
+  dom: {
+    createElement: (tagName) => document.createElement(tagName),
+    createFragment: () => document.createDocumentFragment()
+  },
+  status: { set: applicationSaveStatusController.set }
 });
 
 const segmentTargetStateService = appRuntime.featureFactories.createSegmentTargetStateService({
@@ -4027,7 +4047,7 @@ const applicationStartupController = appRuntime.featureFactories.createApplicati
   },
   durability: { refresh: applicationStorageDurabilityController.refresh },
   projects: {
-    load: (restoreSelection) => loadProjects(restoreSelection),
+    load: projectCollectionLoadController.load,
     count: () => editorSessionStore.getProjects().length
   },
   preferences: {
@@ -4422,7 +4442,7 @@ const projectImportRestoreController =
       clearSelection: applicationNavigation.clearSelection
     },
     projects: {
-      load: loadProjects,
+      load: projectCollectionLoadController.load,
       open: openProject
     },
     workspace: {
@@ -4465,7 +4485,7 @@ workspaceSyncController = appRuntime.featureFactories.createWorkspaceSyncControl
     openProjects: applicationNavigation.openProjects,
     clearSelection: applicationNavigation.clearSelection
   },
-  projects: { load: loadProjects },
+  projects: { load: projectCollectionLoadController.load },
   workspace: {
     getStatus: () => workspaceStorage.getStatus(),
     setStatus: (workspaceStatus) => {
@@ -4673,7 +4693,7 @@ const projectDialogSaveController =
     projects: {
       update: updateProject,
       create: createProject,
-      load: loadProjects,
+      load: projectCollectionLoadController.load,
       open: openProject
     },
     creator: { remember: projectNameService.rememberCreator },
@@ -5199,20 +5219,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-async function loadProjects(selectFirst = false) {
-  editorSessionStore.replaceProjects(await listProjects());
-  const knownProjectIds = new Set(editorSessionStore.getProjects().map((project) => project.id));
-  editorSessionStore.pruneProjectSummaryRevisions(knownProjectIds);
-  workspaceDirtyStateController.prune();
-  await projectSummaryController.refresh();
-  renderProjectList();
-  renderEditor();
-  void applicationTrashController.renderSummary();
-  if (selectFirst && !editorSessionStore.getProject() && editorSessionStore.getProjects()[0]) {
-    await openProject(editorSessionStore.getProjects()[0].id);
-  }
-}
 
 function openProjectDialog(mode = "create") {
   return projectDialogController?.open?.(mode, { returnTarget: document.activeElement }) || Promise.resolve(false);
@@ -5740,7 +5746,7 @@ async function confirmDeleteProject(projectId = editorSessionStore.getProject()?
       applicationNavigation.openProjects();
       applicationNavigation.clearSelection();
     }
-    await loadProjects(false);
+    await projectCollectionLoadController.load(false);
     applicationSaveStatusController.set("Project moved to Trash. Undo is available.", "saved");
     applicationCommandHistoryController.render();
     return true;
