@@ -73,6 +73,13 @@ const projectListPresentationControllerPath = path.join(
   "projects",
   "project-list-presentation-controller.js"
 );
+const projectHomePresentationControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "projects",
+  "project-home-presentation-controller.js"
+);
 const projectResourceSelectionControllerPath = path.join(
   root,
   "src",
@@ -471,6 +478,11 @@ function main() {
     messagesByText,
     projectListPresentationControllerPath,
     "src/features/projects/project-list-presentation-controller.js"
+  );
+  extractScript(
+    messagesByText,
+    projectHomePresentationControllerPath,
+    "src/features/projects/project-home-presentation-controller.js"
   );
   extractScript(
     messagesByText,

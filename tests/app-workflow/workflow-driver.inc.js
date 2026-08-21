@@ -311,7 +311,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     const originalWorkflowProject = editorSessionStore.getProject();
     editorSessionStore.replaceProject({ ...editorSessionStore.getProject(), documents: { malformed: true } });
-    renderProjectHome();
+    projectHomePresentationController.render();
     renderDocumentFilter();
     assert(
       projectDocumentCatalogService.list().every((documentInfo) => documentInfo.id) &&
@@ -623,7 +623,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       documents: [...(editorSessionStore.getProject().documents || []), metadataOnlyDocument]
     }));
     editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((item) => (item.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : item)));
-    renderProjectHome();
+    projectHomePresentationController.render();
     renderDocumentFilter();
     assert(
       projectDocumentCatalogService.list().some((item) => item.id === metadataOnlyDocument.id) &&

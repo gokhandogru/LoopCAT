@@ -1500,6 +1500,44 @@ const editorShellPresentationController =
     }
   });
 
+const projectHomePresentationController =
+  appRuntime.featureFactories.createProjectHomePresentationController({
+    elements: {
+      title: els.projectHomeTitle,
+      meta: els.projectHomeMeta,
+      stats: els.projectHomeStats,
+      fileCount: els.fileCountText,
+      fileList: els.projectFileList
+    },
+    session: {
+      getProject: editorSessionStore.getProject,
+      getSegments: editorSessionStore.getSegments
+    },
+    documents: { list: () => projectDocumentCatalogService.list() },
+    statistics: {
+      byDocument: (documents) => projectDocumentStatisticsService.byDocument(documents),
+      aggregate: (statistics) => projectDocumentStatisticsService.aggregate(statistics),
+      empty: () => projectDocumentStatisticsService.empty()
+    },
+    resources: { summary: projectResourceContextService.summary },
+    language: { display: projectLanguageContextController.display },
+    text: {
+      displaySafeText: applicationTextSafetyService.displaySafeText,
+      displaySafeHtml: applicationTextSafetyService.displaySafeHtml,
+      escapeHtml: applicationTextSafetyService.escapeHtml
+    },
+    localization: uiLocalizationService,
+    dom: {
+      createElement: (tagName) => document.createElement(tagName),
+      createDocumentFragment: () => document.createDocumentFragment()
+    },
+    presentation: { replaceSafeHtml },
+    actions: {
+      deleteDocument: (documentInfo) => confirmDeleteFile(documentInfo),
+      openDocument: (documentId) => projectDocumentOpenController.open(documentId)
+    }
+  });
+
 const projectTermRefreshController = appRuntime.featureFactories.createProjectTermRefreshController({
   session: {
     getProject: editorSessionStore.getProject,
@@ -1571,7 +1609,7 @@ const applicationAggregatePresentationController =
     presentation: {
       renderProjectList: () => projectListPresentationController.render(),
       renderEditor: editorShellPresentationController.render,
-      renderProjectHome: () => renderProjectHome(),
+      renderProjectHome: projectHomePresentationController.render,
       renderProjectAnalysis: () => projectAnalysisController.render(),
       renderDocumentFilter: () => renderDocumentFilter(),
       renderSegments: () => renderSegments(),
@@ -4086,7 +4124,7 @@ const uiLocaleOrchestrationController =
       renderProjectStorageStatus: workspaceRecoveryPresentationService.renderProjectStorage,
       renderProjectsView: () => renderProjectsView(),
       renderResourcesView: () => renderResourcesView(),
-      renderProjectHome: () => renderProjectHome(),
+      renderProjectHome: projectHomePresentationController.render,
       renderProjectAnalysis: projectAnalysisController.render,
       renderEditor: editorShellPresentationController.render,
       renderProgress: () => renderProgress(),
@@ -5504,74 +5542,6 @@ applicationCommandCatalogService = appRuntime.featureFactories.createApplication
     aiOpenAiSuggestion: aiOpenAiSuggestionController
   }
 });
-
-function renderProjectHome() {
-  if (!editorSessionStore.getProject()) return;
-  const documents = projectDocumentCatalogService.list();
-  const documentStatsById = projectDocumentStatisticsService.byDocument(documents);
-  const total = projectDocumentStatisticsService.aggregate(documentStatsById);
-  const sourceWords = total.words;
-  const resources = projectResourceContextService.summary();
-  els.projectHomeTitle.textContent = applicationTextSafetyService.displaySafeText(
-    editorSessionStore.getProject().name
-  );
-  els.projectHomeMeta.textContent = `${projectLanguageContextController.display()} - ${applicationTextSafetyService.displaySafeText(editorSessionStore.getProject().domain || uiLocalizationService.label("noDomain"))} - ${uiLocalizationService.label("mainTm")}: ${applicationTextSafetyService.displaySafeText(resources.mainTm, uiLocalizationService.label("none"))} - ${applicationTextSafetyService.displaySafeText(resources.tmLabel)} - ${applicationTextSafetyService.displaySafeText(resources.tbLabel)}`;
-  replaceSafeHtml(els.projectHomeStats, `
-    <div><strong>${total.percent}%</strong><span>${uiLocalizationService.labelHtml("confirmed")}</span></div>
-    <div><strong>${documents.length}</strong><span>${uiLocalizationService.labelHtml("files")}</span></div>
-    <div><strong>${editorSessionStore.getSegments().length}</strong><span>${uiLocalizationService.labelHtml("segments")}</span></div>
-    <div><strong>${sourceWords}</strong><span>${uiLocalizationService.labelHtml("sourceWords")}</span></div>
-  `);
-  els.fileCountText.textContent = documents.length ? uiLocalizationService.label("fileCount", { count: documents.length }) : uiLocalizationService.source("No files imported");
-  if (!documents.length) {
-    replaceSafeHtml(els.projectFileList, `<div class="empty-file-state">${uiLocalizationService.sourceHtml("Import a DOCX or other format file to start translating this project.")}</div>`);
-    return;
-  }
-  const fragment = document.createDocumentFragment();
-  documents.forEach((documentInfo) => {
-    const stats = documentStatsById.get(documentInfo.id) || projectDocumentStatisticsService.empty();
-    const card = document.createElement("article");
-    card.className = "file-card";
-    replaceSafeHtml(card, `
-      <header>
-        <div>
-          <h4>${applicationTextSafetyService.displaySafeHtml(documentInfo.name)}</h4>
-          <p>${applicationTextSafetyService.escapeHtml((documentInfo.type || "file").toUpperCase())}</p>
-        </div>
-        <span class="language-badge">${stats.percent}%</span>
-      </header>
-      <div class="project-stats">
-        <div><strong>${stats.words}</strong><span>${uiLocalizationService.labelHtml("words")}</span></div>
-        <div><strong>${stats.segments}</strong><span>${uiLocalizationService.labelHtml("segments")}</span></div>
-      </div>
-      <div class="progress-bar"><div style="width:${stats.percent}%"></div></div>
-      <footer>
-        <span>${uiLocalizationService.labelHtml("emptyDraftCount", { empty: stats.empty, draft: stats.draft })}</span>
-        <div class="file-card-actions"></div>
-      </footer>
-    `);
-    card.querySelector(".progress-bar > div").style.width = `${stats.percent}%`;
-    const deleteButton = document.createElement("button");
-    const fileLabel = applicationTextSafetyService.displaySafeText(
-      documentInfo.name,
-      uiLocalizationService.source("file")
-    );
-    deleteButton.className = "danger-small";
-    deleteButton.type = "button";
-    deleteButton.textContent = uiLocalizationService.source("Delete");
-    deleteButton.setAttribute("aria-label", uiLocalizationService.source("Delete file {value1}", { value1: fileLabel }));
-    deleteButton.addEventListener("click", () => confirmDeleteFile(documentInfo));
-    const openButton = document.createElement("button");
-    openButton.className = "primary";
-    openButton.type = "button";
-    openButton.textContent = uiLocalizationService.source("Open");
-    openButton.setAttribute("aria-label", uiLocalizationService.source("Open file {value1}", { value1: fileLabel }));
-    openButton.addEventListener("click", () => projectDocumentOpenController.open(documentInfo.id));
-    card.querySelector(".file-card-actions").append(deleteButton, openButton);
-    fragment.append(card);
-  });
-  els.projectFileList.replaceChildren(fragment);
-}
 
 function renderDocumentFilter() {
   const current = applicationStore.getState().navigation.documentId;

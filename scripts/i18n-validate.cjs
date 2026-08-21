@@ -30,6 +30,13 @@ const projectListPresentationControllerPath = path.join(
   "projects",
   "project-list-presentation-controller.js"
 );
+const projectHomePresentationControllerPath = path.join(
+  root,
+  "src",
+  "features",
+  "projects",
+  "project-home-presentation-controller.js"
+);
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -135,6 +142,11 @@ function validate() {
     ...collectCodeKeys(
       fs.existsSync(projectListPresentationControllerPath)
         ? fs.readFileSync(projectListPresentationControllerPath, "utf8")
+        : ""
+    ),
+    ...collectCodeKeys(
+      fs.existsSync(projectHomePresentationControllerPath)
+        ? fs.readFileSync(projectHomePresentationControllerPath, "utf8")
         : ""
     )
   ];

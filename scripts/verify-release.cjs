@@ -253,6 +253,7 @@ const requiredReleaseFiles = [
   "src/features/projects/project-domain-controller.js",
   "src/features/projects/project-filter-controls-controller.js",
   "src/features/projects/project-home-controller.js",
+  "src/features/projects/project-home-presentation-controller.js",
   "src/features/projects/project-list-presentation-controller.js",
   "src/features/projects/project-resource-selection-controller.js",
   "src/features/projects/project-name-service.js",
@@ -381,6 +382,7 @@ const requiredReleaseFiles = [
   "tests/unit/project-analysis-controller.test.cjs",
   "tests/unit/project-filter-controls-controller.test.cjs",
   "tests/unit/project-home-controller.test.cjs",
+  "tests/unit/project-home-presentation-controller.test.cjs",
   "tests/unit/project-list-presentation-controller.test.cjs",
   "tests/unit/project-document-import-controller.test.cjs",
   "tests/unit/file-import-service.test.cjs",
@@ -671,6 +673,8 @@ const projectFilterControlsControllerJs = readText("src/features/projects/projec
 const projectFilterControlsControllerUnitTests = readText("tests/unit/project-filter-controls-controller.test.cjs");
 const projectHomeControllerJs = readText("src/features/projects/project-home-controller.js");
 const projectHomeControllerUnitTests = readText("tests/unit/project-home-controller.test.cjs");
+const projectHomePresentationControllerJs = readText("src/features/projects/project-home-presentation-controller.js");
+const projectHomePresentationControllerUnitTests = readText("tests/unit/project-home-presentation-controller.test.cjs");
 const projectDocumentImportControllerJs = readText("src/features/import-export/project-document-import-controller.js");
 const projectDocumentImportControllerUnitTests = readText("tests/unit/project-document-import-controller.test.cjs");
 const fileImportServiceJs = readText("src/features/import-export/file-import-service.js");
@@ -18283,9 +18287,9 @@ assertIncludes(
   "ProjectDocumentStatisticsService must compute project document stats in one shared pass for file-card rendering."
 );
 assertIncludes(
-  appJs,
-  "const documentStatsById = projectDocumentStatisticsService.byDocument(documents)",
-  "app.js project home rendering must reuse precomputed document stats."
+  projectHomePresentationControllerJs,
+  "const documentStatsById = statistics.byDocument(documentRecords)",
+  "ProjectHomePresentationController must reuse precomputed document stats."
 );
 assertIncludes(
   projectDocumentStatisticsServiceJs,
@@ -18293,9 +18297,9 @@ assertIncludes(
   "ProjectDocumentStatisticsService must aggregate project-home totals from precomputed document stats."
 );
 assertIncludes(
-  appJs,
-  "const total = projectDocumentStatisticsService.aggregate(documentStatsById)",
-  "app.js project home rendering must avoid a second full segment pass for overall stats."
+  projectHomePresentationControllerJs,
+  "const total = statistics.aggregate(documentStatsById)",
+  "ProjectHomePresentationController must avoid a second full segment pass for overall stats."
 );
 assertIncludes(
   termbaseSelectPresentationControllerJs,
@@ -18303,9 +18307,9 @@ assertIncludes(
   "TermbaseSelectPresentationController options must render in one DOM replacement."
 );
 assertIncludes(
-  appJs,
-  "els.projectFileList.replaceChildren(fragment)",
-  "app.js project home file cards must render in one DOM replacement."
+  projectHomePresentationControllerJs,
+  "elements.fileList.replaceChildren(fragment)",
+  "ProjectHomePresentationController file cards must render in one DOM replacement."
 );
 assertIncludes(
   projectListPresentationControllerJs,
@@ -18951,6 +18955,157 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createProjectHomePresentationController } from "../features/projects/project-home-presentation-controller.js";',
+  "the application runtime must install the checked project-home presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createProjectHomePresentationController,",
+  "the application runtime must expose the checked project-home presentation controller factory."
+);
+for (const snippet of [
+  "ProjectHomePresentationController requires project-home elements.",
+  "ProjectHomePresentationController requires a file-list root.",
+  "ProjectHomePresentationController requires session boundaries.",
+  "ProjectHomePresentationController requires a document catalog boundary.",
+  "ProjectHomePresentationController requires document-statistics boundaries.",
+  "ProjectHomePresentationController requires resource and language boundaries.",
+  "ProjectHomePresentationController requires text-safety boundaries.",
+  "ProjectHomePresentationController requires localization boundaries.",
+  "ProjectHomePresentationController requires DOM creation boundaries.",
+  "ProjectHomePresentationController requires a safe-presentation boundary.",
+  "ProjectHomePresentationController requires document action boundaries.",
+  "if (!session.getProject()) return;",
+  "const documentRecords = documents.list();",
+  "const documentStatsById = statistics.byDocument(documentRecords);",
+  "const total = statistics.aggregate(documentStatsById);",
+  "const resourceSummary = resources.summary();",
+  "elements.title.textContent = text.displaySafeText(session.getProject().name);",
+  "const stats = documentStatsById.get(documentInfo.id) || statistics.empty();",
+  'card.querySelector(".progress-bar > div").style.width = `${stats.percent}%`;',
+  'deleteButton.addEventListener("click", () => actions.deleteDocument(documentInfo));',
+  'openButton.addEventListener("click", () => actions.openDocument(documentInfo.id));',
+  "elements.fileList.replaceChildren(fragment);",
+  "return Object.freeze({ render });"
+]) {
+  assertIncludes(
+    projectHomePresentationControllerJs,
+    snippet,
+    `ProjectHomePresentationController must retain characterized statistics, presentation, and action policy: ${snippet}.`
+  );
+}
+for (const boundary of [
+  "appRuntime.featureFactories.createProjectHomePresentationController({",
+  "title: els.projectHomeTitle",
+  "meta: els.projectHomeMeta",
+  "stats: els.projectHomeStats",
+  "fileCount: els.fileCountText",
+  "fileList: els.projectFileList",
+  "getProject: editorSessionStore.getProject",
+  "getSegments: editorSessionStore.getSegments",
+  "documents: { list: () => projectDocumentCatalogService.list() }",
+  "byDocument: (documents) => projectDocumentStatisticsService.byDocument(documents)",
+  "aggregate: (statistics) => projectDocumentStatisticsService.aggregate(statistics)",
+  "empty: () => projectDocumentStatisticsService.empty()",
+  "summary: projectResourceContextService.summary",
+  "display: projectLanguageContextController.display",
+  "displaySafeText: applicationTextSafetyService.displaySafeText",
+  "displaySafeHtml: applicationTextSafetyService.displaySafeHtml",
+  "escapeHtml: applicationTextSafetyService.escapeHtml",
+  "localization: uiLocalizationService",
+  "createElement: (tagName) => document.createElement(tagName)",
+  "createDocumentFragment: () => document.createDocumentFragment()",
+  "presentation: { replaceSafeHtml }",
+  "deleteDocument: (documentInfo) => confirmDeleteFile(documentInfo)",
+  "openDocument: (documentId) => projectDocumentOpenController.open(documentId)",
+  "renderProjectHome: projectHomePresentationController.render"
+]) {
+  assertIncludes(
+    appJs,
+    boundary,
+    `project-home presentation composition must retain the checked ${boundary} boundary.`
+  );
+}
+assert(
+  (appJs.match(/\bprojectHomePresentationController\.render\b/g) || []).length === 2,
+  "both application project-home presentation consumers must call ProjectHomePresentationController.render directly."
+);
+assert(
+  (appWorkflowDriverJs.match(/\bprojectHomePresentationController\.render\b/g) || []).length === 2,
+  "both workflow project-home presentation consumers must call ProjectHomePresentationController.render directly."
+);
+assert(
+  !/function\s+renderProjectHome\b/.test(appJs) && !/function\s+renderProjectHome\b/.test(appWorkflowDriverJs),
+  "renderProjectHome must not return as a coordinator or workflow helper."
+);
+for (const removedPolicy of [
+  "els.projectHomeTitle.textContent",
+  "els.projectHomeMeta.textContent",
+  "els.fileCountText.textContent",
+  "els.projectFileList.replaceChildren",
+  'deleteButton.addEventListener("click", () => confirmDeleteFile(documentInfo))',
+  'openButton.addEventListener("click", () => projectDocumentOpenController.open(documentInfo.id))'
+]) {
+  assert(
+    !appJs.includes(removedPolicy) && !appWorkflowDriverJs.includes(removedPolicy),
+    `project-home statistics, card, listener, and replacement policy must not return through ${removedPolicy}.`
+  );
+}
+assert(
+  appJs.indexOf("const projectHomePresentationController =") <
+    appJs.indexOf("const applicationAggregatePresentationController =") &&
+    appJs.indexOf("const projectHomePresentationController =") <
+      appJs.indexOf("const projectDocumentOpenController =") &&
+    appJs.indexOf("const projectHomePresentationController =") < appJs.indexOf("const projectDocumentCatalogService ="),
+  "ProjectHomePresentationController must be composed before aggregate rendering and retain call-time adapters for later document owners."
+);
+for (const forbiddenOwner of [
+  "appRuntime",
+  "editorSessionStore",
+  "projectDocumentCatalogService",
+  "projectDocumentStatisticsService",
+  "projectResourceContextService",
+  "projectLanguageContextController",
+  "applicationTextSafetyService",
+  "uiLocalizationService",
+  "confirmDeleteFile",
+  "projectDocumentOpenController",
+  "document.",
+  "els."
+]) {
+  assert(
+    !projectHomePresentationControllerJs.includes(forbiddenOwner),
+    `ProjectHomePresentationController must use injected boundaries rather than own ${forbiddenOwner}.`
+  );
+}
+for (const testName of [
+  "ProjectHomePresentationController preserves the immediate no-project return",
+  "ProjectHomePresentationController preserves summary order and safe project metadata",
+  "ProjectHomePresentationController preserves localized empty-file presentation and return",
+  "ProjectHomePresentationController preserves card statistics and fallback markup",
+  "ProjectHomePresentationController preserves button labels, action order, and listener identities",
+  "ProjectHomePresentationController preserves repeated live project reads",
+  "ProjectHomePresentationController preserves representative failure timing",
+  "ProjectHomePresentationController validates every owner and exposes an immutable API"
+]) {
+  assertIncludes(
+    projectHomePresentationControllerUnitTests,
+    testName,
+    `focused project-home presentation tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  i18nExtractScript,
+  '"src/features/projects/project-home-presentation-controller.js"',
+  "source-catalog extraction must scan the checked project-home presentation controller."
+);
+assertIncludes(
+  i18nValidateScript,
+  '"project-home-presentation-controller.js"',
+  "source-catalog validation must check explicit keys in the checked project-home presentation controller."
+);
+assertIncludes(
+  appBootstrapJs,
   'import { createApplicationAggregatePresentationController } from "./application-aggregate-presentation-controller.js";',
   "the application runtime must install the checked aggregate-presentation controller."
 );
@@ -18983,7 +19138,7 @@ for (const boundary of [
   "filters: { invalidate: () => segmentFilterService.invalidate() }",
   "renderProjectList: () => projectListPresentationController.render()",
   "renderEditor: editorShellPresentationController.render",
-  "renderProjectHome: () => renderProjectHome()",
+  "renderProjectHome: projectHomePresentationController.render",
   "renderProjectAnalysis: () => projectAnalysisController.render()",
   "renderDocumentFilter: () => renderDocumentFilter()",
   "renderSegments: () => renderSegments()",
@@ -19156,7 +19311,7 @@ for (const boundary of [
 for (const [method, count] of [
   ["stableLower", 14],
   ["escapeHtml", 17],
-  ["displaySafeText", 18],
+  ["displaySafeText", 13],
   ["displaySafeHtml", 7],
   ["escapeRegExp", 1],
   ["fileSafeName", 5],
