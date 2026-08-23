@@ -191,7 +191,7 @@ import { createDeliveryExportController } from "../features/import-export/lazy-d
 import { createProjectResourceTransferController } from "../features/import-export/lazy-project-resource-transfer-controller.js";
 import { createImportExportController } from "../features/import-export/import-export-controller.js";
 import { createFileImportService } from "../features/import-export/file-import-service.js";
-import { createProjectDocumentImportController } from "../features/import-export/project-document-import-controller.js";
+import { createProjectDocumentImportController } from "../features/import-export/lazy-project-document-import-controller.js";
 import { createProjectExportBuildService } from "../features/import-export/project-export-build-service.js";
 import { createProjectExportController } from "../features/import-export/project-export-controller.js";
 import { createProjectImportRestoreController } from "../features/import-export/lazy-project-import-restore-controller.js";

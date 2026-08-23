@@ -735,6 +735,18 @@ const projectsViewPresentationControllerUnitTests = readText(
 );
 const projectDocumentImportControllerJs = readText("src/features/import-export/project-document-import-controller.js");
 const projectDocumentImportControllerUnitTests = readText("tests/unit/project-document-import-controller.test.cjs");
+const projectDocumentImportControllerContractJs = readText(
+  "src/features/import-export/project-document-import-controller-contract.js"
+);
+const projectDocumentImportControllerInstallerJs = readText(
+  "src/features/import-export/install-project-document-import-controller.js"
+);
+const lazyProjectDocumentImportControllerJs = readText(
+  "src/features/import-export/lazy-project-document-import-controller.js"
+);
+const lazyProjectDocumentImportControllerUnitTests = readText(
+  "tests/unit/lazy-project-document-import-controller.test.cjs"
+);
 const fileImportServiceJs = readText("src/features/import-export/file-import-service.js");
 const fileImportServiceUnitTests = readText("tests/unit/file-import-service.test.cjs");
 const projectExportBuildServiceJs = readText("src/features/import-export/project-export-build-service.js");
@@ -10923,8 +10935,8 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
-  'import { createProjectDocumentImportController } from "../features/import-export/project-document-import-controller.js";',
-  "The application runtime must install the checked project-document import controller."
+  'import { createProjectDocumentImportController } from "../features/import-export/lazy-project-document-import-controller.js";',
+  "The application runtime must install the checked lazy project-document import controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -14175,7 +14187,7 @@ for (const snippet of [
   "return Object.freeze({"
 ]) {
   assertIncludes(
-    projectDocumentImportControllerJs,
+    `${projectDocumentImportControllerJs}\n${projectDocumentImportControllerContractJs}`,
     snippet,
     `ProjectDocumentImportController must retain characterized routing, persistence, session, navigation, activity, status, and presentation policy: ${snippet}`
   );
@@ -14262,6 +14274,66 @@ for (const testName of [
     projectDocumentImportControllerUnitTests,
     testName,
     `focused project-document import tests must retain characterization: ${testName}`
+  );
+}
+assert(
+  !appBootstrapJs.includes('from "../features/import-export/project-document-import-controller.js";'),
+  "application bootstrap must not eagerly import the project-document import implementation."
+);
+assertIncludes(
+  projectDocumentImportControllerInstallerJs,
+  'from "./project-document-import-controller.js"',
+  "the dynamic project-document import installer must retain the implementation controller."
+);
+assertIncludes(
+  projectDocumentImportControllerJs,
+  'from "./project-document-import-controller-contract.js";',
+  "the eager project-document import implementation must share its synchronous contract."
+);
+assertIncludes(
+  projectDocumentImportControllerJs,
+  "validateProjectDocumentImportControllerOptions(options);",
+  "the eager project-document import implementation must retain synchronous validation."
+);
+for (const snippet of [
+  "export function validateProjectDocumentImportControllerOptions",
+  "export function createProjectDocumentDuplicatePolicy",
+  "function hasDocumentNamed(fileName)",
+  "function confirmDuplicate(file)"
+]) {
+  assertIncludes(
+    projectDocumentImportControllerContractJs,
+    snippet,
+    `the shared project-document import contract must retain synchronous policy: ${snippet}`
+  );
+}
+for (const snippet of [
+  'import("./install-project-document-import-controller.js")',
+  "validateProjectDocumentImportControllerOptions(options);",
+  "const duplicatePolicy = createProjectDocumentDuplicatePolicy(options);",
+  "let controllerPromise = null;",
+  "controllerPromise = null;",
+  "Project-document import implementation could not be loaded. Try again.",
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    lazyProjectDocumentImportControllerJs,
+    snippet,
+    `lazy project-document import must retain policy: ${snippet}`
+  );
+}
+for (const testName of [
+  "lazy project-document import validates synchronously preserves duplicate policy and exposes the frozen ordered API without loading",
+  "lazy project-document import shares one concurrent load and preserves options receivers arguments and results",
+  "lazy project-document import redacts load failure preserves its cause and retries the next import",
+  "lazy project-document import rejects incomplete implementation and permits a repaired retry",
+  "lazy project-document import preserves implementation failure identity without reloading",
+  "lazy project-document import validates loader configuration"
+]) {
+  assertIncludes(
+    lazyProjectDocumentImportControllerUnitTests,
+    testName,
+    `focused lazy-project-document-import tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(
@@ -22146,7 +22218,11 @@ assertIncludes(
   "the checked direct localization import method must reject oversized project files before parsing."
 );
 assertIncludes(
-  functionBody(projectDocumentImportControllerJs, "async function importXliff(file)", "function hasDocumentNamed"),
+  functionBody(
+    projectDocumentImportControllerJs,
+    "async function importXliff(file)",
+    "async function importFile(file)"
+  ),
   'files.assertSize(file, "Project file", files.maxBytes);',
   "the checked direct XLIFF import method must reject oversized project files before parsing."
 );

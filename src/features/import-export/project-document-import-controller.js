@@ -1,3 +1,8 @@
+import {
+  createProjectDocumentDuplicatePolicy,
+  validateProjectDocumentImportControllerOptions
+} from "./project-document-import-controller-contract.js";
+
 /**
  * Owns project-document import routing and the shared post-parse persistence,
  * session, navigation, activity, and presentation sequence. File-size policy,
@@ -60,44 +65,8 @@ export function createProjectDocumentImportController(options) {
   const text = options?.text;
   const confirm = options?.confirm;
 
-  const requiredFunctions = [
-    session?.getProject,
-    session?.getProjects,
-    session?.getSegments,
-    session?.replaceProject,
-    session?.replaceProjects,
-    session?.replaceSegments,
-    catalog?.list,
-    catalog?.manifest,
-    files?.assertSize,
-    formats?.extractDocx,
-    formats?.parseLocalization,
-    formats?.parseXliff,
-    formats?.decodingOptions,
-    formats?.isXliffType,
-    repository?.append,
-    repository?.getProjectSegments,
-    histories?.prepare,
-    progress?.report,
-    ids?.next,
-    summaries?.refresh,
-    navigation?.selectDocument,
-    activity?.log,
-    activity?.appendWarning,
-    workspace?.markDirty,
-    status?.set,
-    status?.mode,
-    presentation?.renderAll,
-    presentation?.refreshEditorContext,
-    text?.lower,
-    text?.safe,
-    confirm
-  ];
-  if (requiredFunctions.some((value) => typeof value !== "function") || !Number.isFinite(files?.maxBytes)) {
-    throw new TypeError(
-      "ProjectDocumentImportController requires checked session, catalog, file, format, repository, history, progress, ID, summary, navigation, activity, workspace, status, presentation, text, and confirmation boundaries."
-    );
-  }
+  validateProjectDocumentImportControllerOptions(options);
+  const { confirmDuplicate, hasDocumentNamed } = createProjectDocumentDuplicatePolicy({ catalog, text, confirm });
 
   function segmentDetail(count) {
     return `${count} segment${count === 1 ? "" : "s"}`;
@@ -259,17 +228,6 @@ export function createProjectDocumentImportController(options) {
         message: `Imported ${result.segments.length} XLIFF segment${result.segments.length === 1 ? "" : "s"}`
       })
     });
-  }
-
-  function hasDocumentNamed(fileName) {
-    const normalized = text.lower(String(fileName || "").trim());
-    if (!normalized) return false;
-    return catalog.list().some((documentInfo) => text.lower(documentInfo.name.trim()) === normalized);
-  }
-
-  function confirmDuplicate(file) {
-    if (!hasDocumentNamed(file.name)) return true;
-    return confirm(`A file named "${text.safe(file.name)}" already exists in this project. Import it again anyway?`);
   }
 
   async function importFile(file) {

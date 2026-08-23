@@ -58,6 +58,10 @@ const projectImportRestoreOutput = productionOutputs.find(
   ([, output]) =>
     normalizePath(output.entryPoint) === "src/features/import-export/install-project-import-restore-controller.js"
 );
+const projectDocumentImportOutput = productionOutputs.find(
+  ([, output]) =>
+    normalizePath(output.entryPoint) === "src/features/import-export/install-project-document-import-controller.js"
+);
 const aiCommandControllerSources = [
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
@@ -190,6 +194,15 @@ if (!productionEntryOutput) {
     failures.push("Hosted startup entry does not lazy-load the project-import/restore implementation.");
   if (Object.hasOwn(output.inputs || {}, "src/features/import-export/project-import-restore-controller.js"))
     failures.push("Hosted startup entry eagerly contains the project-import/restore implementation.");
+  const projectDocumentImportChunkImport = (output.imports || []).find(
+    (entry) =>
+      entry.kind === "dynamic-import" &&
+      normalizePath(entry.path).includes("/chunks/install-project-document-import-controller-")
+  );
+  if (!projectDocumentImportChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the project-document import implementation.");
+  if (Object.hasOwn(output.inputs || {}, "src/features/import-export/project-document-import-controller.js"))
+    failures.push("Hosted startup entry eagerly contains the project-document import implementation.");
   for (const source of [
     "src/reports/report-data-service.js",
     "src/reports/report-document.js",
@@ -202,6 +215,16 @@ if (!productionEntryOutput) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
   }
+}
+if (!projectDocumentImportOutput) {
+  failures.push("Production renderer metafile is missing the project-document import implementation chunk entry.");
+} else {
+  const [outputPath, output] = projectDocumentImportOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("Project-document import implementation chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "src/features/import-export/project-document-import-controller.js"))
+    failures.push("Project-document import implementation chunk is missing its controller source.");
 }
 if (!projectImportRestoreOutput) {
   failures.push("Production renderer metafile is missing the project-import/restore implementation chunk entry.");
