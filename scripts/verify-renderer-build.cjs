@@ -35,6 +35,9 @@ const reportDocumentOutput = productionOutputs.find(
 const reportServicesOutput = productionOutputs.find(
   ([, output]) => normalizePath(output.entryPoint) === "src/reports/install-report-services.js"
 );
+const localizationOutput = productionOutputs.find(
+  ([, output]) => normalizePath(output.entryPoint) === "localization.js"
+);
 const eagerProviderImplementationSources = [
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -93,6 +96,13 @@ if (!productionEntryOutput) {
   );
   if (!reportServicesChunkImport)
     failures.push("Hosted startup entry does not lazy-load the consolidated report-services chunk.");
+  const localizationChunkImport = (output.imports || []).find(
+    (entry) => entry.kind === "dynamic-import" && normalizePath(entry.path).includes("/chunks/localization-")
+  );
+  if (!localizationChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the localization implementation chunk.");
+  if (Object.hasOwn(output.inputs || {}, "localization.js"))
+    failures.push("Hosted startup entry eagerly contains the localization implementation.");
   for (const source of [
     "src/reports/report-data-service.js",
     "src/reports/report-document.js",
@@ -105,6 +115,16 @@ if (!productionEntryOutput) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
   }
+}
+if (!localizationOutput) {
+  failures.push("Production renderer metafile is missing the localization implementation chunk entry.");
+} else {
+  const [outputPath, output] = localizationOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("Localization implementation chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "localization.js"))
+    failures.push("Localization implementation chunk is missing its source module.");
 }
 if (!reportServicesOutput) {
   failures.push("Production renderer metafile is missing the consolidated report-services chunk entry.");

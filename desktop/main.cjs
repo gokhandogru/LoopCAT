@@ -853,7 +853,7 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
         });
         const htmlSegments = (await projectApi.getProjectSegments(project.id)).filter((item) => item.documentId === htmlDocumentId);
         workflowProbe.htmlSavedTarget = htmlSegments.length === 1 && htmlSegments[0].target === "Paketlenmis HTML hedefi.";
-        const htmlTarget = localizationApi.buildLocalizationFile("html", htmlSegments, project.localizationStructures[htmlDocumentId]);
+        const htmlTarget = await localizationApi.buildLocalizationFile("html", htmlSegments, project.localizationStructures[htmlDocumentId]);
         workflowProbe.htmlTargetExported = htmlTarget.includes("<p>Paketlenmis HTML hedefi.</p>") && !htmlTarget.includes("Desktop HTML source.");
 
         const xliffText = \`<?xml version="1.0" encoding="UTF-8"?>

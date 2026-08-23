@@ -903,6 +903,8 @@ const extractedProviderInstallerJs = readText("src/ai/providers/install-extracte
 const eagerProviderInstallerJs = readText("src/ai/providers/install-extracted-providers-eager.js");
 const lazyProviderInstallerJs = readText("src/ai/providers/install-lazy-provider-adapters.js");
 const lazyProviderInstallerUnitTests = readText("tests/unit/lazy-provider-adapters.test.cjs");
+const lazyLocalizationModuleJs = readText("src/features/import-export/install-lazy-localization-module.js");
+const lazyLocalizationModuleUnitTests = readText("tests/unit/lazy-localization-module.test.cjs");
 const anthropicProviderAdapterUnitTests = readText("tests/unit/anthropic-provider-adapter.test.cjs");
 const cohereProviderAdapterUnitTests = readText("tests/unit/cohere-provider-adapter.test.cjs");
 const geminiProviderAdapterUnitTests = readText("tests/unit/gemini-provider-adapter.test.cjs");
@@ -18447,6 +18449,43 @@ assert(
   !productionEntryJs.includes('import "../ai/providers/install-extracted-providers.js"'),
   "The production renderer must not eagerly import extracted provider implementations."
 );
+assertIncludes(
+  productionEntryJs,
+  'import "../features/import-export/install-lazy-localization-module.js";',
+  "The production renderer must install the lazy localization compatibility façade."
+);
+assert(
+  productionEntryJs.indexOf('import "../../xliff.js";') <
+    productionEntryJs.indexOf('import "../features/import-export/install-lazy-localization-module.js";'),
+  "The production renderer must retain format dependency order before installing lazy localization."
+);
+assert(
+  !productionEntryJs.includes('import "../../localization.js";'),
+  "The production renderer must not eagerly import the localization implementation."
+);
+for (const snippet of [
+  'import("../../../localization.js")',
+  "let loadPromise = null;",
+  "loadPromise = null;",
+  "implementation === lazyModule",
+  "namespace.localization = lazyModule;",
+  "return Object.freeze({ load: loadModule, module: lazyModule });"
+]) {
+  assertIncludes(lazyLocalizationModuleJs, snippet, `lazy localization must retain first-use policy: ${snippet}`);
+}
+for (const testName of [
+  "lazy localization installs the mutable two-method compatibility facade",
+  "lazy localization shares one concurrent load and preserves delegate receivers, arguments, and results",
+  "lazy localization propagates load failure identity and retries the next first use",
+  "lazy localization rejects incomplete installation and permits a repaired retry",
+  "lazy localization validates namespace and loader boundaries"
+]) {
+  assertIncludes(
+    lazyLocalizationModuleUnitTests,
+    testName,
+    `focused lazy-localization tests must retain characterization: ${testName}`
+  );
+}
 for (const testName of [
   "lazy provider adapters preserve all registry positions, descriptors, capabilities, and compatibility exports",
   "lazy provider adapters share one concurrent load and preserve delegate receiver, arguments, and results",
@@ -25742,8 +25781,8 @@ assertIncludes(
 );
 assertIncludes(
   desktopMain,
-  "localizationApi.buildLocalizationFile",
-  "desktop/main.cjs desktop smoke must prove packaged localization target export works."
+  "await localizationApi.buildLocalizationFile",
+  "desktop/main.cjs desktop smoke must await and prove packaged lazy-localization target export works."
 );
 assertIncludes(
   desktopMain,
