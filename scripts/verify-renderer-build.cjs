@@ -62,6 +62,10 @@ const projectDocumentImportOutput = productionOutputs.find(
   ([, output]) =>
     normalizePath(output.entryPoint) === "src/features/import-export/install-project-document-import-controller.js"
 );
+const resourceLibraryImportOutput = productionOutputs.find(
+  ([, output]) =>
+    normalizePath(output.entryPoint) === "src/features/resources/install-resource-library-import-controller.js"
+);
 const aiCommandControllerSources = [
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
@@ -203,6 +207,15 @@ if (!productionEntryOutput) {
     failures.push("Hosted startup entry does not lazy-load the project-document import implementation.");
   if (Object.hasOwn(output.inputs || {}, "src/features/import-export/project-document-import-controller.js"))
     failures.push("Hosted startup entry eagerly contains the project-document import implementation.");
+  const resourceLibraryImportChunkImport = (output.imports || []).find(
+    (entry) =>
+      entry.kind === "dynamic-import" &&
+      normalizePath(entry.path).includes("/chunks/install-resource-library-import-controller-")
+  );
+  if (!resourceLibraryImportChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the Resources-library import implementation.");
+  if (Object.hasOwn(output.inputs || {}, "src/features/resources/resource-library-import-controller.js"))
+    failures.push("Hosted startup entry eagerly contains the Resources-library import implementation.");
   for (const source of [
     "src/reports/report-data-service.js",
     "src/reports/report-document.js",
@@ -215,6 +228,16 @@ if (!productionEntryOutput) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
   }
+}
+if (!resourceLibraryImportOutput) {
+  failures.push("Production renderer metafile is missing the Resources-library import implementation chunk entry.");
+} else {
+  const [outputPath, output] = resourceLibraryImportOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("Resources-library import implementation chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "src/features/resources/resource-library-import-controller.js"))
+    failures.push("Resources-library import implementation chunk is missing its controller source.");
 }
 if (!projectDocumentImportOutput) {
   failures.push("Production renderer metafile is missing the project-document import implementation chunk entry.");

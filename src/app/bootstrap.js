@@ -172,7 +172,7 @@ import { createResourceCatalogService } from "../features/resources/resource-cat
 import { createResourceCatalogRefreshController } from "../features/resources/resource-catalog-refresh-controller.js";
 import { createProjectTermRefreshController } from "../features/resources/project-term-refresh-controller.js";
 import { createProjectTermQueryService } from "../features/resources/project-term-query-service.js";
-import { createResourceLibraryImportController } from "../features/resources/resource-library-import-controller.js";
+import { createResourceLibraryImportController } from "../features/resources/lazy-resource-library-import-controller.js";
 import { createResourceLibraryExportController } from "../features/resources/resource-library-export-controller.js";
 import { createResourceMutationController } from "../features/resources/resource-mutation-controller.js";
 import { createQualityReviewController } from "../features/quality/quality-review-controller.js";

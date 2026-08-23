@@ -1027,6 +1027,18 @@ const resourceLibraryExportControllerJs = readText("src/features/resources/resou
 const resourceLibraryExportControllerUnitTests = readText("tests/unit/resource-library-export-controller.test.cjs");
 const resourceLibraryImportControllerJs = readText("src/features/resources/resource-library-import-controller.js");
 const resourceLibraryImportControllerUnitTests = readText("tests/unit/resource-library-import-controller.test.cjs");
+const resourceLibraryImportControllerContractJs = readText(
+  "src/features/resources/resource-library-import-controller-contract.js"
+);
+const resourceLibraryImportControllerInstallerJs = readText(
+  "src/features/resources/install-resource-library-import-controller.js"
+);
+const lazyResourceLibraryImportControllerJs = readText(
+  "src/features/resources/lazy-resource-library-import-controller.js"
+);
+const lazyResourceLibraryImportControllerUnitTests = readText(
+  "tests/unit/lazy-resource-library-import-controller.test.cjs"
+);
 const resourceMutationControllerJs = readText("src/features/resources/resource-mutation-controller.js");
 const resourceMutationControllerUnitTests = readText("tests/unit/resource-mutation-controller.test.cjs");
 const resourceTrashUnitTests = readText("tests/unit/resource-trash.test.cjs");
@@ -3679,8 +3691,8 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
-  'import { createResourceLibraryImportController } from "../features/resources/resource-library-import-controller.js";',
-  "The application runtime must install the checked resource-library import controller."
+  'import { createResourceLibraryImportController } from "../features/resources/lazy-resource-library-import-controller.js";',
+  "The application runtime must install the checked lazy resource-library import controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -6444,6 +6456,58 @@ for (const testName of [
     resourceLibraryImportControllerUnitTests,
     testName,
     `focused resource-library import tests must retain characterization: ${testName}`
+  );
+}
+assert(
+  !appBootstrapJs.includes('from "../features/resources/resource-library-import-controller.js";'),
+  "application bootstrap must not eagerly import the Resources-library import implementation."
+);
+assertIncludes(
+  resourceLibraryImportControllerInstallerJs,
+  'from "./resource-library-import-controller.js"',
+  "the dynamic Resources-library import installer must retain the implementation controller."
+);
+assertIncludes(
+  resourceLibraryImportControllerJs,
+  'from "./resource-library-import-controller-contract.js";',
+  "the eager Resources-library import implementation must share its synchronous contract."
+);
+assertIncludes(
+  resourceLibraryImportControllerJs,
+  "validateResourceLibraryImportControllerOptions(options);",
+  "the eager Resources-library import implementation must retain synchronous validation."
+);
+assertIncludes(
+  resourceLibraryImportControllerContractJs,
+  "export function validateResourceLibraryImportControllerOptions",
+  "the shared Resources-library import contract must retain construction validation."
+);
+for (const snippet of [
+  'import("./install-resource-library-import-controller.js")',
+  "validateResourceLibraryImportControllerOptions(options);",
+  "let controllerPromise = null;",
+  "controllerPromise = null;",
+  "Resources-library import implementation could not be loaded. Try again.",
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    lazyResourceLibraryImportControllerJs,
+    snippet,
+    `lazy Resources-library import must retain policy: ${snippet}`
+  );
+}
+for (const testName of [
+  "lazy Resources-library import validates synchronously and exposes the frozen ordered API without loading",
+  "lazy Resources-library import shares one concurrent load and preserves options receivers arguments and results",
+  "lazy Resources-library import redacts load failure preserves its cause and retries the next import",
+  "lazy Resources-library import rejects incomplete implementation and permits a repaired retry",
+  "lazy Resources-library import preserves implementation failure identity without reloading",
+  "lazy Resources-library import validates loader configuration"
+]) {
+  assertIncludes(
+    lazyResourceLibraryImportControllerUnitTests,
+    testName,
+    `focused lazy-Resources-library-import tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(
