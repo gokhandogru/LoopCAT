@@ -743,6 +743,18 @@ const projectExportControllerJs = readText("src/features/import-export/project-e
 const projectExportControllerUnitTests = readText("tests/unit/project-export-controller.test.cjs");
 const projectImportRestoreControllerJs = readText("src/features/import-export/project-import-restore-controller.js");
 const projectImportRestoreControllerUnitTests = readText("tests/unit/project-import-restore-controller.test.cjs");
+const projectImportRestoreControllerContractJs = readText(
+  "src/features/import-export/project-import-restore-controller-contract.js"
+);
+const projectImportRestoreControllerInstallerJs = readText(
+  "src/features/import-export/install-project-import-restore-controller.js"
+);
+const lazyProjectImportRestoreControllerJs = readText(
+  "src/features/import-export/lazy-project-import-restore-controller.js"
+);
+const lazyProjectImportRestoreControllerUnitTests = readText(
+  "tests/unit/lazy-project-import-restore-controller.test.cjs"
+);
 const projectPackagePortabilityServiceJs = readText(
   "src/features/import-export/project-package-portability-service.js"
 );
@@ -10951,8 +10963,8 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
-  'import { createProjectImportRestoreController } from "../features/import-export/project-import-restore-controller.js";',
-  "The application runtime must install the checked project-import/restore controller."
+  'import { createProjectImportRestoreController } from "../features/import-export/lazy-project-import-restore-controller.js";',
+  "The application runtime must install the checked lazy project-import/restore controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -13505,7 +13517,7 @@ for (const snippet of [
   "return Object.freeze({"
 ]) {
   assertIncludes(
-    projectImportRestoreControllerJs,
+    `${projectImportRestoreControllerJs}\n${projectImportRestoreControllerContractJs}`,
     snippet,
     `ProjectImportRestoreController must retain characterized package-import and backup-restore policy: ${snippet}`
   );
@@ -13606,6 +13618,58 @@ for (const testName of [
     projectImportRestoreControllerUnitTests,
     testName,
     `focused project-import/restore tests must retain characterization: ${testName}`
+  );
+}
+assert(
+  !appBootstrapJs.includes('from "../features/import-export/project-import-restore-controller.js";'),
+  "application bootstrap must not eagerly import the project-import/restore implementation."
+);
+assertIncludes(
+  projectImportRestoreControllerInstallerJs,
+  'from "./project-import-restore-controller.js"',
+  "the dynamic project-import/restore installer must retain the implementation controller."
+);
+assertIncludes(
+  projectImportRestoreControllerJs,
+  'from "./project-import-restore-controller-contract.js";',
+  "the eager project-import/restore implementation must share its synchronous contract."
+);
+assertIncludes(
+  projectImportRestoreControllerJs,
+  "validateProjectImportRestoreControllerOptions(options);",
+  "the eager project-import/restore implementation must retain synchronous validation."
+);
+assertIncludes(
+  projectImportRestoreControllerContractJs,
+  "export function validateProjectImportRestoreControllerOptions",
+  "the shared project-import/restore contract must retain construction validation."
+);
+for (const snippet of [
+  'import("./install-project-import-restore-controller.js")',
+  "validateProjectImportRestoreControllerOptions(options);",
+  "let controllerPromise = null;",
+  "controllerPromise = null;",
+  "Project import and restore implementation could not be loaded. Try again.",
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    lazyProjectImportRestoreControllerJs,
+    snippet,
+    `lazy project-import/restore must retain policy: ${snippet}`
+  );
+}
+for (const testName of [
+  "lazy project import and restore validates synchronously and exposes the frozen ordered API without loading",
+  "lazy project import and restore shares one concurrent load and preserves options receivers arguments and results",
+  "lazy project import and restore redacts load failure preserves its cause and retries the next action",
+  "lazy project import and restore rejects incomplete implementation and permits a repaired retry",
+  "lazy project import and restore preserves implementation failure identity without reloading",
+  "lazy project import and restore validates loader configuration"
+]) {
+  assertIncludes(
+    lazyProjectImportRestoreControllerUnitTests,
+    testName,
+    `focused lazy-project-import/restore tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(

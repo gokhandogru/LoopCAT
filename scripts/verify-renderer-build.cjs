@@ -54,6 +54,10 @@ const projectResourceTransferOutput = productionOutputs.find(
   ([, output]) =>
     normalizePath(output.entryPoint) === "src/features/import-export/install-project-resource-transfer-controller.js"
 );
+const projectImportRestoreOutput = productionOutputs.find(
+  ([, output]) =>
+    normalizePath(output.entryPoint) === "src/features/import-export/install-project-import-restore-controller.js"
+);
 const aiCommandControllerSources = [
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
@@ -177,6 +181,15 @@ if (!productionEntryOutput) {
     failures.push("Hosted startup entry does not lazy-load the project-resource transfer implementation.");
   if (Object.hasOwn(output.inputs || {}, "src/features/import-export/project-resource-transfer-controller.js"))
     failures.push("Hosted startup entry eagerly contains the project-resource transfer implementation.");
+  const projectImportRestoreChunkImport = (output.imports || []).find(
+    (entry) =>
+      entry.kind === "dynamic-import" &&
+      normalizePath(entry.path).includes("/chunks/install-project-import-restore-controller-")
+  );
+  if (!projectImportRestoreChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the project-import/restore implementation.");
+  if (Object.hasOwn(output.inputs || {}, "src/features/import-export/project-import-restore-controller.js"))
+    failures.push("Hosted startup entry eagerly contains the project-import/restore implementation.");
   for (const source of [
     "src/reports/report-data-service.js",
     "src/reports/report-document.js",
@@ -189,6 +202,16 @@ if (!productionEntryOutput) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
   }
+}
+if (!projectImportRestoreOutput) {
+  failures.push("Production renderer metafile is missing the project-import/restore implementation chunk entry.");
+} else {
+  const [outputPath, output] = projectImportRestoreOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("Project-import/restore implementation chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "src/features/import-export/project-import-restore-controller.js"))
+    failures.push("Project-import/restore implementation chunk is missing its controller source.");
 }
 if (!projectResourceTransferOutput) {
   failures.push("Production renderer metafile is missing the project-resource transfer implementation chunk entry.");

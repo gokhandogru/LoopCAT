@@ -1,3 +1,5 @@
+import { validateProjectImportRestoreControllerOptions } from "./project-import-restore-controller-contract.js";
+
 /**
  * Owns project-package import and browser-backup restore orchestration. File
  * task lifecycle, portable parsing/preparation, storage transactions, index
@@ -41,45 +43,7 @@ export function createProjectImportRestoreController(options) {
   const localization = options?.localization;
   const text = options?.text;
 
-  if (
-    typeof files?.progress !== "function" ||
-    typeof files?.parseJson !== "function" ||
-    typeof portability?.validate !== "function" ||
-    typeof portability?.prepare !== "function" ||
-    typeof backup?.validate !== "function" ||
-    typeof session?.getProjects !== "function" ||
-    typeof session?.replaceProject !== "function" ||
-    typeof session?.replaceSegments !== "function" ||
-    typeof autosave?.flush !== "function" ||
-    typeof persistence?.importProjectPackageRecords !== "function" ||
-    typeof persistence?.importAllData !== "function" ||
-    typeof indexes?.rebuildTm !== "function" ||
-    typeof indexes?.rebuildTerms !== "function" ||
-    typeof activity?.logForProject !== "function" ||
-    typeof activity?.appendWarning !== "function" ||
-    typeof navigation?.openProjects !== "function" ||
-    typeof navigation?.clearSelection !== "function" ||
-    typeof projects?.load !== "function" ||
-    typeof projects?.open !== "function" ||
-    typeof workspace?.isConnected !== "function" ||
-    typeof workspace?.clearDirty !== "function" ||
-    typeof workspace?.markDirty !== "function" ||
-    typeof workspace?.clearDirtyMarkers !== "function" ||
-    typeof workspace?.markProjectsDirty !== "function" ||
-    typeof validation?.count !== "function" ||
-    typeof validation?.alertText !== "function" ||
-    typeof presentation?.renderValidation !== "function" ||
-    typeof presentation?.renderWorkspaceStatus !== "function" ||
-    typeof status?.set !== "function" ||
-    typeof status?.mode !== "function" ||
-    typeof localization?.alert !== "function" ||
-    typeof localization?.confirm !== "function" ||
-    typeof text?.safe !== "function"
-  ) {
-    throw new TypeError(
-      "ProjectImportRestoreController requires file, portability, backup, session, autosave, persistence, index, activity, navigation, project, workspace, validation, presentation, status, localization, and text boundaries."
-    );
-  }
+  validateProjectImportRestoreControllerOptions(options);
 
   async function importProjectPackageData(pkg, importOptions = {}) {
     const sourceName = importOptions.sourceName || "project package";
