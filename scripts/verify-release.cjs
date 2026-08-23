@@ -975,6 +975,18 @@ const projectResourceTransferControllerJs = readText(
   "src/features/import-export/project-resource-transfer-controller.js"
 );
 const projectResourceTransferControllerUnitTests = readText("tests/unit/project-resource-transfer-controller.test.cjs");
+const projectResourceTransferControllerContractJs = readText(
+  "src/features/import-export/project-resource-transfer-controller-contract.js"
+);
+const projectResourceTransferControllerInstallerJs = readText(
+  "src/features/import-export/install-project-resource-transfer-controller.js"
+);
+const lazyProjectResourceTransferControllerJs = readText(
+  "src/features/import-export/lazy-project-resource-transfer-controller.js"
+);
+const lazyProjectResourceTransferControllerUnitTests = readText(
+  "tests/unit/lazy-project-resource-transfer-controller.test.cjs"
+);
 const resourcesControllerJs = readText("src/features/resources/resources-controller.js");
 const resourcesControllerUnitTests = readText("tests/unit/resources-controller.test.cjs");
 const resourcesPresentationServiceJs = readText("src/features/resources/resources-presentation-service.js");
@@ -1117,8 +1129,8 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
-  'import { createProjectResourceTransferController } from "../features/import-export/project-resource-transfer-controller.js";',
-  "The application runtime must install the checked project-resource transfer controller."
+  'import { createProjectResourceTransferController } from "../features/import-export/lazy-project-resource-transfer-controller.js";',
+  "The application runtime must install the checked lazy project-resource transfer controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -4947,6 +4959,58 @@ for (const testName of [
     projectResourceTransferControllerUnitTests,
     testName,
     `focused project-resource transfer tests must retain characterization: ${testName}`
+  );
+}
+assert(
+  !appBootstrapJs.includes('from "../features/import-export/project-resource-transfer-controller.js";'),
+  "application bootstrap must not eagerly import the project-resource transfer implementation."
+);
+assertIncludes(
+  projectResourceTransferControllerInstallerJs,
+  'from "./project-resource-transfer-controller.js"',
+  "the dynamic project-resource transfer installer must retain the implementation controller."
+);
+assertIncludes(
+  projectResourceTransferControllerJs,
+  'from "./project-resource-transfer-controller-contract.js";',
+  "the eager project-resource transfer implementation must share its synchronous contract."
+);
+assertIncludes(
+  projectResourceTransferControllerJs,
+  "validateProjectResourceTransferControllerOptions(options);",
+  "the eager project-resource transfer implementation must retain synchronous validation."
+);
+assertIncludes(
+  projectResourceTransferControllerContractJs,
+  "export function validateProjectResourceTransferControllerOptions",
+  "the shared project-resource transfer contract must retain construction validation."
+);
+for (const snippet of [
+  'import("./install-project-resource-transfer-controller.js")',
+  "validateProjectResourceTransferControllerOptions(options);",
+  "let controllerPromise = null;",
+  "controllerPromise = null;",
+  "Project resource transfer implementation could not be loaded. Try again.",
+  "return Object.freeze({"
+]) {
+  assertIncludes(
+    lazyProjectResourceTransferControllerJs,
+    snippet,
+    `lazy project-resource transfer must retain policy: ${snippet}`
+  );
+}
+for (const testName of [
+  "lazy project resource transfer validates synchronously and exposes the frozen ordered API without loading",
+  "lazy project resource transfer shares one concurrent load and preserves options receivers arguments and results",
+  "lazy project resource transfer redacts load failure preserves its cause and retries the next action",
+  "lazy project resource transfer rejects incomplete implementation and permits a repaired retry",
+  "lazy project resource transfer preserves implementation failure identity without reloading",
+  "lazy project resource transfer validates loader configuration"
+]) {
+  assertIncludes(
+    lazyProjectResourceTransferControllerUnitTests,
+    testName,
+    `focused lazy-project-resource-transfer tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(

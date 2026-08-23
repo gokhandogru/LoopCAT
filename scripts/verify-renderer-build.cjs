@@ -50,6 +50,10 @@ const deliveryExportOutput = productionOutputs.find(
   ([, output]) =>
     normalizePath(output.entryPoint) === "src/features/import-export/install-delivery-export-controller.js"
 );
+const projectResourceTransferOutput = productionOutputs.find(
+  ([, output]) =>
+    normalizePath(output.entryPoint) === "src/features/import-export/install-project-resource-transfer-controller.js"
+);
 const aiCommandControllerSources = [
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
@@ -164,6 +168,15 @@ if (!productionEntryOutput) {
     failures.push("Hosted startup entry does not lazy-load the delivery-export implementation.");
   if (Object.hasOwn(output.inputs || {}, "src/features/import-export/delivery-export-controller.js"))
     failures.push("Hosted startup entry eagerly contains the delivery-export implementation.");
+  const projectResourceTransferChunkImport = (output.imports || []).find(
+    (entry) =>
+      entry.kind === "dynamic-import" &&
+      normalizePath(entry.path).includes("/chunks/install-project-resource-transfer-controller-")
+  );
+  if (!projectResourceTransferChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the project-resource transfer implementation.");
+  if (Object.hasOwn(output.inputs || {}, "src/features/import-export/project-resource-transfer-controller.js"))
+    failures.push("Hosted startup entry eagerly contains the project-resource transfer implementation.");
   for (const source of [
     "src/reports/report-data-service.js",
     "src/reports/report-document.js",
@@ -176,6 +189,16 @@ if (!productionEntryOutput) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
   }
+}
+if (!projectResourceTransferOutput) {
+  failures.push("Production renderer metafile is missing the project-resource transfer implementation chunk entry.");
+} else {
+  const [outputPath, output] = projectResourceTransferOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("Project-resource transfer implementation chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "src/features/import-export/project-resource-transfer-controller.js"))
+    failures.push("Project-resource transfer implementation chunk is missing its controller source.");
 }
 if (!deliveryExportOutput) {
   failures.push("Production renderer metafile is missing the delivery-export implementation chunk entry.");
