@@ -187,7 +187,7 @@ import { createQualityDecisionController } from "../features/quality/quality-dec
 import { createReviewStateController } from "../features/quality/review-state-controller.js";
 import { createReviewMetadataController } from "../features/quality/review-metadata-controller.js";
 import { createRecoveryWorkspaceController } from "../features/workspace/recovery-workspace-controller.js";
-import { createDeliveryExportController } from "../features/import-export/delivery-export-controller.js";
+import { createDeliveryExportController } from "../features/import-export/lazy-delivery-export-controller.js";
 import { createProjectResourceTransferController } from "../features/import-export/project-resource-transfer-controller.js";
 import { createImportExportController } from "../features/import-export/import-export-controller.js";
 import { createFileImportService } from "../features/import-export/file-import-service.js";

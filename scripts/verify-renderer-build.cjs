@@ -46,6 +46,10 @@ const aiCommandControllersOutput = productionOutputs.find(
 const aiCommandDomainOutput = productionOutputs.find(
   ([, output]) => normalizePath(output.entryPoint) === "ai-command-domain.js"
 );
+const deliveryExportOutput = productionOutputs.find(
+  ([, output]) =>
+    normalizePath(output.entryPoint) === "src/features/import-export/install-delivery-export-controller.js"
+);
 const aiCommandControllerSources = [
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
@@ -151,6 +155,15 @@ if (!productionEntryOutput) {
     failures.push("Hosted startup entry does not lazy-load the AI command-domain implementation.");
   if (Object.hasOwn(output.inputs || {}, "ai-command-domain.js"))
     failures.push("Hosted startup entry eagerly contains the AI command-domain implementation.");
+  const deliveryExportChunkImport = (output.imports || []).find(
+    (entry) =>
+      entry.kind === "dynamic-import" &&
+      normalizePath(entry.path).includes("/chunks/install-delivery-export-controller-")
+  );
+  if (!deliveryExportChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the delivery-export implementation.");
+  if (Object.hasOwn(output.inputs || {}, "src/features/import-export/delivery-export-controller.js"))
+    failures.push("Hosted startup entry eagerly contains the delivery-export implementation.");
   for (const source of [
     "src/reports/report-data-service.js",
     "src/reports/report-document.js",
@@ -163,6 +176,16 @@ if (!productionEntryOutput) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
   }
+}
+if (!deliveryExportOutput) {
+  failures.push("Production renderer metafile is missing the delivery-export implementation chunk entry.");
+} else {
+  const [outputPath, output] = deliveryExportOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("Delivery-export implementation chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "src/features/import-export/delivery-export-controller.js"))
+    failures.push("Delivery-export implementation chunk is missing its controller source.");
 }
 if (!aiCommandDomainOutput) {
   failures.push("Production renderer metafile is missing the AI command-domain implementation chunk entry.");

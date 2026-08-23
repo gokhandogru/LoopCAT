@@ -923,6 +923,14 @@ const lazyAiCommandControllerFactoriesUnitTests = readText("tests/unit/lazy-ai-c
 const aiCommandDomainJs = readText("ai-command-domain.js");
 const lazyAiCommandDomainJs = readText("src/ai/install-lazy-ai-command-domain.js");
 const lazyAiCommandDomainUnitTests = readText("tests/unit/lazy-ai-command-domain.test.cjs");
+const deliveryExportControllerContractJs = readText(
+  "src/features/import-export/delivery-export-controller-contract.js"
+);
+const deliveryExportControllerInstallerJs = readText(
+  "src/features/import-export/install-delivery-export-controller.js"
+);
+const lazyDeliveryExportControllerJs = readText("src/features/import-export/lazy-delivery-export-controller.js");
+const lazyDeliveryExportControllerUnitTests = readText("tests/unit/lazy-delivery-export-controller.test.cjs");
 const anthropicProviderAdapterUnitTests = readText("tests/unit/anthropic-provider-adapter.test.cjs");
 const cohereProviderAdapterUnitTests = readText("tests/unit/cohere-provider-adapter.test.cjs");
 const geminiProviderAdapterUnitTests = readText("tests/unit/gemini-provider-adapter.test.cjs");
@@ -1099,8 +1107,8 @@ for (const eagerImport of [
 }
 assertIncludes(
   appBootstrapJs,
-  'import { createDeliveryExportController } from "../features/import-export/delivery-export-controller.js";',
-  "The application runtime must install the checked delivery-export controller."
+  'import { createDeliveryExportController } from "../features/import-export/lazy-delivery-export-controller.js";',
+  "The application runtime must install the checked lazy delivery-export controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -4739,7 +4747,7 @@ for (const snippet of [
   "await autosave.flush();",
   "function selectedDocumentForTypes",
   "function scopedSegments",
-  "function canRun(report)",
+  "const canRun = createDeliveryCanRun",
   "function confirmIncomplete",
   "formats.buildTargetDocx",
   "qa.worker?.runQaChecks",
@@ -18664,6 +18672,59 @@ assertIncludes(
   "const parsedPartialXliff = await xliffApi.parseXliffText",
   "the workflow characterization must await the direct lazy XLIFF parser probe."
 );
+assertIncludes(
+  appBootstrapJs,
+  'from "../features/import-export/lazy-delivery-export-controller.js";',
+  "application bootstrap must install the lazy delivery-export factory."
+);
+assert(
+  !appBootstrapJs.includes('from "../features/import-export/delivery-export-controller.js";'),
+  "application bootstrap must not eagerly import the delivery-export implementation."
+);
+assertIncludes(
+  deliveryExportControllerInstallerJs,
+  'from "./delivery-export-controller.js"',
+  "the dynamic delivery-export installer must retain the implementation controller."
+);
+assertIncludes(
+  deliveryExportControllerJs,
+  'from "./delivery-export-controller-contract.js";',
+  "the eager delivery-export implementation must share its synchronous contract."
+);
+assertIncludes(
+  deliveryExportControllerJs,
+  "validateDeliveryExportControllerOptions(options);",
+  "the eager delivery-export implementation must retain synchronous validation."
+);
+assertIncludes(
+  deliveryExportControllerContractJs,
+  "export function createDeliveryCanRun",
+  "the shared delivery-export contract must retain synchronous canRun policy."
+);
+for (const snippet of [
+  'import("./install-delivery-export-controller.js")',
+  "validateDeliveryExportControllerOptions(options);",
+  "const canRun = createDeliveryCanRun",
+  "let controllerPromise = null;",
+  "controllerPromise = null;",
+  "Delivery export implementation could not be loaded. Try again.",
+  "return Object.freeze({"
+]) {
+  assertIncludes(lazyDeliveryExportControllerJs, snippet, `lazy delivery export must retain policy: ${snippet}`);
+}
+for (const testName of [
+  "lazy delivery export validates synchronously preserves canRun and exposes the frozen ordered API without loading",
+  "lazy delivery export shares one concurrent load and preserves options receivers arguments and results",
+  "lazy delivery export redacts load failure preserves its cause and retries the next export",
+  "lazy delivery export rejects incomplete implementation and permits a repaired retry",
+  "lazy delivery export validates loader configuration"
+]) {
+  assertIncludes(
+    lazyDeliveryExportControllerUnitTests,
+    testName,
+    `focused lazy-delivery-export tests must retain characterization: ${testName}`
+  );
+}
 assertIncludes(
   appBootstrapJs,
   'from "../features/ai/lazy-ai-command-controller-factories.js";',

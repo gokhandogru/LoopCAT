@@ -1,3 +1,8 @@
+import {
+  createDeliveryCanRun,
+  validateDeliveryExportControllerOptions
+} from "./delivery-export-controller-contract.js";
+
 /**
  * Owns Target TXT, target DOCX, bilingual DOCX, Other formats, and XLIFF
  * delivery-export orchestration. Storage, domain validation/planning, format
@@ -68,49 +73,8 @@ export function createDeliveryExportController(options) {
   const presentation = options?.presentation;
   const activity = options?.activity;
   const status = options?.status;
-  if (
-    typeof session?.getProject !== "function" ||
-    typeof session?.getSegments !== "function" ||
-    typeof session?.replaceQaChecks !== "function" ||
-    typeof application?.getDocumentId !== "function" ||
-    typeof application?.clearQaFilter !== "function" ||
-    typeof autosave?.flush !== "function" ||
-    typeof documents?.list !== "function" ||
-    typeof documents?.type !== "function" ||
-    typeof terms?.listForValidation !== "function" ||
-    typeof delivery?.plan !== "function" ||
-    typeof delivery?.validate !== "function" ||
-    typeof delivery?.reportCount !== "function" ||
-    typeof delivery?.reportSummary !== "function" ||
-    typeof localization?.source !== "function" ||
-    typeof confirm !== "function" ||
-    typeof displaySafeText !== "function" ||
-    typeof qa?.run !== "function" ||
-    typeof qa?.tagsForSegment !== "function" ||
-    typeof qa?.missingTags !== "function" ||
-    !(formats?.localizationTypes instanceof Set) ||
-    !(formats?.xliffDocumentTypes instanceof Set) ||
-    typeof formats?.buildTargetDocx !== "function" ||
-    typeof formats?.buildBilingualDocx !== "function" ||
-    typeof formats?.buildTargetXliff !== "function" ||
-    typeof formats?.buildLocalizationFile !== "function" ||
-    typeof formats?.buildXliff12 !== "function" ||
-    typeof formats?.buildXliff22 !== "function" ||
-    typeof formats?.localizationMimeType !== "function" ||
-    typeof formats?.xliffMimeType !== "function" ||
-    typeof fileSafeName !== "function" ||
-    typeof download !== "function" ||
-    typeof presentation?.renderValidationReport !== "function" ||
-    typeof presentation?.renderQaResults !== "function" ||
-    typeof activity?.logOptionalProject !== "function" ||
-    typeof status?.appendActivityWarning !== "function" ||
-    typeof status?.exportMode !== "function" ||
-    typeof status?.set !== "function"
-  ) {
-    throw new TypeError(
-      "DeliveryExportController requires session, application, autosave, document, term, delivery, localization, QA, format, download, presentation, activity, and status boundaries."
-    );
-  }
+  validateDeliveryExportControllerOptions(options);
+  const canRun = createDeliveryCanRun({ delivery, status });
 
   function selectedDocumentForTypes(supportedTypes, selectedTypeMessage, missingMessage) {
     const projectDocuments = documents.list();
@@ -151,15 +115,6 @@ export function createDeliveryExportController(options) {
     if (report?.preserved && documentInfo) {
       report.preserved.push(`${displaySafeText(documentInfo.name || "Current file")} selected for ${label} export.`);
     }
-  }
-
-  function canRun(report) {
-    if (!report?.ok || report?.canExport === false) {
-      if (report?.ok) status.set("Export blocked: review the validation report.", "dirty");
-      else status.set(delivery.reportSummary(report), "dirty");
-      return false;
-    }
-    return true;
   }
 
   function canRunBilingual(report) {
