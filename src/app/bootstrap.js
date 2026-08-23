@@ -216,10 +216,8 @@ import { createNoticeStore } from "../status/notice-store.js";
 import { createSaveStore } from "../status/save-store.js";
 import { createStatusController } from "../status/status-controller.js";
 import { createAiProviderService } from "../ai/providers/legacy-registry-adapter.js";
-import { finalizeReportDocument } from "../reports/report-document.js";
 import { createLazyReportDocumentCompositionService as createReportDocumentCompositionService } from "../reports/lazy-report-document-composition-service.js";
-import { createReportDataService } from "../reports/report-data-service.js";
-import { createReportExportController } from "../reports/report-export-controller.js";
+import { createLazyReportServices } from "../reports/lazy-report-services.js";
 import { createReportPresentationService } from "../reports/report-presentation-service.js";
 import { createLocaleLoader } from "../i18n/locale-loader.js";
 import { createUiLocalizationService } from "../i18n/ui-localization-service.js";
@@ -344,9 +342,8 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createWorkspaceProjectCoverageService,
       createWorkspaceRecoveryPresentationService,
       createWorkspaceSyncController,
-      createReportDataService,
       createReportDocumentCompositionService,
-      createReportExportController,
+      createLazyReportServices,
       createReportPresentationService,
       createLanguageInputService,
       createUiLocaleControlsController,
@@ -463,7 +460,6 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       trusted: asTrustedHtml,
       trustedScriptUrl: asTrustedScriptUrl
     }),
-    reports: Object.freeze({ finalize: finalizeReportDocument }),
     preferencesRepository,
     projectRepository,
     status: Object.freeze({

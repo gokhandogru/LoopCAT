@@ -547,6 +547,9 @@ const lazyReportDocumentCompositionServiceJs = readText("src/reports/lazy-report
 const lazyReportDocumentCompositionServiceUnitTests = readText(
   "tests/unit/lazy-report-document-composition-service.test.cjs"
 );
+const lazyReportServicesJs = readText("src/reports/lazy-report-services.js");
+const installReportServicesJs = readText("src/reports/install-report-services.js");
+const lazyReportServicesUnitTests = readText("tests/unit/lazy-report-services.test.cjs");
 const reportPresentationServiceJs = readText("src/reports/report-presentation-service.js");
 const reportPresentationServiceUnitTests = readText("tests/unit/report-presentation-service.test.cjs");
 const i18nExtractScript = readText("scripts/i18n-extract.cjs");
@@ -1059,24 +1062,21 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
+  'import { createLazyReportServices } from "../reports/lazy-report-services.js";',
+  "The application runtime must install the shared lazy report-services boundary."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createLazyReportServices,",
+  "The application runtime must expose the shared lazy report-services factory."
+);
+for (const eagerImport of [
   'import { createReportDataService } from "../reports/report-data-service.js";',
-  "The application runtime must install the checked report-data service."
-);
-assertIncludes(
-  appBootstrapJs,
-  "createReportDataService,",
-  "The application runtime must expose the checked report-data factory."
-);
-assertIncludes(
-  appBootstrapJs,
-  'import { createReportExportController } from "../reports/report-export-controller.js";',
-  "The application runtime must install the checked report-export controller."
-);
-assertIncludes(
-  appBootstrapJs,
-  "createReportExportController,",
-  "The application runtime must expose the checked report-export factory."
-);
+  'import { finalizeReportDocument } from "../reports/report-document.js";',
+  'import { createReportExportController } from "../reports/report-export-controller.js";'
+]) {
+  assert(!appBootstrapJs.includes(eagerImport), `The application runtime must not retain ${eagerImport}`);
+}
 assertIncludes(
   appBootstrapJs,
   'import { createDeliveryExportController } from "../features/import-export/delivery-export-controller.js";',
@@ -4552,7 +4552,12 @@ for (const snippet of [
 ]) {
   assertIncludes(reportDataServiceJs, snippet, `ReportDataService must retain characterized data policy: ${snippet}`);
 }
-assertIncludes(appJs, "createReportDataService({", "app.js must compose the checked report-data service.");
+assertIncludes(appJs, "createLazyReportServices({", "app.js must compose the shared lazy report-services boundary.");
+assertIncludes(
+  appJs,
+  "const reportDataService = lazyReportServices.data;",
+  "app.js must retain the report-data façade."
+);
 for (const boundary of [
   "getProject: editorSessionStore.getProject",
   "getSegments: editorSessionStore.getSegments",
@@ -4575,7 +4580,6 @@ assertIncludes(
   "const reportData = await data.build();",
   "the report-export controller must collect data through ReportDataService directly."
 );
-assertIncludes(appJs, "data: reportDataService", "app.js must inject ReportDataService into report exports.");
 assertIncludes(
   appWorkflowDriverJs,
   "const labelReportData = await reportDataService.build();",
@@ -4600,6 +4604,42 @@ for (const testName of [
   );
 }
 for (const snippet of [
+  'import("./install-report-services.js")',
+  "const dataDependencies = captureDataDependencies(options?.data);",
+  "exportDependencies = captureExportDependencies(options);",
+  "let loadPromise = null;",
+  "loadPromise = null;",
+  "return services[group][method](...args);",
+  "return Object.freeze({ createExports, data });"
+]) {
+  assertIncludes(lazyReportServicesJs, snippet, `lazy report services must retain first-use policy: ${snippet}`);
+}
+for (const snippet of [
+  'import { createReportDataService } from "./report-data-service.js";',
+  'import { finalizeReportDocument } from "./report-document.js";',
+  'import { createReportExportController } from "./report-export-controller.js";',
+  "const data = createReportDataService(options?.data);",
+  "data,",
+  "finalizeDocument: finalizeReportDocument",
+  "return Object.freeze({ data, exports });"
+]) {
+  assertIncludes(installReportServicesJs, snippet, `report installer must retain implementation policy: ${snippet}`);
+}
+for (const testName of [
+  "lazy report services preserve data validation, captured dependencies, and the frozen build facade",
+  "lazy report services preserve export validation, captured dependencies, and the frozen three-method facade",
+  "lazy report services share one concurrent load and preserve delegate receivers, arguments, and results",
+  "lazy report services propagate load failure identity and retry the next first use",
+  "lazy report services reject incomplete installation and permit a repaired retry",
+  "lazy report services validate loader and export-registration boundaries"
+]) {
+  assertIncludes(
+    lazyReportServicesUnitTests,
+    testName,
+    `focused lazy report-services tests must retain characterization: ${testName}`
+  );
+}
+for (const snippet of [
   "if (!session.getProject()) return;",
   "const anonymized = Boolean(options.anonymized);",
   "session.replaceQaChecks(reportData.qaChecks);",
@@ -4620,14 +4660,16 @@ for (const snippet of [
     `ReportExportController must retain characterized export policy: ${snippet}`
   );
 }
-assertIncludes(appJs, "createReportExportController({", "app.js must compose the checked report-export controller.");
+assertIncludes(
+  appJs,
+  "lazyReportServices.createExports({",
+  "app.js must register report-export dependencies through the shared lazy boundary."
+);
 for (const boundary of [
   "replaceQaChecks: editorSessionStore.replaceQaChecks",
   "replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue",
   "clearQaFilter: qaResultsController.clear",
-  "data: reportDataService",
   "documents: reportDocumentCompositionService",
-  "finalizeDocument: finalizeReportDocument",
   "fileSafeName",
   "download",
   "renderQaResults: qaResultsController.render",

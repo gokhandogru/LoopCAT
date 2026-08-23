@@ -32,6 +32,9 @@ const providerInstallerOutput = productionOutputs.find(
 const reportDocumentOutput = productionOutputs.find(
   ([, output]) => normalizePath(output.entryPoint) === "src/reports/report-document-composition-service.js"
 );
+const reportServicesOutput = productionOutputs.find(
+  ([, output]) => normalizePath(output.entryPoint) === "src/reports/install-report-services.js"
+);
 const eagerProviderImplementationSources = [
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -85,9 +88,39 @@ if (!productionEntryOutput) {
     failures.push("Hosted startup entry does not lazy-load the report-document composition chunk.");
   if (Object.hasOwn(output.inputs || {}, "src/reports/report-document-composition-service.js"))
     failures.push("Hosted startup entry eagerly contains report-document composition.");
+  const reportServicesChunkImport = (output.imports || []).find(
+    (entry) => entry.kind === "dynamic-import" && normalizePath(entry.path).includes("/chunks/install-report-services-")
+  );
+  if (!reportServicesChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the consolidated report-services chunk.");
+  for (const source of [
+    "src/reports/report-data-service.js",
+    "src/reports/report-document.js",
+    "src/reports/report-export-controller.js"
+  ]) {
+    if (Object.hasOwn(output.inputs || {}, source))
+      failures.push(`Hosted startup entry eagerly contains report implementation: ${source}`);
+  }
   for (const source of eagerProviderImplementationSources) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
+  }
+}
+if (!reportServicesOutput) {
+  failures.push("Production renderer metafile is missing the consolidated report-services chunk entry.");
+} else {
+  const [outputPath, output] = reportServicesOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("Consolidated report-services chunk is missing from the production asset manifest.");
+  for (const source of [
+    "src/reports/install-report-services.js",
+    "src/reports/report-data-service.js",
+    "src/reports/report-document.js",
+    "src/reports/report-export-controller.js"
+  ]) {
+    if (!Object.hasOwn(output.inputs || {}, source))
+      failures.push(`Consolidated report-services chunk is missing implementation source: ${source}`);
   }
 }
 if (!reportDocumentOutput) {

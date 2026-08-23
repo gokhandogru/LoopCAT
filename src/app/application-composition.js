@@ -249,7 +249,6 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   });
   const focusController = compatibilityModules.focusController.createFocusController();
   const replaceSafeHtml = appRuntime.safeHtml.replace;
-  const finalizeReportDocument = appRuntime.reports.finalize;
   const aiProviderService = appRuntime.featureFactories.createAiProviderService(aiProviderRegistry);
   const applicationStore = appRuntime?.store;
   const applicationNavigation = appRuntime?.navigation;
@@ -2450,25 +2449,28 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     clone: structuredClone,
     now: () => new Date().toISOString()
   });
-  const reportDataService = appRuntime.featureFactories.createReportDataService({
-    session: {
-      getProject: editorSessionStore.getProject,
-      getSegments: editorSessionStore.getSegments
-    },
-    autosave: autosaveService,
-    resources: {
-      getTmNames: projectResourceContextService.tmNames,
-      getTermBaseNames: projectResourceContextService.termBaseNames,
-      summarize: projectResourceContextService.summary
-    },
-    repositories: { getAllByIndex, listTerms, listActivityEvents },
-    portable: { sanitize: sanitizePortableValue },
-    reporting: { validateExportReadiness, analyzeProject, runQaChecks, buildQualityPassportData },
-    worker: workerClient,
-    tags: { forSegment: protectedTagInspectionService.sourceTags, missing: protectedTagInspectionService.missing },
-    redactSensitiveText: applicationTextSafetyService.redactSensitiveText,
-    timestamp: () => new Date().toISOString()
+  const lazyReportServices = appRuntime.featureFactories.createLazyReportServices({
+    data: {
+      session: {
+        getProject: editorSessionStore.getProject,
+        getSegments: editorSessionStore.getSegments
+      },
+      autosave: autosaveService,
+      resources: {
+        getTmNames: projectResourceContextService.tmNames,
+        getTermBaseNames: projectResourceContextService.termBaseNames,
+        summarize: projectResourceContextService.summary
+      },
+      repositories: { getAllByIndex, listTerms, listActivityEvents },
+      portable: { sanitize: sanitizePortableValue },
+      reporting: { validateExportReadiness, analyzeProject, runQaChecks, buildQualityPassportData },
+      worker: workerClient,
+      tags: { forSegment: protectedTagInspectionService.sourceTags, missing: protectedTagInspectionService.missing },
+      redactSensitiveText: applicationTextSafetyService.redactSensitiveText,
+      timestamp: () => new Date().toISOString()
+    }
   });
+  const reportDataService = lazyReportServices.data;
   let qualityReviewController;
   let projectQaController;
   const qualityWorkbenchController = appRuntime.featureFactories.createQualityWorkbenchController({
@@ -2549,16 +2551,14 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       }
     }
   });
-  const reportExportController = appRuntime.featureFactories.createReportExportController({
+  const reportExportController = lazyReportServices.createExports({
     session: {
       getProject: editorSessionStore.getProject,
       replaceQaChecks: editorSessionStore.replaceQaChecks,
       replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue
     },
     application: { clearQaFilter: qaResultsController.clear },
-    data: reportDataService,
     documents: reportDocumentCompositionService,
-    finalizeDocument: finalizeReportDocument,
     fileSafeName: applicationTextSafetyService.fileSafeName,
     download: applicationDownloadController.download,
     presentation: {
