@@ -43,6 +43,9 @@ const xliffOutput = productionOutputs.find(([, output]) => normalizePath(output.
 const aiCommandControllersOutput = productionOutputs.find(
   ([, output]) => normalizePath(output.entryPoint) === "src/features/ai/install-ai-command-controllers.js"
 );
+const aiCommandDomainOutput = productionOutputs.find(
+  ([, output]) => normalizePath(output.entryPoint) === "ai-command-domain.js"
+);
 const aiCommandControllerSources = [
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
@@ -141,6 +144,13 @@ if (!productionEntryOutput) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI command-controller implementation: ${source}`);
   }
+  const aiCommandDomainChunkImport = (output.imports || []).find(
+    (entry) => entry.kind === "dynamic-import" && normalizePath(entry.path).includes("/chunks/ai-command-domain-")
+  );
+  if (!aiCommandDomainChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the AI command-domain implementation.");
+  if (Object.hasOwn(output.inputs || {}, "ai-command-domain.js"))
+    failures.push("Hosted startup entry eagerly contains the AI command-domain implementation.");
   for (const source of [
     "src/reports/report-data-service.js",
     "src/reports/report-document.js",
@@ -153,6 +163,16 @@ if (!productionEntryOutput) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
   }
+}
+if (!aiCommandDomainOutput) {
+  failures.push("Production renderer metafile is missing the AI command-domain implementation chunk entry.");
+} else {
+  const [outputPath, output] = aiCommandDomainOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("AI command-domain implementation chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "ai-command-domain.js"))
+    failures.push("AI command-domain implementation chunk is missing its source module.");
 }
 if (!aiCommandControllersOutput) {
   failures.push("Production renderer metafile is missing the AI command-controller implementation chunk entry.");

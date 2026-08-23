@@ -14,6 +14,7 @@ import "../../validation.js";
 import "../../analysis.js";
 import "../../quality.js";
 import "../../ai.js";
+import "../ai/install-lazy-ai-command-domain.js";
 import "../ai/providers/install-lazy-provider-adapters.js";
 import "../../worker-client.js";
 import "../../project.js";

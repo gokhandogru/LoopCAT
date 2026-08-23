@@ -123,6 +123,7 @@ const requiredAppFiles = [
   "analysis.js",
   "quality.js",
   "ai.js",
+  "ai-command-domain.js",
   "worker-client.js",
   "cat-worker.js",
   "project.js",
@@ -513,6 +514,9 @@ const pnpmWorkspace = readText("pnpm-workspace.yaml");
 const manifest = readJson("manifest.webmanifest");
 const indexHtml = readText("index.html");
 const regressionHtml = readText("regression-test.html");
+const smokeHtml = readText("smoke-test.html");
+const securityPolicyHtml = readText("security-policy-test.html");
+const packageRoundtripHtml = readText("package-roundtrip-test.html");
 const appEntryJs = readText("app.js");
 const applicationCompositionJs = readText("src/app/application-composition.js");
 const applicationCompositionUnitTests = readText("tests/unit/application-composition.test.cjs");
@@ -915,9 +919,10 @@ const lazyXliffModuleUnitTests = readText("tests/unit/lazy-xliff-module.test.cjs
 const aiCommandControllerContractsJs = readText("src/features/ai/ai-command-controller-contracts.js");
 const aiCommandControllerInstallerJs = readText("src/features/ai/install-ai-command-controllers.js");
 const lazyAiCommandControllerFactoriesJs = readText("src/features/ai/lazy-ai-command-controller-factories.js");
-const lazyAiCommandControllerFactoriesUnitTests = readText(
-  "tests/unit/lazy-ai-command-controller-factories.test.cjs"
-);
+const lazyAiCommandControllerFactoriesUnitTests = readText("tests/unit/lazy-ai-command-controller-factories.test.cjs");
+const aiCommandDomainJs = readText("ai-command-domain.js");
+const lazyAiCommandDomainJs = readText("src/ai/install-lazy-ai-command-domain.js");
+const lazyAiCommandDomainUnitTests = readText("tests/unit/lazy-ai-command-domain.test.cjs");
 const anthropicProviderAdapterUnitTests = readText("tests/unit/anthropic-provider-adapter.test.cjs");
 const cohereProviderAdapterUnitTests = readText("tests/unit/cohere-provider-adapter.test.cjs");
 const geminiProviderAdapterUnitTests = readText("tests/unit/gemini-provider-adapter.test.cjs");
@@ -17658,7 +17663,11 @@ assert(
   "Content Security Policy must not allow the whole OpenAI origin."
 );
 assertIncludes(indexHtml, `object-src 'none'`, "Content Security Policy must disable plugin/object content.");
-const openAiHelperFunction = functionBody(aiJs, "async function openAiSuggestion(", "window.CatHan =");
+const openAiHelperFunction = functionBody(
+  aiCommandDomainJs,
+  "async function openAiSuggestion(",
+  "async function pretranslateSegments("
+);
 const defaultLocalAiSettingsFunction = functionBody(
   aiJs,
   "function defaultLocalAiSettings",
@@ -18332,41 +18341,51 @@ assertIncludes(
   "ai.js must include a provider-neutral AI project brief prompt builder."
 );
 assertIncludes(aiJs, "const aiCommandService = {", "ai.js must expose AI-native commands through a central service.");
-assertIncludes(aiJs, "reviewSegment: reviewSegmentWithAi", "aiCommandService must support active-segment AI review.");
 assertIncludes(
-  aiJs,
+  aiCommandDomainJs,
+  "reviewSegment: reviewSegmentWithAi",
+  "the deferred aiCommandService must support active-segment AI review."
+);
+assertIncludes(
+  aiCommandDomainJs,
   "repairSegmentTags: repairSegmentTagsWithAi",
-  "aiCommandService must support active-segment AI tag repair."
+  "the deferred aiCommandService must support active-segment AI tag repair."
 );
 assertIncludes(
-  aiJs,
+  aiCommandDomainJs,
   "suggestSegmentVariants: suggestSegmentVariantsWithAi",
-  "aiCommandService must support active-segment AI alternatives."
+  "the deferred aiCommandService must support active-segment AI alternatives."
 );
 assertIncludes(
-  aiJs,
+  aiCommandDomainJs,
   "polishSegmentStyle: polishSegmentStyleWithAi",
-  "aiCommandService must support active-segment AI draft polish."
+  "the deferred aiCommandService must support active-segment AI draft polish."
 );
 assertIncludes(
-  aiJs,
+  aiCommandDomainJs,
   "adaptSegmentDraft: adaptSegmentDraftWithAi",
-  "aiCommandService must support active-segment AI draft adaptation."
+  "the deferred aiCommandService must support active-segment AI draft adaptation."
 );
 assertIncludes(
-  aiJs,
+  aiCommandDomainJs,
   "applyTerminology: applyTerminologyWithAi",
-  "aiCommandService must support active-segment AI terminology application."
+  "the deferred aiCommandService must support active-segment AI terminology application."
 );
 assertIncludes(
-  aiJs,
+  aiCommandDomainJs,
   "extractSegmentTerms: extractSegmentTermsWithAi",
-  "aiCommandService must support active-segment AI terminology extraction."
+  "the deferred aiCommandService must support active-segment AI terminology extraction."
 );
 assertIncludes(
-  aiJs,
+  aiCommandDomainJs,
   "generateProjectBrief: generateProjectBriefWithAi",
-  "aiCommandService must support AI project brief generation."
+  "the deferred aiCommandService must support AI project brief generation."
+);
+assert(
+  !aiJs.includes("async function pretranslateSegments(options = {})") &&
+    !aiJs.includes("This AI provider cannot run review commands.") &&
+    !aiJs.includes("This AI provider cannot generate project briefs."),
+  "ai.js must not retain the deferred pretranslation or AI command implementation."
 );
 assertIncludes(
   openAiCompatibleProviderAdapterJs,
@@ -18537,13 +18556,21 @@ for (const testName of [
   "lazy DOCX rejects incomplete installation and permits a repaired retry",
   "lazy DOCX validates namespace, detector, and loader boundaries"
 ]) {
-  assertIncludes(lazyDocxModuleUnitTests, testName, `focused lazy-DOCX tests must retain characterization: ${testName}`);
+  assertIncludes(
+    lazyDocxModuleUnitTests,
+    testName,
+    `focused lazy-DOCX tests must retain characterization: ${testName}`
+  );
 }
 for (const testName of [
   "protected-tag detector preserves semantic, generic, variable, placeholder, and overlap behavior",
   "protected-tag detector keeps synchronous deterministic compatibility behavior"
 ]) {
-  assertIncludes(protectedTagsUnitTests, testName, `focused protected-tag tests must retain characterization: ${testName}`);
+  assertIncludes(
+    protectedTagsUnitTests,
+    testName,
+    `focused protected-tag tests must retain characterization: ${testName}`
+  );
 }
 assertIncludes(
   protectedTagsJs,
@@ -18567,8 +18594,7 @@ for (const [name, html] of [
   ["smoke-test.html", smokeTest]
 ]) {
   assert(
-    html.indexOf('<script src="./protected-tags.js"></script>') <
-      html.indexOf('<script src="./docx.js"></script>'),
+    html.indexOf('<script src="./protected-tags.js"></script>') < html.indexOf('<script src="./docx.js"></script>'),
     `${name} must load protected-tag detection before the eager DOCX compatibility script.`
   );
 }
@@ -18615,14 +18641,18 @@ for (const testName of [
   "lazy XLIFF rejects incomplete installation and permits a repaired retry",
   "lazy XLIFF validates namespace and loader boundaries"
 ]) {
-  assertIncludes(lazyXliffModuleUnitTests, testName, `focused lazy-XLIFF tests must retain characterization: ${testName}`);
+  assertIncludes(
+    lazyXliffModuleUnitTests,
+    testName,
+    `focused lazy-XLIFF tests must retain characterization: ${testName}`
+  );
 }
-for (const snippet of [
-  "await formats.buildTargetXliff",
-  "await formats.buildXliff22",
-  "await formats.buildXliff12"
-]) {
-  assertIncludes(deliveryExportControllerJs, snippet, `the delivery controller must retain lazy XLIFF awaiting: ${snippet}`);
+for (const snippet of ["await formats.buildTargetXliff", "await formats.buildXliff22", "await formats.buildXliff12"]) {
+  assertIncludes(
+    deliveryExportControllerJs,
+    snippet,
+    `the delivery controller must retain lazy XLIFF awaiting: ${snippet}`
+  );
 }
 assertIncludes(
   appWorkflowDriverJs,
@@ -18703,6 +18733,69 @@ for (const testName of [
     lazyAiCommandControllerFactoriesUnitTests,
     testName,
     `focused lazy-AI-command tests must retain characterization: ${testName}`
+  );
+}
+assertIncludes(
+  productionEntryJs,
+  'import "../ai/install-lazy-ai-command-domain.js";',
+  "the production renderer must install the lazy AI command domain."
+);
+assert(
+  productionEntryJs.indexOf('import "../../ai.js";') <
+    productionEntryJs.indexOf('import "../ai/install-lazy-ai-command-domain.js";') &&
+    productionEntryJs.indexOf('import "../ai/install-lazy-ai-command-domain.js";') <
+      productionEntryJs.indexOf('import "../ai/providers/install-lazy-provider-adapters.js";'),
+  "the production renderer must install the AI compatibility core, lazy command domain, and providers in order."
+);
+for (const html of [indexHtml, regressionHtml, smokeHtml, securityPolicyHtml, packageRoundtripHtml]) {
+  assert(
+    html.indexOf('<script src="./ai.js"></script>') < html.indexOf('<script src="./ai-command-domain.js"></script>'),
+    "standalone HTML boundaries must install the eager AI command domain after ai.js."
+  );
+}
+for (const snippet of [
+  'import("../../ai-command-domain.js")',
+  "let implementationPromise = null;",
+  "implementationPromise = null;",
+  "restoreLazyModule();",
+  "AI command domain could not be loaded. Try again.",
+  'invokeService("preTranslationService", method, args)',
+  'invokeService("aiCommandService", method, args)',
+  "return Object.freeze({"
+]) {
+  assertIncludes(lazyAiCommandDomainJs, snippet, `lazy AI domain must retain first-use policy: ${snippet}`);
+}
+assertIncludes(
+  aiJs,
+  'Object.defineProperty(aiCompatibilityModule, "__commandDomainRuntime"',
+  "the AI compatibility core must retain a non-public command-domain runtime boundary."
+);
+assertIncludes(
+  aiJs,
+  "enumerable: false",
+  "the AI command-domain runtime boundary must not extend the enumerable compatibility API."
+);
+for (const snippet of [
+  "async function openAiSuggestion(",
+  "async function pretranslateSegments(options = {})",
+  "async function reviewSegmentWithAi(options = {})",
+  "async function generateProjectBriefWithAi(options = {})",
+  "Object.assign(ai, { openAiSuggestion, preTranslationService, aiCommandService });"
+]) {
+  assertIncludes(aiCommandDomainJs, snippet, `the deferred AI domain must retain implementation: ${snippet}`);
+}
+for (const testName of [
+  "lazy AI command domain preserves synchronous contracts and installs ordered mutable facades without loading",
+  "lazy AI command domain shares one concurrent load and preserves service receivers arguments and results",
+  "lazy AI command domain redacts load failure preserves its cause restores facades and retries",
+  "lazy AI command domain rejects incomplete installation and permits a repaired retry",
+  "lazy AI command domain propagates implementation failures without rewriting them",
+  "lazy AI command domain validates compatibility and loader boundaries"
+]) {
+  assertIncludes(
+    lazyAiCommandDomainUnitTests,
+    testName,
+    `focused lazy-AI-domain tests must retain characterization: ${testName}`
   );
 }
 for (const testName of [
@@ -19368,15 +19461,20 @@ assertIncludes(
   "AI command service builds project brief prompts and returns reusable project instructions",
   "regression test must verify the provider-neutral AI project brief command."
 );
-assertIncludes(aiJs, "fetch(OPENAI_RESPONSES_URL", "ai.js must use the explicit OpenAI Responses endpoint constant.");
 assertIncludes(
-  aiJs,
+  aiCommandDomainJs,
+  "fetch(OPENAI_RESPONSES_URL",
+  "the deferred AI domain must use the explicit OpenAI Responses endpoint constant."
+);
+assertIncludes(
+  aiCommandDomainJs,
   "externalAiSourceSharingAllowed(project)",
-  "ai.js must enforce project-level external AI source-sharing consent before network calls."
+  "the deferred AI domain must enforce project-level external AI source-sharing consent before network calls."
 );
 assert(
-  aiJs.indexOf("externalAiSourceSharingAllowed(project)") < aiJs.indexOf("fetch(OPENAI_RESPONSES_URL"),
-  "ai.js must check external AI source-sharing consent before fetching the OpenAI endpoint."
+  openAiHelperFunction.indexOf("externalAiSourceSharingAllowed(project)") <
+    openAiHelperFunction.indexOf("fetchOpenAiResponse("),
+  "the deferred AI domain must check external AI source-sharing consent before fetching the OpenAI endpoint."
 );
 assert(
   openAiHelperFunction.indexOf("The active segment has no source text.") <
@@ -19404,8 +19502,9 @@ assertIncludes(
   "ai.js must keep OpenAI endpoint calls scoped to the OpenAI provider."
 );
 assert(
-  aiJs.indexOf("if (!isOpenAiProvider(project))") < aiJs.indexOf("fetchOpenAiResponse({"),
-  "ai.js must check the selected provider before requesting the OpenAI endpoint."
+  openAiHelperFunction.indexOf("if (!isOpenAiProvider(project))") <
+    openAiHelperFunction.indexOf("fetchOpenAiResponse("),
+  "the deferred AI domain must check the selected provider before requesting the OpenAI endpoint."
 );
 assertIncludes(aiJs, 'toLowerCase() === "openai"', "ai.js must match the OpenAI provider with locale-stable casing.");
 assert(
@@ -19417,13 +19516,16 @@ assertIncludes(
   "const OPENAI_REQUEST_TIMEOUT_MS = 45000",
   "ai.js must keep external AI requests bounded by an explicit timeout."
 );
-assertIncludes(aiJs, "controller.abort()", "ai.js must abort hung external AI requests.");
+assertIncludes(aiCommandDomainJs, "controller.abort()", "the deferred AI domain must abort hung external requests.");
 assertIncludes(
-  aiJs,
+  aiCommandDomainJs,
   "OpenAI request timed out",
-  "ai.js must return a recoverable timeout message for hung external AI requests."
+  "the deferred AI domain must return a recoverable timeout message for hung external AI requests."
 );
-assert(!aiJs.includes("mockSuggestion"), "ai.js must not expose mock AI suggestions in production builds.");
+assert(
+  !aiJs.includes("mockSuggestion") && !aiCommandDomainJs.includes("mockSuggestion"),
+  "the AI compatibility and deferred domain must not expose mock AI suggestions in production builds."
+);
 assert(
   !indexHtml.includes("mockAiSuggestionBtn"),
   "index.html must not expose a user-facing mock AI suggestion button."
@@ -19438,11 +19540,15 @@ assertIncludes(
   "ai.js must expose a browser offline preflight for OpenAI calls."
 );
 assertIncludes(
-  aiJs,
+  aiCommandDomainJs,
   "LoopCAT appears to be offline",
-  "ai.js must fail OpenAI requests with a clear offline-first error when the browser reports offline."
+  "the deferred AI domain must fail OpenAI requests with a clear offline-first error when the browser reports offline."
 );
-assertIncludes(aiJs, "store: false", "ai.js must opt out of provider-side OpenAI response storage.");
+assertIncludes(
+  aiCommandDomainJs,
+  "store: false",
+  "the deferred AI domain must opt out of provider-side OpenAI response storage."
+);
 assert(
   !openAiHelperFunction.includes('source: segment.source || ""'),
   "ai.js OpenAI suggestions must not return duplicated source text for local storage."
@@ -19467,9 +19573,9 @@ assertIncludes(
   "ai.js must keep the current OpenAI default model centralized."
 );
 assertIncludes(
-  aiJs,
+  aiCommandDomainJs,
   'const model = redactSensitiveText(project?.aiSettings?.model || "").trim() || OPENAI_DEFAULT_MODEL;',
-  "ai.js must redact credential-shaped model labels before OpenAI request construction."
+  "the deferred AI domain must redact credential-shaped model labels before OpenAI request construction."
 );
 assertIncludes(
   aiJs,
@@ -19482,14 +19588,14 @@ assertIncludes(
   "ai.js must fail closed on malformed optional local AI context records before prompt construction."
 );
 assertIncludes(
-  aiJs,
+  aiCommandDomainJs,
   "function openAiProviderErrorMessage",
-  "ai.js must normalize OpenAI provider error messages before they reach the UI."
+  "the deferred AI domain must normalize OpenAI provider error messages before they reach the UI."
 );
 assertIncludes(
-  functionBody(aiJs, "function openAiProviderErrorMessage", "function externalAiSourceSharingAllowed"),
+  functionBody(aiCommandDomainJs, "function openAiProviderErrorMessage", "function normalizedOpenAiTimeoutMs"),
   "redactSensitiveText(message)",
-  "ai.js must redact credential-shaped text from OpenAI provider error messages."
+  "the deferred AI domain must redact credential-shaped text from OpenAI provider error messages."
 );
 assertIncludes(
   aiJs,
@@ -19502,9 +19608,9 @@ assertIncludes(
   "ai.js must normalize malformed provider output payloads before extracting response text."
 );
 assertIncludes(
-  aiJs,
+  aiCommandDomainJs,
   "OpenAI request could not connect",
-  "ai.js must convert provider connection failures into clear user-facing status text."
+  "the deferred AI domain must convert provider connection failures into clear user-facing status text."
 );
 assertIncludes(tmJs, '.normalize("NFKC")', "tm.js must normalize text before token indexing and matching.");
 assertIncludes(tmJs, ".toLowerCase()", "tm.js must use locale-stable casing for token indexing and matching.");
