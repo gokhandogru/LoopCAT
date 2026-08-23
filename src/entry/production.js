@@ -7,7 +7,7 @@ import "../../termbase.js";
 import "../../tmx.js";
 import "../../tbx.js";
 import "../../encoding.js";
-import "../../xliff.js";
+import "../features/import-export/install-lazy-xliff-module.js";
 import "../features/import-export/install-lazy-localization-module.js";
 import "../../qa.js";
 import "../../validation.js";

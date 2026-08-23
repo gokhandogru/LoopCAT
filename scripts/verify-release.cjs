@@ -910,6 +910,8 @@ const protectedTagsJs = readText("protected-tags.js");
 const protectedTagsUnitTests = readText("tests/unit/protected-tags.test.cjs");
 const lazyDocxModuleJs = readText("src/features/import-export/install-lazy-docx-module.js");
 const lazyDocxModuleUnitTests = readText("tests/unit/lazy-docx-module.test.cjs");
+const lazyXliffModuleJs = readText("src/features/import-export/install-lazy-xliff-module.js");
+const lazyXliffModuleUnitTests = readText("tests/unit/lazy-xliff-module.test.cjs");
 const anthropicProviderAdapterUnitTests = readText("tests/unit/anthropic-provider-adapter.test.cjs");
 const cohereProviderAdapterUnitTests = readText("tests/unit/cohere-provider-adapter.test.cjs");
 const geminiProviderAdapterUnitTests = readText("tests/unit/gemini-provider-adapter.test.cjs");
@@ -18573,6 +18575,59 @@ assert(
   appWorkflowDriverJs.split("await buildBilingualDocx(").length - 1 === 2,
   "the workflow characterization must await both lazy bilingual DOCX probes."
 );
+assertIncludes(
+  productionEntryJs,
+  'import "../features/import-export/install-lazy-xliff-module.js";',
+  "The production renderer must install the lazy XLIFF compatibility façade."
+);
+assert(
+  productionEntryJs.indexOf('import "../../encoding.js";') <
+    productionEntryJs.indexOf('import "../features/import-export/install-lazy-xliff-module.js";') &&
+    productionEntryJs.indexOf('import "../features/import-export/install-lazy-xliff-module.js";') <
+      productionEntryJs.indexOf('import "../features/import-export/install-lazy-localization-module.js";'),
+  "The production renderer must retain encoding, XLIFF, and localization dependency order."
+);
+assert(
+  !productionEntryJs.includes('import "../../xliff.js";'),
+  "The production renderer must not eagerly import the XLIFF implementation."
+);
+for (const snippet of [
+  'import("../../../xliff.js")',
+  "let loadPromise = null;",
+  "loadPromise = null;",
+  "implementation === lazyModule",
+  "namespace.xliff = lazyModule;",
+  "function xliffMimeType",
+  "return Object.freeze({ load: loadModule, module: lazyModule });"
+]) {
+  assertIncludes(lazyXliffModuleJs, snippet, `lazy XLIFF must retain first-use policy: ${snippet}`);
+}
+for (const testName of [
+  "lazy XLIFF preserves synchronous MIME policy on a mutable eight-method compatibility facade",
+  "lazy XLIFF shares one concurrent load and preserves parser and builder receivers, arguments, and results",
+  "lazy XLIFF propagates load failure identity and retries the next first use",
+  "lazy XLIFF rejects incomplete installation and permits a repaired retry",
+  "lazy XLIFF validates namespace and loader boundaries"
+]) {
+  assertIncludes(lazyXliffModuleUnitTests, testName, `focused lazy-XLIFF tests must retain characterization: ${testName}`);
+}
+for (const snippet of [
+  "await formats.buildTargetXliff",
+  "await formats.buildXliff22",
+  "await formats.buildXliff12"
+]) {
+  assertIncludes(deliveryExportControllerJs, snippet, `the delivery controller must retain lazy XLIFF awaiting: ${snippet}`);
+}
+assertIncludes(
+  appWorkflowDriverJs,
+  "const sdlxliffOutput = await buildTargetXliff",
+  "the workflow characterization must await lazy SDLXLIFF reconstruction."
+);
+assertIncludes(
+  appWorkflowDriverJs,
+  "const parsedPartialXliff = await xliffApi.parseXliffText",
+  "the workflow characterization must await the direct lazy XLIFF parser probe."
+);
 for (const testName of [
   "lazy provider adapters preserve all registry positions, descriptors, capabilities, and compatibility exports",
   "lazy provider adapters share one concurrent load and preserve delegate receiver, arguments, and results",
@@ -25873,18 +25928,18 @@ assertIncludes(
 );
 assertIncludes(
   desktopMain,
-  "xliffApi.parseXliffText",
-  "desktop/main.cjs desktop smoke must prove packaged XLIFF import works."
+  "await xliffApi.parseXliffText",
+  "desktop/main.cjs desktop smoke must await and prove packaged lazy XLIFF import works."
 );
 assertIncludes(
   desktopMain,
-  "xliffApi.buildTargetXliff",
-  "desktop/main.cjs desktop smoke must prove packaged XLIFF target export works."
+  "await xliffApi.buildTargetXliff",
+  "desktop/main.cjs desktop smoke must await and prove packaged lazy XLIFF target export works."
 );
 assertIncludes(
   desktopMain,
-  "xliffApi.buildXliff22",
-  "desktop/main.cjs desktop smoke must prove packaged XLIFF 2.2 handoff export works."
+  "await xliffApi.buildXliff22",
+  "desktop/main.cjs desktop smoke must await and prove packaged lazy XLIFF 2.2 handoff export works."
 );
 assertIncludes(
   desktopMain,

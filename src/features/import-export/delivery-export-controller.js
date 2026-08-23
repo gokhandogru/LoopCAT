@@ -33,10 +33,10 @@
  *     xliffDocumentTypes: Set<string>,
  *     buildTargetDocx: (project: any, segments: any[]) => Promise<any>,
  *     buildBilingualDocx: (project: any, segments: any[], options: any) => Promise<any> | any,
- *     buildTargetXliff: (project: any, segments: any[], structure: any) => any,
+ *     buildTargetXliff: (project: any, segments: any[], structure: any) => Promise<any> | any,
  *     buildLocalizationFile: (type: string, segments: any[], structure: any) => Promise<any>,
- *     buildXliff12: (project: any, segments: any[]) => any,
- *     buildXliff22: (project: any, segments: any[]) => any,
+ *     buildXliff12: (project: any, segments: any[]) => Promise<any> | any,
+ *     buildXliff22: (project: any, segments: any[]) => Promise<any> | any,
  *     localizationMimeType: (extension: string, structure: any) => string,
  *     xliffMimeType: (version: string) => string
  *   },
@@ -429,7 +429,7 @@ export function createDeliveryExportController(options) {
         return;
       }
       const content = formats.xliffDocumentTypes.has(documentType)
-        ? formats.buildTargetXliff(session.getProject(), exportPlan.segments, structure)
+        ? await formats.buildTargetXliff(session.getProject(), exportPlan.segments, structure)
         : await formats.buildLocalizationFile(documentType, exportPlan.segments, structure);
       const extension = documentType === "yml" ? "yaml" : documentType === "markdown" ? "md" : documentType;
       const type = formats.localizationMimeType(extension, structure);
@@ -477,8 +477,8 @@ export function createDeliveryExportController(options) {
         : session.getProject();
       const isXliff22 = version === "2.2";
       const content = isXliff22
-        ? formats.buildXliff22(exportProject, exportPlan.segments)
-        : formats.buildXliff12(exportProject, exportPlan.segments);
+        ? await formats.buildXliff22(exportProject, exportPlan.segments)
+        : await formats.buildXliff12(exportProject, exportPlan.segments);
       const label = isXliff22 ? "XLIFF 2.2" : "XLIFF";
       const exportedMessage = isXliff22 ? "XLIFF 2.2 exported" : "XLIFF exported";
       download(

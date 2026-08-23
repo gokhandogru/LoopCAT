@@ -39,6 +39,7 @@ const localizationOutput = productionOutputs.find(
   ([, output]) => normalizePath(output.entryPoint) === "localization.js"
 );
 const docxOutput = productionOutputs.find(([, output]) => normalizePath(output.entryPoint) === "docx.js");
+const xliffOutput = productionOutputs.find(([, output]) => normalizePath(output.entryPoint) === "xliff.js");
 const eagerProviderImplementationSources = [
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -112,6 +113,12 @@ if (!productionEntryOutput) {
     failures.push("Hosted startup entry eagerly contains the DOCX archive implementation.");
   if (!Object.hasOwn(output.inputs || {}, "protected-tags.js"))
     failures.push("Hosted startup entry is missing the synchronous protected-tag detector.");
+  const xliffChunkImport = (output.imports || []).find(
+    (entry) => entry.kind === "dynamic-import" && normalizePath(entry.path).includes("/chunks/xliff-")
+  );
+  if (!xliffChunkImport) failures.push("Hosted startup entry does not lazy-load the XLIFF implementation chunk.");
+  if (Object.hasOwn(output.inputs || {}, "xliff.js"))
+    failures.push("Hosted startup entry eagerly contains the XLIFF implementation.");
   for (const source of [
     "src/reports/report-data-service.js",
     "src/reports/report-document.js",
@@ -124,6 +131,16 @@ if (!productionEntryOutput) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
   }
+}
+if (!xliffOutput) {
+  failures.push("Production renderer metafile is missing the XLIFF implementation chunk entry.");
+} else {
+  const [outputPath, output] = xliffOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("XLIFF implementation chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "xliff.js"))
+    failures.push("XLIFF implementation chunk is missing its source module.");
 }
 if (!docxOutput) {
   failures.push("Production renderer metafile is missing the DOCX implementation chunk entry.");

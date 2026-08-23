@@ -446,7 +446,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const sdlxliffFixture = `<?xml version="1.0" encoding="UTF-8"?><xliff version="1.2"><file original="workflow.sdlxliff" source-language="en" target-language="tr"><body><trans-unit id="1"><source>Hello world</source><target></target></trans-unit></body></file></xliff>`;
     const sdlxliffParsed = await parseXliffFile(new File([sdlxliffFixture], "workflow.sdlxliff", { type: "application/x-xliff+xml" }));
     assert(sdlxliffParsed.documentType === "sdlxliff", "SDLXLIFF import preserves document type");
-    const sdlxliffOutput = buildTargetXliff(editorSessionStore.getProject(), sdlxliffParsed.segments.map((segment) => ({ ...segment, target: "Merhaba dunya", status: "draft" })), sdlxliffParsed.structure);
+    const sdlxliffOutput = await buildTargetXliff(editorSessionStore.getProject(), sdlxliffParsed.segments.map((segment) => ({ ...segment, target: "Merhaba dunya", status: "draft" })), sdlxliffParsed.structure);
     assert(sdlxliffOutput.includes("Merhaba dunya"), "SDLXLIFF target export updates original XLIFF structure");
     await roundTripLocalizationFixture("workflow.xhtml", `<html xmlns="http://www.w3.org/1999/xhtml"><body><p>Hello world</p></body></html>`, "Merhaba dunya");
     await roundTripLocalizationFixture("workflow.txml", `<txml><segment><source>Hello world</source><target></target></segment></txml>`, "Merhaba dunya");
@@ -6379,7 +6379,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       await deliveryExportController.exportXliff12();
       const partialXliffDownload = scopedExportDownloads.filter((item) => item.type === "application/x-xliff+xml").at(-1);
       const partialXliff = await partialXliffDownload?.blob.text();
-      const parsedPartialXliff = xliffApi.parseXliffText(partialXliff, "partial.xlf");
+      const parsedPartialXliff = await xliffApi.parseXliffText(partialXliff, "partial.xlf");
       assert(
         parsedPartialXliff.segments[0].target === "" &&
           parsedPartialXliff.segments[0].status === "empty" &&
