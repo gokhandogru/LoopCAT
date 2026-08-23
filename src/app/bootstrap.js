@@ -118,13 +118,15 @@ import { createDiagnosticsService } from "../features/diagnostics/diagnostics-se
 import { createAiContextController } from "../features/ai/ai-context-controller.js";
 import { createAiAdministrationController } from "../features/ai/ai-administration-controller.js";
 import { createAiCredentialClearController } from "../features/ai/ai-credential-clear-controller.js";
-import { createAiPretranslationController } from "../features/ai/ai-pretranslation-controller.js";
-import { createAiReviewController } from "../features/ai/ai-review-controller.js";
-import { createAiTagRepairController } from "../features/ai/ai-tag-repair-controller.js";
-import { createAiAlternativesController } from "../features/ai/ai-alternatives-controller.js";
-import { createAiTerminologyApplicationController } from "../features/ai/ai-terminology-application-controller.js";
-import { createAiDraftEditingController } from "../features/ai/ai-draft-editing-controller.js";
-import { createAiTerminologyExtractionController } from "../features/ai/ai-terminology-extraction-controller.js";
+import {
+  createAiAlternativesController,
+  createAiDraftEditingController,
+  createAiPretranslationController,
+  createAiReviewController,
+  createAiTagRepairController,
+  createAiTerminologyApplicationController,
+  createAiTerminologyExtractionController
+} from "../features/ai/lazy-ai-command-controller-factories.js";
 import { createAiProjectBriefController } from "../features/ai/ai-project-brief-controller.js";
 import { createAiSuggestionApplicationController } from "../features/ai/ai-suggestion-application-controller.js";
 import { createAiOpenAiSuggestionController } from "../features/ai/ai-openai-suggestion-controller.js";

@@ -1,3 +1,5 @@
+import { validateAiTerminologyApplicationControllerOptions } from "./ai-command-controller-contracts.js";
+
 /**
  * Owns active and batch AI terminology-application validation, consent,
  * translated-draft eligibility, glossary/protected-token routing, suggestion
@@ -44,81 +46,25 @@ export function createAiTerminologyApplicationController(options) {
   const workspace = options?.workspace;
   const status = options?.status;
 
-  if (
-    typeof editorSessionStore?.getProject !== "function" ||
-    typeof editorSessionStore?.getSegments !== "function" ||
-    typeof editorSessionStore?.replaceSegments !== "function" ||
-    typeof selection?.getActiveSegment !== "function" ||
-    typeof selection?.getActiveIndex !== "function"
-  ) {
-    throw new TypeError("AiTerminologyApplicationController requires EditorSessionStore and selection boundaries.");
-  }
-  if (
-    typeof scope?.getVisibleSegments !== "function" ||
-    typeof scope?.getDocumentSegments !== "function" ||
-    typeof scope?.isLocked !== "function" ||
-    typeof scope?.getTags !== "function"
-  ) {
-    throw new TypeError("AiTerminologyApplicationController requires translated-draft scope boundaries.");
-  }
-  if (
-    typeof settingsBoundary?.persist !== "function" ||
-    typeof settingsBoundary?.runtimeConfig !== "function" ||
-    typeof settingsBoundary?.assertReady !== "function" ||
-    typeof providers?.get !== "function" ||
-    typeof providers?.sharesExternally !== "function" ||
-    typeof consent?.externalShare !== "function" ||
-    typeof context?.termsForSegment !== "function" ||
-    typeof domain?.applyTerminology !== "function"
-  ) {
-    throw new TypeError(
-      "AiTerminologyApplicationController requires settings, provider, consent, context, and domain boundaries."
-    );
-  }
-  if (
-    typeof lifecycle?.isRunning !== "function" ||
-    typeof lifecycle?.isPromptBusy !== "function" ||
-    typeof lifecycle?.sync !== "function"
-  ) {
-    throw new TypeError("AiTerminologyApplicationController requires shared AI lifecycle boundaries.");
-  }
-  if (
-    typeof suggestions?.append !== "function" ||
-    typeof suggestions?.normalize !== "function" ||
-    typeof suggestions?.nextId !== "function"
-  ) {
-    throw new TypeError("AiTerminologyApplicationController requires suggestion boundaries.");
-  }
-  if (
-    typeof persistence?.flush !== "function" ||
-    typeof persistence?.saveMany !== "function" ||
-    typeof persistence?.load !== "function" ||
-    typeof mutation?.touch !== "function" ||
-    typeof mutation?.clearPending !== "function" ||
-    typeof mutation?.restore !== "function" ||
-    typeof mutation?.prepareHistory !== "function" ||
-    typeof mutation?.prepareHistories !== "function"
-  ) {
-    throw new TypeError("AiTerminologyApplicationController requires persistence and mutation boundaries.");
-  }
-  if (
-    typeof presentation?.renderCommandCentre !== "function" ||
-    typeof presentation?.renderAiProgress !== "function" ||
-    typeof presentation?.renderOutput !== "function" ||
-    typeof presentation?.renderSuggestions !== "function" ||
-    typeof presentation?.updateRow !== "function" ||
-    typeof presentation?.renderAll !== "function" ||
-    typeof presentation?.refreshSidebar !== "function" ||
-    typeof activity?.logBatch !== "function" ||
-    typeof workspace?.markDirty !== "function" ||
-    typeof status?.set !== "function" ||
-    typeof options?.redact !== "function"
-  ) {
-    throw new TypeError(
-      "AiTerminologyApplicationController requires presentation, activity, workspace, status, and redaction boundaries."
-    );
-  }
-
+  validateAiTerminologyApplicationControllerOptions(options, {
+    editorSessionStore,
+    selection,
+    scope,
+    settings: settingsBoundary,
+    providers,
+    consent,
+    context,
+    domain,
+    lifecycle,
+    suggestions,
+    persistence,
+    mutation,
+    presentation,
+    activity,
+    workspace,
+    status,
+    redact: options?.redact
+  });
   const createAbortController =
     typeof lifecycle.createAbortController === "function"
       ? lifecycle.createAbortController

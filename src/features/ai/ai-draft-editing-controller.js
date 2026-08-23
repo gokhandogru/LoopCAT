@@ -1,3 +1,5 @@
+import { validateAiDraftEditingControllerOptions } from "./ai-command-controller-contracts.js";
+
 const OPERATIONS = Object.freeze({
   polish: Object.freeze({
     activeReadyAction: "polishing the active draft",
@@ -125,78 +127,25 @@ export function createAiDraftEditingController(options) {
   const workspace = options?.workspace;
   const status = options?.status;
 
-  if (
-    typeof editorSessionStore?.getProject !== "function" ||
-    typeof editorSessionStore?.getSegments !== "function" ||
-    typeof editorSessionStore?.replaceSegments !== "function" ||
-    typeof selection?.getActiveSegment !== "function"
-  ) {
-    throw new TypeError("AiDraftEditingController requires EditorSessionStore and selection boundaries.");
-  }
-  if (
-    typeof scope?.getVisibleSegments !== "function" ||
-    typeof scope?.getDocumentSegments !== "function" ||
-    typeof scope?.isLocked !== "function" ||
-    typeof scope?.getTags !== "function"
-  ) {
-    throw new TypeError("AiDraftEditingController requires translated-draft scope boundaries.");
-  }
-  if (
-    typeof settingsBoundary?.persist !== "function" ||
-    typeof settingsBoundary?.runtimeConfig !== "function" ||
-    typeof settingsBoundary?.assertReady !== "function" ||
-    typeof providers?.get !== "function" ||
-    typeof providers?.sharesExternally !== "function" ||
-    typeof consent?.externalShare !== "function" ||
-    typeof context?.termsForSegment !== "function" ||
-    typeof context?.tmMatchesForSegment !== "function" ||
-    typeof domain?.polish !== "function" ||
-    typeof domain?.adapt !== "function"
-  ) {
-    throw new TypeError(
-      "AiDraftEditingController requires settings, provider, consent, context, and domain boundaries."
-    );
-  }
-  if (
-    typeof lifecycle?.isRunning !== "function" ||
-    typeof lifecycle?.isPromptBusy !== "function" ||
-    typeof lifecycle?.sync !== "function"
-  ) {
-    throw new TypeError("AiDraftEditingController requires shared AI lifecycle boundaries.");
-  }
-  if (
-    typeof suggestions?.append !== "function" ||
-    typeof suggestions?.normalize !== "function" ||
-    typeof suggestions?.nextId !== "function" ||
-    typeof persistence?.flush !== "function" ||
-    typeof persistence?.saveMany !== "function" ||
-    typeof persistence?.load !== "function"
-  ) {
-    throw new TypeError("AiDraftEditingController requires suggestion and persistence boundaries.");
-  }
-  if (
-    typeof mutation?.touch !== "function" ||
-    typeof mutation?.clearPending !== "function" ||
-    typeof mutation?.restore !== "function" ||
-    typeof mutation?.prepareHistory !== "function" ||
-    typeof mutation?.prepareHistories !== "function" ||
-    typeof presentation?.renderCommandCentre !== "function" ||
-    typeof presentation?.renderAiProgress !== "function" ||
-    typeof presentation?.renderOutput !== "function" ||
-    typeof presentation?.renderAll !== "function" ||
-    typeof presentation?.refreshSidebar !== "function"
-  ) {
-    throw new TypeError("AiDraftEditingController requires mutation and presentation boundaries.");
-  }
-  if (
-    typeof activity?.logBatch !== "function" ||
-    typeof workspace?.markDirty !== "function" ||
-    typeof status?.set !== "function" ||
-    typeof options?.redact !== "function"
-  ) {
-    throw new TypeError("AiDraftEditingController requires activity, workspace, status, and redaction boundaries.");
-  }
-
+  validateAiDraftEditingControllerOptions(options, {
+    editorSessionStore,
+    selection,
+    scope,
+    settings: settingsBoundary,
+    providers,
+    consent,
+    context,
+    domain,
+    lifecycle,
+    suggestions,
+    persistence,
+    mutation,
+    presentation,
+    activity,
+    workspace,
+    status,
+    redact: options?.redact
+  });
   const createAbortController =
     typeof lifecycle.createAbortController === "function"
       ? lifecycle.createAbortController

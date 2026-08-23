@@ -1,3 +1,5 @@
+import { validateAiReviewControllerOptions } from "./ai-command-controller-contracts.js";
+
 const RISK_LEVELS = new Set(["none", "low", "medium", "high", "critical"]);
 const RISK_SCORES = { none: 0, low: 25, medium: 50, high: 75, critical: 100 };
 const RISK_ORDER = { none: 0, low: 1, medium: 2, high: 3, critical: 4 };
@@ -50,89 +52,25 @@ export function createAiReviewController(options) {
   const status = options?.status;
   const labels = options?.labels;
 
-  if (
-    typeof editorSessionStore?.getProject !== "function" ||
-    typeof editorSessionStore?.getSegments !== "function" ||
-    typeof editorSessionStore?.replaceSegments !== "function" ||
-    typeof selection?.getActiveSegment !== "function" ||
-    typeof selection?.getActiveIndex !== "function"
-  ) {
-    throw new TypeError("AiReviewController requires EditorSessionStore and selection boundaries.");
-  }
-  if (
-    typeof scope?.getVisibleSegments !== "function" ||
-    typeof scope?.getDocumentSegments !== "function" ||
-    typeof scope?.isLocked !== "function"
-  ) {
-    throw new TypeError("AiReviewController requires review scope boundaries.");
-  }
-  if (
-    typeof settingsBoundary?.persist !== "function" ||
-    typeof settingsBoundary?.runtimeConfig !== "function" ||
-    typeof settingsBoundary?.assertReady !== "function" ||
-    typeof providers?.get !== "function" ||
-    typeof providers?.sharesExternally !== "function" ||
-    typeof consent?.externalShare !== "function"
-  ) {
-    throw new TypeError("AiReviewController requires settings, provider, and consent boundaries.");
-  }
-  if (
-    typeof context?.findTerms !== "function" ||
-    typeof context?.getTermBaseNames !== "function" ||
-    typeof domain?.reviewSegment !== "function" ||
-    typeof domain?.parseRisk !== "function"
-  ) {
-    throw new TypeError("AiReviewController requires prompt-context and review-domain boundaries.");
-  }
-  if (
-    typeof lifecycle?.isRunning !== "function" ||
-    typeof lifecycle?.isPromptBusy !== "function" ||
-    typeof lifecycle?.sync !== "function"
-  ) {
-    throw new TypeError("AiReviewController requires shared AI lifecycle boundaries.");
-  }
-  if (
-    typeof persistence?.flush !== "function" ||
-    typeof persistence?.saveOne !== "function" ||
-    typeof persistence?.saveMany !== "function" ||
-    typeof persistence?.load !== "function"
-  ) {
-    throw new TypeError("AiReviewController requires persistence boundaries.");
-  }
-  if (
-    typeof mutation?.touch !== "function" ||
-    typeof mutation?.clearPending !== "function" ||
-    typeof mutation?.restore !== "function" ||
-    typeof mutation?.prepareHistory !== "function" ||
-    typeof mutation?.prepareHistories !== "function"
-  ) {
-    throw new TypeError("AiReviewController requires review mutation boundaries.");
-  }
-  if (
-    typeof presentation?.renderCommandCentre !== "function" ||
-    typeof presentation?.renderAiProgress !== "function" ||
-    typeof presentation?.renderOutput !== "function" ||
-    typeof presentation?.renderReview !== "function" ||
-    typeof presentation?.updateRow !== "function" ||
-    typeof presentation?.renderAll !== "function" ||
-    typeof presentation?.refreshSidebar !== "function" ||
-    typeof presentation?.renderSegments !== "function" ||
-    typeof presentation?.renderProjectProgress !== "function" ||
-    typeof presentation?.renderHistory !== "function"
-  ) {
-    throw new TypeError("AiReviewController requires presentation boundaries.");
-  }
-  if (
-    typeof activity?.logActive !== "function" ||
-    typeof activity?.logBatch !== "function" ||
-    typeof workspace?.markDirty !== "function" ||
-    typeof status?.set !== "function" ||
-    typeof labels?.risk !== "function" ||
-    typeof options?.redact !== "function"
-  ) {
-    throw new TypeError("AiReviewController requires activity, workspace, status, label, and redaction boundaries.");
-  }
-
+  validateAiReviewControllerOptions(options, {
+    editorSessionStore,
+    selection,
+    scope,
+    settings: settingsBoundary,
+    providers,
+    consent,
+    context,
+    domain,
+    lifecycle,
+    persistence,
+    mutation,
+    presentation,
+    activity,
+    workspace,
+    status,
+    labels,
+    redact: options?.redact
+  });
   const createAbortController =
     typeof lifecycle.createAbortController === "function"
       ? lifecycle.createAbortController

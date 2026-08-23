@@ -1,3 +1,5 @@
+import { validateAiTerminologyExtractionControllerOptions } from "./ai-command-controller-contracts.js";
+
 /**
  * Owns active and batch AI terminology-extraction validation, consent, source
  * scope, lifecycle, provider execution, term persistence sequencing,
@@ -37,53 +39,21 @@ export function createAiTerminologyExtractionController(options) {
   const workspace = options?.workspace;
   const status = options?.status;
 
-  if (
-    typeof editorSessionStore?.getProject !== "function" ||
-    typeof selection?.getActiveSegment !== "function" ||
-    typeof scope?.getSegments !== "function"
-  ) {
-    throw new TypeError(
-      "AiTerminologyExtractionController requires EditorSessionStore, selection, and scope boundaries."
-    );
-  }
-  if (
-    typeof termbase?.getSelectedName !== "function" ||
-    typeof termbase?.saveCandidates !== "function" ||
-    typeof settingsBoundary?.persist !== "function" ||
-    typeof settingsBoundary?.runtimeConfig !== "function" ||
-    typeof settingsBoundary?.assertReady !== "function" ||
-    typeof providers?.get !== "function" ||
-    typeof providers?.sharesExternally !== "function" ||
-    typeof consent?.externalShare !== "function" ||
-    typeof domain?.extractSegmentTerms !== "function"
-  ) {
-    throw new TypeError(
-      "AiTerminologyExtractionController requires termbase, settings, provider, consent, and domain boundaries."
-    );
-  }
-  if (
-    typeof lifecycle?.isRunning !== "function" ||
-    typeof lifecycle?.isPromptBusy !== "function" ||
-    typeof lifecycle?.sync !== "function"
-  ) {
-    throw new TypeError("AiTerminologyExtractionController requires shared AI lifecycle boundaries.");
-  }
-  if (
-    typeof presentation?.renderCommandCentre !== "function" ||
-    typeof presentation?.renderAiProgress !== "function" ||
-    typeof presentation?.renderOutput !== "function" ||
-    typeof presentation?.refreshProjectTerms !== "function" ||
-    typeof presentation?.refreshTerms !== "function" ||
-    typeof activity?.logActive !== "function" ||
-    typeof activity?.logBatch !== "function" ||
-    typeof workspace?.markDirty !== "function" ||
-    typeof status?.set !== "function"
-  ) {
-    throw new TypeError(
-      "AiTerminologyExtractionController requires presentation, activity, workspace, and status boundaries."
-    );
-  }
-
+  validateAiTerminologyExtractionControllerOptions(options, {
+    editorSessionStore,
+    selection,
+    scope,
+    termbase,
+    settings: settingsBoundary,
+    providers,
+    consent,
+    domain,
+    lifecycle,
+    presentation,
+    activity,
+    workspace,
+    status
+  });
   const createAbortController =
     typeof lifecycle.createAbortController === "function"
       ? lifecycle.createAbortController

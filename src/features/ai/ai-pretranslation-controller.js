@@ -1,3 +1,5 @@
+import { validateAiPretranslationControllerOptions } from "./ai-command-controller-contracts.js";
+
 /**
  * Owns local/hosted AI batch-pretranslation validation, consent, selection,
  * lifecycle, provider execution, command/persistence sequencing, presentation,
@@ -45,96 +47,25 @@ export function createAiPretranslationController(options) {
   const workspace = options?.workspace;
   const status = options?.status;
 
-  if (
-    typeof editorSessionStore?.getProject !== "function" ||
-    typeof editorSessionStore?.getSegments !== "function" ||
-    typeof editorSessionStore?.replaceSegments !== "function"
-  ) {
-    throw new TypeError("AiPretranslationController requires EditorSessionStore boundaries.");
-  }
-  if (
-    typeof settingsBoundary?.persist !== "function" ||
-    typeof settingsBoundary?.runtimeConfig !== "function" ||
-    typeof settingsBoundary?.assertReady !== "function" ||
-    typeof settingsBoundary?.projectDefaults !== "function"
-  ) {
-    throw new TypeError("AiPretranslationController requires settings boundaries.");
-  }
-  if (
-    typeof providers?.get !== "function" ||
-    typeof providers?.sharesExternally !== "function" ||
-    typeof consent?.externalShare !== "function" ||
-    typeof consent?.overwrite !== "function"
-  ) {
-    throw new TypeError("AiPretranslationController requires provider and consent boundaries.");
-  }
-  if (
-    typeof scope?.getSegments !== "function" ||
-    typeof scope?.getOptions !== "function" ||
-    typeof domain?.selectSegments !== "function" ||
-    typeof domain?.pretranslateSegments !== "function"
-  ) {
-    throw new TypeError("AiPretranslationController requires scope and provider-domain boundaries.");
-  }
-  if (
-    typeof context?.glossaryTermsForSegment !== "function" ||
-    typeof context?.tmMatchesForSegment !== "function" ||
-    typeof context?.surroundingSegmentsForSegment !== "function"
-  ) {
-    throw new TypeError("AiPretranslationController requires prompt-context boundaries.");
-  }
-  if (typeof lifecycle?.isBusy !== "function" || typeof lifecycle?.sync !== "function") {
-    throw new TypeError("AiPretranslationController requires shared AI lifecycle boundaries.");
-  }
-  if (
-    typeof commands?.bus?.execute !== "function" ||
-    typeof commands?.create !== "function" ||
-    typeof commands?.changed !== "function"
-  ) {
-    throw new TypeError("AiPretranslationController requires command boundaries.");
-  }
-  if (
-    typeof persistence?.flush !== "function" ||
-    typeof persistence?.save !== "function" ||
-    typeof persistence?.load !== "function"
-  ) {
-    throw new TypeError("AiPretranslationController requires persistence boundaries.");
-  }
-  if (
-    typeof mutation?.capturePatch !== "function" ||
-    typeof mutation?.applyPatch !== "function" ||
-    typeof mutation?.clearPending !== "function" ||
-    typeof mutation?.recordHistory !== "function" ||
-    typeof mutation?.touch !== "function" ||
-    typeof mutation?.restore !== "function" ||
-    typeof mutation?.prepareHistory !== "function" ||
-    typeof mutation?.prepareHistories !== "function"
-  ) {
-    throw new TypeError("AiPretranslationController requires target mutation boundaries.");
-  }
-  if (typeof restoration?.restorePatches !== "function" || typeof selection?.getActiveSegmentId !== "function") {
-    throw new TypeError("AiPretranslationController requires restoration and selection boundaries.");
-  }
-  if (
-    typeof presentation?.invalidateFilters !== "function" ||
-    typeof presentation?.renderAll !== "function" ||
-    typeof presentation?.renderSegments !== "function" ||
-    typeof presentation?.renderProjectProgress !== "function" ||
-    typeof presentation?.renderHistory !== "function" ||
-    typeof presentation?.renderAiProgress !== "function" ||
-    typeof presentation?.renderCommandCentre !== "function" ||
-    typeof presentation?.refreshSidebar !== "function"
-  ) {
-    throw new TypeError("AiPretranslationController requires presentation boundaries.");
-  }
-  if (
-    typeof activity?.log !== "function" ||
-    typeof workspace?.markDirty !== "function" ||
-    typeof status?.set !== "function"
-  ) {
-    throw new TypeError("AiPretranslationController requires activity, workspace, and status boundaries.");
-  }
-
+  validateAiPretranslationControllerOptions(options, {
+    editorSessionStore,
+    settings: settingsBoundary,
+    providers,
+    consent,
+    scope,
+    domain,
+    context,
+    lifecycle,
+    commands,
+    persistence,
+    mutation,
+    restoration,
+    selection,
+    presentation,
+    activity,
+    workspace,
+    status
+  });
   const createAbortController =
     typeof lifecycle.createAbortController === "function"
       ? lifecycle.createAbortController

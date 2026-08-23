@@ -40,6 +40,18 @@ const localizationOutput = productionOutputs.find(
 );
 const docxOutput = productionOutputs.find(([, output]) => normalizePath(output.entryPoint) === "docx.js");
 const xliffOutput = productionOutputs.find(([, output]) => normalizePath(output.entryPoint) === "xliff.js");
+const aiCommandControllersOutput = productionOutputs.find(
+  ([, output]) => normalizePath(output.entryPoint) === "src/features/ai/install-ai-command-controllers.js"
+);
+const aiCommandControllerSources = [
+  "src/features/ai/ai-alternatives-controller.js",
+  "src/features/ai/ai-draft-editing-controller.js",
+  "src/features/ai/ai-pretranslation-controller.js",
+  "src/features/ai/ai-review-controller.js",
+  "src/features/ai/ai-tag-repair-controller.js",
+  "src/features/ai/ai-terminology-application-controller.js",
+  "src/features/ai/ai-terminology-extraction-controller.js"
+];
 const eagerProviderImplementationSources = [
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -119,6 +131,16 @@ if (!productionEntryOutput) {
   if (!xliffChunkImport) failures.push("Hosted startup entry does not lazy-load the XLIFF implementation chunk.");
   if (Object.hasOwn(output.inputs || {}, "xliff.js"))
     failures.push("Hosted startup entry eagerly contains the XLIFF implementation.");
+  const aiCommandControllersChunkImport = (output.imports || []).find(
+    (entry) =>
+      entry.kind === "dynamic-import" && normalizePath(entry.path).includes("/chunks/install-ai-command-controllers-")
+  );
+  if (!aiCommandControllersChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the optional AI command-controller implementations.");
+  for (const source of aiCommandControllerSources) {
+    if (Object.hasOwn(output.inputs || {}, source))
+      failures.push(`Hosted startup entry eagerly contains AI command-controller implementation: ${source}`);
+  }
   for (const source of [
     "src/reports/report-data-service.js",
     "src/reports/report-document.js",
@@ -130,6 +152,18 @@ if (!productionEntryOutput) {
   for (const source of eagerProviderImplementationSources) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
+  }
+}
+if (!aiCommandControllersOutput) {
+  failures.push("Production renderer metafile is missing the AI command-controller implementation chunk entry.");
+} else {
+  const [outputPath, output] = aiCommandControllersOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("AI command-controller implementation chunk is missing from the production asset manifest.");
+  for (const source of aiCommandControllerSources) {
+    if (!Object.hasOwn(output.inputs || {}, source))
+      failures.push(`AI command-controller implementation chunk is missing source: ${source}`);
   }
 }
 if (!xliffOutput) {

@@ -912,6 +912,12 @@ const lazyDocxModuleJs = readText("src/features/import-export/install-lazy-docx-
 const lazyDocxModuleUnitTests = readText("tests/unit/lazy-docx-module.test.cjs");
 const lazyXliffModuleJs = readText("src/features/import-export/install-lazy-xliff-module.js");
 const lazyXliffModuleUnitTests = readText("tests/unit/lazy-xliff-module.test.cjs");
+const aiCommandControllerContractsJs = readText("src/features/ai/ai-command-controller-contracts.js");
+const aiCommandControllerInstallerJs = readText("src/features/ai/install-ai-command-controllers.js");
+const lazyAiCommandControllerFactoriesJs = readText("src/features/ai/lazy-ai-command-controller-factories.js");
+const lazyAiCommandControllerFactoriesUnitTests = readText(
+  "tests/unit/lazy-ai-command-controller-factories.test.cjs"
+);
 const anthropicProviderAdapterUnitTests = readText("tests/unit/anthropic-provider-adapter.test.cjs");
 const cohereProviderAdapterUnitTests = readText("tests/unit/cohere-provider-adapter.test.cjs");
 const geminiProviderAdapterUnitTests = readText("tests/unit/gemini-provider-adapter.test.cjs");
@@ -18628,6 +18634,77 @@ assertIncludes(
   "const parsedPartialXliff = await xliffApi.parseXliffText",
   "the workflow characterization must await the direct lazy XLIFF parser probe."
 );
+assertIncludes(
+  appBootstrapJs,
+  'from "../features/ai/lazy-ai-command-controller-factories.js";',
+  "application bootstrap must install the lazy AI command-controller factories."
+);
+for (const implementationPath of [
+  "ai-alternatives-controller.js",
+  "ai-draft-editing-controller.js",
+  "ai-pretranslation-controller.js",
+  "ai-review-controller.js",
+  "ai-tag-repair-controller.js",
+  "ai-terminology-application-controller.js",
+  "ai-terminology-extraction-controller.js"
+]) {
+  assert(
+    !appBootstrapJs.includes(`from "../features/ai/${implementationPath}"`),
+    `application bootstrap must not eagerly import AI command implementation: ${implementationPath}`
+  );
+  assertIncludes(
+    aiCommandControllerInstallerJs,
+    `from "./${implementationPath}"`,
+    `the dynamic AI command installer must retain implementation: ${implementationPath}`
+  );
+}
+for (const snippet of [
+  'import("./install-ai-command-controllers.js")',
+  "let implementationPromise = null;",
+  "implementationPromise = null;",
+  "validate(options);",
+  "let controllerPromise = null;",
+  "controllerPromise = null;",
+  "cancelPending = true;",
+  "AI command implementation could not be loaded. Try again.",
+  "return Object.freeze(api);"
+]) {
+  assertIncludes(
+    lazyAiCommandControllerFactoriesJs,
+    snippet,
+    `lazy AI command controllers must retain first-use policy: ${snippet}`
+  );
+}
+for (const validator of [
+  "validateAiAlternativesControllerOptions",
+  "validateAiDraftEditingControllerOptions",
+  "validateAiPretranslationControllerOptions",
+  "validateAiReviewControllerOptions",
+  "validateAiTagRepairControllerOptions",
+  "validateAiTerminologyApplicationControllerOptions",
+  "validateAiTerminologyExtractionControllerOptions"
+]) {
+  assertIncludes(
+    aiCommandControllerContractsJs,
+    `export function ${validator}`,
+    `shared AI command contracts must retain synchronous validator: ${validator}`
+  );
+}
+for (const testName of [
+  "lazy AI command controller validates synchronously and exposes the frozen ordered API without loading",
+  "lazy AI command controller shares one concurrent load and preserves factory options, receivers, arguments, and results",
+  "lazy AI command controller redacts load failure, preserves its cause, and retries the next command",
+  "lazy AI command controller rejects incomplete implementation and permits a repaired retry",
+  "lazy AI command controller forwards cancellation requested during first-use loading",
+  "lazy AI command factories preserve every controller's first synchronous validation checkpoint",
+  "lazy AI command controller validates loader and API configuration"
+]) {
+  assertIncludes(
+    lazyAiCommandControllerFactoriesUnitTests,
+    testName,
+    `focused lazy-AI-command tests must retain characterization: ${testName}`
+  );
+}
 for (const testName of [
   "lazy provider adapters preserve all registry positions, descriptors, capabilities, and compatibility exports",
   "lazy provider adapters share one concurrent load and preserve delegate receiver, arguments, and results",
