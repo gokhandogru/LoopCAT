@@ -32,7 +32,7 @@
  *     localizationTypes: Set<string>,
  *     xliffDocumentTypes: Set<string>,
  *     buildTargetDocx: (project: any, segments: any[]) => Promise<any>,
- *     buildBilingualDocx: (project: any, segments: any[], options: any) => any,
+ *     buildBilingualDocx: (project: any, segments: any[], options: any) => Promise<any> | any,
  *     buildTargetXliff: (project: any, segments: any[], structure: any) => any,
  *     buildLocalizationFile: (type: string, segments: any[], structure: any) => Promise<any>,
  *     buildXliff12: (project: any, segments: any[]) => any,
@@ -364,7 +364,7 @@ export function createDeliveryExportController(options) {
       application.clearQaFilter();
       presentation.renderQaResults();
       const base = fileSafeName(session.getProject().name || "project");
-      const bytes = formats.buildBilingualDocx(session.getProject(), session.getSegments(), { qaChecks });
+      const bytes = await formats.buildBilingualDocx(session.getProject(), session.getSegments(), { qaChecks });
       download(
         `${base}_bilingual.docx`,
         bytes,

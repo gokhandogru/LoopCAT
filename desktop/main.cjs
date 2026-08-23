@@ -898,7 +898,7 @@ function attachDesktopSmokeProbe(mainWindow, options = {}) {
           !rebuiltDocxImport.segments.some((segment) => segment.text.includes(docxImport.segments[0]?.text || "Desktop DOCX smoke source"));
 
         const translatedSegments = await projectApi.getProjectSegments(project.id);
-        const bilingualBytes = docxApi.buildBilingualDocx(project, translatedSegments, {
+        const bilingualBytes = await docxApi.buildBilingualDocx(project, translatedSegments, {
           qaChecks: [{ id: "desktop-smoke-qa", segmentId: translatedSegments[0]?.id, severity: "info", type: "smoke", message: "Packaged smoke QA note." }]
         });
         workflowProbe.bilingualDocxGenerated = bilingualBytes instanceof Uint8Array &&

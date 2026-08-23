@@ -1,6 +1,7 @@
 import "../../storage.js";
 import "../../workspace-storage.js";
-import "../../docx.js";
+import "../../protected-tags.js";
+import "../features/import-export/install-lazy-docx-module.js";
 import "../../tm.js";
 import "../../termbase.js";
 import "../../tmx.js";

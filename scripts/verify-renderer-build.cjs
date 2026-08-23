@@ -38,6 +38,7 @@ const reportServicesOutput = productionOutputs.find(
 const localizationOutput = productionOutputs.find(
   ([, output]) => normalizePath(output.entryPoint) === "localization.js"
 );
+const docxOutput = productionOutputs.find(([, output]) => normalizePath(output.entryPoint) === "docx.js");
 const eagerProviderImplementationSources = [
   "src/ai/providers/anthropic-provider-adapter.js",
   "src/ai/providers/cohere-provider-adapter.js",
@@ -103,6 +104,14 @@ if (!productionEntryOutput) {
     failures.push("Hosted startup entry does not lazy-load the localization implementation chunk.");
   if (Object.hasOwn(output.inputs || {}, "localization.js"))
     failures.push("Hosted startup entry eagerly contains the localization implementation.");
+  const docxChunkImport = (output.imports || []).find(
+    (entry) => entry.kind === "dynamic-import" && normalizePath(entry.path).includes("/chunks/docx-")
+  );
+  if (!docxChunkImport) failures.push("Hosted startup entry does not lazy-load the DOCX implementation chunk.");
+  if (Object.hasOwn(output.inputs || {}, "docx.js"))
+    failures.push("Hosted startup entry eagerly contains the DOCX archive implementation.");
+  if (!Object.hasOwn(output.inputs || {}, "protected-tags.js"))
+    failures.push("Hosted startup entry is missing the synchronous protected-tag detector.");
   for (const source of [
     "src/reports/report-data-service.js",
     "src/reports/report-document.js",
@@ -115,6 +124,16 @@ if (!productionEntryOutput) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
   }
+}
+if (!docxOutput) {
+  failures.push("Production renderer metafile is missing the DOCX implementation chunk entry.");
+} else {
+  const [outputPath, output] = docxOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("DOCX implementation chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "docx.js"))
+    failures.push("DOCX implementation chunk is missing its source module.");
 }
 if (!localizationOutput) {
   failures.push("Production renderer metafile is missing the localization implementation chunk entry.");

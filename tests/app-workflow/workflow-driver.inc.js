@@ -604,7 +604,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     } finally {
       els.fileEncodingSelect.value = previousEncodingSelection || "auto";
     }
-    const openXmlBytes = buildBilingualDocx(
+    const openXmlBytes = await buildBilingualDocx(
       { name: "Workflow OpenXML", sourceLang: "en", targetLang: "tr" },
       [{ source: "Hello world", target: "", status: "empty" }]
     );
@@ -682,7 +682,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "duplicate file detection is stable under Turkish locale casing"
     );
     Reflect.deleteProperty(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG);
-    const docxLandingBytes = buildBilingualDocx(
+    const docxLandingBytes = await buildBilingualDocx(
       { name: "Workflow DOCX landing", sourceLang: "en", targetLang: "tr" },
       [{ source: "DOCX import landing source.", target: "", status: "empty" }]
     );

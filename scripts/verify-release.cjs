@@ -109,6 +109,7 @@ const requiredAppFiles = [
   "icons/loopcat-icon.png",
   "storage.js",
   "workspace-storage.js",
+  "protected-tags.js",
   "docx.js",
   "tm.js",
   "termbase.js",
@@ -905,6 +906,10 @@ const lazyProviderInstallerJs = readText("src/ai/providers/install-lazy-provider
 const lazyProviderInstallerUnitTests = readText("tests/unit/lazy-provider-adapters.test.cjs");
 const lazyLocalizationModuleJs = readText("src/features/import-export/install-lazy-localization-module.js");
 const lazyLocalizationModuleUnitTests = readText("tests/unit/lazy-localization-module.test.cjs");
+const protectedTagsJs = readText("protected-tags.js");
+const protectedTagsUnitTests = readText("tests/unit/protected-tags.test.cjs");
+const lazyDocxModuleJs = readText("src/features/import-export/install-lazy-docx-module.js");
+const lazyDocxModuleUnitTests = readText("tests/unit/lazy-docx-module.test.cjs");
 const anthropicProviderAdapterUnitTests = readText("tests/unit/anthropic-provider-adapter.test.cjs");
 const cohereProviderAdapterUnitTests = readText("tests/unit/cohere-provider-adapter.test.cjs");
 const geminiProviderAdapterUnitTests = readText("tests/unit/gemini-provider-adapter.test.cjs");
@@ -7145,6 +7150,7 @@ const securityPolicyTest = readText("security-policy-test.html");
 const offlineShellTest = readText("offline-shell-test.html");
 const workspaceStorageTest = readText("workspace-storage-test.html");
 const packageRoundtripTest = readText("package-roundtrip-test.html");
+const largeProjectTest = readText("large-project-test.html");
 const smokeTest = readText("smoke-test.html");
 const regressionTest = readText("regression-test.html");
 const testRunner = readText("test-runner.html");
@@ -18486,6 +18492,87 @@ for (const testName of [
     `focused lazy-localization tests must retain characterization: ${testName}`
   );
 }
+assertIncludes(
+  productionEntryJs,
+  'import "../../protected-tags.js";',
+  "The production renderer must retain synchronous protected-tag detection."
+);
+assertIncludes(
+  productionEntryJs,
+  'import "../features/import-export/install-lazy-docx-module.js";',
+  "The production renderer must install the lazy DOCX compatibility façade."
+);
+assert(
+  productionEntryJs.indexOf('import "../../protected-tags.js";') <
+    productionEntryJs.indexOf('import "../features/import-export/install-lazy-docx-module.js";'),
+  "The production renderer must install protected-tag detection before the lazy DOCX façade."
+);
+assert(
+  !productionEntryJs.includes('import "../../docx.js";'),
+  "The production renderer must not eagerly import the DOCX archive implementation."
+);
+for (const snippet of [
+  'import("../../../docx.js")',
+  "let loadPromise = null;",
+  "loadPromise = null;",
+  "implementation === lazyModule",
+  "namespace.docx = lazyModule;",
+  "detectProtectedTags",
+  "return Object.freeze({ load: loadModule, module: lazyModule });"
+]) {
+  assertIncludes(lazyDocxModuleJs, snippet, `lazy DOCX must retain first-use policy: ${snippet}`);
+}
+for (const testName of [
+  "lazy DOCX preserves the synchronous detector on a mutable four-method compatibility facade",
+  "lazy DOCX shares one concurrent load and preserves archive delegate receivers, arguments, and results",
+  "lazy DOCX propagates load failure identity and retries the next first use",
+  "lazy DOCX rejects incomplete installation and permits a repaired retry",
+  "lazy DOCX validates namespace, detector, and loader boundaries"
+]) {
+  assertIncludes(lazyDocxModuleUnitTests, testName, `focused lazy-DOCX tests must retain characterization: ${testName}`);
+}
+for (const testName of [
+  "protected-tag detector preserves semantic, generic, variable, placeholder, and overlap behavior",
+  "protected-tag detector keeps synchronous deterministic compatibility behavior"
+]) {
+  assertIncludes(protectedTagsUnitTests, testName, `focused protected-tag tests must retain characterization: ${testName}`);
+}
+assertIncludes(
+  protectedTagsJs,
+  "window.CatHan.protectedTags = { detectProtectedTags };",
+  "the extracted protected-tag detector must retain its synchronous compatibility boundary."
+);
+assertIncludes(
+  docxJs,
+  "const detectProtectedTags = window.CatHan?.protectedTags?.detectProtectedTags;",
+  "the DOCX archive implementation must consume the extracted protected-tag detector."
+);
+assert(
+  !docxJs.includes("function detectProtectedTags(text)"),
+  "the DOCX archive implementation must not duplicate the eager protected-tag detector."
+);
+for (const [name, html] of [
+  ["index.html", indexHtml],
+  ["regression-test.html", regressionTest],
+  ["package-roundtrip-test.html", packageRoundtripTest],
+  ["large-project-test.html", largeProjectTest],
+  ["smoke-test.html", smokeTest]
+]) {
+  assert(
+    html.indexOf('<script src="./protected-tags.js"></script>') <
+      html.indexOf('<script src="./docx.js"></script>'),
+    `${name} must load protected-tag detection before the eager DOCX compatibility script.`
+  );
+}
+assertIncludes(
+  deliveryExportControllerJs,
+  "await formats.buildBilingualDocx",
+  "the delivery controller must await lazy bilingual DOCX generation."
+);
+assert(
+  appWorkflowDriverJs.split("await buildBilingualDocx(").length - 1 === 2,
+  "the workflow characterization must await both lazy bilingual DOCX probes."
+);
 for (const testName of [
   "lazy provider adapters preserve all registry positions, descriptors, capabilities, and compatibility exports",
   "lazy provider adapters share one concurrent load and preserve delegate receiver, arguments, and results",
@@ -25816,8 +25903,8 @@ assertIncludes(
 );
 assertIncludes(
   desktopMain,
-  "docxApi.buildBilingualDocx",
-  "desktop/main.cjs desktop smoke must prove packaged bilingual DOCX generation works."
+  "await docxApi.buildBilingualDocx",
+  "desktop/main.cjs desktop smoke must await and prove packaged lazy bilingual DOCX generation works."
 );
 assertIncludes(
   desktopMain,

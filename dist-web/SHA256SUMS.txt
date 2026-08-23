@@ -1,1 +1,1 @@
-b72e89f0d18df6e24f9f967c884ae2be6f80b299d2feafc6d3d7740ba505ab9e  LoopCAT Web 0.0.3.zip
+1a7feb3dd32119b82ea2a536c13d2b3f2eb7def260ade3569754b3893af792b5  LoopCAT Web 0.0.3.zip

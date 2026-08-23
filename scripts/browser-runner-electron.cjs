@@ -26,6 +26,7 @@ for (const asset of JSON.parse(require("node:fs").readFileSync(path.join(testRen
 const standaloneTestDependencies = [
   "ai.js",
   "analysis.js",
+  "protected-tags.js",
   "docx.js",
   "localization.js",
   "project.js",
