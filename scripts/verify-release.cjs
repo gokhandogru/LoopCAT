@@ -913,6 +913,10 @@ const aiSuggestionApplicationControllerJs = readText("src/features/ai/ai-suggest
 const aiSuggestionApplicationControllerUnitTests = readText("tests/unit/ai-suggestion-application-controller.test.cjs");
 const aiOpenAiSuggestionControllerJs = readText("src/features/ai/ai-openai-suggestion-controller.js");
 const aiOpenAiSuggestionControllerUnitTests = readText("tests/unit/ai-openai-suggestion-controller.test.cjs");
+const aiOpenAiSuggestionControllerContractJs = readText("src/features/ai/ai-openai-suggestion-controller-contract.js");
+const aiOpenAiSuggestionControllerInstallerJs = readText("src/features/ai/install-ai-openai-suggestion-controller.js");
+const lazyAiOpenAiSuggestionControllerJs = readText("src/features/ai/lazy-ai-openai-suggestion-controller.js");
+const lazyAiOpenAiSuggestionControllerUnitTests = readText("tests/unit/lazy-ai-openai-suggestion-controller.test.cjs");
 const aiSuggestionPersistenceControllerJs = readText("src/features/ai/ai-suggestion-persistence-controller.js");
 const aiSuggestionPersistenceControllerUnitTests = readText("tests/unit/ai-suggestion-persistence-controller.test.cjs");
 const aiSettingsPersistenceControllerJs = readText("src/features/ai/ai-settings-persistence-controller.js");
@@ -16940,8 +16944,13 @@ for (const testName of [
 }
 assertIncludes(
   appBootstrapJs,
-  "createAiOpenAiSuggestionController",
-  "The application runtime must expose the checked direct-OpenAI-suggestion controller boundary."
+  'import { createAiOpenAiSuggestionController } from "../features/ai/lazy-ai-openai-suggestion-controller.js";',
+  "The application runtime must install the checked lazy direct-OpenAI-suggestion controller boundary."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createAiOpenAiSuggestionController,",
+  "The application runtime must expose the checked direct-OpenAI-suggestion controller factory."
 );
 assertIncludes(
   appJs,
@@ -16994,6 +17003,58 @@ for (const testName of [
     aiOpenAiSuggestionControllerUnitTests,
     testName,
     `focused direct-OpenAI-suggestion tests must characterize ${testName}.`
+  );
+}
+assert(
+  !appBootstrapJs.includes('from "../features/ai/ai-openai-suggestion-controller.js";'),
+  "application bootstrap must not eagerly import the direct OpenAI suggestion implementation."
+);
+assertIncludes(
+  aiOpenAiSuggestionControllerInstallerJs,
+  'from "./ai-openai-suggestion-controller.js"',
+  "the dynamic direct OpenAI suggestion installer must retain the implementation controller."
+);
+assertIncludes(
+  aiOpenAiSuggestionControllerJs,
+  'from "./ai-openai-suggestion-controller-contract.js";',
+  "the eager direct OpenAI suggestion implementation must share its synchronous contract."
+);
+assertIncludes(
+  aiOpenAiSuggestionControllerJs,
+  "validateAiOpenAiSuggestionControllerOptions(options);",
+  "the eager direct OpenAI suggestion implementation must retain synchronous validation."
+);
+assertIncludes(
+  aiOpenAiSuggestionControllerContractJs,
+  "export function validateAiOpenAiSuggestionControllerOptions",
+  "the shared direct OpenAI suggestion contract must retain construction validation."
+);
+for (const snippet of [
+  'import("./install-ai-openai-suggestion-controller.js")',
+  "validateAiOpenAiSuggestionControllerOptions(options);",
+  "let controllerPromise = null;",
+  "controllerPromise = null;",
+  "Direct OpenAI suggestion implementation could not be loaded. Try again.",
+  "return Object.freeze({ create });"
+]) {
+  assertIncludes(
+    lazyAiOpenAiSuggestionControllerJs,
+    snippet,
+    `lazy direct OpenAI suggestion must retain policy: ${snippet}`
+  );
+}
+for (const testName of [
+  "lazy direct OpenAI suggestion validates synchronously and exposes the frozen API without loading",
+  "lazy direct OpenAI suggestion shares one concurrent load and preserves options receiver arguments and results",
+  "lazy direct OpenAI suggestion redacts load failure preserves its cause and retries creation",
+  "lazy direct OpenAI suggestion rejects incomplete implementation and permits a repaired retry",
+  "lazy direct OpenAI suggestion preserves implementation failure identity without reloading",
+  "lazy direct OpenAI suggestion validates loader configuration"
+]) {
+  assertIncludes(
+    lazyAiOpenAiSuggestionControllerUnitTests,
+    testName,
+    `focused lazy-direct-OpenAI-suggestion tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(

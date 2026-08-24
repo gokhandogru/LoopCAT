@@ -129,7 +129,7 @@ import {
 } from "../features/ai/lazy-ai-command-controller-factories.js";
 import { createAiProjectBriefController } from "../features/ai/lazy-ai-project-brief-controller.js";
 import { createAiSuggestionApplicationController } from "../features/ai/ai-suggestion-application-controller.js";
-import { createAiOpenAiSuggestionController } from "../features/ai/ai-openai-suggestion-controller.js";
+import { createAiOpenAiSuggestionController } from "../features/ai/lazy-ai-openai-suggestion-controller.js";
 import { createAiSuggestionPersistenceController } from "../features/ai/ai-suggestion-persistence-controller.js";
 import { createAiSettingsPersistenceController } from "../features/ai/ai-settings-persistence-controller.js";
 import { createAiProviderAdministrationOperationsController } from "../features/ai/ai-provider-administration-operations-controller.js";
