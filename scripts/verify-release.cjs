@@ -753,6 +753,10 @@ const projectExportBuildServiceJs = readText("src/features/import-export/project
 const projectExportBuildServiceUnitTests = readText("tests/unit/project-export-build-service.test.cjs");
 const projectExportControllerJs = readText("src/features/import-export/project-export-controller.js");
 const projectExportControllerUnitTests = readText("tests/unit/project-export-controller.test.cjs");
+const projectExportControllerContractJs = readText("src/features/import-export/project-export-controller-contract.js");
+const projectExportControllerInstallerJs = readText("src/features/import-export/install-project-export-controller.js");
+const lazyProjectExportControllerJs = readText("src/features/import-export/lazy-project-export-controller.js");
+const lazyProjectExportControllerUnitTests = readText("tests/unit/lazy-project-export-controller.test.cjs");
 const projectImportRestoreControllerJs = readText("src/features/import-export/project-import-restore-controller.js");
 const projectImportRestoreControllerUnitTests = readText("tests/unit/project-import-restore-controller.test.cjs");
 const projectImportRestoreControllerContractJs = readText(
@@ -11029,8 +11033,8 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
-  'import { createProjectExportController } from "../features/import-export/project-export-controller.js";',
-  "The application runtime must install the checked project-export controller."
+  'import { createProjectExportController } from "../features/import-export/lazy-project-export-controller.js";',
+  "The application runtime must install the checked lazy project-export controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -13451,7 +13455,7 @@ for (const snippet of [
   "return Object.freeze({"
 ]) {
   assertIncludes(
-    projectExportControllerJs,
+    `${projectExportControllerJs}\n${projectExportControllerContractJs}`,
     snippet,
     `ProjectExportController must retain characterized backup/project export, history, activity, presentation, and failure policy: ${snippet}`
   );
@@ -13533,6 +13537,54 @@ for (const testName of [
     projectExportControllerUnitTests,
     testName,
     `focused project-export controller tests must retain characterization: ${testName}`
+  );
+}
+assert(
+  !appBootstrapJs.includes('from "../features/import-export/project-export-controller.js";'),
+  "application bootstrap must not eagerly import the project-export implementation."
+);
+assertIncludes(
+  projectExportControllerInstallerJs,
+  'from "./project-export-controller.js"',
+  "the dynamic project-export installer must retain the implementation controller."
+);
+assertIncludes(
+  projectExportControllerJs,
+  'from "./project-export-controller-contract.js";',
+  "the eager project-export implementation must share its synchronous contract."
+);
+assertIncludes(
+  projectExportControllerJs,
+  "validateProjectExportControllerOptions(options);",
+  "the eager project-export implementation must retain synchronous validation."
+);
+assertIncludes(
+  projectExportControllerContractJs,
+  "export function validateProjectExportControllerOptions",
+  "the shared project-export contract must retain construction validation."
+);
+for (const snippet of [
+  'import("./install-project-export-controller.js")',
+  "validateProjectExportControllerOptions(options);",
+  "let controllerPromise = null;",
+  "controllerPromise = null;",
+  "Project export implementation could not be loaded. Try again.",
+  "return Object.freeze({"
+]) {
+  assertIncludes(lazyProjectExportControllerJs, snippet, `lazy project export must retain policy: ${snippet}`);
+}
+for (const testName of [
+  "lazy project export validates synchronously and exposes the frozen ordered API without loading",
+  "lazy project export shares one concurrent load and preserves options receivers arguments and results",
+  "lazy project export redacts load failure preserves its cause and retries the next export",
+  "lazy project export rejects incomplete implementation and permits a repaired retry",
+  "lazy project export preserves implementation failure identity without reloading",
+  "lazy project export validates loader configuration"
+]) {
+  assertIncludes(
+    lazyProjectExportControllerUnitTests,
+    testName,
+    `focused lazy-project-export tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(

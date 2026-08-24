@@ -193,7 +193,7 @@ import { createImportExportController } from "../features/import-export/import-e
 import { createFileImportService } from "../features/import-export/file-import-service.js";
 import { createProjectDocumentImportController } from "../features/import-export/lazy-project-document-import-controller.js";
 import { createProjectExportBuildService } from "../features/import-export/project-export-build-service.js";
-import { createProjectExportController } from "../features/import-export/project-export-controller.js";
+import { createProjectExportController } from "../features/import-export/lazy-project-export-controller.js";
 import { createProjectImportRestoreController } from "../features/import-export/lazy-project-import-restore-controller.js";
 import { createProjectPackagePortabilityService } from "../features/import-export/project-package-portability-service.js";
 import { createTextEncodingInputService } from "../features/import-export/text-encoding-input-service.js";
