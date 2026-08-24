@@ -28220,6 +28220,16 @@ assertIncludes(
 );
 assertIncludes(
   desktopWorkflow,
+  "sudo chown root:root dist/linux-unpacked/chrome-sandbox",
+  "Desktop release workflow must give the packaged Linux sandbox helper its required root ownership before smoke."
+);
+assertIncludes(
+  desktopWorkflow,
+  "sudo chmod 4755 dist/linux-unpacked/chrome-sandbox",
+  "Desktop release workflow must enable the packaged Linux sandbox helper before smoke."
+);
+assertIncludes(
+  desktopWorkflow,
   "downloadArtifactCommand: pnpm run verify:download-artifacts -- win",
   "Desktop release workflow must verify Windows download artifacts."
 );

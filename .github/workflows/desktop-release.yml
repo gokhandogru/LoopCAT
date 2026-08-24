@@ -138,6 +138,13 @@ jobs:
       - name: Build desktop artifact
         run: ${{ matrix.command }}
 
+      - name: Prepare Linux packaged sandbox
+        if: matrix.signingPlatform == 'linux'
+        shell: bash
+        run: |
+          sudo chown root:root dist/linux-unpacked/chrome-sandbox
+          sudo chmod 4755 dist/linux-unpacked/chrome-sandbox
+
       - name: Smoke test packaged desktop app
         run: ${{ matrix.desktopSmokeCommand }}
 
