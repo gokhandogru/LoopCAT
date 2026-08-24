@@ -548,13 +548,13 @@ Further reduction should come from measured lazy loading of the remaining uncomm
 ## Manual and external release gates still required
 
 - NVDA/Windows and VoiceOver/macOS audited-flow checks, including keyboard, focus return, 200% zoom, reduced motion, increased contrast, and forced colors.
-- Completed signed clean-machine release evidence for Windows and macOS, plus checksum-authenticated AppImage/DEB build, install, launch, and smoke evidence on Linux. Windows directory packaging, artifact inspection, fuses, and GPU-on/off automated startup are complete, but they are not Authenticode or clean-machine evidence.
+- Completed signed clean-machine release evidence for Windows and macOS, plus checksum-authenticated AppImage/DEB clean-machine install and launch evidence on Linux. Cross-platform CI run 32682762543 now passes static-web build/smoke/upload and the complete Linux release job through AppImage/DEB build, sandboxed packaged smoke, artifact/fuse/download/signature-policy/checksum verification, and upload. Windows and macOS pass every pre-signing quality, accessibility, browser, and wrapper gate, then stop at the fail-closed signing-environment check because the external credentials are not configured.
 - Cold/warm startup, typing latency, long-task, and large-project scroll measurements on the named reference laptop. The roadmap targets remain targets until this evidence is recorded.
 - Final release-candidate visual review by a human at all three required viewports and both themes.
 
 ## Current green automated gates
 
-The 24 August completion-audit checkpoint passes 1,364/1,364 quality tests, all eight browser phases, all 15 accessibility states, all 81 visual checkpoints, 1,973 messages and 57 explicit key references, the regenerated 57-asset web package, Windows directory packaging, artifact and fuse inspection, and packaged renderer-sandbox startup with both normal hardware acceleration and the explicit disabled-GPU fallback.
+The 24 August completion-audit checkpoint passes 1,364/1,364 quality tests, all eight browser phases, all 15 accessibility states, all 81 visual checkpoints, 1,973 messages and 57 explicit key references, the regenerated 57-asset web package, Windows directory packaging, artifact and fuse inspection, and packaged renderer-sandbox startup with both normal hardware acceleration and the explicit disabled-GPU fallback. GitHub Actions run 32682762543 additionally passes the static-web job and complete Linux release job; Windows and macOS pass every gate before the external signing-credential check.
 
 - `pnpm verify:release`
 - `pnpm verify:desktop-wrapper`
@@ -576,6 +576,6 @@ The 24 August completion-audit checkpoint passes 1,364/1,364 quality tests, all 
 
 ## Automated implementation conclusion
 
-The component gallery and completion audit close the last identified automated roadmap artifact. There is no recommended behavior-preserving implementation slice after the measured P2-05 endpoint. The authoritative remaining work is the manual, native-platform, signing/notarization, clean-machine, reference-hardware, and human visual evidence listed above.
+The component gallery and completion audit close the last identified automated roadmap artifact. There is no recommended behavior-preserving implementation slice after the measured P2-05 endpoint. The authoritative remaining work is manual assistive-technology and visual review, signed/notarized clean-machine evidence, reference-hardware measurement, and the explicit residual-size decision listed above.
 
 Do not merge this branch or describe the complete modernization as finished until that evidence is recorded and the residual 750 KB stretch-target decision is explicit. Preserve the completed P1-08 boundaries, 13-line bootstrap entry, offline and direct-file compatibility, supported formats, AI safeguards, command/Undo/Redo semantics, and the full phase gate while collecting it.

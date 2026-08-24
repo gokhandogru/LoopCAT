@@ -99,7 +99,18 @@ The complete local checkpoint gate passed on Windows on 24 August 2026:
 - desktop-wrapper, contextual-AI UX, strict bundle contract, and XLIFF 2.2 schema verification; and
 - Windows production-only directory packaging, `app.asar` inspection, Electron fuses, renderer sandbox startup with hardware acceleration, and the explicit disabled-GPU fallback.
 
-This proves the local automated checkpoint. It does not substitute for signed downloadable artifacts, clean-machine qualification, native macOS/Linux evidence, assistive-technology review, or controlled reference-device measurements.
+This proves the local automated checkpoint. It does not substitute for signed downloadable artifacts, clean-machine qualification, native signed/notarized release evidence, assistive-technology review, or controlled reference-device measurements.
+
+## Cross-platform CI phase-gate result
+
+The GitHub Actions desktop-release workflow on branch checkpoint `83b2e5349c2ff1c602d6323a7aac084d3ff64320` provides the current native-runner evidence: [run 32682762543](https://github.com/gokhandogru/LoopCAT/actions/runs/32682762543).
+
+- The static HTML job passed build, artifact verification, rendered smoke under Xvfb, checksum generation, and artifact upload on Linux.
+- The Linux job passed release provenance and contract checks, all 1,364 quality tests, all 15 automated accessibility states, the full eight-phase browser suite, the desktop-wrapper check, signing-policy validation, AppImage/DEB construction, sandboxed packaged-app smoke, payload and fuse inspection, download and platform-signature policy checks, checksums, and artifact upload.
+- The Windows and macOS jobs passed all static/focused quality, accessibility, browser, and desktop-wrapper gates, then stopped only at the fail-closed signing-environment check because Authenticode and Apple signing/notarization credentials are not configured for this repository.
+- The all-platform release bundle job was consequently and correctly skipped. The overall workflow conclusion is therefore failure even though the web and Linux jobs are green and both proprietary platforms reached only the external credential boundary.
+
+This proves automated web/Linux packaging portability and native Windows/macOS behavior before signing. It is not signed/notarized downloadable-artifact, clean-machine installation, or human release evidence.
 
 ## Remaining completion evidence
 
@@ -109,7 +120,7 @@ The following items prevent a claim that the entire modernization plan is comple
 2. Human checks at 200% zoom, reduced motion, increased contrast, and forced colors.
 3. Final human visual review at 1440×900, 1366×768, and 1024×768 in both light and dark themes.
 4. Controlled cold/warm startup, typing latency, long-task, and large-project scrolling measurements on the named reference laptop.
-5. Completed signed/notarized clean-machine release evidence for Windows and macOS, plus checksum-authenticated AppImage/DEB build, install, and launch evidence for Linux. The repository has a cross-platform workflow, signing checks, artifact verifiers, and `docs/release-smoke-evidence-template.md`, but no completed evidence record for this branch.
+5. Completed signed/notarized clean-machine release evidence for Windows and macOS, plus checksum-authenticated AppImage/DEB clean-machine install and launch evidence for Linux. CI now builds, sandbox-smokes, verifies, checksums, and uploads the Linux artifacts; signing credentials and completed clean-machine evidence remain external.
 6. A decision on the unachieved 750 KB minified stretch target: accept the measured residual, change the target, or authorize a capability/timing trade-off.
 
 Until those items are supplied, this branch is an automated implementation checkpoint rather than an authorized merge or public-release candidate.
