@@ -17,6 +17,7 @@ jobs:
           - name: Windows
             os: windows-latest
             signingPlatform: win
+            accessibilityCommand: pnpm run verify:a11y
             browserCommand: pnpm run verify:browser-runner
             desktopSmokeCommand: pnpm run verify:desktop-smoke
             downloadArtifactCommand: pnpm run verify:download-artifacts -- win
@@ -30,6 +31,7 @@ jobs:
           - name: macOS
             os: macos-latest
             signingPlatform: mac
+            accessibilityCommand: pnpm run verify:a11y
             browserCommand: pnpm run verify:browser-runner
             desktopSmokeCommand: pnpm run verify:desktop-smoke
             downloadArtifactCommand: pnpm run verify:download-artifacts -- mac
@@ -43,6 +45,7 @@ jobs:
           - name: Linux
             os: ubuntu-latest
             signingPlatform: linux
+            accessibilityCommand: xvfb-run -a pnpm run verify:a11y
             browserCommand: xvfb-run -a pnpm run verify:browser-runner
             desktopSmokeCommand: xvfb-run -a pnpm run verify:desktop-smoke
             downloadArtifactCommand: pnpm run verify:download-artifacts -- linux
@@ -121,7 +124,7 @@ jobs:
         run: pnpm run verify:quality
 
       - name: Run automated accessibility checks
-        run: pnpm run verify:a11y
+        run: ${{ matrix.accessibilityCommand }}
 
       - name: Run browser test suite
         run: ${{ matrix.browserCommand }}

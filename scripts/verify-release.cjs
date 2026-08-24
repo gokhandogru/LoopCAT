@@ -28185,6 +28185,16 @@ assertIncludes(
 );
 assertIncludes(
   desktopWorkflow,
+  "accessibilityCommand: pnpm run verify:a11y",
+  "Desktop release workflow must run accessibility checks directly on Windows and macOS."
+);
+assertIncludes(
+  desktopWorkflow,
+  "accessibilityCommand: xvfb-run -a pnpm run verify:a11y",
+  "Desktop release workflow must run accessibility checks under xvfb on Linux."
+);
+assertIncludes(
+  desktopWorkflow,
   "xvfb-run -a pnpm run verify:browser-runner",
   "Desktop release workflow must run browser tests under xvfb on Linux."
 );
