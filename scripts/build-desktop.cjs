@@ -38,7 +38,9 @@ function assertPlatformBuildHost(args) {
   };
   for (const platform of platforms) {
     if (platform === process.platform) continue;
-    throw new Error(`LoopCAT ${names[platform]} desktop artifacts must be built on ${names[platform]}. Run the platform packaging command on the matching OS or through the desktop release workflow.`);
+    throw new Error(
+      `LoopCAT ${names[platform]} desktop artifacts must be built on ${names[platform]}. Run the platform packaging command on the matching OS or through the desktop release workflow.`
+    );
   }
 }
 
@@ -73,11 +75,18 @@ function acquireBuildLock() {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       fs.mkdirSync(buildLockDir);
-      fs.writeFileSync(path.join(buildLockDir, "lock.json"), JSON.stringify({
-        pid: process.pid,
-        startedAt: new Date().toISOString(),
-        args: process.argv.slice(2)
-      }, null, 2));
+      fs.writeFileSync(
+        path.join(buildLockDir, "lock.json"),
+        JSON.stringify(
+          {
+            pid: process.pid,
+            startedAt: new Date().toISOString(),
+            args: process.argv.slice(2)
+          },
+          null,
+          2
+        )
+      );
       return () => {
         fs.rmSync(buildLockDir, { recursive: true, force: true });
       };
@@ -89,7 +98,9 @@ function acquireBuildLock() {
         continue;
       }
       const detail = metadata?.startedAt ? ` started at ${metadata.startedAt}` : "";
-      throw new Error(`Another desktop build appears to be running${detail}. Wait for it to finish before starting another platform build.`);
+      throw new Error(
+        `Another desktop build appears to be running${detail}. Wait for it to finish before starting another platform build.`
+      );
     }
   }
   throw new Error("Could not acquire desktop build lock.");
@@ -99,11 +110,11 @@ function removeBuildScratch() {
   if (!fs.existsSync(distDir)) return;
   const distRoot = `${fs.realpathSync(distDir)}${path.sep}`;
   for (const entry of fs.readdirSync(distDir, { withFileTypes: true })) {
-    const isScratchDirectory = entry.isDirectory() && (
-      /^(?:win|linux)-unpacked$/i.test(entry.name) ||
-      /^mac(?:-.+)?$/i.test(entry.name) ||
-      /^__appImage-/i.test(entry.name)
-    );
+    const isScratchDirectory =
+      entry.isDirectory() &&
+      (/^(?:win|linux)-unpacked$/i.test(entry.name) ||
+        /^mac(?:-.+)?$/i.test(entry.name) ||
+        /^__appImage-/i.test(entry.name));
     const isScratchFile = entry.isFile() && builderSidecarPattern.test(entry.name);
     if (!isScratchDirectory && !isScratchFile) continue;
 
@@ -156,6 +167,11 @@ function electronBuilderInvocation(args = []) {
   };
 }
 
+function withExplicitPublishMode(args) {
+  if (args.some((arg) => arg === "--publish" || arg.startsWith("--publish="))) return args;
+  return [...args, "--publish", "never"];
+}
+
 let releaseBuildLock = null;
 let exitCode = 0;
 try {
@@ -169,7 +185,7 @@ try {
   runNodeScript("verify-renderer-build.cjs");
   runNodeScript("prepare-desktop-app.cjs");
 
-  const invocation = electronBuilderInvocation(process.argv.slice(2));
+  const invocation = electronBuilderInvocation(withExplicitPublishMode(process.argv.slice(2)));
   const result = spawnSync(invocation.command, invocation.args, {
     cwd: root,
     env,

@@ -26976,6 +26976,16 @@ assertIncludes(
 );
 assertIncludes(
   desktopBuildScript,
+  'arg === "--publish" || arg.startsWith("--publish=")',
+  "scripts/build-desktop.cjs must preserve an explicit Electron Builder publish mode."
+);
+assertIncludes(
+  desktopBuildScript,
+  'return [...args, "--publish", "never"]',
+  "scripts/build-desktop.cjs must disable Electron Builder CI auto-publishing by default."
+);
+assertIncludes(
+  desktopBuildScript,
   "removeBuilderDebugSidecars",
   "scripts/build-desktop.cjs must remove Electron Builder debug sidecars after packaging."
 );
