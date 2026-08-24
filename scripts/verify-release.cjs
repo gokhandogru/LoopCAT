@@ -17535,7 +17535,11 @@ assert(/^\d+\.\d+\.\d+/.test(packageJson.version || ""), "package.json version m
 assert(packageJson.packageManager === "pnpm@11.0.7", "package.json must pin the pnpm package manager version.");
 assert(packageJson.engines?.node === ">=24 <25", "package.json must require the Node 24 LTS release line.");
 assert(nodeVersionFile === "24", ".node-version must select Node 24 LTS.");
-assertIncludes(desktopWorkflow, "node-version: 24", "Desktop release workflow must run on Node 24 LTS.");
+const releaseWorkflowNodeVersions = [...desktopWorkflow.matchAll(/node-version:\s*([0-9]+)/g)].map((match) => match[1]);
+assert(
+  releaseWorkflowNodeVersions.length === 3 && releaseWorkflowNodeVersions.every((version) => version === "24"),
+  "Every desktop release workflow job must run on Node 24 LTS."
+);
 assert(
   packageJson.devDependencies?.electron === runtimeContract.electronVersion,
   "Electron must match the officially verified supported runtime contract."
