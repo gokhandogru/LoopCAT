@@ -17476,6 +17476,16 @@ assertIncludes(
 );
 assertIncludes(
   webSmokeScript,
+  "LOOPCAT_WEB_SMOKE_NO_SANDBOX",
+  "Static web smoke must scope its no-sandbox launch to an explicit test-only environment flag."
+);
+assertIncludes(
+  webSmokeScript,
+  '["--no-sandbox"]',
+  "Static web smoke must pass the test-only no-sandbox switch before Electron starts on Linux."
+);
+assertIncludes(
+  webSmokeScript,
   "document.documentElement.scrollWidth",
   "scripts/verify-web-smoke.cjs must check for viewport-level horizontal overflow."
 );
@@ -21047,6 +21057,11 @@ assertIncludes(
   browserRunnerScript,
   "LOOPCAT_BROWSER_RUNNER_NO_SANDBOX",
   "scripts/verify-browser-runner.cjs must make the automation-only Chromium no-sandbox launch mode explicit."
+);
+assertIncludes(
+  browserRunnerScript,
+  '["--no-sandbox"]',
+  "scripts/verify-browser-runner.cjs must pass the automation-only no-sandbox switch before Electron starts on Linux."
 );
 assertIncludes(
   browserRunnerMainScript,
@@ -24778,6 +24793,11 @@ assertIncludes(
   "the deterministic visual checkpoint count must include validation, quality, review, recovery/workspace, and AI administration states."
 );
 assertIncludes(
+  baselineCaptureScript,
+  '["--no-sandbox"]',
+  "Visual checkpoint automation must pass the test-only no-sandbox switch before Electron starts on Linux."
+);
+assertIncludes(
   accessibilityVerificationScript,
   'audit("Review comments populated")',
   "automated accessibility checks must cover the populated Comments inspector."
@@ -27374,8 +27394,18 @@ assert(
   "package.json must expose the static and focused quality gate."
 );
 assert(
-  packageJson.scripts?.["verify:a11y"] === "pnpm build:renderer && electron scripts/verify-accessibility.cjs",
+  packageJson.scripts?.["verify:a11y"] === "pnpm build:renderer && node scripts/verify-accessibility.cjs",
   "package.json must expose deterministic automated accessibility verification."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  "LOOPCAT_ACCESSIBILITY_NO_SANDBOX",
+  "Accessibility automation must scope its no-sandbox launch to an explicit test-only environment flag."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  '["--no-sandbox"]',
+  "Accessibility automation must pass the test-only no-sandbox switch before Electron starts on Linux."
 );
 assert(
   packageJson.scripts?.["verify:visual"] === "pnpm verify:baseline",
@@ -28122,6 +28152,16 @@ assertIncludes(
   desktopWorkflow,
   "pnpm run verify:web-smoke",
   "Desktop release workflow must render-smoke the static HTML distribution artifact before upload."
+);
+assertIncludes(
+  desktopWorkflow,
+  "Install web smoke dependencies",
+  "Desktop release workflow must prepare the Linux virtual display used by static web smoke."
+);
+assertIncludes(
+  desktopWorkflow,
+  "xvfb-run -a pnpm run verify:web-smoke",
+  "Desktop release workflow must render-smoke the static web artifact inside an Xvfb session on Linux."
 );
 assertIncludes(
   desktopWorkflow,

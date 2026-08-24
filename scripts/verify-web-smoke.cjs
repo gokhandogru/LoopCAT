@@ -55,11 +55,14 @@ if (!process.versions.electron) {
     );
     process.exit(1);
   }
-  const result = spawnSync(electronBinary, [__filename, ...args], {
+  const noSandbox =
+    process.env.LOOPCAT_WEB_SMOKE_NO_SANDBOX === "1" ||
+    (process.env.LOOPCAT_WEB_SMOKE_NO_SANDBOX === undefined && process.platform === "linux");
+  const result = spawnSync(electronBinary, [...(noSandbox ? ["--no-sandbox"] : []), __filename, ...args], {
     cwd: root,
     env: {
       ...process.env,
-      LOOPCAT_WEB_SMOKE_NO_SANDBOX: process.env.LOOPCAT_WEB_SMOKE_NO_SANDBOX || "1"
+      LOOPCAT_WEB_SMOKE_NO_SANDBOX: noSandbox ? "1" : "0"
     },
     stdio: "inherit"
   });

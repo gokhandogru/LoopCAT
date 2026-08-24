@@ -8,9 +8,15 @@ const root = path.resolve(__dirname, "..");
 
 if (!process.versions.electron) {
   const electronBinary = require("electron");
-  const result = spawnSync(electronBinary, [__filename], {
+  const noSandbox =
+    process.env.LOOPCAT_ACCESSIBILITY_NO_SANDBOX === "1" ||
+    (process.env.LOOPCAT_ACCESSIBILITY_NO_SANDBOX === undefined && process.platform === "linux");
+  const result = spawnSync(electronBinary, [...(noSandbox ? ["--no-sandbox"] : []), __filename], {
     cwd: root,
-    env: process.env,
+    env: {
+      ...process.env,
+      LOOPCAT_ACCESSIBILITY_NO_SANDBOX: noSandbox ? "1" : "0"
+    },
     stdio: "inherit"
   });
   if (result.error) console.error(result.error.message);
@@ -18,6 +24,7 @@ if (!process.versions.electron) {
 }
 
 const { app, BrowserWindow } = require("electron");
+if (process.env.LOOPCAT_ACCESSIBILITY_NO_SANDBOX === "1") app.commandLine.appendSwitch("no-sandbox");
 const rendererProductionRoot = path.join(root, ".cache", "renderer", "production");
 const { runtimeAssets } = require(path.join(rendererProductionRoot, "config", "production-assets.js"));
 const axeSource = require("axe-core").source;

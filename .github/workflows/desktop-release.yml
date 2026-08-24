@@ -187,6 +187,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install web smoke dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+
       - name: Verify release contract
         run: pnpm run verify:release
 
@@ -200,7 +205,7 @@ jobs:
         run: pnpm run verify:web-artifact
 
       - name: Smoke test static HTML artifact
-        run: pnpm run verify:web-smoke
+        run: xvfb-run -a pnpm run verify:web-smoke
 
       - name: Upload static HTML artifact
         uses: actions/upload-artifact@v4

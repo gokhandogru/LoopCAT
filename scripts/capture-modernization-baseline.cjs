@@ -31,7 +31,11 @@ if (!process.versions.electron) {
     console.error(error.message || error);
     process.exit(1);
   }
+  const noSandbox =
+    process.env.LOOPCAT_BASELINE_NO_SANDBOX === "1" ||
+    (process.env.LOOPCAT_BASELINE_NO_SANDBOX === undefined && process.platform === "linux");
   const childArgs = [
+    ...(noSandbox ? ["--no-sandbox"] : []),
     __filename,
     ...rawArgs.filter((arg, index) => arg !== "--output" && rawArgs[index - 1] !== "--output"),
     "--output",
@@ -42,7 +46,7 @@ if (!process.versions.electron) {
     env: {
       ...process.env,
       LOOPCAT_BASELINE_HOST_NODE: process.version,
-      LOOPCAT_BASELINE_NO_SANDBOX: process.env.LOOPCAT_BASELINE_NO_SANDBOX || "1"
+      LOOPCAT_BASELINE_NO_SANDBOX: noSandbox ? "1" : "0"
     },
     stdio: "inherit"
   });

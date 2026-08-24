@@ -43,7 +43,9 @@ if (!electronBinary) {
   electronBinary = resolveElectronBinary();
 }
 if (typeof electronBinary !== "string" || !electronBinary) {
-  console.error("Electron is not installed correctly and could not be repaired. Run pnpm install --frozen-lockfile with install scripts enabled.");
+  console.error(
+    "Electron is not installed correctly and could not be repaired. Run pnpm install --frozen-lockfile with install scripts enabled."
+  );
   process.exit(1);
 }
 
@@ -51,12 +53,15 @@ runNodeScript("scripts/build-renderer.cjs");
 runNodeScript("scripts/verify-renderer-build.cjs");
 
 const runner = path.join(root, "scripts", "browser-runner-electron.cjs");
-const result = spawnSync(electronBinary, [runner], {
+const noSandbox =
+  process.env.LOOPCAT_BROWSER_RUNNER_NO_SANDBOX === "1" ||
+  (process.env.LOOPCAT_BROWSER_RUNNER_NO_SANDBOX === undefined && process.platform === "linux");
+const result = spawnSync(electronBinary, [...(noSandbox ? ["--no-sandbox"] : []), runner], {
   cwd: root,
   env: {
     ...process.env,
     LOOPCAT_BROWSER_TEST_TIMEOUT_MS: process.env.LOOPCAT_BROWSER_TEST_TIMEOUT_MS || String(10 * 60 * 1000),
-    LOOPCAT_BROWSER_RUNNER_NO_SANDBOX: process.env.LOOPCAT_BROWSER_RUNNER_NO_SANDBOX || "1"
+    LOOPCAT_BROWSER_RUNNER_NO_SANDBOX: noSandbox ? "1" : "0"
   },
   stdio: "inherit"
 });
