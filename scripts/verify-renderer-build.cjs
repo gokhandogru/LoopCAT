@@ -46,6 +46,9 @@ const aiCommandControllersOutput = productionOutputs.find(
 const aiCommandDomainOutput = productionOutputs.find(
   ([, output]) => normalizePath(output.entryPoint) === "ai-command-domain.js"
 );
+const aiProjectBriefOutput = productionOutputs.find(
+  ([, output]) => normalizePath(output.entryPoint) === "src/features/ai/install-ai-project-brief-controller.js"
+);
 const deliveryExportOutput = productionOutputs.find(
   ([, output]) =>
     normalizePath(output.entryPoint) === "src/features/import-export/install-delivery-export-controller.js"
@@ -231,6 +234,15 @@ if (!productionEntryOutput) {
     failures.push("Hosted startup entry does not lazy-load the resource-mutation implementation.");
   if (Object.hasOwn(output.inputs || {}, "src/features/resources/resource-mutation-controller.js"))
     failures.push("Hosted startup entry eagerly contains the resource-mutation implementation.");
+  const aiProjectBriefChunkImport = (output.imports || []).find(
+    (entry) =>
+      entry.kind === "dynamic-import" &&
+      normalizePath(entry.path).includes("/chunks/install-ai-project-brief-controller-")
+  );
+  if (!aiProjectBriefChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the AI project-brief implementation.");
+  if (Object.hasOwn(output.inputs || {}, "src/features/ai/ai-project-brief-controller.js"))
+    failures.push("Hosted startup entry eagerly contains the AI project-brief implementation.");
   const projectExportChunkImport = (output.imports || []).find(
     (entry) =>
       entry.kind === "dynamic-import" &&
@@ -252,6 +264,16 @@ if (!productionEntryOutput) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
   }
+}
+if (!aiProjectBriefOutput) {
+  failures.push("Production renderer metafile is missing the AI project-brief implementation chunk entry.");
+} else {
+  const [outputPath, output] = aiProjectBriefOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("AI project-brief implementation chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "src/features/ai/ai-project-brief-controller.js"))
+    failures.push("AI project-brief implementation chunk is missing its controller source.");
 }
 if (!projectExportOutput) {
   failures.push("Production renderer metafile is missing the project-export implementation chunk entry.");

@@ -905,6 +905,10 @@ const aiDraftEditingControllerJs = readText("src/features/ai/ai-draft-editing-co
 const aiDraftEditingControllerUnitTests = readText("tests/unit/ai-draft-editing-controller.test.cjs");
 const aiProjectBriefControllerJs = readText("src/features/ai/ai-project-brief-controller.js");
 const aiProjectBriefControllerUnitTests = readText("tests/unit/ai-project-brief-controller.test.cjs");
+const aiProjectBriefControllerContractJs = readText("src/features/ai/ai-project-brief-controller-contract.js");
+const aiProjectBriefControllerInstallerJs = readText("src/features/ai/install-ai-project-brief-controller.js");
+const lazyAiProjectBriefControllerJs = readText("src/features/ai/lazy-ai-project-brief-controller.js");
+const lazyAiProjectBriefControllerUnitTests = readText("tests/unit/lazy-ai-project-brief-controller.test.cjs");
 const aiSuggestionApplicationControllerJs = readText("src/features/ai/ai-suggestion-application-controller.js");
 const aiSuggestionApplicationControllerUnitTests = readText("tests/unit/ai-suggestion-application-controller.test.cjs");
 const aiOpenAiSuggestionControllerJs = readText("src/features/ai/ai-openai-suggestion-controller.js");
@@ -16782,8 +16786,13 @@ for (const testName of [
 }
 assertIncludes(
   appBootstrapJs,
-  "createAiProjectBriefController",
-  "The application runtime must expose the checked AI-project-brief controller boundary."
+  'import { createAiProjectBriefController } from "../features/ai/lazy-ai-project-brief-controller.js";',
+  "The application runtime must install the checked lazy AI-project-brief controller boundary."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createAiProjectBriefController,",
+  "The application runtime must expose the checked AI-project-brief controller factory."
 );
 for (const boundary of [
   "if (!project || lifecycle.isRunning() || promptBusy || lifecycle.isPromptBusy()) return false",
@@ -16821,6 +16830,54 @@ for (const testName of [
     aiProjectBriefControllerUnitTests,
     testName,
     `focused AI-project-brief tests must characterize ${testName}.`
+  );
+}
+assert(
+  !appBootstrapJs.includes('from "../features/ai/ai-project-brief-controller.js";'),
+  "application bootstrap must not eagerly import the AI project-brief implementation."
+);
+assertIncludes(
+  aiProjectBriefControllerInstallerJs,
+  'from "./ai-project-brief-controller.js"',
+  "the dynamic AI project-brief installer must retain the implementation controller."
+);
+assertIncludes(
+  aiProjectBriefControllerJs,
+  'from "./ai-project-brief-controller-contract.js";',
+  "the eager AI project-brief implementation must share its synchronous contract."
+);
+assertIncludes(
+  aiProjectBriefControllerJs,
+  "validateAiProjectBriefControllerOptions(options);",
+  "the eager AI project-brief implementation must retain synchronous validation."
+);
+assertIncludes(
+  aiProjectBriefControllerContractJs,
+  "export function validateAiProjectBriefControllerOptions",
+  "the shared AI project-brief contract must retain construction validation."
+);
+for (const snippet of [
+  'import("./install-ai-project-brief-controller.js")',
+  "validateAiProjectBriefControllerOptions(options);",
+  "let controllerPromise = null;",
+  "controllerPromise = null;",
+  "AI project brief implementation could not be loaded. Try again.",
+  "return Object.freeze({ generate });"
+]) {
+  assertIncludes(lazyAiProjectBriefControllerJs, snippet, `lazy AI project brief must retain policy: ${snippet}`);
+}
+for (const testName of [
+  "lazy AI project brief validates synchronously and exposes the frozen API without loading",
+  "lazy AI project brief shares one concurrent load and preserves options receiver arguments and results",
+  "lazy AI project brief redacts load failure preserves its cause and retries generation",
+  "lazy AI project brief rejects incomplete implementation and permits a repaired retry",
+  "lazy AI project brief preserves implementation failure identity without reloading",
+  "lazy AI project brief validates loader configuration"
+]) {
+  assertIncludes(
+    lazyAiProjectBriefControllerUnitTests,
+    testName,
+    `focused lazy-AI-project-brief tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(

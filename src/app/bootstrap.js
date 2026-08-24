@@ -127,7 +127,7 @@ import {
   createAiTerminologyApplicationController,
   createAiTerminologyExtractionController
 } from "../features/ai/lazy-ai-command-controller-factories.js";
-import { createAiProjectBriefController } from "../features/ai/ai-project-brief-controller.js";
+import { createAiProjectBriefController } from "../features/ai/lazy-ai-project-brief-controller.js";
 import { createAiSuggestionApplicationController } from "../features/ai/ai-suggestion-application-controller.js";
 import { createAiOpenAiSuggestionController } from "../features/ai/ai-openai-suggestion-controller.js";
 import { createAiSuggestionPersistenceController } from "../features/ai/ai-suggestion-persistence-controller.js";
