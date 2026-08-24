@@ -911,6 +911,18 @@ const lazyAiProjectBriefControllerJs = readText("src/features/ai/lazy-ai-project
 const lazyAiProjectBriefControllerUnitTests = readText("tests/unit/lazy-ai-project-brief-controller.test.cjs");
 const aiSuggestionApplicationControllerJs = readText("src/features/ai/ai-suggestion-application-controller.js");
 const aiSuggestionApplicationControllerUnitTests = readText("tests/unit/ai-suggestion-application-controller.test.cjs");
+const aiSuggestionApplicationControllerContractJs = readText(
+  "src/features/ai/ai-suggestion-application-controller-contract.js"
+);
+const aiSuggestionApplicationControllerInstallerJs = readText(
+  "src/features/ai/install-ai-suggestion-application-controller.js"
+);
+const lazyAiSuggestionApplicationControllerJs = readText(
+  "src/features/ai/lazy-ai-suggestion-application-controller.js"
+);
+const lazyAiSuggestionApplicationControllerUnitTests = readText(
+  "tests/unit/lazy-ai-suggestion-application-controller.test.cjs"
+);
 const aiOpenAiSuggestionControllerJs = readText("src/features/ai/ai-openai-suggestion-controller.js");
 const aiOpenAiSuggestionControllerUnitTests = readText("tests/unit/ai-openai-suggestion-controller.test.cjs");
 const aiOpenAiSuggestionControllerContractJs = readText("src/features/ai/ai-openai-suggestion-controller-contract.js");
@@ -16886,8 +16898,13 @@ for (const testName of [
 }
 assertIncludes(
   appBootstrapJs,
-  "createAiSuggestionApplicationController",
-  "The application runtime must expose the checked AI-suggestion-application controller boundary."
+  'import { createAiSuggestionApplicationController } from "../features/ai/lazy-ai-suggestion-application-controller.js";',
+  "The application runtime must install the checked lazy AI-suggestion-application controller boundary."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createAiSuggestionApplicationController,",
+  "The application runtime must expose the checked AI-suggestion-application controller factory."
 );
 for (const boundary of [
   "await persistence.flush(project.id)",
@@ -16940,6 +16957,58 @@ for (const testName of [
     aiSuggestionApplicationControllerUnitTests,
     testName,
     `focused AI-suggestion-application tests must characterize ${testName}.`
+  );
+}
+assert(
+  !appBootstrapJs.includes('from "../features/ai/ai-suggestion-application-controller.js";'),
+  "application bootstrap must not eagerly import the AI suggestion-application implementation."
+);
+assertIncludes(
+  aiSuggestionApplicationControllerInstallerJs,
+  'from "./ai-suggestion-application-controller.js"',
+  "the dynamic AI suggestion-application installer must retain the implementation controller."
+);
+assertIncludes(
+  aiSuggestionApplicationControllerJs,
+  'from "./ai-suggestion-application-controller-contract.js";',
+  "the eager AI suggestion-application implementation must share its synchronous contract."
+);
+assertIncludes(
+  aiSuggestionApplicationControllerJs,
+  "validateAiSuggestionApplicationControllerOptions(options);",
+  "the eager AI suggestion-application implementation must retain synchronous validation."
+);
+assertIncludes(
+  aiSuggestionApplicationControllerContractJs,
+  "export function validateAiSuggestionApplicationControllerOptions",
+  "the shared AI suggestion-application contract must retain construction validation."
+);
+for (const snippet of [
+  'import("./install-ai-suggestion-application-controller.js")',
+  "validateAiSuggestionApplicationControllerOptions(options);",
+  "let controllerPromise = null;",
+  "controllerPromise = null;",
+  "AI suggestion application implementation could not be loaded. Try again.",
+  "return Object.freeze({ apply });"
+]) {
+  assertIncludes(
+    lazyAiSuggestionApplicationControllerJs,
+    snippet,
+    `lazy AI suggestion application must retain policy: ${snippet}`
+  );
+}
+for (const testName of [
+  "lazy AI suggestion application validates synchronously and exposes the frozen API without loading",
+  "lazy AI suggestion application shares one concurrent load and preserves options receiver arguments and results",
+  "lazy AI suggestion application redacts load failure preserves its cause and retries application",
+  "lazy AI suggestion application rejects incomplete implementation and permits a repaired retry",
+  "lazy AI suggestion application preserves implementation failure identity without reloading",
+  "lazy AI suggestion application validates loader configuration"
+]) {
+  assertIncludes(
+    lazyAiSuggestionApplicationControllerUnitTests,
+    testName,
+    `focused lazy-AI-suggestion-application tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(

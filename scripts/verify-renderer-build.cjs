@@ -52,6 +52,9 @@ const aiProjectBriefOutput = productionOutputs.find(
 const aiOpenAiSuggestionOutput = productionOutputs.find(
   ([, output]) => normalizePath(output.entryPoint) === "src/features/ai/install-ai-openai-suggestion-controller.js"
 );
+const aiSuggestionApplicationOutput = productionOutputs.find(
+  ([, output]) => normalizePath(output.entryPoint) === "src/features/ai/install-ai-suggestion-application-controller.js"
+);
 const deliveryExportOutput = productionOutputs.find(
   ([, output]) =>
     normalizePath(output.entryPoint) === "src/features/import-export/install-delivery-export-controller.js"
@@ -255,6 +258,15 @@ if (!productionEntryOutput) {
     failures.push("Hosted startup entry does not lazy-load the direct OpenAI suggestion implementation.");
   if (Object.hasOwn(output.inputs || {}, "src/features/ai/ai-openai-suggestion-controller.js"))
     failures.push("Hosted startup entry eagerly contains the direct OpenAI suggestion implementation.");
+  const aiSuggestionApplicationChunkImport = (output.imports || []).find(
+    (entry) =>
+      entry.kind === "dynamic-import" &&
+      normalizePath(entry.path).includes("/chunks/install-ai-suggestion-application-controller-")
+  );
+  if (!aiSuggestionApplicationChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the AI suggestion-application implementation.");
+  if (Object.hasOwn(output.inputs || {}, "src/features/ai/ai-suggestion-application-controller.js"))
+    failures.push("Hosted startup entry eagerly contains the AI suggestion-application implementation.");
   const projectExportChunkImport = (output.imports || []).find(
     (entry) =>
       entry.kind === "dynamic-import" &&
@@ -276,6 +288,16 @@ if (!productionEntryOutput) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
   }
+}
+if (!aiSuggestionApplicationOutput) {
+  failures.push("Production renderer metafile is missing the AI suggestion-application implementation chunk entry.");
+} else {
+  const [outputPath, output] = aiSuggestionApplicationOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("AI suggestion-application implementation chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "src/features/ai/ai-suggestion-application-controller.js"))
+    failures.push("AI suggestion-application implementation chunk is missing its controller source.");
 }
 if (!aiOpenAiSuggestionOutput) {
   failures.push("Production renderer metafile is missing the direct OpenAI suggestion implementation chunk entry.");
