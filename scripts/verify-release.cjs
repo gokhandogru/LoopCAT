@@ -711,6 +711,10 @@ const projectDialogSaveControllerJs = readText("src/features/projects/project-di
 const projectDialogSaveControllerUnitTests = readText("tests/unit/project-dialog-save-controller.test.cjs");
 const projectDeletionControllerJs = readText("src/features/projects/project-deletion-controller.js");
 const projectDeletionControllerUnitTests = readText("tests/unit/project-deletion-controller.test.cjs");
+const projectDeletionControllerContractJs = readText("src/features/projects/project-deletion-controller-contract.js");
+const projectDeletionControllerInstallerJs = readText("src/features/projects/install-project-deletion-controller.js");
+const lazyProjectDeletionControllerJs = readText("src/features/projects/lazy-project-deletion-controller.js");
+const lazyProjectDeletionControllerUnitTests = readText("tests/unit/lazy-project-deletion-controller.test.cjs");
 const projectActivityControllerJs = readText("src/features/projects/project-activity-controller.js");
 const projectActivityControllerUnitTests = readText("tests/unit/project-activity-controller.test.cjs");
 const projectAnalysisControllerJs = readText("src/features/projects/project-analysis-controller.js");
@@ -1694,8 +1698,8 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
-  'import { createProjectDeletionController } from "../features/projects/project-deletion-controller.js";',
-  "the application runtime must install the checked project-deletion controller."
+  'import { createProjectDeletionController } from "../features/projects/lazy-project-deletion-controller.js";',
+  "the application runtime must install the checked lazy project-deletion controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -1761,7 +1765,7 @@ for (const snippet of [
   "return Object.freeze({ deleteProject, deleteDocument });"
 ]) {
   assertIncludes(
-    projectDeletionControllerJs,
+    `${projectDeletionControllerJs}\n${projectDeletionControllerContractJs}`,
     snippet,
     `ProjectDeletionController must retain characterized project/document guard, confirmation, command, session, navigation, activity, presentation, and failure policy: ${snippet}.`
   );
@@ -1886,6 +1890,54 @@ for (const testName of [
     projectDeletionControllerUnitTests,
     testName,
     `focused project-deletion tests must retain characterization: ${testName}.`
+  );
+}
+assert(
+  !appBootstrapJs.includes('from "../features/projects/project-deletion-controller.js";'),
+  "application bootstrap must not eagerly import the project-deletion implementation."
+);
+assertIncludes(
+  projectDeletionControllerInstallerJs,
+  'from "./project-deletion-controller.js"',
+  "the dynamic project-deletion installer must retain the implementation controller."
+);
+assertIncludes(
+  projectDeletionControllerJs,
+  'from "./project-deletion-controller-contract.js";',
+  "the eager project-deletion implementation must share its synchronous contract."
+);
+assertIncludes(
+  projectDeletionControllerJs,
+  "validateProjectDeletionControllerOptions(options);",
+  "the eager project-deletion implementation must retain synchronous validation."
+);
+assertIncludes(
+  projectDeletionControllerContractJs,
+  "export function validateProjectDeletionControllerOptions",
+  "the shared project-deletion contract must retain construction validation."
+);
+for (const snippet of [
+  'import("./install-project-deletion-controller.js")',
+  "validateProjectDeletionControllerOptions(options);",
+  "let controllerPromise = null;",
+  "controllerPromise = null;",
+  "Project deletion implementation could not be loaded. Try again.",
+  "return Object.freeze({"
+]) {
+  assertIncludes(lazyProjectDeletionControllerJs, snippet, `lazy project deletion must retain policy: ${snippet}`);
+}
+for (const testName of [
+  "lazy project deletion validates synchronously and exposes the frozen ordered API without loading",
+  "lazy project deletion shares one concurrent load and preserves options receivers arguments and results",
+  "lazy project deletion redacts load failure preserves its cause and retries deletion",
+  "lazy project deletion rejects incomplete implementation and permits a repaired retry",
+  "lazy project deletion preserves implementation failure identity without reloading",
+  "lazy project deletion validates loader configuration"
+]) {
+  assertIncludes(
+    lazyProjectDeletionControllerUnitTests,
+    testName,
+    `focused lazy-project-deletion tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(

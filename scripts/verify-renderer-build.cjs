@@ -81,6 +81,9 @@ const resourceMutationOutput = productionOutputs.find(
 const projectExportOutput = productionOutputs.find(
   ([, output]) => normalizePath(output.entryPoint) === "src/features/import-export/install-project-export-controller.js"
 );
+const projectDeletionOutput = productionOutputs.find(
+  ([, output]) => normalizePath(output.entryPoint) === "src/features/projects/install-project-deletion-controller.js"
+);
 const aiCommandControllerSources = [
   "src/features/ai/ai-alternatives-controller.js",
   "src/features/ai/ai-draft-editing-controller.js",
@@ -276,6 +279,15 @@ if (!productionEntryOutput) {
     failures.push("Hosted startup entry does not lazy-load the project-export implementation.");
   if (Object.hasOwn(output.inputs || {}, "src/features/import-export/project-export-controller.js"))
     failures.push("Hosted startup entry eagerly contains the project-export implementation.");
+  const projectDeletionChunkImport = (output.imports || []).find(
+    (entry) =>
+      entry.kind === "dynamic-import" &&
+      normalizePath(entry.path).includes("/chunks/install-project-deletion-controller-")
+  );
+  if (!projectDeletionChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the project-deletion implementation.");
+  if (Object.hasOwn(output.inputs || {}, "src/features/projects/project-deletion-controller.js"))
+    failures.push("Hosted startup entry eagerly contains the project-deletion implementation.");
   for (const source of [
     "src/reports/report-data-service.js",
     "src/reports/report-document.js",
@@ -288,6 +300,16 @@ if (!productionEntryOutput) {
     if (Object.hasOwn(output.inputs || {}, source))
       failures.push(`Hosted startup entry eagerly contains AI provider implementation: ${source}`);
   }
+}
+if (!projectDeletionOutput) {
+  failures.push("Production renderer metafile is missing the project-deletion implementation chunk entry.");
+} else {
+  const [outputPath, output] = projectDeletionOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("Project-deletion implementation chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "src/features/projects/project-deletion-controller.js"))
+    failures.push("Project-deletion implementation chunk is missing its controller source.");
 }
 if (!aiSuggestionApplicationOutput) {
   failures.push("Production renderer metafile is missing the AI suggestion-application implementation chunk entry.");

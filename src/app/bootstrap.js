@@ -57,7 +57,7 @@ import { createDashboardController } from "../features/projects/dashboard-contro
 import { createProjectsController } from "../features/projects/projects-controller.js";
 import { createProjectDialogController } from "../features/projects/project-dialog-controller.js";
 import { createProjectDialogSaveController } from "../features/projects/project-dialog-save-controller.js";
-import { createProjectDeletionController } from "../features/projects/project-deletion-controller.js";
+import { createProjectDeletionController } from "../features/projects/lazy-project-deletion-controller.js";
 import { createProjectActivityController } from "../features/projects/project-activity-controller.js";
 import { createProjectAnalysisController } from "../features/projects/project-analysis-controller.js";
 import { createProjectDomainController } from "../features/projects/project-domain-controller.js";
