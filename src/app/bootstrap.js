@@ -174,7 +174,7 @@ import { createProjectTermRefreshController } from "../features/resources/projec
 import { createProjectTermQueryService } from "../features/resources/project-term-query-service.js";
 import { createResourceLibraryImportController } from "../features/resources/lazy-resource-library-import-controller.js";
 import { createResourceLibraryExportController } from "../features/resources/resource-library-export-controller.js";
-import { createResourceMutationController } from "../features/resources/resource-mutation-controller.js";
+import { createResourceMutationController } from "../features/resources/lazy-resource-mutation-controller.js";
 import { createQualityReviewController } from "../features/quality/quality-review-controller.js";
 import { createQaResultsController } from "../features/quality/qa-results-controller.js";
 import { createProjectQaController } from "../features/quality/project-qa-controller.js";

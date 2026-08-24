@@ -1,3 +1,5 @@
+import { validateResourceMutationControllerOptions } from "./resource-mutation-controller-contract.js";
+
 /**
  * Owns Resources-dashboard TM/term saves and reversible entry/resource
  * deletion orchestration. DOM delegation, repositories, Trash commands,
@@ -48,28 +50,7 @@ export function createResourceMutationController(options) {
   const status = options?.status;
   const testHooks = options?.testHooks || {};
   const logger = options?.logger || console;
-  if (
-    typeof session?.getProjectId !== "function" ||
-    typeof repositories?.updateTmEntry !== "function" ||
-    typeof repositories?.updateTerm !== "function" ||
-    typeof resources?.markProjectsUsingDirty !== "function" ||
-    typeof resources?.refresh !== "function" ||
-    typeof resources?.refreshProjectTerms !== "function" ||
-    typeof resources?.labelFromKey !== "function" ||
-    typeof resources?.items !== "function" ||
-    typeof commands?.execute !== "function" ||
-    typeof commands?.createDeleteEntry !== "function" ||
-    typeof commands?.createDeleteResource !== "function" ||
-    typeof commands?.setProjectId !== "function" ||
-    typeof trash?.entryFromCommandResult !== "function" ||
-    typeof trash?.synchronize !== "function" ||
-    typeof presentation?.renderUndo !== "function" ||
-    typeof status?.set !== "function"
-  ) {
-    throw new TypeError(
-      "ResourceMutationController requires session, repository, resource, command, Trash, presentation, and status boundaries."
-    );
-  }
+  validateResourceMutationControllerOptions(options);
 
   async function saveTmEntry(entry, values) {
     try {

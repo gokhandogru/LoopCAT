@@ -66,6 +66,9 @@ const resourceLibraryImportOutput = productionOutputs.find(
   ([, output]) =>
     normalizePath(output.entryPoint) === "src/features/resources/install-resource-library-import-controller.js"
 );
+const resourceMutationOutput = productionOutputs.find(
+  ([, output]) => normalizePath(output.entryPoint) === "src/features/resources/install-resource-mutation-controller.js"
+);
 const projectExportOutput = productionOutputs.find(
   ([, output]) => normalizePath(output.entryPoint) === "src/features/import-export/install-project-export-controller.js"
 );
@@ -219,6 +222,15 @@ if (!productionEntryOutput) {
     failures.push("Hosted startup entry does not lazy-load the Resources-library import implementation.");
   if (Object.hasOwn(output.inputs || {}, "src/features/resources/resource-library-import-controller.js"))
     failures.push("Hosted startup entry eagerly contains the Resources-library import implementation.");
+  const resourceMutationChunkImport = (output.imports || []).find(
+    (entry) =>
+      entry.kind === "dynamic-import" &&
+      normalizePath(entry.path).includes("/chunks/install-resource-mutation-controller-")
+  );
+  if (!resourceMutationChunkImport)
+    failures.push("Hosted startup entry does not lazy-load the resource-mutation implementation.");
+  if (Object.hasOwn(output.inputs || {}, "src/features/resources/resource-mutation-controller.js"))
+    failures.push("Hosted startup entry eagerly contains the resource-mutation implementation.");
   const projectExportChunkImport = (output.imports || []).find(
     (entry) =>
       entry.kind === "dynamic-import" &&
@@ -250,6 +262,16 @@ if (!projectExportOutput) {
     failures.push("Project-export implementation chunk is missing from the production asset manifest.");
   if (!Object.hasOwn(output.inputs || {}, "src/features/import-export/project-export-controller.js"))
     failures.push("Project-export implementation chunk is missing its controller source.");
+}
+if (!resourceMutationOutput) {
+  failures.push("Production renderer metafile is missing the resource-mutation implementation chunk entry.");
+} else {
+  const [outputPath, output] = resourceMutationOutput;
+  const relativeOutputPath = normalizePath(path.relative(path.join(rendererRoot, "production"), outputPath));
+  if (!productionAssets.includes(relativeOutputPath))
+    failures.push("Resource-mutation implementation chunk is missing from the production asset manifest.");
+  if (!Object.hasOwn(output.inputs || {}, "src/features/resources/resource-mutation-controller.js"))
+    failures.push("Resource-mutation implementation chunk is missing its controller source.");
 }
 if (!resourceLibraryImportOutput) {
   failures.push("Production renderer metafile is missing the Resources-library import implementation chunk entry.");

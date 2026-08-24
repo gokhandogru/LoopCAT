@@ -1045,6 +1045,14 @@ const lazyResourceLibraryImportControllerUnitTests = readText(
 );
 const resourceMutationControllerJs = readText("src/features/resources/resource-mutation-controller.js");
 const resourceMutationControllerUnitTests = readText("tests/unit/resource-mutation-controller.test.cjs");
+const resourceMutationControllerContractJs = readText(
+  "src/features/resources/resource-mutation-controller-contract.js"
+);
+const resourceMutationControllerInstallerJs = readText(
+  "src/features/resources/install-resource-mutation-controller.js"
+);
+const lazyResourceMutationControllerJs = readText("src/features/resources/lazy-resource-mutation-controller.js");
+const lazyResourceMutationControllerUnitTests = readText("tests/unit/lazy-resource-mutation-controller.test.cjs");
 const resourceTrashUnitTests = readText("tests/unit/resource-trash.test.cjs");
 const trashCommandsJs = readText("src/commands/trash-commands.js");
 const trashRepositoryJs = readText("src/data/trash-repository.js");
@@ -3705,8 +3713,8 @@ assertIncludes(
 );
 assertIncludes(
   appBootstrapJs,
-  'import { createResourceMutationController } from "../features/resources/resource-mutation-controller.js";',
-  "The application runtime must install the checked resource-mutation controller."
+  'import { createResourceMutationController } from "../features/resources/lazy-resource-mutation-controller.js";',
+  "The application runtime must install the checked lazy resource-mutation controller."
 );
 assertIncludes(
   appBootstrapJs,
@@ -6606,6 +6614,54 @@ for (const testName of [
     resourceMutationControllerUnitTests,
     testName,
     `focused resource-mutation tests must retain characterization: ${testName}`
+  );
+}
+assert(
+  !appBootstrapJs.includes('from "../features/resources/resource-mutation-controller.js";'),
+  "application bootstrap must not eagerly import the resource-mutation implementation."
+);
+assertIncludes(
+  resourceMutationControllerInstallerJs,
+  'from "./resource-mutation-controller.js"',
+  "the dynamic resource-mutation installer must retain the implementation controller."
+);
+assertIncludes(
+  resourceMutationControllerJs,
+  'from "./resource-mutation-controller-contract.js";',
+  "the eager resource-mutation implementation must share its synchronous contract."
+);
+assertIncludes(
+  resourceMutationControllerJs,
+  "validateResourceMutationControllerOptions(options);",
+  "the eager resource-mutation implementation must retain synchronous validation."
+);
+assertIncludes(
+  resourceMutationControllerContractJs,
+  "export function validateResourceMutationControllerOptions",
+  "the shared resource-mutation contract must retain construction validation."
+);
+for (const snippet of [
+  'import("./install-resource-mutation-controller.js")',
+  "validateResourceMutationControllerOptions(options);",
+  "let controllerPromise = null;",
+  "controllerPromise = null;",
+  "Resource mutation implementation could not be loaded. Try again.",
+  "return Object.freeze({"
+]) {
+  assertIncludes(lazyResourceMutationControllerJs, snippet, `lazy resource mutation must retain policy: ${snippet}`);
+}
+for (const testName of [
+  "lazy resource mutation validates synchronously and exposes the frozen ordered API without loading",
+  "lazy resource mutation shares one concurrent load and preserves options receivers arguments and results",
+  "lazy resource mutation redacts load failure preserves its cause and retries the next action",
+  "lazy resource mutation rejects incomplete implementation and permits a repaired retry",
+  "lazy resource mutation preserves implementation failure identity without reloading",
+  "lazy resource mutation validates loader configuration"
+]) {
+  assertIncludes(
+    lazyResourceMutationControllerUnitTests,
+    testName,
+    `focused lazy-resource-mutation tests must retain characterization: ${testName}`
   );
 }
 assertIncludes(
