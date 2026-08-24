@@ -132,9 +132,12 @@ The latest editor-filter controls checkpoint also moves document selection plus 
 
 This document records what the current working tree implements from the 2026 modernization roadmap. It supplements, and does not replace, the review and plan. The repository must not be described as having completed the entire roadmap until the partial items below and the remaining manual/platform gates are closed.
 
+The requirement-by-requirement audit is recorded in `docs/modernization-completion-audit-2026-08-24.md`. It finds all roadmap code packages implemented with automated evidence, the 750 KB minified stretch target unachieved by the remaining behavior-preserving boundaries, and the complete-plan claim still blocked by manual, reference-hardware, signed/native-platform, and final human visual evidence.
+
 ## Delivered
 
 - Deterministic characterization fixtures, bundle/version-contract enforcement, three-viewport screenshot capture, accessibility automation, and focused unit/static gates.
+- A test-only semantic component gallery covers primary/secondary/disabled/icon controls, fields, selects, menus, save/job/error states, the update banner, Undo toast, preserved-work dialog, panels, rows, AI suggestion/application, and actionable empty states using the production token/theme/component CSS. Focused tests prove the gallery is absent from the production entry, generated asset manifest, and desktop package file set, and the gallery is included in the standard formatting gate.
 - Separate esbuild production/test renderer graphs. Production verification rejects workflow harnesses, mocks, fixtures, debug routes, source test globals, and test imports.
 - One generated production asset manifest used by renderer staging, web packaging, desktop packaging/protocol allowlisting, service-worker caching, and artifact verification.
 - Electron 43.3.0, electron-builder 26.15.3, Node 24 tooling, renderer sandboxing, context isolation, secure fuses, hardware acceleration by default, and an explicit restart-based GPU fallback.
@@ -498,6 +501,10 @@ P1-08 is complete. Continue preserving its release guards and full behavior gate
 
 Lazy locale chunks, production/test graph separation, minification, update lifecycle, offline asset generation, the bootstrap-only application entry, and the measured AI/report/format/delivery/resource/project import/export lazy-load boundaries are delivered. The production graph is 2,994,970 bytes across 37 modules. The hosted/desktop entry asset is 927,638 bytes (255,606 bytes gzip), while its thirteen synchronously imported shared chunks add 29,106 bytes (7,801 bytes gzip), making total initial static JavaScript 956,744 bytes (263,407 bytes gzip). The extracted project-deletion implementation chunk is 2,370 bytes (991 bytes gzip); the earlier AI suggestion application, direct OpenAI suggestion, AI project brief, Resources mutation, manual project export, Resources-library import, project-document and package import/restore, current-project resource-transfer, delivery, AI-controller, AI-domain, provider, report, localization, DOCX, and XLIFF chunks remain separately loaded on first use. The direct-file fallback is 1,501,138 bytes (414,949 bytes gzip). Compared with the completed P1-08 checkpoint, total hosted/desktop initial static JavaScript is 263,992 bytes smaller (56,664 bytes smaller gzip) and now remains 206,744 bytes above the 750 KB minified stretch target. The separately loaded direct-file fallback is a compatibility artifact and must be tracked independently.
 
+The recommended grouped AI-administration boundary was measured and rejected. Provider administration, provider form/presentation, prompt preview/test, runtime settings, credential storage, settings persistence, local settings persistence, and AI context contribute 53,649 raw bytes to the application output. The current administration mount installs 63 native listeners, and the same family is read synchronously by startup/editor presentation, project-dialog focus, runtime settings, direct OpenAI, provider operations, persistence, and prompt paths. Even a zero-overhead removal would leave approximately 903,095 initial raw bytes, still 153,095 bytes above the target. Deferral would therefore change listener, first-render, form-read, or focus timing without achieving 750 KB, so it is not a behavior-preserving P2-05 slice.
+
+This is the measured endpoint of automated P2-05 work. Further reduction needs an explicit product decision to relax behavior, timing, offline/direct-file compatibility, or the target; it must not be represented as another safe extraction.
+
 The checked lazy provider-adapter slice preserves the exact 18-provider registry order, descriptors, defaults, capabilities, compatibility exports, mutable provider-object behavior, receiver identity, arguments, results, concurrent first-use sharing, original failure identity, and retry after load or incomplete-install failure. Production installs lightweight synchronous placeholders and dynamically imports the existing implementations on the first provider method call; the standalone regression harness retains an explicit eager test boundary. Renderer verification proves all 13 implementation modules are absent from the hosted startup entry, the extracted installer is a dynamic chunk, and that chunk remains in the production asset manifest for offline packaging. Five focused tests and the full 1,256-test quality gate pass, together with release/import/source-isolation/bundle checks, the full eight-phase Electron browser suite, all 15 accessibility states, 81 visual screenshots, the regenerated 27-asset web package and smoke test, Windows desktop packaging, artifact inspection, fuses, and GPU-on/off packaged startup, with no intended user-visible difference.
 
 The checked lazy report-document slice preserves synchronous dependency validation and capture, the frozen two-method service API, exact delegate receiver/arguments/results, one shared concurrent first-use load, original load-failure identity, incomplete-install rejection, and retry. Project Report and Quality Passport orchestration now awaits composition inside the existing contained export lifecycle, while the workflow characterization explicitly awaits its direct service call. Renderer verification proves the 18,961-byte implementation contribution is absent from the hosted startup entry, emitted as a dynamic chunk, and retained in the production asset manifest. This slice removes another 16,541 bytes (3,046 bytes gzip) from hosted startup. Five focused lazy tests, 13 combined report tests, and the full 1,261-test quality gate pass, together with release/import/source-isolation/bundle checks, the full eight-phase Electron browser suite including report CSP/redaction/activity behavior, all 15 accessibility states, 81 visual screenshots, the regenerated 28-asset web package and smoke test, Windows desktop packaging, artifact inspection, fuses, and GPU-on/off packaged startup, with no intended user-visible difference.
@@ -541,11 +548,13 @@ Further reduction should come from measured lazy loading of the remaining uncomm
 ## Manual and external release gates still required
 
 - NVDA/Windows and VoiceOver/macOS audited-flow checks, including keyboard, focus return, 200% zoom, reduced motion, increased contrast, and forced colors.
-- Signed packaged smoke/artifact evidence on macOS and Linux in addition to the completed Windows evidence.
+- Completed signed clean-machine release evidence for Windows and macOS, plus checksum-authenticated AppImage/DEB build, install, launch, and smoke evidence on Linux. Windows directory packaging, artifact inspection, fuses, and GPU-on/off automated startup are complete, but they are not Authenticode or clean-machine evidence.
 - Cold/warm startup, typing latency, long-task, and large-project scroll measurements on the named reference laptop. The roadmap targets remain targets until this evidence is recorded.
 - Final release-candidate visual review by a human at all three required viewports and both themes.
 
 ## Current green automated gates
+
+The 24 August completion-audit checkpoint passes 1,364/1,364 quality tests, all eight browser phases, all 15 accessibility states, all 81 visual checkpoints, 1,973 messages and 57 explicit key references, the regenerated 57-asset web package, Windows directory packaging, artifact and fuse inspection, and packaged renderer-sandbox startup with both normal hardware acceleration and the explicit disabled-GPU fallback.
 
 - `pnpm verify:release`
 - `pnpm verify:desktop-wrapper`
@@ -565,19 +574,8 @@ Further reduction should come from measured lazy loading of the remaining uncomm
 - `pnpm verify:fuses`
 - `pnpm verify:desktop-smoke`
 
-## Recommended next implementation task
+## Automated implementation conclusion
 
-Continue P2-05 by measuring a grouped AI-administration lifecycle boundary rather than adding more single-controller proxies. Determine whether provider administration, form/presentation, prompt preview/test, runtime settings, credential storage, and settings persistence can install together on the first AI Command Centre intent while preserving synchronous runtime/provider contracts, startup rendering, project-dialog focus and listener timing, credential privacy, provider availability, prompt output, and every existing standalone characterization. Proceed only if the complete grouped boundary produces a material raw and gzip reduction; otherwise record the measured limitation and move to the modernization completion audit.
+The component gallery and completion audit close the last identified automated roadmap artifact. There is no recommended behavior-preserving implementation slice after the measured P2-05 endpoint. The authoritative remaining work is the manual, native-platform, signing/notarization, clean-machine, reference-hardware, and human visual evidence listed above.
 
-Entry criteria:
-
-- Use the renderer metafile to rank uncommon feature families by initial-entry contribution and account for both hosted/desktop and direct-file compatibility artifacts separately.
-- Preserve offline use, mature format support, command/Undo/Redo semantics, eager-versus-call-time adapter timing, startup checkpoints, and production/test isolation; loading failure must be visible, redacted, and recoverable.
-- Keep the completed P1-08 boundaries and 13-line `app.js` entry intact; do not trade the measured target for removed capability or reintroduced coordinator policy.
-
-Exit criteria:
-
-- Uncommon feature code is absent from the hosted/desktop initial entry and loads only on its characterized first-use path, while the direct-file fallback remains functional and independently measured.
-- Focused lazy-load order, concurrency, retry, failure, and isolation tests plus every existing unit, browser, accessibility, visual, web, packaging, artifact, fuse, and GPU startup gate pass with no intended user-visible difference.
-
-Continue until the automated implementation packages are complete and the remaining manual/external evidence is clearly separated from code work.
+Do not merge this branch or describe the complete modernization as finished until that evidence is recorded and the residual 750 KB stretch-target decision is explicit. Preserve the completed P1-08 boundaries, 13-line bootstrap entry, offline and direct-file compatibility, supported formats, AI safeguards, command/Undo/Redo semantics, and the full phase gate while collecting it.
