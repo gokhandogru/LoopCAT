@@ -27422,6 +27422,31 @@ assert(
   "package.json must expose deterministic visual-regression verification."
 );
 assertIncludes(
+  baselineCaptureScript,
+  'measureEditorWorkspace("open", 0.55)',
+  "Modernization baseline verification must enforce the 55% open-inspector editor-space target at 1366x768."
+);
+assertIncludes(
+  baselineCaptureScript,
+  'measureEditorWorkspace("closed", 0.7)',
+  "Modernization baseline verification must enforce the 70% closed-inspector editor-space target at 1366x768."
+);
+assertIncludes(
+  baselineCaptureScript,
+  "sourceAndTargetWidth / workspaceWidth",
+  "Modernization baseline verification must measure actual source/target DOM width against the workspace."
+);
+assertIncludes(
+  baselineCaptureScript,
+  "async function setExactViewport(viewport)",
+  "Modernization baseline verification must calibrate the renderer to the named viewport dimensions."
+);
+assertIncludes(
+  baselineCaptureScript,
+  '"Emulation.setDeviceMetricsOverride"',
+  "Modernization baseline verification must use exact Chromium device metrics under fractional display scaling."
+);
+assertIncludes(
   electronFusesScript,
   "getCurrentFuseWire",
   "scripts/verify-electron-fuses.cjs must inspect the packaged executable fuse wire."

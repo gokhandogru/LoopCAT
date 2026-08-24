@@ -41,7 +41,7 @@ For retained local artifacts rather than a disposable verification run:
 node scripts/capture-modernization-baseline.cjs --output test-artifacts/modernization-baseline-current
 ```
 
-The capture uses a deterministic project and produces 81 screenshots covering projects empty/populated, project dashboard, translation editor, import-validation error and focus recovery, resource dashboards and Trash, recovery/workspace state, new-project and focused utility dialogs, contextual AI, provider administration/AI Command Centre, review/quality inspector states, responsive and compact editor checkpoints, Focus mode, command palette, and light/dark themes at 1440×900, 1366×768, and 1024×768. `baseline.json` records runtime versions, asset composition, startup sample, input-dispatch sample, scroll-frame sample, keyboard paths, and known accessibility exceptions.
+The capture uses a deterministic project and produces 81 screenshots covering projects empty/populated, project dashboard, translation editor, import-validation error and focus recovery, resource dashboards and Trash, recovery/workspace state, new-project and focused utility dialogs, contextual AI, provider administration/AI Command Centre, review/quality inspector states, responsive and compact editor checkpoints, Focus mode, command palette, and light/dark themes at 1440×900, 1366×768, and 1024×768. `baseline.json` records runtime versions, asset composition, startup sample, input-dispatch sample, scroll-frame sample, keyboard paths, known accessibility exceptions, and actual source-plus-target DOM width ratios at 1366×768. Verification requires at least 70% of workspace width with the inspector closed and at least 55% with it open.
 
 ## Contract baseline
 

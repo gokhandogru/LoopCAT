@@ -95,6 +95,7 @@ let windowRef;
 let failed = false;
 const pageErrors = [];
 const screenshots = [];
+const editorSpaceMeasurements = {};
 
 app.disableHardwareAcceleration();
 if (process.env.LOOPCAT_BASELINE_NO_SANDBOX === "1") app.commandLine.appendSwitch("no-sandbox");
@@ -154,15 +155,82 @@ async function settle() {
   await new Promise((resolve) => setTimeout(resolve, 80));
 }
 
+async function setExactViewport(viewport) {
+  if (!windowRef.webContents.debugger.isAttached()) windowRef.webContents.debugger.attach("1.3");
+  await windowRef.webContents.debugger.sendCommand("Emulation.setDeviceMetricsOverride", {
+    width: viewport.width,
+    height: viewport.height,
+    deviceScaleFactor: 1,
+    mobile: false,
+    screenWidth: viewport.width,
+    screenHeight: viewport.height
+  });
+  await settle();
+  const actual = await windowRef.webContents.executeJavaScript(
+    `({ width: window.innerWidth, height: window.innerHeight })`,
+    true
+  );
+  if (actual.width !== viewport.width || actual.height !== viewport.height) {
+    throw new Error(`Could not set ${viewport.name} renderer viewport; received ${actual.width}x${actual.height}.`);
+  }
+}
+
 async function captureState(number, slug) {
   for (const viewport of viewports) {
-    windowRef.setContentSize(viewport.width, viewport.height);
-    await settle();
+    await setExactViewport(viewport);
     const fileName = `${number}-${slug}-${viewport.name}.png`;
     const image = await windowRef.webContents.capturePage();
     await fsPromises.writeFile(path.join(outputDir, fileName), image.toPNG());
     screenshots.push(fileName);
   }
+}
+
+async function measureEditorWorkspace(state, minimumRatio) {
+  const viewport = viewports.find((item) => item.name === "1366x768");
+  await setExactViewport(viewport);
+  const measurement = await windowRef.webContents.executeJavaScript(
+    `(() => {
+      const workspace = document.querySelector("#workspace");
+      const inspector = document.querySelector("#editorInspector");
+      const toggle = document.querySelector("#inspectorToggleBtn");
+      const headers = document.querySelectorAll(".segment-grid thead th");
+      const workspaceWidth = workspace.getBoundingClientRect().width;
+      const sourceWidth = headers[1].getBoundingClientRect().width;
+      const targetWidth = headers[2].getBoundingClientRect().width;
+      const sourceAndTargetWidth = sourceWidth + targetWidth;
+      return {
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        inspectorExpanded: toggle.getAttribute("aria-expanded") === "true",
+        inspectorDisplayed: getComputedStyle(inspector).display !== "none",
+        workspaceInspectorClosed: workspace.classList.contains("inspector-closed"),
+        workspaceWidth: Number(workspaceWidth.toFixed(2)),
+        sourceWidth: Number(sourceWidth.toFixed(2)),
+        targetWidth: Number(targetWidth.toFixed(2)),
+        sourceAndTargetWidth: Number(sourceAndTargetWidth.toFixed(2)),
+        sourceAndTargetRatio: Number((sourceAndTargetWidth / workspaceWidth).toFixed(4))
+      };
+    })()`,
+    true
+  );
+  const expectedOpen = state === "open";
+  if (
+    measurement.viewport.width !== viewport.width ||
+    measurement.viewport.height !== viewport.height ||
+    measurement.inspectorExpanded !== expectedOpen ||
+    measurement.inspectorDisplayed !== expectedOpen ||
+    measurement.workspaceInspectorClosed === expectedOpen
+  ) {
+    throw new Error(`Editor workspace ${state} state was not measurable: ${JSON.stringify(measurement)}.`);
+  }
+  if (measurement.sourceAndTargetRatio < minimumRatio) {
+    throw new Error(
+      `Editor source/target width ratio ${measurement.sourceAndTargetRatio} is below ${minimumRatio} with the inspector ${state}.`
+    );
+  }
+  editorSpaceMeasurements[state] = { minimumRatio, ...measurement };
+  console.log(
+    `Editor source/target width uses ${(measurement.sourceAndTargetRatio * 100).toFixed(2)}% of the 1366x768 workspace with the inspector ${state}.`
+  );
 }
 
 function fileMetrics() {
@@ -343,6 +411,7 @@ app
       "!document.querySelector('#editorView').classList.contains('hidden') && document.querySelector('#segmentBody textarea')",
       "translation editor"
     );
+    await measureEditorWorkspace("open", 0.55);
     await captureState("03", "translation-editor");
 
     await windowRef.webContents.executeJavaScript(
@@ -381,6 +450,7 @@ app
       "document.querySelector('#inspectorToggleBtn').getAttribute('aria-expanded') === 'false'",
       "closed inspector"
     );
+    await measureEditorWorkspace("closed", 0.7);
     await captureState("04", "editor-inspector-closed");
     await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorToggleBtn').click()", true);
     await waitFor(
@@ -515,6 +585,7 @@ app
         startupMs: Number(startupMs.toFixed(2)),
         typingDispatchMs: Number(typingDispatchMs.toFixed(2)),
         twelveScrollFramesMs: Number(scrollSampleMs.toFixed(2)),
+        editorSpace: editorSpaceMeasurements,
         bundle: fileMetrics()
       },
       keyboardPaths: [

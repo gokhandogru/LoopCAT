@@ -554,7 +554,7 @@ Further reduction should come from measured lazy loading of the remaining uncomm
 
 ## Current green automated gates
 
-The 24 August completion-audit checkpoint passes 1,364/1,364 quality tests, all eight browser phases, all 15 accessibility states, all 81 visual checkpoints, 1,973 messages and 57 explicit key references, the regenerated 57-asset web package, Windows directory packaging, artifact and fuse inspection, and packaged renderer-sandbox startup with both normal hardware acceleration and the explicit disabled-GPU fallback. GitHub Actions run 32682762543 additionally passes the static-web job and complete Linux release job; Windows and macOS pass every gate before the external signing-credential check.
+The 24 August completion-audit checkpoint passes 1,364/1,364 quality tests, all eight browser phases, all 15 accessibility states, all 81 visual checkpoints, exact 1366×768 source-plus-target workspace ratios of 85.33% with the inspector closed and 61.91% open against the required 70%/55%, 1,973 messages and 57 explicit key references, the regenerated 57-asset web package, Windows directory packaging, artifact and fuse inspection, and packaged renderer-sandbox startup with both normal hardware acceleration and the explicit disabled-GPU fallback. GitHub Actions run 32682762543 additionally passes the static-web job and complete Linux release job; Windows and macOS pass every gate before the external signing-credential check.
 
 - `pnpm verify:release`
 - `pnpm verify:desktop-wrapper`
