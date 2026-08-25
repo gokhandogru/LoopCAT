@@ -209,7 +209,7 @@ test("ConcordanceController preserves editor/project guards and exact empty-keyw
   assert.equal(await empty.controller.open(), undefined);
   assert.deepEqual(
     empty.calls.find(([name]) => name === "status"),
-    ["status", "Select source or target text, then press Ctrl/Cmd+Shift+K.", "dirty"]
+    ["status", "Select source or target text, then press F4 or Ctrl/Cmd+Shift+K.", "dirty"]
   );
 });
 

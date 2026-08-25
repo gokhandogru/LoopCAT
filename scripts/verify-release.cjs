@@ -181,6 +181,7 @@ const requiredReleaseFiles = [
   "src/app/application-validation-presentation-controller.js",
   "src/app/application-view-controller.js",
   "src/app/global-keyboard-controller.js",
+  "src/app/keyboard-shortcuts.js",
   "src/app/localization-download-mime-type-service.js",
   "src/app/navigation-controller.js",
   "src/app/compatibility-module-registry.js",
@@ -211,6 +212,7 @@ const requiredReleaseFiles = [
   "src/features/editor/segment-confirmation-state-service.js",
   "src/features/editor/segment-tm-save-controller.js",
   "src/features/editor/concordance-controller.js",
+  "src/features/editor/quick-insert-controller.js",
   "src/features/editor/segment-navigation-controller.js",
   "src/features/editor/segment-draft-application-service.js",
   "src/features/editor/structural-segment-controller.js",
@@ -359,6 +361,7 @@ const requiredReleaseFiles = [
   "tests/unit/application-update-controls-controller.test.cjs",
   "tests/unit/application-view-controller.test.cjs",
   "tests/unit/global-keyboard-controller.test.cjs",
+  "tests/unit/keyboard-shortcuts.test.cjs",
   "tests/unit/editor-filter-controls-controller.test.cjs",
   "tests/unit/focus-mode-controller.test.cjs",
   "tests/unit/inspector-toggle-controller.test.cjs",
@@ -385,6 +388,7 @@ const requiredReleaseFiles = [
   "tests/unit/segment-command-restoration-controller.test.cjs",
   "tests/unit/segment-confirmation-state-service.test.cjs",
   "tests/unit/segment-tm-save-controller.test.cjs",
+  "tests/unit/quick-insert-controller.test.cjs",
   "tests/unit/tm-matches-controller.test.cjs",
   "tests/unit/term-suggestions-controller.test.cjs",
   "tests/unit/term-form-controller.test.cjs",
@@ -620,6 +624,8 @@ const applicationViewControllerJs = readText("src/app/application-view-controlle
 const applicationViewControllerUnitTests = readText("tests/unit/application-view-controller.test.cjs");
 const globalKeyboardControllerJs = readText("src/app/global-keyboard-controller.js");
 const globalKeyboardControllerUnitTests = readText("tests/unit/global-keyboard-controller.test.cjs");
+const keyboardShortcutsJs = readText("src/app/keyboard-shortcuts.js");
+const keyboardShortcutsUnitTests = readText("tests/unit/keyboard-shortcuts.test.cjs");
 const editorFilterControlsControllerJs = readText("src/features/editor/editor-filter-controls-controller.js");
 const editorFilterControlsControllerUnitTests = readText("tests/unit/editor-filter-controls-controller.test.cjs");
 const focusModeControllerJs = readText("src/features/editor/focus-mode-controller.js");
@@ -667,6 +673,8 @@ const segmentCommandRestorationControllerJs = readText("src/features/editor/segm
 const segmentConfirmationStateServiceJs = readText("src/features/editor/segment-confirmation-state-service.js");
 const segmentTmSaveControllerJs = readText("src/features/editor/segment-tm-save-controller.js");
 const concordanceControllerJs = readText("src/features/editor/concordance-controller.js");
+const quickInsertControllerJs = readText("src/features/editor/quick-insert-controller.js");
+const quickInsertControllerUnitTests = readText("tests/unit/quick-insert-controller.test.cjs");
 const segmentNavigationControllerJs = readText("src/features/editor/segment-navigation-controller.js");
 const segmentDraftApplicationServiceJs = readText("src/features/editor/segment-draft-application-service.js");
 const targetReplacementControllerJs = readText("src/features/editor/target-replacement-controller.js");
@@ -2515,10 +2523,11 @@ for (const snippet of [
   "features.structural.nextForMerge(selection.getActiveSegment())",
   'run: () => features.projectDialog("edit")',
   'run: () => features.filterPreset.apply("translate")',
-  'undo: "Ctrl/Cmd+Z"',
-  'redo: "Ctrl/Cmd+Shift+Z"',
-  'concordance: "Ctrl/Cmd+Alt+K"',
-  '"focus-mode": "Ctrl/Cmd+Shift+F"',
+  'import { shortcutLabel } from "./keyboard-shortcuts.js";',
+  '"previous-open": "open-previous"',
+  '"quick-insert": "quick-insert"',
+  '"review-comment": "review-comment"',
+  "shortcut: shortcutLabel(shortcutIds[entry.id])",
   'disabledReason: entry.enabled ? "" : "Unavailable in the current context."',
   "return Object.freeze({ list });"
 ]) {
@@ -2540,6 +2549,7 @@ assert(
       "trash",
       "confirm",
       "next-open",
+      "previous-open",
       "focus-mode",
       "copy-source",
       "split-segment",
@@ -2550,7 +2560,10 @@ assert(
       "quality-passport",
       "next-quality-risk",
       "concordance",
+      "quick-insert",
+      "find-segments",
       "replace-target",
+      "review-comment",
       "preset-translate",
       "preset-review",
       "preset-qa-fixes",
@@ -2575,7 +2588,7 @@ assert(
       "local-ai-project-brief",
       "openai-ai"
     ]),
-  "ApplicationCommandCatalogService must retain all 39 command IDs in exact order."
+  "ApplicationCommandCatalogService must retain all 43 command IDs in exact order."
 );
 for (const boundary of [
   "let applicationCommandCatalogService;",
@@ -2631,7 +2644,7 @@ for (const forbiddenOwner of [
   );
 }
 for (const testName of [
-  "ApplicationCommandCatalogService preserves all 39 command records in exact order",
+  "ApplicationCommandCatalogService preserves all 43 command records in exact order",
   "ApplicationCommandCatalogService preserves direct action identities and wrapper arguments",
   "ApplicationCommandCatalogService preserves command-project fallback and capability query order",
   "ApplicationCommandCatalogService preserves repeated active-segment structural reads and short circuits",
@@ -8715,7 +8728,7 @@ assert(
   (applicationEventWiringControllerJs.match(/\blifecycles\.palette\?\.mountTrigger\?\.\(\)/g) || []).length === 1,
   "ApplicationEventWiringController must retain exactly one optional command-palette trigger mount."
 );
-for (const directConsumer of ["palette?.open?.()", "palette?.close?.()"]) {
+for (const directConsumer of ["run(event, palette?.open)", "palette?.close?.()"]) {
   assertIncludes(
     globalKeyboardControllerJs,
     directConsumer,
@@ -8727,9 +8740,9 @@ assert(
   "app.js must not regain direct PaletteController.open invocation after trigger ownership moves into the controller."
 );
 assert(
-  globalKeyboardControllerJs.split("palette?.open?.()").length - 1 === 2 &&
+  globalKeyboardControllerJs.split("run(event, palette?.open)").length - 1 === 1 &&
     globalKeyboardControllerJs.split("palette?.close?.()").length - 1 === 1,
-  "both global open shortcuts and the Escape route must call the optional PaletteController boundary directly."
+  "the centralized global open shortcuts and Escape route must call the optional PaletteController boundary directly."
 );
 assertIncludes(
   appWorkflowDriverJs,
@@ -10511,18 +10524,50 @@ assertIncludes(
   "createGlobalKeyboardController,",
   "the application runtime must expose the checked global keyboard controller factory."
 );
+for (const snippet of [
+  'palette: define("palette", { key: "f2", label: "F2" })',
+  'concordance: define("concordance", { key: "f4", label: "F4" })',
+  '"replace-target": define("replace-target", {',
+  '"split-segment": define("split-segment", {',
+  '"merge-segments": define("merge-segments", {',
+  "if (!event || event.isComposing) return false;",
+  'event.getModifierState?.("AltGraph")',
+  "Boolean(shortcut.primary) !== primary"
+]) {
+  assertIncludes(keyboardShortcutsJs, snippet, `keyboard shortcut registry must retain ${snippet}.`);
+}
+for (const testName of [
+  "shortcut registry is immutable and exposes the documented central labels",
+  "shortcut matching accepts Ctrl or Command and requires exact modifiers",
+  "physical-key fallback works without accepting composition, AltGraph, or unusable key states",
+  "editable and target-editor classification keeps application routing contextual"
+]) {
+  assertIncludes(
+    keyboardShortcutsUnitTests,
+    testName,
+    `focused keyboard-shortcut tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  globalKeyboardControllerJs,
+  'from "./keyboard-shortcuts.js";',
+  "GlobalKeyboardController must route through the central keyboard shortcut registry."
+);
 for (const boundary of [
   'target.addEventListener("keydown", handleKeydown, true)',
   'target.removeEventListener("keydown", handleKeydown, true)',
-  "event.target?.matches?.(\"input, textarea, [contenteditable='true']\")",
+  "const editableTarget = isEditableKeyboardTarget(event.target)",
   "const projectId = commands.getProjectId()",
-  "event.shiftKey ? commands.canRedo(projectId) : commands.canUndo(projectId)",
-  "void (event.shiftKey ? commands.redo() : commands.undo())",
-  'event.shiftKey && key === "p"',
-  'const isK = key === "k" || event.code === "KeyK"',
-  'context.getView() === "editor" &&',
-  "context.hasProject()",
-  "const concordanceShortcut = isK && (event.ctrlKey || event.metaKey) && event.altKey",
+  "const redoRequested = matchesShortcut(event, KEYBOARD_SHORTCUTS.redo, normalizeKey)",
+  "const canRun = redoRequested ? commands.canRedo(projectId) : commands.canUndo(projectId)",
+  "void (redoRequested ? commands.redo() : commands.undo())",
+  'matchesAny(event, ["palette", "palette-alternate", "palette-compat"])',
+  'const editorReady = context.getView() === "editor" && context.hasProject()',
+  'matchesAny(event, ["concordance", "concordance-alternate", "concordance-legacy"])',
+  'matchesAny(event, ["replace-target", "replace-target-compat"])',
+  'matchesAny(event, ["split-segment", "split-segment-compat"])',
+  'matchesAny(event, ["merge-segments", "merge-segments-compat"])',
+  'event.key === "Escape" && quickInsert?.isOpen?.()',
   'event.key === "Escape" && concordance.isOpen()',
   'event.key === "Escape" && palette?.isOpen?.()',
   'event.key === "Escape" && focus.isActive()'
@@ -10571,10 +10616,12 @@ for (const forbiddenOwner of [
 for (const testName of [
   "GlobalKeyboardController owns capture listener lifecycle and exposes a checked immutable API",
   "global Undo and Redo preserve editable exclusion, capability checks, project identity, and event effects",
-  "palette shortcuts preserve modifier overlap, KeyK fallback, optional startup behavior, and event order",
+  "palette shortcuts preserve browser-safe F2, alternates, optional startup behavior, and event order",
   "Focus-mode shortcut preserves editor and project eligibility",
-  "concordance shortcut preserves editor qualification, Alt priority, KeyK fallback, and synchronous failures",
-  "Escape preserves concordance, palette, and Focus-mode priority without stopping propagation"
+  "concordance shortcuts preserve browser-safe F4, legacy routing, qualification, and synchronous failures",
+  "Escape preserves Quick Insert, concordance, palette, and Focus-mode priority without stopping propagation",
+  "global editor shortcuts route exact actions and preserve unrelated editable fields",
+  "IME composition and AltGraph prevent application shortcut routing"
 ]) {
   assertIncludes(
     globalKeyboardControllerUnitTests,
@@ -10582,6 +10629,47 @@ for (const testName of [
     `focused global keyboard tests must retain characterization: ${testName}.`
   );
 }
+assertIncludes(
+  appBootstrapJs,
+  'import { createQuickInsertController } from "../features/editor/quick-insert-controller.js";',
+  "the application runtime must install the checked Quick Insert controller."
+);
+assertIncludes(
+  appBootstrapJs,
+  "createQuickInsertController,",
+  "the application runtime must expose the checked Quick Insert controller factory."
+);
+for (const snippet of [
+  "QuickInsertController requires project and active-segment boundaries.",
+  "QuickInsertController requires TM, termbase, and saved-AI result boundaries.",
+  ".slice(0, 4)",
+  ".filter((term) => !term.isForbidden && text(term.targetTerm))",
+  ".slice(0, 3)",
+  ".slice(0, 2)",
+  "return [...tmResults, ...termResults, ...aiResults].slice(0, 9)",
+  "await Promise.allSettled([sources.refreshTm(), sources.refreshTerms()])",
+  "return Object.freeze({ close, execute, handleKeydown, hasSuggestions, isOpen, mount, open, render, unmount })"
+]) {
+  assertIncludes(quickInsertControllerJs, snippet, `Quick Insert must retain characterized policy: ${snippet}.`);
+}
+for (const testName of [
+  "Quick Insert ranks four TM, three approved terms, and two newest saved AI results",
+  "Quick Insert applies TM replacement, term insertion metadata, and saved AI identity",
+  "Quick Insert keyboard navigation supports wrap, direct numbers, Enter, Escape, and IME safety",
+  "Quick Insert keeps the editor closed for empty or stale contexts and reports empty results",
+  "Quick Insert validates boundaries and exposes an immutable lifecycle API"
+]) {
+  assertIncludes(
+    quickInsertControllerUnitTests,
+    testName,
+    `focused Quick Insert tests must retain characterization: ${testName}.`
+  );
+}
+assertIncludes(
+  appJs,
+  "appRuntime.featureFactories.createQuickInsertController({",
+  "application composition must create the checked Quick Insert controller."
+);
 assertIncludes(
   commandBusJs,
   "recordApplied",
@@ -12613,7 +12701,7 @@ for (const snippet of [
   'channel: "match"',
   'resourceId: match.id || ""',
   "root.replaceChildren(fragment)",
-  "return Object.freeze({ refresh })"
+  "return Object.freeze({ getResults, refresh })"
 ]) {
   assertIncludes(
     tmMatchesControllerJs,
@@ -12648,8 +12736,8 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `TM-matches composition must inject the checked ${boundary} boundary.`);
 }
 assert(
-  (appJs.match(/\btmMatchesController\.refresh\b/g) || []).length === 3,
-  "editor context, direct segment-TM save, and current-project TM import must call TmMatchesController directly."
+  (appJs.match(/\btmMatchesController\.refresh\b/g) || []).length === 4,
+  "editor context, direct segment-TM save, current-project TM import, and Quick Insert must call TmMatchesController directly."
 );
 assert(
   !/async\s+function\s+refreshTmMatches\b/.test(appJs) &&
@@ -12709,17 +12797,19 @@ for (const snippet of [
   'localization.labelHtml(term.isForbidden ? "forbidden" : "approved")',
   'text.escapeHtml(term.termBaseName || "")',
   'term.notes ? `<p>${text.escapeHtml(term.notes)}</p>` : ""',
+  'if (!term.isForbidden && typeof target?.insert === "function")',
+  "target.insert(term.targetTerm, {",
   'button.textContent = localization.source("Delete")',
   "await mutation.deleteTerm(term, {",
   "refreshResourceView: false",
   "refreshSuggestions: true",
   "root.replaceChildren(fragment)",
-  "return Object.freeze({ refresh })"
+  "return Object.freeze({ getResults, refresh })"
 ]) {
   assertIncludes(
     termSuggestionsControllerJs,
     snippet,
-    `TermSuggestionsController must retain characterized lookup, stale-result, presentation, and deletion policy: ${snippet}`
+    `TermSuggestionsController must retain characterized lookup, stale-result, presentation, insertion, and deletion policy: ${snippet}`
   );
 }
 assert(
@@ -12743,15 +12833,16 @@ for (const boundary of [
   "text: { escapeHtml: applicationTextSafetyService.escapeHtml }",
   "safeHtml: { replace: replaceSafeHtml }",
   "mutation: { deleteTerm: (...args) => resourceMutationController.deleteTerm(...args) }",
+  "target: { insert: (...args) => targetProducerController.insertTermTarget(...args) }",
   "createElement: (tagName) => document.createElement(tagName)",
   "createFragment: () => document.createDocumentFragment()"
 ]) {
   assertIncludes(appJs, boundary, `term-suggestions composition must inject the checked ${boundary} boundary.`);
 }
 assert(
-  (appJs.match(/\btermSuggestionsController\.refresh\b/g) || []).length === 5 &&
+  (appJs.match(/\btermSuggestionsController\.refresh\b/g) || []).length === 6 &&
     (appWorkflowDriverJs.match(/\btermSuggestionsController\.refresh\b/g) || []).length === 1,
-  "project transfer, AI extraction, editor context, Trash, term save, and workflow consumers must call TermSuggestionsController directly."
+  "project transfer, AI extraction, editor context, Trash, term save, Quick Insert, and workflow consumers must call TermSuggestionsController directly."
 );
 assert(
   !/async\s+function\s+refreshTerms\b/.test(appJs) && !/async\s+function\s+refreshTerms\b/.test(appWorkflowDriverJs),
@@ -12773,6 +12864,7 @@ for (const testName of [
   "TermSuggestionsController preserves stale project and segment result suppression",
   "TermSuggestionsController preserves lookup rejection timing before presentation effects",
   "TermSuggestionsController preserves ordered approved and forbidden safe cards with one replacement",
+  "TermSuggestionsController offers insertion only for approved terms",
   "TermSuggestionsController preserves awaited deletion identity, options, undefined fulfillment, and rejection",
   "TermSuggestionsController validates boundaries, propagates rendering failures, and exposes an immutable API"
 ]) {
@@ -12985,9 +13077,9 @@ for (const boundary of [
 }
 assert(
   (applicationEventWiringControllerJs.match(/\blifecycles\.projectQa\.mount\b/g) || []).length === 1 &&
-    (appJs.match(/\bprojectQaController\.run\b/g) || []).length === 1 &&
+    (appJs.match(/\bprojectQaController\.run\b/g) || []).length === 2 &&
     (appWorkflowDriverJs.match(/\bprojectQaController\.run\b/g) || []).length === 3,
-  "the Run QA lifecycle must mount once and EditorContext, palette, and all three workflow consumers must call ProjectQaController directly."
+  "the Run QA lifecycle must mount once and EditorContext, palette, global keyboard, and all three workflow consumers must call ProjectQaController directly."
 );
 assert(
   !/async\s+function\s+runProjectQa\b/.test(appJs) &&
@@ -14699,7 +14791,7 @@ for (const snippet of [
   "const escaped = text.escapeHtml(textValue)",
   'new RegExp(text.escapeRegExp(text.escapeHtml(keyword)), "gi")',
   'if (navigation.getView() !== "editor" || !session.getProject()) return',
-  'status.set("Select a source word, then press Ctrl+K or Alt+K.", "dirty")',
+  'status.set("Select source or target text, then press F4 or Ctrl/Cmd+Shift+K.", "dirty")',
   "const query = text.normalizeCase(keyword)",
   "const entries = await tm.listEntries()",
   "const tmNames = new Set(tm.getNames())",
@@ -14726,7 +14818,7 @@ for (const snippet of [
   'elements.closeButton.addEventListener("click", handleClose)',
   'elements.overlay.addEventListener("click", handleOverlayClick)',
   "if (event.target === elements.overlay) close()",
-  "return Object.freeze({ close, highlight, mount, open, selectedKeyword, unmount })"
+  "return Object.freeze({ close, handleKeydown, highlight, mount, open, selectedKeyword, unmount })"
 ]) {
   assertIncludes(
     concordanceControllerJs,
@@ -14770,7 +14862,7 @@ for (const boundary of [
 for (const directConsumer of ["concordanceController.mount()", "concordance: concordanceController"]) {
   assertIncludes(appJs, directConsumer, `concordance consumers must call the controller directly: ${directConsumer}.`);
 }
-for (const directConsumer of ["concordance.open()", "concordance.close()"]) {
+for (const directConsumer of ["run(event, concordance.open)", "concordance.close()"]) {
   assertIncludes(
     globalKeyboardControllerJs,
     directConsumer,
@@ -14803,6 +14895,7 @@ for (const testName of [
   "ConcordanceController preserves editor/project guards and exact empty-keyword status",
   "ConcordanceController filters linked language-pair results, sorts newest first, renders safely, inserts, and closes",
   "ConcordanceController renders the localized safe empty state and opens the overlay",
+  "ConcordanceController supports keyboard result navigation, insertion, cancellation, and focus restoration",
   "ConcordanceController propagates repository failure before changing overlay visibility",
   "ConcordanceController validates collaborators and exposes an immutable API"
 ]) {
@@ -14838,10 +14931,12 @@ for (const snippet of [
   "presentation.renderPrompt()",
   "await context.refresh()",
   "if (!session.getSegments().length) return",
-  "const start = Math.max(navigation.getActiveIndex() + 1, 0)",
-  "index >= start && filters.isOpen(segment)",
-  "index < start && filters.isOpen(segment)",
-  "const next = afterCurrent !== -1 ? afterCurrent : beforeCurrent",
+  "async function moveOpen(direction = 1)",
+  "const activeIndex = navigation.getActiveIndex()",
+  "const openIndexes = session",
+  ".filter(({ segment }) => filters.isOpen(segment))",
+  "[...openIndexes].reverse().find((index) => index < activeIndex)",
+  "openIndexes.find((index) => index > activeIndex)",
   "if (next === -1) return",
   "await select(next)",
   "if (!filters.matches(session.getSegments()[next]))",
@@ -14849,7 +14944,9 @@ for (const snippet of [
   'statusFilter.value = "all"',
   "presentation.renderSegments()",
   "focus.target()",
-  "return Object.freeze({ ensureVisible, nextOpen, select })"
+  "return moveOpen(1)",
+  "return moveOpen(-1)",
+  "return Object.freeze({ ensureVisible, nextOpen, previousOpen, select })"
 ]) {
   assertIncludes(
     segmentNavigationControllerJs,
@@ -14935,6 +15032,7 @@ for (const testName of [
   "SegmentNavigationController propagates context failure after preserving preceding selection effects",
   "SegmentNavigationController next-open prefers later candidates and focuses without resetting matching filters",
   "SegmentNavigationController next-open wraps, resets a hiding status filter, rerenders, and focuses",
+  "SegmentNavigationController previous-open prefers earlier candidates and wraps backward",
   "SegmentNavigationController next-open is inert for empty and fully confirmed collections",
   "SegmentNavigationController validates collaborators and exposes an immutable API"
 ]) {
@@ -21495,8 +21593,8 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `editor-shell composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  (appJs.match(/\beditorShellPresentationController\.render\b/g) || []).length === 10,
-  "all ten application editor-shell consumers must call EditorShellPresentationController.render directly."
+  (appJs.match(/\beditorShellPresentationController\.render\b/g) || []).length === 11,
+  "all eleven application editor-shell consumers must call EditorShellPresentationController.render directly."
 );
 assert(
   (appWorkflowDriverJs.match(/\beditorShellPresentationController\.render\b/g) || []).length === 3,
@@ -21976,8 +22074,8 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `application active-segment composition and consumers must retain ${boundary}.`);
 }
 assert(
-  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 27,
-  "all 27 application active-segment consumers must call ApplicationActiveSegmentService directly."
+  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 29,
+  "all 29 application active-segment consumers must call ApplicationActiveSegmentService directly."
 );
 assert(
   (appWorkflowDriverJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 9,

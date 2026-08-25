@@ -79,6 +79,10 @@ export function createGlobalKeyboardController(options) {
     return true;
   }
 
+  function matchesAny(event, shortcutIds) {
+    return shortcutIds.some((id) => matchesShortcut(event, KEYBOARD_SHORTCUTS[id], normalizeKey));
+  }
+
   function handleKeydown(event) {
     if (!isUsableShortcutEvent(event)) return;
     const editableTarget = isEditableKeyboardTarget(event.target);
@@ -98,20 +102,13 @@ export function createGlobalKeyboardController(options) {
         return;
       }
     }
-    if (
-      matchesShortcut(event, KEYBOARD_SHORTCUTS.palette, normalizeKey) ||
-      matchesShortcut(event, KEYBOARD_SHORTCUTS["palette-compat"], normalizeKey)
-    ) {
+    if (matchesAny(event, ["palette", "palette-alternate", "palette-compat"])) {
       quickInsert?.close?.();
       run(event, palette?.open);
       return;
     }
     const editorReady = context.getView() === "editor" && context.hasProject();
-    if (
-      editorReady &&
-      (matchesShortcut(event, KEYBOARD_SHORTCUTS.concordance, normalizeKey) ||
-        matchesShortcut(event, KEYBOARD_SHORTCUTS["concordance-legacy"], normalizeKey))
-    ) {
+    if (editorReady && matchesAny(event, ["concordance", "concordance-alternate", "concordance-legacy"])) {
       quickInsert?.close?.();
       run(event, concordance.open);
       return;
@@ -124,11 +121,11 @@ export function createGlobalKeyboardController(options) {
       run(event, editor.focusSearch);
       return;
     }
-    if (editorReady && matchesShortcut(event, KEYBOARD_SHORTCUTS["replace-target"], normalizeKey)) {
+    if (editorReady && matchesAny(event, ["replace-target", "replace-target-compat"])) {
       run(event, editor.openReplace);
       return;
     }
-    if (editorReady && matchesShortcut(event, KEYBOARD_SHORTCUTS["review-comment"], normalizeKey)) {
+    if (editorReady && matchesAny(event, ["review-comment", "review-comment-alternate", "review-comment-compat"])) {
       run(event, editor.openReviewComment);
       return;
     }
@@ -167,7 +164,7 @@ export function createGlobalKeyboardController(options) {
     if (
       editorReady &&
       (!editableTarget || targetEditor) &&
-      matchesShortcut(event, KEYBOARD_SHORTCUTS["split-segment"], normalizeKey)
+      matchesAny(event, ["split-segment", "split-segment-compat"])
     ) {
       run(event, editor.splitSegment);
       return;
@@ -175,7 +172,7 @@ export function createGlobalKeyboardController(options) {
     if (
       editorReady &&
       (!editableTarget || targetEditor) &&
-      matchesShortcut(event, KEYBOARD_SHORTCUTS["merge-segments"], normalizeKey)
+      matchesAny(event, ["merge-segments", "merge-segments-compat"])
     ) {
       run(event, editor.mergeSegment);
       return;

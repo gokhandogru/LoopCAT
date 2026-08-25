@@ -30,7 +30,12 @@ test("shortcut registry is immutable and exposes the documented central labels",
   assert.equal(Object.isFrozen(KEYBOARD_SHORTCUTS.confirm), true);
   assert.equal(shortcutLabel("confirm"), "Ctrl/Cmd+Enter");
   assert.equal(shortcutLabel("quick-insert"), "Tab");
-  assert.equal(shortcutLabel("concordance"), "Ctrl/Cmd+Shift+K");
+  assert.equal(shortcutLabel("palette"), "F2");
+  assert.equal(shortcutLabel("concordance"), "F4");
+  assert.equal(shortcutLabel("review-comment"), "Shift+F4");
+  assert.equal(shortcutLabel("replace-target"), "Ctrl/Cmd+Shift+H");
+  assert.equal(shortcutLabel("split-segment"), "Ctrl/Cmd+Shift+E");
+  assert.equal(shortcutLabel("merge-segments"), "Ctrl/Cmd+Shift+L");
   assert.equal(shortcutLabel("missing"), "");
 });
 
@@ -46,12 +51,12 @@ test("shortcut matching accepts Ctrl or Command and requires exact modifiers", a
   assert.equal(matchesShortcut(event({ key: "Tab" }), KEYBOARD_SHORTCUTS["quick-insert"]), true);
 });
 
-test("physical-key fallback works without accepting composition, AltGraph, or consumed events", async () => {
+test("physical-key fallback works without accepting composition, AltGraph, or unusable key states", async () => {
   const { KEYBOARD_SHORTCUTS, isUsableShortcutEvent, matchesShortcut } = await loadModule();
   assert.equal(
     matchesShortcut(
       event({ code: "KeyK", ctrlKey: true, key: "Unidentified", shiftKey: true }),
-      KEYBOARD_SHORTCUTS.concordance
+      KEYBOARD_SHORTCUTS["concordance-alternate"]
     ),
     true
   );
@@ -59,12 +64,15 @@ test("physical-key fallback works without accepting composition, AltGraph, or co
     event({ ctrlKey: true, isComposing: true, key: "k" }),
     event({ ctrlKey: true, key: "Dead" }),
     event({ ctrlKey: true, key: "Process" }),
-    event({ ctrlKey: true, defaultPrevented: true, key: "k" }),
     event({ ctrlKey: true, key: "k", getModifierState: (name) => name === "AltGraph" })
   ]) {
     assert.equal(isUsableShortcutEvent(blocked), false);
-    assert.equal(matchesShortcut(blocked, KEYBOARD_SHORTCUTS.palette), false);
+    assert.equal(matchesShortcut(blocked, KEYBOARD_SHORTCUTS["palette-compat"]), false);
   }
+
+  const consumedF2 = event({ defaultPrevented: true, key: "F2" });
+  assert.equal(isUsableShortcutEvent(consumedF2), true);
+  assert.equal(matchesShortcut(consumedF2, KEYBOARD_SHORTCUTS.palette), true);
 });
 
 test("editable and target-editor classification keeps application routing contextual", async () => {

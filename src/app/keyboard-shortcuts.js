@@ -5,12 +5,19 @@ function define(id, options) {
 export const KEYBOARD_SHORTCUTS = Object.freeze({
   undo: define("undo", { key: "z", primary: true, label: "Ctrl/Cmd+Z" }),
   redo: define("redo", { key: "z", primary: true, shift: true, label: "Ctrl/Cmd+Shift+Z" }),
-  palette: define("palette", { key: "k", code: "KeyK", primary: true, label: "Ctrl/Cmd+K" }),
-  "palette-compat": define("palette-compat", {
+  palette: define("palette", { key: "f2", label: "F2" }),
+  "palette-alternate": define("palette-alternate", {
     key: "p",
+    code: "KeyP",
     primary: true,
     shift: true,
     label: "Ctrl/Cmd+Shift+P"
+  }),
+  "palette-compat": define("palette-compat", {
+    key: "k",
+    code: "KeyK",
+    primary: true,
+    label: "Ctrl/Cmd+K"
   }),
   confirm: define("confirm", { key: "enter", primary: true, label: "Ctrl/Cmd+Enter" }),
   "visible-next": define("visible-next", { key: "arrowdown", alt: true, label: "Alt+Down" }),
@@ -29,7 +36,8 @@ export const KEYBOARD_SHORTCUTS = Object.freeze({
     label: "Ctrl/Cmd+Shift+S"
   }),
   "quick-insert": define("quick-insert", { key: "tab", label: "Tab" }),
-  concordance: define("concordance", {
+  concordance: define("concordance", { key: "f4", label: "F4" }),
+  "concordance-alternate": define("concordance-alternate", {
     key: "k",
     code: "KeyK",
     primary: true,
@@ -50,9 +58,34 @@ export const KEYBOARD_SHORTCUTS = Object.freeze({
     label: "Ctrl/Cmd+Shift+F"
   }),
   "find-segments": define("find-segments", { key: "f", primary: true, label: "Ctrl/Cmd+F" }),
-  "replace-target": define("replace-target", { key: "h", primary: true, label: "Ctrl/Cmd+H" }),
+  "replace-target": define("replace-target", {
+    key: "h",
+    code: "KeyH",
+    primary: true,
+    shift: true,
+    label: "Ctrl/Cmd+Shift+H"
+  }),
+  "replace-target-compat": define("replace-target-compat", {
+    key: "h",
+    code: "KeyH",
+    primary: true,
+    label: "Ctrl/Cmd+H"
+  }),
   "review-comment": define("review-comment", {
+    key: "f4",
+    shift: true,
+    label: "Shift+F4"
+  }),
+  "review-comment-alternate": define("review-comment-alternate", {
+    key: "y",
+    code: "KeyY",
+    primary: true,
+    shift: true,
+    label: "Ctrl/Cmd+Shift+Y"
+  }),
+  "review-comment-compat": define("review-comment-compat", {
     key: "m",
+    code: "KeyM",
     primary: true,
     shift: true,
     label: "Ctrl/Cmd+Shift+M"
@@ -66,8 +99,32 @@ export const KEYBOARD_SHORTCUTS = Object.freeze({
   }),
   "next-quality-risk": define("next-quality-risk", { key: "f9", label: "F9" }),
   qa: define("qa", { key: "f9", shift: true, label: "Shift+F9" }),
-  "split-segment": define("split-segment", { key: "e", primary: true, label: "Ctrl/Cmd+E" }),
-  "merge-segments": define("merge-segments", { key: "j", primary: true, label: "Ctrl/Cmd+J" })
+  "split-segment": define("split-segment", {
+    key: "e",
+    code: "KeyE",
+    primary: true,
+    shift: true,
+    label: "Ctrl/Cmd+Shift+E"
+  }),
+  "split-segment-compat": define("split-segment-compat", {
+    key: "e",
+    code: "KeyE",
+    primary: true,
+    label: "Ctrl/Cmd+E"
+  }),
+  "merge-segments": define("merge-segments", {
+    key: "l",
+    code: "KeyL",
+    primary: true,
+    shift: true,
+    label: "Ctrl/Cmd+Shift+L"
+  }),
+  "merge-segments-compat": define("merge-segments-compat", {
+    key: "j",
+    code: "KeyJ",
+    primary: true,
+    label: "Ctrl/Cmd+J"
+  })
 });
 
 function normalizedKey(value, normalizeKey) {
@@ -84,7 +141,7 @@ export function isTargetEditor(target) {
 }
 
 export function isUsableShortcutEvent(event) {
-  if (!event || event.defaultPrevented || event.isComposing) return false;
+  if (!event || event.isComposing) return false;
   if (event.getModifierState?.("AltGraph")) return false;
   const key = normalizedKey(event.key);
   return key !== "dead" && key !== "process" && (key !== "unidentified" || Boolean(event.code));

@@ -271,15 +271,15 @@ test("ApplicationCommandCatalogService preserves all 43 command records in exact
       "previous-open": "Alt+Shift+Enter",
       "focus-mode": "Ctrl/Cmd+Shift+F",
       "copy-source": "Ctrl/Cmd+Shift+S",
-      "split-segment": "Ctrl/Cmd+E",
-      "merge-segments": "Ctrl/Cmd+J",
+      "split-segment": "Ctrl/Cmd+Shift+E",
+      "merge-segments": "Ctrl/Cmd+Shift+L",
       qa: "Shift+F9",
       "next-quality-risk": "F9",
-      concordance: "Ctrl/Cmd+Shift+K",
+      concordance: "F4",
       "quick-insert": "Tab",
       "find-segments": "Ctrl/Cmd+F",
-      "replace-target": "Ctrl/Cmd+H",
-      "review-comment": "Ctrl/Cmd+Shift+M"
+      "replace-target": "Ctrl/Cmd+Shift+H",
+      "review-comment": "Shift+F4"
     }
   );
   assert.equal(

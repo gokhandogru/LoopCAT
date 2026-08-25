@@ -120,7 +120,7 @@ export function createConcordanceController(options) {
     if (navigation.getView() !== "editor" || !session.getProject()) return;
     const keyword = selectedKeyword();
     if (!keyword) {
-      status.set("Select source or target text, then press Ctrl/Cmd+Shift+K.", "dirty");
+      status.set("Select source or target text, then press F4 or Ctrl/Cmd+Shift+K.", "dirty");
       return;
     }
     returnTarget = dom.getActiveElement();

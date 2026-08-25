@@ -1,6 +1,6 @@
 const APP_VERSION = "0.0.3";
 // Bump when a cached UI asset changes so installed PWAs refresh their shell.
-const STATIC_ASSET_REVISION = "2026-08-07-loopbird-branding";
+const STATIC_ASSET_REVISION = "2026-08-25-browser-safe-shortcuts";
 const CACHE_PREFIX = "loopcat-offline-";
 const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}-${STATIC_ASSET_REVISION}`;
 

@@ -9,6 +9,7 @@ LoopCAT's shortcut system is optimized for the translator's main loop: edit, ins
 - Text editing remains safe. Application shortcuts do not replace ordinary typing, browser text editing, or shortcuts inside unrelated inputs. Target-editor commands are enabled only in the target editor or in a non-editable editor context.
 - International keyboards are first-class. LoopCAT ignores shortcut routing during IME composition and when `AltGraph` is active, so accented characters and input methods are not mistaken for commands.
 - Advanced commands use function keys or mnemonic letters, while destructive or structural actions require a modifier.
+- Browser-safe function keys are provided for core discovery and lookup actions. Chrome-reserved chords remain compatibility aliases only, because a browser or extension can consume them before a web page receives an event.
 - One contextual picker handles TM, terminology, and saved AI results. This avoids allocating a different hard-to-remember shortcut to every suggestion rank.
 
 ## Translation and navigation
@@ -29,18 +30,18 @@ LoopCAT's shortcut system is optimized for the translator's main loop: edit, ins
 
 ## Search, review, and structure
 
-| Action              | Windows / Linux | macOS         | Behavior                                                                                                                             |
-| ------------------- | --------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Command palette     | `Ctrl+K`        | `Cmd+K`       | Searches available commands and shows their shortcuts. `Ctrl/Cmd+Shift+P` is also supported for users accustomed to editor palettes. |
-| Concordance         | `Ctrl+Shift+K`  | `Cmd+Shift+K` | Searches the TM using selected source or target text. The previous `Ctrl/Cmd+Alt+K` binding remains as a compatibility alias.        |
-| Find segments       | `Ctrl+F`        | `Cmd+F`       | Focuses and selects the editor's source/target search field.                                                                         |
-| Replace target text | `Ctrl+H`        | `Cmd+H`       | Opens target find-and-replace.                                                                                                       |
-| Add review comment  | `Ctrl+Shift+M`  | `Cmd+Shift+M` | Opens the Review inspector and focuses the comment field.                                                                            |
-| Next quality risk   | `F9`            | `F9`          | Moves to the next item in the Quality Workbench risk queue.                                                                          |
-| Run QA              | `Shift+F9`      | `Shift+F9`    | Runs project QA checks.                                                                                                              |
-| Split segment       | `Ctrl+E`        | `Cmd+E`       | Splits the active segment when its format and caret position allow it.                                                               |
-| Merge with next     | `Ctrl+J`        | `Cmd+J`       | Merges the active segment with the next compatible segment.                                                                          |
-| Toggle Focus mode   | `Ctrl+Shift+F`  | `Cmd+Shift+F` | Enters or exits the translation-only Focus view.                                                                                     |
+| Action              | Windows / Linux              | macOS                       | Behavior                                                                                                                      |
+| ------------------- | ---------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Command palette     | `F2` or `Ctrl+Shift+P`       | `F2` or `Cmd+Shift+P`       | Searches available commands and shows their shortcuts. `Ctrl/Cmd+K` remains a compatibility alias, but Chrome may reserve it. |
+| Concordance         | `F4` or `Ctrl+Shift+K`       | `F4` or `Cmd+Shift+K`       | Searches the TM using selected source or target text. `Ctrl/Cmd+Alt+K` remains a compatibility alias.                         |
+| Find segments       | `Ctrl+F`                     | `Cmd+F`                     | Focuses and selects the editor's source/target search field.                                                                  |
+| Replace target text | `Ctrl+Shift+H`               | `Cmd+Shift+H`               | Opens target find-and-replace. `Ctrl/Cmd+H` remains a desktop compatibility alias.                                            |
+| Add review comment  | `Shift+F4` or `Ctrl+Shift+Y` | `Shift+F4` or `Cmd+Shift+Y` | Opens the Review inspector and focuses the comment field. `Ctrl/Cmd+Shift+M` remains a compatibility alias.                   |
+| Next quality risk   | `F9`                         | `F9`                        | Moves to the next item in the Quality Workbench risk queue.                                                                   |
+| Run QA              | `Shift+F9`                   | `Shift+F9`                  | Runs project QA checks.                                                                                                       |
+| Split segment       | `Ctrl+Shift+E`               | `Cmd+Shift+E`               | Splits the active segment when its format and caret position allow it. `Ctrl/Cmd+E` remains a desktop compatibility alias.    |
+| Merge with next     | `Ctrl+Shift+L`               | `Cmd+Shift+L`               | Merges the active segment with the next compatible segment. `Ctrl/Cmd+J` remains a desktop compatibility alias.               |
+| Toggle Focus mode   | `Ctrl+Shift+F`               | `Cmd+Shift+F`               | Enters or exits the translation-only Focus view.                                                                              |
 
 `Escape` closes Quick Insert, concordance, the command palette, or Focus mode, starting with the topmost active surface.
 
@@ -56,6 +57,8 @@ Use `Up`/`Down` or `Tab`/`Shift+Tab` to move, `1`–`9` to choose directly, `Ent
 
 ## Discoverability and accessibility
 
-Open the command palette with `Ctrl/Cmd+K` to find commands by name and see their current bindings. Frequently used buttons and target editors also expose shortcut hints through titles and `aria-keyshortcuts`. The pickers use normal keyboard focus, selected-state announcements, and focus restoration when they close.
+Open the command palette with `F2` or `Ctrl/Cmd+Shift+P` to find commands by name and see their current bindings. Frequently used buttons and target editors also expose shortcut hints through titles and `aria-keyshortcuts`. The pickers use normal keyboard focus, selected-state announcements, and focus restoration when they close.
+
+If an installed Chrome extension owns a global shortcut, Chrome may never deliver that key event to LoopCAT. Use `F2` to reach every command, or change the extension binding in Chrome's extension-shortcut settings. After installing an updated hosted/PWA build, accept the LoopCAT update prompt or reload once so the new offline shell activates.
 
 Shortcut customization is not yet exposed in Settings. The bindings live in one declarative registry at `src/app/keyboard-shortcuts.js`, so a future configurable shortcut profile can replace labels and matching rules without duplicating command logic.

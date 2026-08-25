@@ -160,7 +160,7 @@ Current capabilities:
 - Save confirmed segments to project TM.
 - Use a main TM and linked reference TMs.
 - Show exact and fuzzy TM matches for the active segment.
-- Run concordance search from selected source text with Ctrl+K or Alt+K.
+- Run concordance search from selected source or target text with browser-safe `F4` or `Ctrl/Cmd+Shift+K`.
 - Pretranslate empty segments from TM matches above a chosen percentage.
 - Import and export project TMX.
 - Import, preview, edit, and export standalone TM resources.
@@ -331,7 +331,7 @@ Current capabilities:
 - Electron 43 runs with renderer sandboxing, context isolation, secure fuses, and hardware acceleration enabled by default; an explicit restart-based graphics fallback is available for affected machines.
 - System, Light, and Dark themes plus Balanced and Compact density are remembered locally.
 - The editor supports Focus mode and a remembered 280–420 px contextual inspector that changes to an overlay below 1100 px.
-- A fuzzy grouped `Ctrl/Cmd+K` command palette provides keyboard navigation, shortcuts, disabled reasons, and recent commands.
+- A fuzzy grouped command palette opened with browser-safe `F2` or `Ctrl/Cmd+Shift+P` provides keyboard navigation, shortcuts, disabled reasons, and recent commands.
 - Saving, background jobs, notices, warnings, and recoverable errors use separate presentation models.
 - Service-worker updates present an explicit reload/defer action and flush pending work before activation.
 - Local diagnostics can be previewed and downloaded without network transmission; project text, prompts, secrets, names, and exact local paths are excluded or redacted.

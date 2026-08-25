@@ -16382,6 +16382,13 @@
         "app.js:9709"
       ]
     },
+    "auto.f2.ctrl.cmd.shift.p.f5b1af4d": {
+      "message": "F2 · Ctrl/Cmd+Shift+P",
+      "description": "Static title attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.fa.215a9561": {
       "message": "fa",
       "description": "Generated interface text from app.js.",

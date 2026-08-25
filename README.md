@@ -72,7 +72,7 @@ The following capabilities are implemented in the current codebase and covered b
 - Use native browser/Electron spellcheck in target segment editors, with the desktop wrapper syncing spellcheck to the active project target language where the runtime supports it.
 - Choose the LoopCAT interface language from the Workspace menu, including built-in Catalan, English, and Turkish, import custom UI translation JSON, and export the English UI source catalog for translators.
 - Use System, Light, or Dark themes, Balanced or Compact density, Focus mode, and a remembered 280–420 px contextual inspector that becomes an overlay on narrower screens.
-- Open the fuzzy, grouped command palette with `Ctrl/Cmd+K`, navigate it with the keyboard, and reuse recent commands without adding permanent editor clutter.
+- Open the fuzzy, grouped command palette with browser-safe `F2` or `Ctrl/Cmd+Shift+P`, navigate it with the keyboard, and reuse recent commands without adding permanent editor clutter.
 - Use the [keyboard-first translation workflow](docs/keyboard-shortcuts.md), including `Tab` Quick Insert for TM, approved terminology, and saved AI suggestions; `Ctrl/Cmd+Enter` confirmation; filtered and open-segment navigation; protected-tag insertion; search, review, QA, and structural commands.
 - Undo and redo ordinary target typing, Copy Source, TM/concordance/tag insertion, target replacement, confirmation, review-state changes, AI suggestion application, TM/AI pretranslation, and compatible split/merge operations through bounded transactional commands.
 - Keep bounded per-segment target revision history for post-editing review.
@@ -578,7 +578,7 @@ For downloadable desktop builds, use the Electron wrapper documented in `docs/de
 
 Before packaging a release, run `pnpm run verify:provenance -- --allow-untagged`, `pnpm install --frozen-lockfile`, `pnpm run verify:release`, then run the browser tests and a small manual import/edit/export smoke test. The provenance gate fails before packaging if Git is not available, Git metadata such as `.git/HEAD` is missing, the checkout is dirty, or the checked-out commit does not match the release tag or CI SHA. The browser runner includes a large-project fixture so release checks cover academic-length package, autosave, QA, and backup behavior. Tagged releases can use the desktop release workflow to produce platform-specific artifacts, verify the combined Windows/macOS/Linux download bundle, and publish a combined `SHA256SUMS.txt` checksum file.
 
-The offline cache name is tied to the app version. When preparing a release, bump `package.json` and keep `manifest.webmanifest` plus `service-worker.js` on the same version; `pnpm run verify:release` fails if they drift.
+The offline cache name is tied to the app version and `STATIC_ASSET_REVISION` in `service-worker.js`. When preparing a release, bump `package.json` and keep `manifest.webmanifest` plus `service-worker.js` on the same version; when cached UI assets change without a version bump, update `STATIC_ASSET_REVISION` so installed browser clients receive the new shell. `pnpm run verify:release` fails if the version files drift.
 
 Projects now carry local workspace/user metadata, resource links, QA settings, AI settings, export history, and activity events. These fields are intentionally local placeholders today, but they keep the data model ready for optional encrypted backup, project sharing, or team workspaces later.
 

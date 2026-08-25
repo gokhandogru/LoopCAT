@@ -238,12 +238,14 @@ test("global Undo and Redo preserve editable exclusion, capability checks, proje
   );
 });
 
-test("palette shortcuts preserve modifier overlap, KeyK fallback, optional startup behavior, and event order", async () => {
+test("palette shortcuts preserve browser-safe F2, alternates, optional startup behavior, and event order", async () => {
   const { createGlobalKeyboardController } = await loadFactory();
   for (const event of [
+    keyboardEvent({ key: "F2" }),
     keyboardEvent({ ctrlKey: true, key: "P", shiftKey: true }),
     keyboardEvent({ key: "k", metaKey: true }),
-    keyboardEvent({ code: "KeyK", ctrlKey: true, key: "Unidentified" })
+    keyboardEvent({ code: "KeyK", ctrlKey: true, key: "Unidentified" }),
+    keyboardEvent({ defaultPrevented: true, key: "F2" })
   ]) {
     const harness = createHarness(createGlobalKeyboardController);
     harness.controller.handleKeydown(event);
@@ -256,13 +258,13 @@ test("palette shortcuts preserve modifier overlap, KeyK fallback, optional start
   }
 
   const optional = createHarness(createGlobalKeyboardController, { noPalette: true });
-  const optionalEvent = keyboardEvent({ ctrlKey: true, key: "k" });
+  const optionalEvent = keyboardEvent({ key: "F2" });
   optional.controller.handleKeydown(optionalEvent);
   assert.deepEqual(optionalEvent.effects, []);
 
   const paletteOpenError = new Error("palette unavailable");
   const failing = createHarness(createGlobalKeyboardController, { paletteOpenError });
-  const failingEvent = keyboardEvent({ ctrlKey: true, key: "k" });
+  const failingEvent = keyboardEvent({ key: "F2" });
   assert.throws(() => failing.controller.handleKeydown(failingEvent), paletteOpenError);
   assert.deepEqual(failingEvent.effects, ["preventDefault", "stopPropagation"]);
 });
@@ -287,26 +289,31 @@ test("Focus-mode shortcut preserves editor and project eligibility", async () =>
   }
 });
 
-test("concordance shortcut preserves editor qualification, Alt priority, KeyK fallback, and synchronous failures", async () => {
+test("concordance shortcuts preserve browser-safe F4, legacy routing, qualification, and synchronous failures", async () => {
   const { createGlobalKeyboardController } = await loadFactory();
-  const eligible = createHarness(createGlobalKeyboardController);
-  const eligibleEvent = keyboardEvent({ altKey: true, code: "KeyK", ctrlKey: true, key: "Unidentified" });
-  eligible.controller.handleKeydown(eligibleEvent);
-  assert.deepEqual(eligibleEvent.effects, ["preventDefault", "stopPropagation"]);
-  assert.equal(eligible.getState().concordanceOpen, true);
-  assert.equal(
-    eligible.calls.some(([name]) => name === "paletteOpen"),
-    false
-  );
+  for (const eligibleEvent of [
+    keyboardEvent({ key: "F4" }),
+    keyboardEvent({ code: "KeyK", ctrlKey: true, key: "Unidentified", shiftKey: true }),
+    keyboardEvent({ altKey: true, code: "KeyK", ctrlKey: true, key: "Unidentified" })
+  ]) {
+    const eligible = createHarness(createGlobalKeyboardController);
+    eligible.controller.handleKeydown(eligibleEvent);
+    assert.deepEqual(eligibleEvent.effects, ["preventDefault", "stopPropagation"]);
+    assert.equal(eligible.getState().concordanceOpen, true);
+    assert.equal(
+      eligible.calls.some(([name]) => name === "paletteOpen"),
+      false
+    );
+  }
 
   const ineligible = createHarness(createGlobalKeyboardController, { view: "resources" });
-  const ineligibleEvent = keyboardEvent({ altKey: true, key: "k", metaKey: true });
+  const ineligibleEvent = keyboardEvent({ key: "F4" });
   ineligible.controller.handleKeydown(ineligibleEvent);
   assert.deepEqual(ineligibleEvent.effects, []);
 
   const concordanceOpenError = new Error("concordance unavailable");
   const failing = createHarness(createGlobalKeyboardController, { concordanceOpenError });
-  const failingEvent = keyboardEvent({ altKey: true, ctrlKey: true, key: "k" });
+  const failingEvent = keyboardEvent({ key: "F4" });
   assert.throws(() => failing.controller.handleKeydown(failingEvent), concordanceOpenError);
   assert.deepEqual(failingEvent.effects, ["preventDefault", "stopPropagation"]);
 });
@@ -372,14 +379,19 @@ test("global editor shortcuts route exact actions and preserve unrelated editabl
   const { createGlobalKeyboardController } = await loadFactory();
   const cases = [
     [keyboardEvent({ ctrlKey: true, key: "f" }), "focusSearch"],
+    [keyboardEvent({ ctrlKey: true, key: "h", shiftKey: true }), "openReplace"],
     [keyboardEvent({ ctrlKey: true, key: "h" }), "openReplace"],
+    [keyboardEvent({ key: "F4", shiftKey: true }), "openReviewComment"],
+    [keyboardEvent({ ctrlKey: true, key: "y", shiftKey: true }), "openReviewComment"],
     [keyboardEvent({ ctrlKey: true, key: "m", shiftKey: true }), "openReviewComment"],
     [keyboardEvent({ ctrlKey: true, key: "s", shiftKey: true }), "copySource"],
     [keyboardEvent({ altKey: true, key: "Enter" }), "nextOpen"],
     [keyboardEvent({ altKey: true, key: "Enter", shiftKey: true }), "previousOpen"],
     [keyboardEvent({ key: "F9" }), "nextQualityRisk"],
     [keyboardEvent({ key: "F9", shiftKey: true }), "runQa"],
+    [keyboardEvent({ ctrlKey: true, key: "e", shiftKey: true }), "splitSegment"],
     [keyboardEvent({ ctrlKey: true, key: "e" }), "splitSegment"],
+    [keyboardEvent({ ctrlKey: true, key: "l", shiftKey: true }), "mergeSegment"],
     [keyboardEvent({ ctrlKey: true, key: "j" }), "mergeSegment"]
   ];
   for (const [event, action] of cases) {
@@ -392,7 +404,7 @@ test("global editor shortcuts route exact actions and preserve unrelated editabl
   for (const event of [
     keyboardEvent({ ctrlKey: true, editable: true, key: "s", shiftKey: true }),
     keyboardEvent({ altKey: true, editable: true, key: "Enter" }),
-    keyboardEvent({ ctrlKey: true, editable: true, key: "e" })
+    keyboardEvent({ ctrlKey: true, editable: true, key: "e", shiftKey: true })
   ]) {
     const harness = createHarness(createGlobalKeyboardController);
     harness.controller.handleKeydown(event);

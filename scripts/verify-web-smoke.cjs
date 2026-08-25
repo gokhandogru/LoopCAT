@@ -485,6 +485,41 @@ async function settlePaint(windowRef) {
   }
 }
 
+async function waitForRendererState(windowRef, expression, label) {
+  const started = Date.now();
+  while (Date.now() - started < 5000) {
+    const ready = await windowRef.webContents.executeJavaScript(`Boolean(${expression})`, true);
+    if (ready) return true;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Timed out waiting for ${label}.`);
+}
+
+async function inspectPaletteShortcut(windowRef) {
+  windowRef.webContents.sendInputEvent({ type: "keyDown", keyCode: "F2" });
+  windowRef.webContents.sendInputEvent({ type: "keyUp", keyCode: "F2" });
+  await waitForRendererState(
+    windowRef,
+    `!document.querySelector("#commandPaletteOverlay")?.classList.contains("hidden")`,
+    "F2 command palette"
+  );
+  const state = await windowRef.webContents.executeJavaScript(
+    `(() => ({
+      open: !document.querySelector("#commandPaletteOverlay")?.classList.contains("hidden"),
+      activeId: document.activeElement?.id || ""
+    }))()`,
+    true
+  );
+  windowRef.webContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
+  windowRef.webContents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
+  await waitForRendererState(
+    windowRef,
+    `document.querySelector("#commandPaletteOverlay")?.classList.contains("hidden")`,
+    "command palette close"
+  );
+  return state;
+}
+
 function createSmokeWindow(pageMessages) {
   const windowRef = new BrowserWindow({
     width: 1280,
@@ -534,6 +569,8 @@ async function inspectViewport(windowRef, url, viewport, pageMessages, loadError
   await settlePaint(windowRef);
   const shell = await windowRef.webContents.executeJavaScript(layoutScript(), true);
   await settlePaint(windowRef);
+  const paletteShortcut = await inspectPaletteShortcut(windowRef);
+  await settlePaint(windowRef);
   const shellScreenshot = await capture(windowRef, `web-smoke-${viewport.name}-shell.png`);
   const dialog = await windowRef.webContents.executeJavaScript(dialogScript(), true);
   await settlePaint(windowRef);
@@ -558,6 +595,11 @@ async function inspectViewport(windowRef, url, viewport, pageMessages, loadError
   );
   assert(shell.hasShell, `${viewport.name} app shell is not visible.`);
   assert(shell.newProjectVisible, `${viewport.name} New project button is not visible.`);
+  assert(paletteShortcut.open, `${viewport.name} F2 did not open the packaged command palette.`);
+  assert(
+    paletteShortcut.activeId === "commandPaletteInput",
+    `${viewport.name} F2 command palette should focus commandPaletteInput, got "${paletteShortcut.activeId}".`
+  );
   assert(
     shell.mobileProjectRailHidden,
     `${viewport.name} first screen shows the duplicate project rail above the dashboard controls.`
