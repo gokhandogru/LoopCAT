@@ -1112,6 +1112,10 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     concordanceMeta: document.querySelector("#concordanceMeta"),
     concordanceResults: document.querySelector("#concordanceResults"),
     closeConcordanceBtn: document.querySelector("#closeConcordanceBtn"),
+    quickInsertOverlay: document.querySelector("#quickInsertOverlay"),
+    quickInsertMeta: document.querySelector("#quickInsertMeta"),
+    quickInsertResults: document.querySelector("#quickInsertResults"),
+    closeQuickInsertBtn: document.querySelector("#closeQuickInsertBtn"),
     projectDashboard: document.querySelector("#projectDashboard"),
     projectSearchInput: document.querySelector("#projectSearchInput"),
     projectsImportProjectBtn: document.querySelector("#projectsImportProjectBtn"),
@@ -2120,6 +2124,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     text: { escapeHtml: applicationTextSafetyService.escapeHtml },
     safeHtml: { replace: replaceSafeHtml },
     mutation: { deleteTerm: (...args) => resourceMutationController.deleteTerm(...args) },
+    target: { insert: (...args) => targetProducerController.insertTermTarget(...args) },
     dom: {
       createElement: (tagName) => document.createElement(tagName),
       createFragment: () => document.createDocumentFragment()
@@ -2754,6 +2759,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     workspace: { markDirty: workspaceDirtyStateController.mark }
   });
+  let quickInsertController = null;
   targetEditController = appRuntime.featureFactories.createTargetEditController({
     editorSessionStore,
     commandBus: appRuntime.commands.bus,
@@ -2775,7 +2781,15 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     getVisiblePosition: segmentFilterService.visiblePosition,
     normalizeKey: applicationTextSafetyService.stableLower,
     undo: applicationCommandHistoryController.undo,
-    redo: applicationCommandHistoryController.redo
+    redo: applicationCommandHistoryController.redo,
+    quickInsert: {
+      hasSuggestions: () => Boolean(quickInsertController?.hasSuggestions?.()),
+      open: () => quickInsertController?.open?.()
+    },
+    protectedTags: {
+      missing: protectedTagInspectionService.missing,
+      insert: (tagTexts) => targetProducerController.insertProtectedTags(tagTexts)
+    }
   });
   const targetProducerController = appRuntime.featureFactories.createTargetProducerController({
     copySourceElement: els.copySourceBtn,
@@ -2784,6 +2798,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       bus: appRuntime.commands.bus,
       createCopySource: appRuntime.commands.createCopySourceToTargetCommand,
       createTmTarget: appRuntime.commands.createInsertTmTargetCommand,
+      createTermTarget: appRuntime.commands.createInsertTermTargetCommand,
       createProtectedTag: appRuntime.commands.createInsertProtectedTagCommand,
       changed: applicationCommandHistoryController.render
     },
@@ -3188,6 +3203,34 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     label: uiLocalizationService.label,
     formatDateTime: applicationDateTimeService.dateTime
   });
+  quickInsertController = appRuntime.featureFactories.createQuickInsertController({
+    elements: {
+      overlay: els.quickInsertOverlay,
+      meta: els.quickInsertMeta,
+      results: els.quickInsertResults,
+      closeButton: els.closeQuickInsertBtn
+    },
+    session: {
+      getProject: editorSessionStore.getProject,
+      getSegment: applicationActiveSegmentService.get
+    },
+    sources: {
+      refreshTm: tmMatchesController.refresh,
+      getTm: tmMatchesController.getResults,
+      refreshTerms: termSuggestionsController.refresh,
+      getTerms: termSuggestionsController.getResults,
+      getAi: () => applicationActiveSegmentService.get()?.aiSuggestions || []
+    },
+    actions: {
+      insertTm: targetProducerController.insertTmTarget,
+      insertTerm: targetProducerController.insertTermTarget,
+      applyAi: (...args) => aiSuggestionApplicationController.apply(...args)
+    },
+    localization: { source: uiLocalizationService.source },
+    status: { set: applicationSaveStatusController.set },
+    focus: focusController
+  });
+  quickInsertController.mount();
   const aiCommandLifecycleCoordinator = appRuntime.featureFactories.createAiCommandLifecycleCoordinator({
     state: {
       read: () => state.localAi,
@@ -4424,6 +4467,17 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       focusActive: () => targetEditController.focusActive()
     }
   });
+  const focusSegmentSearch = () => {
+    els.segmentSearchInput.focus();
+    els.segmentSearchInput.select?.();
+  };
+  const openReviewComment = () => {
+    state.inspectorOpen = true;
+    void workspaceLayoutController?.setInspectorOpen?.(true);
+    verticalFeatureState?.inspector?.setContext?.({ tab: "review" });
+    editorShellPresentationController.render();
+    requestAnimationFrame(() => els.reviewCommentInput.focus());
+  };
   const globalKeyboardController = appRuntime.featureFactories.createGlobalKeyboardController({
     target: window,
     normalizeKey: applicationTextSafetyService.stableLower,
@@ -4448,10 +4502,26 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       open: concordanceController.open,
       close: concordanceController.close
     },
+    quickInsert: {
+      isOpen: quickInsertController.isOpen,
+      close: quickInsertController.close
+    },
     focus: {
       isActive: () => applicationStore.getState().interface.focusMode,
       toggle: focusModeController.toggle,
       disable: () => focusModeController.set(false)
+    },
+    editor: {
+      focusSearch: focusSegmentSearch,
+      openReplace: targetReplacementController.open,
+      openReviewComment,
+      copySource: targetProducerController.copySourceToTarget,
+      nextOpen: segmentNavigationController.nextOpen,
+      previousOpen: segmentNavigationController.previousOpen,
+      nextQualityRisk: qualityWorkbenchController.nextRisk,
+      runQa: projectQaController.run,
+      splitSegment: structuralSegmentController.split,
+      mergeSegment: structuralSegmentController.merge
     }
   });
 
@@ -5757,7 +5827,10 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       reports: reportExportController,
       quality: qualityWorkbenchController,
       concordance: concordanceController,
+      quickInsert: quickInsertController,
+      search: { focus: focusSegmentSearch },
       replacement: targetReplacementController,
+      review: { openComment: openReviewComment },
       filterPreset: { apply: (preset) => filterPresetController?.applyPreset?.(preset) },
       aiPretranslation: aiPretranslationController,
       aiReview: aiReviewController,

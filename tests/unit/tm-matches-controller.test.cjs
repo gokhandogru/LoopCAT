@@ -295,6 +295,17 @@ test("TmMatchesController preserves ordered safe match cards, fallbacks, and one
     ]
   );
   assert.equal(harness.calls.filter(([name]) => name === "replaceChildren").length, 1);
+  assert.deepEqual(harness.controller.getResults(), [
+    {
+      id: "m1",
+      score: 97,
+      tmName: "Main <TM>",
+      source: "Source <one>",
+      target: "Target & one",
+      projectName: "Project > one"
+    },
+    { score: 82, source: "Second", target: "İkinci" }
+  ]);
 });
 
 test("TmMatchesController preserves synchronous target insertion provenance, ID fallback, and failures", async () => {

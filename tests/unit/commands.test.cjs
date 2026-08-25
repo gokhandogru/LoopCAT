@@ -341,7 +341,12 @@ test("failed EditTarget Undo preserves the applied state and remains retryable",
 
 test("discrete target producers preserve patches, provenance boundaries, selection, and retryable Undo", async () => {
   const [
-    { createCopySourceToTargetCommand, createInsertProtectedTagCommand, createInsertTmTargetCommand },
+    {
+      createCopySourceToTargetCommand,
+      createInsertProtectedTagCommand,
+      createInsertTermTargetCommand,
+      createInsertTmTargetCommand
+    },
     { createCommandBus },
     { createUndoStore }
   ] = await Promise.all([
@@ -370,6 +375,12 @@ test("discrete target producers preserve patches, provenance boundaries, selecti
       "Sensitive TM target",
       "insert-tm-target",
       { origin: "translation-memory", channel: "concordance", resourceId: "tm-1" }
+    ],
+    [
+      createInsertTermTargetCommand,
+      "Before approved term target",
+      "insert-term-target",
+      { origin: "termbase", resourceId: "term-1", sourceTerm: "source term" }
     ],
     [
       createInsertProtectedTagCommand,

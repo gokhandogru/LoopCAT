@@ -7,6 +7,7 @@ Use this page to distinguish current product documentation from dated research a
 - [Main README](../README.md) — project status, installation, capabilities, architecture, tests, privacy, and development workflow.
 - [Product and release roadmap](../ROADMAP.md) — shipped baseline, current priorities, release qualification, and production-ready exit criteria.
 - [Capability documentation](loopcat-capabilities.md) — detailed current behavior and suggested acceptance checks.
+- [Keyboard shortcuts](keyboard-shortcuts.md) — keyboard strategy, complete binding reference, Quick Insert behavior, context rules, and accessibility notes.
 - [Desktop packaging](desktop-packaging.md) — build, artifact, security, signing, checksum, clean-machine, and repository-mirror procedures.
 - [Project package format v1](loopcat-package-format-v1.md) — portable `.loopcat.json` contract, reconstruction metadata, privacy, and compatibility.
 - [Brand guidelines](brand-guidelines.md) — Loopbird, naming, palette, voice, and product principles.

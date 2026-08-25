@@ -1,3 +1,5 @@
+import { shortcutLabel } from "./keyboard-shortcuts.js";
+
 /**
  * Owns command-palette catalog composition. Palette search, rendering,
  * persistence, focus, and execution remain in PaletteController; feature
@@ -17,7 +19,7 @@ export function createApplicationCommandCatalogService({
     [features?.history, ["undo", "redo"]],
     [features?.trash, ["open"]],
     [features?.confirmation, ["confirm"]],
-    [features?.navigation, ["nextOpen"]],
+    [features?.navigation, ["nextOpen", "previousOpen"]],
     [features?.focus, ["toggle"]],
     [features?.targetProducer, ["copySourceToTarget"]],
     [features?.structural, ["split", "merge", "canSplit", "canMerge", "nextForMerge"]],
@@ -26,7 +28,10 @@ export function createApplicationCommandCatalogService({
     [features?.reports, ["exportQualityPassport", "exportProjectReport", "exportAnonymizedReport"]],
     [features?.quality, ["nextRisk"]],
     [features?.concordance, ["open"]],
+    [features?.quickInsert, ["open", "hasSuggestions"]],
+    [features?.search, ["focus"]],
     [features?.replacement, ["open"]],
+    [features?.review, ["openComment"]],
     [features?.filterPreset, ["apply"]],
     [features?.aiPretranslation, ["pretranslate"]],
     [features?.aiReview, ["reviewActive", "reviewBatch"]],
@@ -80,6 +85,12 @@ export function createApplicationCommandCatalogService({
         id: "next-open",
         label: "Next open segment",
         run: features.navigation.nextOpen,
+        enabled: Boolean(session.getSegments().length)
+      },
+      {
+        id: "previous-open",
+        label: "Previous open segment",
+        run: features.navigation.previousOpen,
         enabled: Boolean(session.getSegments().length)
       },
       {
@@ -148,10 +159,29 @@ export function createApplicationCommandCatalogService({
         enabled: Boolean(session.getProject())
       },
       {
+        id: "quick-insert",
+        label: "Open Quick Insert suggestions",
+        keywords: ["TM", "termbase", "term", "AI", "suggestions"],
+        run: features.quickInsert.open,
+        enabled: Boolean(selection.getActiveSegment() && features.quickInsert.hasSuggestions())
+      },
+      {
+        id: "find-segments",
+        label: "Find in source or target",
+        run: features.search.focus,
+        enabled: Boolean(session.getProject())
+      },
+      {
         id: "replace-target",
         label: "Find and replace target text",
         run: features.replacement.open,
         enabled: Boolean(session.getProject())
+      },
+      {
+        id: "review-comment",
+        label: "Add review comment",
+        run: features.review.openComment,
+        enabled: Boolean(selection.getActiveSegment())
       },
       {
         id: "preset-translate",
@@ -300,15 +330,27 @@ export function createApplicationCommandCatalogService({
         enabled: Boolean(selection.getActiveSegment())
       }
     ];
-    const shortcuts = {
-      undo: "Ctrl/Cmd+Z",
-      redo: "Ctrl/Cmd+Shift+Z",
-      concordance: "Ctrl/Cmd+Alt+K",
-      "focus-mode": "Ctrl/Cmd+Shift+F"
+    const shortcutIds = {
+      undo: "undo",
+      redo: "redo",
+      confirm: "confirm",
+      "next-open": "open-next",
+      "previous-open": "open-previous",
+      "focus-mode": "focus-mode",
+      "copy-source": "copy-source",
+      "split-segment": "split-segment",
+      "merge-segments": "merge-segments",
+      qa: "qa",
+      "next-quality-risk": "next-quality-risk",
+      concordance: "concordance",
+      "quick-insert": "quick-insert",
+      "find-segments": "find-segments",
+      "replace-target": "replace-target",
+      "review-comment": "review-comment"
     };
     return commands.map((entry) => ({
       ...entry,
-      shortcut: shortcuts[entry.id] || "",
+      shortcut: shortcutLabel(shortcutIds[entry.id]),
       disabledReason: entry.enabled ? "" : "Unavailable in the current context."
     }));
   }

@@ -9,6 +9,7 @@ const moduleAt = (relativePath) => import(pathToFileURL(path.join(root, relative
 function fakeElement(tagName = "DIV") {
   const listeners = new Map();
   const classes = new Set();
+  const attributes = new Map();
   const element = {
     tagName,
     children: [],
@@ -17,7 +18,11 @@ function fakeElement(tagName = "DIV") {
     classList: {
       add: (...names) => names.forEach((name) => classes.add(name)),
       remove: (...names) => names.forEach((name) => classes.delete(name)),
-      contains: (name) => classes.has(name)
+      contains: (name) => classes.has(name),
+      toggle(name, force) {
+        if (force === undefined ? !classes.has(name) : force) classes.add(name);
+        else classes.delete(name);
+      }
     },
     addEventListener(type, listener) {
       if (!listeners.has(type)) listeners.set(type, new Set());
@@ -27,7 +32,12 @@ function fakeElement(tagName = "DIV") {
       listeners.get(type)?.delete(listener);
     },
     dispatch(type, event = {}) {
-      listeners.get(type)?.forEach((listener) => listener({ target: element, ...event }));
+      const nextEvent = { target: element, ...event };
+      listeners.get(type)?.forEach((listener) => listener(nextEvent));
+      return nextEvent;
+    },
+    click() {
+      element.dispatch("click");
     },
     append(child) {
       element.children.push(child);
@@ -39,6 +49,15 @@ function fakeElement(tagName = "DIV") {
       if (selector !== "footer") return null;
       element.footer ||= fakeElement("FOOTER");
       return element.footer;
+    },
+    setAttribute(name, value) {
+      attributes.set(name, String(value));
+    },
+    getAttribute(name) {
+      return attributes.get(name) ?? null;
+    },
+    focus() {
+      element.focused = (element.focused || 0) + 1;
     }
   };
   return element;
@@ -190,7 +209,7 @@ test("ConcordanceController preserves editor/project guards and exact empty-keyw
   assert.equal(await empty.controller.open(), undefined);
   assert.deepEqual(
     empty.calls.find(([name]) => name === "status"),
-    ["status", "Select a source word, then press Ctrl+K or Alt+K.", "dirty"]
+    ["status", "Select source or target text, then press Ctrl/Cmd+Shift+K.", "dirty"]
   );
 });
 
@@ -252,6 +271,41 @@ test("ConcordanceController renders the localized safe empty state and opens the
   await harness.controller.open();
   assert.equal(harness.results.html, '<div class="muted">safe:No TM units contain this keyword.</div>');
   assert.equal(harness.overlay.classList.contains("hidden"), false);
+});
+
+test("ConcordanceController supports keyboard result navigation, insertion, cancellation, and focus restoration", async () => {
+  const { createConcordanceController } = await moduleAt("src/features/editor/concordance-controller.js");
+  const returnTarget = fakeElement("TEXTAREA");
+  returnTarget.value = "Alpha";
+  returnTarget.selectionStart = 0;
+  returnTarget.selectionEnd = 5;
+  const harness = createHarness(createConcordanceController, {
+    activeElement: returnTarget,
+    entries: [
+      { id: "one", source: "Alpha one", target: "Bir", sourceLang: "en", targetLang: "tr", tmName: "Main TM" },
+      { id: "two", source: "Alpha two", target: "İki", sourceLang: "en", targetLang: "tr", tmName: "Main TM" }
+    ]
+  });
+  harness.controller.mount();
+  await harness.controller.open();
+  const cards = harness.results.children[0].children;
+  const firstButton = cards[0].footer.children[0];
+  const secondButton = cards[1].footer.children[0];
+  assert.equal(firstButton.getAttribute("aria-selected"), "true");
+
+  harness.overlay.dispatch("keydown", { key: "ArrowDown", preventDefault() {} });
+  assert.equal(secondButton.getAttribute("aria-selected"), "true");
+  harness.overlay.dispatch("keydown", { key: "Enter", preventDefault() {} });
+  assert.deepEqual(
+    harness.calls.find(([name]) => name === "insert"),
+    ["insert", "İki", { channel: "concordance", resourceId: "two" }]
+  );
+  assert.equal(returnTarget.focused, 1);
+
+  await harness.controller.open();
+  harness.overlay.dispatch("keydown", { key: "Escape", preventDefault() {} });
+  assert.equal(harness.overlay.classList.contains("hidden"), true);
+  assert.equal(returnTarget.focused, 2);
 });
 
 test("ConcordanceController propagates repository failure before changing overlay visibility", async () => {

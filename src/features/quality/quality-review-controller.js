@@ -1,3 +1,5 @@
+import { KEYBOARD_SHORTCUTS, matchesShortcut } from "../../app/keyboard-shortcuts.js";
+
 function requireElement(value, name) {
   if (!value?.addEventListener) throw new TypeError(`QualityReviewController requires ${name}.`);
   return value;
@@ -116,6 +118,10 @@ export function createQualityReviewController(options) {
       reviewNote: String(reviewNoteInput.value || "").trim(),
       commentBody: String(reviewCommentInput.value || "").trim()
     };
+  }
+
+  function saveReview() {
+    return runAction("save-review", () => options.saveReview?.(readReview()));
   }
 
   function readProfile() {
@@ -374,7 +380,13 @@ export function createQualityReviewController(options) {
     if (mounted) return false;
     listen(reviewForm, "submit", (event) => {
       event.preventDefault?.();
-      void runAction("save-review", () => options.saveReview?.(readReview()));
+      void saveReview();
+    });
+    listen(reviewCommentInput, "keydown", (event) => {
+      if (!matchesShortcut(event, KEYBOARD_SHORTCUTS.confirm)) return;
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      void saveReview();
     });
     listen(qualityForm, "submit", (event) => {
       event.preventDefault?.();

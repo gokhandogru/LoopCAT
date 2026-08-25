@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, "../..");
 function fakeElement() {
   const listeners = new Map();
   const classes = new Set();
+  const attributes = new Map();
   return {
     value: "",
     selectionStart: 0,
@@ -34,6 +35,12 @@ function fakeElement() {
     setSelectionRange(start, end) {
       this.selectionStart = start;
       this.selectionEnd = end;
+    },
+    setAttribute(name, value) {
+      attributes.set(name, String(value));
+    },
+    getAttribute(name) {
+      return attributes.get(name) ?? null;
     }
   };
 }
@@ -78,7 +85,7 @@ function createSessionHarness() {
   };
 }
 
-function createHarness(createTargetEditController) {
+function createHarness(createTargetEditController, overrides = {}) {
   const segment = { id: "s1", projectId: "p1", target: "before" };
   const textarea = fakeElement();
   textarea.value = segment.target;
@@ -117,7 +124,15 @@ function createHarness(createTargetEditController) {
     getVisibleIndexes: () => [0, 1, 2],
     getVisiblePosition: () => 0,
     undo: () => calls.push(["undo"]),
-    redo: () => calls.push(["redo"])
+    redo: () => calls.push(["redo"]),
+    quickInsert: {
+      hasSuggestions: () => overrides.hasSuggestions !== false,
+      open: () => calls.push(["quickInsert"])
+    },
+    protectedTags: {
+      missing: () => overrides.missingTags || [{ text: "<b>" }, { text: "</b>" }],
+      insert: (tagTexts) => calls.push(["insertTags", tagTexts])
+    }
   });
   return { calls, controller, editingCell, segment, sessions, textarea };
 }
@@ -131,6 +146,8 @@ test("target editor owns focus, composition input, coalescing, blur finalization
     index: 0,
     segmentId: "s1"
   });
+  assert.match(harness.textarea.getAttribute("aria-keyshortcuts"), /Control\+Enter/);
+  assert.match(harness.textarea.getAttribute("title"), /Quick Insert: Tab/);
 
   harness.textarea.dispatch("focus");
   assert.equal(harness.editingCell.classList.contains("editing"), true);
@@ -213,4 +230,52 @@ test("target editor normalizes caret selection and routes Undo, Redo, confirm, a
   harness.textarea.selectionStart = 2;
   harness.textarea.selectionEnd = 4;
   assert.deepEqual(harness.controller.activeSelection(harness.segment), { start: 2, end: 4 });
+});
+
+test("target editor routes contextual Quick Insert and protected-tag shortcuts as atomic actions", async () => {
+  const { createTargetEditController } = await loadFactory();
+  const harness = createHarness(createTargetEditController);
+  const event = (overrides) => ({
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    prevented: false,
+    stopped: false,
+    preventDefault() {
+      this.prevented = true;
+    },
+    stopPropagation() {
+      this.stopped = true;
+    },
+    ...overrides
+  });
+
+  const quickInsertEvent = event({ key: "Tab" });
+  harness.controller.handleKeydown(quickInsertEvent, 0);
+  assert.equal(quickInsertEvent.prevented && quickInsertEvent.stopped, true);
+  assert.ok(harness.calls.some(([name]) => name === "quickInsert"));
+
+  const nextTagEvent = event({ key: "F8" });
+  harness.controller.handleKeydown(nextTagEvent, 0);
+  assert.deepEqual(
+    harness.calls.find(([name]) => name === "insertTags"),
+    ["insertTags", ["<b>"]]
+  );
+
+  const allTagsEvent = event({ ctrlKey: true, key: "F8", shiftKey: true });
+  harness.controller.handleKeydown(allTagsEvent, 0);
+  assert.deepEqual(harness.calls.filter(([name]) => name === "insertTags").at(-1), ["insertTags", ["<b>", "</b>"]]);
+
+  const unavailable = createHarness(createTargetEditController, { hasSuggestions: false, missingTags: [] });
+  const nativeTab = event({ key: "Tab" });
+  unavailable.controller.handleKeydown(nativeTab, 0);
+  assert.equal(nativeTab.prevented, false);
+  const noTag = event({ key: "F8" });
+  unavailable.controller.handleKeydown(noTag, 0);
+  assert.equal(noTag.prevented, false);
+
+  const composing = event({ isComposing: true, key: "Tab" });
+  harness.controller.handleKeydown(composing, 0);
+  assert.equal(harness.calls.filter(([name]) => name === "quickInsert").length, 1);
 });

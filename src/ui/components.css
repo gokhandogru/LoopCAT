@@ -79,6 +79,7 @@
 
 .liquid-glass-edition .menu-panel,
 .liquid-glass-edition .concordance-popover,
+.liquid-glass-edition .quick-insert-popover,
 .liquid-glass-edition .command-palette,
 .liquid-glass-edition dialog {
   border-color: var(--color-line);
@@ -90,11 +91,38 @@
 }
 
 .liquid-glass-edition .concordance-overlay,
+.liquid-glass-edition .quick-insert-overlay,
 .liquid-glass-edition .command-palette-overlay,
 .liquid-glass-edition dialog::backdrop {
   background: var(--color-overlay);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+.liquid-glass-edition .quick-insert-popover > header,
+.liquid-glass-edition .quick-insert-popover > footer {
+  border-color: var(--color-line);
+  background: var(--color-surface-subtle);
+}
+
+.liquid-glass-edition .quick-insert-result {
+  border-color: var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.liquid-glass-edition .quick-insert-result:hover,
+.liquid-glass-edition .quick-insert-result.active {
+  border-color: var(--color-focus);
+  background: var(--color-accent-soft);
+  box-shadow: var(--focus-ring);
+}
+
+.liquid-glass-edition .quick-insert-result > kbd {
+  border-color: var(--color-line);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
 }
 
 .liquid-glass-edition .trash-dialog-card {

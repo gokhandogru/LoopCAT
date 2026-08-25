@@ -174,6 +174,30 @@ test("SegmentNavigationController next-open wraps, resets a hiding status filter
   assert.equal(harness.statusFilter.value, "all");
 });
 
+test("SegmentNavigationController previous-open prefers earlier candidates and wraps backward", async () => {
+  const { createSegmentNavigationController } = await moduleAt("src/features/editor/segment-navigation-controller.js");
+  const earlier = createHarness(createSegmentNavigationController, {
+    activeIndex: 2,
+    openIds: ["s1", "s2"]
+  });
+  await earlier.controller.previousOpen();
+  assert.deepEqual(
+    earlier.calls.find(([name]) => name === "select"),
+    ["select", 1, "s1"]
+  );
+
+  const wrapped = createHarness(createSegmentNavigationController, {
+    activeIndex: 0,
+    openIds: ["s1", "s2"]
+  });
+  await wrapped.controller.previousOpen();
+  assert.deepEqual(
+    wrapped.calls.find(([name]) => name === "select"),
+    ["select", 2, "s2"]
+  );
+  assert.deepEqual(wrapped.calls.at(-1), ["focusTarget"]);
+});
+
 test("SegmentNavigationController next-open is inert for empty and fully confirmed collections", async () => {
   const { createSegmentNavigationController } = await moduleAt("src/features/editor/segment-navigation-controller.js");
   const empty = createHarness(createSegmentNavigationController, { segments: [] });

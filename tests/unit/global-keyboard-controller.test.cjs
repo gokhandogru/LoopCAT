@@ -32,11 +32,17 @@ function keyboardEvent(overrides = {}) {
     altKey: false,
     code: "",
     ctrlKey: false,
+    defaultPrevented: false,
+    getModifierState: () => false,
+    isComposing: false,
     key: "",
     metaKey: false,
     shiftKey: false,
     target: {
-      matches: () => Boolean(overrides.editable)
+      matches: (selector) =>
+        selector === ".segment-grid textarea"
+          ? Boolean(overrides.targetEditor)
+          : Boolean(overrides.editable || overrides.targetEditor)
     },
     preventDefault: () => effects.push("preventDefault"),
     stopPropagation: () => effects.push("stopPropagation"),
@@ -50,6 +56,7 @@ function createHarness(createGlobalKeyboardController, overrides = {}) {
   const target = fakeTarget(calls);
   let concordanceOpen = Boolean(overrides.concordanceOpen);
   let paletteOpen = Boolean(overrides.paletteOpen);
+  let quickInsertOpen = Boolean(overrides.quickInsertOpen);
   let focusActive = Boolean(overrides.focusActive);
   const commandResult = overrides.commandResult || { pending: true };
   const options = {
@@ -122,6 +129,13 @@ function createHarness(createGlobalKeyboardController, overrides = {}) {
         concordanceOpen = false;
       }
     },
+    quickInsert: {
+      isOpen: () => quickInsertOpen,
+      close: () => {
+        calls.push(["quickInsertClose"]);
+        quickInsertOpen = false;
+      }
+    },
     focus: {
       isActive: () => {
         calls.push(["focusIsActive"]);
@@ -135,7 +149,21 @@ function createHarness(createGlobalKeyboardController, overrides = {}) {
         calls.push(["focusDisable"]);
         focusActive = false;
       }
-    }
+    },
+    editor: Object.fromEntries(
+      [
+        "focusSearch",
+        "openReplace",
+        "openReviewComment",
+        "copySource",
+        "nextOpen",
+        "previousOpen",
+        "nextQualityRisk",
+        "runQa",
+        "splitSegment",
+        "mergeSegment"
+      ].map((name) => [name, () => calls.push([name])])
+    )
   };
   if (overrides.invalidBoundary === "target") options.target = {};
   if (overrides.invalidBoundary === "commands") options.commands.undo = null;
@@ -146,7 +174,7 @@ function createHarness(createGlobalKeyboardController, overrides = {}) {
   return {
     calls,
     controller: createGlobalKeyboardController(options),
-    getState: () => ({ concordanceOpen, focusActive, paletteOpen }),
+    getState: () => ({ concordanceOpen, focusActive, paletteOpen, quickInsertOpen }),
     target
   };
 }
@@ -215,7 +243,7 @@ test("palette shortcuts preserve modifier overlap, KeyK fallback, optional start
   for (const event of [
     keyboardEvent({ ctrlKey: true, key: "P", shiftKey: true }),
     keyboardEvent({ key: "k", metaKey: true }),
-    keyboardEvent({ code: "KeyK", ctrlKey: true, key: "Unidentified", shiftKey: true })
+    keyboardEvent({ code: "KeyK", ctrlKey: true, key: "Unidentified" })
   ]) {
     const harness = createHarness(createGlobalKeyboardController);
     harness.controller.handleKeydown(event);
@@ -230,7 +258,7 @@ test("palette shortcuts preserve modifier overlap, KeyK fallback, optional start
   const optional = createHarness(createGlobalKeyboardController, { noPalette: true });
   const optionalEvent = keyboardEvent({ ctrlKey: true, key: "k" });
   optional.controller.handleKeydown(optionalEvent);
-  assert.deepEqual(optionalEvent.effects, ["preventDefault", "stopPropagation"]);
+  assert.deepEqual(optionalEvent.effects, []);
 
   const paletteOpenError = new Error("palette unavailable");
   const failing = createHarness(createGlobalKeyboardController, { paletteOpenError });
@@ -283,8 +311,20 @@ test("concordance shortcut preserves editor qualification, Alt priority, KeyK fa
   assert.deepEqual(failingEvent.effects, ["preventDefault", "stopPropagation"]);
 });
 
-test("Escape preserves concordance, palette, and Focus-mode priority without stopping propagation", async () => {
+test("Escape preserves Quick Insert, concordance, palette, and Focus-mode priority without stopping propagation", async () => {
   const { createGlobalKeyboardController } = await loadFactory();
+  const quickInsert = createHarness(createGlobalKeyboardController, {
+    concordanceOpen: true,
+    focusActive: true,
+    paletteOpen: true,
+    quickInsertOpen: true
+  });
+  const quickInsertEvent = keyboardEvent({ key: "Escape" });
+  quickInsert.controller.handleKeydown(quickInsertEvent);
+  assert.deepEqual(quickInsertEvent.effects, ["preventDefault"]);
+  assert.equal(quickInsert.getState().quickInsertOpen, false);
+  assert.equal(quickInsert.getState().concordanceOpen, true);
+
   const concordance = createHarness(createGlobalKeyboardController, {
     concordanceOpen: true,
     focusActive: true,
@@ -293,7 +333,12 @@ test("Escape preserves concordance, palette, and Focus-mode priority without sto
   const concordanceEvent = keyboardEvent({ key: "Escape" });
   concordance.controller.handleKeydown(concordanceEvent);
   assert.deepEqual(concordanceEvent.effects, ["preventDefault"]);
-  assert.deepEqual(concordance.getState(), { concordanceOpen: false, focusActive: true, paletteOpen: true });
+  assert.deepEqual(concordance.getState(), {
+    concordanceOpen: false,
+    focusActive: true,
+    paletteOpen: true,
+    quickInsertOpen: false
+  });
   assert.equal(
     concordance.calls.some(([name]) => name === "paletteClose"),
     false
@@ -303,7 +348,12 @@ test("Escape preserves concordance, palette, and Focus-mode priority without sto
   const paletteEvent = keyboardEvent({ key: "Escape" });
   palette.controller.handleKeydown(paletteEvent);
   assert.deepEqual(paletteEvent.effects, ["preventDefault"]);
-  assert.deepEqual(palette.getState(), { concordanceOpen: false, focusActive: true, paletteOpen: false });
+  assert.deepEqual(palette.getState(), {
+    concordanceOpen: false,
+    focusActive: true,
+    paletteOpen: false,
+    quickInsertOpen: false
+  });
 
   const focus = createHarness(createGlobalKeyboardController, { focusActive: true });
   const focusEvent = keyboardEvent({ key: "Escape" });
@@ -316,4 +366,58 @@ test("Escape preserves concordance, palette, and Focus-mode priority without sto
   wrongCase.controller.handleKeydown(wrongCaseEvent);
   assert.deepEqual(wrongCaseEvent.effects, []);
   assert.equal(wrongCase.getState().focusActive, true);
+});
+
+test("global editor shortcuts route exact actions and preserve unrelated editable fields", async () => {
+  const { createGlobalKeyboardController } = await loadFactory();
+  const cases = [
+    [keyboardEvent({ ctrlKey: true, key: "f" }), "focusSearch"],
+    [keyboardEvent({ ctrlKey: true, key: "h" }), "openReplace"],
+    [keyboardEvent({ ctrlKey: true, key: "m", shiftKey: true }), "openReviewComment"],
+    [keyboardEvent({ ctrlKey: true, key: "s", shiftKey: true }), "copySource"],
+    [keyboardEvent({ altKey: true, key: "Enter" }), "nextOpen"],
+    [keyboardEvent({ altKey: true, key: "Enter", shiftKey: true }), "previousOpen"],
+    [keyboardEvent({ key: "F9" }), "nextQualityRisk"],
+    [keyboardEvent({ key: "F9", shiftKey: true }), "runQa"],
+    [keyboardEvent({ ctrlKey: true, key: "e" }), "splitSegment"],
+    [keyboardEvent({ ctrlKey: true, key: "j" }), "mergeSegment"]
+  ];
+  for (const [event, action] of cases) {
+    const harness = createHarness(createGlobalKeyboardController);
+    harness.controller.handleKeydown(event);
+    assert.deepEqual(event.effects, ["preventDefault", "stopPropagation"], action);
+    assert.equal(harness.calls.filter(([name]) => name === action).length, 1, action);
+  }
+
+  for (const event of [
+    keyboardEvent({ ctrlKey: true, editable: true, key: "s", shiftKey: true }),
+    keyboardEvent({ altKey: true, editable: true, key: "Enter" }),
+    keyboardEvent({ ctrlKey: true, editable: true, key: "e" })
+  ]) {
+    const harness = createHarness(createGlobalKeyboardController);
+    harness.controller.handleKeydown(event);
+    assert.deepEqual(event.effects, []);
+  }
+
+  const targetEditor = createHarness(createGlobalKeyboardController);
+  const targetEvent = keyboardEvent({ ctrlKey: true, key: "s", shiftKey: true, targetEditor: true });
+  targetEditor.controller.handleKeydown(targetEvent);
+  assert.deepEqual(targetEvent.effects, ["preventDefault", "stopPropagation"]);
+  assert.ok(targetEditor.calls.some(([name]) => name === "copySource"));
+});
+
+test("IME composition and AltGraph prevent application shortcut routing", async () => {
+  const { createGlobalKeyboardController } = await loadFactory();
+  for (const event of [
+    keyboardEvent({ ctrlKey: true, isComposing: true, key: "k" }),
+    keyboardEvent({ ctrlKey: true, key: "k", getModifierState: (name) => name === "AltGraph" })
+  ]) {
+    const harness = createHarness(createGlobalKeyboardController);
+    harness.controller.handleKeydown(event);
+    assert.deepEqual(event.effects, []);
+    assert.equal(
+      harness.calls.some(([name]) => name === "paletteOpen"),
+      false
+    );
+  }
 });

@@ -45,6 +45,7 @@ import {
   createCopySourceToTargetCommand,
   createEditTargetCommand,
   createInsertProtectedTagCommand,
+  createInsertTermTargetCommand,
   createInsertTmTargetCommand,
   createMergeSegmentCommand,
   createReplaceTargetsCommand,
@@ -104,6 +105,7 @@ import { createTmMatchesController } from "../features/editor/tm-matches-control
 import { createTermSuggestionsController } from "../features/editor/term-suggestions-controller.js";
 import { createTermFormController } from "../features/editor/term-form-controller.js";
 import { createConcordanceController } from "../features/editor/concordance-controller.js";
+import { createQuickInsertController } from "../features/editor/quick-insert-controller.js";
 import { createSegmentNavigationController } from "../features/editor/segment-navigation-controller.js";
 import { createSegmentDraftApplicationService } from "../features/editor/segment-draft-application-service.js";
 import { createTargetReplacementController } from "../features/editor/target-replacement-controller.js";
@@ -259,6 +261,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createCopySourceToTargetCommand,
       createEditTargetCommand,
       createInsertProtectedTagCommand,
+      createInsertTermTargetCommand,
       createInsertTmTargetCommand,
       createMergeSegmentCommand,
       createReplaceTargetsCommand,
@@ -419,6 +422,7 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createTermSuggestionsController,
       createTermFormController,
       createConcordanceController,
+      createQuickInsertController,
       createApplicationActiveSegmentService,
       createApplicationAggregatePresentationController,
       createApplicationCommandCatalogService,

@@ -111,6 +111,14 @@ function createHarness(createTermSuggestionsController, overrides = {}) {
         return overrides.deletionPromise || deletionResult;
       }
     },
+    target: overrides.withTarget
+      ? {
+          insert(...args) {
+            calls.push(["insertTerm", ...args]);
+            return overrides.insertResult;
+          }
+        }
+      : undefined,
     dom: {
       createElement(tagName) {
         calls.push(["createElement", tagName]);
@@ -288,6 +296,28 @@ test("TermSuggestionsController preserves ordered approved and forbidden safe ca
     ]
   );
   assert.equal(harness.calls.filter(([name]) => name === "replaceChildren").length, 1);
+  assert.deepEqual(harness.controller.getResults(), suggestions);
+});
+
+test("TermSuggestionsController offers insertion only for approved terms", async () => {
+  const { createTermSuggestionsController } = await loadFactory();
+  const approved = { id: "t1", sourceTerm: "Open", targetTerm: "Aç" };
+  const forbidden = { id: "t2", sourceTerm: "Never", targetTerm: "Asla", isForbidden: true };
+  const harness = createHarness(createTermSuggestionsController, {
+    suggestions: [approved, forbidden],
+    withTarget: true
+  });
+  await harness.controller.refresh();
+
+  assert.deepEqual(
+    harness.cards().map((card) => card.children.map((button) => button.textContent)),
+    [["S:Insert", "S:Delete"], ["S:Delete"]]
+  );
+  assert.equal(harness.cards()[0].children[0].listeners.get("click")(), undefined);
+  assert.deepEqual(
+    harness.calls.find(([name]) => name === "insertTerm"),
+    ["insertTerm", "Aç", { resourceId: "t1", sourceTerm: "Open" }]
+  );
 });
 
 test("TermSuggestionsController preserves awaited deletion identity, options, undefined fulfillment, and rejection", async () => {

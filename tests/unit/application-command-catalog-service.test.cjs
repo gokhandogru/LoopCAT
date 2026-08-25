@@ -12,6 +12,7 @@ function loadFactory() {
 const ACTION_NAMES = [
   "confirm",
   "nextOpen",
+  "previousOpen",
   "toggleFocus",
   "copySource",
   "saveToTm",
@@ -20,7 +21,10 @@ const ACTION_NAMES = [
   "exportQualityPassport",
   "nextQualityRisk",
   "openConcordance",
+  "openQuickInsert",
+  "focusSearch",
   "openReplace",
+  "openReviewComment",
   "applyFilterPreset",
   "exportProjectReport",
   "exportAnonymizedReport",
@@ -62,7 +66,8 @@ function createHarness(createApplicationCommandCatalogService, overrides = {}) {
     canRedo: overrides.canRedo ?? true,
     canSplit: overrides.canSplit ?? true,
     canMerge: overrides.canMerge ?? true,
-    nextSegment: overrides.nextSegment || { id: "segment-2" }
+    nextSegment: overrides.nextSegment || { id: "segment-2" },
+    quickInsertAvailable: overrides.quickInsertAvailable ?? true
   };
   const action =
     (name) =>
@@ -152,7 +157,7 @@ function createHarness(createApplicationCommandCatalogService, overrides = {}) {
     history: dependencies.history,
     trash: dependencies.trash,
     confirmation: { confirm: actions.confirm },
-    navigation: { nextOpen: actions.nextOpen },
+    navigation: { nextOpen: actions.nextOpen, previousOpen: actions.previousOpen },
     focus: { toggle: actions.toggleFocus },
     targetProducer: { copySourceToTarget: actions.copySource },
     structural: dependencies.structural,
@@ -166,7 +171,10 @@ function createHarness(createApplicationCommandCatalogService, overrides = {}) {
     },
     quality: { nextRisk: actions.nextQualityRisk },
     concordance: { open: actions.openConcordance },
+    quickInsert: { open: actions.openQuickInsert, hasSuggestions: () => model.quickInsertAvailable },
+    search: { focus: actions.focusSearch },
     replacement: { open: actions.openReplace },
+    review: { openComment: actions.openReviewComment },
     filterPreset: { apply: actions.applyFilterPreset },
     aiPretranslation: { pretranslate: actions.aiPretranslate },
     aiReview: { reviewActive: actions.aiReviewActive, reviewBatch: actions.aiReviewBatch },
@@ -204,6 +212,7 @@ const EXPECTED_METADATA = [
   ["trash", "Open Trash", "", undefined],
   ["confirm", "Confirm segment", "", undefined],
   ["next-open", "Next open segment", "", undefined],
+  ["previous-open", "Previous open segment", "", undefined],
   ["focus-mode", "Enter Focus view", "", undefined],
   ["copy-source", "Copy source", "", undefined],
   ["split-segment", "Split segment", "Segment", ["divide", "cursor", "structure"]],
@@ -214,7 +223,10 @@ const EXPECTED_METADATA = [
   ["quality-passport", "Export Quality Passport", "", undefined],
   ["next-quality-risk", "Next quality risk", "", undefined],
   ["concordance", "Open concordance", "", undefined],
+  ["quick-insert", "Open Quick Insert suggestions", "", ["TM", "termbase", "term", "AI", "suggestions"]],
+  ["find-segments", "Find in source or target", "", undefined],
   ["replace-target", "Find and replace target text", "", undefined],
+  ["review-comment", "Add review comment", "", undefined],
   ["preset-translate", "Use Translate filter preset", "Filters", ["open", "segments", "matches"]],
   ["preset-review", "Use Review filter preset", "Filters", ["needs review", "comments"]],
   ["preset-qa-fixes", "Use QA fixes filter preset", "Filters", ["quality", "blocked", "fixes"]],
@@ -240,11 +252,11 @@ const EXPECTED_METADATA = [
   ["openai-ai", "Create OpenAI suggestion", "", undefined]
 ];
 
-test("ApplicationCommandCatalogService preserves all 39 command records in exact order", async () => {
+test("ApplicationCommandCatalogService preserves all 43 command records in exact order", async () => {
   const { createApplicationCommandCatalogService } = await loadFactory();
   const { service } = createHarness(createApplicationCommandCatalogService);
   const commands = service.list();
-  assert.equal(commands.length, 39);
+  assert.equal(commands.length, 43);
   assert.deepEqual(
     commands.map(({ id, label, group = "", keywords }) => [id, label, group, keywords]),
     EXPECTED_METADATA
@@ -254,8 +266,20 @@ test("ApplicationCommandCatalogService preserves all 39 command records in exact
     {
       undo: "Ctrl/Cmd+Z",
       redo: "Ctrl/Cmd+Shift+Z",
+      confirm: "Ctrl/Cmd+Enter",
+      "next-open": "Alt+Enter",
+      "previous-open": "Alt+Shift+Enter",
       "focus-mode": "Ctrl/Cmd+Shift+F",
-      concordance: "Ctrl/Cmd+Alt+K"
+      "copy-source": "Ctrl/Cmd+Shift+S",
+      "split-segment": "Ctrl/Cmd+E",
+      "merge-segments": "Ctrl/Cmd+J",
+      qa: "Shift+F9",
+      "next-quality-risk": "F9",
+      concordance: "Ctrl/Cmd+Shift+K",
+      "quick-insert": "Tab",
+      "find-segments": "Ctrl/Cmd+F",
+      "replace-target": "Ctrl/Cmd+H",
+      "review-comment": "Ctrl/Cmd+Shift+M"
     }
   );
   assert.equal(
@@ -274,6 +298,7 @@ test("ApplicationCommandCatalogService preserves direct action identities and wr
     trash: dependencies.trash.open,
     confirm: actions.confirm,
     "next-open": actions.nextOpen,
+    "previous-open": actions.previousOpen,
     "focus-mode": actions.toggleFocus,
     "copy-source": actions.copySource,
     "split-segment": dependencies.structural.split,
@@ -283,7 +308,10 @@ test("ApplicationCommandCatalogService preserves direct action identities and wr
     "quality-passport": actions.exportQualityPassport,
     "next-quality-risk": actions.nextQualityRisk,
     concordance: actions.openConcordance,
+    "quick-insert": actions.openQuickInsert,
+    "find-segments": actions.focusSearch,
     "replace-target": actions.openReplace,
+    "review-comment": actions.openReviewComment,
     "project-report": actions.exportProjectReport,
     "anonymized-report": actions.exportAnonymizedReport,
     "local-ai-pretranslate": actions.aiPretranslate,
@@ -353,7 +381,7 @@ test("ApplicationCommandCatalogService preserves repeated active-segment structu
   const { createApplicationCommandCatalogService } = await loadFactory();
   const active = createHarness(createApplicationCommandCatalogService);
   active.service.list();
-  assert.equal(active.calls.filter(([name]) => name === "getActiveSegment").length, 16);
+  assert.equal(active.calls.filter(([name]) => name === "getActiveSegment").length, 18);
   assert.deepEqual(
     active.calls.find(([name]) => name === "canSplit"),
     ["canSplit", active.model.activeSegment]
@@ -369,7 +397,7 @@ test("ApplicationCommandCatalogService preserves repeated active-segment structu
 
   const absent = createHarness(createApplicationCommandCatalogService, { activeSegment: null });
   const commands = absent.service.list();
-  assert.equal(absent.calls.filter(([name]) => name === "getActiveSegment").length, 13);
+  assert.equal(absent.calls.filter(([name]) => name === "getActiveSegment").length, 15);
   assert.equal(
     absent.calls.some(([name]) => name === "canSplit"),
     false
@@ -417,12 +445,16 @@ test("ApplicationCommandCatalogService returns fresh records while retaining dir
   assert.notEqual(first, second);
   assert.notEqual(first[0], second[0]);
   assert.equal(first[0].run, second[0].run);
-  assert.notEqual(first[7].keywords, second[7].keywords);
-  assert.notEqual(first[10].run, second[10].run);
+  const firstSplit = first.find((entry) => entry.id === "split-segment");
+  const secondSplit = second.find((entry) => entry.id === "split-segment");
+  const firstSettings = first.find((entry) => entry.id === "project-settings");
+  const secondSettings = second.find((entry) => entry.id === "project-settings");
+  assert.notEqual(firstSplit.keywords, secondSplit.keywords);
+  assert.notEqual(firstSettings.run, secondSettings.run);
   first[0].label = "changed";
-  first[7].keywords.push("changed");
+  firstSplit.keywords.push("changed");
   assert.equal(second[0].label, "Undo last action");
-  assert.deepEqual(second[7].keywords, ["divide", "cursor", "structure"]);
+  assert.deepEqual(secondSplit.keywords, ["divide", "cursor", "structure"]);
 });
 
 test("ApplicationCommandCatalogService preserves lookup and capability failure timing", async () => {

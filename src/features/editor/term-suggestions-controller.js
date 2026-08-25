@@ -14,6 +14,7 @@
  *   text: { escapeHtml: (value: unknown) => string },
  *   safeHtml: { replace: (element: any, html: string) => unknown },
  *   mutation: { deleteTerm: (term: any, options: object) => Promise<unknown> | unknown },
+ *   target?: { insert: (target: string, options?: object) => Promise<unknown> | unknown },
  *   dom: { createElement: (tagName: string) => any, createFragment: () => any }
  * }} options
  */
@@ -25,6 +26,7 @@ export function createTermSuggestionsController(options) {
   const text = options?.text;
   const safeHtml = options?.safeHtml;
   const mutation = options?.mutation;
+  const target = options?.target;
   const dom = options?.dom;
   if (
     !root?.classList ||
@@ -50,9 +52,14 @@ export function createTermSuggestionsController(options) {
     throw new TypeError("TermSuggestionsController requires browser DOM boundaries.");
   }
 
+  let currentResults = [];
+  let resultContext = Object.freeze({ projectId: "", segmentId: "" });
+
   async function refresh() {
     const segment = session.getActiveSegment();
     if (!segment || !session.getProject()) {
+      currentResults = [];
+      resultContext = Object.freeze({ projectId: "", segmentId: "" });
       root.textContent = localization.source("No active segment.");
       root.classList.add("muted");
       return;
@@ -66,6 +73,8 @@ export function createTermSuggestionsController(options) {
       termBaseNames: terms.getNames()
     });
     if (session.getProject()?.id !== projectId || session.getActiveSegment()?.id !== segmentId) return;
+    currentResults = suggestions.slice();
+    resultContext = Object.freeze({ projectId, segmentId });
     root.classList.toggle("muted", !suggestions.length);
     if (!suggestions.length) {
       root.textContent = localization.source("No terms found in this segment.");
@@ -80,6 +89,18 @@ export function createTermSuggestionsController(options) {
         `<header><strong>${text.escapeHtml(term.sourceTerm)}</strong><span>${text.escapeHtml(term.targetTerm)}</span><span>${localization.labelHtml(term.isForbidden ? "forbidden" : "approved")}</span><span>${text.escapeHtml(term.termBaseName || "")}</span></header>
       ${term.notes ? `<p>${text.escapeHtml(term.notes)}</p>` : ""}`
       );
+      if (!term.isForbidden && typeof target?.insert === "function") {
+        const insertButton = dom.createElement("button");
+        insertButton.type = "button";
+        insertButton.textContent = localization.source("Insert");
+        insertButton.addEventListener("click", () =>
+          target.insert(term.targetTerm, {
+            resourceId: term.id || "",
+            sourceTerm: term.sourceTerm || ""
+          })
+        );
+        card.append(insertButton);
+      }
       const button = dom.createElement("button");
       button.textContent = localization.source("Delete");
       button.addEventListener("click", async () => {
@@ -94,5 +115,12 @@ export function createTermSuggestionsController(options) {
     root.replaceChildren(fragment);
   }
 
-  return Object.freeze({ refresh });
+  function getResults() {
+    const project = session.getProject();
+    const segment = session.getActiveSegment();
+    if (project?.id !== resultContext.projectId || segment?.id !== resultContext.segmentId) return [];
+    return currentResults.slice();
+  }
+
+  return Object.freeze({ getResults, refresh });
 }

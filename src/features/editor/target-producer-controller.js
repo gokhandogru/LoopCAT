@@ -7,7 +7,7 @@
  * @param {{
  *   copySourceElement: any,
  *   editorSessionStore: { getProject: () => any, getSegments: () => any[] },
- *   commands: { bus: { execute: (command: any) => Promise<any> }, createCopySource: (options: object) => any, createTmTarget: (options: object) => any, createProtectedTag: (options: object) => any, changed: () => void },
+ *   commands: { bus: { execute: (command: any) => Promise<any> }, createCopySource: (options: object) => any, createTmTarget: (options: object) => any, createTermTarget: (options: object) => any, createProtectedTag: (options: object) => any, changed: () => void },
  *   editLifecycle: { finalize: (segmentId: string) => unknown },
  *   persistence: { clearPending: (segment: any, options?: object) => unknown, debounce: (segment: any) => unknown },
  *   selection: { getActiveIndex: () => number, active: (segment: any) => { start: number, end: number } | null, normalize: (selection: any, targetLength: number) => { start: number, end: number } | null, focus: (selection?: { start: number, end: number } | null) => unknown },
@@ -32,6 +32,8 @@ export function createTargetProducerController(options) {
   const view = options?.view;
   const workspace = options?.workspace;
   const status = options?.status;
+  const createTermTarget =
+    typeof commands?.createTermTarget === "function" ? commands.createTermTarget : commands?.createTmTarget;
   if (!copySourceElement?.addEventListener || !copySourceElement?.removeEventListener) {
     throw new TypeError("TargetProducerController requires the Copy Source button.");
   }
@@ -181,20 +183,52 @@ export function createTargetProducerController(options) {
     });
   }
 
-  function insertProtectedTag(tagText) {
+  function insertTermTarget(targetTerm, insertOptions = {}) {
     const segment = currentSegment();
-    if (!segment) return Promise.resolve(null);
+    if (!segment || !String(targetTerm || "")) return Promise.resolve(null);
+    const current = String(segment.target || "");
+    const selected = selection.active(segment) || { start: current.length, end: current.length };
+    const term = String(targetTerm);
+    const nextTarget = `${current.slice(0, selected.start)}${term}${current.slice(selected.end)}`;
+    const nextPosition = selected.start + term.length;
+    return run({
+      createCommand: createTermTarget,
+      target: nextTarget,
+      reason: "insert-term",
+      provenance: {
+        origin: "termbase",
+        ...(insertOptions.resourceId ? { resourceId: String(insertOptions.resourceId) } : {}),
+        ...(insertOptions.sourceTerm ? { sourceTerm: String(insertOptions.sourceTerm) } : {})
+      },
+      targetSelection: { start: nextPosition, end: nextPosition },
+      successMessage: "Term inserted"
+    });
+  }
+
+  function insertProtectedTag(tagText) {
+    return insertProtectedTags([tagText]);
+  }
+
+  function insertProtectedTags(tagTexts) {
+    const segment = currentSegment();
+    const tags = (Array.isArray(tagTexts) ? tagTexts : [tagTexts]).map(String).filter(Boolean);
+    if (!segment || !tags.length) return Promise.resolve(null);
     const current = segment.target || "";
     const selected = selection.active(segment) || { start: current.length, end: current.length };
-    const nextTarget = `${current.slice(0, selected.start)}${tagText}${current.slice(selected.end)}`;
-    const nextPosition = selected.start + String(tagText || "").length;
+    const inserted = tags.join("");
+    const nextTarget = `${current.slice(0, selected.start)}${inserted}${current.slice(selected.end)}`;
+    const nextPosition = selected.start + inserted.length;
     return run({
       createCommand: commands.createProtectedTag,
       target: nextTarget,
-      reason: "insert-tag",
-      provenance: { origin: "user", producer: "protected-tag" },
+      reason: tags.length === 1 ? "insert-tag" : "insert-tags",
+      provenance: {
+        origin: "user",
+        producer: "protected-tag",
+        ...(tags.length > 1 ? { count: tags.length } : {})
+      },
       targetSelection: { start: nextPosition, end: nextPosition },
-      successMessage: "Protected tag inserted"
+      successMessage: tags.length === 1 ? "Protected tag inserted" : `${tags.length} protected tags inserted`
     });
   }
 
@@ -217,6 +251,8 @@ export function createTargetProducerController(options) {
   return Object.freeze({
     copySourceToTarget,
     insertProtectedTag,
+    insertProtectedTags,
+    insertTermTarget,
     insertTmTarget,
     mount,
     unmount

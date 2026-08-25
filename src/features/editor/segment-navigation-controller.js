@@ -78,12 +78,18 @@ export function createSegmentNavigationController(options) {
     await context.refresh();
   }
 
-  async function nextOpen() {
+  async function moveOpen(direction = 1) {
     if (!session.getSegments().length) return;
-    const start = Math.max(navigation.getActiveIndex() + 1, 0);
-    const afterCurrent = session.getSegments().findIndex((segment, index) => index >= start && filters.isOpen(segment));
-    const beforeCurrent = session.getSegments().findIndex((segment, index) => index < start && filters.isOpen(segment));
-    const next = afterCurrent !== -1 ? afterCurrent : beforeCurrent;
+    const activeIndex = navigation.getActiveIndex();
+    const openIndexes = session
+      .getSegments()
+      .map((segment, index) => ({ segment, index }))
+      .filter(({ segment }) => filters.isOpen(segment))
+      .map(({ index }) => index);
+    const next =
+      direction < 0
+        ? ([...openIndexes].reverse().find((index) => index < activeIndex) ?? openIndexes.at(-1) ?? -1)
+        : (openIndexes.find((index) => index > activeIndex) ?? openIndexes[0] ?? -1);
     if (next === -1) return;
     await select(next);
     if (!filters.matches(session.getSegments()[next])) {
@@ -94,5 +100,13 @@ export function createSegmentNavigationController(options) {
     focus.target();
   }
 
-  return Object.freeze({ ensureVisible, nextOpen, select });
+  function nextOpen() {
+    return moveOpen(1);
+  }
+
+  function previousOpen() {
+    return moveOpen(-1);
+  }
+
+  return Object.freeze({ ensureVisible, nextOpen, previousOpen, select });
 }

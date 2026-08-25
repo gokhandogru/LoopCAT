@@ -982,6 +982,7 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .concordance-overlay,
+.liquid-glass-edition .quick-insert-overlay,
 .liquid-glass-edition .command-palette-overlay {
   background: rgba(43, 51, 66, 0.24);
   backdrop-filter: blur(12px);
@@ -989,6 +990,7 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .concordance-popover,
+.liquid-glass-edition .quick-insert-popover,
 .liquid-glass-edition .command-palette {
   border: 1px solid rgba(255, 255, 255, 0.88);
   border-radius: 22px;
@@ -999,7 +1001,8 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .command-results button,
-.liquid-glass-edition .concordance-results article {
+.liquid-glass-edition .concordance-results article,
+.liquid-glass-edition .quick-insert-result {
   border-radius: 12px;
 }
 
@@ -1274,6 +1277,7 @@ body.liquid-glass-edition {
   .liquid-glass-edition .sidebar,
   .liquid-glass-edition .menu-panel,
   .liquid-glass-edition .concordance-popover,
+  .liquid-glass-edition .quick-insert-popover,
   .liquid-glass-edition .command-palette,
   .liquid-glass-edition dialog,
   .liquid-glass-edition #projectForm > .dialog-actions {
@@ -1283,6 +1287,7 @@ body.liquid-glass-edition {
   }
 
   .liquid-glass-edition .concordance-overlay,
+  .liquid-glass-edition .quick-insert-overlay,
   .liquid-glass-edition .command-palette-overlay,
   .liquid-glass-edition dialog::backdrop {
     backdrop-filter: none;

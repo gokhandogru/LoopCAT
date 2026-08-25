@@ -165,6 +165,15 @@ export function createInsertTmTargetCommand(options) {
   });
 }
 
+export function createInsertTermTargetCommand(options) {
+  return createTargetProducerCommand({
+    ...options,
+    id: "insert-term-target",
+    label: "Insert termbase target",
+    undoLabel: "Undo term insertion"
+  });
+}
+
 export function createInsertProtectedTagCommand(options) {
   return createTargetProducerCommand({
     ...options,

@@ -74,6 +74,7 @@ function createHarness(createTargetProducerController, overrides = {}) {
       },
       createCopySource: commandFactory("copy-source-to-target"),
       createTmTarget: commandFactory("insert-tm-target"),
+      createTermTarget: commandFactory("insert-term-target"),
       createProtectedTag: commandFactory("insert-protected-tag"),
       changed: () => calls.push(["commandsChanged"])
     },
@@ -235,6 +236,28 @@ test("TM match and concordance producers preserve distinct provenance and defaul
   assert.deepEqual(harness.statuses.at(-1), ["Concordance target inserted; Undo is available", "dirty"]);
 });
 
+test("approved-term producer inserts at the target selection with termbase provenance", async () => {
+  const { createTargetProducerController } = await loadFactory();
+  const harness = createHarness(createTargetProducerController, {
+    activeSelection: { start: 1, end: 3 }
+  });
+
+  const result = await harness.controller.insertTermTarget("Term", {
+    resourceId: "term-7",
+    sourceTerm: "Source term"
+  });
+
+  assert.equal(result.receipt.commandId, "insert-term-target");
+  assert.equal(harness.segment.target, "DTermft");
+  assert.deepEqual(harness.created["insert-term-target"].provenance, {
+    origin: "termbase",
+    resourceId: "term-7",
+    sourceTerm: "Source term"
+  });
+  assert.deepEqual(result.applied.selection, { start: 5, end: 5 });
+  assert.deepEqual(harness.statuses.at(-1), ["Term inserted; Undo is available", "dirty"]);
+});
+
 test("protected-tag producer replaces the active range and restores a collapsed post-insert caret", async () => {
   const { createTargetProducerController } = await loadFactory();
   const harness = createHarness(createTargetProducerController, {
@@ -256,6 +279,23 @@ test("protected-tag producer replaces the active range and restores a collapsed 
         name === "applyTarget" && target === "D<b>ft" && status === "draft" && reason === "insert-tag"
     )
   );
+});
+
+test("protected-tag producer inserts all requested tags through one reversible command", async () => {
+  const { createTargetProducerController } = await loadFactory();
+  const harness = createHarness(createTargetProducerController, {
+    activeSelection: { start: 5, end: 5 }
+  });
+
+  const result = await harness.controller.insertProtectedTags(["<b>", "</b>"]);
+
+  assert.equal(harness.segment.target, "Draft<b></b>");
+  assert.deepEqual(harness.created["insert-protected-tag"].provenance, {
+    origin: "user",
+    producer: "protected-tag",
+    count: 2
+  });
+  assert.deepEqual(result.applied.selection, { start: 12, end: 12 });
 });
 
 test("filter membership changes preserve scroll while producer failure restores the exact target patch and caret", async () => {

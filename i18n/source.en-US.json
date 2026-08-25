@@ -205,7 +205,8 @@
         "app.js:2552",
         "app.js:2597",
         "app.js:2647",
-        "app.js:2699"
+        "app.js:2699",
+        "src/app/application-offline-shell-controller.js:146"
       ]
     },
     "auto.activityevents.043a4fa3": {
@@ -264,7 +265,9 @@
         "app.js:12284",
         "app.js:12305",
         "app.js:12370",
-        "app.js:12377"
+        "app.js:12377",
+        "src/features/import-export/project-export-controller.js:152",
+        "src/features/workspace/workspace-package-save-controller.js:136"
       ]
     },
     "auto.adapt.active.draft.with.ai.ed3ca584": {
@@ -1222,7 +1225,9 @@
         "app.js:12952",
         "app.js:13017",
         "app.js:13024",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:167",
+        "src/reports/report-document-composition-service.js:336"
       ]
     },
     "auto.ai.draft.adaptation.canceled.04249a69": {
@@ -1392,7 +1397,11 @@
         "app.js:2826",
         "app.js:2876",
         "app.js:2928",
-        "index.html"
+        "index.html",
+        "src/features/editor/segment-provenance-service.js:26",
+        "src/features/projects/project-analysis-controller.js:93",
+        "src/reports/report-document-composition-service.js:178",
+        "src/reports/report-document-composition-service.js:393"
       ]
     },
     "auto.ai.initiated.pretranslation.segment.aipret.1bfa813d": {
@@ -1898,7 +1907,9 @@
         "app.js:13001",
         "app.js:13066",
         "app.js:13073",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:181",
+        "src/reports/report-document-composition-service.js:394"
       ]
     },
     "auto.ai.review.risk.levels.93ac0320": {
@@ -1928,7 +1939,8 @@
         "app.js:12807",
         "app.js:12829",
         "app.js:12894",
-        "app.js:12901"
+        "app.js:12901",
+        "src/reports/report-document-composition-service.js:184"
       ]
     },
     "auto.ai.settings.save.failed.72a0165c": {
@@ -2157,7 +2169,8 @@
         "app.js:12825",
         "app.js:12890",
         "app.js:12897",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:180"
       ]
     },
     "auto.ai.tag.repair.canceled.633c6711": {
@@ -2541,7 +2554,15 @@
         "app.js:12799",
         "app.js:12821",
         "app.js:12886",
-        "app.js:12893"
+        "app.js:12893",
+        "src/reports/report-document-composition-service.js:176"
+      ]
+    },
+    "auto.aistatefilter.a7a2c939": {
+      "message": "aiStateFilter",
+      "description": "Generated interface text from src/features/editor/editor-filter-controls-controller.js.",
+      "locations": [
+        "src/features/editor/editor-filter-controls-controller.js:24"
       ]
     },
     "auto.akan.b42c988b": {
@@ -2633,7 +2654,8 @@
         "app.js:5289",
         "app.js:5334",
         "app.js:5374",
-        "index.html"
+        "index.html",
+        "src/features/editor/document-filter-presentation-controller.js:55"
       ]
     },
     "auto.all.language.pairs.c4773452": {
@@ -2661,7 +2683,8 @@
         "app.js:5308",
         "app.js:5353",
         "app.js:5393",
-        "index.html"
+        "index.html",
+        "src/features/projects/language-pair-filter-presentation-controller.js:57"
       ]
     },
     "auto.all.project.segments.af71bfa0": {
@@ -2718,7 +2741,8 @@
         "app.js:7622",
         "app.js:7645",
         "app.js:7685",
-        "app.js:7717"
+        "app.js:7717",
+        "src/features/quality/qa-results-controller.js:96"
       ]
     },
     "auto.all.visible.segments.57767b7e": {
@@ -2731,6 +2755,13 @@
     "auto.allow.source.text.to.be.sent.to.ai.f22ee36d": {
       "message": "Allow source text to be sent to AI",
       "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.alt.enter.abed5470": {
+      "message": "Alt+Enter",
+      "description": "Static title attribute from index.html.",
       "locations": [
         "index.html"
       ]
@@ -2823,7 +2854,8 @@
         "app.js:6230",
         "app.js:6338",
         "app.js:6383",
-        "app.js:6423"
+        "app.js:6423",
+        "src/features/editor/segment-command-restoration-controller.js:144"
       ]
     },
     "auto.an.affected.segment.is.no.longer.available.f9d53cd7": {
@@ -2835,7 +2867,8 @@
         "app.js:6281",
         "app.js:6389",
         "app.js:6434",
-        "app.js:6474"
+        "app.js:6474",
+        "src/features/editor/segment-command-restoration-controller.js:194"
       ]
     },
     "auto.anii.d777a2db": {
@@ -2879,7 +2912,8 @@
         "app.js:12719",
         "app.js:12741",
         "app.js:12806",
-        "app.js:12813"
+        "app.js:12813",
+        "src/reports/report-document-composition-service.js:93"
       ]
     },
     "auto.anonymized.report.02180bf8": {
@@ -3092,7 +3126,8 @@
         "app.js:2545",
         "app.js:2590",
         "app.js:2640",
-        "app.js:2692"
+        "app.js:2692",
+        "src/app/application-offline-shell-controller.js:139"
       ]
     },
     "auto.applytotarget.e08b6007": {
@@ -3349,7 +3384,8 @@
         "app.js:12953",
         "app.js:13018",
         "app.js:13025",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:337"
       ]
     },
     "auto.auto.0d612c12": {
@@ -3375,7 +3411,8 @@
         "app.js:3264",
         "app.js:3309",
         "app.js:3359",
-        "app.js:3411"
+        "app.js:3411",
+        "src/features/import-export/text-encoding-input-service.js:2"
       ]
     },
     "auto.auto.c614ba7c": {
@@ -3401,7 +3438,8 @@
         "app.js:3264",
         "app.js:3309",
         "app.js:3359",
-        "app.js:3411"
+        "app.js:3411",
+        "src/features/import-export/text-encoding-input-service.js:2"
       ]
     },
     "auto.automatic.lm.studio.server.start.is.availa.96356226": {
@@ -3436,6 +3474,13 @@
     },
     "auto.available.commands.8022dbea": {
       "message": "Available commands",
+      "description": "Static aria-label attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.available.translation.suggestions.325e4468": {
+      "message": "Available translation suggestions",
       "description": "Static aria-label attribute from index.html.",
       "locations": [
         "index.html"
@@ -4356,7 +4401,8 @@
         "app.js:6225",
         "app.js:6333",
         "app.js:6378",
-        "app.js:6418"
+        "app.js:6418",
+        "src/features/editor/segment-command-restoration-controller.js:139"
       ]
     },
     "auto.be.986b1bc1": {
@@ -4814,7 +4860,9 @@
         "app.js:4284",
         "app.js:4324",
         "app.js:4412",
-        "app.js:4457"
+        "app.js:4457",
+        "src/features/resources/resources-presentation-service.js:246",
+        "src/features/resources/resources-presentation-service.js:270"
       ]
     },
     "auto.by.level.6054dcd3": {
@@ -4844,7 +4892,8 @@
         "app.js:12949",
         "app.js:12971",
         "app.js:13036",
-        "app.js:13043"
+        "app.js:13043",
+        "src/reports/report-document-composition-service.js:355"
       ]
     },
     "auto.by.severity.47b9debe": {
@@ -4898,7 +4947,9 @@
         "app.js:12967",
         "app.js:12989",
         "app.js:13054",
-        "app.js:13061"
+        "app.js:13061",
+        "src/reports/report-document-composition-service.js:233",
+        "src/reports/report-document-composition-service.js:382"
       ]
     },
     "auto.by.type.b9212eda": {
@@ -4952,7 +5003,9 @@
         "app.js:12969",
         "app.js:12991",
         "app.js:13056",
-        "app.js:13063"
+        "app.js:13063",
+        "src/reports/report-document-composition-service.js:235",
+        "src/reports/report-document-composition-service.js:384"
       ]
     },
     "auto.ca.1c42c72c": {
@@ -5100,7 +5153,9 @@
         "app.js:12091",
         "app.js:12099",
         "app.js:12123",
-        "app.js:12131"
+        "app.js:12131",
+        "src/features/import-export/project-export-build-service.js:183",
+        "src/features/import-export/project-export-build-service.js:193"
       ]
     },
     "auto.cantonese.b75dba35": {
@@ -5826,7 +5881,46 @@
         "app.js:13079",
         "app.js:13084",
         "app.js:13085",
-        "app.js:13086"
+        "app.js:13086",
+        "src/reports/report-document-composition-service.js:135",
+        "src/reports/report-document-composition-service.js:136",
+        "src/reports/report-document-composition-service.js:137",
+        "src/reports/report-document-composition-service.js:138",
+        "src/reports/report-document-composition-service.js:144",
+        "src/reports/report-document-composition-service.js:145",
+        "src/reports/report-document-composition-service.js:146",
+        "src/reports/report-document-composition-service.js:147",
+        "src/reports/report-document-composition-service.js:148",
+        "src/reports/report-document-composition-service.js:149",
+        "src/reports/report-document-composition-service.js:150",
+        "src/reports/report-document-composition-service.js:156",
+        "src/reports/report-document-composition-service.js:157",
+        "src/reports/report-document-composition-service.js:158",
+        "src/reports/report-document-composition-service.js:159",
+        "src/reports/report-document-composition-service.js:178",
+        "src/reports/report-document-composition-service.js:179",
+        "src/reports/report-document-composition-service.js:180",
+        "src/reports/report-document-composition-service.js:181",
+        "src/reports/report-document-composition-service.js:182",
+        "src/reports/report-document-composition-service.js:204",
+        "src/reports/report-document-composition-service.js:205",
+        "src/reports/report-document-composition-service.js:206",
+        "src/reports/report-document-composition-service.js:207",
+        "src/reports/report-document-composition-service.js:345",
+        "src/reports/report-document-composition-service.js:346",
+        "src/reports/report-document-composition-service.js:347",
+        "src/reports/report-document-composition-service.js:348",
+        "src/reports/report-document-composition-service.js:349",
+        "src/reports/report-document-composition-service.js:350",
+        "src/reports/report-document-composition-service.js:392",
+        "src/reports/report-document-composition-service.js:393",
+        "src/reports/report-document-composition-service.js:394",
+        "src/reports/report-document-composition-service.js:395",
+        "src/reports/report-document-composition-service.js:396",
+        "src/reports/report-document-composition-service.js:397",
+        "src/reports/report-document-composition-service.js:405",
+        "src/reports/report-document-composition-service.js:406",
+        "src/reports/report-document-composition-service.js:407"
       ]
     },
     "auto.case.9254c4bb": {
@@ -5906,7 +6000,8 @@
         "app.js:12977",
         "app.js:13042",
         "app.js:13049",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:363"
       ]
     },
     "auto.cebuano.56c856e0": {
@@ -6418,6 +6513,20 @@
         "app.js:224"
       ]
     },
+    "auto.choose.78b7c9f6": {
+      "message": "Choose",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.choose.a.tm.match.approved.term.or.saved.a.4290639b": {
+      "message": "Choose a TM match, approved term, or saved AI suggestion.",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.choose.folder.1838a415": {
       "message": "Choose folder",
       "description": "Static interface text from index.html.",
@@ -6561,7 +6670,8 @@
         "app.js:5282",
         "app.js:5370",
         "app.js:5415",
-        "app.js:5455"
+        "app.js:5455",
+        "src/features/projects/projects-view-presentation-controller.js:123"
       ]
     },
     "auto.clear.hosted.key.f9016e86": {
@@ -6588,7 +6698,15 @@
         "app.js:5281",
         "app.js:5369",
         "app.js:5414",
-        "app.js:5454"
+        "app.js:5454",
+        "src/features/projects/projects-view-presentation-controller.js:122"
+      ]
+    },
+    "auto.click.b93ec566": {
+      "message": "click",
+      "description": "Generated interface text from src/features/editor/panel-toggle-controller.js.",
+      "locations": [
+        "src/features/editor/panel-toggle-controller.js:67"
       ]
     },
     "auto.client.approved.5e7b2197": {
@@ -6602,7 +6720,9 @@
       "message": "Close",
       "description": "Static interface text from index.html.",
       "locations": [
-        "index.html"
+        "index.html",
+        "src/features/resources/resources-presentation-service.js:246",
+        "src/features/resources/resources-presentation-service.js:270"
       ]
     },
     "auto.close.commands.c3608c3a": {
@@ -6617,6 +6737,27 @@
       "description": "Static aria-label attribute from index.html.",
       "locations": [
         "index.html"
+      ]
+    },
+    "auto.close.quick.insert.81c2371d": {
+      "message": "Close Quick Insert",
+      "description": "Static aria-label attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.closetbresourcebtn.f6b7024d": {
+      "message": "closeTbResourceBtn",
+      "description": "Generated interface text from src/features/resources/resources-presentation-service.js.",
+      "locations": [
+        "src/features/resources/resources-presentation-service.js:270"
+      ]
+    },
+    "auto.closetmresourcebtn.409a7a06": {
+      "message": "closeTmResourceBtn",
+      "description": "Generated interface text from src/features/resources/resources-presentation-service.js.",
+      "locations": [
+        "src/features/resources/resources-presentation-service.js:246"
       ]
     },
     "auto.cloud.suggestion.5cb21b22": {
@@ -6912,7 +7053,8 @@
         "app.js:6991",
         "app.js:7086",
         "app.js:7131",
-        "app.js:7171"
+        "app.js:7171",
+        "src/features/editor/concordance-controller.js:142"
       ]
     },
     "auto.concurrency.2ec390bf": {
@@ -7306,6 +7448,13 @@
         "index.html"
       ]
     },
+    "auto.confirm.current.segment.ctrl.cmd.enter.1a9a732b": {
+      "message": "Confirm current segment (Ctrl/Cmd+Enter)",
+      "description": "Static title attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.confirm.d0c4047c": {
       "message": "confirm",
       "description": "Generated interface text from app.js.",
@@ -7497,7 +7646,11 @@
         "app.js:13031",
         "app.js:13038",
         "app.js:5553",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:136",
+        "src/reports/report-document-composition-service.js:146",
+        "src/reports/report-document-composition-service.js:190",
+        "src/reports/report-document-composition-service.js:350"
       ]
     },
     "auto.confirmed.and.locked.segments.are.always.p.84584823": {
@@ -7867,7 +8020,8 @@
       "message": "Creator",
       "description": "Static interface text from index.html.",
       "locations": [
-        "index.html"
+        "index.html",
+        "src/features/editor/editor-shell-presentation-controller.js:168"
       ]
     },
     "auto.crimean.tatar.eddfee56": {
@@ -8017,7 +8171,9 @@
         "app.js:9056",
         "app.js:9077",
         "app.js:9117",
-        "app.js:9149"
+        "app.js:9149",
+        "src/features/editor/segment-filter-service.js:56",
+        "src/features/editor/segment-provenance-service.js:16"
       ]
     },
     "auto.croatian.3e5488aa": {
@@ -8690,7 +8846,8 @@
         "app.js:4168",
         "app.js:4258",
         "app.js:4303",
-        "app.js:4355"
+        "app.js:4355",
+        "src/features/projects/project-resource-selection-controller.js:181"
       ]
     },
     "auto.delete.f6fdbe48": {
@@ -8824,7 +8981,13 @@
         "app.js:7733",
         "app.js:7756",
         "app.js:7796",
-        "app.js:7828"
+        "app.js:7828",
+        "src/features/editor/term-suggestions-controller.js:105",
+        "src/features/projects/project-home-presentation-controller.js:128",
+        "src/features/projects/projects-view-presentation-controller.js:100",
+        "src/features/resources/resources-presentation-service.js:128",
+        "src/features/resources/resources-presentation-service.js:189",
+        "src/features/resources/resources-presentation-service.js:222"
       ]
     },
     "auto.delete.file.value1.a393a65a": {
@@ -8846,7 +9009,8 @@
         "app.js:5181",
         "app.js:5269",
         "app.js:5314",
-        "app.js:5354"
+        "app.js:5354",
+        "src/features/projects/project-home-presentation-controller.js:129"
       ]
     },
     "auto.delete.file.value1.from.this.project.this..3797d571": {
@@ -8889,7 +9053,8 @@
         "app.js:5260",
         "app.js:5348",
         "app.js:5393",
-        "app.js:5433"
+        "app.js:5433",
+        "src/features/projects/projects-view-presentation-controller.js:101"
       ]
     },
     "auto.delete.resource.value1.ac0ea47d": {
@@ -8911,7 +9076,8 @@
         "app.js:5452",
         "app.js:5535",
         "app.js:5580",
-        "app.js:5620"
+        "app.js:5620",
+        "src/features/resources/resources-presentation-service.js:131"
       ]
     },
     "auto.delete.this.term.this.cannot.be.undone.664ef392": {
@@ -8949,7 +9115,8 @@
         "app.js:1665",
         "app.js:1710",
         "app.js:1764",
-        "app.js:1833"
+        "app.js:1833",
+        "src/app/application-trash-controller.js:89"
       ]
     },
     "auto.deleted.local.items.stay.here.until.you.em.9bced109": {
@@ -9007,7 +9174,8 @@
         "app.js:12937",
         "app.js:12959",
         "app.js:13024",
-        "app.js:13031"
+        "app.js:13031",
+        "src/reports/report-document-composition-service.js:343"
       ]
     },
     "auto.diagnostics.could.not.be.collected.7d052c0f": {
@@ -13524,7 +13692,8 @@
         "app.js:4412",
         "app.js:4457",
         "app.js:4513",
-        "index.html"
+        "index.html",
+        "src/app/application-validation-presentation-controller.js:79"
       ]
     },
     "auto.dismiss.validation.report.293e132e": {
@@ -13534,7 +13703,8 @@
         "app.js:3575",
         "app.js:3583",
         "app.js:3591",
-        "app.js:4512"
+        "app.js:4512",
+        "src/app/application-validation-presentation-controller.js:78"
       ]
     },
     "auto.dita.8babcf73": {
@@ -13741,6 +13911,13 @@
         "app.js:9838"
       ]
     },
+    "auto.documents.687c8286": {
+      "message": "Documents",
+      "description": "Generated interface text from src/features/editor/editor-shell-presentation-controller.js.",
+      "locations": [
+        "src/features/editor/editor-shell-presentation-controller.js:176"
+      ]
+    },
     "auto.docx.export.failed.ade79cc1": {
       "message": "DOCX export failed",
       "description": "Generated interface text from app.js.",
@@ -13871,7 +14048,16 @@
         "app.js:13195",
         "app.js:9928",
         "app.js:9936",
-        "app.js:9944"
+        "app.js:9944",
+        "src/features/import-export/delivery-export-controller.js:249",
+        "src/features/import-export/project-export-build-service.js:147"
+      ]
+    },
+    "auto.docx.import.80414d6a": {
+      "message": "DOCX import",
+      "description": "Generated interface text from src/features/import-export/project-document-import-controller.js.",
+      "locations": [
+        "src/features/import-export/project-document-import-controller.js:149"
       ]
     },
     "auto.docx.source.c61a474a": {
@@ -13923,7 +14109,9 @@
         "app.js:12780",
         "app.js:12845",
         "app.js:12852",
-        "index.html"
+        "index.html",
+        "src/features/editor/editor-shell-presentation-controller.js:169",
+        "src/reports/report-document-composition-service.js:135"
       ]
     },
     "auto.dotm.6ad8ece5": {
@@ -14210,7 +14398,8 @@
         "app.js:12997",
         "app.js:13019",
         "app.js:13084",
-        "app.js:13091"
+        "app.js:13091",
+        "src/reports/report-document-composition-service.js:412"
       ]
     },
     "auto.el.4f1ea4f0": {
@@ -14261,6 +14450,13 @@
         "app.js:8089",
         "app.js:8129",
         "app.js:8161"
+      ]
+    },
+    "auto.empty.targets.480ad4e0": {
+      "message": "empty targets",
+      "description": "Generated interface text from src/features/projects/project-analysis-controller.js.",
+      "locations": [
+        "src/features/projects/project-analysis-controller.js:86"
       ]
     },
     "auto.empty.trash.permanently.33e83cdf": {
@@ -14335,7 +14531,8 @@
         "app.js:678",
         "app.js:682",
         "app.js:685",
-        "app.js:690"
+        "app.js:690",
+        "src/i18n/language-input-service.js:89"
       ]
     },
     "auto.enable.ai.helpers.before.requesting.an.ope.231e25d0": {
@@ -14775,6 +14972,13 @@
         "app.js:271"
       ]
     },
+    "auto.enter.2b9eceb7": {
+      "message": "Enter",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.enter.a.match.percentage.between.0.and.100.e265b4c6": {
       "message": "Enter a match percentage between 0 and 100.",
       "description": "Generated interface text from app.js.",
@@ -15184,7 +15388,8 @@
         "app.js:8630",
         "app.js:8632",
         "app.js:8643",
-        "app.js:8664"
+        "app.js:8664",
+        "src/features/quality/qa-results-controller.js:103"
       ]
     },
     "auto.errors.57004359": {
@@ -15231,7 +15436,9 @@
         "app.js:4431",
         "app.js:4461",
         "app.js:4483",
-        "app.js:4505"
+        "app.js:4505",
+        "src/app/application-validation-presentation-controller.js:1",
+        "src/app/application-validation-presentation-controller.js:71"
       ]
     },
     "auto.errors.805e86a8": {
@@ -15272,6 +15479,13 @@
         "app.js:690"
       ]
     },
+    "auto.esc.1f7a4f9e": {
+      "message": "Esc",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.escapehtml.term.notes.2184441b": {
       "message": "${escapeHtml(term.notes ||",
       "description": "Generated interface text from app.js.",
@@ -15296,7 +15510,8 @@
         "app.js:5680",
         "app.js:5782",
         "app.js:5827",
-        "app.js:5867"
+        "app.js:5867",
+        "src/features/resources/resources-presentation-service.js:207"
       ]
     },
     "auto.escapehtml.term.sourceterm.48842522": {
@@ -15563,7 +15778,8 @@
         "app.js:3539",
         "app.js:3584",
         "app.js:3634",
-        "app.js:3686"
+        "app.js:3686",
+        "src/features/import-export/delivery-export-controller.js:175"
       ]
     },
     "auto.export.blocked.fix.missing.protected.place.20fa3c4b": {
@@ -15723,7 +15939,8 @@
         "app.js:5541",
         "app.js:5586",
         "app.js:5626",
-        "index.html"
+        "index.html",
+        "src/features/resources/resources-presentation-service.js:138"
       ]
     },
     "auto.export.folder.backup.69b62e1e": {
@@ -15844,7 +16061,9 @@
         "app.js:12988",
         "app.js:13010",
         "app.js:13075",
-        "app.js:13082"
+        "app.js:13082",
+        "src/reports/report-document-composition-service.js:240",
+        "src/reports/report-document-composition-service.js:403"
       ]
     },
     "auto.export.redacted.diagnostics.e1d0ac50": {
@@ -15873,7 +16092,8 @@
         "app.js:5457",
         "app.js:5542",
         "app.js:5587",
-        "app.js:5627"
+        "app.js:5627",
+        "src/features/resources/resources-presentation-service.js:141"
       ]
     },
     "auto.export.tbx.400983bc": {
@@ -16304,7 +16524,9 @@
         "app.js:12955",
         "app.js:12977",
         "app.js:13042",
-        "app.js:13049"
+        "app.js:13049",
+        "src/reports/report-document-composition-service.js:190",
+        "src/reports/report-document-composition-service.js:363"
       ]
     },
     "auto.file.971c419d": {
@@ -16326,7 +16548,8 @@
         "app.js:5177",
         "app.js:5265",
         "app.js:5310",
-        "app.js:5350"
+        "app.js:5350",
+        "src/features/projects/project-home-presentation-controller.js:125"
       ]
     },
     "auto.file.delete.failed.3565f44e": {
@@ -16497,7 +16720,9 @@
         "app.js:12861",
         "app.js:12898",
         "app.js:12905",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:144",
+        "src/reports/report-document-composition-service.js:188"
       ]
     },
     "auto.filipino.cd9a5554": {
@@ -16646,7 +16871,8 @@
         "app.js:3447",
         "app.js:3492",
         "app.js:3542",
-        "app.js:3594"
+        "app.js:3594",
+        "src/features/editor/protected-text-replacement-service.js:34"
       ]
     },
     "auto.find.target.text.e8547e76": {
@@ -16926,7 +17152,8 @@
         "app.js:12830",
         "app.js:12852",
         "app.js:12917",
-        "app.js:12924"
+        "app.js:12924",
+        "src/reports/report-document-composition-service.js:207"
       ]
     },
     "auto.formal.6e69a85c": {
@@ -17595,7 +17822,8 @@
         "app.js:7647",
         "app.js:7670",
         "app.js:7710",
-        "app.js:7742"
+        "app.js:7742",
+        "src/features/quality/qa-results-controller.js:126"
       ]
     },
     "auto.go.2e0b45f2": {
@@ -17879,7 +18107,8 @@
         "app.js:5071",
         "app.js:5159",
         "app.js:5204",
-        "app.js:5244"
+        "app.js:5244",
+        "src/features/editor/editor-shell-presentation-controller.js:153"
       ]
     },
     "auto.high.9235afd3": {
@@ -17994,7 +18223,9 @@
         "app.js:9056",
         "app.js:9077",
         "app.js:9117",
-        "app.js:9149"
+        "app.js:9149",
+        "src/features/editor/segment-filter-service.js:56",
+        "src/features/editor/segment-provenance-service.js:16"
       ]
     },
     "auto.high.ai.risk.4c49ca8b": {
@@ -18049,7 +18280,9 @@
         "app.js:13002",
         "app.js:13067",
         "app.js:13074",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:182",
+        "src/reports/report-document-composition-service.js:395"
       ]
     },
     "auto.high.b1a5954a": {
@@ -18552,7 +18785,8 @@
         "app.js:5419",
         "app.js:5501",
         "app.js:5546",
-        "app.js:5586"
+        "app.js:5586",
+        "src/features/resources/resources-presentation-service.js:92"
       ]
     },
     "auto.import.a.tmx.file.af7a96e2": {
@@ -18565,7 +18799,8 @@
         "app.js:5419",
         "app.js:5501",
         "app.js:5546",
-        "app.js:5586"
+        "app.js:5586",
+        "src/features/resources/resources-presentation-service.js:92"
       ]
     },
     "auto.import.canceled.7ff2abac": {
@@ -18647,7 +18882,8 @@
         "app.js:5380",
         "app.js:5425",
         "app.js:5465",
-        "index.html"
+        "index.html",
+        "src/features/projects/projects-view-presentation-controller.js:130"
       ]
     },
     "auto.import.tbx.67e61598": {
@@ -18734,7 +18970,8 @@
         "app.js:11806",
         "app.js:9945",
         "app.js:9953",
-        "app.js:9961"
+        "app.js:9961",
+        "src/features/import-export/project-document-import-controller.js:151"
       ]
     },
     "auto.imported.value1.term.value2.4d52d06f": {
@@ -18952,7 +19189,8 @@
         "app.js:11772",
         "app.js:11793",
         "app.js:11833",
-        "app.js:11865"
+        "app.js:11865",
+        "src/features/import-export/project-document-import-controller.js:228"
       ]
     },
     "auto.inari.sami.cd0fe3ad": {
@@ -19076,7 +19314,9 @@
         "app.js:7628",
         "app.js:7651",
         "app.js:7691",
-        "app.js:7723"
+        "app.js:7723",
+        "src/features/quality/qa-results-controller.js:103",
+        "src/reports/report-presentation-service.js:71"
       ]
     },
     "auto.insert.95802daa": {
@@ -19111,7 +19351,8 @@
         "app.js:7692",
         "app.js:7715",
         "app.js:7755",
-        "app.js:7787"
+        "app.js:7787",
+        "src/features/editor/tm-matches-controller.js:95"
       ]
     },
     "auto.insert.target.8473ef4e": {
@@ -19139,7 +19380,8 @@
         "app.js:7011",
         "app.js:7106",
         "app.js:7151",
-        "app.js:7191"
+        "app.js:7191",
+        "src/features/editor/concordance-controller.js:170"
       ]
     },
     "auto.insert.the.missing.protected.placeholder.i.81f26631": {
@@ -20189,7 +20431,8 @@
         "app.js:3148",
         "app.js:3196",
         "app.js:3200",
-        "app.js:3248"
+        "app.js:3248",
+        "src/i18n/language-input-service.js:89"
       ]
     },
     "auto.language.pair.3392baa9": {
@@ -20409,7 +20652,9 @@
         "app.js:12982",
         "app.js:13004",
         "app.js:13069",
-        "app.js:13076"
+        "app.js:13076",
+        "src/reports/report-document-composition-service.js:206",
+        "src/reports/report-document-composition-service.js:397"
       ]
     },
     "auto.linked.tm.units.06aa207c": {
@@ -20463,7 +20708,9 @@
         "app.js:12981",
         "app.js:13003",
         "app.js:13068",
-        "app.js:13075"
+        "app.js:13075",
+        "src/reports/report-document-composition-service.js:205",
+        "src/reports/report-document-composition-service.js:396"
       ]
     },
     "auto.linkedin.gokhan.dogru.localization.1e3d6d59": {
@@ -21058,6 +21305,24 @@
         "app.js:11764"
       ]
     },
+    "auto.localization.import.63752ed7": {
+      "message": "Localization import",
+      "description": "Generated interface text from src/features/import-export/project-document-import-controller.js.",
+      "locations": [
+        "src/features/import-export/project-document-import-controller.js:188"
+      ]
+    },
+    "auto.localization.sourcehtml.026b2522": {
+      "message": "${localization.sourceHtml(",
+      "description": "Generated interface text from src/features/resources/resources-presentation-service.js.",
+      "locations": [
+        "src/features/resources/resources-presentation-service.js:174",
+        "src/features/resources/resources-presentation-service.js:175",
+        "src/features/resources/resources-presentation-service.js:205",
+        "src/features/resources/resources-presentation-service.js:206",
+        "src/features/resources/resources-presentation-service.js:207"
+      ]
+    },
     "auto.localize.ec8bde7b": {
       "message": "localize",
       "description": "Generated interface text from app.js.",
@@ -21146,7 +21411,8 @@
         "app.js:12720",
         "app.js:12742",
         "app.js:12807",
-        "app.js:12814"
+        "app.js:12814",
+        "src/reports/report-document-composition-service.js:96"
       ]
     },
     "auto.loopcat.finds.the.bridge.on.port.8502.auto.2ffcff43": {
@@ -21183,7 +21449,8 @@
         "app.js:12720",
         "app.js:12742",
         "app.js:12807",
-        "app.js:12814"
+        "app.js:12814",
+        "src/reports/report-document-composition-service.js:97"
       ]
     },
     "auto.loopcat.quality.passport.51386511": {
@@ -21236,7 +21503,9 @@
         "app.js:12981",
         "app.js:12988",
         "app.js:13005",
-        "app.js:13012"
+        "app.js:13012",
+        "src/reports/report-document-composition-service.js:300",
+        "src/reports/report-document-composition-service.js:324"
       ]
     },
     "auto.loopcat.tried.the.standard.opus.cat.addres.a6f271c1": {
@@ -21339,7 +21608,8 @@
         "app.js:9056",
         "app.js:9077",
         "app.js:9117",
-        "app.js:9149"
+        "app.js:9149",
+        "src/features/editor/segment-provenance-service.js:16"
       ]
     },
     "auto.low.a124947c": {
@@ -22086,7 +22356,8 @@
         "app.js:9056",
         "app.js:9077",
         "app.js:9117",
-        "app.js:9149"
+        "app.js:9149",
+        "src/features/editor/segment-provenance-service.js:16"
       ]
     },
     "auto.medium.d404968e": {
@@ -22116,7 +22387,8 @@
         "app.js:7265",
         "app.js:7266",
         "app.js:7305",
-        "index.html"
+        "index.html",
+        "src/features/quality/quality-presentation-service.js:72"
       ]
     },
     "auto.memory.name.c36dfd43": {
@@ -22233,7 +22505,8 @@
         "app.js:12620",
         "app.js:12642",
         "app.js:12707",
-        "app.js:12714"
+        "app.js:12714",
+        "src/reports/report-presentation-service.js:78"
       ]
     },
     "auto.meta.ccfd8557": {
@@ -22387,7 +22660,8 @@
         "app.js:5924",
         "app.js:6032",
         "app.js:6077",
-        "app.js:6117"
+        "app.js:6117",
+        "src/features/editor/segment-status-presentation-service.js:78"
       ]
     },
     "auto.mistral.ai.c879d832": {
@@ -22792,7 +23066,11 @@
         "app.js:7644",
         "app.js:7667",
         "app.js:7707",
-        "app.js:7739"
+        "app.js:7739",
+        "src/features/quality/qa-results-controller.js:122",
+        "src/reports/report-document-composition-service.js:130",
+        "src/reports/report-document-composition-service.js:209",
+        "src/reports/report-document-composition-service.js:326"
       ]
     },
     "auto.my.3ece1471": {
@@ -22835,6 +23113,13 @@
         "app.js:406",
         "app.js:410",
         "app.js:418"
+      ]
+    },
+    "auto.navigate.1eee3afe": {
+      "message": "Navigate",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.nb.ecbfa235": {
@@ -22968,7 +23253,8 @@
         "app.js:12932",
         "app.js:12954",
         "app.js:13019",
-        "app.js:13026"
+        "app.js:13026",
+        "src/reports/report-document-composition-service.js:338"
       ]
     },
     "auto.never.80c3052d": {
@@ -23320,7 +23606,10 @@
         "app.js:7760",
         "app.js:7771",
         "app.js:7803",
-        "index.html"
+        "index.html",
+        "src/features/editor/term-suggestions-controller.js:63",
+        "src/features/editor/tm-matches-controller.js:63",
+        "src/features/quality/revision-history-presentation-service.js:67"
       ]
     },
     "auto.no.activity.recorded.bd88847d": {
@@ -23808,7 +24097,8 @@
         "app.js:12994",
         "app.js:13016",
         "app.js:13081",
-        "app.js:13088"
+        "app.js:13088",
+        "src/reports/report-document-composition-service.js:409"
       ]
     },
     "auto.no.files.imported.d99f5bf8": {
@@ -23835,7 +24125,8 @@
         "app.js:5147",
         "app.js:5235",
         "app.js:5280",
-        "app.js:5320"
+        "app.js:5320",
+        "src/features/projects/project-home-presentation-controller.js:89"
       ]
     },
     "auto.no.linked.terms.f6d99f18": {
@@ -23933,7 +24224,8 @@
         "app.js:12998",
         "app.js:13020",
         "app.js:13085",
-        "app.js:13092"
+        "app.js:13092",
+        "src/reports/report-document-composition-service.js:413"
       ]
     },
     "auto.no.matching.project.terminology.found.for..961054f3": {
@@ -23999,7 +24291,8 @@
         "app.js:5280",
         "app.js:5368",
         "app.js:5413",
-        "app.js:5453"
+        "app.js:5453",
+        "src/features/projects/projects-view-presentation-controller.js:121"
       ]
     },
     "auto.no.project.53580ca7": {
@@ -24118,7 +24411,8 @@
         "app.js:7610",
         "app.js:7633",
         "app.js:7673",
-        "app.js:7705"
+        "app.js:7705",
+        "src/features/quality/qa-results-controller.js:84"
       ]
     },
     "auto.no.quality.profile.loaded.935a3d17": {
@@ -24194,7 +24488,8 @@
         "app.js:12860",
         "app.js:12882",
         "app.js:12947",
-        "app.js:12954"
+        "app.js:12954",
+        "src/reports/report-document-composition-service.js:243"
       ]
     },
     "auto.no.risk.queue.yet.6eb5628f": {
@@ -24282,7 +24577,9 @@
         "app.js:12884",
         "app.js:12906",
         "app.js:12971",
-        "app.js:12978"
+        "app.js:12978",
+        "src/reports/report-document-composition-service.js:290",
+        "src/reports/report-document-composition-service.js:60"
       ]
     },
     "auto.no.segments.match.this.view.4bf40299": {
@@ -24309,7 +24606,8 @@
         "app.js:5986",
         "app.js:6094",
         "app.js:6139",
-        "app.js:6179"
+        "app.js:6179",
+        "src/features/editor/segment-grid-presentation-controller.js:82"
       ]
     },
     "auto.no.segments.to.pre.translate.3b1a554a": {
@@ -24460,7 +24758,8 @@
         "app.js:7479",
         "app.js:7502",
         "app.js:7542",
-        "app.js:7574"
+        "app.js:7574",
+        "src/features/quality/revision-history-presentation-service.js:73"
       ]
     },
     "auto.no.terms.found.in.this.segment.2ec482a6": {
@@ -24489,7 +24788,8 @@
         "app.js:7723",
         "app.js:7746",
         "app.js:7786",
-        "app.js:7818"
+        "app.js:7818",
+        "src/features/editor/term-suggestions-controller.js:80"
       ]
     },
     "auto.no.terms.yet.1bc93bfe": {
@@ -24525,7 +24825,8 @@
         "app.js:7680",
         "app.js:7703",
         "app.js:7743",
-        "app.js:7775"
+        "app.js:7775",
+        "src/features/editor/tm-matches-controller.js:80"
       ]
     },
     "auto.no.tm.matches.at.value1.or.higher.83622adb": {
@@ -24660,7 +24961,8 @@
         "app.js:3589",
         "app.js:3597",
         "app.js:3605",
-        "app.js:4514"
+        "app.js:4514",
+        "src/app/application-validation-presentation-controller.js:80"
       ]
     },
     "auto.no.value1.yet.0a7c3068": {
@@ -24882,7 +25184,8 @@
         "app.js:5937",
         "app.js:6045",
         "app.js:6090",
-        "app.js:6130"
+        "app.js:6130",
+        "src/features/editor/segment-status-presentation-service.js:93"
       ]
     },
     "auto.notermbases.2305feed": {
@@ -24895,7 +25198,8 @@
         "app.js:5415",
         "app.js:5497",
         "app.js:5542",
-        "app.js:5582"
+        "app.js:5582",
+        "src/features/resources/resources-presentation-service.js:88"
       ]
     },
     "auto.notes.3add7b96": {
@@ -24922,7 +25226,8 @@
         "app.js:5680",
         "app.js:5782",
         "app.js:5827",
-        "app.js:5867"
+        "app.js:5867",
+        "src/features/resources/resources-presentation-service.js:207"
       ]
     },
     "auto.notes.70440046": {
@@ -24956,7 +25261,8 @@
         "app.js:4834",
         "app.js:4842",
         "app.js:4850",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:219"
       ]
     },
     "auto.notranslationmemories.30bcaf82": {
@@ -24969,7 +25275,16 @@
         "app.js:5415",
         "app.js:5497",
         "app.js:5542",
-        "app.js:5582"
+        "app.js:5582",
+        "src/features/resources/resources-presentation-service.js:88"
+      ]
+    },
+    "auto.notset.88ccdbce": {
+      "message": "notSet",
+      "description": "Generated interface text from src/features/editor/editor-shell-presentation-controller.js.",
+      "locations": [
+        "src/features/editor/editor-shell-presentation-controller.js:168",
+        "src/features/editor/editor-shell-presentation-controller.js:169"
       ]
     },
     "auto.nuer.32dbe7e3": {
@@ -25418,7 +25733,10 @@
         "app.js:5462",
         "app.js:5549",
         "app.js:5594",
-        "app.js:5634"
+        "app.js:5634",
+        "src/features/projects/project-home-presentation-controller.js:134",
+        "src/features/projects/projects-view-presentation-controller.js:106",
+        "src/features/resources/resources-presentation-service.js:149"
       ]
     },
     "auto.open.concordance.38d2ae1e": {
@@ -25474,7 +25792,8 @@
         "app.js:5187",
         "app.js:5275",
         "app.js:5320",
-        "app.js:5360"
+        "app.js:5360",
+        "src/features/projects/project-home-presentation-controller.js:135"
       ]
     },
     "auto.open.opus.cat.installation.guide.b3c2f052": {
@@ -25503,7 +25822,8 @@
         "app.js:5266",
         "app.js:5354",
         "app.js:5399",
-        "app.js:5439"
+        "app.js:5439",
+        "src/features/projects/projects-view-presentation-controller.js:107"
       ]
     },
     "auto.open.resource.value1.c800ec9d": {
@@ -25525,7 +25845,8 @@
         "app.js:5463",
         "app.js:5550",
         "app.js:5595",
-        "app.js:5635"
+        "app.js:5635",
+        "src/features/resources/resources-presentation-service.js:150"
       ]
     },
     "auto.open.segments.ad176116": {
@@ -26318,7 +26639,8 @@
         "app.js:2544",
         "app.js:2589",
         "app.js:2639",
-        "app.js:2691"
+        "app.js:2691",
+        "src/app/application-offline-shell-controller.js:138"
       ]
     },
     "auto.perplexity.sonar.80c1f1c2": {
@@ -26691,7 +27013,9 @@
         "app.js:12940",
         "app.js:12962",
         "app.js:13027",
-        "app.js:13034"
+        "app.js:13034",
+        "src/reports/report-document-composition-service.js:157",
+        "src/reports/report-document-composition-service.js:346"
       ]
     },
     "auto.potawatomi.20f5ed7c": {
@@ -26912,7 +27236,9 @@
         "app.js:4431",
         "app.js:4466",
         "app.js:4483",
-        "app.js:4510"
+        "app.js:4510",
+        "src/app/application-validation-presentation-controller.js:1",
+        "src/app/application-validation-presentation-controller.js:76"
       ]
     },
     "auto.pretranslate.01a10f4c": {
@@ -27073,7 +27399,8 @@
         "app.js:12765",
         "app.js:12787",
         "app.js:12852",
-        "app.js:12859"
+        "app.js:12859",
+        "src/reports/report-document-composition-service.js:142"
       ]
     },
     "auto.progresssummary.8ae3c007": {
@@ -27099,7 +27426,8 @@
         "app.js:6080",
         "app.js:6188",
         "app.js:6233",
-        "app.js:6273"
+        "app.js:6273",
+        "src/features/editor/segment-progress-presentation-service.js:32"
       ]
     },
     "auto.project.98f54143": {
@@ -27141,7 +27469,8 @@
         "app.js:5256",
         "app.js:5344",
         "app.js:5389",
-        "app.js:5429"
+        "app.js:5429",
+        "src/features/projects/projects-view-presentation-controller.js:97"
       ]
     },
     "auto.project.analysis.d3f4f7f3": {
@@ -27413,7 +27742,11 @@
         "app.js:1716",
         "app.js:1770",
         "app.js:1839",
-        "index.html"
+        "index.html",
+        "src/app/application-trash-controller.js:95",
+        "src/reports/report-document-composition-service.js:133",
+        "src/reports/report-document-composition-service.js:292",
+        "src/reports/report-document-composition-service.js:94"
       ]
     },
     "auto.project.file.803ed44f": {
@@ -27423,7 +27756,8 @@
         "app.js:1669",
         "app.js:1714",
         "app.js:1768",
-        "app.js:1837"
+        "app.js:1837",
+        "src/app/application-trash-controller.js:93"
       ]
     },
     "auto.project.glossary.hints.88a66f02": {
@@ -27714,7 +28048,8 @@
         "app.js:12304",
         "app.js:12325",
         "app.js:12390",
-        "app.js:12397"
+        "app.js:12397",
+        "src/features/workspace/workspace-package-save-controller.js:103"
       ]
     },
     "auto.project.package.export.failed.60eb7842": {
@@ -28864,7 +29199,8 @@
         "app.js:12971",
         "app.js:12993",
         "app.js:13058",
-        "app.js:13065"
+        "app.js:13065",
+        "src/reports/report-document-composition-service.js:386"
       ]
     },
     "auto.qa.evidence.06c54f97": {
@@ -28894,7 +29230,8 @@
         "app.js:12966",
         "app.js:12988",
         "app.js:13053",
-        "app.js:13060"
+        "app.js:13060",
+        "src/reports/report-document-composition-service.js:381"
       ]
     },
     "auto.qa.fixes.618b4bf6": {
@@ -29013,7 +29350,9 @@
         "app.js:12943",
         "app.js:12965",
         "app.js:13030",
-        "app.js:13037"
+        "app.js:13037",
+        "src/reports/report-document-composition-service.js:138",
+        "src/reports/report-document-composition-service.js:349"
       ]
     },
     "auto.qa.summary.afb9733a": {
@@ -29043,7 +29382,8 @@
         "app.js:12849",
         "app.js:12871",
         "app.js:12936",
-        "app.js:12943"
+        "app.js:12943",
+        "src/reports/report-document-composition-service.js:232"
       ]
     },
     "auto.quality.4ff18f00": {
@@ -29094,7 +29434,8 @@
         "app.js:12951",
         "app.js:12973",
         "app.js:13038",
-        "app.js:13045"
+        "app.js:13045",
+        "src/reports/report-document-composition-service.js:357"
       ]
     },
     "auto.quality.categories.96fd2ff5": {
@@ -29124,7 +29465,8 @@
         "app.js:12795",
         "app.js:12817",
         "app.js:12882",
-        "app.js:12889"
+        "app.js:12889",
+        "src/reports/report-document-composition-service.js:172"
       ]
     },
     "auto.quality.contract.a5494de2": {
@@ -29154,7 +29496,8 @@
         "app.js:12923",
         "app.js:12945",
         "app.js:13010",
-        "app.js:13017"
+        "app.js:13017",
+        "src/reports/report-document-composition-service.js:329"
       ]
     },
     "auto.quality.decision.save.failed.a29e52b7": {
@@ -29252,7 +29595,8 @@
         "app.js:12799",
         "app.js:12864",
         "app.js:12871",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:154"
       ]
     },
     "auto.quality.passport.export.failed.a495470b": {
@@ -29462,7 +29806,9 @@
         "app.js:12939",
         "app.js:12961",
         "app.js:13026",
-        "app.js:13033"
+        "app.js:13033",
+        "src/reports/report-document-composition-service.js:156",
+        "src/reports/report-document-composition-service.js:345"
       ]
     },
     "auto.quality.workbench.e4e2f06b": {
@@ -29484,6 +29830,13 @@
         "app.js:451",
         "app.js:455",
         "app.js:463"
+      ]
+    },
+    "auto.quick.insert.74589f4a": {
+      "message": "Quick Insert",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.recent.activity.8aebf36d": {
@@ -29513,7 +29866,8 @@
         "app.js:12863",
         "app.js:12885",
         "app.js:12950",
-        "app.js:12957"
+        "app.js:12957",
+        "src/reports/report-document-composition-service.js:246"
       ]
     },
     "auto.recommendation.6422fcc9": {
@@ -29543,7 +29897,8 @@
         "app.js:12620",
         "app.js:12642",
         "app.js:12707",
-        "app.js:12714"
+        "app.js:12714",
+        "src/reports/report-presentation-service.js:78"
       ]
     },
     "auto.recovery.copy.export.failed.6f57778f": {
@@ -29581,7 +29936,8 @@
         "app.js:12827",
         "app.js:12849",
         "app.js:12914",
-        "app.js:12921"
+        "app.js:12921",
+        "src/reports/report-document-composition-service.js:204"
       ]
     },
     "auto.redacted.secret.2236e3a7": {
@@ -29768,7 +30124,8 @@
         "app.js:2588",
         "app.js:2638",
         "app.js:2690",
-        "index.html"
+        "index.html",
+        "src/app/application-offline-shell-controller.js:137"
       ]
     },
     "auto.reloading.9ad122a9": {
@@ -29783,7 +30140,8 @@
         "app.js:2552",
         "app.js:2597",
         "app.js:2647",
-        "app.js:2699"
+        "app.js:2699",
+        "src/app/application-offline-shell-controller.js:146"
       ]
     },
     "auto.reloading.loopcat.c8595e9f": {
@@ -29798,7 +30156,8 @@
         "app.js:2546",
         "app.js:2591",
         "app.js:2641",
-        "app.js:2693"
+        "app.js:2693",
+        "src/app/application-offline-shell-controller.js:140"
       ]
     },
     "auto.remember.hosted.key.in.this.browser.14c75c82": {
@@ -29927,7 +30286,8 @@
         "app.js:12771",
         "app.js:12793",
         "app.js:12858",
-        "app.js:12865"
+        "app.js:12865",
+        "src/reports/report-document-composition-service.js:148"
       ]
     },
     "auto.replace.a7cf7b25": {
@@ -30224,7 +30584,8 @@
         "app.js:5448",
         "app.js:5531",
         "app.js:5576",
-        "app.js:5616"
+        "app.js:5616",
+        "src/features/resources/resources-presentation-service.js:125"
       ]
     },
     "auto.resource.action.failed.cf41efa1": {
@@ -30290,7 +30651,8 @@
         "app.js:12832",
         "app.js:12854",
         "app.js:12919",
-        "app.js:12926"
+        "app.js:12926",
+        "src/reports/report-document-composition-service.js:209"
       ]
     },
     "auto.resource.type.1782c3c8": {
@@ -30361,7 +30723,8 @@
         "app.js:12847",
         "app.js:12912",
         "app.js:12919",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:202"
       ]
     },
     "auto.restore.3cbe6d6b": {
@@ -30378,7 +30741,8 @@
         "app.js:1681",
         "app.js:1726",
         "app.js:1780",
-        "app.js:1849"
+        "app.js:1849",
+        "src/app/application-trash-controller.js:105"
       ]
     },
     "auto.restore.browser.backup.01d94147": {
@@ -30402,7 +30766,8 @@
         "app.js:1682",
         "app.js:1727",
         "app.js:1781",
-        "app.js:1850"
+        "app.js:1850",
+        "src/app/application-trash-controller.js:108"
       ]
     },
     "auto.restoring.backup.stores.dceeb40f": {
@@ -30577,7 +30942,8 @@
         "app.js:12975",
         "app.js:12997",
         "app.js:13062",
-        "app.js:13069"
+        "app.js:13069",
+        "src/reports/report-document-composition-service.js:390"
       ]
     },
     "auto.review.and.repair.4d370ed5": {
@@ -30639,7 +31005,9 @@
         "app.js:12949",
         "app.js:13014",
         "app.js:13021",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:164",
+        "src/reports/report-document-composition-service.js:333"
       ]
     },
     "auto.review.e29a79fe": {
@@ -30730,7 +31098,9 @@
         "app.js:12977",
         "app.js:12999",
         "app.js:13064",
-        "app.js:13071"
+        "app.js:13071",
+        "src/reports/report-document-composition-service.js:149",
+        "src/reports/report-document-composition-service.js:392"
       ]
     },
     "auto.review.qa.48d1585d": {
@@ -30884,7 +31254,8 @@
         "app.js:12984",
         "app.js:13006",
         "app.js:13071",
-        "app.js:13078"
+        "app.js:13078",
+        "src/reports/report-document-composition-service.js:399"
       ]
     },
     "auto.reviewable.ai.suggestions.are.available.fo.291de958": {
@@ -30911,7 +31282,8 @@
         "app.js:5948",
         "app.js:6056",
         "app.js:6101",
-        "app.js:6141"
+        "app.js:6141",
+        "src/features/editor/segment-status-presentation-service.js:104"
       ]
     },
     "auto.reviewed.31ef8593": {
@@ -30938,6 +31310,13 @@
         "app.js:3653",
         "app.js:3705",
         "index.html"
+      ]
+    },
+    "auto.reviewstatefilter.e24e0cc8": {
+      "message": "reviewStateFilter",
+      "description": "Generated interface text from src/features/editor/editor-filter-controls-controller.js.",
+      "locations": [
+        "src/features/editor/editor-filter-controls-controller.js:24"
       ]
     },
     "auto.revision.history.13487505": {
@@ -30976,7 +31355,8 @@
         "app.js:4329",
         "app.js:4417",
         "app.js:4462",
-        "app.js:4506"
+        "app.js:4506",
+        "src/app/application-validation-presentation-controller.js:72"
       ]
     },
     "auto.risk.5a8f23f5": {
@@ -31018,7 +31398,8 @@
         "app.js:12859",
         "app.js:12881",
         "app.js:12946",
-        "app.js:12953"
+        "app.js:12953",
+        "src/reports/report-document-composition-service.js:242"
       ]
     },
     "auto.risk.items.8872058e": {
@@ -31071,7 +31452,9 @@
         "app.js:12941",
         "app.js:12963",
         "app.js:13028",
-        "app.js:13035"
+        "app.js:13035",
+        "src/reports/report-document-composition-service.js:158",
+        "src/reports/report-document-composition-service.js:347"
       ]
     },
     "auto.risk.levels.57b81254": {
@@ -31101,7 +31484,8 @@
         "app.js:12793",
         "app.js:12815",
         "app.js:12880",
-        "app.js:12887"
+        "app.js:12887",
+        "src/reports/report-document-composition-service.js:170"
       ]
     },
     "auto.risk.queue.9876a33e": {
@@ -31131,7 +31515,8 @@
         "app.js:12948",
         "app.js:12970",
         "app.js:13035",
-        "app.js:13042"
+        "app.js:13042",
+        "src/reports/report-document-composition-service.js:354"
       ]
     },
     "auto.risk.ranked.ai.review.comment.f0d9d8f5": {
@@ -31158,7 +31543,8 @@
         "app.js:5956",
         "app.js:6064",
         "app.js:6109",
-        "app.js:6149"
+        "app.js:6149",
+        "src/features/editor/segment-status-presentation-service.js:112"
       ]
     },
     "auto.risk.tolerance.88a292bb": {
@@ -31213,7 +31599,9 @@
         "app.js:12950",
         "app.js:13015",
         "app.js:13022",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:165",
+        "src/reports/report-document-composition-service.js:334"
       ]
     },
     "auto.risks.92ddd0d2": {
@@ -31243,7 +31631,8 @@
         "app.js:12991",
         "app.js:13013",
         "app.js:13078",
-        "app.js:13085"
+        "app.js:13085",
+        "src/reports/report-document-composition-service.js:406"
       ]
     },
     "auto.risky.f8a3616d": {
@@ -31291,7 +31680,9 @@
         "app.js:4431",
         "app.js:4462",
         "app.js:4483",
-        "app.js:4506"
+        "app.js:4506",
+        "src/app/application-validation-presentation-controller.js:1",
+        "src/app/application-validation-presentation-controller.js:72"
       ]
     },
     "auto.ro.eed1903a": {
@@ -31513,6 +31904,14 @@
         "app.js:459",
         "app.js:463",
         "app.js:471"
+      ]
+    },
+    "auto.s.a0f1490a": {
+      "message": "s",
+      "description": "Generated interface text from src/features/import-export/project-import-restore-controller.js.",
+      "locations": [
+        "src/features/import-export/project-import-restore-controller.js:185",
+        "src/features/import-export/project-import-restore-controller.js:188"
       ]
     },
     "auto.s.gaw.karen.myanmar.358873eb": {
@@ -31814,6 +32213,13 @@
         "index.html"
       ]
     },
+    "auto.save.comments.with.ctrl.cmd.enter.168e75af": {
+      "message": "Save comments with Ctrl/Cmd+Enter",
+      "description": "Static title attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.save.current.project.da3a61c2": {
       "message": "Save current project",
       "description": "Static interface text from index.html.",
@@ -31874,7 +32280,9 @@
         "app.js:5834",
         "app.js:5844",
         "app.js:5874",
-        "index.html"
+        "index.html",
+        "src/features/resources/resources-presentation-service.js:182",
+        "src/features/resources/resources-presentation-service.js:215"
       ]
     },
     "auto.save.packages.217bddf9": {
@@ -32384,7 +32792,8 @@
         "app.js:9974",
         "app.js:9982",
         "app.js:9990",
-        "index.html"
+        "index.html",
+        "src/features/import-export/project-document-import-controller.js:190"
       ]
     },
     "auto.saved.c75c31df": {
@@ -34638,7 +35047,8 @@
         "app.js:2544",
         "app.js:2589",
         "app.js:2639",
-        "app.js:2691"
+        "app.js:2691",
+        "src/app/application-offline-shell-controller.js:138"
       ]
     },
     "auto.saving.e7912bf7": {
@@ -34653,7 +35063,8 @@
         "app.js:2552",
         "app.js:2597",
         "app.js:2647",
-        "app.js:2699"
+        "app.js:2699",
+        "src/app/application-offline-shell-controller.js:146"
       ]
     },
     "auto.saving.project.package.records.df64b0b7": {
@@ -34833,7 +35244,9 @@
         "app.js:3676",
         "app.js:3677",
         "app.js:3728",
-        "app.js:3729"
+        "app.js:3729",
+        "src/reports/report-document-composition-service.js:363",
+        "src/reports/report-presentation-service.js:78"
       ]
     },
     "auto.segment.merge.failed.1b0485ce": {
@@ -35050,7 +35463,8 @@
         "app.js:12802",
         "app.js:12824",
         "app.js:12889",
-        "app.js:12896"
+        "app.js:12896",
+        "src/reports/report-document-composition-service.js:179"
       ]
     },
     "auto.select.a.docx.document.to.export.680efdf6": {
@@ -35605,7 +36019,8 @@
         "app.js:12642",
         "app.js:12707",
         "app.js:12714",
-        "index.html"
+        "index.html",
+        "src/reports/report-presentation-service.js:78"
       ]
     },
     "auto.shambala.09ced99a": {
@@ -35634,6 +36049,13 @@
         "app.js:477",
         "app.js:481",
         "app.js:489"
+      ]
+    },
+    "auto.shift.f9.2014c794": {
+      "message": "Shift+F9",
+      "description": "Static title attribute from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.shona.5b84cc8c": {
@@ -35696,11 +36118,19 @@
         "app.js:5071",
         "app.js:5159",
         "app.js:5204",
-        "app.js:5244"
+        "app.js:5244",
+        "src/features/editor/editor-shell-presentation-controller.js:154"
       ]
     },
     "auto.show.only.translation.segments.9d295e04": {
       "message": "Show only translation segments",
+      "description": "Static title attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.show.only.translation.segments.ctrl.cmd.sh.99beac0a": {
+      "message": "Show only translation segments (Ctrl/Cmd+Shift+F)",
       "description": "Static title attribute from index.html.",
       "locations": [
         "index.html"
@@ -35775,7 +36205,8 @@
         "app.js:12955",
         "app.js:12977",
         "app.js:13042",
-        "app.js:13049"
+        "app.js:13049",
+        "src/reports/report-document-composition-service.js:363"
       ]
     },
     "auto.silesian.067cf381": {
@@ -35837,7 +36268,9 @@
         "app.js:4431",
         "app.js:4464",
         "app.js:4483",
-        "app.js:4508"
+        "app.js:4508",
+        "src/app/application-validation-presentation-controller.js:1",
+        "src/app/application-validation-presentation-controller.js:74"
       ]
     },
     "auto.simplified.chinese.e03f20a9": {
@@ -36228,7 +36661,8 @@
         "app.js:4254",
         "app.js:4342",
         "app.js:4387",
-        "app.js:4439"
+        "app.js:4439",
+        "src/features/import-export/project-export-controller.js:150"
       ]
     },
     "auto.simulated.file.delete.activity.failure.053e0bf6": {
@@ -36540,7 +36974,8 @@
         "app.js:12453",
         "app.js:12475",
         "app.js:12540",
-        "app.js:12547"
+        "app.js:12547",
+        "src/features/projects/project-dialog-save-controller.js:171"
       ]
     },
     "auto.simulated.project.delete.failure.68f6726e": {
@@ -36629,7 +37064,8 @@
         "app.js:12415",
         "app.js:12437",
         "app.js:12502",
-        "app.js:12509"
+        "app.js:12509",
+        "src/features/projects/project-dialog-save-controller.js:133"
       ]
     },
     "auto.simulated.qa.activity.log.failure.9a102191": {
@@ -37032,7 +37468,8 @@
         "app.js:12282",
         "app.js:12303",
         "app.js:12368",
-        "app.js:12375"
+        "app.js:12375",
+        "src/features/workspace/workspace-package-save-controller.js:134"
       ]
     },
     "auto.sindhi.e0330c53": {
@@ -37144,7 +37581,9 @@
         "app.js:4431",
         "app.js:4465",
         "app.js:4483",
-        "app.js:4509"
+        "app.js:4509",
+        "src/app/application-validation-presentation-controller.js:1",
+        "src/app/application-validation-presentation-controller.js:75"
       ]
     },
     "auto.skipped.5a000ad7": {
@@ -37362,7 +37801,8 @@
         "app.js:4832",
         "app.js:4840",
         "app.js:4848",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:219"
       ]
     },
     "auto.source.words.bb1f899d": {
@@ -37392,7 +37832,8 @@
         "app.js:12760",
         "app.js:12782",
         "app.js:12847",
-        "app.js:12854"
+        "app.js:12854",
+        "src/reports/report-document-composition-service.js:137"
       ]
     },
     "auto.sourceassets.35142117": {
@@ -37452,7 +37893,8 @@
         "app.js:5678",
         "app.js:5780",
         "app.js:5825",
-        "app.js:5865"
+        "app.js:5865",
+        "src/features/resources/resources-presentation-service.js:205"
       ]
     },
     "auto.sourcewordcount.776873ac": {
@@ -37478,7 +37920,8 @@
         "app.js:6081",
         "app.js:6189",
         "app.js:6234",
-        "app.js:6274"
+        "app.js:6274",
+        "src/features/editor/segment-progress-presentation-service.js:33"
       ]
     },
     "auto.south.azerbaijani.f93a3b96": {
@@ -37937,7 +38380,9 @@
         "app.js:12948",
         "app.js:13013",
         "app.js:13020",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:163",
+        "src/reports/report-document-composition-service.js:332"
       ]
     },
     "auto.standard.f410e046": {
@@ -38011,7 +38456,8 @@
         "app.js:5290",
         "app.js:5378",
         "app.js:5423",
-        "app.js:5463"
+        "app.js:5463",
+        "src/features/projects/projects-view-presentation-controller.js:126"
       ]
     },
     "auto.starting.lm.studio.server.b50d0a8d": {
@@ -38122,7 +38568,8 @@
         "app.js:12860",
         "app.js:12925",
         "app.js:12932",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:219"
       ]
     },
     "auto.storage.and.resources.d8cd4522": {
@@ -38462,7 +38909,8 @@
         "app.js:12864",
         "app.js:12886",
         "app.js:12951",
-        "app.js:12958"
+        "app.js:12958",
+        "src/reports/report-document-composition-service.js:251"
       ]
     },
     "auto.sundanese.14bb55d7": {
@@ -38720,7 +39168,9 @@
         "app.js:5932",
         "app.js:5946",
         "app.js:5972",
-        "app.js:5986"
+        "app.js:5986",
+        "src/features/editor/segment-markup-presentation-service.js:79",
+        "src/features/editor/segment-markup-presentation-service.js:95"
       ]
     },
     "auto.tag.chip.tag.chip.value1.tag.chip.action.8df6f9ff": {
@@ -38767,7 +39217,9 @@
         "app.js:5954",
         "app.js:5984",
         "app.js:5994",
-        "app.js:6024"
+        "app.js:6024",
+        "src/features/editor/segment-markup-presentation-service.js:104",
+        "src/features/editor/segment-markup-presentation-service.js:129"
       ]
     },
     "auto.tag.chip.tag.chip.value1.value2.405b207a": {
@@ -38794,7 +39246,8 @@
         "app.js:5755",
         "app.js:5863",
         "app.js:5908",
-        "app.js:5948"
+        "app.js:5948",
+        "src/features/editor/segment-markup-presentation-service.js:60"
       ]
     },
     "auto.tag.repair.102818c3": {
@@ -39005,7 +39458,8 @@
         "app.js:12773",
         "app.js:12795",
         "app.js:12860",
-        "app.js:12867"
+        "app.js:12867",
+        "src/reports/report-document-composition-service.js:150"
       ]
     },
     "auto.target.term.a12ee680": {
@@ -39039,7 +39493,8 @@
         "app.js:4833",
         "app.js:4841",
         "app.js:4849",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:219"
       ]
     },
     "auto.target.text.bd9b4ecd": {
@@ -39140,7 +39595,8 @@
         "app.js:5887",
         "app.js:5995",
         "app.js:6040",
-        "app.js:6080"
+        "app.js:6080",
+        "src/features/editor/segment-row-presentation-service.js:72"
       ]
     },
     "auto.target.txt.9c1f04e1": {
@@ -39228,7 +39684,8 @@
         "app.js:5679",
         "app.js:5781",
         "app.js:5826",
-        "app.js:5866"
+        "app.js:5866",
+        "src/features/resources/resources-presentation-service.js:206"
       ]
     },
     "auto.taroko.578b2510": {
@@ -39257,6 +39714,15 @@
         "app.js:531",
         "app.js:535",
         "app.js:543"
+      ]
+    },
+    "auto.tb.fbce2c36": {
+      "message": "tb",
+      "description": "Generated interface text from src/features/resources/resources-presentation-service.js.",
+      "locations": [
+        "src/features/projects/project-resource-selection-controller.js:33",
+        "src/features/resources/resources-presentation-service.js:23",
+        "src/features/resources/resources-presentation-service.js:270"
       ]
     },
     "auto.tb.name.b09f7471": {
@@ -39370,7 +39836,8 @@
         "app.js:1536",
         "app.js:1581",
         "app.js:1635",
-        "app.js:1704"
+        "app.js:1704",
+        "src/features/import-export/project-package-portability-service.js:121"
       ]
     },
     "auto.term.could.not.be.moved.to.trash.existing..b4407f72": {
@@ -39577,7 +40044,9 @@
         "app.js:1719",
         "app.js:1773",
         "app.js:1842",
-        "index.html"
+        "index.html",
+        "src/app/application-trash-controller.js:98",
+        "src/reports/report-document-composition-service.js:219"
       ]
     },
     "auto.termbase.e2ae11d6": {
@@ -40027,7 +40496,10 @@
         "app.js:12951",
         "app.js:13016",
         "app.js:13023",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:166",
+        "src/reports/report-document-composition-service.js:213",
+        "src/reports/report-document-composition-service.js:335"
       ]
     },
     "auto.terminology.d4e28002": {
@@ -40521,7 +40993,9 @@
         "app.js:8199",
         "app.js:8222",
         "app.js:8262",
-        "app.js:8294"
+        "app.js:8294",
+        "src/features/editor/segment-command-restoration-controller.js:232",
+        "src/features/editor/segment-command-restoration-controller.js:96"
       ]
     },
     "auto.the.bridge.requires.1f131a87": {
@@ -40548,7 +41022,8 @@
         "app.js:3526",
         "app.js:3571",
         "app.js:3621",
-        "app.js:3673"
+        "app.js:3673",
+        "src/features/import-export/delivery-export-controller.js:150"
       ]
     },
     "auto.the.local.first.translation.workspace.3213bfcc": {
@@ -40621,7 +41096,8 @@
         "app.js:2545",
         "app.js:2590",
         "app.js:2640",
-        "app.js:2692"
+        "app.js:2692",
+        "src/app/application-offline-shell-controller.js:139"
       ]
     },
     "auto.the.original.split.segment.is.no.longer.av.cd5f6e17": {
@@ -40673,7 +41149,8 @@
       "locations": [
         "app.js:5642",
         "app.js:5687",
-        "app.js:5727"
+        "app.js:5727",
+        "src/features/resources/resource-mutation-controller.js:91"
       ]
     },
     "auto.the.reversible.segment.merge.service.is.un.6deeed60": {
@@ -40831,7 +41308,8 @@
         "app.js:12871",
         "app.js:12893",
         "app.js:12958",
-        "app.js:12965"
+        "app.js:12965",
+        "src/reports/report-document-composition-service.js:263"
       ]
     },
     "auto.this.hosted.openai.compatible.endpoint.is..e837f727": {
@@ -40888,7 +41366,8 @@
         "app.js:13001",
         "app.js:13023",
         "app.js:13088",
-        "app.js:13095"
+        "app.js:13095",
+        "src/reports/report-document-composition-service.js:416"
       ]
     },
     "auto.this.report.contains.project.metadata.coun.166bb44c": {
@@ -40918,7 +41397,8 @@
         "app.js:12871",
         "app.js:12893",
         "app.js:12958",
-        "app.js:12965"
+        "app.js:12965",
+        "src/reports/report-document-composition-service.js:263"
       ]
     },
     "auto.tibetan.8b6a4f79": {
@@ -40990,7 +41470,8 @@
         "app.js:12864",
         "app.js:12886",
         "app.js:12951",
-        "app.js:12958"
+        "app.js:12958",
+        "src/reports/report-document-composition-service.js:251"
       ]
     },
     "auto.timed.out.waiting.for.offline.app.shell.b6a8fff3": {
@@ -41016,7 +41497,8 @@
         "app.js:2491",
         "app.js:2536",
         "app.js:2586",
-        "app.js:2638"
+        "app.js:2638",
+        "src/app/application-offline-shell-controller.js:78"
       ]
     },
     "auto.timed.out.waiting.for.offline.app.shell.co.618a14ff": {
@@ -41042,7 +41524,8 @@
         "app.js:2506",
         "app.js:2551",
         "app.js:2601",
-        "app.js:2653"
+        "app.js:2653",
+        "src/app/application-offline-shell-controller.js:96"
       ]
     },
     "auto.timeout.ms.15b720a7": {
@@ -41138,7 +41621,11 @@
         "app.js:2710",
         "app.js:2755",
         "app.js:2805",
-        "app.js:2857"
+        "app.js:2857",
+        "src/features/import-export/project-package-portability-service.js:120",
+        "src/features/projects/project-resource-selection-controller.js:33",
+        "src/features/resources/resources-presentation-service.js:23",
+        "src/features/resources/resources-presentation-service.js:246"
       ]
     },
     "auto.tm.entry.could.not.be.moved.to.trash.exist.5964f583": {
@@ -41516,7 +42003,8 @@
         "app.js:2806",
         "app.js:2851",
         "app.js:2901",
-        "app.js:2953"
+        "app.js:2953",
+        "src/features/editor/segment-provenance-service.js:54"
       ]
     },
     "auto.tm.pretranslation.match.value1.from.value2.60824e35": {
@@ -41539,7 +42027,8 @@
         "app.js:2805",
         "app.js:2850",
         "app.js:2900",
-        "app.js:2952"
+        "app.js:2952",
+        "src/features/editor/segment-provenance-service.js:50"
       ]
     },
     "auto.tm.pretranslation.settings.are.unavailable.4ffa2fc5": {
@@ -41698,7 +42187,8 @@
         "app.js:12954",
         "app.js:13019",
         "app.js:13026",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:338"
       ]
     },
     "auto.tongan.4d339fb5": {
@@ -41766,7 +42256,8 @@
         "app.js:12953",
         "app.js:12975",
         "app.js:13040",
-        "app.js:13047"
+        "app.js:13047",
+        "src/reports/report-document-composition-service.js:359"
       ]
     },
     "auto.tosk.albanian.a566892f": {
@@ -42047,7 +42538,8 @@
         "app.js:1673",
         "app.js:1718",
         "app.js:1772",
-        "app.js:1841"
+        "app.js:1841",
+        "src/app/application-trash-controller.js:97"
       ]
     },
     "auto.trash.6aa46034": {
@@ -42081,7 +42573,8 @@
         "app.js:1673",
         "app.js:1727",
         "app.js:1796",
-        "index.html"
+        "index.html",
+        "src/app/application-trash-controller.js:47"
       ]
     },
     "auto.trash.emptied.permanently.dc810f55": {
@@ -42155,7 +42648,8 @@
         "app.js:1628",
         "app.js:1673",
         "app.js:1727",
-        "app.js:1796"
+        "app.js:1796",
+        "src/app/application-trash-controller.js:46"
       ]
     },
     "auto.trash.value1.item.s.1d905565": {
@@ -42172,7 +42666,8 @@
         "app.js:1629",
         "app.js:1674",
         "app.js:1728",
-        "app.js:1797"
+        "app.js:1797",
+        "src/app/application-trash-controller.js:50"
       ]
     },
     "auto.try.again.042c862e": {
@@ -42525,7 +43020,10 @@
         "app.js:12900",
         "app.js:12907",
         "app.js:12951",
-        "app.js:12958"
+        "app.js:12958",
+        "src/reports/report-document-composition-service.js:190",
+        "src/reports/report-document-composition-service.js:251",
+        "src/reports/report-presentation-service.js:78"
       ]
     },
     "auto.udmurt.48754816": {
@@ -42704,7 +43202,8 @@
         "app.js:4018",
         "app.js:4150",
         "app.js:4195",
-        "app.js:4247"
+        "app.js:4247",
+        "src/features/resources/resource-catalog-service.js:38"
       ]
     },
     "auto.unranked.risk.65d76339": {
@@ -42740,7 +43239,8 @@
         "app.js:8671",
         "app.js:8692",
         "app.js:8732",
-        "app.js:8764"
+        "app.js:8764",
+        "src/features/quality/quality-presentation-service.js:96"
       ]
     },
     "auto.unsaved.changes.29267269": {
@@ -42844,7 +43344,9 @@
         "app.js:12857",
         "app.js:12864",
         "app.js:12900",
-        "app.js:12907"
+        "app.js:12907",
+        "src/reports/report-document-composition-service.js:147",
+        "src/reports/report-document-composition-service.js:190"
       ]
     },
     "auto.untranslated.segments.only.f21e4116": {
@@ -42866,7 +43368,8 @@
         "app.js:2547",
         "app.js:2592",
         "app.js:2642",
-        "app.js:2694"
+        "app.js:2694",
+        "src/app/application-offline-shell-controller.js:141"
       ]
     },
     "auto.update.ready.1fd080d5": {
@@ -42882,7 +43385,8 @@
         "app.js:2588",
         "app.js:2638",
         "app.js:2690",
-        "index.html"
+        "index.html",
+        "src/app/application-offline-shell-controller.js:137"
       ]
     },
     "auto.upper.sorbian.3dcd2223": {
@@ -43254,6 +43758,13 @@
         "app.js:10560",
         "app.js:10568",
         "app.js:10576"
+      ]
+    },
+    "auto.value1.cd176dc1": {
+      "message": "({value1})",
+      "description": "Generated interface text from src/i18n/ui-locale-orchestration-controller.js.",
+      "locations": [
+        "src/i18n/ui-locale-orchestration-controller.js:67"
       ]
     },
     "auto.value1.confirmed.value2.open.value3.total.cb19a466": {
@@ -43668,7 +44179,23 @@
         "app.js:7667",
         "app.js:7707",
         "app.js:7739",
-        "qa.js:24"
+        "qa.js:24",
+        "src/features/editor/concordance-controller.js:152",
+        "src/features/projects/project-home-presentation-controller.js:93",
+        "src/features/projects/project-list-presentation-controller.js:61",
+        "src/features/quality/qa-results-controller.js:122",
+        "src/reports/report-document-composition-service.js:216",
+        "src/reports/report-document-composition-service.js:223",
+        "src/reports/report-document-composition-service.js:228",
+        "src/reports/report-document-composition-service.js:237",
+        "src/reports/report-document-composition-service.js:255",
+        "src/reports/report-document-composition-service.js:259",
+        "src/reports/report-document-composition-service.js:366",
+        "src/reports/report-document-composition-service.js:377",
+        "src/reports/report-presentation-service.js:42",
+        "src/reports/report-presentation-service.js:47",
+        "src/reports/report-presentation-service.js:55",
+        "src/reports/report-presentation-service.js:64"
       ]
     },
     "auto.value1.delete.failed.becc951c": {
@@ -43736,7 +44263,8 @@
         "app.js:3531",
         "app.js:3576",
         "app.js:3626",
-        "app.js:3678"
+        "app.js:3678",
+        "src/features/import-export/delivery-export-controller.js:156"
       ]
     },
     "auto.value1.empty.target.segment.s.will.remain..d24ebc2b": {
@@ -43756,7 +44284,8 @@
         "app.js:3534",
         "app.js:3579",
         "app.js:3629",
-        "app.js:3681"
+        "app.js:3681",
+        "src/features/import-export/delivery-export-controller.js:163"
       ]
     },
     "auto.value1.export.a.portable.project.package.s.d99f095f": {
@@ -43861,7 +44390,8 @@
         "app.js:11918",
         "app.js:11939",
         "app.js:11979",
-        "app.js:12011"
+        "app.js:12011",
+        "src/features/import-export/file-import-service.js:71"
       ]
     },
     "auto.value1.is.still.running.wait.for.it.to.fin.e3b8ef72": {
@@ -43927,7 +44457,8 @@
         "app.js:11904",
         "app.js:11925",
         "app.js:11965",
-        "app.js:11997"
+        "app.js:11997",
+        "src/features/import-export/file-import-service.js:57"
       ]
     },
     "auto.value1.is.too.large.choose.a.loopcat.json..b90e78a2": {
@@ -43960,7 +44491,8 @@
         "app.js:11910",
         "app.js:11931",
         "app.js:11971",
-        "app.js:12003"
+        "app.js:12003",
+        "src/features/import-export/file-import-service.js:63"
       ]
     },
     "auto.value1.item.languagepair.fd58e223": {
@@ -44078,7 +44610,8 @@
         "app.js:3537",
         "app.js:3582",
         "app.js:3632",
-        "app.js:3684"
+        "app.js:3684",
+        "src/features/import-export/delivery-export-controller.js:170"
       ]
     },
     "auto.value1.note.value2.08a22b52": {
@@ -44153,7 +44686,8 @@
         "app.js:12205",
         "app.js:12226",
         "app.js:12291",
-        "app.js:12298"
+        "app.js:12298",
+        "src/features/import-export/project-import-restore-controller.js:157"
       ]
     },
     "auto.value1.project.value2.restored.dfc26f63": {
@@ -44409,7 +44943,8 @@
         "app.js:12155",
         "app.js:12176",
         "app.js:12241",
-        "app.js:12248"
+        "app.js:12248",
+        "src/features/import-export/project-import-restore-controller.js:84"
       ]
     },
     "auto.value1.segment.value2.restored.b17711a1": {
@@ -44746,7 +45281,9 @@
         "app.js:9541",
         "app.js:9562",
         "app.js:9602",
-        "app.js:9634"
+        "app.js:9634",
+        "src/reports/report-document-composition-service.js:209",
+        "src/reports/report-document-composition-service.js:210"
       ]
     },
     "auto.value1.value2.50844f2e": {
@@ -44893,7 +45430,9 @@
         "app.js:7632",
         "app.js:7655",
         "app.js:7695",
-        "app.js:7727"
+        "app.js:7727",
+        "src/features/editor/panel-toggle-controller.js:30",
+        "src/features/quality/qa-results-controller.js:108"
       ]
     },
     "auto.value1.value2.8f94dda3": {
@@ -44946,7 +45485,8 @@
         "app.js:3139",
         "app.js:3184",
         "app.js:3234",
-        "app.js:3286"
+        "app.js:3286",
+        "src/i18n/language-input-service.js:127"
       ]
     },
     "auto.value1.value2.connected.d525c3d1": {
@@ -45004,7 +45544,8 @@
         "app.js:1675",
         "app.js:1720",
         "app.js:1774",
-        "app.js:1843"
+        "app.js:1843",
+        "src/app/application-trash-controller.js:99"
       ]
     },
     "auto.value1.value2.df067c3c": {
@@ -45080,7 +45621,8 @@
         "app.js:5077",
         "app.js:5165",
         "app.js:5210",
-        "app.js:5250"
+        "app.js:5250",
+        "src/features/editor/editor-shell-presentation-controller.js:160"
       ]
     },
     "auto.value1.value2.value3.value4.value5.value6.a9a7eeac": {
@@ -45104,7 +45646,8 @@
         "app.js:5140",
         "app.js:5228",
         "app.js:5273",
-        "app.js:5313"
+        "app.js:5313",
+        "src/features/projects/project-home-presentation-controller.js:77"
       ]
     },
     "auto.value2.35535dde": {
@@ -45170,7 +45713,8 @@
         "app.js:3862",
         "app.js:4060",
         "app.js:4112",
-        "app.js:4160"
+        "app.js:4160",
+        "src/features/import-export/text-encoding-input-service.js:35"
       ]
     },
     "auto.value3.2e98d68f": {
@@ -45213,7 +45757,8 @@
         "app.js:7644",
         "app.js:7667",
         "app.js:7707",
-        "app.js:7739"
+        "app.js:7739",
+        "src/features/quality/qa-results-controller.js:122"
       ]
     },
     "auto.value5.c769091e": {
@@ -45242,7 +45787,8 @@
         "app.js:7644",
         "app.js:7667",
         "app.js:7707",
-        "app.js:7739"
+        "app.js:7739",
+        "src/features/quality/qa-results-controller.js:122"
       ]
     },
     "auto.venda.928ceab0": {
@@ -45535,7 +46081,8 @@
         "app.js:7628",
         "app.js:7651",
         "app.js:7691",
-        "app.js:7723"
+        "app.js:7723",
+        "src/features/quality/qa-results-controller.js:103"
       ]
     },
     "auto.warnings.1430f976": {
@@ -45586,7 +46133,9 @@
         "app.js:4330",
         "app.js:4418",
         "app.js:4463",
-        "app.js:4507"
+        "app.js:4507",
+        "src/app/application-validation-presentation-controller.js:73",
+        "src/reports/report-document-composition-service.js:407"
       ]
     },
     "auto.warnings.bd207fab": {
@@ -45633,7 +46182,9 @@
         "app.js:4431",
         "app.js:4463",
         "app.js:4483",
-        "app.js:4507"
+        "app.js:4507",
+        "src/app/application-validation-presentation-controller.js:1",
+        "src/app/application-validation-presentation-controller.js:73"
       ]
     },
     "auto.welsh.e71d224a": {
@@ -45779,7 +46330,8 @@
         "app.js:12813",
         "app.js:12835",
         "app.js:12900",
-        "app.js:12907"
+        "app.js:12907",
+        "src/reports/report-document-composition-service.js:190"
       ]
     },
     "auto.workflow.preset.817d7ce5": {
@@ -45793,7 +46345,8 @@
       "message": "Workspace",
       "description": "Static interface text from index.html.",
       "locations": [
-        "index.html"
+        "index.html",
+        "src/features/editor/editor-shell-presentation-controller.js:171"
       ]
     },
     "auto.workspace.action.failed.0de3f9c1": {
@@ -46283,6 +46836,13 @@
         "app.js:11744"
       ]
     },
+    "auto.xliff.import.cfc793bd": {
+      "message": "XLIFF import",
+      "description": "Generated interface text from src/features/import-export/project-document-import-controller.js.",
+      "locations": [
+        "src/features/import-export/project-document-import-controller.js:226"
+      ]
+    },
     "auto.xliff.value1.export.failed.66d381c8": {
       "message": "XLIFF {value1} export failed",
       "description": "Generated interface text from app.js.",
@@ -46496,7 +47056,8 @@
         "app.js:2547",
         "app.js:2592",
         "app.js:2642",
-        "app.js:2694"
+        "app.js:2694",
+        "src/app/application-offline-shell-controller.js:141"
       ]
     },
     "auto.your.saved.project.and.workspace.state.wil.45c4e9ef": {
@@ -46511,7 +47072,8 @@
         "app.js:2546",
         "app.js:2591",
         "app.js:2641",
-        "app.js:2693"
+        "app.js:2693",
+        "src/app/application-offline-shell-controller.js:140"
       ]
     },
     "auto.zh.68a5d7a1": {
@@ -46726,7 +47288,8 @@
         "app.js:12990",
         "app.js:13012",
         "app.js:13077",
-        "app.js:13084"
+        "app.js:13084",
+        "src/reports/report-document-composition-service.js:405"
       ]
     },
     "ui.label.eventCount": {
@@ -46816,7 +47379,9 @@
         "app.js:12920",
         "app.js:12942",
         "app.js:13007",
-        "app.js:13014"
+        "app.js:13014",
+        "src/reports/report-document-composition-service.js:130",
+        "src/reports/report-document-composition-service.js:326"
       ]
     },
     "ui.label.go": {
@@ -46884,7 +47449,9 @@
         "app.js:12942",
         "app.js:12964",
         "app.js:13029",
-        "app.js:13036"
+        "app.js:13036",
+        "src/reports/report-document-composition-service.js:159",
+        "src/reports/report-document-composition-service.js:348"
       ]
     },
     "ui.label.hostedNetwork": {
@@ -46905,7 +47472,9 @@
       "message": "Insert",
       "description": "Reusable UI label used by dynamic LoopCAT renderers.",
       "locations": [
-        "app.js"
+        "app.js",
+        "index.html",
+        "src/features/editor/term-suggestions-controller.js:95"
       ]
     },
     "ui.label.languages": {
@@ -46978,7 +47547,8 @@
         "app.js:12827",
         "app.js:12849",
         "app.js:12914",
-        "app.js:12921"
+        "app.js:12921",
+        "src/reports/report-document-composition-service.js:204"
       ]
     },
     "ui.label.managedDeployments": {
@@ -47114,7 +47684,8 @@
         "app.js:12617",
         "app.js:12639",
         "app.js:12704",
-        "app.js:12711"
+        "app.js:12711",
+        "src/reports/report-presentation-service.js:73"
       ]
     },
     "ui.label.noSourceFile": {
@@ -47218,7 +47789,9 @@
         "app.js:12931",
         "app.js:12953",
         "app.js:13018",
-        "app.js:13025"
+        "app.js:13025",
+        "src/reports/report-document-composition-service.js:135",
+        "src/reports/report-document-composition-service.js:337"
       ]
     },
     "ui.label.ollamaHostedCloud": {
@@ -47325,7 +47898,9 @@
         "app.js:7215",
         "app.js:7309",
         "app.js:7310",
-        "app.js:7349"
+        "app.js:7349",
+        "src/features/quality/quality-presentation-service.js:84",
+        "src/reports/report-document-composition-service.js:363"
       ]
     },
     "ui.label.riskItems": {
@@ -47410,7 +47985,9 @@
         "app.js:12862",
         "app.js:12900",
         "app.js:12907",
-        "index.html"
+        "index.html",
+        "src/reports/report-document-composition-service.js:145",
+        "src/reports/report-document-composition-service.js:190"
       ]
     },
     "ui.label.simplified": {
@@ -47449,7 +48026,8 @@
         "app.js:5648",
         "app.js:5752",
         "app.js:5797",
-        "app.js:5837"
+        "app.js:5837",
+        "src/features/resources/resources-presentation-service.js:174"
       ]
     },
     "ui.label.sourceFile": {
@@ -47502,7 +48080,8 @@
         "app.js:5649",
         "app.js:5753",
         "app.js:5798",
-        "app.js:5838"
+        "app.js:5838",
+        "src/features/resources/resources-presentation-service.js:175"
       ]
     },
     "ui.label.termbase": {

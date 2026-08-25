@@ -297,6 +297,15 @@ test("QualityReviewController owns form and action events without owning domain 
   elements.qualityIssueSeveritySelect.value = "critical";
   elements.qualityDecisionNoteInput.value = " Evidence ";
   elements.reviewForm.dispatch("submit");
+  const saveShortcut = elements.reviewCommentInput.dispatch("keydown", {
+    ctrlKey: true,
+    key: "Enter",
+    stopPropagation() {
+      this.propagationStopped = true;
+    }
+  });
+  assert.equal(saveShortcut.defaultPrevented, true);
+  assert.equal(saveShortcut.propagationStopped, true);
   elements.qualityForm.dispatch("submit");
   elements.qualityDecisionForm.dispatch("submit");
   elements.refreshQualityRiskBtn.dispatch("click");
@@ -328,6 +337,7 @@ test("QualityReviewController owns form and action events without owning domain 
 
   assert.deepEqual(calls, [
     ["review", { reviewState: "reviewed", reviewNote: "Note", commentBody: "Comment" }],
+    ["review", { reviewState: "reviewed", reviewNote: "Note", commentBody: "Comment" }],
     [
       "profile",
       {
@@ -348,7 +358,7 @@ test("QualityReviewController owns form and action events without owning domain 
   ]);
   controller.unmount();
   elements.refreshQualityRiskBtn.dispatch("click");
-  assert.equal(calls.length, 7, "unmount removes the controller's delegated listeners");
+  assert.equal(calls.length, 8, "unmount removes the controller's delegated listeners");
 });
 
 test("QualityReviewController preserves active form edits and restores risk focus across rendering", async () => {

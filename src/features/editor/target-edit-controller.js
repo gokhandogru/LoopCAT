@@ -1,3 +1,5 @@
+import { KEYBOARD_SHORTCUTS, isUsableShortcutEvent, matchesShortcut } from "../../app/keyboard-shortcuts.js";
+
 function normalizeSelection(selection, targetLength) {
   if (!selection) return null;
   const length = Math.max(0, Number(targetLength) || 0);
@@ -28,7 +30,9 @@ function normalizeSelection(selection, targetLength) {
  *   getVisiblePosition?: (index: number) => number,
  *   normalizeKey?: (value: unknown) => string,
  *   undo?: () => Promise<unknown> | unknown,
- *   redo?: () => Promise<unknown> | unknown
+ *   redo?: () => Promise<unknown> | unknown,
+ *   quickInsert?: { hasSuggestions?: () => boolean, open?: () => Promise<unknown> | unknown },
+ *   protectedTags?: { missing?: (segment: any) => any[], insert?: (tagTexts: string[]) => Promise<unknown> | unknown }
  * }} options
  */
 export function createTargetEditController(options) {
@@ -86,6 +90,8 @@ export function createTargetEditController(options) {
     typeof options.normalizeKey === "function" ? options.normalizeKey : (value) => String(value || "").toLowerCase();
   const undo = typeof options.undo === "function" ? options.undo : () => {};
   const redo = typeof options.redo === "function" ? options.redo : () => {};
+  const quickInsert = options.quickInsert || {};
+  const protectedTags = options.protectedTags || {};
   const composingEditors = new WeakSet();
 
   function finalize(segmentId) {
@@ -151,31 +157,58 @@ export function createTargetEditController(options) {
   }
 
   function handleKeydown(event, index) {
-    const key = normalizeKey(event.key);
-    if ((event.ctrlKey || event.metaKey) && key === "z" && !event.altKey) {
+    if (!isUsableShortcutEvent(event)) return;
+    if (
+      matchesShortcut(event, KEYBOARD_SHORTCUTS.undo, normalizeKey) ||
+      matchesShortcut(event, KEYBOARD_SHORTCUTS.redo, normalizeKey)
+    ) {
       finalize(editorSessionStore.getSegments()[index]?.id || "");
       const projectId = getCommandProjectId() || editorSessionStore.getProject()?.id || null;
-      const canRun = event.shiftKey ? commandBus.canRedo(projectId) : commandBus.canUndo(projectId);
+      const redoRequested = matchesShortcut(event, KEYBOARD_SHORTCUTS.redo, normalizeKey);
+      const canRun = redoRequested ? commandBus.canRedo(projectId) : commandBus.canUndo(projectId);
       if (canRun) {
         event.preventDefault();
         event.stopPropagation();
-        void (event.shiftKey ? redo() : undo());
+        void (redoRequested ? redo() : undo());
         return;
       }
     }
-    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+    if (matchesShortcut(event, KEYBOARD_SHORTCUTS.confirm, normalizeKey)) {
       event.preventDefault();
       void confirmSegment();
       return;
     }
-    if (event.altKey && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+    if (
+      matchesShortcut(event, KEYBOARD_SHORTCUTS["visible-next"], normalizeKey) ||
+      matchesShortcut(event, KEYBOARD_SHORTCUTS["visible-previous"], normalizeKey)
+    ) {
       event.preventDefault();
       const visible = getVisibleIndexes();
       const position = getVisiblePosition(index);
-      const offset = event.key === "ArrowDown" ? 1 : -1;
+      const offset = matchesShortcut(event, KEYBOARD_SHORTCUTS["visible-next"], normalizeKey) ? 1 : -1;
       const nextPosition = Math.max(0, Math.min(position + offset, visible.length - 1));
       const next = visible[nextPosition];
       void Promise.resolve(activateSegment(next)).then(() => focusActive());
+      return;
+    }
+    if (matchesShortcut(event, KEYBOARD_SHORTCUTS["quick-insert"], normalizeKey) && quickInsert.hasSuggestions?.()) {
+      event.preventDefault();
+      event.stopPropagation();
+      void quickInsert.open?.();
+      return;
+    }
+    if (
+      matchesShortcut(event, KEYBOARD_SHORTCUTS["all-tags"], normalizeKey) ||
+      matchesShortcut(event, KEYBOARD_SHORTCUTS["next-tag"], normalizeKey)
+    ) {
+      const segment = editorSessionStore.getSegments()[index];
+      const missing = protectedTags.missing?.(segment) || [];
+      const insertAll = matchesShortcut(event, KEYBOARD_SHORTCUTS["all-tags"], normalizeKey);
+      const tagTexts = (insertAll ? missing : missing.slice(0, 1)).map((tag) => String(tag?.text || tag?.label || ""));
+      if (!tagTexts.length) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void protectedTags.insert?.(tagTexts);
     }
   }
 
@@ -183,6 +216,14 @@ export function createTargetEditController(options) {
     if (!textarea?.addEventListener) {
       throw new TypeError("TargetEditController requires a target textarea.");
     }
+    textarea.setAttribute?.(
+      "aria-keyshortcuts",
+      "Control+Enter Meta+Enter Alt+ArrowDown Alt+ArrowUp Tab F8 Control+Shift+F8 Meta+Shift+F8"
+    );
+    textarea.setAttribute?.(
+      "title",
+      "Confirm: Ctrl/Cmd+Enter · Quick Insert: Tab · Navigate: Alt+Up/Down · Insert tags: F8"
+    );
     const listeners = {
       focus: () => {
         editingCell?.classList?.add?.("editing");

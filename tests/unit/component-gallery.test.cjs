@@ -21,6 +21,7 @@ test("the test-only component gallery covers the semantic component states", () 
     "banner",
     "toast",
     "dialog",
+    "quick-insert",
     "panel",
     "row",
     "ai-suggestion",

@@ -52,9 +52,14 @@ export function createTmMatchesController(options) {
     throw new TypeError("TmMatchesController requires browser DOM boundaries.");
   }
 
+  let currentResults = [];
+  let resultContext = Object.freeze({ projectId: "", segmentId: "" });
+
   async function refresh() {
     const segment = session.getActiveSegment();
     if (!segment || !session.getProject()) {
+      currentResults = [];
+      resultContext = Object.freeze({ projectId: "", segmentId: "" });
       root.textContent = localization.source("No active segment.");
       root.classList.add("muted");
       return;
@@ -68,6 +73,8 @@ export function createTmMatchesController(options) {
       tmNames: tm.getNames()
     });
     if (session.getProject()?.id !== projectId || session.getActiveSegment()?.id !== segmentId) return;
+    currentResults = matches.slice();
+    resultContext = Object.freeze({ projectId, segmentId });
     root.classList.toggle("muted", !matches.length);
     if (!matches.length) {
       root.textContent = localization.source("No TM matches.");
@@ -98,5 +105,12 @@ export function createTmMatchesController(options) {
     root.replaceChildren(fragment);
   }
 
-  return Object.freeze({ refresh });
+  function getResults() {
+    const project = session.getProject();
+    const segment = session.getActiveSegment();
+    if (project?.id !== resultContext.projectId || segment?.id !== resultContext.segmentId) return [];
+    return currentResults.slice();
+  }
+
+  return Object.freeze({ getResults, refresh });
 }

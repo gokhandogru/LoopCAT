@@ -8,6 +8,8 @@
       content="default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'"
     />
     <title>LoopCAT component gallery</title>
+    <link rel="stylesheet" href="../../styles.css?gallery=quick-insert" />
+    <link rel="stylesheet" href="../../liquid-glass/styles.css?gallery=quick-insert" />
     <link rel="stylesheet" href="../../src/ui/tokens.css" />
     <link rel="stylesheet" href="../../src/ui/themes.css" />
     <link rel="stylesheet" href="../../src/ui/base.css" />
@@ -73,6 +75,15 @@
       .component-gallery .update-ready-banner {
         position: static;
         max-width: none;
+      }
+
+      .component-gallery [data-component="quick-insert"] {
+        grid-column: 1 / -1;
+      }
+
+      .component-gallery .quick-insert-popover {
+        width: 100%;
+        max-height: none;
       }
 
       .gallery-statuses {
@@ -237,6 +248,45 @@
                 <button type="button">Close</button>
               </div>
             </dialog>
+          </article>
+
+          <article class="gallery-sample" data-component="quick-insert">
+            <h3>Quick Insert</h3>
+            <section class="quick-insert-popover" role="dialog" aria-labelledby="gallery-quick-insert-title">
+              <header>
+                <div>
+                  <h2 id="gallery-quick-insert-title">Quick Insert</h2>
+                  <p>TM and AI replace the target; terms insert at the caret.</p>
+                </div>
+                <button type="button" aria-label="Close Quick Insert">Close</button>
+              </header>
+              <div class="quick-insert-results" role="listbox" aria-label="Available translation suggestions">
+                <button class="quick-insert-result" type="button" role="option" aria-selected="false">
+                  <kbd>1</kbd>
+                  <span class="quick-insert-heading"><strong>TM match</strong><span>96% · Main TM</span></span>
+                  <span class="quick-insert-source">Save the translated file.</span>
+                  <span class="quick-insert-target">Çevrilmiş dosyayı kaydedin.</span>
+                </button>
+                <button class="quick-insert-result active" type="button" role="option" aria-selected="true">
+                  <kbd>2</kbd>
+                  <span class="quick-insert-heading"><strong>Approved term</strong><span>Main TB</span></span>
+                  <span class="quick-insert-source">translated file</span>
+                  <span class="quick-insert-target">çevrilmiş dosya</span>
+                </button>
+                <button class="quick-insert-result" type="button" role="option" aria-selected="false">
+                  <kbd>3</kbd>
+                  <span class="quick-insert-heading"><strong>Saved AI suggestion</strong><span>Local AI</span></span>
+                  <span class="quick-insert-source">Replaces the target and marks it for review</span>
+                  <span class="quick-insert-target">Lütfen çevrilmiş dosyayı kaydedin.</span>
+                </button>
+              </div>
+              <footer>
+                <span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span>
+                <span><kbd>1–9</kbd> Choose</span>
+                <span><kbd>Enter</kbd> Insert</span>
+                <span><kbd>Esc</kbd> Close</span>
+              </footer>
+            </section>
           </article>
         </div>
       </section>

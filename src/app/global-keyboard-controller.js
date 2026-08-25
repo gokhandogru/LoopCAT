@@ -1,3 +1,11 @@
+import {
+  KEYBOARD_SHORTCUTS,
+  isEditableKeyboardTarget,
+  isTargetEditor,
+  isUsableShortcutEvent,
+  matchesShortcut
+} from "./keyboard-shortcuts.js";
+
 /**
  * Owns application-global keyboard listener lifecycle and shortcut routing.
  * Command, palette, concordance, Focus-mode, session, and navigation behavior
@@ -16,7 +24,9 @@
  *   context: { getView: () => string, hasProject: () => boolean },
  *   palette?: { isOpen?: () => boolean, open?: () => unknown, close?: () => unknown } | null,
  *   concordance: { isOpen: () => boolean, open: () => unknown, close: () => unknown },
- *   focus: { isActive: () => boolean, toggle: () => unknown, disable: () => unknown }
+ *   quickInsert?: { isOpen?: () => boolean, close?: () => unknown } | null,
+ *   focus: { isActive: () => boolean, toggle: () => unknown, disable: () => unknown },
+ *   editor?: Record<string, Function> | null
  * }} options
  */
 export function createGlobalKeyboardController(options) {
@@ -26,7 +36,9 @@ export function createGlobalKeyboardController(options) {
   const context = options?.context;
   const palette = options?.palette;
   const concordance = options?.concordance;
+  const quickInsert = options?.quickInsert;
   const focus = options?.focus;
+  const editor = options?.editor || {};
   if (!target?.addEventListener || !target?.removeEventListener || typeof normalizeKey !== "function") {
     throw new TypeError("GlobalKeyboardController requires an event target and key normalizer.");
   }
@@ -59,49 +71,118 @@ export function createGlobalKeyboardController(options) {
 
   let mounted = false;
 
+  function run(event, action) {
+    if (typeof action !== "function") return false;
+    event.preventDefault();
+    event.stopPropagation();
+    void action();
+    return true;
+  }
+
   function handleKeydown(event) {
-    const key = normalizeKey(event.key);
-    const editableTarget = event.target?.matches?.("input, textarea, [contenteditable='true']");
-    if ((event.ctrlKey || event.metaKey) && key === "z" && !editableTarget) {
+    if (!isUsableShortcutEvent(event)) return;
+    const editableTarget = isEditableKeyboardTarget(event.target);
+    const targetEditor = isTargetEditor(event.target);
+    if (
+      !editableTarget &&
+      (matchesShortcut(event, KEYBOARD_SHORTCUTS.undo, normalizeKey) ||
+        matchesShortcut(event, KEYBOARD_SHORTCUTS.redo, normalizeKey))
+    ) {
       const projectId = commands.getProjectId();
-      const canRun = event.shiftKey ? commands.canRedo(projectId) : commands.canUndo(projectId);
+      const redoRequested = matchesShortcut(event, KEYBOARD_SHORTCUTS.redo, normalizeKey);
+      const canRun = redoRequested ? commands.canRedo(projectId) : commands.canUndo(projectId);
       if (canRun) {
         event.preventDefault();
         event.stopPropagation();
-        void (event.shiftKey ? commands.redo() : commands.undo());
+        void (redoRequested ? commands.redo() : commands.undo());
         return;
       }
     }
-    if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === "p") {
-      event.preventDefault();
-      event.stopPropagation();
-      palette?.open?.();
+    if (
+      matchesShortcut(event, KEYBOARD_SHORTCUTS.palette, normalizeKey) ||
+      matchesShortcut(event, KEYBOARD_SHORTCUTS["palette-compat"], normalizeKey)
+    ) {
+      quickInsert?.close?.();
+      run(event, palette?.open);
       return;
     }
-    const isK = key === "k" || event.code === "KeyK";
-    if (isK && (event.ctrlKey || event.metaKey) && !event.altKey) {
-      event.preventDefault();
-      event.stopPropagation();
-      palette?.open?.();
+    const editorReady = context.getView() === "editor" && context.hasProject();
+    if (
+      editorReady &&
+      (matchesShortcut(event, KEYBOARD_SHORTCUTS.concordance, normalizeKey) ||
+        matchesShortcut(event, KEYBOARD_SHORTCUTS["concordance-legacy"], normalizeKey))
+    ) {
+      quickInsert?.close?.();
+      run(event, concordance.open);
+      return;
+    }
+    if (editorReady && matchesShortcut(event, KEYBOARD_SHORTCUTS["focus-mode"], normalizeKey)) {
+      run(event, focus.toggle);
+      return;
+    }
+    if (editorReady && matchesShortcut(event, KEYBOARD_SHORTCUTS["find-segments"], normalizeKey)) {
+      run(event, editor.focusSearch);
+      return;
+    }
+    if (editorReady && matchesShortcut(event, KEYBOARD_SHORTCUTS["replace-target"], normalizeKey)) {
+      run(event, editor.openReplace);
+      return;
+    }
+    if (editorReady && matchesShortcut(event, KEYBOARD_SHORTCUTS["review-comment"], normalizeKey)) {
+      run(event, editor.openReviewComment);
       return;
     }
     if (
-      (event.ctrlKey || event.metaKey) &&
-      event.shiftKey &&
-      key === "f" &&
-      context.getView() === "editor" &&
-      context.hasProject()
+      editorReady &&
+      (!editableTarget || targetEditor) &&
+      matchesShortcut(event, KEYBOARD_SHORTCUTS["copy-source"], normalizeKey)
     ) {
-      event.preventDefault();
-      event.stopPropagation();
-      focus.toggle();
+      run(event, editor.copySource);
       return;
     }
-    const concordanceShortcut = isK && (event.ctrlKey || event.metaKey) && event.altKey;
-    if (concordanceShortcut && context.getView() === "editor") {
+    if (
+      editorReady &&
+      (!editableTarget || targetEditor) &&
+      matchesShortcut(event, KEYBOARD_SHORTCUTS["open-next"], normalizeKey)
+    ) {
+      run(event, editor.nextOpen);
+      return;
+    }
+    if (
+      editorReady &&
+      (!editableTarget || targetEditor) &&
+      matchesShortcut(event, KEYBOARD_SHORTCUTS["open-previous"], normalizeKey)
+    ) {
+      run(event, editor.previousOpen);
+      return;
+    }
+    if (editorReady && matchesShortcut(event, KEYBOARD_SHORTCUTS["next-quality-risk"], normalizeKey)) {
+      run(event, editor.nextQualityRisk);
+      return;
+    }
+    if (editorReady && matchesShortcut(event, KEYBOARD_SHORTCUTS.qa, normalizeKey)) {
+      run(event, editor.runQa);
+      return;
+    }
+    if (
+      editorReady &&
+      (!editableTarget || targetEditor) &&
+      matchesShortcut(event, KEYBOARD_SHORTCUTS["split-segment"], normalizeKey)
+    ) {
+      run(event, editor.splitSegment);
+      return;
+    }
+    if (
+      editorReady &&
+      (!editableTarget || targetEditor) &&
+      matchesShortcut(event, KEYBOARD_SHORTCUTS["merge-segments"], normalizeKey)
+    ) {
+      run(event, editor.mergeSegment);
+      return;
+    }
+    if (event.key === "Escape" && quickInsert?.isOpen?.()) {
       event.preventDefault();
-      event.stopPropagation();
-      concordance.open();
+      quickInsert.close?.();
       return;
     }
     if (event.key === "Escape" && concordance.isOpen()) {

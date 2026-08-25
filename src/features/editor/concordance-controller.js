@@ -74,6 +74,9 @@ export function createConcordanceController(options) {
   }
 
   let mounted = false;
+  let activeIndex = 0;
+  let visibleButtons = [];
+  let returnTarget = null;
 
   function selectedKeyword() {
     const selection = dom.getSelection()?.toString().trim();
@@ -96,15 +99,31 @@ export function createConcordanceController(options) {
   function close() {
     elements.overlay.classList.add("hidden");
     elements.results.replaceChildren();
+    visibleButtons = [];
+    activeIndex = 0;
+    returnTarget?.focus?.();
+  }
+
+  function syncActive() {
+    if (!visibleButtons.length) return;
+    activeIndex = Math.max(0, Math.min(activeIndex, visibleButtons.length - 1));
+    visibleButtons.forEach((button, index) => {
+      const active = index === activeIndex;
+      button.classList?.toggle?.("active", active);
+      button.setAttribute?.("aria-selected", String(active));
+      button.tabIndex = active ? 0 : -1;
+    });
+    visibleButtons[activeIndex]?.focus?.();
   }
 
   async function open() {
     if (navigation.getView() !== "editor" || !session.getProject()) return;
     const keyword = selectedKeyword();
     if (!keyword) {
-      status.set("Select a source word, then press Ctrl+K or Alt+K.", "dirty");
+      status.set("Select source or target text, then press Ctrl/Cmd+Shift+K.", "dirty");
       return;
     }
+    returnTarget = dom.getActiveElement();
     const query = text.normalizeCase(keyword);
     const entries = await tm.listEntries();
     const tmNames = new Set(tm.getNames());
@@ -127,12 +146,14 @@ export function createConcordanceController(options) {
       count: results.length
     });
     if (!results.length) {
+      visibleButtons = [];
       safeHtml.replace(
         elements.results,
         `<div class="muted">${localization.sourceHtml("No TM units contain this keyword.")}</div>`
       );
     } else {
       const fragment = dom.createFragment();
+      visibleButtons = [];
       results.forEach((entry) => {
         const card = dom.createElement("article");
         card.className = "concordance-card";
@@ -147,6 +168,8 @@ export function createConcordanceController(options) {
         const insertButton = dom.createElement("button");
         insertButton.type = "button";
         insertButton.textContent = localization.source("Insert target");
+        insertButton.setAttribute?.("role", "option");
+        insertButton.setAttribute?.("aria-selected", "false");
         insertButton.addEventListener("click", () => {
           target.insert(entry.target, {
             channel: "concordance",
@@ -154,23 +177,47 @@ export function createConcordanceController(options) {
           });
           close();
         });
+        visibleButtons.push(insertButton);
         card.querySelector("footer").append(insertButton);
         fragment.append(card);
       });
       elements.results.replaceChildren(fragment);
     }
     elements.overlay.classList.remove("hidden");
+    activeIndex = 0;
+    syncActive();
   }
 
   const handleClose = () => close();
   const handleOverlayClick = (event) => {
     if (event.target === elements.overlay) close();
   };
+  const handleKeydown = (event) => {
+    if (elements.overlay.classList.contains("hidden") || event.isComposing || event.getModifierState?.("AltGraph"))
+      return;
+    if (event.key === "ArrowDown") activeIndex = (activeIndex + 1) % visibleButtons.length;
+    else if (event.key === "ArrowUp") activeIndex = (activeIndex - 1 + visibleButtons.length) % visibleButtons.length;
+    else if (event.key === "Home") activeIndex = 0;
+    else if (event.key === "End") activeIndex = visibleButtons.length - 1;
+    else if (event.key === "Enter" && visibleButtons.length) {
+      event.preventDefault?.();
+      visibleButtons[activeIndex]?.click?.();
+      return;
+    } else if (event.key === "Escape") {
+      event.preventDefault?.();
+      close();
+      return;
+    } else return;
+    if (!visibleButtons.length) return;
+    event.preventDefault?.();
+    syncActive();
+  };
 
   function mount() {
     if (mounted) return false;
     elements.closeButton.addEventListener("click", handleClose);
     elements.overlay.addEventListener("click", handleOverlayClick);
+    elements.overlay.addEventListener("keydown", handleKeydown);
     mounted = true;
     return true;
   }
@@ -179,9 +226,10 @@ export function createConcordanceController(options) {
     if (!mounted) return false;
     elements.closeButton.removeEventListener("click", handleClose);
     elements.overlay.removeEventListener("click", handleOverlayClick);
+    elements.overlay.removeEventListener("keydown", handleKeydown);
     mounted = false;
     return true;
   }
 
-  return Object.freeze({ close, highlight, mount, open, selectedKeyword, unmount });
+  return Object.freeze({ close, handleKeydown, highlight, mount, open, selectedKeyword, unmount });
 }

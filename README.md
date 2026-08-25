@@ -8,7 +8,7 @@ LoopCAT is a local-first computer-assisted translation (CAT) tool for translator
 
 LoopCAT is designed for a complete single-user workflow: create a project, import source files, translate or post-edit, use TM and terminology, run QA, review changes, recover from packages or backups, and export target files without requiring an internet connection. Local or hosted AI can be added explicitly, but it is optional and does not replace the offline workflow.
 
-[Install](#how-to-install) | [Current status](#current-project-status) | [What works today](#what-works-today) | [Limitations and remaining work](#current-limitations-and-remaining-work) | [AI providers](#local-ai-command-centre) | [Tests](#browser-tests) | [Documentation](docs/README.md) | [Roadmap](ROADMAP.md) | [Brand](docs/brand-guidelines.md) | [License](#license)
+[Install](#how-to-install) | [Current status](#current-project-status) | [What works today](#what-works-today) | [Keyboard shortcuts](docs/keyboard-shortcuts.md) | [AI providers](#local-ai-command-centre) | [Tests](#browser-tests) | [Documentation](docs/README.md) | [Roadmap](ROADMAP.md) | [Brand](docs/brand-guidelines.md) | [License](#license)
 
 ## Current Project Status
 
@@ -73,6 +73,7 @@ The following capabilities are implemented in the current codebase and covered b
 - Choose the LoopCAT interface language from the Workspace menu, including built-in Catalan, English, and Turkish, import custom UI translation JSON, and export the English UI source catalog for translators.
 - Use System, Light, or Dark themes, Balanced or Compact density, Focus mode, and a remembered 280–420 px contextual inspector that becomes an overlay on narrower screens.
 - Open the fuzzy, grouped command palette with `Ctrl/Cmd+K`, navigate it with the keyboard, and reuse recent commands without adding permanent editor clutter.
+- Use the [keyboard-first translation workflow](docs/keyboard-shortcuts.md), including `Tab` Quick Insert for TM, approved terminology, and saved AI suggestions; `Ctrl/Cmd+Enter` confirmation; filtered and open-segment navigation; protected-tag insertion; search, review, QA, and structural commands.
 - Undo and redo ordinary target typing, Copy Source, TM/concordance/tag insertion, target replacement, confirmation, review-state changes, AI suggestion application, TM/AI pretranslation, and compatible split/merge operations through bounded transactional commands.
 - Keep bounded per-segment target revision history for post-editing review.
 - Search and filter segments while translating, including AI-generated pretranslations, AI suggestions, and risk-ranked AI review comments. AI-pretranslated rows display as `AI initiated`; confirming one clears `Needs review` while keeping the AI origin visible.
@@ -80,7 +81,7 @@ The following capabilities are implemented in the current codebase and covered b
 - Move directly to the next open segment.
 - Copy source into target for segments that should be carried over.
 - Pretranslate empty segments from TM matches above a chosen percentage.
-- Run concordance search from the current TM with Ctrl+K or Alt+K on selected source text.
+- Run concordance search from the current TM with `Ctrl/Cmd+Shift+K` on selected source or target text; the previous `Ctrl/Cmd+Alt+K` binding remains available as a compatibility alias.
 - Show protected placeholders as inline tag chips.
 - Insert protected placeholders into target segments.
 - Prevent confirming a segment when protected placeholders are missing.
@@ -226,6 +227,8 @@ LoopCAT uses checked ES modules and feature controllers without a framework rewr
 The portable project contract is documented in `docs/loopcat-package-format-v1.md`.
 
 The current feature and AI capability inventory is documented in `docs/loopcat-capabilities.md`.
+
+The keyboard strategy, shortcut reference, Quick Insert behavior, and international-keyboard safeguards are documented in [`docs/keyboard-shortcuts.md`](docs/keyboard-shortcuts.md).
 
 The multi-provider AI plan and research matrix are documented in `docs/ai-provider-integration-research.md`.
 
