@@ -78,14 +78,16 @@ fs.writeFileSync(path.join(downloadsDirectory, checksumName), `${checksumLines.j
 
 const readme = `# LoopCAT ${version} Downloads
 
-These are the current repository copies of the LoopCAT ${version} public prerelease downloads.
+These are the current repository download-mirror files generated from the LoopCAT ${version} code in the same repository checkpoint.
 
 | Download | File |
 | --- | --- |
 ${artifacts.map((artifact) => `| ${artifact.label} | [\`${artifact.name}\`](./${artifact.name}) |`).join("\n")}
 | SHA-256 checksums | [\`${checksumName}\`](./${checksumName}) |
 
-The Windows installer and portable application are unsigned. Windows may show an unknown-publisher or SmartScreen warning. Verify the ZIP files against the checksum list and proceed only if you trust the [LoopCAT repository](https://github.com/gokhandogru/LoopCAT).
+The Windows installer and portable application are unsigned. Windows may show an unknown-publisher or SmartScreen warning. Verify these ZIP files against the checksum list in this directory and proceed only if you trust the [LoopCAT repository](https://github.com/gokhandogru/LoopCAT).
+
+The binaries attached to the older \`draft-0.0.3\` GitHub prerelease tag are a historical tagged build. They are not byte-identical to this current repository mirror; do not mix ZIPs and checksum files from the two locations.
 
 For installation steps, current limitations, and source documentation, see the [main README](../README.md).
 `;

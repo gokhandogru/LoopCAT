@@ -14,12 +14,12 @@ This roadmap is organized by status rather than by numbered phases:
 
 ## Current Position And Priority Order
 
-The core offline CAT workflow, recovery model, academic review features, broad format support, and optional AI safety controls are implemented. The remaining path to a production-ready cross-platform desktop release is primarily release qualification, deeper real-world format fidelity, and sustained large-project performance.
+The core offline CAT workflow, recovery model, academic review features, broad format support, optional AI safety controls, reversible command model, modern editor shell, and modular application architecture are implemented. The remaining path to a production-ready cross-platform desktop release is primarily human/platform release qualification, deeper real-world format fidelity, sustained large-project performance, and an explicit decision about the unachieved optional bundle-size stretch target.
 
-1. Complete signed, clean-machine release qualification on Windows, macOS, and Linux.
+1. Complete signed Windows, signed/notarized macOS, and checksum-authenticated Linux clean-machine release qualification.
 2. Deepen DOCX and IDML fixture coverage for complex publishing structures.
 3. Add true chunked import, long-duration autosave and memory profiling, and larger persistent TM indexes.
-4. Split the large UI coordinator after behavior and release gates are stable.
+4. Record reference-device startup, typing, long-task, and scroll measurements, then accept or revise the 750 KB minified stretch target before making any compatibility trade-off.
 5. Expand research-oriented revision-history exports without weakening the core workflow.
 
 Brand foundation is now part of the release baseline: the borderless Loopbird, product palette, category language, and platform icon pipeline are shared by LoopCAT Web and LoopCAT Desktop. Product copy and new UI should follow [the brand guidelines](docs/brand-guidelines.md).
@@ -33,6 +33,16 @@ Brand foundation is now part of the release baseline: the borderless Loopbird, p
 - Product tokens use Deep Pine, Interface/Bright Teal, Seafoam, Warm Ivory, Clay, and the supporting semantic palette.
 - “Translation, in flow.” is the brand idea; “The local-first translation workspace” is the category descriptor; LoopCAT remains the product name across platforms.
 - New connection, AI, onboarding, empty-state, status, and recovery copy should reinforce human control, local-by-default behavior, low-friction power, and visible feedback.
+
+### Modern Workspace And Reversible Commands
+
+- A semantic System/Light/Dark theme system, Balanced/Compact density, Focus mode, remembered layout, and responsive contextual inspector keep source and target text dominant at laptop widths.
+- The fuzzy grouped `Ctrl/Cmd+K` command palette supports keyboard navigation, disabled reasons, shortcuts, and recent commands.
+- Bounded Undo/Redo commands cover target editing and producers, replacement, confirmation, review state, AI application, TM/AI pretranslation, compatible split/merge, and reversible project/document/resource deletion.
+- Projects, files, TM entries, terms, translation memories, and termbases can move to local Trash; Empty Trash is the explicit irreversible boundary.
+- Saving, background jobs, notices, warnings, and recoverable errors use separate presentation models with preserved-work and retry context.
+- Local diagnostics can be previewed and exported without network transmission and strip project text, prompts, secrets, names, and exact local paths.
+- The application entry is a 13-line bootstrap. Feature ownership is composed through checked controllers, services, stores, and lazy first-use boundaries under `src/`; the workflow driver is injected only into the test graph.
 
 ### Offline Desktop And Network Boundaries
 
@@ -145,7 +155,8 @@ These are release-blocking requirements. A build is not production-ready merely 
 - Add chunked imports for very large documents.
 - Expand persistent indexes for large TMs while keeping TM matching and QA in workers.
 - Extend large-project tests with truly long-running autosave and memory profiling.
-- Split the large UI coordinator into smaller controllers after behavior stabilizes.
+- Preserve the completed modular controller/service boundaries and the production/test graph separation.
+- Record controlled reference-device measurements and resolve the remaining 750 KB minified stretch-target decision before trading away direct-file, offline, first-render, focus, or capability behavior.
 
 ### Priority 3: Academic Research Workflows
 
@@ -194,6 +205,14 @@ These are release-blocking requirements. A build is not production-ready merely 
 - Support offline work as the default path even when AI settings exist in a project.
 
 ## Delivered Milestones
+
+### 2026 Modernization Checkpoint
+
+- Electron 43, renderer sandboxing, secure fuses, hardware acceleration by default, and an explicit restart-based graphics fallback are implemented and automatically checked.
+- The production browser and desktop graphs exclude test routes, workflow drivers, fixtures, mocks, and test globals; dynamic feature chunks remain in the offline asset manifest.
+- Projects → dashboard → editor, semantic light/dark themes, responsive inspector layouts, command palette 2.0, Undo/Redo, local Trash, status/job/error presentation, actionable empty states, redacted diagnostics, and DOM/Trusted Types hardening are implemented.
+- The current automated checkpoint passes 1,364 quality tests, eight browser phases, 15 accessibility states, and 81 visual checkpoints. Human assistive-technology, zoom, final visual, reference-hardware, signing/notarization, and clean-machine evidence remains release work.
+- The root `app.js` is a bootstrap-only entry and application policy is split across checked feature boundaries. This completes the former “split the large UI coordinator” roadmap item.
 
 ### Desktop Reliability Foundations
 

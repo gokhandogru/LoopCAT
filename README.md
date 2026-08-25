@@ -8,18 +8,18 @@ LoopCAT is a local-first computer-assisted translation (CAT) tool for translator
 
 LoopCAT is designed for a complete single-user workflow: create a project, import source files, translate or post-edit, use TM and terminology, run QA, review changes, recover from packages or backups, and export target files without requiring an internet connection. Local or hosted AI can be added explicitly, but it is optional and does not replace the offline workflow.
 
-[Install](#how-to-install) | [Current status](#current-project-status) | [What works today](#what-works-today) | [Limitations and remaining work](#current-limitations-and-remaining-work) | [AI providers](#local-ai-command-centre) | [Tests](#browser-tests) | [Roadmap](ROADMAP.md) | [Brand](docs/brand-guidelines.md) | [License](#license)
+[Install](#how-to-install) | [Current status](#current-project-status) | [What works today](#what-works-today) | [Limitations and remaining work](#current-limitations-and-remaining-work) | [AI providers](#local-ai-command-centre) | [Tests](#browser-tests) | [Documentation](docs/README.md) | [Roadmap](ROADMAP.md) | [Brand](docs/brand-guidelines.md) | [License](#license)
 
 ## Current Project Status
 
-LoopCAT is beyond a proof-of-concept MVP: the core offline CAT workflow and recovery model are implemented. Version `0.0.3` is the current public prerelease and adds the Loopbird brand system, XLIFF 2.2 Core support, and refreshed web plus Windows downloads. The Windows packages are unsigned, and the project is still under active development, so `0.0.3` should not yet be described as a fully production-qualified cross-platform desktop release.
+LoopCAT is beyond a proof-of-concept MVP: the core offline CAT workflow, recovery model, modern editor shell, reversible command model, and modular application architecture are implemented. Version `0.0.3` remains the current prerelease version. The repository download mirror is rebuilt from the current code, while the older assets attached to the `draft-0.0.3` GitHub prerelease remain a historical tagged build. The Windows packages are unsigned, and the project is still under active development, so `0.0.3` should not yet be described as a fully production-qualified cross-platform desktop release.
 
 | Area | Current state |
 | --- | --- |
 | Core translation workflow | Implemented: multi-file projects, segmentation, CAT-grid editing, statuses, comments, revision history, QA, TM, terminology, analysis, and target export. |
 | Offline and recovery | Implemented: IndexedDB autosave, portable project packages, full browser backups, visible workspace-folder packages where supported, and offline web/desktop shells. |
-| Public downloads | Version `0.0.3` provides a web bundle plus unsigned Windows installer and portable packages with SHA-256 checksums. The same files are mirrored in [`downloads/`](downloads/). |
-| Cross-platform desktop | Electron packaging targets Windows, macOS, and Linux. Signed/notarized public artifacts and recorded clean-machine evidence for every platform remain release-qualification work. |
+| Repository downloads | Version `0.0.3` provides a current web bundle plus unsigned Windows installer and portable packages with SHA-256 checksums in [`downloads/`](downloads/). |
+| Cross-platform desktop | Electron 43 packaging targets Windows, macOS, and Linux with the renderer sandbox and hardware acceleration enabled by default. Native CI builds and verifies Linux AppImage/DEB artifacts; signed/notarized public artifacts and recorded clean-machine evidence for every platform remain release-qualification work. |
 | Format support | Broad import/export coverage is implemented, including XLIFF 1.2 and XLIFF 2.0/2.1/2.2 Core, DOCX, localization formats, publishing formats, subtitles, resources, and terminology exchange. Perfect reconstruction of every complex Office, OpenDocument, and DTP structure is not claimed. |
 | Scale | Browser tests cover projects with thousands of segments and indexed TM lookup. True chunked document import, deeper persistent indexes, and long-duration autosave/memory profiling remain. |
 | AI | Optional and local-first. Ollama, LM Studio/OpenAI-compatible runtimes, and OPUS-CAT can run locally; hosted providers require explicit configuration and source-sharing confirmation. |
@@ -29,14 +29,14 @@ The detailed distinction between shipped behavior, release blockers, near-term p
 
 ## How to Install
 
-Download LoopCAT from the [LoopCAT 0.0.3 unsigned prerelease](https://github.com/gokhandogru/LoopCAT/releases/tag/draft-0.0.3). Use these release assets instead of GitHub's automatic source-code ZIP:
+Use the current versioned files in the repository's [`downloads/`](downloads/) directory. They are application packages, unlike GitHub's automatic source-code ZIP:
 
-- Web version: download [`LoopCAT.Web.0.0.3.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/draft-0.0.3/LoopCAT.Web.0.0.3.zip), extract it, and open `index.html`. For installable offline PWA behavior, serve the extracted folder from a local or hosted HTTP/HTTPS origin; direct `file://` opening still runs the app, but browsers do not allow service-worker installation from local files.
-- Windows desktop installer: download [`LoopCAT.Windows.Setup.0.0.3.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/draft-0.0.3/LoopCAT.Windows.Setup.0.0.3.zip), extract it, and run `LoopCAT Setup 0.0.3.exe`.
-- Windows portable desktop: download [`LoopCAT.0.0.3.Portable.zip`](https://github.com/gokhandogru/LoopCAT/releases/download/draft-0.0.3/LoopCAT.0.0.3.Portable.zip), extract it, and run `LoopCAT 0.0.3.exe` without installation.
-- Checksums: download [`LoopCAT.0.0.3.SHA256SUMS.txt`](https://github.com/gokhandogru/LoopCAT/releases/download/draft-0.0.3/LoopCAT.0.0.3.SHA256SUMS.txt) and verify the three ZIP files before opening them.
+- Web version: download [`LoopCAT.Web.0.0.3.zip`](downloads/LoopCAT.Web.0.0.3.zip), extract it, and open `index.html`. For installable offline PWA behavior, serve the extracted folder from a local or hosted HTTP/HTTPS origin; direct `file://` opening still runs the app, but browsers do not allow service-worker installation from local files.
+- Windows desktop installer: download [`LoopCAT.Windows.Setup.0.0.3.zip`](downloads/LoopCAT.Windows.Setup.0.0.3.zip), extract it, and run `LoopCAT Setup 0.0.3.exe`.
+- Windows portable desktop: download [`LoopCAT.0.0.3.Portable.zip`](downloads/LoopCAT.0.0.3.Portable.zip), extract it, and run `LoopCAT 0.0.3.exe` without installation.
+- Checksums: download [`LoopCAT.0.0.3.SHA256SUMS.txt`](downloads/LoopCAT.0.0.3.SHA256SUMS.txt) and verify the three ZIP files before opening them.
 
-The same verified files are stored in the repository's [`downloads/`](downloads/) directory. The Windows packages are currently unsigned, so Windows may display an unknown-publisher or SmartScreen warning. LoopCAT does not bypass that warning; verify the checksum and proceed only if you trust this repository. Earlier versions remain available from the [GitHub releases page](https://github.com/gokhandogru/LoopCAT/releases).
+The Windows packages are currently unsigned, so Windows may display an unknown-publisher or SmartScreen warning. LoopCAT does not bypass that warning; verify the checksum from the same repository checkpoint and proceed only if you trust this repository. The [LoopCAT 0.0.3 GitHub prerelease](https://github.com/gokhandogru/LoopCAT/releases/tag/draft-0.0.3) and its attached binaries are retained as the historical build made from tag commit `6f9754d`; they are not the current repository mirror.
 
 ## License
 
@@ -62,7 +62,7 @@ The following capabilities are implemented in the current codebase and covered b
 - Decode text-based imports with BOM, charset-declaration, auto-detection, or manual override for UTF-8, UTF-16, Windows code pages, ISO-8859 families, Shift_JIS/EUC-JP, GB18030/Big5, and EUC-KR; eligible text exports preserve UTF and single-byte legacy encodings when the target text can be represented safely.
 - Keep inline tags, placeholders, and variables visible as short protected copyable chips while translating, including semantic labels such as `<b>` and `<i>` for bold and italic markup; complex Word runs keep hidden style ids so exact DOCX reconstruction metadata is not flattened.
 - Keep several imported documents inside one project.
-- Delete projects or individual files after an in-app confirmation prompt.
+- Move projects or individual files to local Trash after confirmation, restore them later, and use Undo/Redo for reversible deletion commands. Empty Trash is the explicit irreversible action.
 - Filter the editor by document.
 - Segment source text into editable translation units, with DOCX import protection for common academic abbreviations and initials.
 
@@ -70,7 +70,10 @@ The following capabilities are implemented in the current codebase and covered b
 
 - Edit target segments in a CAT-style grid.
 - Use native browser/Electron spellcheck in target segment editors, with the desktop wrapper syncing spellcheck to the active project target language where the runtime supports it.
-- Choose the LoopCAT interface language from the Workspace menu, including built-in English and Turkish, import custom UI translation JSON, and export the English UI source catalog for translators.
+- Choose the LoopCAT interface language from the Workspace menu, including built-in Catalan, English, and Turkish, import custom UI translation JSON, and export the English UI source catalog for translators.
+- Use System, Light, or Dark themes, Balanced or Compact density, Focus mode, and a remembered 280–420 px contextual inspector that becomes an overlay on narrower screens.
+- Open the fuzzy, grouped command palette with `Ctrl/Cmd+K`, navigate it with the keyboard, and reuse recent commands without adding permanent editor clutter.
+- Undo and redo ordinary target typing, Copy Source, TM/concordance/tag insertion, target replacement, confirmation, review-state changes, AI suggestion application, TM/AI pretranslation, and compatible split/merge operations through bounded transactional commands.
 - Keep bounded per-segment target revision history for post-editing review.
 - Search and filter segments while translating, including AI-generated pretranslations, AI suggestions, and risk-ranked AI review comments. AI-pretranslated rows display as `AI initiated`; confirming one clears `Needs review` while keeping the AI origin visible.
 - Search by source, target, or both, with optional regex and case-sensitive matching.
@@ -114,6 +117,7 @@ The following capabilities are implemented in the current codebase and covered b
 - Export offline project reports with terminology status tables for approved and forbidden terms.
 - Export a Quality Passport HTML report with the project quality contract, quality score, post-editing effort estimate, risk queue, quality category breakdowns, QA evidence, review/AI evidence, and export-readiness notes while omitting segment text.
 - Export anonymized offline project reports for research documentation.
+- Preview and export local-only redacted diagnostics covering runtime, sandbox/GPU state, storage, updates, and normalized errors without transmitting project text, prompts, secrets, names, or exact local paths.
 - Include target revision counts in offline project reports while keeping segment text out of the report.
 - Track local activity events for imports, exports, QA runs, segment confirmations, review changes, and AI actions, including the actual AI provider used and the configured project provider where they differ.
 - Store local workspace/user metadata so projects remain local-first while staying ready for future sync or team ownership.
@@ -146,7 +150,7 @@ The current implementation is usable for substantial single-user offline project
 
 ### Release Qualification
 
-- Version `0.0.3` currently publishes the web bundle and unsigned Windows installer/portable downloads described above. macOS and Linux packaging targets are implemented, but current native artifacts still require platform-specific builds, signing/notarization where applicable, checksum verification, and recorded clean-machine evidence before publication.
+- Version `0.0.3` currently provides the repository web bundle and unsigned Windows installer/portable downloads described above. Native CI has built and verified Linux AppImage/DEB packages, but a formal all-platform release still requires versioned publication, signing/notarization where applicable, checksum verification, and recorded clean-machine evidence.
 - A public cross-platform desktop release still requires signed Windows artifacts, signed and notarized macOS artifacts, checksum-verified Linux artifacts, and completed clean-machine evidence for every public download.
 - Disk-full and permission-denied workspace-save results must be recorded for release candidates. The automated gates and evidence template exist, but they do not replace real platform testing.
 
@@ -164,21 +168,22 @@ The current implementation is usable for substantial single-user offline project
 
 - Server sync, shared cloud storage, team ownership, and real-time collaboration are not implemented. Portable project packages, browser backups, and visible workspace-folder packages are the current handoff and recovery model.
 - Revision history is stored per segment and counted in reports, but richer research-oriented revision-history export options remain.
-- The main UI coordinator is still large and is intended to be split into smaller controllers after behavior and release gates stabilize.
+- Controlled reference-device startup, typing, long-task, and large-project scroll profiling remains to be recorded. The hosted initial JavaScript is below the old baseline but still exceeds the optional 750 KB minified stretch target; further reduction requires an explicit compatibility or behavior trade-off.
 
 See [ROADMAP.md](ROADMAP.md) for the ordered release blockers, near-term priorities, shipped baseline, and production-ready exit criterion.
 
 ## Architecture
 
-Storage, format, validation, QA, AI, and worker responsibilities are split into dedicated modules. `app.js` still acts as the large UI coordinator and remains a planned maintainability refactor.
+LoopCAT uses checked ES modules and feature controllers without a framework rewrite. The root `app.js` is a 13-line bootstrap; `src/app/application-composition.js` is the composition root, and application, editor, project, resource, quality, AI, recovery, command, status, diagnostics, and presentation policy lives behind explicit controllers, services, stores, and lazy first-use boundaries under `src/`.
 
 - `index.html` defines the static UI shell.
 - `manifest.webmanifest` and `service-worker.js` define the installable offline app shell.
 - `scripts/build-web.cjs` creates the static HTML distribution ZIP in `dist-web/`.
+- `scripts/build-desktop.cjs` creates platform artifacts and, for the standard Windows distribution, invokes `scripts/create-windows-zip-wrappers.ps1` so installer/portable ZIPs are rebuilt from the current executables instead of reusing stale archives.
 - `scripts/publish-repository-downloads.cjs` copies the verified web, Windows installer, and Windows portable ZIPs into the versioned [`downloads/`](downloads/) mirror and generates its checksum file.
 - `scripts/opus-cat-web-bridge.cjs` is the optional local bridge for using OPUS-CAT from the plain web `index.html` build when the browser blocks OPUS-CAT's direct local HTTP response.
 - `i18n.js`, `i18n/source.en-US.json`, and `i18n/locales/*.json` own UI internationalization for the app shell and generated interface text; compiled `*.js` catalog files are bundled so the static app still works offline and from local files.
-- `scripts/i18n-extract.cjs`, `scripts/i18n-sync.cjs`, `scripts/i18n-validate.cjs`, and `scripts/i18n-compile.cjs` maintain the source catalog, create target locale files, validate placeholders/keys, and compile runtime catalogs. To add a locale, run `node scripts/i18n-sync.cjs --locale ca-ES`, translate `i18n/locales/ca-ES.json`, then run `node scripts/i18n-validate.cjs` and `node scripts/i18n-compile.cjs`.
+- `scripts/i18n-extract.cjs`, `scripts/i18n-sync.cjs`, `scripts/i18n-validate.cjs`, and `scripts/i18n-compile.cjs` maintain the source catalog, create target locale files, validate placeholders/keys, and compile runtime catalogs. To add another locale, run a command such as `node scripts/i18n-sync.cjs --locale de-DE`, translate the generated JSON, then run `node scripts/i18n-validate.cjs` and `node scripts/i18n-compile.cjs`.
 - `scripts/verify-web-artifact.cjs` verifies the static HTML ZIP, version alignment, checksums, and runtime asset list.
 - `scripts/verify-web-smoke.cjs` extracts the static HTML ZIP, serves it from localhost, and checks desktop/mobile rendering, console health, horizontal overflow, and the New project and About dialogs.
 - `package.json` and `desktop/main.cjs` define the Electron desktop wrapper for Windows, macOS, and Linux packaging.
@@ -197,8 +202,10 @@ Storage, format, validation, QA, AI, and worker responsibilities are split into 
 - `scripts/verify-release-evidence.cjs` checks completed clean-machine release evidence for missing results, unresolved placeholders, failed checks, vague release identity, platform-specific artifact-tested choices, and private release details.
 - `scripts/verify-release-evidence-selftest.cjs` proves the evidence verifier accepts a completed publishable record and rejects placeholders, vague commit/tag or artifact-source identity, failed signing, not-applicable notarization, online-mode evidence, and secret-bearing notes.
 - `.github/workflows/desktop-release.yml` builds downloadable desktop artifacts for Windows, macOS, and Linux.
-- `styles.css` contains the application layout and visual system.
-- `app.js` wires UI events and coordinates app state.
+- `src/ui/tokens.css`, `themes.css`, `base.css`, `components.css`, and `layouts.css` define the semantic light/dark design system, responsive workspace, density, focus, motion, and component states.
+- `app.js` installs the application composition boundary and contains no feature, state, DOM, event, or test-harness ownership.
+- `src/app/application-composition.js` composes the runtime and checked feature boundaries; `src/app/bootstrap.js` installs the controller and service graph.
+- `src/features/` owns feature-level controllers and presentation services; `src/state/`, `src/commands/`, `src/status/`, and `src/platform/` own shared state, reversible commands, status models, and platform boundaries.
 - `storage.js` owns IndexedDB setup and generic persistence helpers.
 - `project.js` owns project and segment operations.
 - `docx.js` owns DOCX zip reading, Word XML extraction, and segmentation.
@@ -206,7 +213,7 @@ Storage, format, validation, QA, AI, and worker responsibilities are split into 
 - `qa.js` owns QA checks and terminology validation.
 - `validation.js` owns validation report shapes for packages, backup, and export readiness.
 - `analysis.js` owns project analysis and TM leverage summaries.
-- `ai.js` owns local AI governance helpers, the local provider registry, Ollama/TranslateGemma pre-translation, and the explicit OpenAI suggestion path.
+- `ai.js` exposes the compatibility provider catalog and shared AI governance helpers; provider adapters and AI command/application orchestration load through checked boundaries under `src/ai/` and `src/features/ai/`.
 - `worker-client.js` and `cat-worker.js` move TM matching and QA scoring off the UI thread when workers are available.
 - `tm.js` owns translation memory storage and fuzzy matching.
 - `tmx.js` owns TMX parsing and generation.
@@ -486,11 +493,13 @@ The browser sandbox cannot launch OPUS-CAT, Node.js, or another local executable
 - `offline-shell-test.html` checks service-worker install, core app-shell caching, navigation fallback, and bounded runtime caching.
 - `smoke-test.html` checks the broad local editing, resources, import/export, QA, and OpenAI provider-stub flow.
 - `regression-test.html` checks schema defaults, analysis, validation, backup shape, forbidden-term export gates, DOCX text boxes plus header/footer/footnote/comment/table/list reconstruction, and localization import/export behavior.
-- `index.html#app-workflow-test` checks the real app workflow for project creation, file import, pending segment save flush, backup export, term-list import, and terminology details in offline project reports.
+- The test renderer injects the deep application-workflow driver from `tests/app-workflow/` into the real app composition. It covers projects, imports, editor commands, autosave/retry, Undo/Redo, Trash, TM/terminology, QA/review/quality, AI safeguards and suggestions, reports/delivery, packages/backups, workspaces, localization, focus, and recovery. Production verification rejects this driver, its route, fixtures, mocks, and test globals from public artifacts.
 - `pnpm run verify:ai-sidebar-ux` opens the real app shell in Electron and checks the AI Command Centre order for the LM Studio local workflow: connect provider, choose model, pre-translate, then collapsed optional tools.
 - `workspace-storage-test.html` checks visible workspace package saves, simulated write-failure rollback behavior, manifest recovery, resource index recovery, unreadable package warnings, and health repair behavior.
 - `package-roundtrip-test.html` checks the stable `.loopcat.json` contract, JSON serialization, privacy rules, and package import restoration.
 - `large-project-test.html` checks thousands of segments, revision-aware batch saves, indexed TM lookup, QA, validation, visible workspace package save, and full backup metadata.
+
+The current automated modernization checkpoint contains 1,364 focused/static quality tests, eight browser phases, 15 deterministic accessibility states, and 81 visual checkpoints. These automated checks do not replace the outstanding human assistive-technology, zoom, visual, clean-machine, signing/notarization, and reference-hardware evidence described in the roadmap.
 
 ## Local-First Notes
 

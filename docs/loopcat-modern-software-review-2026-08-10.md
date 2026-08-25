@@ -1,5 +1,7 @@
 # LoopCAT modern software review
 
+> **Historical baseline review.** This document intentionally preserves the evidence and recommendations as they stood on 10 August 2026. The Electron/runtime, sandbox/GPU policy, production/test separation, accessibility states, design system, themes, editor layout, Undo/Redo and Trash model, command palette, modular application architecture, status model, diagnostics, and lazy-loading work described here as gaps have since been implemented. See [the current capability guide](loopcat-capabilities.md), [implementation status](modernization-implementation-status-2026-08-10.md), and [completion audit](modernization-completion-audit-2026-08-24.md). Remaining work is primarily manual/platform evidence, reference-device profiling, complex-format depth, and the optional 750 KB stretch-target decision.
+
 **Date:** 10 August 2026  
 **Repository:** `D:\Gokhan Codex\CatHan`  
 **Branch reviewed:** `main`  

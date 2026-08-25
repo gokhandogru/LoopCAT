@@ -181,6 +181,12 @@ Browser-only values, such as the optional OpenAI API key in LoopCAT's AI setting
 
 Derived local indexes, such as the persistent TM token index used for faster matching, are not package fields. They are rebuilt from embedded or imported TM entries after restore/import.
 
+Local Trash and Undo/Redo have different portability rules:
+
+- A single-project `.loopcat.json` package contains the active project state and does not include local Trash entries or the in-memory Undo/Redo command stack.
+- The current full browser-backup/storage schema is version `6` and includes sanitized `trashEntries` so local deleted items can survive a full-profile backup/restore.
+- The bounded Undo/Redo command stack is runtime-only and starts empty after an application restart or restore; durable segment history and Trash records remain available through their own data models.
+
 Before packages and backups are written, LoopCAT defensively removes secret-shaped fields such as API keys, tokens, authorization headers, passwords, AI provider trace fields such as `prompt`, `promptTemplate`, `responseId`, `requestId`, `providerRequestId`, `providerResponseId`, and `customEndpoint`, plus browser-only handle fields such as `fileHandle`, `directoryHandle`, and `workspaceHandle` from exported project, segment, resource, and activity records. Original JSON source reconstruction data under `localizationStructures/<documentId>/sourceJson` is path-aware and preserves source-file keys with those names, including common software-localization keys such as `password`, `accessToken`, and `fileHandle`, because they are real file structure rather than LoopCAT metadata. A `sourceJson` object anywhere else is not treated as reconstruction data and must not bypass privacy stripping or validation. Delimited CSV/TSV reconstruction stores those words as row cell values and preserves them for the same reason. `apiKeyMode` is preserved because it records workflow preference, not a credential.
 
 Project package import validates the complete package for secret-shaped fields, AI provider trace fields outside original JSON `localizationStructures/<documentId>/sourceJson` reconstruction data, and browser-only handle fields outside original JSON `localizationStructures/<documentId>/sourceJson` reconstruction data before writing records. Backup restore validates top-level store shapes, blocks secret-bearing, provider-trace-bearing, or handle-bearing restore files in the UI, and sanitizes records again at the storage layer before replacing local stores.

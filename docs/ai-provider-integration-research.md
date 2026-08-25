@@ -1,5 +1,7 @@
 # AI Provider Integration Research
 
+> **Status note — 25 August 2026.** The implementation inventory and provider matrix below were checked against the current LoopCAT provider catalog: 20 presets across 18 provider registry positions, including local Ollama, LM Studio, and OPUS-CAT plus named hosted adapters. The external endpoint/model verification section remains the dated 30 June 2026 research snapshot; model availability and provider API details can change, so use the in-app model refresh and optional live verification commands before relying on a preset for production work.
+
 Current implementation status:
 
 - Implemented: local Ollama through `/api/version`, `/api/tags`, `/api/pull`, and `/api/chat`.
@@ -136,13 +138,13 @@ Keep one workflow and multiple adapters:
 6. Hosted providers must require action-time confirmation before source text is sent outside LoopCAT.
 7. Browser CSP and Electron network guards should allow only implemented hosted provider origins and exact API paths. Do not add wildcard provider access.
 
-## Next Provider Work
+## Further Provider Work
 
 Highest-value next adapters:
 
 1. Provider-native adapters only where OpenAI-compatible behavior is not enough for production quality or model discovery.
-2. AI-native commands on top of the shared provider registry: active-segment and batch AI review, active and batch tag-repair suggestions, active and batch draft polishing, active and batch draft adaptation, active and batch target alternatives, active and batch terminology application, terminology extraction, and project brief generation are implemented.
-3. Provider-specific glossary/context tuning can build on the shared per-segment TM, glossary, and nearby-context callbacks now used by Local AI pretranslation.
+2. Provider-specific glossary/context tuning can build on the shared per-segment TM, glossary, and nearby-context callbacks now used by Local AI pretranslation.
+3. Keep live endpoint/model verification optional and credential-safe; preset model names are starting points rather than availability guarantees.
 
 ## AI-Native CAT Tool Ideas
 

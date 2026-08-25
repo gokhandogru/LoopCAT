@@ -1,9 +1,12 @@
 # LoopCAT modernization completion audit
 
 - Audit date: 24 August 2026
+- Repository status update: 25 August 2026
 - Requested branch base: `a301ef2ef27fa124151cb937c80383748b810145`
 - Audited implementation tip before this audit checkpoint: `583790eec6440d7946cbd943fed99db37a2dfd98`
-- Working branch: `codex/p1-08-target-edit-autosave`
+- Final automated implementation checkpoint: `df83f40e98968a9550f93934cfbae462758a12b2`
+- Historical implementation branch: `codex/p1-08-target-edit-autosave`
+- Current default branch: `main` at `df83f40e98968a9550f93934cfbae462758a12b2`
 
 ## Scope and conclusion
 
@@ -14,11 +17,11 @@ This audit checks the current implementation against:
 - `docs/modernization-baseline.md`; and
 - `docs/modernization-implementation-status-2026-08-10.md`.
 
-The longer modernization baseline is commit `0a2d5343`; the user-requested continuation branch begins at merge commit `a301ef2`. `main` remains at `a301ef2` and is not merged with this branch.
+The longer modernization baseline is commit `0a2d5343`; the user-requested continuation branch begins at merge commit `a301ef2`. After this audit was written, the user explicitly authorized the completed implementation checkpoint to be fast-forwarded into `main`. On 25 August 2026, local `main`, `origin/main`, and the historical implementation branch all pointed to `df83f40`.
 
 All roadmap code packages have an implementation and automated regression evidence. The missing test-only component-gallery artifact is added by this audit checkpoint and is explicitly excluded from production entries and packaged files. The remaining work is not another behavior-preserving extraction slice: it is external release evidence, assistive-technology and human visual review, controlled reference-hardware profiling, and the unachieved 750 KB minified performance stretch target.
 
-Accordingly, the automated implementation is complete, but completion of the entire modernization plan is **not yet proven**.
+Accordingly, the automated implementation is complete and is now on `main`, but completion of the entire modernization plan is **not yet proven**.
 
 Evidence states used below:
 
@@ -124,4 +127,4 @@ The following items prevent a claim that the entire modernization plan is comple
 5. Completed signed/notarized clean-machine release evidence for Windows and macOS, plus checksum-authenticated AppImage/DEB clean-machine install and launch evidence for Linux. CI now builds, sandbox-smokes, verifies, checksums, and uploads the Linux artifacts; signing credentials and completed clean-machine evidence remain external.
 6. A decision on the unachieved 750 KB minified stretch target: accept the measured residual, change the target, or authorize a capability/timing trade-off.
 
-Until those items are supplied, this branch is an automated implementation checkpoint rather than an authorized merge or public-release candidate.
+The implementation checkpoint has been merged to `main`, but it is not a production-qualified public-release candidate until those items are supplied and the residual-size decision is recorded. Merging the code and completing release qualification are deliberately separate claims.

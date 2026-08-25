@@ -10,7 +10,7 @@ LoopCAT supports a multi-project local workspace.
 
 Current capabilities:
 
-- Create, reopen, search, filter, and delete local projects.
+- Create, reopen, search, and filter local projects; move projects to local Trash after confirmation and restore them before Trash is emptied.
 - Require project name plus source and target languages before saving a new project.
 - Use bundled offline language/locales in language pair setup.
 - Show recent/common language-pair shortcuts.
@@ -121,6 +121,7 @@ Current capabilities:
 - Replace target text while skipping protected tag and placeholder tokens.
 - Split compatible unstructured or DOCX paragraph segments.
 - Merge compatible unstructured or DOCX paragraph segments.
+- Undo and redo coalesced target typing plus discrete Copy Source, TM/concordance insertion, protected-tag insertion, replacement, confirmation, review-state, AI application, TM/AI pretranslation, and compatible split/merge commands.
 - Preserve source/target bidirectional display with automatic text direction for world scripts.
 
 Suggested tests:
@@ -162,7 +163,8 @@ Current capabilities:
 - Run concordance search from selected source text with Ctrl+K or Alt+K.
 - Pretranslate empty segments from TM matches above a chosen percentage.
 - Import and export project TMX.
-- Import, preview, edit, export, and delete standalone TM resources.
+- Import, preview, edit, and export standalone TM resources.
+- Move TM entries and whole translation-memory resources to local Trash with Undo/Redo and conflict-safe restoration.
 - Normalize direct TM resource saves and imports so incomplete rows do not persist.
 - Normalize friendly language labels before resource lookup.
 - Mark linked projects dirty when a linked TM resource changes.
@@ -188,7 +190,8 @@ Current capabilities:
 - Block delivery export when forbidden terminology appears.
 - Import and export TBX.
 - Import CSV, TSV, and XLSX terminology lists.
-- Preview, edit, export, import, and delete standalone termbase resources.
+- Preview, edit, export, and import standalone termbase resources.
+- Move terms and whole termbase resources to local Trash with Undo/Redo and conflict-safe restoration.
 - Preserve termbase notes in TBX.
 - Redact credential-looking notes during TBX and term-list import/export.
 - Keep approved and forbidden terms visible in offline project reports.
@@ -304,6 +307,7 @@ Current capabilities:
 - Detect damaged, oversized, unreadable, stale, or invalid workspace package entries.
 - Keep workspace package dirty markers across reloads for recovery.
 - Show a backup reminder for long-running projects without a recent portable package export.
+- Keep local Trash and command history outside the portable single-project package contract; package exports contain the active project state, while full browser backup/restore follows its separately versioned storage contract.
 
 Suggested tests:
 
@@ -324,6 +328,14 @@ Current capabilities:
 - Desktop renderer hardening keeps web security on and blocks insecure features.
 - Browser and desktop network policy is narrow and explicit.
 - Packaged Windows builds produce an installer and portable executable.
+- Electron 43 runs with renderer sandboxing, context isolation, secure fuses, and hardware acceleration enabled by default; an explicit restart-based graphics fallback is available for affected machines.
+- System, Light, and Dark themes plus Balanced and Compact density are remembered locally.
+- The editor supports Focus mode and a remembered 280–420 px contextual inspector that changes to an overlay below 1100 px.
+- A fuzzy grouped `Ctrl/Cmd+K` command palette provides keyboard navigation, shortcuts, disabled reasons, and recent commands.
+- Saving, background jobs, notices, warnings, and recoverable errors use separate presentation models.
+- Service-worker updates present an explicit reload/defer action and flush pending work before activation.
+- Local diagnostics can be previewed and downloaded without network transmission; project text, prompts, secrets, names, and exact local paths are excluded or redacted.
+- Production artifacts exclude the deep workflow driver, test route, fixtures, mocks, and test globals. The root `app.js` is a 13-line bootstrap into checked feature controllers and services.
 
 Suggested tests:
 
@@ -331,6 +343,8 @@ Suggested tests:
 - Verify IndexedDB persistence in the packaged desktop app.
 - Verify the app opens through `loopcat://app/index.html`.
 - Confirm test/debug pages are not accessible through the desktop protocol.
+- Switch themes and density, resize/close the inspector, exercise the command palette entirely by keyboard, and verify preferences survive reload.
+- Export local diagnostics and confirm no source/target text, prompts, secrets, user names, project names, or exact local paths appear.
 
 ## 12. AI Capability Overview
 
@@ -358,6 +372,7 @@ The AI Command Centre currently exposes these provider presets:
 | xAI Grok | `xai` | `https://api.x.ai/v1` | `grok-4.3` | Yes |
 | Azure OpenAI | `azure-openai` | `https://YOUR-RESOURCE-NAME.openai.azure.com/openai/v1` | `gpt-4.1-nano` | Yes |
 | LM Studio local | `openai-compatible` | `http://localhost:1234/v1` | `translategemma` | No |
+| OPUS-CAT local | `opus-cat` | `http://localhost:8500` | `default` | No |
 | DeepSeek | `deepseek` | `https://api.deepseek.com` | `deepseek-v4-pro` | Yes |
 | Perplexity Sonar | `perplexity` | `https://api.perplexity.ai/v1` | `sonar-pro` | Yes |
 | Groq | `groq` | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | Yes |
@@ -771,6 +786,7 @@ These are important when testing and documenting LoopCAT publicly:
 - Hosted provider support depends on live provider APIs, keys, account access, and model availability.
 - The default model names in the app are presets and may need to be changed to models actually available in a user's account.
 - Local Ollama and LM Studio depend on local runtime installation and model availability.
+- OPUS-CAT depends on a running local OPUS-CAT MT Engine plus an installed matching language-pair model; it supports pretranslation rather than prompt-based review/edit commands.
 - AI suggestions are assistive, not automatically trusted translation memory.
 - AI pretranslation writes targets directly but always marks them for review.
 - Most AI editing commands save suggestions rather than overwriting targets.
@@ -778,6 +794,8 @@ These are important when testing and documenting LoopCAT publicly:
 - Very complex DOCX, OpenXML, OpenDocument, and DTP layouts still need real-world fixture depth beyond the current tested structures.
 - Unsigned desktop builds may trigger operating-system warnings.
 - Local browser storage is not a substitute for project package exports or workspace-folder backups.
+- Automated modernization gates do not replace pending NVDA/VoiceOver, 200% zoom, final human visual, clean-machine, signing/notarization, storage-failure, and reference-hardware evidence.
+- Hosted initial JavaScript is smaller than the recorded baseline but remains above the optional 750 KB minified stretch target; further reduction requires an explicit behavior, timing, offline, or direct-file compatibility decision.
 
 ## 30. Suggested End-To-End Acceptance Test
 

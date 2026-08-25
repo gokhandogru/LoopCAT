@@ -1,5 +1,7 @@
 # LoopCAT modernization — Plan mode prompt
 
+> **Historical planning artifact.** This prompt is retained to explain the requirements and sequencing used for the 2026 modernization. It is not the current implementation backlog: all roadmap code packages described below now have implementations and automated regression evidence. Use [the current roadmap](../ROADMAP.md), [implementation status](modernization-implementation-status-2026-08-10.md), and [completion audit](modernization-completion-audit-2026-08-24.md) for present-day work.
+
 Copy the prompt below into Plan mode from the LoopCAT repository root.
 
 ---

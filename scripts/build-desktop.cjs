@@ -172,6 +172,41 @@ function withExplicitPublishMode(args) {
   return [...args, "--publish", "never"];
 }
 
+function shouldCreateWindowsZipWrappers(args) {
+  if (process.platform !== "win32" || args.includes("--dir")) return false;
+  const platforms = requestedPlatforms(args);
+  if (platforms.size && !platforms.has("win32")) return false;
+  const targets = new Set(args.filter((arg) => arg === "nsis" || arg === "portable"));
+  return targets.size === 0 || (targets.has("nsis") && targets.has("portable"));
+}
+
+function createWindowsZipWrappers() {
+  const scriptPath = path.join(root, "scripts", "create-windows-zip-wrappers.ps1");
+  const result = spawnSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      scriptPath,
+      "-DistDirectory",
+      distDir,
+      "-Version",
+      require(path.join(root, "package.json")).version
+    ],
+    {
+      cwd: root,
+      env,
+      stdio: "inherit",
+      shell: false
+    }
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error("Windows installer ZIP creation failed.");
+}
+
 let releaseBuildLock = null;
 let exitCode = 0;
 try {
@@ -185,7 +220,8 @@ try {
   runNodeScript("verify-renderer-build.cjs");
   runNodeScript("prepare-desktop-app.cjs");
 
-  const invocation = electronBuilderInvocation(withExplicitPublishMode(process.argv.slice(2)));
+  const buildArgs = process.argv.slice(2);
+  const invocation = electronBuilderInvocation(withExplicitPublishMode(buildArgs));
   const result = spawnSync(invocation.command, invocation.args, {
     cwd: root,
     env,
@@ -198,6 +234,9 @@ try {
     exitCode = 1;
   } else {
     exitCode = result.status ?? 1;
+  }
+  if (exitCode === 0 && shouldCreateWindowsZipWrappers(buildArgs)) {
+    createWindowsZipWrappers();
   }
   removeBuilderDebugSidecars();
 } catch (error) {

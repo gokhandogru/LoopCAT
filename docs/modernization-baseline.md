@@ -1,5 +1,7 @@
 # LoopCAT modernization baseline
 
+> **Historical baseline.** These values intentionally describe the 10 August 2026 starting point. The current implementation uses Electron 43.3.0 with sandboxing and hardware acceleration enabled by default, a 13-line `app.js` bootstrap, separate production/test graphs, semantic light/dark themes, checked feature controllers/services, and the completed automated modernization gates. See [implementation status](modernization-implementation-status-2026-08-10.md) and [the completion audit](modernization-completion-audit-2026-08-24.md); do not treat the exceptions below as current defects.
+
 **Baseline commit:** `0a2d5343d6c2a2ef859a16bc0674e128e7803d1a`  
 **Captured:** 10 August 2026  
 **Purpose:** Safety evidence for the incremental modernization. These measurements characterize the current application; performance targets are not claimed as achieved until controlled reference-device profiling is complete.

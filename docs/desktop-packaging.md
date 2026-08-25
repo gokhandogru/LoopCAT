@@ -2,6 +2,13 @@
 
 LoopCAT can run as a static browser app, an installable offline web app, or a bundled Electron desktop app.
 
+## Current Checkpoint State
+
+- The repository currently packages LoopCAT `0.0.3` with Electron 43.3.0 and electron-builder 26.15.3.
+- The current Windows repository mirror is intentionally unsigned and is suitable for trusted prerelease testing, not production release qualification.
+- Native CI has completed the static-web and Linux AppImage/DEB build, sandboxed smoke, artifact, fuse, download-policy, and checksum gates. Windows and macOS reach the fail-closed signing-credential boundary; completed signed/notarized clean-machine evidence is still required.
+- The files under `downloads/` are regenerated from the current repository checkout. The binaries attached to the older `draft-0.0.3` GitHub prerelease tag are a historical tagged build and must not be silently replaced with binaries from a different commit.
+
 ## Why Electron
 
 Electron is the current desktop packaging path because LoopCAT is already an HTML-first CAT tool. The wrapper keeps the same application code and provides downloadable builds for Windows, macOS, and Linux.
@@ -128,6 +135,8 @@ Build installable artifacts for the current platform:
 pnpm run dist
 ```
 
+On Windows, the standard `dist`/`dist:win` path also recreates `LoopCAT Windows Setup <version>.zip` and `LoopCAT <version> Portable.zip` from the installer and portable executables. The wrapper step validates that every source and destination stays directly inside `dist/`, so stale ZIPs from an earlier checkout cannot be reused by `downloads:prepare`.
+
 Launch the unpacked packaged desktop app in hidden smoke mode and verify the bundled `loopcat://app/index.html` shell renders, serves packaged app-shell assets through the private protocol, blocks test pages from that protocol, can write/read/delete a local IndexedDB record, can create a real project, save segment targets, rebuild packaged HTML, XLIFF, and target DOCX exports from imported source structure, generate a bilingual DOCX, export a backup containing saved targets, read targets back, and clean up in an isolated temporary profile:
 
 ```bash
@@ -154,7 +163,7 @@ After the current web bundle and Windows installer/portable ZIPs have all passed
 pnpm run downloads:prepare
 ```
 
-This copies the three versioned ZIPs into `downloads/`, removes superseded generated downloads from that directory, writes the repository-facing SHA-256 checksum list, and updates `downloads/README.md`. Commit those generated files only when intentionally publishing a repository download mirror.
+This copies the three versioned ZIPs into `downloads/`, removes superseded generated downloads from that directory, writes the repository-facing SHA-256 checksum list, and updates `downloads/README.md`. Commit those generated files only when intentionally publishing a repository download mirror. A tagged GitHub release is a separate provenance boundary: do not overwrite its assets with a build from another commit; create a correctly versioned/tagged release instead.
 
 Validate a completed release evidence copy before publishing. With no file argument, the command checks that the reusable template still contains the required sections and checks. For a release candidate, compare the completed evidence against the generated checksum file:
 
@@ -198,7 +207,7 @@ Run each platform command on the matching operating system. The build wrapper re
 
 Artifacts are written to `dist/`.
 
-The GitHub Actions workflow in `.github/workflows/desktop-release.yml` builds the same desktop artifacts on Windows, macOS, and Linux when run manually or when a `v*` tag is pushed. Each platform job uploads only public download files plus its platform checksum file; Windows jobs also pick up optional installer and portable ZIP wrappers when they are present. Unpacked app folders and builder debug sidecars are retained only inside the job workspace for verification. The final `release-bundle` job downloads all platform artifacts, runs `pnpm run verify:download-bundle -- --dist release-dist`, removes nested platform checksum sidecars while generating a combined `SHA256SUMS.txt`, verifies the combined file, and uploads the `LoopCAT-All-Platforms` artifact for publication.
+The GitHub Actions workflow in `.github/workflows/desktop-release.yml` builds the same desktop artifacts on Windows, macOS, and Linux when run manually or when a `v*` tag is pushed. Each platform job uploads only public download files plus its platform checksum file; the standard Windows build recreates installer and portable ZIP wrappers from the just-built executables. Unpacked app folders and builder debug sidecars are retained only inside the job workspace for verification. The final `release-bundle` job downloads all platform artifacts, runs `pnpm run verify:download-bundle -- --dist release-dist`, removes nested platform checksum sidecars while generating a combined `SHA256SUMS.txt`, verifies the combined file, and uploads the `LoopCAT-All-Platforms` artifact for publication.
 
 The Linux workflow job installs `xvfb`, Ruby, `fpm`, `rpm`, `libarchive-tools`, and the available `libfuse2` package before packaging so Electron Builder can produce both `.AppImage` and `.deb` downloads on the Ubuntu runner.
 
