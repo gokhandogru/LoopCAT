@@ -6,9 +6,7 @@ Copy the prompt below into Plan mode from the LoopCAT repository root.
 
 ---
 
-You are in **Plan mode** for the LoopCAT repository at:
-
-`D:\Gokhan Codex\CatHan`
+You are in **Plan mode** at the LoopCAT repository root. All paths below are relative to that root.
 
 Your task is to produce a **thorough, ordered, dependency-aware implementation plan** for modernizing LoopCAT. Do not implement changes in this task. Inspect the repository and return a plan precise enough that later implementation tasks can execute it without rediscovering the architecture or making major product decisions.
 
@@ -16,13 +14,13 @@ Your task is to produce a **thorough, ordered, dependency-aware implementation p
 
 Read this review completely before planning:
 
-`D:\Gokhan Codex\CatHan\docs\loopcat-modern-software-review-2026-08-10.md`
+`docs/loopcat-modern-software-review-2026-08-10.md`
 
 Treat its findings, evidence, scorecard, P0–P3 backlog, constraints, and success measures as the requirements baseline. Inspect the current repository to validate exact files, dependencies, tests, build paths, and architectural seams. If the code has changed since the review, explicitly identify the difference and plan against the current code without silently discarding the review’s intent.
 
 Use the nine audit screenshots as visual evidence:
 
-`D:\Gokhan Codex\CatHan\test-artifacts\modern-software-audit-2026-08-10`
+`test-artifacts/modern-software-audit-2026-08-10`
 
 The target product feeling is:
 

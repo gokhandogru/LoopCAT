@@ -133,7 +133,9 @@
       "README.md",
       "LICENSE",
       "NOTICE",
-      "docs/**"
+      "docs/**",
+      "!docs/loopcat-modern-software-review-*.md",
+      "!docs/loopcat-modernization-plan-prompt-*.md"
     ],
     "win": {
       "icon": "icons/loopcat-icon.ico",

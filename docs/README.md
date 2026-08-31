@@ -24,8 +24,10 @@ Use this page to distinguish current product documentation from dated research a
 
 These files preserve evidence and decisions from the 2026 modernization. Historical gap statements remain in place so the audit trail is understandable; each file identifies the current source of truth.
 
-- [Modern software review — 10 August 2026](loopcat-modern-software-review-2026-08-10.md)
-- [Plan-mode prompt — 10 August 2026](loopcat-modernization-plan-prompt-2026-08-10.md)
+The internal software review and planning prompt are available in the repository only. Desktop packages omit their contents; the links below open the repository copies.
+
+- [Modern software review — 10 August 2026](https://github.com/gokhandogru/LoopCAT/blob/main/docs/loopcat-modern-software-review-2026-08-10.md)
+- [Plan-mode prompt — 10 August 2026](https://github.com/gokhandogru/LoopCAT/blob/main/docs/loopcat-modernization-plan-prompt-2026-08-10.md)
 - [Modernization baseline — 10 August 2026](modernization-baseline.md)
 - [Implementation status](modernization-implementation-status-2026-08-10.md)
 - [Completion audit — 24 August 2026, repository state updated 25 August](modernization-completion-audit-2026-08-24.md)

@@ -21,6 +21,7 @@ const rendererAssets = new Set([
   "config/production-assets.js",
   ...JSON.parse(fs.readFileSync(path.join(rendererRoot, "assets.json"), "utf8"))
 ]);
+const internalDocumentPattern = /^docs\/loopcat-(?:modern-software-review|modernization-plan-prompt)-[^/]+\.md$/i;
 
 function assertInsideStage(target) {
   const resolved = path.resolve(target);
@@ -48,6 +49,7 @@ function copyDirectory(relativePath) {
   const sourceRoot = path.join(root, relativePath);
   for (const entry of fs.readdirSync(sourceRoot, { withFileTypes: true })) {
     const child = path.posix.join(relativePath.replaceAll("\\", "/"), entry.name);
+    if (internalDocumentPattern.test(child)) continue;
     if (entry.isDirectory()) copyDirectory(child);
     else if (entry.isFile()) copyFile(child);
   }

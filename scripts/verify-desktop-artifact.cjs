@@ -45,6 +45,7 @@ const sourceMirrorFiles = requiredFiles.filter(
 );
 
 const forbiddenPatterns = [
+  /^docs\/loopcat-(?:modern-software-review|modernization-plan-prompt)-[^/]+\.md$/i,
   /(^|\/)(test-runner|security-policy-test|smoke-test|regression-test|offline-shell-test|workspace-storage-test|package-roundtrip-test|large-project-test)\.html$/i,
   /^test-artifacts\//i,
   /^node_modules\//i,
