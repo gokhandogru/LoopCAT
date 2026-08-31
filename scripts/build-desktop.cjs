@@ -1,6 +1,7 @@
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const { writeReceipt } = require("./repository-build-identity.cjs");
 
 const root = path.resolve(__dirname, "..");
 const distDir = path.join(root, "dist");
@@ -237,6 +238,14 @@ try {
   }
   if (exitCode === 0 && shouldCreateWindowsZipWrappers(buildArgs)) {
     createWindowsZipWrappers();
+    const identity = JSON.parse(fs.readFileSync(path.join(root, ".cache", "desktop-app", "build-info.json"), "utf8"));
+    const version = identity.version;
+    writeReceipt(root, distDir, identity, [
+      `LoopCAT Setup ${version}.exe`,
+      `LoopCAT ${version}.exe`,
+      `LoopCAT Windows Setup ${version}.zip`,
+      `LoopCAT ${version} Portable.zip`
+    ]);
   }
   removeBuilderDebugSidecars();
 } catch (error) {

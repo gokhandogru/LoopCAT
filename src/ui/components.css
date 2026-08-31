@@ -69,6 +69,28 @@
   box-shadow: var(--elevation-none);
 }
 
+.liquid-glass-edition .save-status:empty {
+  display: none;
+}
+
+.liquid-glass-edition .analysis-panel,
+.liquid-glass-edition .file-list-header {
+  padding: var(--space-3) var(--space-4);
+}
+
+.liquid-glass-edition .analysis-header,
+.liquid-glass-edition .file-list-header {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.liquid-glass-edition .analysis-header > span,
+.liquid-glass-edition .file-list-header > span {
+  margin-inline-start: auto;
+  text-align: end;
+}
+
 .liquid-glass-edition .project-tile:hover,
 .liquid-glass-edition .file-card:hover,
 .liquid-glass-edition .resource-card:hover {
@@ -316,7 +338,7 @@
 
 .liquid-glass-edition .ai-contextual-heading {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
 }
@@ -326,10 +348,44 @@
   margin: 0;
 }
 
-.liquid-glass-edition .ai-contextual-heading p {
-  margin-top: var(--space-1);
+.liquid-glass-edition .ai-contextual-safeguard {
+  margin: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
+}
+
+.liquid-glass-edition .ai-contextual-scope {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.liquid-glass-edition .ai-contextual-scope select {
+  width: 100%;
+  min-width: 0;
+}
+
+.liquid-glass-edition #contextualAiProgressMount:has(.local-ai-progress:not(.running)) {
+  display: none;
+}
+
+.liquid-glass-edition .ai-provider-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  padding: var(--space-6);
+}
+
+.liquid-glass-edition .ai-provider-dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.liquid-glass-edition .ai-provider-dialog-heading h2 {
+  margin: 0;
 }
 
 .liquid-glass-edition .ai-contextual-actions {
@@ -341,6 +397,14 @@
 .liquid-glass-edition .ai-contextual-actions button {
   min-width: 0;
   text-align: left;
+}
+
+.liquid-glass-edition #contextualAiCancelBtn {
+  grid-column: 1 / -1;
+}
+
+.liquid-glass-edition #contextualAiCancelBtn:disabled {
+  display: none;
 }
 
 .liquid-glass-edition .project-ai-options > summary {

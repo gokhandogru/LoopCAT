@@ -1,4 +1,4 @@
-const LOCAL_PRETRANSLATION_MODES = new Set(["selected", "untranslated", "visible", "project"]);
+const LOCAL_PRETRANSLATION_MODES = new Set(["selected", "document", "untranslated", "visible", "project"]);
 const LOCAL_VARIANT_MODES = new Set(["standard", "formal", "concise", "locale", "plain"]);
 const LOCAL_ADAPT_MODES = new Set(["simplify", "formalize", "localize", "shorten"]);
 

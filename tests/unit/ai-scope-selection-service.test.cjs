@@ -84,7 +84,7 @@ test("AI terminology scope preserves selected, sparse visible, project, untransl
     harness.service.terminologySegments({ mode: "untranslated" }).map((segment) => segment.id),
     ["s2"]
   );
-  assert.equal(harness.service.terminologySegments({ mode: "document" }), harness.documentSegments);
+  assert.deepEqual(harness.service.terminologySegments({ mode: "document" }), harness.documentSegments);
   const noActive = createHarness(createAiScopeSelectionService, { activeSegment: null });
   assert.deepEqual(noActive.service.terminologySegments({ mode: "selected" }), []);
 });
@@ -95,9 +95,44 @@ test("AI pretranslation scope preserves project-backed and document-backed sourc
   for (const mode of ["project", "visible", "selected"]) {
     assert.equal(harness.service.pretranslationSegments({ mode }), harness.allSegments);
   }
-  for (const mode of ["untranslated", "document", "unknown"]) {
-    assert.equal(harness.service.pretranslationSegments({ mode }), harness.documentSegments);
+  for (const mode of ["document", "unknown"]) {
+    assert.deepEqual(harness.service.pretranslationSegments({ mode }), harness.documentSegments);
   }
+  assert.deepEqual(
+    harness.service.pretranslationSegments({ mode: "untranslated" }).map((segment) => segment.id),
+    ["s2"]
+  );
+});
+
+test("AI document scope never includes other files or follows the search filter", async () => {
+  const { createAiScopeSelectionService } = await loadFactory();
+  const allSegments = [
+    { id: "a1", documentId: "a", target: "Draft" },
+    { id: "b1", documentId: "b", target: "" },
+    { id: "a2", documentId: "a", target: "" }
+  ];
+  const harness = createHarness(createAiScopeSelectionService, {
+    allSegments,
+    documentSegments: allSegments,
+    activeSegment: allSegments[0],
+    visibleIndexes: [1]
+  });
+  for (const method of ["terminologySegments", "pretranslationSegments"]) {
+    assert.deepEqual(
+      harness.service[method]({ mode: "document" }).map((segment) => segment.id),
+      ["a1", "a2"]
+    );
+  }
+  assert.deepEqual(
+    harness.service.terminologySegments({ mode: "untranslated" }).map((segment) => segment.id),
+    ["a2"]
+  );
+  const ambiguous = createHarness(createAiScopeSelectionService, {
+    allSegments,
+    documentSegments: allSegments,
+    activeSegment: null
+  });
+  assert.deepEqual(ambiguous.service.pretranslationSegments({ mode: "document" }), []);
 });
 
 test("AI pretranslation options preserve active and ordered sparse visible stable IDs", async () => {

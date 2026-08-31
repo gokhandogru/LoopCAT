@@ -149,7 +149,7 @@ test("ApplicationSaveStatusController preserves falsy text normalization and eve
   const falsy = createHarness(createApplicationSaveStatusController);
   falsy.controller.set(0);
   assert.deepEqual(falsy.calls[0], ["redaction.sanitize", ""]);
-  assert.equal(falsy.state.text, "source:");
+  assert.equal(falsy.state.text, "");
   assert.equal(falsy.state.className, "save-status ");
 
   for (const text of [
@@ -167,7 +167,8 @@ test("ApplicationSaveStatusController preserves falsy text normalization and eve
     "Import project: reading",
     "Import project: parsing",
     "Import project: importing",
-    "Import project: saving"
+    "Import project: saving",
+    "Local AI pre-translating 44 segments..."
   ]) {
     const harness = createHarness(createApplicationSaveStatusController);
     harness.controller.set(text);
@@ -180,11 +181,11 @@ test("ApplicationSaveStatusController preserves falsy text normalization and eve
   }
 });
 
-test("ApplicationSaveStatusController replaces a pending saved timer before the next status", async () => {
+test("ApplicationSaveStatusController cancels notice expiry when unsaved work replaces it", async () => {
   const { createApplicationSaveStatusController } = await loadFactory();
   const harness = createHarness(createApplicationSaveStatusController);
   harness.controller.set("Project package saved", "saved");
-  assert.deepEqual(harness.calls.slice(-1), [["timers.set", 5000]]);
+  assert.deepEqual(harness.calls.slice(-1), [["timers.set", 2000]]);
   assert.deepEqual([...harness.callbacks.keys()], [41]);
 
   harness.calls.length = 0;
@@ -197,45 +198,85 @@ test("ApplicationSaveStatusController replaces a pending saved timer before the 
   );
 });
 
-test("ApplicationSaveStatusController preserves delayed-saved eligibility, callback order, and private timer release", async () => {
+test("ApplicationSaveStatusController dismisses completed successes, failures, and warnings without claiming a save", async () => {
   const { createApplicationSaveStatusController } = await loadFactory();
 
-  for (const [text, mode, expectedTimer] of [
-    ["Completed", "saved", true],
-    ["Saved to workspace", "", true],
-    ["Saved", "saved", false],
-    ["saved to workspace", "", false],
-    ["Completed", "dirty", false]
+  for (const [text, mode] of [
+    ["Completed", "saved"],
+    ["Saved to workspace", ""],
+    ["Saved", "saved"],
+    ["Local AI pre-translation: no segments updated; 1 failed", "saved"],
+    ["Local AI pre-translation failed", "dirty"],
+    ["Starting LM Studio server failed", "dirty"],
+    ["Select a segment first", "dirty"]
   ]) {
     const harness = createHarness(createApplicationSaveStatusController);
     harness.controller.set(text, mode);
-    assert.equal(
-      harness.calls.some(([name]) => name === "timers.set"),
-      expectedTimer,
-      `${text}/${mode}`
+    assert.equal(harness.state.busy, "false", text);
+    assert.deepEqual(harness.calls.at(-1), ["timers.set", 2000], text);
+    const published = harness.calls.filter(([name]) => name === "model.publish");
+    harness.fire(41);
+    assert.deepEqual(harness.state, { text: "", className: "save-status", busy: "false" }, text);
+    assert.deepEqual(
+      harness.calls.filter(([name]) => name === "model.publish"),
+      published
     );
   }
-
-  const harness = createHarness(createApplicationSaveStatusController, { savedLabel: "Localized saved" });
-  harness.controller.set("Saved to folder");
-  harness.calls.length = 0;
-  assert.equal(harness.fire(41), undefined);
-  assert.deepEqual(harness.calls, [
-    ["localization.translate", "app.status.saved"],
-    ["view.setText", "Localized saved"],
-    ["view.setClass", "save-status saved"]
-  ]);
-  assert.deepEqual(harness.state, { text: "Localized saved", className: "save-status saved", busy: "false" });
-
-  harness.calls.length = 0;
-  harness.controller.set("Next status");
-  assert.equal(
-    harness.calls.some(([name]) => name === "timers.clear"),
-    false
-  );
 });
 
-test("ApplicationSaveStatusController preserves synchronous failure timing and retained timer after callback failure", async () => {
+test("ApplicationSaveStatusController preserves running operations and pending autosave indicators", async () => {
+  const { createApplicationSaveStatusController } = await loadFactory();
+  for (const [text, mode] of [
+    ["Saving...", ""],
+    ["Local AI pre-translating 44 segments...", ""],
+    ["Canceling local AI batch...", "dirty"],
+    ["Unsaved changes", "dirty"],
+    ["2 save pending", "saved"],
+    ["Save failed; retrying autosave", "dirty"]
+  ]) {
+    const harness = createHarness(createApplicationSaveStatusController);
+    harness.controller.set(text, mode);
+    assert.equal(harness.callbacks.size, 0, text);
+    harness.controller.navigationChanged({ view: "project" }, { view: "editor" });
+    assert.equal(harness.state.text, `source:${text}`);
+  }
+});
+
+test("ApplicationSaveStatusController clears notices when changing screens, projects, or files but not segments", async () => {
+  const { createApplicationSaveStatusController } = await loadFactory();
+  const previous = { view: "editor", projectId: "project-1", documentId: "doc-1", segmentId: "segment-1" };
+  for (const patch of [
+    { view: "project" },
+    { view: "resources" },
+    { projectId: "project-2" },
+    { documentId: "doc-2" }
+  ]) {
+    const harness = createHarness(createApplicationSaveStatusController);
+    harness.controller.set("Local AI pre-translation failed", "dirty");
+    harness.controller.navigationChanged({ ...previous, ...patch }, previous);
+    assert.equal(harness.state.text, "");
+    assert.equal(harness.callbacks.size, 0);
+  }
+  const harness = createHarness(createApplicationSaveStatusController);
+  harness.controller.set("Translation updated", "saved");
+  harness.controller.navigationChanged({ ...previous, segmentId: "segment-2" }, previous);
+  assert.equal(harness.state.text, "source:Translation updated");
+  assert.equal(harness.callbacks.size, 1);
+});
+
+test("ApplicationSaveStatusController ignores expired callbacks after navigation or a newer operation", async () => {
+  const { createApplicationSaveStatusController } = await loadFactory();
+  const harness = createHarness(createApplicationSaveStatusController);
+  harness.controller.set("Translation updated", "saved");
+  const staleCallback = harness.callbacks.get(41);
+  harness.controller.navigationChanged({ view: "projects" }, { view: "editor" });
+  harness.controller.set("Running QA...");
+  staleCallback();
+  assert.equal(harness.state.text, "source:Running QA...");
+  assert.equal(harness.state.busy, "true");
+});
+
+test("ApplicationSaveStatusController preserves synchronous failure timing", async () => {
   const { createApplicationSaveStatusController } = await loadFactory();
   for (const errorAt of [
     "redaction.sanitize",
@@ -265,25 +306,13 @@ test("ApplicationSaveStatusController preserves synchronous failure timing and r
   };
   assert.throws(() => clearHarness.controller.set("Next"), clearError);
   assert.deepEqual(clearHarness.calls, [["timers.clear", 41]]);
-
-  const callbackError = new Error("translate sentinel");
-  const callbackHarness = createHarness(createApplicationSaveStatusController);
-  callbackHarness.controller.set("Completed", "saved");
-  callbackHarness.localization.translate = (key) => {
-    callbackHarness.calls.push(["localization.translate", key]);
-    throw callbackError;
-  };
-  assert.throws(() => callbackHarness.fire(41), callbackError);
-  callbackHarness.calls.length = 0;
-  callbackHarness.controller.set("Next");
-  assert.deepEqual(callbackHarness.calls[0], ["timers.clear", 41]);
 });
 
-test("ApplicationSaveStatusController validates boundaries and exposes only an immutable set action", async () => {
+test("ApplicationSaveStatusController validates boundaries and exposes immutable status actions", async () => {
   const { createApplicationSaveStatusController } = await loadFactory();
   const valid = createHarness(createApplicationSaveStatusController);
   assert.equal(Object.isFrozen(valid.controller), true);
-  assert.deepEqual(Object.keys(valid.controller), ["set"]);
+  assert.deepEqual(Object.keys(valid.controller), ["set", "navigationChanged"]);
 
   const create = (changes = {}) =>
     createApplicationSaveStatusController({

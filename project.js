@@ -48,7 +48,7 @@ function defaultAiSettings(settings = {}) {
   const localTargetCode = redactSensitiveText(source.localTargetCode || "").trim();
   const localConcurrency = Number(source.localConcurrency);
   const localTimeoutMs = Number(source.localTimeoutMs);
-  const localPretranslateMode = ["selected", "untranslated", "visible", "project"].includes(String(source.localPretranslateMode || "").trim())
+  const localPretranslateMode = ["selected", "document", "untranslated", "visible", "project"].includes(String(source.localPretranslateMode || "").trim())
     ? String(source.localPretranslateMode).trim()
     : "untranslated";
   const localVariantMode = ["standard", "formal", "concise", "locale", "plain"].includes(String(source.localVariantMode || "").trim())

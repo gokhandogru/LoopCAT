@@ -31,8 +31,6 @@
         </a>
         <div class="topbar-actions">
           <span id="saveStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true">Saved</span>
-          <button id="undoBtn" type="button" title="Undo last reversible action" disabled>Undo</button>
-          <button id="redoBtn" type="button" title="Redo last reverted action" disabled>Redo</button>
           <button id="projectsViewBtn">Projects</button>
           <button id="resourcesViewBtn">Resources</button>
           <button id="trashBtn" type="button">Trash</button>
@@ -952,11 +950,23 @@
               <section class="ai-contextual-workflow" aria-labelledby="aiContextualTitle">
                 <div class="ai-contextual-heading">
                   <div>
-                    <h3 id="aiContextualTitle">AI for this segment</h3>
-                    <p>Suggestions stay inspectable and do not replace confirmed or locked text.</p>
+                    <h3 id="aiContextualTitle">AI tools</h3>
                   </div>
                   <button id="openProjectAiSettingsBtn" type="button">Provider settings</button>
                 </div>
+                <label class="ai-contextual-scope">
+                  Scope
+                  <select id="localAiModeSelect">
+                    <option value="selected">Selected segment</option>
+                    <option value="document">Current document</option>
+                    <option value="project">Whole project</option>
+                    <option value="visible">Filtered segments</option>
+                    <option value="untranslated">Untranslated in document</option>
+                  </select>
+                </label>
+                <p class="ai-contextual-safeguard">
+                  Suggestions stay inspectable. Confirmed and locked text is preserved.
+                </p>
                 <p id="contextualAiStatus" class="ai-privacy-note" role="status" aria-live="polite">
                   Provider not connected
                 </p>
@@ -967,9 +977,9 @@
                   <button id="contextualAiPolishBtn" type="button">Polish draft</button>
                   <button id="contextualAiVariantsBtn" type="button">Suggest alternatives</button>
                   <button id="contextualAiApplyTermsBtn" type="button">Apply terminology</button>
-                  <button id="contextualOpenAiSuggestionBtn" type="button">Cloud suggestion</button>
                   <button id="contextualAiCancelBtn" type="button" disabled>Cancel</button>
                 </div>
+                <div id="contextualAiProgressMount"></div>
                 <div id="contextualAiSuggestionMount" class="ai-contextual-results"></div>
                 <div id="contextualAiOutputMount" class="ai-contextual-results"></div>
               </section>
@@ -1094,15 +1104,6 @@
                         <input id="localAiTargetCodeInput" autocomplete="off" list="languageCodeOptions" />
                       </label>
                     </div>
-                    <label>
-                      Scope
-                      <select id="localAiModeSelect">
-                        <option value="selected">Selected segment only</option>
-                        <option value="untranslated">Untranslated segments only</option>
-                        <option value="visible">All visible segments</option>
-                        <option value="project">All project segments</option>
-                      </select>
-                    </label>
                     <p class="local-ai-safeguard">
                       Confirmed and locked segments are preserved. Existing target text is skipped unless overwrite is
                       enabled.
@@ -1642,6 +1643,14 @@
           <button id="saveProjectBtn" class="primary" value="default">Create</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="aiProviderDialog" class="ai-provider-dialog" aria-labelledby="aiProviderDialogTitle">
+      <div class="ai-provider-dialog-heading">
+        <h2 id="aiProviderDialogTitle">AI settings</h2>
+        <button id="closeAiProviderDialogBtn" type="button">Close</button>
+      </div>
+      <div id="aiProviderSettingsMount"></div>
     </dialog>
 
     <datalist id="languageOptions"></datalist>

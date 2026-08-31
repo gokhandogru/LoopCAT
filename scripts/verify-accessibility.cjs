@@ -92,7 +92,7 @@ async function waitFor(expression, label, timeoutMs = 15000) {
   throw new Error(`Timed out waiting for ${label}.`);
 }
 
-async function audit(name) {
+async function auditCurrentTheme(name) {
   await windowRef.webContents.executeJavaScript(axeSource, true);
   const results = await windowRef.webContents.executeJavaScript(
     `axe.run(document, {
@@ -107,7 +107,7 @@ async function audit(name) {
       .map((violation) => {
         const targets = violation.nodes
           .slice(0, 5)
-          .map((node) => node.target.join(" "))
+          .map((node) => `${node.target.join(" ")}: ${node.failureSummary || ""}`)
           .join(", ");
         return `${violation.id} (${violation.impact}): ${targets}`;
       })
@@ -119,6 +119,29 @@ async function audit(name) {
   );
 }
 
+async function audit(name) {
+  for (const theme of ["light", "dark"]) {
+    await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const select = document.querySelector("#themeSelect");
+        select.value = ${JSON.stringify(theme)};
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      })()`,
+      true
+    );
+    await waitFor(`document.documentElement.dataset.theme === ${JSON.stringify(theme)}`, `${theme} theme`);
+    // Let control background transitions finish before measuring contrast.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
+    await windowRef.webContents.executeJavaScript(
+      "document.getAnimations().forEach((animation) => animation.finish())",
+      true
+    );
+    await auditCurrentTheme(`${name} (${theme})`);
+  }
+}
+
 async function finish() {
   if (windowRef && !windowRef.isDestroyed()) windowRef.destroy();
   if (server) {
@@ -126,11 +149,15 @@ async function finish() {
       server.close(resolve);
     });
   }
-  await fs.rm(userDataDir, { recursive: true, force: true });
+  await fs.rm(userDataDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 }).catch((error) => {
+    console.warn(`Temporary accessibility profile cleanup: ${error.message}`);
+  });
 }
 
 app.setPath("userData", userDataDir);
 app.enableSandbox();
+// Keep Electron alive until asynchronous cleanup and error reporting finish.
+app.on("window-all-closed", () => {});
 
 app
   .whenReady()
@@ -141,7 +168,7 @@ app
         width: 1440,
         height: 900,
         show: false,
-        webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
+        webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false }
       });
       await windowRef.loadURL(`http://127.0.0.1:${port}/index.html`);
       await waitFor("document.querySelector('#projectsView') && window.CatHan?.storage", "Projects view");
@@ -280,11 +307,13 @@ app
         true
       );
       await waitFor("document.querySelector('.file-card button.primary')", "accessibility project dashboard");
+      await audit("Project dashboard populated");
       await windowRef.webContents.executeJavaScript(
         "document.querySelector('.file-card button.primary').click()",
         true
       );
       await waitFor("document.querySelector('#segmentBody textarea')", "accessibility translation editor");
+      await audit("Editor with segments, status badges, and matches");
       await windowRef.webContents.executeJavaScript(
         `(() => {
           const returnTarget = document.querySelector("#focusModeBtn");
@@ -326,23 +355,39 @@ app
         "document.querySelector('#inspectorTabQuality').getAttribute('aria-selected') === 'true'",
         "populated Quality Workbench"
       );
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const toggle = document.querySelector("#inspectorQualityPanel [data-panel-toggle]");
+          if (toggle.getAttribute("aria-expanded") !== "true") toggle.click();
+          document.querySelector("#runQaBtn").click();
+          document.querySelector("#refreshQualityRiskBtn").click();
+        })()`,
+        true
+      );
+      await waitFor("document.querySelector('#qualitySummary .quality-summary-grid')", "expanded quality summary");
       await audit("Quality Workbench populated");
       await windowRef.webContents.executeJavaScript(
         `(() => {
           document.querySelector("#inspectorTabAi").click();
+        })()`,
+        true
+      );
+      await audit("AI sidebar with scope selection");
+      await windowRef.webContents.executeJavaScript(
+        `(() => {
           const opener = document.querySelector("#openProjectAiSettingsBtn");
           opener.focus();
           opener.click();
         })()`,
         true
       );
-      await waitFor(
-        "document.querySelector('#projectDialog').open && document.querySelector('#projectAiOptions').open",
-        "AI provider administration dialog"
-      );
+      await waitFor("document.querySelector('#aiProviderDialog').open", "AI provider administration dialog");
       await audit("AI provider administration and command centre");
-      await windowRef.webContents.executeJavaScript("document.querySelector('#cancelProjectBtn').click()", true);
-      await waitFor("!document.querySelector('#projectDialog').open", "AI provider administration dialog close");
+      await windowRef.webContents.executeJavaScript(
+        "document.querySelector('#closeAiProviderDialogBtn').click()",
+        true
+      );
+      await waitFor("!document.querySelector('#aiProviderDialog').open", "AI provider administration dialog close");
       await waitFor(
         "document.activeElement === document.querySelector('#openProjectAiSettingsBtn')",
         "AI provider administration focus return"

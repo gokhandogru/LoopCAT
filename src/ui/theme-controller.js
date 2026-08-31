@@ -24,7 +24,7 @@ export function createThemeController({
     documentRoot.dataset.theme = resolved;
     documentRoot.style.colorScheme = resolved;
     if (select) select.value = preference;
-    if (themeColorMeta) themeColorMeta.content = resolved === "dark" ? "#101514" : "#f6f7f6";
+    if (themeColorMeta) themeColorMeta.content = resolved === "dark" ? "#111820" : "#f6f7f6";
     return resolved;
   }
 

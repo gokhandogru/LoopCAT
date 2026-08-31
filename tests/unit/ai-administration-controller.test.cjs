@@ -235,6 +235,7 @@ test("AiAdministrationController owns provider and command action lifecycle with
     }
   });
   assert.equal(controller.mount(), true);
+  controller.render({ projectId: "p1", availability: { hasProject: true, hasSegment: true } });
   els.saveSettingsButton.click();
   els.providerPresetSelect.value = "gemini";
   els.providerPresetSelect.dispatch("change");
@@ -372,6 +373,45 @@ test("AiAdministrationController renders provider details with safe DOM construc
   assert.equal(els.providerSummary.querySelector("img"), null);
   assert.equal(els.hostedKeyControls.classList.contains("hidden"), false);
   assert.equal(els.localAiApiKeyInput.value, "secret");
+});
+
+test("AiAdministrationController routes every contextual action through the visible scope", async () => {
+  const { createAiAdministrationController } = await moduleAt("src/features/ai/ai-administration-controller.js");
+  const els = elements(fakeDocument());
+  const calls = [];
+  const actions = { contextualTranslate: () => calls.push(`translate:${els.modeSelect.value}`) };
+  for (const action of ["review", "repair", "polish", "variants", "applyTerms"]) {
+    actions[`${action}Segment`] = () => calls.push(`${action}:selected`);
+    actions[`${action}Batch`] = () => calls.push(`${action}:${els.modeSelect.value}`);
+  }
+  const controller = createAiAdministrationController({ elements: els, actions });
+  controller.mount();
+  const view = { projectId: "p1", availability: { hasProject: true, hasSegment: true } };
+  controller.render(view);
+  for (const mode of ["selected", "document", "project", "visible", "untranslated"]) {
+    els.modeSelect.value = mode;
+    els.modeSelect.dispatch("change");
+    controller.render(view);
+    assert.equal(els.modeSelect.value, mode, "scope survives editor rerenders");
+    calls.length = 0;
+    for (const button of ["Translate", "Review", "Repair", "Polish", "Variants", "ApplyTerms"]) {
+      els[`contextual${button}Button`].click();
+    }
+    assert.deepEqual(
+      calls,
+      ["translate", "review", "repair", "polish", "variants", "applyTerms"].map((action) => `${action}:${mode}`)
+    );
+  }
+  controller.render({ ...view, projectId: "p2" });
+  assert.equal(els.modeSelect.value, "selected", "a different project starts safely on one segment");
+  controller.renderAvailability({ hasProject: true, hasSegment: true, running: true });
+  assert.equal(els.modeSelect.disabled, true, "scope is fixed while a batch runs");
+  assert.equal(els.contextualTranslateButton.disabled, true);
+  controller.renderAvailability({ hasProject: true, hasSegment: false });
+  assert.equal(els.contextualReviewButton.disabled, true);
+  els.modeSelect.value = "project";
+  els.modeSelect.dispatch("change");
+  assert.equal(els.contextualReviewButton.disabled, false, "project actions do not need a selected segment");
 });
 
 test("AiAdministrationController renders busy status, progress, availability, and output disclosure", async () => {

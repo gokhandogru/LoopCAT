@@ -5,23 +5,490 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-canvas: #101514;
-  --color-surface: #171e1c;
-  --color-surface-subtle: #1e2825;
-  --color-surface-raised: #222d2a;
-  --color-text: #eef5f3;
-  --color-text-muted: #aabbb7;
-  --color-line: #35433f;
-  --color-line-strong: #61736e;
-  --color-accent: #5ec9ba;
-  --color-accent-hover: #83ddcf;
-  --color-accent-soft: #183e38;
-  --color-success: #69c7a8;
-  --color-warning: #e2ac68;
-  --color-danger: #ed929a;
-  --color-focus: #83ddcf;
-  --color-on-accent: #09211e;
-  --color-overlay: rgba(0, 0, 0, 0.58);
+  --color-canvas: #111820;
+  --color-surface: #18222d;
+  --color-surface-subtle: #202d39;
+  --color-surface-raised: #253442;
+  --color-input: #121c26;
+  --color-hover: #2b3c4b;
+  --color-text: #e8edf2;
+  --color-text-muted: #acbac7;
+  --color-line: #3a4b5c;
+  --color-line-strong: #8293a3;
+  --color-control-line: #718596;
+  --color-accent: #5cd3bf;
+  --color-accent-hover: #91ebdb;
+  --color-accent-soft: #193e39;
+  --color-success: #a0e2ba;
+  --color-success-soft: #15392c;
+  --color-warning: #ffd28a;
+  --color-warning-soft: #49351a;
+  --color-danger: #ffabb3;
+  --color-danger-soft: #4a252d;
+  --color-info: #aad6ff;
+  --color-info-soft: #173a59;
+  --color-violet: #d4bcff;
+  --color-violet-soft: #322749;
+  --color-highlight: #eec96d;
+  --color-on-highlight: #211908;
+  --color-focus: #91f4df;
+  --color-on-accent: #0b2925;
+  --color-disabled: #98a7b5;
+  --color-overlay: rgba(3, 8, 14, 0.72);
   --elevation-transient: 0 16px 40px rgba(0, 0, 0, 0.42);
-  --focus-ring: 0 0 0 1px #101514;
+  --focus-ring: 0 0 0 1px var(--color-canvas);
+}
+
+@media (prefers-contrast: more) {
+  :root[data-theme="dark"] {
+    --color-text-muted: #d2dce5;
+    --color-line: #8293a3;
+    --color-control-line: #acbac7;
+  }
+}
+
+/* The legacy editor and glass skin contain fixed light surfaces. Keep their
+   light appearance intact while giving every dark surface a matching foreground. */
+:root[data-theme="dark"] .liquid-glass-edition * {
+  scrollbar-color: var(--color-line-strong) var(--color-canvas);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition ::selection {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(
+    .project-toolbar,
+    .segment-grid-wrap,
+    .segment-grid,
+    .segment-grid td,
+    .local-ai-drawer,
+    .local-ai-primary-group,
+    .local-ai-status,
+    .quality-active-evidence,
+    .quality-decision-form,
+    .quality-risk-card,
+    .revision-pair div,
+    .project-advanced-body,
+    .resource-option,
+    .target-tag-preview,
+    .concordance-card
+  ) {
+  border-color: var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(
+    .progress-wrap,
+    .segment-controls,
+    .segment-grid th,
+    .project-stats div,
+    .project-home-stats div,
+    .analysis-grid div,
+    .project-filters,
+    .resource-import-row,
+    .resource-tabs,
+    .local-ai-group,
+    .local-ai-provider-summary,
+    .quality-summary,
+    .quality-summary-grid div,
+    .quality-risk-list,
+    .revision-history-list,
+    .ai-suggestion-list,
+    .local-ai-progress,
+    .workspace-health,
+    .workspace-submenu-body,
+    .project-advanced-options,
+    .project-storage-config,
+    .project-resource-config,
+    .resource-picker-block,
+    .empty-state,
+    .empty-file-state,
+    .opus-cat-help-command,
+    .command-palette > header,
+    .concordance-popover > header
+  ) {
+  border-color: var(--color-line);
+  background: var(--color-surface-subtle);
+}
+
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(
+    .segment-grid th,
+    .local-ai-group h3,
+    .local-ai-inline-details > summary,
+    .local-ai-drawer > summary,
+    .quality-summary-grid strong,
+    .quality-active-evidence strong,
+    .concordance-target
+  ) {
+  color: var(--color-text);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .progress-bar {
+  background: var(--color-line);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition :is(button, summary, .file-button, .icon-file, .compact-checkbox),
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  .project-toolbar
+  .toolbar-actions
+  :is(button:not(.primary), .menu > summary) {
+  border-color: var(--color-control-line);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .liquid-glass-edition :is(button, summary, .file-button, .icon-file):hover,
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  .project-toolbar
+  .toolbar-actions
+  :is(button:not(.primary), .menu > summary):hover {
+  border-color: var(--color-line-strong);
+  background: var(--color-hover);
+  color: var(--color-text);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(
+    .brand,
+    .brand:hover,
+    .panel-toggle,
+    .topbar-actions > button:not(.primary),
+    .topbar-actions > details > summary,
+    .inspector-tabs button,
+    .menu-panel button,
+    .menu-item,
+    .workspace-submenu > summary
+  ) {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-text);
+}
+
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(
+    .panel-toggle,
+    .topbar-actions > button:not(.primary),
+    .topbar-actions > details > summary,
+    .inspector-tabs button,
+    .menu-panel button,
+    .menu-item,
+    .workspace-submenu > summary,
+    .project-item
+  ):hover {
+  background: var(--color-hover);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition :is(input, select, textarea, .target-cell textarea) {
+  border-color: var(--color-control-line);
+  background: var(--color-input);
+  color: var(--color-text);
+  caret-color: var(--color-focus);
+  accent-color: var(--color-accent);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition :is(input, textarea)::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .liquid-glass-edition :is(input, select, textarea):hover {
+  border-color: var(--color-line-strong);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition :is(input, select, textarea, .target-cell textarea):focus {
+  border-color: var(--color-focus);
+  background: var(--color-input);
+}
+
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(
+    .primary,
+    .resource-card-actions button.primary,
+    .resource-tabs button.active,
+    .local-ai-section-number,
+    .focus-exit-btn
+  ),
+:root[data-theme="dark"] .liquid-glass-edition :is(#confirmBtn, #newProjectBtn, #replaceAllBtn) {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(.primary, .resource-card-actions button.primary, .resource-tabs button.active, .focus-exit-btn):hover,
+:root[data-theme="dark"] .liquid-glass-edition :is(#confirmBtn, #newProjectBtn, #replaceAllBtn):hover {
+  border-color: var(--color-accent-hover);
+  background: var(--color-accent-hover);
+  color: var(--color-on-accent);
+}
+
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(
+    .inspector-tabs button[aria-selected="true"],
+    .language-pair-chip-list button.active,
+    .qa-summary button.active,
+    .command-item.active:not(:disabled),
+    .command-item[aria-selected="true"]:not(:disabled),
+    .project-item.active,
+    .quick-insert-result.active
+  ),
+:root[data-theme="dark"] .liquid-glass-edition #nextOpenBtn {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-hover);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition :is(.danger-small, .resource-card-actions button.danger-small) {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition :is(.danger-small, .resource-card-actions button.danger-small):hover {
+  background: var(--color-danger);
+  color: var(--color-canvas);
+}
+
+/* Disabled controls stay legible, with no hover treatment implying availability. */
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(button, input, select, textarea, .primary, #confirmBtn, #newProjectBtn, #replaceAllBtn, #nextOpenBtn):disabled {
+  border-color: var(--color-line);
+  background: var(--color-surface-subtle);
+  color: var(--color-disabled);
+  opacity: 1;
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .segment-grid tr:hover td {
+  background: var(--color-surface-subtle);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .segment-grid tr.active td {
+  background: var(--color-accent-soft);
+  box-shadow:
+    inset 0 1px var(--color-line),
+    inset 0 -1px var(--color-line);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .segment-grid tr.active td:first-child {
+  box-shadow:
+    inset 3px 0 var(--color-accent),
+    inset 0 1px var(--color-line),
+    inset 0 -1px var(--color-line);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .segment-grid tr.active .target-cell textarea {
+  background: var(--color-input);
+  border-color: var(--color-control-line);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .segment-grid tr.active .target-cell textarea:focus {
+  border-color: var(--color-focus);
+}
+
+/* Status is conveyed by the existing text labels as well as these paired colors. */
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(
+    .status-pill,
+    .status-pill.empty,
+    .severity-pill,
+    .quality-category-pill,
+    .local-ai-provider-badges span,
+    .import-format-chips span
+  ) {
+  border-color: var(--color-line);
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+}
+
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(
+    .status-pill.confirmed,
+    .review-pill.reviewed,
+    .save-status,
+    .local-ai-status.connected,
+    .tm-match-badge,
+    .language-badge,
+    .ai-segment-badge.ai-risk-low
+  ) {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(
+    .status-pill.draft,
+    .review-pill.needs-review,
+    .severity-pill.warning,
+    .ai-segment-badge.ai-risk-medium,
+    .workspace-recovery,
+    .backup-reminder,
+    .validation-report
+  ) {
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .validation-item {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(
+    .review-pill.blocked,
+    .severity-pill.error,
+    .local-ai-status.disconnected,
+    .ai-segment-badge.ai-risk-high,
+    .ai-segment-badge.ai-risk-critical
+  ) {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(
+    .comment-marker,
+    .severity-pill.info,
+    .ai-segment-badge.ai-draft,
+    .ai-segment-badge.ai-initiated,
+    .local-ai-progress.running
+  ) {
+  border-color: var(--color-info);
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .ai-segment-badge.ai-suggestion {
+  border-color: var(--color-violet);
+  background: var(--color-violet-soft);
+  color: var(--color-violet);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition :is(.tag-chip, button.tag-chip-action, .tag-chip-placeholder) {
+  border-color: var(--color-info);
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .tag-chip-tag {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .tag-chip-variable {
+  border-color: var(--color-violet);
+  background: var(--color-violet-soft);
+  color: var(--color-violet);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition :is(.term-highlight, mark, .concordance-card mark) {
+  background: var(--color-highlight);
+  color: var(--color-on-highlight);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition :is(.tm-panel .match-card, .tb-panel .term-card) {
+  border-color: var(--color-line);
+  background: var(--color-surface-subtle);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .tb-panel .forbidden-term-card {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .replace-panel,
+:root[data-theme="dark"] .liquid-glass-edition #projectForm > .dialog-actions {
+  border-color: var(--color-line);
+  background: var(--color-surface-raised);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  .resources-view
+  :is(.resource-card, .resource-detail, .resource-row, .resource-tabs) {
+  border-color: var(--color-line);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .local-ai-status-dot {
+  background: var(--color-text-muted);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .local-ai-status.checking .local-ai-status-dot {
+  background: var(--color-warning);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .local-ai-status.connected .local-ai-status-dot {
+  background: var(--color-success);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .local-ai-status.error .local-ai-status-dot {
+  background: var(--color-danger);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .quality-risk-card:is(.critical, .high) {
+  border-left-color: var(--color-danger);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .quality-risk-card.medium {
+  border-left-color: var(--color-warning);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .quality-risk-card.low {
+  border-left-color: var(--color-info);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .tag-warning-row {
+  box-shadow: inset 3px 0 var(--color-warning);
+}
+
+:root[data-theme="dark"] body.focus-mode {
+  background: var(--color-canvas);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .workspace.focus-mode :is(.segment-grid-wrap, .segment-grid) {
+  background: var(--color-surface);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .workspace.focus-mode .segment-grid th {
+  background: var(--color-surface-subtle);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .workspace.focus-mode .target-cell textarea {
+  border-color: var(--color-control-line);
+  background: var(--color-input);
+}
+
+:root[data-theme="dark"] .liquid-glass-edition .workspace.focus-mode .target-cell textarea:focus {
+  border-color: var(--color-focus);
 }

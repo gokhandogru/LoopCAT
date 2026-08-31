@@ -334,6 +334,7 @@ export function createAiProviderFormController(options) {
     const settings = settingsBoundary.readProject(project);
     const state = currentState();
     administration.render({
+      projectId: project?.id || null,
       settings: {
         ...settings,
         sourceLanguage: settings.sourceLanguage || languages.nameForUi(settings.sourceCode || project?.sourceLang),

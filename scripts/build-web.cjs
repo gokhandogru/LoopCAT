@@ -2,6 +2,7 @@ const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const { createBuildIdentity, writeReceipt } = require("./repository-build-identity.cjs");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -155,6 +156,7 @@ const rendererAssets = new Set([
 fs.rmSync(distDir, { recursive: true, force: true });
 fs.mkdirSync(distDir, { recursive: true });
 
+const identity = createBuildIdentity(root);
 const entries = WEB_ASSETS.map((relativePath) =>
   assertAssetPath(relativePath, rendererAssets.has(relativePath) ? rendererRoot : root)
 )
@@ -173,6 +175,15 @@ const entries = WEB_ASSETS.map((relativePath) =>
   });
 
 const chunks = [];
+const identityData = Buffer.from(`${JSON.stringify(identity, null, 2)}\n`, "utf8");
+entries.push({
+  path: "build-info.json",
+  name: Buffer.from("build-info.json"),
+  data: identityData,
+  crc: crc32(identityData),
+  ...dosDateTime(),
+  offset: 0
+});
 let offset = 0;
 for (const entry of entries) {
   entry.offset = offset;
@@ -192,5 +203,6 @@ const zipBuffer = Buffer.concat([
 
 fs.writeFileSync(artifactPath, zipBuffer);
 fs.writeFileSync(checksumPath, `${sha256(artifactPath)}  ${artifactName}\n`, "utf8");
+writeReceipt(root, distDir, identity, [artifactName]);
 console.log(`Wrote ${path.relative(root, artifactPath)} with ${entries.length} static web assets.`);
 console.log(`Wrote ${path.relative(root, checksumPath)}.`);

@@ -2,6 +2,7 @@ const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const { createBuildIdentity, assertSameIdentity } = require("./repository-build-identity.cjs");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -149,6 +150,15 @@ for (const asset of REQUIRED_WEB_ASSETS) {
 }
 
 const productionApp = entries.get("app.js")?.toString("utf8") || "";
+try {
+  assertSameIdentity(
+    JSON.parse(entries.get("build-info.json")?.toString("utf8") || "{}"),
+    createBuildIdentity(root),
+    "Web build identity"
+  );
+} catch (error) {
+  fail(error.message);
+}
 for (const marker of ["runAppWorkflowTest", "app-workflow-test", "_TEST_FLAG", "Simulated autosave save failure"]) {
   if (productionApp.includes(marker)) fail(`Static web production renderer contains test-only marker: ${marker}`);
 }

@@ -1232,6 +1232,10 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     saveAiSettingsBtn: document.querySelector("#saveAiSettingsBtn"),
     projectAiOptions: document.querySelector("#projectAiOptions"),
     projectAiSettingsMount: document.querySelector("#projectAiSettingsMount"),
+    aiProviderDialog: document.querySelector("#aiProviderDialog"),
+    aiProviderSettingsMount: document.querySelector("#aiProviderSettingsMount"),
+    closeAiProviderDialogBtn: document.querySelector("#closeAiProviderDialogBtn"),
+    contextualAiProgressMount: document.querySelector("#contextualAiProgressMount"),
     openProjectAiSettingsBtn: document.querySelector("#openProjectAiSettingsBtn"),
     contextualAiStatus: document.querySelector("#contextualAiStatus"),
     contextualAiTranslateBtn: document.querySelector("#contextualAiTranslateBtn"),
@@ -1240,7 +1244,6 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     contextualAiPolishBtn: document.querySelector("#contextualAiPolishBtn"),
     contextualAiVariantsBtn: document.querySelector("#contextualAiVariantsBtn"),
     contextualAiApplyTermsBtn: document.querySelector("#contextualAiApplyTermsBtn"),
-    contextualOpenAiSuggestionBtn: document.querySelector("#contextualOpenAiSuggestionBtn"),
     contextualAiCancelBtn: document.querySelector("#contextualAiCancelBtn"),
     contextualAiSuggestionMount: document.querySelector("#contextualAiSuggestionMount"),
     contextualAiOutputMount: document.querySelector("#contextualAiOutputMount"),
@@ -1348,6 +1351,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       set: (callback, delay) => setTimeout(callback, delay),
       clear: (timer) => clearTimeout(timer)
     }
+  });
+  applicationStore.subscribe((next, previous) => {
+    applicationSaveStatusController.navigationChanged(next.navigation, previous.navigation);
   });
   const applicationImportProgressController = appRuntime.featureFactories.createApplicationImportProgressController({
     context: {
@@ -2237,6 +2243,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     contextualStatus: els.contextualAiStatus
   });
   aiContextController?.mount?.();
+  els.contextualAiProgressMount.append(els.localAiProgress);
 
   const aiAdministrationController = appRuntime?.featureFactories?.createAiAdministrationController?.({
     elements: {
@@ -2258,7 +2265,6 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       contextualPolishButton: els.contextualAiPolishBtn,
       contextualVariantsButton: els.contextualAiVariantsBtn,
       contextualApplyTermsButton: els.contextualAiApplyTermsBtn,
-      contextualOpenAiButton: els.contextualOpenAiSuggestionBtn,
       contextualCancelButton: els.contextualAiCancelBtn,
       openAiSuggestionButton: els.openAiSuggestionBtn,
       privacyNote: els.localAiPrivacyNote,
@@ -3337,7 +3343,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
           .visibleIndexes()
           .map((index) => editorSessionStore.getSegments()[index])
           .filter(Boolean),
-      getDocumentSegments: projectDocumentCatalogService.currentSegments,
+      getDocumentSegments: () => aiScopeSelectionService.terminologySegments({ mode: "document" }),
       isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment))
     },
     settings: {
@@ -3415,7 +3421,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
           .visibleIndexes()
           .map((index) => editorSessionStore.getSegments()[index])
           .filter(Boolean),
-      getDocumentSegments: projectDocumentCatalogService.currentSegments,
+      getDocumentSegments: () => aiScopeSelectionService.terminologySegments({ mode: "document" }),
       isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
       getTags: protectedTagInspectionService.sourceTags,
       getMissingTags: protectedTagInspectionService.missing,
@@ -3490,7 +3496,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
           .visibleIndexes()
           .map((index) => editorSessionStore.getSegments()[index])
           .filter(Boolean),
-      getDocumentSegments: projectDocumentCatalogService.currentSegments,
+      getDocumentSegments: () => aiScopeSelectionService.terminologySegments({ mode: "document" }),
       isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
       getTags: protectedTagInspectionService.sourceTags
     },
@@ -3573,7 +3579,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
           .visibleIndexes()
           .map((index) => editorSessionStore.getSegments()[index])
           .filter(Boolean),
-      getDocumentSegments: projectDocumentCatalogService.currentSegments,
+      getDocumentSegments: () => aiScopeSelectionService.terminologySegments({ mode: "document" }),
       isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
       getTags: protectedTagInspectionService.sourceTags
     },
@@ -3646,7 +3652,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
           .visibleIndexes()
           .map((index) => editorSessionStore.getSegments()[index])
           .filter(Boolean),
-      getDocumentSegments: projectDocumentCatalogService.currentSegments,
+      getDocumentSegments: () => aiScopeSelectionService.terminologySegments({ mode: "document" }),
       isLocked: (segment) => Boolean(preTranslationService.isLockedSegment?.(segment)),
       getTags: protectedTagInspectionService.sourceTags
     },
@@ -4741,6 +4747,15 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     }
   });
   dialogLifecycleController?.register?.({
+    id: "ai-provider",
+    dialog: els.aiProviderDialog,
+    opener: els.openProjectAiSettingsBtn,
+    closer: els.closeAiProviderDialogBtn,
+    initialFocus: els.localAiPresetSelect,
+    beforeOpen: () => els.aiProviderSettingsMount.append(els.aiSettingsForm),
+    onClose: () => els.projectAiSettingsMount.append(els.aiSettingsForm)
+  });
+  dialogLifecycleController?.register?.({
     id: "about",
     dialog: els.aboutDialog,
     opener: els.aboutBtn,
@@ -5382,8 +5397,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     openers: [
       { element: els.newProjectBtn, mode: "create" },
       { element: els.projectSettingsBtn, mode: "edit" },
-      { element: els.editorProjectSettingsBtn, mode: "edit" },
-      { element: els.openProjectAiSettingsBtn, mode: "edit", focusAi: true }
+      { element: els.editorProjectSettingsBtn, mode: "edit" }
     ],
     getProject: () => editorSessionStore.getProject(),
     refreshResources: resourceCatalogRefreshController.refresh,

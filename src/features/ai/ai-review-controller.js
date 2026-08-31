@@ -294,6 +294,9 @@ export function createAiReviewController(options) {
     if (mode === "selected") return selection.getActiveSegment() ? [selection.getActiveSegment()] : [];
     if (mode === "visible") return scope.getVisibleSegments();
     if (mode === "project") return editorSessionStore.getSegments();
+    if (mode === "untranslated") {
+      return scope.getDocumentSegments().filter((segment) => !String(segment.target || "").trim());
+    }
     return scope.getDocumentSegments();
   }
 

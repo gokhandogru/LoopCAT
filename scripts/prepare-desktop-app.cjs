@@ -1,6 +1,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { createBuildIdentity, assertSameIdentity, writeJson } = require("./repository-build-identity.cjs");
 const root = path.resolve(__dirname, "..");
+const identity = createBuildIdentity(root);
 const stageRoot = path.join(root, ".cache", "desktop-app");
 const rendererRoot = path.join(root, ".cache", "renderer", "production");
 const generatedProductionAssetsPath = path.join(rendererRoot, "config", "production-assets.js");
@@ -90,5 +92,7 @@ fs.writeFileSync(
   assertInsideStage(path.join(stageRoot, "package.json")),
   `${JSON.stringify(stagedPackage, null, 2)}\n`
 );
+assertSameIdentity(identity, createBuildIdentity(root), "Desktop staging inputs");
+writeJson(assertInsideStage(path.join(stageRoot, "build-info.json")), identity);
 
 console.log(`Prepared production-only desktop app in ${path.relative(root, stageRoot)}.`);

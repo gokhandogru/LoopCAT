@@ -522,12 +522,12 @@ app
       true
     );
     await waitFor(
-      "document.querySelector('#projectDialog').open && document.querySelector('#projectAiOptions').open",
+      "document.querySelector('#aiProviderDialog').open",
       "AI provider administration dialog"
     );
     await captureState("05", "ai-provider-administration");
-    await windowRef.webContents.executeJavaScript("document.querySelector('#cancelProjectBtn').click()", true);
-    await waitFor("!document.querySelector('#projectDialog').open", "AI provider administration dialog close");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#closeAiProviderDialogBtn').click()", true);
+    await waitFor("!document.querySelector('#aiProviderDialog').open", "AI provider administration dialog close");
     await windowRef.webContents.executeJavaScript(
       "document.querySelector('[data-inspector-tab=\"matches\"]').click()",
       true
@@ -557,6 +557,13 @@ app
     );
     await waitFor("document.documentElement.dataset.theme === 'dark'", "dark theme");
     await captureState("10", "dark-editor-inspector-open");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorTabAi').click()", true);
+    await captureState("10", "dark-ai-sidebar");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#openProjectAiSettingsBtn').click()", true);
+    await waitFor("document.querySelector('#aiProviderDialog').open", "dark AI settings dialog");
+    await captureState("10", "dark-ai-settings");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#closeAiProviderDialogBtn').click()", true);
+    await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorTabMatches').click()", true);
     await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorToggleBtn').click()", true);
     await waitFor(
       "document.querySelector('#inspectorToggleBtn').getAttribute('aria-expanded') === 'false'",
@@ -602,7 +609,7 @@ app
     };
     await fsPromises.writeFile(path.join(outputDir, "baseline.json"), `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 
-    const expectedScreenshotCount = 81;
+    const expectedScreenshotCount = 87;
     if (screenshots.length !== expectedScreenshotCount) {
       throw new Error(`Expected ${expectedScreenshotCount} screenshots, captured ${screenshots.length}.`);
     }

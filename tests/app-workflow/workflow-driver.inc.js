@@ -710,18 +710,18 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.openProjectAiSettingsBtn.focus();
     els.openProjectAiSettingsBtn.click();
     await waitFor(
-      () => els.projectDialog.open && els.projectAiOptions.open && document.activeElement === els.localAiPresetSelect,
-      "project AI settings deep link"
+      () => els.aiProviderDialog.open && document.activeElement === els.localAiPresetSelect,
+      "AI-only provider settings"
     );
     assert(
-      projectDialogController?.isEditing?.() && els.projectAdvancedOptions.open,
-      "project dialog controller opens the requested AI settings context"
+      !els.projectDialog.open && els.aiSettingsForm.parentElement === els.aiProviderSettingsMount,
+      "provider settings exclude the project form"
     );
-    els.cancelProjectBtn.click();
+    els.closeAiProviderDialogBtn.click();
     await new Promise((resolve) => requestAnimationFrame(resolve));
     assert(
       document.activeElement === els.openProjectAiSettingsBtn,
-      "project dialog controller restores the AI settings opener after close"
+      "AI settings restores the opener after close"
     );
     verticalFeatureState?.inspector?.setContext?.({ tab: "matches" });
     editorShellPresentationController.render();
@@ -5826,7 +5826,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     Reflect.deleteProperty(state, IMPORT_ACTIVITY_FAILURE_TEST_FLAG);
     assert(state.workspaceDirtyProjectIds.has(copyImport.pkg.project.id), "manual project package import marks connected workspace package dirty");
     const copiedSegments = await getProjectSegments(copyImport.pkg.project.id);
-    assert(copiedSegments.length === packageSourceSegments.length && copiedSegments.every((segment) => !originalSegmentIds.has(segment.id)) && copiedSegments.some((segment) => segment.target === switchText), "project package copy remaps project-scoped segment ids");
+    assert(copiedSegments.length === packageSourceSegments.length && copiedSegments.every((segment) => !originalSegmentIds.has(segment.id)), "project package copy remaps project-scoped segment ids");
+    // The earlier backup-restore scenario replaces the switchText draft. Compare
+    // the package's current contents, not an edit from before that restore.
+    assert(copiedSegments.every((copy) => packageSourceSegments.some((source) =>
+      copy.index === source.index && copy.documentName === source.documentName && copy.source === source.source && copy.target === source.target
+    )), "project package copy preserves every exported segment source and target");
     const tmAfterCopy = await getAll("tmEntries");
     assert(tmAfterCopy.some((entry) => entry.id === collisionTm.id && entry.target === collisionTm.target) && tmAfterCopy.some((entry) => entry.id !== collisionTm.id && entry.target === "Incoming TM target"), "project package import remaps colliding TM resource ids");
     const termsAfterCopy = await getAll("terms");

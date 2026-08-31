@@ -52,6 +52,9 @@ export function createAiAdministrationController(options) {
   const listeners = [];
   let outputObserver = null;
   let mounted = false;
+  let scopeMode = "selected";
+  let scopeProjectId = null;
+  let availability = {};
 
   function listen(target, eventType, listener) {
     if (!target?.addEventListener) return;
@@ -322,6 +325,7 @@ export function createAiAdministrationController(options) {
   }
 
   function renderAvailability({ hasProject = false, hasSegment = false, running = false, promptBusy = false } = {}) {
+    availability = { hasProject, hasSegment, running, promptBusy };
     const busy = Boolean(running || promptBusy);
     if (elements.pretranslateButton) elements.pretranslateButton.disabled = running || !hasProject;
     if (elements.cancelButton) elements.cancelButton.disabled = !running;
@@ -352,17 +356,26 @@ export function createAiAdministrationController(options) {
       button.disabled = busy || !hasProject;
     });
     if (elements.adaptModeSelect) elements.adaptModeSelect.disabled = busy || !hasProject;
-    const contextualBusy = busy || !hasProject || !hasSegment;
+    const needsSegment = scopeMode === "selected" || scopeMode === "document";
+    const contextualBusy = busy || !hasProject || (needsSegment && !hasSegment);
+    if (elements.modeSelect) elements.modeSelect.disabled = busy || !hasProject;
     if (elements.contextualTranslateButton) {
-      elements.contextualTranslateButton.disabled = running || !hasProject || !hasSegment;
+      elements.contextualTranslateButton.disabled = contextualBusy;
+      const labels = {
+        selected: "Translate selected",
+        document: "Translate document",
+        project: "Translate project",
+        visible: "Translate filtered",
+        untranslated: "Translate untranslated"
+      };
+      elements.contextualTranslateButton.textContent = source(labels[scopeMode]);
     }
     [
       elements.contextualReviewButton,
       elements.contextualRepairButton,
       elements.contextualPolishButton,
       elements.contextualVariantsButton,
-      elements.contextualApplyTermsButton,
-      elements.contextualOpenAiButton
+      elements.contextualApplyTermsButton
     ]
       .filter(Boolean)
       .forEach((button) => {
@@ -372,6 +385,10 @@ export function createAiAdministrationController(options) {
   }
 
   function render(view = {}) {
+    if (scopeProjectId !== view.projectId) {
+      scopeProjectId = view.projectId;
+      scopeMode = "selected";
+    }
     const settings = view.settings || {};
     renderPresets(view.presets || {});
     setProviderFields(settings);
@@ -379,7 +396,7 @@ export function createAiAdministrationController(options) {
     if (elements.sourceCodeInput) elements.sourceCodeInput.value = settings.sourceCode || "";
     if (elements.targetLanguageInput) elements.targetLanguageInput.value = settings.targetLanguage || "";
     if (elements.targetCodeInput) elements.targetCodeInput.value = settings.targetCode || "";
-    if (elements.modeSelect) elements.modeSelect.value = settings.mode || "";
+    if (elements.modeSelect) elements.modeSelect.value = scopeMode;
     if (elements.concurrencyInput) elements.concurrencyInput.value = String(settings.concurrency ?? "");
     if (elements.timeoutInput) elements.timeoutInput.value = String(settings.timeoutMs ?? "");
     if (elements.overwriteInput) elements.overwriteInput.checked = Boolean(settings.overwriteExisting);
@@ -428,16 +445,31 @@ export function createAiAdministrationController(options) {
     if (mounted) return false;
     listen(elements.saveSettingsButton, "click", () => void runAction("save-settings", actions.saveSettings));
     listen(elements.contextualTranslateButton, "click", () => {
-      if (elements.modeSelect) elements.modeSelect.value = "selected";
       void runAction("contextual-translate", actions.contextualTranslate);
     });
+    listen(elements.modeSelect, "change", () => {
+      scopeMode = elements.modeSelect.value || "selected";
+      renderAvailability(availability);
+      void runAction("scope-change", actions.formChanged);
+    });
     [
-      [elements.contextualReviewButton, "contextual-review", actions.reviewSegment],
-      [elements.contextualRepairButton, "contextual-repair", actions.repairSegment],
-      [elements.contextualPolishButton, "contextual-polish", actions.polishSegment],
-      [elements.contextualVariantsButton, "contextual-variants", actions.variantsSegment],
-      [elements.contextualApplyTermsButton, "contextual-apply-terms", actions.applyTermsSegment],
-      [elements.contextualOpenAiButton, "contextual-openai", actions.openAiSuggestion],
+      [elements.contextualReviewButton, "contextual-review", actions.reviewSegment, actions.reviewBatch],
+      [elements.contextualRepairButton, "contextual-repair", actions.repairSegment, actions.repairBatch],
+      [elements.contextualPolishButton, "contextual-polish", actions.polishSegment, actions.polishBatch],
+      [elements.contextualVariantsButton, "contextual-variants", actions.variantsSegment, actions.variantsBatch],
+      [
+        elements.contextualApplyTermsButton,
+        "contextual-apply-terms",
+        actions.applyTermsSegment,
+        actions.applyTermsBatch
+      ]
+    ].forEach(([button, phase, segmentAction, batchAction]) => {
+      listen(button, "click", () => {
+        const action = scopeMode === "selected" ? segmentAction : batchAction;
+        void runAction(phase, action);
+      });
+    });
+    [
       [elements.contextualCancelButton, "contextual-cancel", actions.cancel],
       [elements.openAiSuggestionButton, "openai-suggestion", actions.openAiSuggestion],
       [elements.testConnectionButton, "test-connection", actions.testConnection],
@@ -519,7 +551,6 @@ export function createAiAdministrationController(options) {
       });
     [
       promptModeSelect,
-      elements.modeSelect,
       elements.concurrencyInput,
       elements.timeoutInput,
       elements.overwriteInput,

@@ -15,6 +15,7 @@ $installerZipPath = [System.IO.Path]::Combine($distPath, "LoopCAT Windows Setup 
 $portableZipPath = [System.IO.Path]::Combine($distPath, "LoopCAT $Version Portable.zip")
 $installerTempZipPath = [System.IO.Path]::Combine($distPath, "LoopCAT Windows Setup $Version.tmp.zip")
 $portableTempZipPath = [System.IO.Path]::Combine($distPath, "LoopCAT $Version Portable.tmp.zip")
+$buildInfoPath = Join-Path $PSScriptRoot '../.cache/desktop-app/build-info.json'
 
 foreach ($path in @($installerPath, $portablePath, $installerZipPath, $portableZipPath, $installerTempZipPath, $portableTempZipPath)) {
   $resolved = [System.IO.Path]::GetFullPath($path)
@@ -23,7 +24,7 @@ foreach ($path in @($installerPath, $portablePath, $installerZipPath, $portableZ
   }
 }
 
-foreach ($source in @($installerPath, $portablePath)) {
+foreach ($source in @($installerPath, $portablePath, $buildInfoPath)) {
   if (-not [System.IO.File]::Exists($source)) {
     throw "Missing Windows release executable: $source"
   }
@@ -32,8 +33,8 @@ foreach ($source in @($installerPath, $portablePath)) {
 Remove-Item -LiteralPath $installerTempZipPath, $portableTempZipPath -Force -ErrorAction SilentlyContinue
 
 try {
-  Compress-Archive -LiteralPath $installerPath -DestinationPath $installerTempZipPath -CompressionLevel Optimal
-  Compress-Archive -LiteralPath $portablePath -DestinationPath $portableTempZipPath -CompressionLevel Optimal
+  Compress-Archive -LiteralPath $installerPath, $buildInfoPath -DestinationPath $installerTempZipPath -CompressionLevel Optimal
+  Compress-Archive -LiteralPath $portablePath, $buildInfoPath -DestinationPath $portableTempZipPath -CompressionLevel Optimal
 
   Remove-Item -LiteralPath $installerZipPath, $portableZipPath -Force -ErrorAction SilentlyContinue
   Move-Item -LiteralPath $installerTempZipPath -Destination $installerZipPath

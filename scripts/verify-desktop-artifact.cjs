@@ -1,6 +1,7 @@
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
+const { createBuildIdentity, assertSameIdentity } = require("./repository-build-identity.cjs");
 
 const root = path.resolve(__dirname, "..");
 const distDir = path.join(root, "dist");
@@ -210,6 +211,15 @@ function verifyArchive(asarPath) {
   }
 
   const packagedPackageJson = textFile(archive, byPath, "package.json");
+  try {
+    assertSameIdentity(
+      JSON.parse(textFile(archive, byPath, "build-info.json") || "{}"),
+      createBuildIdentity(root),
+      "Packaged desktop build identity"
+    );
+  } catch (error) {
+    fail(error.message);
+  }
   const manifest = JSON.parse(textFile(archive, byPath, "manifest.webmanifest") || "{}");
   const indexHtml = textFile(archive, byPath, "index.html");
   const serviceWorker = textFile(archive, byPath, "service-worker.js");

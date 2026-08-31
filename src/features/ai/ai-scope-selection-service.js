@@ -26,6 +26,14 @@ export function createAiScopeSelectionService(options) {
     throw new TypeError("AiScopeSelectionService requires project, settings, segment, and filter boundaries.");
   }
 
+  function documentSegments() {
+    const scoped = segments.getDocument();
+    const activeDocumentId = segments.getActive()?.documentId;
+    if (activeDocumentId) return scoped.filter((segment) => segment.documentId === activeDocumentId);
+    // An ambiguous all-files view must never expand a document-only operation.
+    return new Set(scoped.map((segment) => segment.documentId)).size <= 1 ? scoped : [];
+  }
+
   function terminologySegments(settings = settingsBoundary.read()) {
     if (!project.get()) return [];
     if (settings.mode === "selected") return segments.getActive() ? [segments.getActive()] : [];
@@ -37,8 +45,9 @@ export function createAiScopeSelectionService(options) {
     }
     if (settings.mode === "project") return segments.getAll();
     if (settings.mode === "untranslated") {
-      return segments.getDocument().filter((segment) => !String(segment.target || "").trim());
+      return documentSegments().filter((segment) => !String(segment.target || "").trim());
     }
+    if (settings.mode === "document") return documentSegments();
     return segments.getDocument();
   }
 
@@ -61,6 +70,7 @@ export function createAiScopeSelectionService(options) {
     if (settings.mode === "project" || settings.mode === "visible" || settings.mode === "selected") {
       return segments.getAll();
     }
+    if (settings.mode === "document" || settings.mode === "untranslated") return terminologySegments(settings);
     return segments.getDocument();
   }
 

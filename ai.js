@@ -146,7 +146,7 @@ const LOCAL_AI_PROVIDER_GUIDANCE = {
 const LOCAL_AI_SETTINGS_STORAGE = "loopcat.localAi.settings";
 const DEFAULT_LOCAL_AI_TIMEOUT_MS = 120000;
 const LOCAL_AI_PROVIDER_IDS = new Set(["ollama", "openai", "deepseek", "gemini", "anthropic", "cohere", "mistral", "xai", "perplexity", "groq", "together", "openrouter", "huggingface", "deepinfra", "fireworks", "azure-openai", "openai-compatible", "opus-cat"]);
-const LOCAL_AI_PRETRANSLATION_MODES = new Set(["selected", "untranslated", "visible", "project"]);
+const LOCAL_AI_PRETRANSLATION_MODES = new Set(["selected", "document", "untranslated", "visible", "project"]);
 const LOCAL_AI_VARIANT_MODES = new Set(["standard", "formal", "concise", "locale", "plain"]);
 const LOCAL_AI_ADAPT_MODES = new Set(["simplify", "formalize", "localize", "shorten"]);
 const AI_REVIEW_RISK_LEVELS = ["none", "low", "medium", "high", "critical"];
@@ -1717,7 +1717,7 @@ function scopeSegmentsForPretranslation(segments = [], options = {}) {
   const selectedIds = new Set(options.selectedSegmentIds || []);
   const visibleIds = new Set(options.visibleSegmentIds || []);
   if (mode === "selected") return segments.filter((segment) => selectedIds.has(segment.id));
-  if (mode === "visible") return visibleIds.size ? segments.filter((segment) => visibleIds.has(segment.id)) : segments;
+  if (mode === "visible") return segments.filter((segment) => visibleIds.has(segment.id));
   return segments;
 }
 

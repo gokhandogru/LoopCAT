@@ -37,7 +37,7 @@ Brand foundation is now part of the release baseline: the borderless Loopbird, p
 ### Modern Workspace And Reversible Commands
 
 - A semantic System/Light/Dark theme system, Balanced/Compact density, Focus mode, remembered layout, and responsive contextual inspector keep source and target text dominant at laptop widths.
-- The fuzzy grouped `Ctrl/Cmd+K` command palette supports keyboard navigation, disabled reasons, shortcuts, and recent commands.
+- The fuzzy grouped command palette (`F2` or `Ctrl/Cmd+Shift+P`; see [keyboard shortcuts](docs/keyboard-shortcuts.md)) supports keyboard navigation, disabled reasons, shortcuts, and recent commands.
 - Bounded Undo/Redo commands cover target editing and producers, replacement, confirmation, review state, AI application, TM/AI pretranslation, compatible split/merge, and reversible project/document/resource deletion.
 - Projects, files, TM entries, terms, translation memories, and termbases can move to local Trash; Empty Trash is the explicit irreversible boundary.
 - Saving, background jobs, notices, warnings, and recoverable errors use separate presentation models with preserved-work and retry context.

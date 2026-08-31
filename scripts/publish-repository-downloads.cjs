@@ -3,6 +3,15 @@
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
+const {
+  createBuildIdentity,
+  assertReceiptArtifact,
+  repositoryArtifacts,
+  receiptName,
+  writeJson,
+  fileRecord,
+  verifyRepositoryDownloads
+} = require("./repository-build-identity.cjs");
 
 const root = path.resolve(__dirname, "..");
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
@@ -51,6 +60,13 @@ function assertZip(filePath) {
   }
 }
 
+const identity = createBuildIdentity(root);
+// Validate every source and its build receipt before changing the existing mirror.
+for (const artifact of repositoryArtifacts(version)) {
+  const directory = path.join(root, artifact.directory);
+  const receipt = JSON.parse(fs.readFileSync(path.join(directory, receiptName), "utf8"));
+  assertReceiptArtifact(receipt, identity, directory, artifact.source);
+}
 for (const artifact of artifacts) assertZip(artifact.source);
 fs.mkdirSync(downloadsDirectory, { recursive: true });
 
@@ -75,10 +91,27 @@ const checksumLines = artifacts.map((artifact) => {
   return `${sha256(target)}  ${artifact.name}`;
 });
 fs.writeFileSync(path.join(downloadsDirectory, checksumName), `${checksumLines.join("\n")}\n`, "utf8");
+writeJson(path.join(downloadsDirectory, "release.json"), {
+  schemaVersion: 1,
+  channel: "unsigned-development-preview",
+  identity,
+  releaseNotes: `docs/releases/${version}.md`,
+  qualification:
+    "Not production-qualified. Windows signing and clean-machine testing remain outstanding; no macOS or Linux downloads are included.",
+  artifacts: artifacts.map(({ name }) => ({ name, ...fileRecord(path.join(downloadsDirectory, name)) }))
+});
 
 const readme = `# LoopCAT ${version} Downloads
 
-These are the current repository download-mirror files generated from the LoopCAT ${version} code in the same repository checkpoint.
+This is an **unsigned development preview**, not a tagged or production-qualified release.
+
+Build: \`${identity.buildId}\`
+
+Base commit: \`${identity.baseCommit}\`
+
+Source snapshot SHA-256: \`${identity.sourceSha256}\`
+
+The source snapshot includes the base commit plus local release-preparation changes; it is not claimed to be the unchanged base commit. All three ZIPs were built from this same snapshot. Each ZIP contains \`build-info.json\`; the desktop application also embeds it inside \`resources/app.asar\`. The [release manifest](./release.json) records the complete source fingerprint and ZIP hashes.
 
 | Download | File |
 | --- | --- |
@@ -87,10 +120,11 @@ ${artifacts.map((artifact) => `| ${artifact.label} | [\`${artifact.name}\`](./${
 
 The Windows installer and portable application are unsigned. Windows may show an unknown-publisher or SmartScreen warning. Verify these ZIP files against the checksum list in this directory and proceed only if you trust the [LoopCAT repository](https://github.com/gokhandogru/LoopCAT).
 
-The binaries attached to the older \`draft-0.0.3\` GitHub prerelease tag are a historical tagged build. They are not byte-identical to this current repository mirror; do not mix ZIPs and checksum files from the two locations.
+The older \`draft-0.0.3\` tag points to July commit \`6f9754d\`. Its historical assets are not this preview; do not mix ZIPs or checksum lists. Prior untagged 0.0.3 mirror files have been superseded here without changing that historical tag.
 
-For installation steps, current limitations, and source documentation, see the [main README](../README.md).
+For installation and checksum instructions, see the [main README](../README.md). The authoritative release notes are [LoopCAT ${version}](../docs/releases/${version}.md). After preparing downloads, run \`pnpm run verify:repository-downloads\` to detect changed sources, mixed builds, modified ZIPs, incorrect checksums, or leftover older downloads.
 `;
 fs.writeFileSync(path.join(downloadsDirectory, "README.md"), readme, "utf8");
+verifyRepositoryDownloads(root);
 
 console.log(`Prepared ${artifacts.length} LoopCAT ${version} repository downloads and ${checksumName}.`);

@@ -8176,8 +8176,8 @@ for (const testName of [
 }
 assertIncludes(
   appJs,
-  "project dialog controller opens the requested AI settings context",
-  "the application workflow must characterize the AI settings project-dialog deep link."
+  "provider settings exclude the project form",
+  "the application workflow must characterize the separate AI provider settings dialog."
 );
 assertIncludes(
   tmPretranslationDialogControllerJs,
@@ -15999,7 +15999,8 @@ for (const boundary of [
   ".map((index) => segments.getAll()[index])",
   'if (settings.mode === "project") return segments.getAll()',
   'if (settings.mode === "untranslated")',
-  'return segments.getDocument().filter((segment) => !String(segment.target || "").trim())',
+  'return documentSegments().filter((segment) => !String(segment.target || "").trim())',
+  'if (settings.mode === "document") return documentSegments()',
   "function projectBriefSampleSegments(limit = 6)",
   "const source = scoped.length ? scoped : segments.getAll()",
   'if (!String(segment.source || "").trim()) continue',
@@ -16300,7 +16301,7 @@ assertIncludes(
   "The application runtime must expose the checked AI runtime-settings service boundary."
 );
 for (const boundary of [
-  'const LOCAL_PRETRANSLATION_MODES = new Set(["selected", "untranslated", "visible", "project"])',
+  'const LOCAL_PRETRANSLATION_MODES = new Set(["selected", "document", "untranslated", "visible", "project"])',
   'const LOCAL_VARIANT_MODES = new Set(["standard", "formal", "concise", "locale", "plain"])',
   'const LOCAL_ADAPT_MODES = new Set(["simplify", "formalize", "localize", "shorten"])',
   "function normalizeProjectSettings(settings = {})",
@@ -23020,23 +23021,25 @@ for (const snippet of [
   "ApplicationSaveStatusController requires checked localization boundaries.",
   "ApplicationSaveStatusController requires checked view boundaries.",
   "ApplicationSaveStatusController requires checked timer boundaries.",
-  "let savedTimer = 0",
-  "if (savedTimer)",
-  "timers.clear(savedTimer)",
+  "const NOTICE_DURATION_MS = 2000",
+  "let noticeTimer = 0",
+  "if (noticeTimer) timers.clear(noticeTimer)",
   'const displayText = redaction.sanitize(text || "").trim()',
   "model.publish({",
   "projectId: context.getProjectId()",
   "segmentId: context.getSegmentId()",
-  "view.setText(localization.source(displayText))",
+  'view.setText(displayText ? localization.source(displayText) : "")',
   "view.setClass(`save-status ${mode}`)",
-  "const operationActive = OPERATION_PATTERN.test(displayText)",
+  'mode !== "saved" && OPERATION_PATTERN.test(displayText) && !COMPLETED_PATTERN.test(displayText)',
   "view.setBusy(String(operationActive))",
-  '(mode === "saved" || displayText.startsWith("Saved to ")) && displayText !== "Saved"',
-  "savedTimer = timers.set(() => {",
-  'view.setText(localization.translate("app.status.saved"))',
-  'view.setClass("save-status saved")',
-  "}, 5000)",
-  "return Object.freeze({ set })"
+  "persistent = operationActive || PENDING_SAVE_PATTERN.test(displayText)",
+  "noticeTimer = timers.set(() => {",
+  "if (revision !== noticeRevision) return",
+  'view.setText("")',
+  'view.setClass("save-status")',
+  "}, NOTICE_DURATION_MS)",
+  "function navigationChanged(next, previous)",
+  "return Object.freeze({ set, navigationChanged })"
 ]) {
   assertIncludes(
     applicationSaveStatusControllerJs,
@@ -23095,10 +23098,13 @@ for (const forbiddenOwner of [
 for (const testName of [
   "ApplicationSaveStatusController preserves redaction, live context, model, and visible presentation order",
   "ApplicationSaveStatusController preserves falsy text normalization and every operation-busy branch",
-  "ApplicationSaveStatusController replaces a pending saved timer before the next status",
-  "ApplicationSaveStatusController preserves delayed-saved eligibility, callback order, and private timer release",
-  "ApplicationSaveStatusController preserves synchronous failure timing and retained timer after callback failure",
-  "ApplicationSaveStatusController validates boundaries and exposes only an immutable set action"
+  "ApplicationSaveStatusController cancels notice expiry when unsaved work replaces it",
+  "ApplicationSaveStatusController dismisses completed successes, failures, and warnings without claiming a save",
+  "ApplicationSaveStatusController preserves running operations and pending autosave indicators",
+  "ApplicationSaveStatusController clears notices when changing screens, projects, or files but not segments",
+  "ApplicationSaveStatusController ignores expired callbacks after navigation or a newer operation",
+  "ApplicationSaveStatusController preserves synchronous failure timing",
+  "ApplicationSaveStatusController validates boundaries and exposes immutable status actions"
 ]) {
   assertIncludes(
     applicationSaveStatusControllerUnitTests,
@@ -24887,7 +24893,7 @@ assertIncludes(
 );
 assertIncludes(
   baselineCaptureScript,
-  "const expectedScreenshotCount = 81;",
+  "const expectedScreenshotCount = 87;",
   "the deterministic visual checkpoint count must include validation, quality, review, recovery/workspace, and AI administration states."
 );
 assertIncludes(

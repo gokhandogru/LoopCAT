@@ -1,7 +1,7 @@
 {
   "name": "LoopCAT",
   "short_name": "LoopCAT",
-  "version": "0.0.3",
+  "version": "0.0.4-dev.20260831",
   "description": "The local-first translation workspace for professional editing, review, resources, and optional AI.",
   "start_url": "./index.html",
   "scope": "./",

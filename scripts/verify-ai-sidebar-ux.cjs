@@ -192,7 +192,7 @@ function sidebarInspectionScript() {
       click("#saveProjectBtn");
       await waitFor(() => !document.querySelector("#projectDialog")?.open, "created project");
       click("#openProjectAiSettingsBtn");
-      await waitFor(() => document.querySelector("#projectDialog")?.open, "AI provider settings");
+      await waitFor(() => document.querySelector("#aiProviderDialog")?.open, "AI provider settings");
       await waitFor(() => document.querySelector('#localAiPresetSelect option[value="lm-studio"]'), "LM Studio preset option");
       setValue("#localAiPresetSelect", "lm-studio");
       await waitFor(() => document.querySelector("#localAiBaseUrlInput")?.value === "http://localhost:1234/v1", "LM Studio preset");
@@ -213,6 +213,16 @@ function sidebarInspectionScript() {
       return {
         groups,
         adminParent: document.querySelector("#aiSettingsForm")?.parentElement?.id || "",
+        projectDialogOpen: document.querySelector("#projectDialog").open,
+        containsProjectFields: Boolean(document.querySelector("#aiProviderDialog #sourceLangInput, #aiProviderDialog #projectTmResourceList, #aiProviderDialog #projectTbResourceList")),
+        scopeParent: document.querySelector("#localAiModeSelect").closest(".ai-contextual-workflow") !== null,
+        scopeOptions: Array.from(document.querySelector("#localAiModeSelect").options).map(option => option.value),
+        hasTopbarHistory: Boolean(document.querySelector(".topbar #undoBtn, .topbar #redoBtn")),
+        emptyFilterCandidates: window.CatHan.ai.preTranslationService.selectSegments(
+          [{ id: "scope-check", source: "Hello", target: "", status: "empty" }],
+          { mode: "visible", visibleSegmentIds: [] }
+        ).candidates.length,
+        normalizedDocumentScope: window.CatHan.ai.defaultLocalAiSettings({ mode: "document" }).mode,
         suggestionParent: document.querySelector("#aiSuggestionList")?.parentElement?.id || "",
         contextualActions: Array.from(document.querySelectorAll(".ai-contextual-actions button")).map(text),
         overflowItems,
@@ -277,7 +287,20 @@ app
     const titles = info.groups.map((group) => group.title);
     assert(titles[0]?.includes("Connect provider"), "AI sidebar should start with provider connection.");
     assert(titles[1]?.includes("Choose model"), "AI sidebar should put model selection second.");
-    assert(info.adminParent === "projectAiSettingsMount", "Provider administration should live in Project settings.");
+    assert(info.adminParent === "aiProviderSettingsMount", "Provider settings should open in their own dialog.");
+    assert(
+      !info.projectDialogOpen && !info.containsProjectFields,
+      "Provider settings must exclude project metadata and resources."
+    );
+    assert(info.scopeParent, "Scope must be immediately available in the AI sidebar.");
+    assert(
+      ["selected", "document", "project", "visible", "untranslated"].every((mode) => info.scopeOptions.includes(mode)),
+      "All AI scopes must be available."
+    );
+    assert(!info.hasTopbarHistory, "Undo and Redo must not occupy the top bar.");
+    assert(info.emptyFilterCandidates === 0, "An empty filter must not pretranslate the entire project.");
+    assert(info.normalizedDocumentScope === "document", "The provider runtime must preserve document scope.");
+    assert(!info.contextualActions.includes("Cloud suggestion"), "The redundant cloud action must be removed.");
     assert(
       info.suggestionParent === "contextualAiSuggestionMount",
       "AI suggestions should live in the contextual inspector."
@@ -289,7 +312,6 @@ app
       "Polish draft",
       "Suggest alternatives",
       "Apply terminology",
-      "Cloud suggestion",
       "Cancel"
     ]) {
       assert(info.contextualActions.includes(action), `Contextual AI should expose ${action}.`);

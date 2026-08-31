@@ -1,6 +1,6 @@
 {
   "name": "loopcat",
-  "version": "0.0.3",
+  "version": "0.0.4-dev.20260831",
   "description": "The local-first translation workspace for professional editing, review, resources, and optional AI.",
   "homepage": "https://github.com/gokhandogru/LoopCAT",
   "private": true,
@@ -65,7 +65,8 @@
     "dist": "node scripts/build-desktop.cjs",
     "dist:win": "node scripts/build-desktop.cjs --win nsis portable",
     "dist:mac": "node scripts/build-desktop.cjs --mac dmg zip",
-    "dist:linux": "node scripts/build-desktop.cjs --linux AppImage deb"
+    "dist:linux": "node scripts/build-desktop.cjs --linux AppImage deb",
+    "verify:repository-downloads": "node scripts/verify-repository-downloads.cjs"
   },
   "keywords": [
     "cat-tool",
@@ -112,6 +113,7 @@
       "output": "dist"
     },
     "files": [
+      "build-info.json",
       "index.html",
       "styles.css",
       "liquid-glass/styles.css",
