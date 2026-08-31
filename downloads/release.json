@@ -4,10 +4,10 @@
   "identity": {
     "schemaVersion": 1,
     "version": "0.0.4-dev.20260831",
-    "buildId": "0.0.4-dev.20260831+source.92e3832c0146",
+    "buildId": "0.0.4-dev.20260831+source.239cf868ce3d",
     "sourceKind": "working-tree-snapshot",
-    "baseCommit": "efdd7f263c47d1398fea8b1eb90b1c343639333d",
-    "sourceSha256": "92e3832c0146065a6fcd08df3709a4abe6935d8842868c50f694aca56f799454",
+    "baseCommit": "ef4f8c7e5e1d957915aaa4fb607b84709c5ee217",
+    "sourceSha256": "239cf868ce3dbaca0b43f88b2f8e57f1e68a8458f9328690617ca1efa1c4d1d7",
     "sourceFiles": [
       {
         "path": ".gitattributes",
@@ -95,11 +95,6 @@
         "sha256": "75a38336b187095967bc5c07fd6fe9e77d2d05dc6327337af34e6eed7835d0ef"
       },
       {
-        "path": "deep-research-report.md",
-        "bytes": 14103,
-        "sha256": "80fbc580882383c6484c5b4d2e93542a5bc5dcbe6e81db482fd386ab6ed190e4"
-      },
-      {
         "path": "desktop/main.cjs",
         "bytes": 56908,
         "sha256": "644c65480c42ecf086afe5d4aa6045f8a94f23d88dbd11f665bdd90c783d6a4d"
@@ -116,8 +111,8 @@
       },
       {
         "path": "docs/README.md",
-        "bytes": 2948,
-        "sha256": "3d3ea3b7c8879fc674a44a327c617ce0210633afea22a22335bee932a1f4d028"
+        "bytes": 3226,
+        "sha256": "a381c11d8234dbafd56528231b4547acfd7174ee7da431fc493ace0dc52103fb"
       },
       {
         "path": "docs/ai-provider-integration-research.md",
@@ -131,8 +126,8 @@
       },
       {
         "path": "docs/desktop-packaging.md",
-        "bytes": 27391,
-        "sha256": "4e0d5498bc72ecbd8e3be07102d91f0c5e8e5826511539cee154975a87a120c1"
+        "bytes": 27764,
+        "sha256": "7f013e9b43cb6e98fa7d864ebf365ac99af766c6642c85f1359c2b1013003105"
       },
       {
         "path": "docs/keyboard-shortcuts.md",
@@ -146,13 +141,13 @@
       },
       {
         "path": "docs/loopcat-modern-software-review-2026-08-10.md",
-        "bytes": 47517,
-        "sha256": "5d53d776661ecd34bdb53ca176bfb7cdac69e3a0417230ecc729174dee9555b5"
+        "bytes": 47515,
+        "sha256": "52389dc65b93e8395fd863d357fc27040cca649abecb40471c1e10af10d72ab1"
       },
       {
         "path": "docs/loopcat-modernization-plan-prompt-2026-08-10.md",
-        "bytes": 17675,
-        "sha256": "5431b92108c078dd6cabd8f8ed70cd1911dea344df58b0b57fd3bbb26af38816"
+        "bytes": 17647,
+        "sha256": "03c005945457a742aef637865382444b356180e72a756fa123175cbf6a6686ad"
       },
       {
         "path": "docs/loopcat-package-format-v1.md",
@@ -191,8 +186,8 @@
       },
       {
         "path": "docs/releases/0.0.4-dev.20260831.md",
-        "bytes": 3884,
-        "sha256": "31af4900cba0dbf459d90d6ee923fb85f1e66597dd5ce3d601d17674f0ec332d"
+        "bytes": 4332,
+        "sha256": "22e90cc726f98428b117583224ad109669770496f06e5e4367c36a5f54d48ffc"
       },
       {
         "path": "docx.js",
@@ -316,8 +311,8 @@
       },
       {
         "path": "package.json",
-        "bytes": 7060,
-        "sha256": "6266a23933a2c2d5a9d46ba2b169b3aeb8b32987f5cfd46c7d5c42678de30bcf"
+        "bytes": 7165,
+        "sha256": "cd804daf1b99fb7cb542e75af937875e88d61fa1970deaa4487c119c2922c95d"
       },
       {
         "path": "pnpm-lock.yaml",
@@ -426,8 +421,8 @@
       },
       {
         "path": "scripts/prepare-desktop-app.cjs",
-        "bytes": 4513,
-        "sha256": "23228a184ac1ee45c73139833ce01b63629748edf1c27503d0fd6950dcff8194"
+        "bytes": 4683,
+        "sha256": "4da196926e281b01e61a6dc3b3f19a2037c78f14588fb087d11ec8ebed4e4310"
       },
       {
         "path": "scripts/publish-repository-downloads.cjs",
@@ -471,8 +466,8 @@
       },
       {
         "path": "scripts/verify-desktop-artifact.cjs",
-        "bytes": 17074,
-        "sha256": "283ccee42bbe9487c1ce9bdeaa8be91979fe821e9d9a2d11e4d671ee5d2b08ac"
+        "bytes": 17159,
+        "sha256": "ab9b3c988fce72b6df8e5735637679111e723dc303c8db7a2bd2bdcdcc94f730"
       },
       {
         "path": "scripts/verify-desktop-wrapper.cjs",
@@ -3246,18 +3241,18 @@
   "artifacts": [
     {
       "name": "LoopCAT.Web.0.0.4-dev.20260831.zip",
-      "bytes": 3546501,
-      "sha256": "3e64048bd8a03112dad9b52527a4544a83bbafbb18fca6e562a36773a020cfd2"
+      "bytes": 3546447,
+      "sha256": "a9d92cfcb8bccb92e20fb51cd5f4b18949c85bb71f61652a5cb67eb4a2e23f37"
     },
     {
       "name": "LoopCAT.Windows.Setup.0.0.4-dev.20260831.zip",
-      "bytes": 100202821,
-      "sha256": "7a28072501d096d6413225109daa0936eb9fdfd608918b85c899e856b0ee2384"
+      "bytes": 100184658,
+      "sha256": "c234740864a236aa3cd7b4cbce94886127ef4639faa83bd9efedaab6bc58c6c7"
     },
     {
       "name": "LoopCAT.0.0.4-dev.20260831.Portable.zip",
-      "bytes": 100048330,
-      "sha256": "8cd90a14aee9b042be80f8a7c51e665dba109920b7f652ef6f11c33860258b97"
+      "bytes": 100030121,
+      "sha256": "77b89118f9b487f8accf9e58c48809590cd2bde9966f61456bf241cb1b6c2867"
     }
   ]
 }
