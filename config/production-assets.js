@@ -24,6 +24,7 @@
   const offlineAssets = Object.freeze([...runtimeAssets, "LICENSE", "NOTICE"]);
   const webDistributionAssets = Object.freeze([
     ...offlineAssets,
+    "og.png",
     "package.json",
     "scripts/opus-cat-web-bridge.cjs",
     "README.md"

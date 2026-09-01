@@ -61,6 +61,7 @@
     "downloads:prepare": "node scripts/publish-repository-downloads.cjs",
     "pack": "node scripts/build-desktop.cjs --dir",
     "dist:web": "node scripts/build-web.cjs",
+    "dist:sites": "node scripts/build-sites.cjs",
     "dist:html": "node scripts/build-web.cjs",
     "dist": "node scripts/build-desktop.cjs",
     "dist:win": "node scripts/build-desktop.cjs --win nsis portable",
