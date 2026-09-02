@@ -8,7 +8,7 @@ LoopCAT is a local-first computer-assisted translation (CAT) tool for translator
 
 LoopCAT is designed for a complete single-user workflow: create a project, import source files, translate or post-edit, use TM and terminology, run QA, review changes, recover from packages or backups, and export target files without requiring an internet connection. Local or hosted AI can be added explicitly, but it is optional and does not replace the offline workflow.
 
-[Install](#how-to-install) | [Current status](#current-project-status) | [What works today](#what-works-today) | [Keyboard shortcuts](docs/keyboard-shortcuts.md) | [AI providers](#local-ai-command-centre) | [Tests](#browser-tests) | [Documentation](docs/README.md) | [Roadmap](ROADMAP.md) | [Brand](docs/brand-guidelines.md) | [License](#license)
+[Install](#how-to-install) | [Current status](#current-project-status) | [What works today](#what-works-today) | [Keyboard shortcuts](docs/keyboard-shortcuts.md) | [AI providers](#local-ai-command-centre) | [Tests](#browser-tests) | [Documentation](docs/README.md) | [Roadmap](ROADMAP.md) | [Brand](docs/brand-guidelines.md) | [How to cite](#how-to-cite) | [License](#license)
 
 ## Current Project Status
 
@@ -43,6 +43,12 @@ The Windows packages are currently unsigned, so Windows may display an unknown-p
 Keep the three ZIPs, their checksum list, and `release.json` from the same repository checkpoint. On Windows, run `Get-FileHash -Algorithm SHA256 -LiteralPath 'path-to-downloaded.zip'` and compare the full hash with the matching filename in the checksum list. On Linux use `sha256sum -c LoopCAT.VERSION.SHA256SUMS.txt`, or on macOS use `shasum -a 256 -c LoopCAT.VERSION.SHA256SUMS.txt`, replacing `VERSION` with the downloaded preview version.
 
 Extract the selected ZIP before running it. Every ZIP contains `build-info.json`, with the same version, build ID, base commit, and source-snapshot hash as `release.json`. The snapshot includes local release-preparation changes and is not represented as an unchanged tagged commit. The Windows executable also embeds that identity inside `resources/app.asar`. SHA-256 detects mismatched or corrupted files; it does not replace publisher signing or establish authenticity independently of the trusted download source.
+
+## How to Cite
+
+If you use LoopCAT in research, teaching, or academic work, please cite the following preprint in APA style:
+
+Dogru, G., & Martín Mor, A. (2026). From tool use to technological agency: LoopCAT as a local-first, open-source tool for translation technology education [Preprint]. *arXiv*. https://doi.org/10.48550/arXiv.2609.00344
 
 ## License
 
