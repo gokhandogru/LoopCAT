@@ -4,6 +4,7 @@ Use this page to distinguish current product documentation from dated research a
 
 ## Current Product And Engineering Documentation
 
+- [Beginner Guide](beginner-guide/index.html) — friendly installation, first-project, everyday translation, QA, export, backup, and troubleshooting walkthrough ([download the Word edition](beginner-guide/LoopCAT-Beginners-Guide.docx)).
 - [Main README](../README.md) — project status, installation, capabilities, architecture, tests, privacy, and development workflow.
 - [Product and release roadmap](../ROADMAP.md) — shipped baseline, current priorities, release qualification, and production-ready exit criteria.
 - [Capability documentation](loopcat-capabilities.md) — detailed current behavior and suggested acceptance checks.

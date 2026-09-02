@@ -8,7 +8,7 @@ LoopCAT is a local-first computer-assisted translation (CAT) tool for translator
 
 LoopCAT is designed for a complete single-user workflow: create a project, import source files, translate or post-edit, use TM and terminology, run QA, review changes, recover from packages or backups, and export target files without requiring an internet connection. Local or hosted AI can be added explicitly, but it is optional and does not replace the offline workflow.
 
-[Install](#how-to-install) | [Current status](#current-project-status) | [What works today](#what-works-today) | [Keyboard shortcuts](docs/keyboard-shortcuts.md) | [AI providers](#local-ai-command-centre) | [Tests](#browser-tests) | [Documentation](docs/README.md) | [Roadmap](ROADMAP.md) | [Brand](docs/brand-guidelines.md) | [How to cite](#how-to-cite) | [License](#license)
+[Beginner Guide](docs/beginner-guide/index.html) ([Word](docs/beginner-guide/LoopCAT-Beginners-Guide.docx)) | [Install](#how-to-install) | [Current status](#current-project-status) | [What works today](#what-works-today) | [Keyboard shortcuts](docs/keyboard-shortcuts.md) | [AI providers](#local-ai-command-centre) | [Tests](#browser-tests) | [Documentation](docs/README.md) | [Roadmap](ROADMAP.md) | [Brand](docs/brand-guidelines.md) | [How to cite](#how-to-cite) | [License](#license)
 
 ## Current Project Status
 
