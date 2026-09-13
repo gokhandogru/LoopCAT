@@ -1,3 +1,0 @@
-a9d92cfcb8bccb92e20fb51cd5f4b18949c85bb71f61652a5cb67eb4a2e23f37  LoopCAT.Web.0.0.4-dev.20260831.zip
-c234740864a236aa3cd7b4cbce94886127ef4639faa83bd9efedaab6bc58c6c7  LoopCAT.Windows.Setup.0.0.4-dev.20260831.zip
-77b89118f9b487f8accf9e58c48809590cd2bde9966f61456bf241cb1b6c2867  LoopCAT.0.0.4-dev.20260831.Portable.zip

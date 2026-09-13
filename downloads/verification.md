@@ -1,46 +1,53 @@
-# Privacy rebuild verification — LoopCAT 0.0.4-dev.20260831
+# Release verification — LoopCAT 0.0.4-dev.20260913
 
-Verified on 31 August 2026 on Windows x64 with Node 24 and Electron 43.3.0. This refresh changes documentation and packaging only and replaces the current repository download mirror. It remains an unsigned development preview.
+Verified on 13 September 2026. This is an unsigned Windows x64 development preview, not a signed stable release.
 
-- Build ID: `0.0.4-dev.20260831+source.239cf868ce3d`
-- Source commit: `ef4f8c7e5e1d957915aaa4fb607b84709c5ee217`
-- Source snapshot SHA-256: `239cf868ce3dbaca0b43f88b2f8e57f1e68a8458f9328690617ca1efa1c4d1d7`
-- All fingerprinted source files match the committed source. The following download-only commit preserves that identity and commit ancestry.
-- [Release notes](../docs/releases/0.0.4-dev.20260831.md) and [machine-readable manifest](release.json).
+## Identity
 
-## Results for this rebuild
+- Source commit: `456c553ca98dcae296364103d10cffb46cb8a2db`.
+- Build ID: `0.0.4-dev.20260913+source.7749c6f74b7b`.
+- Source snapshot SHA-256: `7749c6f74b7b750b99060612db20c75b4246b97c73ea4dc4622b219a3f7b7261`.
+- All three ZIPs contain matching build-info.json; the Windows app also embeds it in resources/app.asar.
+- The source commit descends from the owner's `75ce076` commit. Download publication is a later, download-only commit; no prior commit is overwritten.
+- [Release notes](../docs/releases/0.0.4-dev.20260913.md), [source and ZIP manifest](release.json), and [GitHub prerelease](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20260913).
+
+## Recorded checks
 
 | Check | Result |
 | --- | --- |
-| Repository privacy | Four personal workspace references replaced with repository-relative references. The tracked-source scan found no remaining personal workspace path or local username. |
-| Desktop documentation policy | Internal software reviews and planning prompts are omitted from staging and packaging, and rejected by the desktop artifact verifier. Their contents are absent from the rebuilt app. |
-| Download contents | No personal workspace/user markers or excluded document files in the checked web and Windows app contents. The deleted competitor report is also absent from the source fingerprint. |
-| Runtime comparison | 37 renderer/runtime files are byte-identical to the previous verified August 31 build. No application behavior changes are included. |
-| Release and build checks | Release contract, bundle isolation, localization validation/compilation, renderer build verification, and desktop wrapper verification passed. |
-| Build identity tests | All three existing focused tests passed, covering changed inputs, mixed builds, modified archives, checksums, and unwanted downloads. |
-| Web download | Static archive verification and rendered web smoke passed. |
-| Desktop payload | Runtime/source assets, version, ASAR integrity metadata, and Electron security fuses passed. |
-| Packaged desktop startup | Passed with the renderer OS sandbox enabled in both normal hardware acceleration and explicit graphics-fallback modes, using isolated temporary profiles. |
-| Installer and portable contents | Both nested app payloads match the verified unpacked application. ZIP-wrapped executable bytes match the built executables. All three ZIP identities match. |
-| Download verification | Expected Windows artifacts, four distribution checksums, and the final three-ZIP repository manifest/checksum checks passed. |
-| Authenticode | Both distributable executables are NotSigned, consistent with preview labeling. |
+| Quality | ESLint, configured Prettier checks, TypeScript, stylelint, all **1,445 unit tests**, and import-boundary verification passed. |
+| Browser | All nine native Windows Electron suites passed: reliability, security policy, offline shell, smoke, regression, application workflow, workspace storage, package round trip, and large project. |
+| Accessibility | Automated light/dark checks passed with zero non-blocking findings in the recorded states. A temporary-profile cleanup warning did not affect assertions. |
+| Visual states | Baseline verification passed for 87 screenshots, including light/dark UI states and editor width checks. This is not manual visual or screen-reader certification. |
+| Release and renderer | Updated schema/resource characterization, bundle contract and self-test, renderer production/test isolation, localization validation and compilation, and desktop wrapper checks passed. |
+| Web artifact | Final ZIP static verification and HTTP/local-file startup smoke passed. The complete ZIP includes 66 static web assets. |
+| Windows payload | ASAR content/source-identity checks and Electron fuse verification passed; raw node_modules are excluded because the required archive library is already bundled. |
+| Packaged desktop | Final payload smoke passed with the renderer OS sandbox and hardware acceleration, then with the supported hardware-acceleration-off setting. Persistence, HTML/XLIFF/DOCX workflows, backup and app-shell checks passed. |
+| Portable executable | The final portable EXE was launched separately and passed the same built-in workflow smoke with an isolated profile, OS sandbox and hardware acceleration. |
+| Downloads | Expected Windows installer/portable EXEs and ZIP wrappers passed artifact rules and four distribution checksum checks. The three-ZIP repository mirror passed source-fingerprint, receipt and checksum verification. |
+| Version labels | Package, PWA manifest, service worker, asset contract, active README/install guidance and HTML beginner guide use 0.0.4-dev.20260913. Windows FileVersion has that label; the Windows numeric ProductVersion is 0.0.4.0. |
+| Signing | Both public Windows EXEs report NotSigned, as disclosed for this preview. No signing qualification is claimed. |
 
-Desktop payload SHA-256: `a8a9d7e19c499873523945e5d5d7030fcea474dd5a2face31c1af505c38a22c8`.
+The sandboxed Electron browser attempt failed before renderer startup with GPU exit code -1073741515. The native rerun passed with Electron's renderer sandbox enabled. No application sandbox or security fuse was disabled to obtain release evidence.
 
-The full unit/browser/accessibility suites and installed-desktop upgrade were not repeated for this documentation-only refresh. The [previous August 31 verification record](https://github.com/gokhandogru/LoopCAT/blob/742467cf54ad4b97a8d93771bb91132c64b98914/downloads/verification.md) records those earlier results; the runtime comparison above confirms the checked application files remain unchanged. This rebuild's startup checks used temporary profiles and did not alter existing translation data or the installed desktop copy.
+Release preparation corrected outdated resource/schema assertions and bundle-test marker counts; the production renderer still excludes test-only flags and simulated failures. The desktop smoke fixture now reloads the project revision after segment append and uses standard forward-slash DOCX ZIP paths. The archive reader's unsafe-path rejection remains unchanged and has a regression test for this fixture.
 
-## Exact download set
+The browser, accessibility and screenshot runs cover the final renderer implementation. Subsequent changes only adjusted packaging exclusions and the desktop smoke probe; final artifact and native smoke checks were repeated after rebuilding.
+
+## Public assets
+
+The GitHub release includes all five application assets below and SHA256SUMS.txt covering them. The repository mirror includes the three ZIPs and its separate versioned ZIP-only checksum list.
 
 | File | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `LoopCAT.Web.0.0.4-dev.20260831.zip` | 3,546,447 | `a9d92cfcb8bccb92e20fb51cd5f4b18949c85bb71f61652a5cb67eb4a2e23f37` |
-| `LoopCAT.Windows.Setup.0.0.4-dev.20260831.zip` | 100,184,658 | `c234740864a236aa3cd7b4cbce94886127ef4639faa83bd9efedaab6bc58c6c7` |
-| `LoopCAT.0.0.4-dev.20260831.Portable.zip` | 100,030,121 | `77b89118f9b487f8accf9e58c48809590cd2bde9966f61456bf241cb1b6c2867` |
+| `LoopCAT.Web.0.0.4-dev.20260913.zip` | 5,784,384 | `74fda09e4f20c0c3a8ed289a22daca43b50c2f588cdd4df2d067d7106af3d406` |
+| `LoopCAT.Windows.Setup.0.0.4-dev.20260913.zip` | 100,470,008 | `62a179f5cc782404ea91fbfb5bfe5b215a7821a17192ede2c53a6a2d25229674` |
+| `LoopCAT.0.0.4-dev.20260913.Portable.zip` | 100,315,617 | `7a0c8976d7623c482e791ae95660636e3e61f0b39e56ebf7bf8405b3e691b216` |
+| `LoopCAT Setup 0.0.4-dev.20260913.exe` | 100,426,501 | `d05e22034c78a95fde5c593561dac030debf221c138d1736276c47114321abfe` |
+| `LoopCAT 0.0.4-dev.20260913.exe` | 100,266,143 | `deb5fad4a6db667062949b4bb7d8ad9b2bceeb8a15beda1e6096efb34c01c113` |
 
-## Remaining launch boundaries
+## Limits and retained history
 
-Git history and historical release tags/assets are unchanged. Older commits and older copies of downloads may still contain earlier document versions. The repository remains private; this cleanup does not authorize public visibility.
+No NSIS install/upgrade was performed over the owner's existing installation. Independent clean-machine installation, signing, manual assistive-technology checks, long-duration soak and the full multi-platform failure matrix remain outstanding. Native macOS and Linux packages are not part of this preview.
 
-Windows signing, clean-machine installation/upgrade evidence, manual screen-reader accessibility review, sustained performance, disk-full, and permission-denied qualification remain outstanding. Native macOS/Linux packages are not part of this preview. Do not label this download set a signed stable release.
-
-Raw verification outputs remain local in ignored workspace directories. Personal translation data is not included in these downloads or commits.
+Test profiles were isolated from personal projects. Raw test logs remain in ignored local cache directories and are not shipped. The previous August download mirror is recoverable from Git history; historical GitHub releases and tags are unchanged. Checksums detect corruption and mismatched assets, but do not independently authenticate an unsigned publisher.
