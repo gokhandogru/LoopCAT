@@ -1921,7 +1921,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
     } finally {
       aiApplyTermsProvider.completePrompt = originalAiBatchApplyTermsCompletePrompt;
-      await Promise.all(aiBatchApplyTermsSavedTerms.filter((term) => term?.id).map((term) => deleteTerm(term.id)));
+      // Each deletion updates the shared resource revision; clean up sequentially.
+      for (const term of aiBatchApplyTermsSavedTerms.filter((term) => term?.id)) {
+        await deleteTerm(term.id);
+      }
       applicationNavigation.selectDocument({ documentId: originalBatchApplyTermsFilters.documentFilter });
       editorFilterStore.update({
         query: originalBatchApplyTermsFilters.segmentQuery,

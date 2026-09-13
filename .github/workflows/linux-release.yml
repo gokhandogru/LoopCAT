@@ -47,8 +47,13 @@ jobs:
           pnpm run verify:signing-env -- linux
       - name: Verify browser and accessibility behavior
         run: |
+          # Use the workflow revision's test harness (serialized term cleanup).
+          # Restore the release fixture before packaging its exact source snapshot.
+          git show "$GITHUB_SHA:tests/app-workflow/workflow-driver.inc.js" > tests/app-workflow/workflow-driver.inc.js
           xvfb-run -a pnpm run verify:browser-runner
           xvfb-run -a pnpm run verify:a11y
+          git restore -- tests/app-workflow/workflow-driver.inc.js
+          GITHUB_SHA="$(git rev-parse HEAD)" pnpm run verify:provenance -- --allow-untagged
       - name: Build Linux x64 packages
         run: node scripts/build-desktop.cjs --linux AppImage deb --x64
       - name: Verify payload and unpacked application
