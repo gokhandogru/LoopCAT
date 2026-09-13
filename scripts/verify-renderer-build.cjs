@@ -19,6 +19,7 @@ const forbiddenProductionMarkers = [
   "_TEST_FLAG",
   "Simulated autosave save failure",
   "Simulated AI apply save failure",
+  "Simulated TM save failure",
   "APP WORKFLOW TEST"
 ];
 const normalizePath = (value) => String(value || "").replaceAll("\\", "/");

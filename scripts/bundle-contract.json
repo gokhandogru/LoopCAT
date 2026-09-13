@@ -12,8 +12,8 @@
     "src/app/application-composition.js": {
       "runAppWorkflowTest": 1,
       "#app-workflow-test": 1,
-      "_TEST_FLAG": 78,
-      "Simulated ": 33
+      "_TEST_FLAG": 79,
+      "Simulated ": 34
     }
   },
   "forbiddenMarkers": [
