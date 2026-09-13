@@ -343,7 +343,11 @@
         });
         const projectWithDocumentManifest = await window.CatHan.storage.get("projects", project.id);
         assert(projectWithDocumentManifest.documents.some((documentInfo) => documentInfo.id === "reg-doc" && documentInfo.name === "ui.html"), "segment import records project document manifest metadata");
-        const staleProjectDocumentUpdate = await window.CatHan.project.updateProject({ ...project, documents: [] });
+        let projectConflict = false;
+        try { await window.CatHan.project.updateProject({ ...project, documents: [] }); }
+        catch (error) { projectConflict = error.name === "StorageConflictError"; }
+        assert(projectConflict, "stale project metadata raises a recoverable conflict");
+        const staleProjectDocumentUpdate = await window.CatHan.storage.get("projects", project.id);
         assert(
           staleProjectDocumentUpdate.documents.some((documentInfo) => documentInfo.id === "reg-doc" && documentInfo.name === "ui.html"),
           "project update preserves existing document manifest when stale settings data omits imported files"
@@ -3135,12 +3139,15 @@
         const freshSegment = { ...afterAtomicImport[0], target: "Guncel ceviri", revision: 2 };
         const staleSegment = { ...afterAtomicImport[0], target: "Eski ceviri", revision: 1 };
         await window.CatHan.project.saveSegment(freshSegment);
-        await window.CatHan.project.saveSegment(staleSegment);
+        let staleRejected = false;
+        try { await window.CatHan.project.saveSegment(staleSegment); }
+        catch (error) { staleRejected = error.name === "StorageConflictError"; }
+        assert(staleRejected, "stale segment save reports a recoverable conflict instead of false success");
         const afterStaleSave = await window.CatHan.project.getProjectSegments(project.id);
         assert(afterStaleSave.find((segment) => segment.id === freshSegment.id).target === "Guncel ceviri", "stale segment save cannot overwrite newer revision");
 
         await window.CatHan.project.updateProject({
-          ...project,
+          ...await window.CatHan.storage.get("projects", project.id),
           aiSettings: { ...project.aiSettings, apiKey: "sk-backup-key-that-must-not-export" },
           authorizationToken: "bearer-backup-token-that-must-not-export",
           sessionCookie: "backup-session-cookie-that-must-not-export"
@@ -5622,10 +5629,14 @@
         const opusCatProbeUrls = [];
         const discoveredOpusCat = await opusCatProvider.testConnection({
           baseUrl: "http://localhost:8500",
-          fetchImpl: async (url) => {
+          fetchImpl: async (url, options) => {
             const probeUrl = String(url);
             opusCatProbeUrls.push(probeUrl);
+            if (probeUrl === "http://127.0.0.1:8502/loopcat-session") {
+              return { ok: true, json: async () => ({ capability: "test-session-capability" }) };
+            }
             if (probeUrl.startsWith("http://127.0.0.1:8502/")) {
+              if (options.method !== "POST" || options.headers["X-LoopCAT-Capability"] !== "test-session-capability") throw new Error("Bridge request was not authenticated.");
               return { ok: true, json: async () => ["en-tr"] };
             }
             throw new TypeError("Simulated browser CORS or connection failure");
@@ -5663,7 +5674,7 @@
             discoveredOpusCat.baseUrl === "http://127.0.0.1:8502" &&
             discoveredOpusCat.connectionMode === "browser bridge" &&
             discoveredOpusCat.autoDiscovered === true &&
-            opusCatProbeUrls.length === 3 &&
+            opusCatProbeUrls.length === 4 &&
             opusCatSetupError?.message === "OPUS-CAT connection failed. Open Connection help for setup steps." &&
             window.CatHan.ai.localAiProviderPresetForSettings({ providerId: "opus-cat", baseUrl: "http://localhost:8500/MTRestService" })?.id === "opus-cat" &&
             window.CatHan.ai.localAiProviderPresetForSettings({ providerId: "opus-cat", baseUrl: "http://127.0.0.1:8502" })?.id === "opus-cat" &&

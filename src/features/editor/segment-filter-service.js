@@ -1,3 +1,5 @@
+import { evaluateRegex } from "./regex-worker-client.js";
+
 /**
  * Owns segment filter predicates and revision-keyed visible-index caching.
  * Filter controls, navigation mutation, segment mutation, and rendering remain
@@ -5,6 +7,9 @@
  *
  * @param {{
  *   getSegments: () => any[],
+ *   onResults?: () => void,
+ *   onError?: (error: Error) => void,
+ *   evaluateRegex?: typeof evaluateRegex,
  *   getFilters: () => any,
  *   getDocumentId: () => string,
  *   normalizeCase: (value: unknown) => string,
@@ -37,6 +42,10 @@ export function createSegmentFilterService(options) {
 
   let revision = 0;
   let cache = { key: "", indexes: [], positions: new Map() };
+  let regexResult = { key: "", ids: new Set() };
+  let regexRequestKey = "";
+  let regexAbort;
+  let regexTimer;
 
   function invalidate() {
     revision += 1;
@@ -63,17 +72,39 @@ export function createSegmentFilterService(options) {
     if (!query) return () => true;
     const scope = filters.scope;
     if (filters.regex) {
-      try {
-        const pattern = new RegExp(query, filters.caseSensitive ? "" : "i");
-        return (segment) => {
-          const source = segment.source || "";
-          const target = segment.target || "";
-          const haystack = scope === "source" ? source : scope === "target" ? target : `${source} ${target}`;
-          return pattern.test(haystack);
-        };
-      } catch {
-        return () => false;
+      const key = cacheKey();
+      if (regexResult.key === key) return (segment) => regexResult.ids.has(segment.id);
+      if (regexRequestKey !== key) {
+        regexRequestKey = key;
+        regexAbort?.abort();
+        clearTimeout(regexTimer);
+        regexAbort = new AbortController();
+        const signal = regexAbort.signal;
+        regexTimer = setTimeout(async () => {
+          try {
+            const records = getSegments().map((segment) => ({
+              id: segment.id,
+              text:
+                scope === "source"
+                  ? segment.source || ""
+                  : scope === "target"
+                    ? segment.target || ""
+                    : `${segment.source || ""} ${segment.target || ""}`
+            }));
+            const result = await (options.evaluateRegex || evaluateRegex)(
+              { type: "query", pattern: query, caseSensitive: filters.caseSensitive, records },
+              { signal }
+            );
+            if (signal.aborted || key !== cacheKey()) return;
+            regexResult = { key, ids: new Set(result.filter((item) => item.match).map((item) => item.id)) };
+            cache.key = "";
+            options.onResults?.();
+          } catch (error) {
+            if (!signal.aborted && key === cacheKey()) options.onError?.(error);
+          }
+        }, 200);
       }
+      return () => false;
     }
     if (filters.caseSensitive) {
       return (segment) => {

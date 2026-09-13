@@ -353,6 +353,20 @@ test("WorkspaceDirtyStateController marks every matching resource project and re
   assert.deepEqual(harness.calls.slice(-2), [["setItem", STORAGE_KEY, '["shared"]'], ["renderStatus"]]);
 });
 
+test("WorkspaceDirtyStateController matches stable resource ids while retaining legacy name fallback", async () => {
+  const { createWorkspaceDirtyStateController } = await loadFactory();
+  const linked = {
+    id: "stable-linked",
+    sourceLang: "en",
+    targetLang: "tr",
+    links: [{ type: "tm", name: "Renamed TM", resourceId: "resource-1" }]
+  };
+  const harness = createHarness(createWorkspaceDirtyStateController, { projects: [linked] });
+  assert.equal(harness.controller.usesResource(linked, "tm", "Old TM", "en", "tr", "resource-1"), true);
+  assert.equal(harness.controller.markProjectsUsingResource("tm", "Old TM", "en", "tr", "resource-1"), 1);
+  assert.deepEqual(Array.from(harness.model.dirty), ["stable-linked"]);
+});
+
 test("WorkspaceDirtyStateController preserves clear, clear-all, and memory-only effect sequencing", async () => {
   const { createWorkspaceDirtyStateController } = await loadFactory();
   const clearHarness = createHarness(createWorkspaceDirtyStateController, {
@@ -360,7 +374,7 @@ test("WorkspaceDirtyStateController preserves clear, clear-all, and memory-only 
     recovery: ["current", "other"],
     project: { id: "current" }
   });
-  assert.equal(clearHarness.controller.clear(), undefined);
+  assert.equal(clearHarness.controller.clear(), true);
   assert.deepEqual(Array.from(clearHarness.model.dirty), ["other"]);
   assert.deepEqual(Array.from(clearHarness.model.recovery), ["other"]);
   assert.deepEqual(clearHarness.calls, [["getProject"], ["setItem", STORAGE_KEY, '["other"]'], ["renderStatus"]]);
@@ -445,6 +459,7 @@ test("WorkspaceDirtyStateController validates boundaries and exposes an immutabl
   assert.equal(Object.isFrozen(controller), true);
   assert.deepEqual(Object.keys(controller), [
     "ids",
+    "generation",
     "readStored",
     "persist",
     "restore",

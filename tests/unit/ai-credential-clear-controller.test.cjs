@@ -59,7 +59,7 @@ test("AiCredentialClearController preserves the exact OpenAI success sequence an
   const { createAiCredentialClearController } = await loadFactory();
   const { calls, controller } = createHarness(createAiCredentialClearController);
   assert.equal(Object.isFrozen(controller), true);
-  assert.equal(controller.clearOpenAi(), true);
+  assert.equal(await controller.clearOpenAi(), true);
   assert.deepEqual(calls, [
     ["save-openai", "", false],
     ["clear-open-secret"],
@@ -83,7 +83,7 @@ test("AiCredentialClearController redacts OpenAI storage failures and returns fa
       }
     }
   });
-  assert.equal(controller.clearOpenAi(), false);
+  assert.equal(await controller.clearOpenAi(), false);
   assert.deepEqual(calls, [
     ["save-openai", "", false],
     ["redact", "OpenAI key could not be cleared."],
@@ -98,7 +98,7 @@ test("AiCredentialClearController preserves absent optional OpenAI presentation 
       presentation: { clearOpenSecret: undefined, renderOpenStatus: undefined }
     }
   });
-  assert.equal(success.controller.clearOpenAi(), true);
+  assert.equal(await success.controller.clearOpenAi(), true);
   assert.deepEqual(success.calls, [["save-openai", "", false]]);
 
   const failure = createHarness(createAiCredentialClearController, {
@@ -111,7 +111,7 @@ test("AiCredentialClearController preserves absent optional OpenAI presentation 
       presentation: { renderOpenStatus: undefined }
     }
   });
-  assert.equal(failure.controller.clearOpenAi(), false);
+  assert.equal(await failure.controller.clearOpenAi(), false);
   assert.equal(
     failure.calls.some(([name]) => name === "redact"),
     false
@@ -121,7 +121,7 @@ test("AiCredentialClearController preserves absent optional OpenAI presentation 
 test("AiCredentialClearController preserves settings-first local credential clearing", async () => {
   const { createAiCredentialClearController } = await loadFactory();
   const { calls, controller, localSettings } = createHarness(createAiCredentialClearController);
-  assert.equal(controller.clearLocal(), true);
+  assert.equal(await controller.clearLocal(), true);
   assert.deepEqual(calls, [
     ["read-local"],
     ["save-local", "", false, localSettings],
@@ -143,7 +143,7 @@ test("AiCredentialClearController redacts local storage failures and preserves l
       }
     }
   });
-  assert.equal(controller.clearLocal(), false);
+  assert.equal(await controller.clearLocal(), false);
   assert.deepEqual(calls, [
     ["read-local"],
     ["save-local", "", false, localSettings],
@@ -164,7 +164,7 @@ test("AiCredentialClearController preserves primary and downstream failure timin
       }
     }
   });
-  assert.throws(
+  await assert.rejects(
     () => settingsFailure.controller.clearLocal(),
     (error) => error === settingsError
   );
@@ -179,7 +179,7 @@ test("AiCredentialClearController preserves primary and downstream failure timin
       }
     }
   });
-  assert.throws(() => nonErrorFailure.controller.clearOpenAi(), TypeError);
+  await assert.rejects(() => nonErrorFailure.controller.clearOpenAi(), TypeError);
 
   for (const [method, dependencies, expected] of [
     [
@@ -228,7 +228,7 @@ test("AiCredentialClearController preserves primary and downstream failure timin
     ]
   ]) {
     const harness = createHarness(createAiCredentialClearController, { dependencies });
-    assert.throws(() => harness.controller[method](), new RegExp(expected));
+    await assert.rejects(() => harness.controller[method](), new RegExp(expected));
   }
 });
 

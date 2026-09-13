@@ -108,9 +108,10 @@ function createHarness(createSegmentConfirmationController, overrides = {}) {
         Reflect.ownKeys(value).forEach((key) => delete value[key]);
         Object.assign(value, snapshot);
       },
-      preparePersistedRollback(value, savedRevision) {
-        calls.push(["prepareRollback", savedRevision]);
+      preparePersistedRollback(value, savedRevision, savedStorageVersion) {
+        calls.push(["prepareRollback", savedRevision, savedStorageVersion]);
         value.revision = Math.max(Number(value.revision || 0), savedRevision) + 1;
+        if (Number(savedStorageVersion) > 0) value.storageVersion = Number(savedStorageVersion);
         value.updatedAt = "rollback";
       }
     },
@@ -120,6 +121,14 @@ function createHarness(createSegmentConfirmationController, overrides = {}) {
         calls.push(["save", value.status, value.revision]);
         return save(value, calls);
       },
+      ...(overrides.confirmAtomic
+        ? {
+            confirmAtomic: (projectValue, segmentValue, context) => {
+              calls.push(["confirmAtomic", projectValue.id, segmentValue.id, context]);
+              return overrides.confirmAtomic(projectValue, segmentValue, context);
+            }
+          }
+        : {}),
       saveToTm: () => {
         calls.push(["saveToTm"]);
         return overrides.tmError ? Promise.reject(overrides.tmError) : Promise.resolve();
@@ -235,6 +244,27 @@ test("secondary TM, activity, and navigation failures keep confirmation durable 
   assert.equal(harness.calls.filter(([name]) => name === "warn").length, 3);
 });
 
+test("atomic confirmation uses a stable document-and-position context key", async () => {
+  const { createSegmentConfirmationController } = await loadFactory();
+  const contexts = [];
+  const harness = createHarness(createSegmentConfirmationController, {
+    confirmAtomic: (_project, segment, context) => {
+      segment.documentName = "Manual.docx";
+      contexts.push(context);
+      return Promise.resolve();
+    }
+  });
+  harness.segment.documentName = "Manual.docx";
+  harness.segment.index = 7;
+
+  assert.equal(await harness.controller.confirm(), true);
+  assert.equal(contexts[0].documentKey, "Manual.docx#7");
+  assert.equal(
+    harness.calls.some(([name]) => name === "saveToTm"),
+    false
+  );
+});
+
 test("primary confirmation failure restores the in-memory snapshot and releases busy state", async () => {
   const { createSegmentConfirmationController } = await loadFactory();
   const harness = createHarness(createSegmentConfirmationController, {
@@ -280,4 +310,29 @@ test("post-save confirmation failure persists a monotonic rollback and reports r
     "dirty"
   ]);
   assert.ok(harness.calls.some(([name, revision]) => name === "prepareRollback" && revision === 5));
+});
+
+test("atomic post-save failure rolls back through the storage version that confirmation committed", async () => {
+  const { createSegmentConfirmationController } = await loadFactory();
+  let rollbackStorageVersion = 0;
+  const harness = createHarness(createSegmentConfirmationController, {
+    confirmAtomic: (_project, segment) => {
+      segment.storageVersion = 14;
+      return Promise.resolve();
+    },
+    save: (segment) => {
+      rollbackStorageVersion = segment.storageVersion;
+      return Promise.resolve();
+    },
+    testHooks: {
+      afterSave() {
+        throw new Error("post-commit display failure");
+      }
+    }
+  });
+
+  assert.equal(await harness.controller.confirm(), false);
+  assert.equal(harness.segment.status, "draft");
+  assert.equal(rollbackStorageVersion, 14);
+  assert.equal(harness.segment.storageVersion, 14);
 });

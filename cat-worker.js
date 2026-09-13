@@ -43,7 +43,7 @@ function languagePairOf(entry = {}) {
 function memoryKey(entry = {}) {
   return [
     languagePairOf(entry),
-    entry.tmName || "",
+    entry.resourceId || entry.tmName || "",
     normalizeText(entry.source),
     normalizeText(entry.target)
   ].join("::");
@@ -83,33 +83,105 @@ function resourceNameSet(names, legacyName) {
   return new Set([...(Array.isArray(names) ? names : []), legacyName].map((name) => String(name || "").trim()).filter(Boolean));
 }
 
+function orderedTokenSimilarity(aTokens, bTokens) {
+  if (!aTokens.length || !bTokens.length) return 0;
+  let cursor = 0;
+  let count = 0;
+  for (const token of aTokens) {
+    const index = bTokens.indexOf(token, cursor);
+    if (index < 0) continue;
+    count += 1;
+    cursor = index + 1;
+  }
+  return count / Math.max(aTokens.length, bTokens.length);
+}
+
+function contextMatches(entry, context = {}) {
+  const previous = normalizeText(context.previousSource || "");
+  const next = normalizeText(context.nextSource || "");
+  const documentKey = cleanText(context.documentKey);
+  const previousMatch = previous && previous === normalizeText(entry.previousSource || "");
+  const nextMatch = next && next === normalizeText(entry.nextSource || "");
+  return Boolean(documentKey && documentKey === cleanText(entry.documentKey) || previousMatch && nextMatch || previousMatch && !next || nextMatch && !previous);
+}
+
 function scoreTmEntries(entries, options = {}) {
-  const { source, sourceLang, targetLang, tmName, tmNames, limit = 6 } = options || {};
+  const { source, sourceLang, targetLang, tmName, tmNames, limit = 6, context = {} } = options || {};
+  if (
+    Object.prototype.hasOwnProperty.call(options, "resourceLinks") &&
+    !(options.resourceLinks || []).some((link) => link?.type === "tm" && link.lookup !== false)
+  ) return [];
   const sourceText = cleanText(source);
   const normalizedSource = normalizeText(sourceText);
   if (!normalizedSource) return [];
   const sourceTokens = tokensFromNormalized(normalizedSource);
   const languagePair = languagePairFromFields(sourceLang, targetLang);
   const allowedNames = resourceNameSet(tmNames, tmName);
+  const links = new Map((options.resourceLinks || []).filter((link) => link?.type === "tm" && link.lookup !== false).map((link, index) => [link.resourceId || link.name, { ...link, priority: Number(link.priority) || index, penalty: Math.max(0, Math.min(30, Number(link.penalty) || 0)) }]));
   const byKey = new Map();
   (entries || []).forEach((entry) => {
     if (languagePair && languagePairOf(entry) !== languagePair) return;
-    if (allowedNames.size && !allowedNames.has(entry.tmName)) return;
+    const link = links.get(entry.resourceId || entry.tmName);
+    if (links.size && !link) return;
+    if (!links.size && allowedNames.size && !allowedNames.has(entry.tmName)) return;
     const normalizedCandidate = normalizeText(entry.source);
+    const candidateTokens = tokensFromNormalized(normalizedCandidate);
+    const overlapRatio = tokenOverlapTokens(sourceTokens, candidateTokens);
+    const characterScore = similarityNormalized(normalizedSource, normalizedCandidate);
     if (
       normalizedCandidate !== normalizedSource &&
-      tokenOverlapTokens(sourceTokens, tokensFromNormalized(normalizedCandidate)) < 0.15
+      overlapRatio < 0.15 &&
+      characterScore < 45
     ) return;
-    const scored = { ...entry, score: similarityNormalized(normalizedSource, normalizedCandidate) };
-    if (scored.score < 45) return;
-    const key = [languagePairOf(entry), entry.tmName || "", normalizedCandidate, normalizeText(entry.target)].join("::");
+    const overlapScore = Math.round(overlapRatio * 100);
+    const orderScore = Math.round(orderedTokenSimilarity(sourceTokens, candidateTokens) * 100);
+    let rawScore;
+    let matchKind;
+    if (sourceText === cleanText(entry.source) && contextMatches(entry, context)) { rawScore = 101; matchKind = "context-exact"; }
+    else if (sourceText === cleanText(entry.source)) { rawScore = 100; matchKind = "exact"; }
+    else if (normalizedCandidate === normalizedSource) { rawScore = 99; matchKind = "normalized-exact"; }
+    else {
+      const combined = Math.round(characterScore * 0.55 + overlapScore * 0.3 + orderScore * 0.15);
+      rawScore = Math.min(98, overlapScore ? combined : Math.max(combined, characterScore - 3));
+      matchKind = "fuzzy";
+    }
+    if (rawScore < 45) return;
+    const penalty = link?.penalty || 0;
+    const effectiveScore = Math.max(0, Math.min(101, rawScore - penalty));
+    const scored = {
+      ...entry,
+      score: effectiveScore,
+      rawScore,
+      penalty,
+      effectiveScore,
+      matchKind,
+      resourcePriority: link?.priority ?? 999,
+      sameDomainProvenance: Boolean(
+        cleanText(context.domain) && normalizeText(entry.domain) === normalizeText(context.domain)
+      ),
+      provenance: [{
+        resourceId: entry.resourceId || "",
+        resourceName: entry.tmName || "",
+        projectName: entry.projectName || "",
+        domain: entry.domain || "",
+        updatedAt: entry.updatedAt || ""
+      }]
+    };
+    const key = [languagePairOf(entry), normalizedCandidate, normalizeText(entry.target)].join("::");
     const existing = byKey.get(key);
-    if (!existing || scored.score > existing.score || new Date(scored.updatedAt) > new Date(existing.updatedAt)) {
+    if (existing) existing.provenance.push(...scored.provenance.filter((item) => !existing.provenance.some((known) => known.resourceId === item.resourceId)));
+    if (!existing || scored.effectiveScore > existing.effectiveScore || new Date(scored.updatedAt) > new Date(existing.updatedAt)) {
+      if (existing) scored.provenance = existing.provenance;
       byKey.set(key, scored);
     }
   });
   return Array.from(byKey.values())
-    .sort((a, b) => b.score - a.score || new Date(b.updatedAt) - new Date(a.updatedAt))
+    .sort((a, b) =>
+      b.effectiveScore - a.effectiveScore ||
+      a.resourcePriority - b.resourcePriority ||
+      Number(b.sameDomainProvenance) - Number(a.sameDomainProvenance) ||
+      new Date(b.updatedAt) - new Date(a.updatedAt)
+    )
     .slice(0, limit);
 }
 
@@ -125,6 +197,60 @@ function containsTerm(text, term) {
   const normalizedTerm = normalizeText(term);
   if (!normalizedTerm) return false;
   return ` ${normalizeText(text)} `.includes(` ${normalizedTerm} `);
+}
+
+function containsDesignation(text, value, caseSensitivity = "insensitive") {
+  const source = String(text || "");
+  const designation = String(value || "");
+  if (!designation) return false;
+  if (caseSensitivity === "sensitive") return source.includes(designation);
+  if (caseSensitivity === "initial-sensitive") {
+    const index = source.toLocaleLowerCase().indexOf(designation.toLocaleLowerCase());
+    return index >= 0 && source[index] === designation[0];
+  }
+  return containsTerm(source, designation);
+}
+
+function sourceDesignationMatches(text, term) {
+  if (term.matchMode === "prefix") {
+    const sourceTokens = normalizeText(text).split(" ").filter(Boolean);
+    const termTokens = normalizeText(term.text).split(" ").filter(Boolean);
+    return Boolean(termTokens.length && sourceTokens.some((_, index) =>
+      termTokens.every((token, offset) => sourceTokens[index + offset]?.startsWith(token))
+    ));
+  }
+  if (term.matchMode === "fuzzy") {
+    const sourceTokens = normalizeText(text).split(" ").filter(Boolean);
+    const termTokens = normalizeText(term.text).split(" ").filter(Boolean);
+    if (!termTokens.length || sourceTokens.length < termTokens.length) return false;
+    const threshold = Math.max(50, Math.min(100, Number(term.fuzzyThreshold) || 85));
+    for (let index = 0; index <= sourceTokens.length - termTokens.length; index += 1) {
+      if (similarity(sourceTokens.slice(index, index + termTokens.length).join(" "), termTokens.join(" ")) >= threshold) return true;
+    }
+    return false;
+  }
+  return containsDesignation(text, term.text, term.caseSensitivity);
+}
+
+function termConceptGroups(terms) {
+  const groups = new Map();
+  (terms || []).forEach((term) => {
+    const key = term.conceptId || `${term.resourceId || term.termBaseName}:${term.sourceTerm}`;
+    if (!groups.has(key)) groups.set(key, { sourceTerms: [], accepted: [], forbidden: [] });
+    const group = groups.get(key);
+    if (!group.sourceTerms.some((item) => item.text === term.sourceTerm)) {
+      group.sourceTerms.push({
+        text: term.sourceTerm,
+        caseSensitivity: term.caseSensitivity,
+        matchMode: term.matchMode,
+        fuzzyThreshold: term.fuzzyThreshold
+      });
+    }
+    const designation = { text: term.targetTerm, caseSensitivity: term.caseSensitivity };
+    if (term.isForbidden || term.status === "forbidden") group.forbidden.push(designation);
+    else if (!group.accepted.some((item) => item.text === designation.text)) group.accepted.push(designation);
+  });
+  return Array.from(groups.values());
 }
 
 function missingTags(segment) {
@@ -160,6 +286,7 @@ function issue({ type, severity, segment, index, message, fixHint }) {
 
 function runQaChecks(segments, terms = []) {
   const checks = [];
+  const concepts = termConceptGroups(terms);
   (segments || []).forEach((segment, index) => {
     const target = segment.target || "";
     if (!target.trim()) {
@@ -215,27 +342,27 @@ function runQaChecks(segments, terms = []) {
         fixHint: "Check whether punctuation should match the source."
       }));
     }
-    (terms || []).forEach((term) => {
-      const sourceHasTerm = containsTerm(segment.source, term.sourceTerm);
-      if (!sourceHasTerm || !term.targetTerm) return;
-      if (term.isForbidden && containsTerm(target, term.targetTerm)) {
+    concepts.forEach((concept) => {
+      const source = concept.sourceTerms.find((term) => sourceDesignationMatches(segment.source, term));
+      if (!source) return;
+      concept.forbidden.forEach((term) => {
+        if (!containsDesignation(target, term.text, term.caseSensitivity)) return;
         checks.push(issue({
           type: "forbidden-term",
           severity: "error",
           segment,
           index,
-          message: `Forbidden term used: ${term.targetTerm}.`,
+          message: `Forbidden term used: ${term.text}.`,
           fixHint: "Replace this with the approved wording or document a termbase exception before delivery."
         }));
-        return;
-      }
-      if (!term.isForbidden && !containsTerm(target, term.targetTerm)) {
+      });
+      if (concept.accepted.length && !concept.accepted.some((term) => containsDesignation(target, term.text, term.caseSensitivity))) {
         checks.push(issue({
           type: "term",
           severity: "warning",
           segment,
           index,
-          message: `Term may be missing: ${term.sourceTerm} -> ${term.targetTerm}.`,
+          message: `Term may be missing: ${source.text} -> ${concept.accepted.map((term) => term.text).join(" / ")}.`,
           fixHint: "Use the approved term or update the termbase if this is a valid exception."
         }));
       }

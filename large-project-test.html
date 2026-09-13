@@ -200,13 +200,20 @@
           target: protectedTarget,
           revision: Number(savedBatch[0].revision || 0) + 5
         });
-        const staleSave = await window.CatHan.project.saveSegments([{
-          ...savedBatch[0],
-          target: `${savedBatch[0].target} Older stale version.`,
-          revision: savedBatch[0].revision
-        }]);
+        const rejectedTarget = `${savedBatch[0].target} Older stale version.`;
+        let staleRejected = false;
+        try {
+          await window.CatHan.project.saveSegments([{
+            ...savedBatch[0],
+            target: rejectedTarget,
+            revision: savedBatch[0].revision
+          }]);
+        } catch (error) {
+          staleRejected = error.name === "StorageConflictError";
+        }
         const staleReload = await window.CatHan.storage.get("segments", savedBatch[0].id);
-        assert(staleSave[0].target === protectedTarget && staleReload.target === protectedTarget, "batch save preserves newer segment revisions");
+        const conflicts = await window.CatHan.storage.getAll("conflictCopies");
+        assert(staleRejected && staleReload.target === protectedTarget && conflicts.some((copy) => copy.changes?.some((change) => change.value?.target === rejectedTarget)), "batch save preserves newer segment revisions and retains rejected output");
 
         const finalSegments = await window.CatHan.project.getProjectSegments(project.id);
         assert(finalSegments.length === SEGMENT_COUNT && finalSegments[0].target === protectedTarget, "large project reload preserves saved targets");

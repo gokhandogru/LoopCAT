@@ -1,5 +1,6 @@
 const DEFAULT_SAVE_DELAY_MS = 450;
 const DEFAULT_RETRY_DELAY_MS = 2000;
+const DEFAULT_MAX_WAIT_MS = 2000;
 
 /**
  * Owns pending target-save timers, retry scheduling, forced flushes, and
@@ -15,6 +16,8 @@ const DEFAULT_RETRY_DELAY_MS = 2000;
  *   testHooks?: { beforeSave?: (segment: any) => void, beforeFlush?: (segments: any[]) => void },
  *   saveDelayMs?: number,
  *   retryDelayMs?: number,
+ *   maxWaitMs?: number,
+ *   now?: () => number,
  *   setTimer?: (callback: () => void, delay: number) => any,
  *   clearTimer?: (timer: any) => void
  * }} options
@@ -24,6 +27,13 @@ export function createAutosaveService(options) {
   const repository = options?.repository;
   const editLifecycle = options?.editLifecycle;
   const status = options?.status;
+  function publish(message, mode = undefined) {
+    try {
+      status.set(message, mode);
+    } catch (error) {
+      console.warn("Save status could not be displayed.", error);
+    }
+  }
   if (typeof editorSessionStore?.getSegments !== "function") {
     throw new TypeError("AutosaveService requires EditorSessionStore segment selection.");
   }
@@ -49,18 +59,33 @@ export function createAutosaveService(options) {
   const beforeSave = typeof options.testHooks?.beforeSave === "function" ? options.testHooks.beforeSave : () => {};
   const beforeFlush = typeof options.testHooks?.beforeFlush === "function" ? options.testHooks.beforeFlush : () => {};
   const pending = new Map();
+  const inFlight = new Set();
+  const latestGenerations = new Map();
+  const now = options.now || Date.now;
+  const maxWaitMs = options.maxWaitMs ?? DEFAULT_MAX_WAIT_MS;
+  let generation = 0;
+  let writeTail = Promise.resolve();
+
+  function size() {
+    return new Set([
+      ...pending.keys(),
+      ...Array.from(inFlight).flatMap((operation) => operation.records.map((record) => record.id))
+    ]).size;
+  }
 
   function pendingRecords(projectId = "") {
     return Array.from(pending.entries())
-      .map(([id, record]) => ({ id, timer: record.timer, segment: record.segment }))
+      .map(([id, record]) => ({ ...record, id }))
       .filter((record) => record.segment && (!projectId || record.segment.projectId === projectId));
   }
 
   function discard(segmentId) {
     const record = pending.get(segmentId);
+    latestGenerations.delete(segmentId);
     if (!record) return false;
     clearTimer(record.timer);
     pending.delete(segmentId);
+    latestGenerations.delete(segmentId);
     return true;
   }
 
@@ -74,41 +99,109 @@ export function createAutosaveService(options) {
     editLifecycle.finalizeAll();
     pending.forEach((record) => clearTimer(record.timer));
     pending.clear();
+    latestGenerations.clear();
   }
 
-  function queue(segment, delay = saveDelayMs) {
-    if (!segment?.id) return false;
-    const timer = setTimer(async () => {
+  function persistRecords(records, single = false) {
+    records.forEach((record) => {
+      clearTimer(record.timer);
+      if (pending.get(record.id)?.generation === record.generation) pending.delete(record.id);
+    });
+    const operation = { records, promise: null };
+    inFlight.add(operation);
+    const write = writeTail.then(async () => {
+      publish("Saving...");
       try {
-        editLifecycle.finalize(segment.id);
-        status.set("Saving...");
-        const record = pending.get(segment.id);
-        const latest =
-          editorSessionStore.getSegments().find((item) => item.id === segment.id) || record?.segment || segment;
-        beforeSave(latest);
-        await repository.save(latest);
-        if (pending.get(segment.id)?.timer === timer) pending.delete(segment.id);
-        status.set(pending.size ? `${pending.size} save pending` : "Saved", "saved");
+        const segments = records.map((record) => record.segment);
+        const expectedVersions = segments.map((segment) => Number(segment.storageVersion || 0));
+        let committed;
+        if (single) {
+          beforeSave(segments[0]);
+          committed = [await repository.save(segments[0])];
+        } else {
+          beforeFlush(segments);
+          committed = await repository.saveMany(segments);
+        }
+        try {
+          let currentById;
+          segments.forEach((segment, index) => {
+            const saved = committed?.[index] || segment;
+            if (saved?.storageVersion === undefined) return;
+            if (segments.length > 1 && !currentById)
+              currentById = new Map(editorSessionStore.getSegments().map((value) => [value.id, value]));
+            const current = currentById
+              ? currentById.get(segment.id)
+              : editorSessionStore.getSegments().find((value) => value.id === segment.id);
+            if (
+              current?.projectId === segment.projectId &&
+              Number(current.storageVersion || 0) === expectedVersions[index] &&
+              Number(current.revision || 0) >= Number(segment.revision || 0)
+            )
+              current.storageVersion = saved.storageVersion;
+          });
+        } catch (error) {
+          console.warn("Saved output; refresh the editor's stored version.", error);
+        }
+        return segments;
+      } catch (error) {
+        records.forEach((record) => {
+          // A failed older write must never replace a newer queued edit or resurrect a deletion.
+          if (!pending.has(record.id) && latestGenerations.get(record.id) === record.generation) {
+            queue(record.segment, retryDelayMs);
+          }
+        });
+        publish(`${error?.message || "Save failed"}; retrying autosave`, "dirty");
+        throw error;
+      } finally {
+        inFlight.delete(operation);
+      }
+    });
+    operation.promise = write.then((segments) => {
+      publish(size() ? `${size()} save pending` : "Saved", size() ? "dirty" : "saved");
+      // Presentation failure cannot turn a committed write into a failed save.
+      try {
         onSaved();
       } catch (error) {
-        const record = pending.get(segment.id);
-        const latest =
-          editorSessionStore.getSegments().find((item) => item.id === segment.id) || record?.segment || segment;
-        if (pending.get(segment.id)?.timer === timer) {
-          pending.delete(segment.id);
-          queue(latest, retryDelayMs);
-        }
-        status.set(`${error?.message || "Save failed"}; retrying autosave`, "dirty");
+        console.warn("Saved output; history presentation needs refreshing.", error);
+      }
+      return segments;
+    });
+    writeTail = operation.promise.catch(() => {});
+    return operation.promise;
+  }
+
+  function queue(segment, delay = saveDelayMs, firstQueuedAt = now()) {
+    if (!segment?.id) return false;
+    const previous = pending.get(segment.id);
+    if (previous) clearTimer(previous.timer);
+    const record = {
+      id: segment.id,
+      segment: structuredClone(segment),
+      generation: ++generation,
+      firstQueuedAt,
+      timer: null
+    };
+    // Isolated workflow probes use symbols; these are never stored or exported by structured clone.
+    if (options.testHooks) for (const key of Object.getOwnPropertySymbols(segment)) record.segment[key] = segment[key];
+    const timer = setTimer(async () => {
+      if (pending.get(segment.id) !== record) return;
+      editLifecycle.finalize(segment.id);
+      try {
+        await persistRecords([record], true);
+      } catch {
+        // persistRecords owns retry state and the visible error.
       }
     }, delay);
-    pending.set(segment.id, { timer, segment });
+    record.timer = timer;
+    pending.set(segment.id, record);
+    latestGenerations.set(segment.id, record.generation);
     return true;
   }
 
   function debounce(segment) {
-    status.set("Unsaved changes", "dirty");
-    clear(segment, { finalizeEdit: false });
-    return queue(segment);
+    publish("Unsaved changes", "dirty");
+    const firstQueuedAt = pending.get(segment?.id)?.firstQueuedAt ?? now();
+    return queue(segment, Math.min(saveDelayMs, Math.max(0, maxWaitMs - (now() - firstQueuedAt))), firstQueuedAt);
   }
 
   function clearDocument(projectId, documentId) {
@@ -120,21 +213,19 @@ export function createAutosaveService(options) {
       });
   }
 
-  async function flush(projectId = "") {
+  async function flush(projectId = "", throughGeneration = generation) {
     if (projectId) editLifecycle.finalizeProject(projectId);
     else editLifecycle.finalizeAll();
-    const records = pendingRecords(projectId);
-    if (!records.length) return [];
-    records.forEach((record) => discard(record.id));
-    const segments = records.map((record) => record.segment);
-    try {
-      beforeFlush(segments);
-      if (segments.length) await repository.saveMany(segments);
-    } catch (error) {
-      records.forEach((record) => queue(record.segment, retryDelayMs));
-      throw error;
-    }
-    return segments;
+    const writes = Array.from(inFlight)
+      .filter((operation) =>
+        operation.records.some(
+          (record) => (!projectId || record.segment.projectId === projectId) && record.generation <= throughGeneration
+        )
+      )
+      .map((operation) => operation.promise);
+    const records = pendingRecords(projectId).filter((record) => record.generation <= throughGeneration);
+    if (records.length) writes.push(persistRecords(records));
+    return (await Promise.all(writes)).flat();
   }
 
   return Object.freeze({
@@ -144,9 +235,18 @@ export function createAutosaveService(options) {
     debounce,
     discard,
     flush,
-    has: (segmentId) => pending.has(segmentId),
+    has: (segmentId) =>
+      pending.has(segmentId) ||
+      Array.from(inFlight).some((operation) => operation.records.some((record) => record.id === segmentId)),
     pendingRecords,
     queue,
-    size: () => pending.size
+    enqueueEdit(projectId, mutation) {
+      if (mutation?.projectId !== projectId) throw new TypeError("Edit project does not match its segment.");
+      debounce(mutation);
+      return generation;
+    },
+    getGeneration: () => generation,
+    getState: () => ({ pending: pending.size, inFlight: inFlight.size, generation }),
+    size
   });
 }

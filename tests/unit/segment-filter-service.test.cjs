@@ -25,6 +25,8 @@ function createHarness(createSegmentFilterService, overrides = {}) {
   };
   let documentId = overrides.documentId || "";
   const service = createSegmentFilterService({
+    evaluateRegex: overrides.evaluateRegex,
+    onResults: overrides.onResults,
     getSegments() {
       calls.push(["getSegments"]);
       return segments;
@@ -85,9 +87,20 @@ test("SegmentFilterService preserves empty, scoped literal, normalized, and case
 
 test("SegmentFilterService preserves regex case flags, scope, and invalid-pattern containment", async () => {
   const { createSegmentFilterService } = await moduleAt("src/features/editor/segment-filter-service.js");
+  let ready;
+  const completed = new Promise((resolve) => {
+    ready = resolve;
+  });
   const harness = createHarness(createSegmentFilterService, {
+    onResults: ready,
+    evaluateRegex: ({ pattern, caseSensitive, records }) => {
+      const regex = new RegExp(pattern, caseSensitive ? "" : "i");
+      return Promise.resolve(records.map((record) => ({ id: record.id, match: regex.test(record.text) })));
+    },
     filters: { query: "^install", scope: "source", regex: true }
   });
+  assert.equal(harness.service.queryMatcher()(harness.segments[0]), false);
+  await completed;
   assert.equal(harness.service.queryMatcher()(harness.segments[0]), true);
   harness.patchFilters({ caseSensitive: true });
   assert.equal(harness.service.queryMatcher()(harness.segments[0]), false);

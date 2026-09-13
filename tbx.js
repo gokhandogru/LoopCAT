@@ -198,11 +198,12 @@ function tbxTermFromEntry(entryInner, defaults, options, now) {
     .map((node) => String(node.text || "").trim().toLowerCase())
     .join(" ");
   const rawNotes = descrips
-    .filter((node) => ["context", "note", "definition", "explanation", "usagenote"].includes(node.type))
+    .filter((node) => ["context", "note", "explanation", "usagenote"].includes(node.type))
     .map((node) => String(node.text || "").trim())
     .filter(Boolean)
     .join("; ");
   const notes = redactSensitiveText(rawNotes).trim();
+  const metadata = Object.fromEntries(descrips.map((item) => [item.type, item.text]));
   const variants = [];
   const langPattern = createAnyElementBlockRegex(["langSet", "langSec"]);
   let langMatch;
@@ -219,12 +220,30 @@ function tbxTermFromEntry(entryInner, defaults, options, now) {
   if (!sourceTerm || !targetTerm) return null;
   return {
     id: window.CatHan.storage.makeId("term"),
+    conceptId: cleanText(metadata.xloopcatconceptid || metadata.loopcatconceptid || metadata.conceptid),
+    sourceDesignationId: cleanText(
+      metadata.xloopcatsourcedesignationid || metadata.loopcatsourcedesignationid || metadata.sourcedesignationid
+    ),
+    targetDesignationId: cleanText(
+      metadata.xloopcattargetdesignationid || metadata.loopcattargetdesignationid || metadata.targetdesignationid
+    ),
     sourceTerm,
     targetTerm,
     sourceLang: defaults.sourceLang,
     targetLang: defaults.targetLang,
     languagePair: `${defaults.sourceLang}::${defaults.targetLang}`,
     notes,
+    definition: cleanText(metadata.definition),
+    subject: cleanText(metadata.subjectfield || metadata.subject),
+    domain: cleanText(metadata.domain),
+    partOfSpeech: cleanText(metadata.partofspeech),
+    usageExample: cleanText(metadata.context || metadata.usageexample),
+    status: status.includes("forbidden") ? "forbidden" : status.includes("admitted") ? "admitted" : "preferred",
+    caseSensitivity: ["sensitive", "initial-sensitive", "insensitive"].includes(metadata.casesensitivity)
+      ? metadata.casesensitivity
+      : "insensitive",
+    matchMode: ["exact", "prefix", "fuzzy"].includes(metadata.matchmode) ? metadata.matchmode : "exact",
+    fuzzyThreshold: Math.max(50, Math.min(100, Number(metadata.fuzzythreshold) || 85)),
     termBaseName: defaults.termBaseName,
     isForbidden: status.includes("forbidden"),
     createdAt: now,
@@ -315,6 +334,9 @@ function parseTbxDom(text, options = {}) {
       .filter(Boolean)
       .join("; ");
     const notes = redactSensitiveText(rawNotes).trim();
+    const metadata = Object.fromEntries(
+      descrips.map((node) => [descripType(node), cleanText(node.textContent || "")])
+    );
     Array.from(entry.getElementsByTagNameNS("*", "langSet")).forEach((langSet) => {
       const lang = langOf(langSet).toLowerCase();
       const term = cleanText(langSet.getElementsByTagNameNS("*", "term")[0]?.textContent || "");
@@ -324,12 +346,30 @@ function parseTbxDom(text, options = {}) {
     if (sourceTerm && targetTerm) {
       terms.push({
         id: makeId("term"),
+        conceptId: cleanText(metadata.xloopcatconceptid || metadata.loopcatconceptid || metadata.conceptid),
+        sourceDesignationId: cleanText(
+          metadata.xloopcatsourcedesignationid || metadata.loopcatsourcedesignationid || metadata.sourcedesignationid
+        ),
+        targetDesignationId: cleanText(
+          metadata.xloopcattargetdesignationid || metadata.loopcattargetdesignationid || metadata.targetdesignationid
+        ),
         sourceTerm,
         targetTerm,
         sourceLang,
         targetLang,
         languagePair: `${sourceLang}::${targetLang}`,
         notes,
+        definition: cleanText(metadata.definition),
+        subject: cleanText(metadata.subjectfield || metadata.subject),
+        domain: cleanText(metadata.domain),
+        partOfSpeech: cleanText(metadata.partofspeech),
+        usageExample: cleanText(metadata.context || metadata.usageexample),
+        status: status.includes("forbidden") ? "forbidden" : status.includes("admitted") ? "admitted" : "preferred",
+        caseSensitivity: ["sensitive", "initial-sensitive", "insensitive"].includes(metadata.casesensitivity)
+          ? metadata.casesensitivity
+          : "insensitive",
+        matchMode: ["exact", "prefix", "fuzzy"].includes(metadata.matchmode) ? metadata.matchmode : "exact",
+        fuzzyThreshold: Math.max(50, Math.min(100, Number(metadata.fuzzythreshold) || 85)),
         termBaseName,
         isForbidden: status.includes("forbidden"),
         createdAt: now,
@@ -346,11 +386,24 @@ function buildTbx(terms, optionsInput = {}) {
     .map((term) => tbxTermRecord(term, options))
     .map((term) => {
       const notes = redactSensitiveText(term.notes || "").trim();
+      const metadata = [
+        ["x-loopcat-conceptId", term.conceptId],
+        ["x-loopcat-sourceDesignationId", term.sourceDesignationId],
+        ["x-loopcat-targetDesignationId", term.targetDesignationId],
+        ["termStatus", term.status || (term.isForbidden ? "forbidden" : "preferred")],
+        ["definition", term.definition],
+        ["subjectField", term.subject],
+        ["domain", term.domain],
+        ["partOfSpeech", term.partOfSpeech],
+        ["context", term.usageExample || notes],
+        ["caseSensitivity", term.caseSensitivity],
+        ["matchMode", term.matchMode],
+        ["fuzzyThreshold", term.matchMode === "fuzzy" ? term.fuzzyThreshold || 85 : ""]
+      ].filter(([, value]) => value !== undefined && value !== null && String(value).trim());
       return `      <termEntry id="${esc(term.id)}">
         <langSet xml:lang="${esc(term.sourceLang)}"><tig><term>${esc(term.sourceTerm)}</term></tig></langSet>
         <langSet xml:lang="${esc(term.targetLang)}"><tig><term>${esc(term.targetTerm)}</term></tig></langSet>
-        ${term.isForbidden ? `<descrip type="termStatus">forbidden</descrip>` : ""}
-        ${notes ? `<descrip type="context">${esc(notes)}</descrip>` : ""}
+        ${metadata.map(([type, value]) => `<descrip type="${esc(type)}">${esc(value)}</descrip>`).join("\n        ")}
       </termEntry>`;
     })
     .join("\n");

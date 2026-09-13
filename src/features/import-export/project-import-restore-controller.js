@@ -12,7 +12,7 @@ import { validateProjectImportRestoreControllerOptions } from "./project-import-
  *   backup: { validate: (backup: any) => any },
  *   session: { getProjects: () => any[], replaceProject: (project: any) => unknown, replaceSegments: (segments: any[]) => unknown },
  *   autosave: { flush: (projectId?: string) => Promise<unknown> },
- *   persistence: { importProjectPackageRecords: (records: any) => Promise<unknown>, importAllData: (backup: any) => Promise<unknown> },
+ *   persistence: { importProjectPackageRecords: (records: any) => Promise<unknown>, importAllData: (backup: any) => Promise<unknown>, prepareRestore?: (backup: any, options?: any) => Promise<any>, commitRestore?: (plan: any) => Promise<any> },
  *   indexes: { rebuildTm: () => Promise<unknown>, rebuildTerms: () => Promise<unknown> },
  *   activity: { logForProject: (projectId: string, type: string, summary: string, detail: any, label: string) => Promise<{ ok: boolean }>, appendWarning: (message: string, logged: boolean) => string },
  *   navigation: { openProjects: () => unknown, clearSelection: () => unknown },
@@ -92,11 +92,20 @@ export function createProjectImportRestoreController(options) {
           ]
         }
       : packageValidation;
+    const resourceRecords = prepared.resources || {};
     await persistence.importProjectPackageRecords({
       project: prepared.project,
       segments: prepared.segments || [],
-      tmEntries: prepared.resources?.tmEntries || [],
-      terms: prepared.resources?.terms || [],
+      tmEntries: resourceRecords.tmEntries || [],
+      terms: resourceRecords.terms || [],
+      ...(Object.hasOwn(resourceRecords, "resources") ? { resources: resourceRecords.resources || [] } : {}),
+      ...(Object.hasOwn(resourceRecords, "tmContributions")
+        ? { tmContributions: resourceRecords.tmContributions || [] }
+        : {}),
+      ...(Object.hasOwn(resourceRecords, "termConcepts") ? { termConcepts: resourceRecords.termConcepts || [] } : {}),
+      ...(Object.hasOwn(resourceRecords, "termDesignations")
+        ? { termDesignations: resourceRecords.termDesignations || [] }
+        : {}),
       activityEvents: prepared.activityEvents || [],
       replaceProjectId
     });
@@ -144,7 +153,7 @@ export function createProjectImportRestoreController(options) {
 
   async function restoreBackupData(backupRecord) {
     await files.progress("Validating backup");
-    const backupReport = backup.validate(backupRecord);
+    const backupReport = backupRecord.archiveStagingId ? backupRecord.validation : backup.validate(backupRecord);
     if (!backupReport.ok) {
       presentation.renderValidation(backupReport);
       status.set("Backup restore failed validation", "dirty");
@@ -156,16 +165,42 @@ export function createProjectImportRestoreController(options) {
       null,
       `${(backupRecord.projects || []).length} project${(backupRecord.projects || []).length === 1 ? "" : "s"}`
     );
-    await persistence.importAllData(backupRecord);
-    await files.progress("Rebuilding resource indexes");
-    await indexes.rebuildTm();
-    await indexes.rebuildTerms();
-    await files.progress("Refreshing projects");
+    if (persistence.prepareRestore && persistence.commitRestore) {
+      const names = (backupRecord.projects || []).map((project) => text.safe(project.name)).join(", ");
+      let mode = "copy";
+      if (
+        !localization.confirm(
+          `Import these projects as separate copies, keeping current work? ${names || "(empty backup)"}`
+        )
+      ) {
+        const affected = session
+          .getProjects()
+          .map((project) => text.safe(project.name))
+          .join(", ");
+        if (
+          !localization.confirm(
+            `Replace the entire local workspace, including ${affected || "all local records"}? A verified rollback checkpoint will be kept.`
+          )
+        )
+          return null;
+        mode = "replace";
+      }
+      const plan = await persistence.prepareRestore(backupRecord, { mode });
+      await persistence.commitRestore(plan);
+    } else await persistence.importAllData(backupRecord);
     session.replaceProject(null);
     session.replaceSegments([]);
     navigation.openProjects();
     navigation.clearSelection();
     await projects.load(false);
+    let indexWarning = false;
+    try {
+      await files.progress("Rebuilding resource indexes");
+      await indexes.rebuildTm();
+      await indexes.rebuildTerms();
+    } catch {
+      indexWarning = true;
+    }
     const restoredProjectIds = session
       .getProjects()
       .map((project) => project.id)
@@ -184,8 +219,8 @@ export function createProjectImportRestoreController(options) {
         `${(backupRecord.projects || []).length} project${
           (backupRecord.projects || []).length === 1 ? "" : "s"
         } restored.`,
-        `${(backupRecord.segments || []).length} segment${
-          (backupRecord.segments || []).length === 1 ? "" : "s"
+        `${backupRecord.counts?.segments ?? (backupRecord.segments || []).length} segment${
+          (backupRecord.counts?.segments ?? (backupRecord.segments || []).length) === 1 ? "" : "s"
         } restored.`
       ],
       simplified: [],
@@ -204,14 +239,15 @@ export function createProjectImportRestoreController(options) {
     presentation.renderValidation(restoreReport);
     const restoreNotes = validation.count(restoreReport);
     status.set(
-      restoreNotes
-        ? `Backup restored with ${restoreNotes} validation note${restoreNotes === 1 ? "" : "s"}`
-        : "Backup restored",
-      restoreNotes ? "dirty" : "saved"
+      indexWarning
+        ? "Restore completed; indexes need repair"
+        : restoreNotes
+          ? `Backup restored with ${restoreNotes} validation note${restoreNotes === 1 ? "" : "s"}`
+          : "Backup restored",
+      indexWarning || restoreNotes ? "dirty" : "saved"
     );
     return { backup: backupRecord, report: restoreReport };
   }
-
   async function restoreBackupFile(file) {
     await files.progress("Reading backup file", file);
     return restoreBackupData(await files.parseJson(file, "Backup file"));

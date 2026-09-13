@@ -28,7 +28,7 @@ module.exports = [
     ignores: ["dist/**", "dist-web/**", ".cache/**", "node_modules/**", "test-artifacts/**"]
   },
   {
-    files: ["src/**/*.js", "config/**/*.js"],
+    files: ["src/**/*.js", "config/**/*.js", "storage.js", "workspace-storage.js", "worker-client.js", "regex-worker.js", "ai.js", "docx.js", "localization.js", "project.js"],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: "module",
@@ -44,7 +44,8 @@ module.exports = [
   },
   {
     files: [
-      "desktop/runtime-settings.cjs",
+      "desktop/**/*.cjs",
+      "scripts/opus-cat-web-bridge.cjs",
       "scripts/build-renderer.cjs",
       "scripts/verify-renderer-build.cjs",
       "scripts/verify-electron-fuses.cjs",

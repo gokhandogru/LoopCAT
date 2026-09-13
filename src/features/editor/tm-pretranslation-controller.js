@@ -9,7 +9,7 @@
  *   editorSessionStore: { getProject: () => any, getSegments: () => any[] },
  *   segments: { getDocumentSegments: () => any[], isLocked: (segment: any) => boolean },
  *   threshold: { request: () => Promise<any> | any },
- *   tm: { getNames: (project: any) => string[], findMatchesBatch: (options: any[]) => Promise<any[]> },
+ *   tm: { getNames: (project: any) => string[], getLinks?: (project: any) => any[], context?: (segment: any) => object, findMatchesBatch: (options: any[]) => Promise<any[]> },
  *   commands: { bus: { execute: (command: any) => Promise<any> }, create: (options: object) => any, changed: () => void },
  *   persistence: { flush: (projectId: string) => Promise<unknown>, save: (segments: any[]) => Promise<unknown> },
  *   mutation: { capturePatch: (segment: any) => any, applyTarget: (segment: any, target: string, status: string, reason: string) => void, touch: (segment: any) => unknown, restore: (segment: any, snapshot: any) => void, prepareHistory: (segment: any) => unknown },
@@ -142,27 +142,42 @@ export function createTmPretranslationController(options) {
       status.set("Pretranslating...");
       await presentation.yieldToUi();
       const tmNames = tm.getNames(editorSessionStore.getProject());
-      const uniqueSources = Array.from(new Set(candidates.map((segment) => segment.source)));
+      const hasResourceLinks = typeof tm.getLinks === "function";
+      const resourceLinks = hasResourceLinks ? tm.getLinks(editorSessionStore.getProject()) || [] : [];
+      const hasContext = typeof tm.context === "function";
+      const lookupKeyBySegment = new Map();
+      const uniqueLookups = Array.from(
+        new Map(
+          candidates.map((segment) => {
+            const context = hasContext ? tm.context(segment) || {} : null;
+            const key = hasContext ? `${segment.source}\u0000${JSON.stringify(context)}` : segment.source;
+            lookupKeyBySegment.set(segment.id, key);
+            return [key, { key, source: segment.source, context }];
+          })
+        ).values()
+      );
       const matchesBySource = new Map();
-      for (let offset = 0; offset < uniqueSources.length; offset += batchSize) {
-        const sources = uniqueSources.slice(offset, offset + batchSize);
-        const matchOptions = sources.map((source) => ({
-          source,
+      for (let offset = 0; offset < uniqueLookups.length; offset += batchSize) {
+        const lookups = uniqueLookups.slice(offset, offset + batchSize);
+        const matchOptions = lookups.map((lookup) => ({
+          source: lookup.source,
           sourceLang: editorSessionStore.getProject().sourceLang,
           targetLang: editorSessionStore.getProject().targetLang,
           tmNames,
+          ...(hasResourceLinks ? { resourceLinks } : {}),
+          ...(hasContext ? { context: lookup.context } : {}),
           limit: 1
         }));
         const batches = await tm.findMatchesBatch(matchOptions);
-        sources.forEach((source, index) => matchesBySource.set(source, batches[index]?.[0] || null));
-        const completed = Math.min(offset + sources.length, uniqueSources.length);
-        status.set(`Pretranslating... ${completed}/${uniqueSources.length}`);
+        lookups.forEach((lookup, index) => matchesBySource.set(lookup.key, batches[index]?.[0] || null));
+        const completed = Math.min(offset + lookups.length, uniqueLookups.length);
+        status.set(`Pretranslating... ${completed}/${uniqueLookups.length}`);
         await presentation.yieldToUi();
       }
 
       const proposals = [];
       for (const segment of candidates) {
-        const match = matchesBySource.get(segment.source);
+        const match = matchesBySource.get(lookupKeyBySegment.get(segment.id));
         if (!match || match.score < matchThreshold || !match.target?.trim()) continue;
         proposals.push({ segment, match });
       }

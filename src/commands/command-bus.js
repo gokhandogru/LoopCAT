@@ -26,6 +26,7 @@ export function createCommandBus({ undoStore }) {
   }
 
   async function execute(command, options = {}) {
+    globalThis.window?.CatHan?.ownership?.assertWritable(command?.projectId);
     if (!command?.id || typeof command.execute !== "function")
       throw new TypeError("A command ID and execute function are required.");
     const result = await command.execute();
@@ -37,6 +38,7 @@ export function createCommandBus({ undoStore }) {
     execute,
     recordApplied,
     async undo(projectId) {
+      globalThis.window?.CatHan?.ownership?.assertWritable(projectId);
       const item = undoStore.popUndo(projectId);
       if (!item) return null;
       try {
@@ -49,6 +51,7 @@ export function createCommandBus({ undoStore }) {
       }
     },
     async redo(projectId) {
+      globalThis.window?.CatHan?.ownership?.assertWritable(projectId);
       const item = undoStore.popRedo(projectId);
       if (!item) return null;
       try {

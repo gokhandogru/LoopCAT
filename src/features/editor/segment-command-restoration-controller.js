@@ -6,14 +6,15 @@
  * @param {{
  *   editorSessionStore: { getSegments: () => any[], replaceSegmentAt: (index: number, segment: any) => unknown },
  *   targetState: { capturePatch: (segment: any) => any, applyPatch: (segment: any, patch: any) => any, prepareHistory: (segment: any) => any },
- *   autosave: { clear: (segment: any) => unknown },
- *   persistence: { save: (segment: any) => Promise<unknown>, saveMany: (segments: any[]) => Promise<unknown> },
+ *   autosave: { clear: (segment: any) => unknown, retry?: (segment: any) => unknown },
+ *   persistence: { save: (segment: any) => Promise<unknown>, saveMany: (segments: any[]) => Promise<unknown>, restoreResourceSegment?: (segment: any, current: any) => Promise<unknown> },
  *   selection: { getActiveSegment: () => any, select: (index: number, segmentId: string) => unknown, selectGrid: (index: number, segmentId: string) => unknown, inspect: (segmentId: string) => unknown, normalize: (selection: any, targetLength: number) => any, focus: (selection?: any) => unknown, navigateNext: () => Promise<unknown> },
  *   filters: { invalidate: () => void },
  *   presentation: { renderSegments: (options?: object) => void, renderProgress: (options?: object) => void, renderHistory: () => void, renderAll: () => void, refreshContext: () => Promise<unknown> },
  *   workspace: { markDirty: () => void },
  *   clone: (value: any) => any,
- *   now: () => string
+ *   now: () => string,
+ *   onPresentationError?: (error: Error) => void
  * }} options
  */
 export function createSegmentCommandRestorationController(options) {
@@ -27,6 +28,17 @@ export function createSegmentCommandRestorationController(options) {
   const workspace = options?.workspace;
   const clone = options?.clone;
   const now = options?.now;
+  function committedPresentationError(error, result) {
+    // The command bus must advance Undo/Redo after a successful commit even
+    // when a later render or context lookup fails.
+    try {
+      workspace.markDirty();
+      options.onPresentationError?.(error);
+    } catch {
+      /* Commit remains authoritative. */
+    }
+    return result;
+  }
   if (
     typeof editorSessionStore?.getSegments !== "function" ||
     typeof editorSessionStore?.replaceSegmentAt !== "function"
@@ -80,6 +92,10 @@ export function createSegmentCommandRestorationController(options) {
 
   function prepareSnapshot(snapshot, current) {
     const restored = targetState.prepareHistory(clone(snapshot));
+    // Undo/Redo compares against the current record; recreating a split/merged
+    // segment is an explicit insertion, not a stale write resurrected by retry.
+    if (current?.storageVersion !== undefined || restored.storageVersion !== undefined)
+      restored.storageVersion = current?.storageVersion || 0;
     const currentRevision = Number(current?.revision || 0);
     const snapshotRevision = Number(restored.revision || 0);
     restored.revision =
@@ -97,6 +113,7 @@ export function createSegmentCommandRestorationController(options) {
     const segment = editorSessionStore.getSegments()[index];
     const currentPatch = targetState.capturePatch(segment);
     const previousStatus = segment.status || (segment.target?.trim() ? "draft" : "empty");
+    let committed = false;
     try {
       const restoredPatch = clone(nextPatch);
       restoredPatch.revision = Math.max(Number(currentPatch.revision || 0), Number(restoredPatch.revision || 0)) + 1;
@@ -104,6 +121,7 @@ export function createSegmentCommandRestorationController(options) {
       targetState.applyPatch(segment, restoredPatch);
       autosave.clear(segment);
       await persistence.save(segment);
+      committed = true;
       selection.selectGrid(index, segment.id);
       selection.inspect(segment.id);
       filters.invalidate();
@@ -123,7 +141,14 @@ export function createSegmentCommandRestorationController(options) {
         selection: targetSelection
       };
     } catch (error) {
+      if (committed)
+        return committedPresentationError(error, {
+          recoveryToken: segmentId,
+          activeSegmentId: segment.id,
+          focusTarget: false
+        });
       targetState.applyPatch(segment, currentPatch);
+      autosave.retry?.(segment);
       filters.invalidate();
       presentation.renderSegments({ preserveScroll: true });
       presentation.renderProgress();
@@ -146,6 +171,7 @@ export function createSegmentCommandRestorationController(options) {
       return index;
     });
     const previousActiveId = selection.getActiveSegment()?.id || "";
+    let committed = false;
     try {
       const restored = patches.map((patch, offset) => {
         const segment = editorSessionStore.getSegments()[indexes[offset]];
@@ -158,6 +184,7 @@ export function createSegmentCommandRestorationController(options) {
         return segment;
       });
       await persistence.saveMany(restored);
+      committed = true;
       const requestedActiveId = restoreOptions.activeSegmentId || previousActiveId || restored[0]?.id || "";
       const requestedIndex = segmentIndex(requestedActiveId);
       if (requestedIndex >= 0) {
@@ -175,9 +202,19 @@ export function createSegmentCommandRestorationController(options) {
         focusTarget: true
       };
     } catch (error) {
+      if (committed)
+        return committedPresentationError(error, {
+          patches: segmentIds.map((id) => targetState.capturePatch(editorSessionStore.getSegments()[segmentIndex(id)])),
+          affectedCount: segmentIds.length,
+          activeSegmentId: selection.getActiveSegment()?.id || ""
+        });
       currentById.forEach((patch, segmentId) => {
         const index = segmentIndex(segmentId);
-        if (index >= 0) targetState.applyPatch(editorSessionStore.getSegments()[index], patch);
+        if (index >= 0) {
+          const segment = editorSessionStore.getSegments()[index];
+          targetState.applyPatch(segment, patch);
+          autosave.retry?.(segment);
+        }
       });
       filters.invalidate();
       presentation.renderAll();
@@ -186,6 +223,7 @@ export function createSegmentCommandRestorationController(options) {
   }
 
   async function restoreSnapshots(nextSnapshots, restoreOptions = {}) {
+    let committed = false;
     const snapshots = Array.isArray(nextSnapshots) ? nextSnapshots : [];
     const currentById = new Map();
     const indexes = [];
@@ -204,6 +242,7 @@ export function createSegmentCommandRestorationController(options) {
         return next;
       });
       await persistence.saveMany(restored);
+      committed = true;
       const requestedActiveId = restoreOptions.activeSegmentId || previousActiveId || restored[0]?.id || "";
       const requestedIndex = segmentIndex(requestedActiveId);
       if (requestedIndex >= 0) {
@@ -218,9 +257,17 @@ export function createSegmentCommandRestorationController(options) {
         activeSegmentId: selection.getActiveSegment()?.id || restored[0]?.id || ""
       };
     } catch (error) {
+      if (committed)
+        return committedPresentationError(error, {
+          snapshots: snapshots.map((snapshot) => clone(editorSessionStore.getSegments()[segmentIndex(snapshot.id)])),
+          activeSegmentId: selection.getActiveSegment()?.id || ""
+        });
       for (const [segmentId, snapshot] of currentById) {
         const index = segmentIndex(segmentId);
-        if (index >= 0) editorSessionStore.replaceSegmentAt(index, targetState.prepareHistory(snapshot));
+        if (index >= 0) {
+          editorSessionStore.replaceSegmentAt(index, targetState.prepareHistory(snapshot));
+          autosave.retry?.(editorSessionStore.getSegments()[index]);
+        }
       }
       presentation.renderAll();
       throw error;
@@ -228,6 +275,7 @@ export function createSegmentCommandRestorationController(options) {
   }
 
   async function restoreSnapshot(segmentId, nextSnapshot, restoreOptions = {}) {
+    let committed = false;
     const index = segmentIndex(segmentId);
     if (index < 0) throw new Error("The affected segment is no longer available.");
     const currentSnapshot = clone(editorSessionStore.getSegments()[index]);
@@ -235,7 +283,10 @@ export function createSegmentCommandRestorationController(options) {
       const restored = prepareSnapshot(nextSnapshot, currentSnapshot);
       editorSessionStore.replaceSegmentAt(index, restored);
       autosave.clear(restored);
-      await persistence.save(restored);
+      if (restoreOptions.resourceAware && typeof persistence.restoreResourceSegment === "function") {
+        await persistence.restoreResourceSegment(restored, currentSnapshot);
+      } else await persistence.save(restored);
+      committed = true;
       selection.selectGrid(index, restored.id);
       selection.inspect(restored.id);
       workspace.markDirty();
@@ -248,7 +299,13 @@ export function createSegmentCommandRestorationController(options) {
         activeSegmentId: selection.getActiveSegment()?.id || restored.id
       };
     } catch (error) {
+      if (committed)
+        return committedPresentationError(error, {
+          snapshot: clone(editorSessionStore.getSegments()[index]),
+          activeSegmentId: segmentId
+        });
       editorSessionStore.replaceSegmentAt(index, targetState.prepareHistory(currentSnapshot));
+      autosave.retry?.(editorSessionStore.getSegments()[index]);
       presentation.renderAll();
       throw error;
     }

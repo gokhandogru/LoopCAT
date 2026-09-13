@@ -21,6 +21,7 @@ export function createApplicationSaveStatusController({ redaction, model, contex
   let noticeTimer = 0;
   let persistent = false;
   let revision = 0;
+  let persistenceNotice = null;
 
   function cancelTimer() {
     if (noticeTimer) timers.clear(noticeTimer);
@@ -45,6 +46,10 @@ export function createApplicationSaveStatusController({ redaction, model, contex
   }
 
   function set(text, mode = "") {
+    if (persistenceNotice) {
+      text = persistenceNotice.text;
+      mode = persistenceNotice.mode;
+    }
     cancelTimer();
     const noticeRevision = ++revision;
     const displayText = redaction.sanitize(text || "").trim();
@@ -58,7 +63,7 @@ export function createApplicationSaveStatusController({ redaction, model, contex
     view.setClass(`save-status ${mode}`);
     const operationActive =
       mode !== "saved" && OPERATION_PATTERN.test(displayText) && !COMPLETED_PATTERN.test(displayText);
-    persistent = operationActive || PENDING_SAVE_PATTERN.test(displayText);
+    persistent = Boolean(persistenceNotice) || operationActive || PENDING_SAVE_PATTERN.test(displayText);
     view.setBusy(String(operationActive));
     if (displayText && !persistent) {
       noticeTimer = timers.set(() => {
@@ -69,5 +74,10 @@ export function createApplicationSaveStatusController({ redaction, model, contex
     }
   }
 
-  return Object.freeze({ set, navigationChanged });
+  function setPersistence(text, mode = "") {
+    if (mode === "saved") persistenceNotice = null;
+    else if (!/^(Unsaved changes|\d+ save pending|Saving\.{3})$/i.test(text)) persistenceNotice = { text, mode };
+    set(text, mode);
+  }
+  return Object.freeze({ set, setPersistence, navigationChanged });
 }

@@ -243,20 +243,14 @@ test("primary AI project brief persistence failure restores exact project and pr
   assert.match(harness.statuses.at(-1)[0], /project write failed/);
 });
 
-test("post-save AI administration failure restores in-memory project state and visible style input", async () => {
+test("post-save AI administration failure preserves the committed brief", async () => {
   const { createAiProjectBriefController } = await loadFactory();
   const harness = createHarness(createAiProjectBriefController, {
     administrationError: new Error("form refresh failed")
   });
-  const before = structuredClone(harness.getProject());
-
-  assert.equal(await harness.controller.generate(), false);
-  assert.deepEqual(harness.getProject(), before);
-  assert.deepEqual(harness.getProjects()[0], before);
-  assert.deepEqual(harness.calls.filter(([name]) => name === "setStyleGuide").at(-1), [
-    "setStyleGuide",
-    "Keep UI labels concise."
-  ]);
+  assert.equal(await harness.controller.generate(), true);
+  assert.match(harness.getProject().aiSettings.styleGuide, /AI project brief/);
+  assert.deepEqual(harness.getProjects()[0], harness.getProject());
   assert.match(harness.statuses.at(-1)[0], /form refresh failed/);
 });
 

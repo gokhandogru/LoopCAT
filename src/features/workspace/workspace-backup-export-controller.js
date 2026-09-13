@@ -5,8 +5,8 @@
  *
  * @param {{
  *   connection: { isConnected: () => boolean },
- *   build: { buildBackupExport: () => Promise<{ backup: any, validation: any }> },
- *   storage: { exportFullBackup: (backup: any) => Promise<any>, getStatus: () => Promise<any> },
+ *   build: { buildBackupExport: (options?: any) => Promise<{ backup: any, validation: any }> },
+ *   storage: { exportFullBackup: (backup: any, options?: any) => Promise<any>, getStatus: () => Promise<any> },
  *   workspace: { setStatus: (status: any) => unknown },
  *   validation: { count: (report: any) => number, errorReport: (message: string) => any },
  *   presentation: { renderWorkspaceStatus: () => unknown, renderValidation: (report: any) => unknown },
@@ -39,11 +39,11 @@ export function createWorkspaceBackupExportController(options) {
     );
   }
 
-  async function exportBackup() {
+  async function exportBackup(exportOptions = {}) {
     if (!connection.isConnected()) return;
     try {
-      const { backup, validation: validationReport } = await build.buildBackupExport();
-      const reference = await storage.exportFullBackup(backup);
+      const { backup, validation: validationReport } = await build.buildBackupExport({ format: "archive" });
+      const reference = await storage.exportFullBackup(backup, exportOptions);
       const workspaceStatus = await storage.getStatus();
       workspace.setStatus(workspaceStatus);
       presentation.renderWorkspaceStatus();

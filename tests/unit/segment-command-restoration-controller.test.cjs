@@ -6,6 +6,17 @@ const test = require("node:test");
 const root = path.resolve(__dirname, "../..");
 const moduleAt = (relativePath) => import(pathToFileURL(path.join(root, relativePath)).href);
 
+test("R4 explicit structural restoration uses current storage versions and insertion version for removed segments", async () => {
+  const { createSegmentCommandRestorationController } = await moduleAt(
+    "src/features/editor/segment-command-restoration-controller.js"
+  );
+  const harness = createHarness(createSegmentCommandRestorationController);
+  const snapshot = { id: "s", revision: 3, storageVersion: 7 };
+  assert.equal(harness.controller.prepareSnapshot(snapshot, { revision: 5, storageVersion: 12 }).storageVersion, 12);
+  assert.equal(harness.controller.prepareSnapshot(snapshot, undefined).storageVersion, 0);
+  assert.equal(snapshot.storageVersion, 7);
+});
+
 function createHarness(createSegmentCommandRestorationController, overrides = {}) {
   const calls = [];
   const originalSegments = overrides.segments || [
@@ -52,7 +63,10 @@ function createHarness(createSegmentCommandRestorationController, overrides = {}
         return segment;
       }
     },
-    autosave: { clear: (segment) => calls.push(["clear", segment.id]) },
+    autosave: {
+      clear: (segment) => calls.push(["clear", segment.id]),
+      ...(overrides.retry ? { retry: overrides.retry } : {})
+    },
     persistence: {
       save(segment) {
         calls.push(["save", segment.id]);
@@ -99,7 +113,7 @@ function createHarness(createSegmentCommandRestorationController, overrides = {}
       renderAll: () => calls.push(["renderAll"]),
       refreshContext: () => {
         calls.push(["refreshContext"]);
-        return Promise.resolve();
+        return overrides.refreshError ? Promise.reject(overrides.refreshError) : Promise.resolve();
       }
     },
     workspace: { markDirty: () => calls.push(["markDirty"]) },
@@ -128,6 +142,23 @@ test("SegmentCommandRestorationController prepares isolated snapshots with finit
   assert.deepEqual(restored.targetHistory, []);
   snapshot.target = "Changed later";
   assert.equal(restored.target, "Restored");
+});
+
+test("R6 failed Undo requeues the restored unsaved target; post-commit UI failure still completes Undo", async () => {
+  const { createSegmentCommandRestorationController } = await moduleAt(
+    "src/features/editor/segment-command-restoration-controller.js"
+  );
+  const retried = [];
+  const failed = createHarness(createSegmentCommandRestorationController, {
+    saveError: new Error("quota"),
+    retry: (segment) => retried.push(structuredClone(segment))
+  });
+  await assert.rejects(failed.controller.restorePatch("s1", { target: "Undo target" }), /quota/);
+  assert.equal(retried[0].target, "First");
+  const committed = createHarness(createSegmentCommandRestorationController, { refreshError: new Error("UI failed") });
+  const result = await committed.controller.restorePatch("s1", { target: "Undo committed" });
+  assert.equal(result.recoveryToken, "s1");
+  assert.equal(committed.segments[0].target, "Undo committed");
 });
 
 test("SegmentCommandRestorationController restores one target patch with exact selection and presentation recovery", async () => {

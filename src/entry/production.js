@@ -1,4 +1,5 @@
 import "../../storage.js";
+import "../features/import-export/install-archive-adapter.js";
 import "../../workspace-storage.js";
 import "../../protected-tags.js";
 import "../features/import-export/install-lazy-docx-module.js";

@@ -40,7 +40,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
   const waitFor = async (predicate, label) => {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 10000) {
-      const value = predicate();
+      const value = await predicate();
       if (value) return value;
       await delay(50);
     }
@@ -65,11 +65,17 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(Boolean(document.querySelector('link[rel="manifest"]')), "installable app manifest linked");
     const workflowDatabase = await storageApi.openDatabase();
     assert(
-      workflowDatabase.version === 6 &&
+      workflowDatabase.version === 8 &&
         workflowDatabase.objectStoreNames.contains("trashEntries") &&
-        storageConstants.PROJECT_PACKAGE_SCHEMA_VERSION === 5 &&
-        storageConstants.BACKUP_SCHEMA_VERSION === 6,
-      "schema 6 adds Trash while project packages remain schema 5"
+        workflowDatabase.objectStoreNames.contains("journal") &&
+        workflowDatabase.objectStoreNames.contains("checkpoints") &&
+        workflowDatabase.objectStoreNames.contains("resources") &&
+        workflowDatabase.objectStoreNames.contains("tmContributions") &&
+        workflowDatabase.objectStoreNames.contains("termConcepts") &&
+        workflowDatabase.objectStoreNames.contains("termDesignations") &&
+        storageConstants.PROJECT_PACKAGE_SCHEMA_VERSION === 6 &&
+        storageConstants.BACKUP_SCHEMA_VERSION === 7,
+      "schema 8 adds durable shared resources while portable schemas remain versioned independently"
     );
     const productionMockAiSelector = "#mock" + "AiSuggestionBtn";
     assert(!document.querySelector(productionMockAiSelector), "production UI does not expose mock AI suggestions");
@@ -362,7 +368,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "OPUS-CAT help close restores focus to the visible connection-help entry point"
     );
     opusCatHelpController.setVisible(false);
-    const legacyDialogSettings = projectResourceSelectionController.collect({
+    const malformedDialogProject = {
       ...editorSessionStore.getProject(),
       resourceLinks: [
         null,
@@ -370,13 +376,16 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         { id: "legacy-dialog-invalid-link", type: "glossary", name: "Ignored glossary" },
         { id: "legacy-dialog-tb", type: "termbase", name: projectResourceContextService.primaryTermBase(editorSessionStore.getProject()) }
       ]
-    });
+    };
+    projectResourceSelectionController.prepare(malformedDialogProject);
+    const legacyDialogSettings = projectResourceSelectionController.collect(malformedDialogProject);
     assert(
       legacyDialogSettings.resourceLinks.some((link) => link.id === "legacy-dialog-main-tm") &&
         legacyDialogSettings.resourceLinks.some((link) => link.id === "legacy-dialog-tb") &&
         !legacyDialogSettings.resourceLinks.some((link) => link.type === "glossary"),
       "project settings dialog tolerates malformed legacy resource links"
     );
+    projectResourceSelectionController.prepare(editorSessionStore.getProject());
     document.querySelector("#projectDomainInput").value = "Settings activity warning";
     if (els.saveProjectToFolderInput) els.saveProjectToFolderInput.checked = false;
     segmentTargetStateService.setHiddenField(els.projectForm, PROJECT_SETTINGS_ACTIVITY_FAILURE_TEST_FLAG, true);
@@ -750,6 +759,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       document.querySelectorAll("#newProjectBtn").length === 1 && !document.querySelector("#newProjectFromDashboardBtn"),
       "Projects view exposes one non-duplicated New project action"
     );
+    applicationSaveStatusController.set("Checking save status layout", "saved");
     const saveStatusStyle = getComputedStyle(els.saveStatus);
     assert(
       saveStatusStyle.display.endsWith("flex") && saveStatusStyle.alignItems === "center" && saveStatusStyle.justifyContent === "center",
@@ -989,7 +999,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       restoreGuardError.includes("Simulated pending save flush failure") &&
         editorSessionStore.getProject()?.id === project.id &&
         autosaveService.has(editorSessionStore.getSegments()[segmentIndex].id),
-      "backup restore stops before destructive restore when pending save flush fails"
+      `backup restore stops before destructive restore when pending save flush fails (error=${restoreGuardError || "none"}; active=${editorSessionStore.getProject()?.id === project.id}; pending=${autosaveService.has(editorSessionStore.getSegments()[segmentIndex]?.id)}; validation=${JSON.stringify(validateBackupFile(restoreGuardBackup).errors)})`
     );
     Reflect.deleteProperty(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG);
     await autosaveService.flush(project.id);
@@ -1029,7 +1039,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     };
     HTMLAnchorElement.prototype.click = function noopDownloadClick() {};
     try {
-      els.backupExportBtn.click();
+      document.getElementById("backupJsonExportBtn").click();
       const backupDownload = await waitFor(() => capturedDownloads.find((item) => item.type === "application/json"), "backup download");
       const backup = JSON.parse(backupDownload.text);
       assert((backup.segments || []).some((segment) => segment.target === backupTargetText), "browser backup flushes pending segment edits");
@@ -2710,7 +2720,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       Reflect.deleteProperty(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG);
       Storage.prototype.setItem = function setItemWithOpenAiFailure(key, value) {
-        if (this === localStorage && key === OPENAI_KEY_STORAGE && value === "sk-browser-storage-failure") {
+        if (this === sessionStorage && key === OPENAI_KEY_STORAGE && value === "sk-browser-storage-failure") {
           throw new Error("Simulated browser OpenAI key storage failure");
         }
         return originalStorageSetItem.call(this, key, value);
@@ -3710,14 +3720,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const previousLocalAiKeyFieldValue = els.localAiApiKeyInput?.value || "";
     try {
       if (els.localAiApiKeyInput) els.localAiApiKeyInput.value = "";
-      saveLocalAiKey("deepseek-provider-scoped-key", true, deepSeekKeySettings);
-      saveLocalAiKey("gemini-provider-scoped-key", false, geminiKeySettings);
+      await saveLocalAiKey("deepseek-provider-scoped-key", true, deepSeekKeySettings);
+      await saveLocalAiKey("gemini-provider-scoped-key", false, geminiKeySettings);
       assert(
         storedLocalAiKey(deepSeekKeySettings) === "deepseek-provider-scoped-key" &&
           storedLocalAiKey(geminiKeySettings) === "gemini-provider-scoped-key" &&
           localAiRuntimeConfig(deepSeekKeySettings).apiKey === "deepseek-provider-scoped-key" &&
           localAiRuntimeConfig(geminiKeySettings).apiKey === "gemini-provider-scoped-key" &&
-          localAiKeyStorageLabel(deepSeekKeySettings).includes("this provider") &&
+          localAiKeyStorageLabel(deepSeekKeySettings).includes("tab and provider") &&
           localAiKeyStorageLabel(geminiKeySettings).includes("tab and provider") &&
           !localStorage.getItem(LOCAL_AI_KEY_STORAGE) &&
           !sessionStorage.getItem(LOCAL_AI_KEY_STORAGE),
@@ -3871,11 +3881,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await segmentConfirmationController.confirm();
     const persistedAfterConfirmTmFailure = (await getProjectSegments(project.id)).find((segment) => segment.id === confirmRollbackSegment.id);
     assert(
-      els.saveStatus.textContent.includes("TM save failed") &&
-        editorSessionStore.getSegments()[segmentIndex].status === "confirmed" &&
-        persistedAfterConfirmTmFailure?.status === "confirmed" &&
-        state.workspaceDirtyProjectIds.has(project.id),
-      "confirm TM save failure keeps segment confirmed and reports warning"
+      els.saveStatus.textContent.includes("Simulated TM save failure") &&
+        editorSessionStore.getSegments()[segmentIndex].status === "draft" &&
+        persistedAfterConfirmTmFailure?.status === "draft",
+      "atomic confirm TM failure preserves the persisted draft"
     );
     Reflect.deleteProperty(confirmRollbackSegment, SAVE_TM_FAILURE_TEST_FLAG);
     await segmentNavigationController.select(segmentIndex);
@@ -3891,7 +3900,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         editorSessionStore.getSegments()[segmentIndex].status === "confirmed" &&
         persistedAfterConfirmActivityFailure?.status === "confirmed" &&
         state.workspaceDirtyProjectIds.has(project.id),
-      "confirm activity log failure keeps segment confirmed and reports warning"
+      `confirm activity log failure keeps segment confirmed and reports warning (${els.saveStatus.textContent}; live=${editorSessionStore.getSegments()[segmentIndex].status}; stored=${persistedAfterConfirmActivityFailure?.status})`
     );
     Reflect.deleteProperty(confirmRollbackSegment, CONFIRM_ACTIVITY_FAILURE_TEST_FLAG);
 
@@ -3945,11 +3954,17 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.qualityDecisionNoteInput.value = "Quality evidence note";
     const qualityDecisionSubmitEvent = new Event("submit", { bubbles: true, cancelable: true });
     const qualityDecisionSubmitResult = els.qualityDecisionForm.dispatchEvent(qualityDecisionSubmitEvent);
-    await waitFor(
-      () => (applicationActiveSegmentService.get()?.comments || []).length === qualityDecisionCommentCount + 1,
-      "checked quality decision form submit"
-    );
-    const storedQualityDecisionSegment = (await getProjectSegments(project.id)).find((segment) => segment.id === qualityDecisionSegment?.id);
+    let storedQualityDecisionSegment = null;
+    await waitFor(async () => {
+      if ((applicationActiveSegmentService.get()?.comments || []).length !== qualityDecisionCommentCount + 1) return false;
+      storedQualityDecisionSegment = (await getProjectSegments(project.id)).find(
+        (segment) => segment.id === qualityDecisionSegment?.id
+      );
+      return (
+        storedQualityDecisionSegment?.reviewState === "needs-review" &&
+        (storedQualityDecisionSegment?.comments || []).length === qualityDecisionCommentCount + 1
+      );
+    }, "checked quality decision persistence");
     assert(
       !qualityDecisionSubmitResult && qualityDecisionSubmitEvent.defaultPrevented,
       "checked quality/review controller delegates quality decision save"
@@ -4409,7 +4424,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       await resourceCatalogRefreshController.refresh();
       const xmlDownloadsBeforeResourceTmx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      resourceLibraryExportController.exportResource("tm", `${projectResourceContextService.mainTm()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
+      resourceLibraryExportController.exportResource("tm", projectResourceContextService.mainTmLink()?.resourceId);
       const resourceTmxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
       const resourceTmxDownload = resourceTmxDownloads[resourceTmxDownloads.length - 1];
       const resourceTmxText = await resourceTmxDownload.blob.text();
@@ -4433,7 +4448,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       await resourceCatalogRefreshController.refresh();
       const xmlDownloadsBeforeResourceTbx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      resourceLibraryExportController.exportResource("tb", `${projectResourceContextService.primaryTermBase()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
+      const primaryTermbaseName = projectResourceContextService.primaryTermBase();
+      const primaryTermbaseLink = projectResourceContextService
+        .lookupTermbaseLinks()
+        .find((link) => link.name === primaryTermbaseName);
+      resourceLibraryExportController.exportResource("tb", primaryTermbaseLink?.resourceId);
       const resourceTbxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
       const resourceTbxDownload = resourceTbxDownloads[resourceTbxDownloads.length - 1];
       const resourceTbxText = await resourceTbxDownload.blob.text();
@@ -4789,6 +4808,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         (await storageApi.get("trashEntries", atomicConflictTrashId))?.entityType === "project",
       "resource Trash transaction conflict rolls back every live record and preserves the existing Trash item"
     );
+    // Resolve the deliberate conflict through the production retry action before
+    // testing independent command warnings. Unrelated notices cannot clear it.
+    document.getElementById("retryLocalSaveBtn").click();
+    await new Promise((resolve) => setTimeout(resolve, 50));
     await storageApi.deleteByKey("trashEntries", atomicConflictTrashId);
     RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.add(`tm:${bulkTmKey}`);
     const failedBulkTmDelete = await resourceMutationController.deleteResource("tm", bulkTmKey);
@@ -4887,7 +4910,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     const resourceTrashBackup = await exportAllData();
     assert(
-      resourceTrashBackup.schemaVersion === 6 &&
+      resourceTrashBackup.schemaVersion === storageConstants.BACKUP_SCHEMA_VERSION &&
         resourceTrashBackup.trashEntries.some(
           (entry) => entry.entityType === "translation-memory" && entry.payload?.records?.length === 2
         ) &&
@@ -4896,7 +4919,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         ) &&
         !resourceTrashBackup.tmEntries.some((entry) => entry.tmName === bulkTmName) &&
         !resourceTrashBackup.terms.some((term) => term.termBaseName === bulkTbName),
-      "schema-6 backup preserves resource Trash while project-package schema remains independent"
+      "current backup schema preserves resource Trash while project-package schema remains independent"
     );
 
     await projectDocumentImportController.importLocalization(new File([JSON.stringify({ title: "Package source JSON" })], "workflow-structure.json", { type: "application/json" }));
@@ -4932,7 +4955,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       targetEditController.updateDraft(segmentIndex, packageFlushFailureText);
       segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[segmentIndex], FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG, true);
       const packageDownloadCountBeforeFlushFailure = packageDownloads.length;
-      await projectExportController.exportProjectPackage();
+      await projectExportController.exportProjectPackage({ format: "json" });
       assert(
         els.saveStatus.textContent.includes("Simulated pending save flush failure") &&
           autosaveService.has(editorSessionStore.getSegments()[segmentIndex].id) &&
@@ -4945,7 +4968,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       URL.createObjectURL = () => {
         throw new Error("Simulated package download failure");
       };
-      await projectExportController.exportProjectPackage();
+      await projectExportController.exportProjectPackage({ format: "json" });
       assert(
         els.saveStatus.textContent.includes("Simulated package download failure") &&
           !(editorSessionStore.getProject().exportHistory || []).some((entry) => entry.type === "project-package") &&
@@ -4959,7 +4982,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const packageExportTargetText = `Paket dis aktariminda saklanan hedef ${Date.now()}`;
       targetEditController.updateDraft(segmentIndex, packageExportTargetText);
       assert(autosaveService.has(editorSessionStore.getSegments()[segmentIndex].id), "pending save exists before project package export");
-      await projectExportController.exportProjectPackage();
+      await projectExportController.exportProjectPackage({ format: "json" });
       const packageDownload = await waitFor(() => packageDownloads.find((item) => item.type === "application/json" && item.text.includes('"type": "project-package"')), "project package download");
       const exportedPackage = JSON.parse(packageDownload.text);
       assert((exportedPackage.segments || []).some((segment) => segment.target === packageExportTargetText), "project package export flushes pending segment edits");
@@ -4971,7 +4994,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           exportedPackage.sourceAssets?.some((asset) => asset.name === "workflow-structure.csv" && asset.originalAvailable && asset.structurePreserved),
         "project package source assets report JSON and CSV reconstruction data"
       );
-      assert(els.backupReminderPanel.classList.contains("hidden"), "project package export clears backup reminder");
+      assert(!els.backupReminderPanel.classList.contains("hidden"), "unverified anchor download preserves the backup reminder");
     } finally {
       URL.createObjectURL = originalPackageCreateObjectUrl;
       HTMLAnchorElement.prototype.click = originalPackageAnchorClick;
@@ -5447,7 +5470,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
 
     const restoreDirtyBackup = await exportAllData();
     workspaceDirtyStateController.clearAll();
-    const restoreDirtyResult = await projectImportRestoreController.restoreBackupData(restoreDirtyBackup);
+    let restoreDirtyResult;
+    const originalRestoreConfirm = window.confirm;
+    window.confirm = (message) => !message.startsWith("Import these projects as separate copies");
+    try { restoreDirtyResult = await projectImportRestoreController.restoreBackupData(restoreDirtyBackup); }
+    finally { window.confirm = originalRestoreConfirm; }
     assert(restoreDirtyResult && restoreDirtyBackup.projects.every((item) => state.workspaceDirtyProjectIds.has(item.id)) && state.lastValidationReport?.risky?.some((item) => item.includes("must be saved to the workspace folder")), "manual backup restore marks connected workspace packages dirty");
 
     workspaceDirtyStateController.clearAll();
@@ -5630,7 +5657,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       sourceName: "invalid-shape.loopcat.json",
       suppressAlert: true
     });
-    assert(!invalidPackageShapeResult && els.saveStatus.textContent === "Project package import failed validation", "invalid project package shape reports failed import status");
+    assert(!invalidPackageShapeResult && els.saveStatus.textContent === "Project package import failed validation", `invalid project package shape reports failed import status (${els.saveStatus.textContent})`);
 
     const originalListWorkspacePackages = workspaceStorage.listProjectPackages;
     const originalReadWorkspacePackage = workspaceStorage.readProjectPackage;
@@ -5697,7 +5724,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const originalWarningSyncListWorkspacePackages = workspaceStorage.listProjectPackages;
     const originalWarningSyncReadWorkspacePackage = workspaceStorage.readProjectPackage;
     const originalWarningSyncWorkspaceStatus = state.workspaceStatus;
-    const workspaceWarningPackage = await projectExportBuildService.buildProjectPackage({
+    const workspaceWarningProject = await storageApi.put("projects", {
       ...project,
       id: `workspace-warning-${Date.now()}`,
       name: `Workspace Warning ${Date.now()}`,
@@ -5711,7 +5738,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         enabled: true,
         sendSourceToAi: true
       })
-    }, []);
+    });
+    const workspaceWarningPackage = await projectExportBuildService.buildProjectPackage(workspaceWarningProject, []);
+    await deleteProject(workspaceWarningProject.id);
     workspaceStorage.listProjectPackages = async () => [{
       id: workspaceWarningPackage.project.id,
       name: workspaceWarningPackage.project.name,
@@ -5887,7 +5916,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       documentName: structuralDocument.name,
       documentType: structuralDocument.type
     });
-    editorSessionStore.replaceProject(await updateProject({ ...editorSessionStore.getProject(), documents: [...(editorSessionStore.getProject().documents || []), structuralDocument] }));
+    // appendProjectSegments commits the document manifest with the segments.
+    editorSessionStore.replaceProject(await storageApi.get("projects", project.id));
     editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((item) => (item.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : item)));
     editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(project.id)));
     await projectDocumentOpenController.open(structuralDocument.id);

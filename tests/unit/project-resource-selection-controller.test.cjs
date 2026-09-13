@@ -43,6 +43,15 @@ function createHarness(createProjectResourceSelectionController, overrides = {})
       return { dataset: { mainTm: state.main } };
     }
   };
+  if (overrides.modern) {
+    elements.projectNameInput = { value: overrides.projectName || "New project" };
+    elements.resourceDialog = {
+      addEventListener() {},
+      showModal: () => calls.push(["showResourceDialog"])
+    };
+    elements.resourceForm = { addEventListener() {} };
+    elements.dialog.close = (value) => calls.push(["closeProjectDialog", value]);
+  }
   let id = 0;
   const tmMatches = overrides.tmMatches || [];
   const tbMatches = overrides.tbMatches || [];
@@ -84,6 +93,8 @@ function createHarness(createProjectResourceSelectionController, overrides = {})
     catalog: {
       matching(type, sourceLang, targetLang, selectedNames) {
         calls.push(["matching", type, sourceLang, targetLang, selectedNames]);
+        if (typeof overrides.matching === "function")
+          return overrides.matching(type, sourceLang, targetLang, selectedNames);
         return type === "tm" ? tmMatches : tbMatches;
       }
     },
@@ -124,6 +135,37 @@ test("ProjectResourceSelectionController preserves normalized dialog values and 
     () => createProjectResourceSelectionController({}),
     /requires the source-language input|requires dialog, resource, catalog/
   );
+});
+
+test("modern resource setup does not echo new drafts as existing catalog resources", async () => {
+  const { createProjectResourceSelectionController } = await moduleAt(
+    "src/features/projects/project-resource-selection-controller.js"
+  );
+  const { calls, controller } = createHarness(createProjectResourceSelectionController, {
+    modern: true,
+    projectName: "Resource QA",
+    matching: (type, sourceLang, targetLang, selectedNames) =>
+      selectedNames.map((name) => ({
+        id: `catalog-${type}-${name}`,
+        resourceId: `catalog-${type}-${name}`,
+        type: type === "tm" ? "tm" : "termbase",
+        name,
+        sourceLang,
+        targetLang,
+        count: 0
+      }))
+  });
+
+  controller.prepare();
+  assert.equal(controller.open(), true);
+
+  assert.deepEqual(
+    calls.filter(([name]) => name === "matching").map((call) => call[4]),
+    [[], []]
+  );
+  const tmHtml = calls.find((entry) => entry[0] === "replaceSafeHtml" && entry[1] === "tm-list")[2];
+  assert.equal((tmHtml.match(/data-policy-row=/g) || []).length, 1);
+  assert.match(tmHtml, /New — created with project/);
 });
 
 test("ProjectResourceSelectionController preserves no-language early return without replacing picker content", async () => {

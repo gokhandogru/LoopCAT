@@ -83,13 +83,45 @@ function statusError(runtime, data, status) {
 async function requestJson(runtime, action, params = {}, options = {}, config = {}) {
   const baseUrl = runtime.normalizeOpusCatBaseUrl(config.baseUrl || runtime.OPUS_CAT_DEFAULT_BASE_URL);
   const queryString = query(params);
-  const url = `${runtime.opusCatApiUrl(baseUrl, action)}${queryString ? `?${queryString}` : ""}`;
+  let url = `${runtime.opusCatApiUrl(baseUrl, action)}${queryString ? `?${queryString}` : ""}`;
   let result = null;
   try {
+    if (new URL(baseUrl).port === "8502") {
+      if (globalThis.location?.origin === "null")
+        throw new Error("Serve LoopCAT from a permitted HTTP/HTTPS origin to use the browser bridge.");
+      const key = `loopcat-opus-session:${new URL(baseUrl).origin}`;
+      let capability = globalThis.sessionStorage?.getItem(key);
+      if (!capability) {
+        const session = await runtime.fetchJsonWithTimeout(
+          `${new URL(baseUrl).origin}/loopcat-session`,
+          { method: "GET" },
+          config
+        );
+        if (!session.response?.ok || !session.data?.capability) throw new Error("Bridge session authorization failed.");
+        capability = session.data.capability;
+        globalThis.sessionStorage?.setItem(key, capability);
+      }
+      url = runtime.opusCatApiUrl(baseUrl, action);
+      options = {
+        ...options,
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-LoopCAT-Capability": capability },
+        body: JSON.stringify(params)
+      };
+    }
     result = await runtime.fetchJsonWithTimeout(url, options, config);
+    if (new URL(baseUrl).port === "8502" && result.response?.status === 403 && !config.bridgeRetried) {
+      globalThis.sessionStorage?.removeItem(`loopcat-opus-session:${new URL(baseUrl).origin}`);
+      return requestJson(runtime, action, params, options, { ...config, bridgeRetried: true });
+    }
   } catch (error) {
     const message = String(error?.message || "");
-    if (message.includes("canceled") || message.includes("timed out")) throw error;
+    if (
+      message.includes("canceled") ||
+      message.includes("timed out") ||
+      message.includes("permitted HTTP/HTTPS origin")
+    )
+      throw error;
     throw new Error(`OPUS-CAT MT Engine is not reachable at ${baseUrl}. Start OPUS-CAT MT Engine and try again.`);
   }
   if (!result.response?.ok) throw new Error(statusError(runtime, result.data, result.response?.status));

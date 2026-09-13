@@ -71,7 +71,12 @@ test("OPUS-CAT adapter preserves direct and bridge discovery, bounded probes, ca
   const { createOpusCatProviderAdapter, installOpusCatProviderAdapter } = await moduleAt(
     "src/ai/providers/opus-cat-provider-adapter.js"
   );
-  const runtime = createRuntime([new Error("direct failed"), new Error("ipv4 failed"), ok(["en-tr", "de-fr"])]);
+  const runtime = createRuntime([
+    new Error("direct failed"),
+    new Error("ipv4 failed"),
+    ok({ capability: "session-capability" }),
+    ok(["en-tr", "de-fr"])
+  ]);
   const provider = createOpusCatProviderAdapter(runtime);
   const connected = await provider.testConnection({ baseUrl: "http://localhost:8500", timeoutMs: 9000 });
   assert.equal(connected.baseUrl, "http://127.0.0.1:8502");
@@ -80,7 +85,10 @@ test("OPUS-CAT adapter preserves direct and bridge discovery, bounded probes, ca
   assert.equal(connected.modelCount, 2);
   assert.equal(connected.version, "2 pairs");
   assert.equal(runtime.calls[0].config.timeoutMs, 5000);
-  assert.equal(runtime.calls[2].url, "http://127.0.0.1:8502/MTRestService/ListSupportedLanguagePairs?tokenCode=0");
+  assert.equal(runtime.calls[2].url, "http://127.0.0.1:8502/loopcat-session");
+  assert.equal(runtime.calls[3].url, "http://127.0.0.1:8502/MTRestService/ListSupportedLanguagePairs");
+  assert.equal(runtime.calls[3].options.method, "POST");
+  assert.equal(runtime.calls[3].options.headers["X-LoopCAT-Capability"], "session-capability");
 
   const registered = [];
   const ai = {

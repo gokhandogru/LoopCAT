@@ -68,6 +68,7 @@ function createHarness(createAutosaveService, overrides = {}) {
       savedNotifications += 1;
     },
     testHooks: overrides.testHooks,
+    now: overrides.now,
     setTimer: scheduler.setTimer,
     clearTimer: scheduler.clearTimer
   });
@@ -107,6 +108,53 @@ test("autosave debounce coalesces timers and persists the latest EditorSessionSt
   assert.equal(harness.service.size(), 0);
   assert.deepEqual(harness.statuses.at(-1), ["Saved", "saved"]);
   assert.equal(harness.savedNotifications(), 1);
+});
+
+test("R2 overlapping flushes await in-flight immutable revisions and preserve a newer edit on failure", async () => {
+  const { createAutosaveService } = await loadFactory();
+  let rejectWrite;
+  const writes = [];
+  const harness = createHarness(createAutosaveService, {
+    saveMany: (records) => {
+      writes.push(records);
+      return writes.length === 1
+        ? new Promise((resolve, reject) => {
+            rejectWrite = reject;
+          })
+        : Promise.resolve();
+    }
+  });
+  const segment = { id: "s", projectId: "p", target: "first" };
+  harness.service.debounce(segment);
+  const first = harness.service.flush("p");
+  const second = harness.service.flush("p");
+  let finished = false;
+  const outcomes = Promise.allSettled([first, second]).then((result) => {
+    finished = true;
+    return result;
+  });
+  await Promise.resolve();
+  assert.equal(finished, false);
+  assert.equal(harness.service.size(), 1);
+  segment.target = "newest";
+  harness.service.debounce(segment);
+  assert.equal(writes[0][0].target, "first");
+  rejectWrite(new Error("quota exceeded"));
+  assert.ok((await outcomes).every((result) => result.status === "rejected"));
+  assert.equal(harness.service.pendingRecords()[0].segment.target, "newest");
+  await harness.service.flush("p");
+  assert.equal(writes[1][0].target, "newest");
+  assert.equal(harness.service.size(), 0);
+});
+
+test("continuous typing requests a checkpoint within two seconds", async () => {
+  const { createAutosaveService } = await loadFactory();
+  let now = 0;
+  const harness = createHarness(createAutosaveService, { now: () => now });
+  for (now = 0; now <= 1800; now += 200) harness.service.debounce({ id: "s", projectId: "p", target: String(now) });
+  assert.equal(harness.scheduler.active()[0].delay, 200);
+  await harness.scheduler.runNext();
+  assert.equal(harness.saved[0].target, "1800");
 });
 
 test("timed autosave failure remains pending and retries after two seconds", async () => {

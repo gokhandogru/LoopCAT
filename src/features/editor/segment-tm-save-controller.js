@@ -6,7 +6,7 @@
  * @param {{
  *   session: { getProject: () => any },
  *   selection: { getActiveSegment: () => any },
- *   tm: { saveEntry: (entry: object) => Promise<any>, mainName: (project: any) => string, refreshMatches: () => Promise<unknown> },
+ *   tm: { saveEntry: (entry: object) => Promise<any>, mainName: (project: any) => string, mainLink?: (project: any) => any, refreshMatches: () => Promise<unknown> },
  *   workspace: { markDirty: (projectId: string) => void },
  *   status: { set: (message: string, mode?: string) => void },
  *   testHooks?: { beforeSave?: (segment: any) => void }
@@ -37,13 +37,15 @@ export function createSegmentTmSaveController(options) {
   async function save(segment, project = session.getProject()) {
     if (!segment || !project || !segment.source.trim() || !segment.target.trim()) return null;
     beforeSave(segment);
+    const resourceId = tm.mainLink?.(project)?.resourceId || "";
     const entry = await tm.saveEntry({
       source: segment.source,
       target: segment.target,
       sourceLang: project.sourceLang,
       targetLang: project.targetLang,
       projectName: project.name,
-      tmName: tm.mainName(project)
+      tmName: tm.mainName(project),
+      ...(resourceId ? { resourceId } : {})
     });
     workspace.markDirty(project.id);
     return entry;

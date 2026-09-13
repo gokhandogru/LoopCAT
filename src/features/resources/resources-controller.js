@@ -22,6 +22,11 @@ function resourceType(value) {
  *   importTm?: (file: File) => Promise<unknown>,
  *   importTb?: (file: File) => Promise<unknown>,
  *   importTermList?: (file: File) => Promise<unknown>,
+ *   createResource?: (type: "tm" | "tb", values: any) => Promise<unknown>,
+ *   renameResource?: (type: "tm" | "tb", id: string) => Promise<unknown>,
+ *   duplicateResource?: (type: "tm" | "tb", id: string) => Promise<unknown>,
+ *   setResourceArchived?: (type: "tm" | "tb", id: string, archived: boolean) => Promise<unknown>,
+ *   addEntry?: (type: "tm" | "tb", resourceId: string) => Promise<unknown>,
  *   deleteResource?: (type: "tm" | "tb", key: string) => Promise<boolean>,
  *   exportResource?: (type: "tm" | "tb", key: string) => Promise<unknown> | unknown,
  *   saveTmEntry?: (entry: any, values: { source: string, target: string }) => Promise<boolean>,
@@ -59,6 +64,7 @@ export function createResourcesController(options) {
   let openKey = null;
   let tmEntries = [];
   let terms = [];
+  let resourceRecords = [];
 
   function listen(target, eventType, listener) {
     if (!target?.addEventListener) return;
@@ -67,7 +73,13 @@ export function createResourcesController(options) {
   }
 
   function snapshot() {
-    return Object.freeze({ type, openKey, tmEntries: [...tmEntries], terms: [...terms] });
+    return Object.freeze({
+      type,
+      openKey,
+      tmEntries: [...tmEntries],
+      terms: [...terms],
+      resources: [...resourceRecords]
+    });
   }
 
   function syncTabs() {
@@ -125,7 +137,9 @@ export function createResourcesController(options) {
   function setResources(resources = {}, renderAfter = true) {
     tmEntries = Array.isArray(resources.tmEntries) ? resources.tmEntries : [];
     terms = Array.isArray(resources.terms) ? resources.terms : [];
-    if (openKey && !items(type, openKey).length) openKey = null;
+    resourceRecords = Array.isArray(resources.resources) ? resources.resources : [];
+    if (openKey && !items(type, openKey).length && !resourceRecords.some((resource) => resource.id === openKey))
+      openKey = null;
     if (renderAfter) render();
     return snapshot();
   }
@@ -223,6 +237,15 @@ export function createResourcesController(options) {
         await options.exportResource?.(actionType, key);
         return;
       }
+      if (["rename", "duplicate", "archive", "restore"].includes(action) && button.dataset.resourceId) {
+        if (action === "rename") await options.renameResource?.(actionType, button.dataset.resourceId);
+        if (action === "duplicate") await options.duplicateResource?.(actionType, button.dataset.resourceId);
+        if (["archive", "restore"].includes(action)) {
+          await options.setResourceArchived?.(actionType, button.dataset.resourceId, action === "archive");
+        }
+        await options.navigate?.();
+        return;
+      }
       if (action === "delete-resource") {
         const deleted = await options.deleteResource?.(actionType, key);
         if (deleted) scheduleFrame(() => (actionType === "tm" ? tmTab : tbTab).focus?.());
@@ -255,6 +278,14 @@ export function createResourcesController(options) {
     const actionType = resourceType(button.dataset.resourceType || type);
     if (action === "close-detail") {
       closeResource();
+      return;
+    }
+    if (action === "add-entry") {
+      try {
+        await options.addEntry?.(actionType, String(button.dataset.resourceId || openKey || ""));
+      } catch (error) {
+        reportError(error, { phase: "detail-add-entry", type: actionType });
+      }
       return;
     }
     const row = button.closest?.("[data-resource-row]");
@@ -310,6 +341,19 @@ export function createResourcesController(options) {
     }
   }
 
+  async function createEmptyResource(actionType) {
+    const isTm = actionType === "tm";
+    const nameInput = isTm ? elements.tmNameInput : elements.tbNameInput;
+    const sourceInput = isTm ? elements.tmSourceLanguageInput : elements.tbSourceLanguageInput;
+    const targetInput = isTm ? elements.tmTargetLanguageInput : elements.tbTargetLanguageInput;
+    const name = String(nameInput?.value || "").trim();
+    const sourceLang = options.normalizeLanguageInput?.(sourceInput) || String(sourceInput?.value || "").trim();
+    const targetLang = options.normalizeLanguageInput?.(targetInput) || String(targetInput?.value || "").trim();
+    if (!name || !sourceLang || !targetLang) throw new Error("Enter a resource name and both languages first.");
+    await options.createResource?.(actionType, { name, sourceLang, targetLang });
+    await options.navigate?.();
+  }
+
   function handleTabKeydown(event) {
     if (!new Set(["ArrowLeft", "ArrowRight", "Home", "End"]).has(event.key)) return;
     event.preventDefault?.();
@@ -357,6 +401,16 @@ export function createResourcesController(options) {
       termListImportInput,
       "change",
       () => void handleImport(termListImportInput, "Term list resource import", options.importTermList, "tb")
+    );
+    listen(
+      elements.createTmButton,
+      "click",
+      () => void createEmptyResource("tm").catch((error) => reportError(error, { phase: "create", type: "tm" }))
+    );
+    listen(
+      elements.createTbButton,
+      "click",
+      () => void createEmptyResource("tb").catch((error) => reportError(error, { phase: "create", type: "tb" }))
     );
     mounted = true;
     syncTabs();

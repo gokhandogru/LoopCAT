@@ -30,10 +30,11 @@ import { validateResourceLibraryImportControllerOptions } from "./resource-libra
  *   },
  *   repositories: {
  *     importTmEntries: (entries: any[], options: any) => Promise<any>,
- *     importTerms: (terms: any[], options: any) => Promise<any>
+ *     importTerms: (terms: any[], options: any) => Promise<any>,
+ *     createResource?: (resource: any) => Promise<any>
  *   },
  *   resources: {
- *     markProjectsUsingDirty: (type: string, name: string, sourceLang: string, targetLang: string) => unknown,
+ *     markProjectsUsingDirty: (type: string, name: string, sourceLang: string, targetLang: string, resourceId?: string) => unknown,
  *     open: (type: string, key: string, options: { render: boolean, focus: boolean }) => unknown,
  *     refresh: () => Promise<any>,
  *     refreshProjectTerms: (options: { rerender: boolean }) => Promise<any>
@@ -81,6 +82,11 @@ export function createResourceLibraryImportController(options) {
       files.reportProgress(phase, file, files.progressDetail(progress.saved, progress.total, label(progress.saved)));
   }
 
+  function markProjectsUsingResource(type, name, sourceLang, targetLang, resourceId = "") {
+    if (resourceId) return resources.markProjectsUsingDirty(type, name, sourceLang, targetLang, resourceId);
+    return resources.markProjectsUsingDirty(type, name, sourceLang, targetLang);
+  }
+
   async function parseTermListFile(file, parseOptions) {
     const isWorkbook =
       /\.xlsx$/i.test(file?.name || "") ||
@@ -113,16 +119,30 @@ export function createResourceLibraryImportController(options) {
           )
       }
     );
-    await files.reportProgress("Saving TM resource entries", file, `${entries.length} ${entryLabel(entries.length)}`);
-    await repositories.importTmEntries(entries, {
+    const resource =
+      typeof repositories.createResource === "function"
+        ? await repositories.createResource({ type: "tm", name: tmName, sourceLang, targetLang })
+        : { id: "", name: tmName };
+    const resourceEntries = entries.map((entry) => ({
+      ...entry,
+      resourceId: resource.id || entry.resourceId || "",
+      tmName: resource.name || tmName,
+      isSeeded: true
+    }));
+    await files.reportProgress(
+      "Saving TM resource entries",
+      file,
+      `${resourceEntries.length} ${entryLabel(resourceEntries.length)}`
+    );
+    await repositories.importTmEntries(resourceEntries, {
       onProgress: importProgress(file, "Saving TM resource entries", entryLabel),
       onIndexProgress: importProgress(file, "Indexing TM resource entries", () => "index rows")
     });
-    resources.markProjectsUsingDirty("tm", tmName, sourceLang, targetLang);
+    markProjectsUsingResource("tm", resource.name || tmName, sourceLang, targetLang, resource.id);
     await files.reportProgress("Refreshing resources", file);
-    resources.open("tm", `${tmName}::${sourceLang}::${targetLang}`, { render: false, focus: false });
+    resources.open("tm", resource.id || `${tmName}::${sourceLang}::${targetLang}`, { render: false, focus: false });
     await resources.refresh();
-    status.set(`Imported ${entries.length} TM entries`, "saved");
+    status.set(`Imported ${resourceEntries.length} TM entries`, "saved");
   }
 
   async function importTbx(file) {
@@ -153,14 +173,33 @@ export function createResourceLibraryImportController(options) {
   }
 
   async function saveTermbaseTerms(file, terms, { termBaseName, sourceLang, targetLang }) {
-    await files.reportProgress("Saving termbase resource terms", file, `${terms.length} ${termLabel(terms.length)}`);
-    await repositories.importTerms(terms, {
+    const resource =
+      typeof repositories.createResource === "function"
+        ? await repositories.createResource({
+            type: "termbase",
+            name: termBaseName,
+            sourceLang,
+            targetLang,
+            languages: [sourceLang, targetLang]
+          })
+        : { id: "", name: termBaseName };
+    const resourceTerms = terms.map((term) => ({
+      ...term,
+      resourceId: resource.id || term.resourceId || "",
+      termBaseName: resource.name || termBaseName
+    }));
+    await files.reportProgress(
+      "Saving termbase resource terms",
+      file,
+      `${resourceTerms.length} ${termLabel(resourceTerms.length)}`
+    );
+    await repositories.importTerms(resourceTerms, {
       onProgress: importProgress(file, "Saving termbase resource terms", termLabel),
       onIndexProgress: importProgress(file, "Indexing termbase resource terms", () => "index rows")
     });
-    resources.markProjectsUsingDirty("termbase", termBaseName, sourceLang, targetLang);
+    markProjectsUsingResource("termbase", resource.name || termBaseName, sourceLang, targetLang, resource.id);
     await files.reportProgress("Refreshing resources", file);
-    resources.open("tb", `${termBaseName}::${sourceLang}::${targetLang}`, {
+    resources.open("tb", resource.id || `${termBaseName}::${sourceLang}::${targetLang}`, {
       render: false,
       focus: false
     });

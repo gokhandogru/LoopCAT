@@ -2,6 +2,14 @@ function errorMessage(error, fallback) {
   return error?.message || String(error || fallback) || fallback;
 }
 
+function tmDocumentContextKey(segment, documentIndex = -1) {
+  const explicit = String(segment?.contextKey || "").trim();
+  if (explicit) return explicit;
+  const documentName = String(segment?.documentName || segment?.documentId || "").trim();
+  const stableIndex = Number.isFinite(Number(segment?.index)) ? Number(segment.index) : documentIndex;
+  return documentName && stableIndex >= 0 ? `${documentName}#${stableIndex}` : documentName;
+}
+
 /**
  * Owns segment-confirmation UI, busy, validation, command, navigation, and
  * recovery orchestration. Segment records remain owned by EditorSessionStore;
@@ -15,9 +23,9 @@ function errorMessage(error, fallback) {
  *   selection: { getActiveIndex: () => number, focusTarget: () => void, goToNextOpen: () => Promise<unknown> },
  *   validation: { missingTags: (segment: any) => any[], tagLabel: (tag: any) => string },
  *   filters: { matches: (segment: any) => boolean },
- *   mutation: { confirm: (segment: any) => void, restore: (segment: any, snapshot: any) => void, preparePersistedRollback: (segment: any, savedRevision: number) => void },
- *   persistence: { clearPending: (segment: any) => void, save: (segment: any) => Promise<unknown>, saveToTm: (segment: any, project: any) => Promise<unknown>, logActivity: (segment: any, project: any) => Promise<unknown> },
- *   restoration: { restoreCommand: (segmentId: string, snapshot: any, options: { navigateNext: boolean }) => Promise<unknown> | unknown },
+ *   mutation: { confirm: (segment: any) => void, restore: (segment: any, snapshot: any) => void, preparePersistedRollback: (segment: any, savedRevision: number, savedStorageVersion?: number) => void },
+ *   persistence: { clearPending: (segment: any) => void, save: (segment: any) => Promise<unknown>, confirmAtomic?: (project: any, segment: any, context: object) => Promise<unknown>, saveToTm: (segment: any, project: any) => Promise<unknown>, logActivity: (segment: any, project: any) => Promise<unknown> },
+ *   restoration: { restoreCommand: (segmentId: string, snapshot: any, options: { navigateNext: boolean, resourceAware?: boolean }) => Promise<unknown> | unknown },
  *   view: { updateRow: (index: number) => void, renderSegments: (options?: object) => void, renderProgress: (options?: object) => void, scheduleHistory: () => void, renderHistory: () => void },
  *   workspace: { markDirty: (projectId?: string) => void },
  *   status: { set: (message: string, mode?: string) => void },
@@ -160,6 +168,7 @@ export function createSegmentConfirmationController(options) {
     const passedFiltersBefore = filters.matches(segment);
     const previous = structuredClone(segment);
     let savedConfirmedRevision = 0;
+    let savedConfirmedStorageVersion = 0;
     const warnings = [];
     confirmingSegmentIds.add(segment.id);
     renderBusy();
@@ -170,7 +179,10 @@ export function createSegmentConfirmationController(options) {
         segmentId: segment.id,
         beforeSnapshot: previous,
         restoreSnapshot: (snapshot, context) =>
-          restoration.restoreCommand(segment.id, snapshot, { navigateNext: context.direction === "redo" }),
+          restoration.restoreCommand(segment.id, snapshot, {
+            navigateNext: context.direction === "redo",
+            resourceAware: true
+          }),
         applyFirst: async () => {
           mutation.confirm(segment);
           persistence.clearPending(segment);
@@ -180,8 +192,20 @@ export function createSegmentConfirmationController(options) {
           view.renderProgress({ previousStatus, nextStatus: segment.status });
           view.scheduleHistory();
           beforeSave(segment);
-          await persistence.save(segment);
+          const documentSegments = editorSessionStore
+            .getSegments()
+            .filter((item) => item.documentId === segment.documentId);
+          const documentIndex = documentSegments.findIndex((item) => item.id === segment.id);
+          const context = {
+            documentKey: tmDocumentContextKey(segment, documentIndex),
+            previousSource: documentSegments[documentIndex - 1]?.source || "",
+            nextSource: documentSegments[documentIndex + 1]?.source || ""
+          };
+          const atomicConfirmation = typeof persistence.confirmAtomic === "function";
+          if (atomicConfirmation) await persistence.confirmAtomic(project, segment, context);
+          else await persistence.save(segment);
           savedConfirmedRevision = Number(segment.revision || 0);
+          savedConfirmedStorageVersion = Number(segment.storageVersion || 0);
           afterSave(segment);
           workspace.markDirty(project.id);
 
@@ -191,7 +215,9 @@ export function createSegmentConfirmationController(options) {
           });
           renderBusy();
 
-          const tmResult = settledSecondary(() => persistence.saveToTm(segment, project), "Confirm TM save failed.");
+          const tmResult = atomicConfirmation
+            ? Promise.resolve(true)
+            : settledSecondary(() => persistence.saveToTm(segment, project), "Confirm TM save failed.");
           const activityResult = Promise.resolve()
             .then(() => {
               beforeActivity(segment);
@@ -222,7 +248,7 @@ export function createSegmentConfirmationController(options) {
     } catch (error) {
       mutation.restore(segment, previous);
       if (savedConfirmedRevision) {
-        mutation.preparePersistedRollback(segment, savedConfirmedRevision);
+        mutation.preparePersistedRollback(segment, savedConfirmedRevision, savedConfirmedStorageVersion);
         try {
           await persistence.save(segment);
         } catch (rollbackError) {

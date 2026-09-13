@@ -3,7 +3,7 @@
  * matching policy. Resource state ownership, item sorting, presentation,
  * persistence, and project linking remain outside this service.
  *
- * @param {{ getState: () => { tmEntries?: any[], terms?: any[] } | null | undefined }} options
+ * @param {{ getState: () => { tmEntries?: any[], terms?: any[], resources?: any[] } | null | undefined }} options
  */
 export function createResourceCatalogService(options) {
   const getState = options?.getState;
@@ -56,11 +56,41 @@ export function createResourceCatalogService(options) {
 
   function matching(type, sourceLang, targetLang, selectedNames = []) {
     const isTm = type === "tm";
-    const resourceState = getState() || { tmEntries: [], terms: [] };
-    const summaries = summarize(
-      isTm ? resourceState.tmEntries || [] : resourceState.terms || [],
-      isTm ? "tmName" : "termBaseName"
-    ).filter((resource) => resource.sourceLang === sourceLang && resource.targetLang === targetLang);
+    const resourceState = getState() || { tmEntries: [], terms: [], resources: [] };
+    const items = isTm ? resourceState.tmEntries || [] : resourceState.terms || [];
+    const resourceType = isTm ? "tm" : "termbase";
+    const stableResources = (resourceState.resources || []).filter((resource) => {
+      if (resource.type !== resourceType || resource.archived) return false;
+      return isTm
+        ? resource.sourceLang === sourceLang && resource.targetLang === targetLang
+        : Array.isArray(resource.languages)
+          ? resource.languages.includes(sourceLang) && resource.languages.includes(targetLang)
+          : resource.sourceLang === sourceLang && resource.targetLang === targetLang;
+    });
+    /** @type {any[]} */
+    const summaries = stableResources.map((resource) => ({
+      key: resource.id,
+      id: resource.id,
+      resourceId: resource.id,
+      name: resource.name,
+      sourceLang: resource.sourceLang,
+      targetLang: resource.targetLang,
+      languages: resource.languages || [resource.sourceLang, resource.targetLang],
+      languagePair: resource.languagePair || `${resource.sourceLang}::${resource.targetLang}`,
+      count: items.filter(
+        (item) =>
+          item.resourceId === resource.id ||
+          (!item.resourceId && item[isTm ? "tmName" : "termBaseName"] === resource.name)
+      ).length,
+      updatedAt: resource.updatedAt || resource.createdAt || ""
+    }));
+    if (!stableResources.length) {
+      summaries.push(
+        ...summarize(items, isTm ? "tmName" : "termBaseName").filter(
+          (resource) => resource.sourceLang === sourceLang && resource.targetLang === targetLang
+        )
+      );
+    }
     selectedNames.forEach((name) => {
       if (summaries.some((resource) => resource.name === name)) return;
       summaries.push({

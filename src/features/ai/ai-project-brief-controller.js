@@ -55,9 +55,12 @@ export function createAiProjectBriefController(options) {
   }
 
   async function generate() {
-    const project = editorSessionStore.getProject();
+    let project = editorSessionStore.getProject();
     if (!project || lifecycle.isRunning() || promptBusy || lifecycle.isPromptBusy()) return false;
     const settings = await settingsBoundary.persist();
+    const savedSettingsProject = editorSessionStore.getProject();
+    if (savedSettingsProject?.id !== project.id) return false;
+    project = savedSettingsProject;
     let config = null;
     try {
       config = settingsBoundary.runtimeConfig(settings);
@@ -91,6 +94,7 @@ export function createAiProjectBriefController(options) {
     }
 
     const projectSnapshot = structuredClone(project);
+    let committed = false;
     promptBusy = true;
     syncLifecycle();
     presentation.renderCommandCentre();
@@ -119,6 +123,7 @@ export function createAiProjectBriefController(options) {
         styleGuide: nextStyleGuide
       });
       const savedProject = await persistence.updateProject({ ...project, aiSettings });
+      committed = true;
       editorSessionStore.replaceProject(savedProject);
       replaceProjectInList(savedProject);
       workspace.markDirty();
@@ -143,6 +148,10 @@ export function createAiProjectBriefController(options) {
       );
       return true;
     } catch (error) {
+      if (committed) {
+        status.set(`Project brief saved; display refresh failed: ${error.message}`, "dirty");
+        return true;
+      }
       editorSessionStore.replaceProject(projectSnapshot);
       replaceProjectInList(projectSnapshot);
       administration.setStyleGuide(

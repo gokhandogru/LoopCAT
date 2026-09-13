@@ -19,6 +19,7 @@
     "icons/loopcat-loopbird-mono.svg",
     "icons/loopcat-icon.png",
     "cat-worker.js",
+    "regex-worker.js",
     "app.js"
   ]);
   const offlineAssets = Object.freeze([...runtimeAssets, "LICENSE", "NOTICE"]);

@@ -10,7 +10,7 @@
  *   build: { buildProjectPackage: (project?: any, segments?: any[] | null, options?: any) => Promise<any>, assertValidProjectPackageForWrite: (pkg: any, action: string) => unknown },
  *   projects: { knownById: (projectId: string) => any, list: () => Promise<any[]> },
  *   activity: { draft: (project: any, type: string, summary: string, detail?: any) => any, bulkPut: (storeName: string, records: any[]) => Promise<unknown>, list: (projectId: string) => Promise<any[]> },
- *   workspace: { isConnected: () => boolean, setStatus: (status: any) => unknown, markMissingLocalDirty: () => Promise<number>, clearDirty: (projectId: string) => unknown, markDirty: (projectId?: string) => unknown, hasDirty: () => boolean, dirtyIds: () => string[], recoveryIds: () => string[], isAutosaving: () => boolean, setAutosaving: (value: boolean) => unknown, getAutosaveTimer: () => any, setAutosaveTimer: (timer: any) => unknown },
+ *   workspace: { isConnected: () => boolean, setStatus: (status: any) => unknown, markMissingLocalDirty: () => Promise<number>, clearDirty: (projectId: string, generation?: number) => unknown, generation?: (projectId: string) => number, markDirty: (projectId?: string) => unknown, hasDirty: () => boolean, dirtyIds: () => string[], recoveryIds: () => string[], isAutosaving: () => boolean, setAutosaving: (value: boolean) => unknown, getAutosaveTimer: () => any, setAutosaveTimer: (timer: any) => unknown },
  *   validation: { count: (report: any) => number },
  *   presentation: { renderWorkspaceStatus: () => unknown, renderValidation: (report: any) => unknown, renderBackupReminder: () => unknown, renderRecovery: () => unknown },
  *   status: { set: (message: string, mode?: string) => unknown },
@@ -98,16 +98,31 @@ export function createWorkspacePackageSaveController(options) {
     );
   }
 
-  async function saveById(projectId, saveOptions = {}) {
+  const projectWrites = new Map();
+
+  function saveById(projectId, saveOptions = {}) {
+    const previous = projectWrites.get(projectId) || Promise.resolve();
+    const write = previous.catch(() => {}).then(() => saveGeneration(projectId, saveOptions));
+    projectWrites.set(projectId, write);
+    const cleanup = () => {
+      if (projectWrites.get(projectId) === write) projectWrites.delete(projectId);
+    };
+    write.then(cleanup, cleanup);
+    return write;
+  }
+
+  async function saveGeneration(projectId, saveOptions = {}) {
     const project = projects.knownById(projectId) || (await projects.list()).find((item) => item.id === projectId);
     if (!project) throw new Error("Project package could not be found.");
     try {
       await autosave.flush(projectId);
+      const generation = workspace.generation?.(projectId);
       const pkg = await build.buildProjectPackage(project, null, saveOptions);
       build.assertValidProjectPackageForWrite(pkg, "save project package to workspace");
       const result = await storage.saveProjectPackage(pkg);
       if (session.getProject()?.id === projectId) workspace.setStatus(await storage.getStatus());
-      workspace.clearDirty(projectId);
+      if (generation === undefined) workspace.clearDirty(projectId);
+      else workspace.clearDirty(projectId, generation);
       return { pkg, result };
     } catch (error) {
       workspace.markDirty(projectId);

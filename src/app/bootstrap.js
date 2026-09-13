@@ -153,6 +153,8 @@ import { createAiScopeSelectionService } from "../features/ai/ai-scope-selection
 import { createExternalAiConsentService } from "../features/ai/external-ai-consent-service.js";
 import { createOpusCatHelpController } from "../features/ai/opus-cat-help-controller.js";
 import { createProjectResourceSelectionController } from "../features/projects/project-resource-selection-controller.js";
+import { createQuickTermCaptureController } from "../features/editor/quick-term-capture-controller.js";
+import { createPredictiveTypingController } from "../features/editor/predictive-typing-controller.js";
 import { createProjectLanguagePairShortcutsController } from "../features/projects/project-language-pair-shortcuts-controller.js";
 import { createProjectCollectionLoadController } from "../features/projects/project-collection-load-controller.js";
 import { createProjectDocumentOpenController } from "../features/projects/project-document-open-controller.js";
@@ -383,6 +385,8 @@ export function createApplicationRuntime({ browserWindow, compatibilityModules, 
       createProjectRecordLookupService,
       createProjectsController,
       createProjectResourceSelectionController,
+      createQuickTermCaptureController,
+      createPredictiveTypingController,
       createResourceCatalogService,
       createResourceCatalogRefreshController,
       createProjectTermRefreshController,

@@ -1,4 +1,14 @@
-const INITIAL_SAVE_STATE = Object.freeze({ status: "saved", projectId: null, segmentId: "", message: "Saved" });
+const INITIAL_SAVE_STATE = Object.freeze({
+  status: "saved",
+  projectId: null,
+  segmentId: "",
+  message: "Saved",
+  pendingCount: 0,
+  inFlightCount: 0,
+  committedGeneration: 0,
+  verifiedBackupGeneration: null,
+  durableErrors: []
+});
 
 export function createSaveStore(initialState = {}) {
   let state = { ...INITIAL_SAVE_STATE, ...initialState };
@@ -17,6 +27,7 @@ export function createSaveStore(initialState = {}) {
     setSaving: (detail) => update("saving", detail),
     setSaved: (detail) => update("saved", detail),
     setFailed: (detail) => update("failed", detail),
+    setDurability: (detail) => update(state.status, detail),
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);

@@ -117,6 +117,7 @@ function createHarness(createProjectExportController, overrides = {}) {
         downloadCount += 1;
         calls.push(["download", downloadCount, name, content, mime]);
         if (overrides.downloadErrorAt === downloadCount) throw overrides.downloadError;
+        return overrides.delivery || { written: true, verified: true };
       }
     },
     validation: {
@@ -202,6 +203,24 @@ function createHarness(createProjectExportController, overrides = {}) {
   };
 }
 
+test("R13 export completion preserves the current editor when navigation changes during the write", async () => {
+  const { createProjectExportController } = await loadFactory();
+  const harness = createHarness(createProjectExportController);
+  const other = { id: "project-2", name: "Keep current editor" };
+  harness.options.files.download = () => {
+    harness.options.session.replaceProject(other);
+    return { verified: true };
+  };
+  harness.options.persistence.getProject = () =>
+    Promise.resolve({ id: "project-1", name: "Updated during export", storageVersion: 19, exportHistory: [] });
+  await harness.service.exportProjectPackage();
+  assert.equal(harness.options.session.getProject(), other);
+  const saved = harness.calls.find(([name]) => name === "updateProject")[1];
+  assert.equal(saved.name, "Updated during export");
+  assert.equal(saved.storageVersion, 19);
+  assert.equal(saved.exportHistory.at(-1).verified, true);
+});
+
 test("ProjectExportController exports a browser backup with exact file, validation, and status effects", async () => {
   const { createProjectExportController } = await loadFactory();
   const { calls, backupRecord, backupValidation, service } = createHarness(createProjectExportController);
@@ -213,14 +232,14 @@ test("ProjectExportController exports a browser backup with exact file, validati
   assert.deepEqual(calls.slice(-3), [
     ["renderValidation", backupValidation],
     ["reportCount", backupValidation],
-    ["status", "Backup exported", "saved"]
+    ["status", "Backup verified", "saved"]
   ]);
 
   const notesHarness = createHarness(createProjectExportController, {
     backupValidation: { ok: true, noteCount: 2 }
   });
   assert.equal(await notesHarness.service.exportBrowserBackup(), true);
-  assert.deepEqual(notesHarness.calls.at(-1), ["status", "Backup exported with 2 validation notes", "dirty"]);
+  assert.deepEqual(notesHarness.calls.at(-1), ["status", "Backup verified with 2 validation notes", "dirty"]);
 });
 
 test("ProjectExportController contains browser-backup failures with report precedence and exact fallback", async () => {
@@ -230,6 +249,7 @@ test("ProjectExportController contains browser-backup failures with report prece
   const attachedHarness = createHarness(createProjectExportController, { backupBuildError: attachedError });
   assert.equal(await attachedHarness.service.exportBrowserBackup(), false);
   assert.deepEqual(attachedHarness.calls, [
+    ["now"],
     ["buildBackupExport"],
     ["renderValidation", attachedValidation],
     ["status", "Backup blocked", "dirty"]
@@ -293,12 +313,16 @@ test("ProjectExportController completes two-pass project export, history, activi
   assert.deepEqual(pendingProject.exportHistory[1], {
     id: "export-1770000000000",
     type: "project-package",
+    verified: true,
     filename: "Project-One.loopcat.json",
     warningCount: 1,
     createdAt: "2026-08-20T15:30:45.000Z"
   });
   assert.equal(projectBuilds[1][3], null);
-  assert.deepEqual(projectBuilds[1][4], { activityEvents: [harness.pendingActivityEvent] });
+  assert.deepEqual(projectBuilds[1][4], {
+    exportHistory: projectBuilds[1][2].exportHistory,
+    activityEvents: [harness.pendingActivityEvent]
+  });
   const draftCall = harness.calls.find(([name]) => name === "draftActivity");
   assert.deepEqual(draftCall.slice(2), [
     "export",
@@ -397,7 +421,7 @@ test("ProjectExportController preserves simulated and persisted activity warning
   const simulatedHarness = createHarness(createProjectExportController, { shouldFailActivity: true });
   assert.equal(await simulatedHarness.service.exportProjectPackage(), undefined);
   const finalBuild = simulatedHarness.calls.filter(([name]) => name === "buildProjectPackage")[1];
-  assert.deepEqual(finalBuild[4], { activityEvents: [] });
+  assert.deepEqual(finalBuild[4], { exportHistory: finalBuild[2].exportHistory, activityEvents: [] });
   assert.equal(
     simulatedHarness.calls.some(([name]) => name === "draftActivity"),
     false

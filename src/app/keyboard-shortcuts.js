@@ -36,6 +36,14 @@ export const KEYBOARD_SHORTCUTS = Object.freeze({
     label: "Ctrl/Cmd+Shift+S"
   }),
   "quick-insert": define("quick-insert", { key: "tab", label: "Tab" }),
+  "quick-insert-alternate": define("quick-insert-alternate", { key: "insert", alt: true, label: "Alt+Insert" }),
+  "term-capture": define("term-capture", {
+    key: "g",
+    code: "KeyG",
+    primary: true,
+    shift: true,
+    label: "Ctrl/Cmd+Shift+G"
+  }),
   concordance: define("concordance", { key: "f4", label: "F4" }),
   "concordance-alternate": define("concordance-alternate", {
     key: "k",

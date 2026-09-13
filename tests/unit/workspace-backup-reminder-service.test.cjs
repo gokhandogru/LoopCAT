@@ -245,8 +245,13 @@ test("WorkspaceBackupReminderService preserves dismiss guards, custom hours, and
 
 test("WorkspaceBackupReminderService selects the latest valid package export without mutating history", async () => {
   const { createWorkspaceBackupReminderService } = await loadFactory();
-  const oldExport = { type: "project-package", createdAt: "2026-07-01T00:00:00.000Z", marker: "old" };
-  const latestExport = { type: "project-package", createdAt: "2026-08-20T00:00:00.000Z", marker: "latest" };
+  const oldExport = { type: "project-package", verified: true, createdAt: "2026-07-01T00:00:00.000Z", marker: "old" };
+  const latestExport = {
+    type: "project-package",
+    verified: true,
+    createdAt: "2026-08-20T00:00:00.000Z",
+    marker: "latest"
+  };
   const project = {
     exportHistory: [
       oldExport,
@@ -312,7 +317,7 @@ test("WorkspaceBackupReminderService preserves every threshold and exact reminde
     /^This project is 1 day old/
   );
 
-  const recentExport = { type: "project-package", createdAt: new Date(now - 6 * DAY_MS).toISOString() };
+  const recentExport = { type: "project-package", verified: true, createdAt: new Date(now - 6 * DAY_MS).toISOString() };
   const longProject = {
     id: "exported",
     createdAt: new Date(now - 20 * DAY_MS).toISOString(),
@@ -326,7 +331,7 @@ test("WorkspaceBackupReminderService preserves every threshold and exact reminde
     null
   );
 
-  const oldExport = { type: "project-package", createdAt: new Date(now - 7 * DAY_MS).toISOString() };
+  const oldExport = { type: "project-package", verified: true, createdAt: new Date(now - 7 * DAY_MS).toISOString() };
   const staleProject = { ...longProject, exportHistory: [oldExport] };
   assert.deepEqual(info(staleProject, [{ createdAt: now.toISOString() }]), {
     reason: "1 project activity has happened since the last project package export.",

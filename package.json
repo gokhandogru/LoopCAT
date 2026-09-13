@@ -10,10 +10,10 @@
   },
   "main": "desktop/main.cjs",
   "scripts": {
-    "start": "electron .",
-    "desktop": "electron .",
+    "start": "pnpm build:renderer && electron .",
+    "desktop": "pnpm build:renderer && electron .",
     "build:renderer": "node scripts/build-renderer.cjs",
-    "lint": "eslint src config desktop/runtime-settings.cjs scripts/build-renderer.cjs scripts/verify-renderer-build.cjs scripts/verify-electron-fuses.cjs scripts/verify-import-boundaries.cjs scripts/verify-accessibility.cjs tests/unit",
+    "lint": "eslint src config desktop storage.js workspace-storage.js worker-client.js regex-worker.js ai.js docx.js localization.js project.js scripts/opus-cat-web-bridge.cjs scripts/build-renderer.cjs scripts/verify-renderer-build.cjs scripts/verify-electron-fuses.cjs scripts/verify-import-boundaries.cjs scripts/verify-accessibility.cjs tests/unit",
     "format:check": "prettier --check src config desktop/runtime-settings.cjs scripts/build-renderer.cjs scripts/verify-renderer-build.cjs scripts/verify-electron-fuses.cjs scripts/verify-import-boundaries.cjs scripts/verify-accessibility.cjs tests/component-gallery tests/unit",
     "format:write": "prettier --write src config desktop/runtime-settings.cjs scripts/build-renderer.cjs scripts/verify-renderer-build.cjs scripts/verify-electron-fuses.cjs scripts/verify-import-boundaries.cjs scripts/verify-accessibility.cjs tests/component-gallery tests/unit",
     "typecheck": "tsc --project tsconfig.json",
@@ -89,6 +89,7 @@
     "electron-builder": "26.15.3",
     "esbuild": "0.28.2",
     "eslint": "10.8.1",
+    "fake-indexeddb": "6.2.5",
     "globals": "17.4.0",
     "pixelmatch": "7.2.0",
     "pngjs": "7.0.0",
@@ -124,6 +125,8 @@
       "app.js",
       "chunks/**",
       "cat-worker.js",
+      "regex-worker.js",
+      "archive-worker.js",
       "config/production-assets.js",
       "src/ui/tokens.css",
       "src/ui/themes.css",
@@ -162,5 +165,8 @@
       "category": "Office",
       "maintainer": "Dr. Gokhan Dogru <gokhandogru@users.noreply.github.com>"
     }
+  },
+  "dependencies": {
+    "@zip.js/zip.js": "2.11.4"
   }
 }

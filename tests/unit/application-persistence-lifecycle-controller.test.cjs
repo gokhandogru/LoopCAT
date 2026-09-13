@@ -9,6 +9,51 @@ function loadFactory() {
   return import(pathToFileURL(path.join(root, "src/app/application-persistence-lifecycle-controller.js")).href);
 }
 
+test("R11 desktop close pauses editing through acknowledgement and resumes on cancellation or save failure", async () => {
+  const { createApplicationPersistenceLifecycleController } = await loadFactory();
+  const calls = [];
+  const target = createTarget(calls, "window");
+  let listener;
+  target.LoopCATDesktop = {
+    onPrepareClose: (value) => {
+      listener = value;
+      return () => {};
+    }
+  };
+  let paused = false;
+  let fail = false;
+  const controller = createApplicationPersistenceLifecycleController({
+    targets: { window: target, document: createTarget(calls, "document") },
+    visibility: { getState: () => "visible" },
+    pending: { hasImport: () => false },
+    autosave: {
+      size: () => 0,
+      flush: () => {
+        assert.equal(paused, true);
+        return fail ? Promise.reject(new Error("quota")) : Promise.resolve();
+      }
+    },
+    flushMutations: () => Promise.resolve(),
+    pauseEditing: () => {
+      paused = true;
+      return () => {
+        paused = false;
+      };
+    },
+    workspace: { hasUnsaved: () => false, autosaveDirty: () => Promise.resolve() },
+    logger: { warn() {} }
+  });
+  controller.mount();
+  await listener({ mode: "flush" });
+  assert.equal(paused, true);
+  await listener({ mode: "resume" });
+  assert.equal(paused, false);
+  fail = true;
+  await assert.rejects(listener({ mode: "flush" }), /quota/);
+  assert.equal(paused, false);
+  controller.unmount();
+});
+
 function createTarget(calls, name, options = {}) {
   const listeners = new Map();
   return {
@@ -27,6 +72,60 @@ function createTarget(calls, name, options = {}) {
     }
   };
 }
+
+test("R11 cancelled or superseded close cannot acknowledge a stale flush or release the newer editing pause", async () => {
+  const { createApplicationPersistenceLifecycleController } = await loadFactory();
+  const target = createTarget([], "window");
+  let listener;
+  target.LoopCATDesktop = {
+    onPrepareClose: (value) => {
+      listener = value;
+    }
+  };
+  const flushes = [];
+  let paused = 0;
+  const controller = createApplicationPersistenceLifecycleController({
+    targets: { window: target, document: createTarget([], "document") },
+    visibility: { getState: () => "visible" },
+    pending: { hasImport: () => false },
+    autosave: {
+      size: () => 1,
+      flush: () =>
+        new Promise((resolve) => {
+          flushes.push(resolve);
+        })
+    },
+    workspace: { hasUnsaved: () => false, autosaveDirty: () => Promise.resolve() },
+    logger: { warn() {} },
+    pauseEditing: () => {
+      paused++;
+      return () => {
+        paused--;
+      };
+    }
+  });
+  controller.mount();
+  const first = listener({ mode: "flush" });
+  const firstRejected = assert.rejects(first, /superseded/);
+  await listener({ mode: "resume" });
+  assert.equal(paused, 0);
+  const second = listener({ mode: "flush" });
+  flushes[0]();
+  await firstRejected;
+  assert.equal(paused, 1);
+  let warned = false;
+  target.dispatch("beforeunload", {
+    preventDefault() {
+      warned = true;
+    }
+  });
+  assert.equal(warned, true);
+  flushes[1]();
+  await second;
+  await listener({ mode: "resume" });
+  assert.equal(paused, 0);
+  controller.unmount();
+});
 
 function createHarness(createApplicationPersistenceLifecycleController, overrides = {}) {
   const calls = [];

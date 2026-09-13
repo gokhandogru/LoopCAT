@@ -4,10 +4,10 @@
  * resource selection, target commands, and browser DOM primitives are injected.
  *
  * @param {{
- *   elements: { overlay: any, closeButton: any, meta: any, results: any },
+ *   elements: { overlay: any, closeButton: any, meta: any, results: any, queryInput?: any, scopeSelect?: any, resourceSelect?: any, searchButton?: any },
  *   session: { getProject: () => any },
  *   navigation: { getView: () => string },
- *   tm: { listEntries: () => Promise<any[]>, getNames: () => string[] },
+ *   tm: { listEntries: () => Promise<any[]>, getNames: () => string[], getLinks?: () => any[] },
  *   resources: { summary: () => any },
  *   languages: { display: () => string },
  *   localization: { label: (key: string, values?: object) => string, source: (text: string) => string, sourceHtml: (text: string) => string },
@@ -77,6 +77,7 @@ export function createConcordanceController(options) {
   let activeIndex = 0;
   let visibleButtons = [];
   let returnTarget = null;
+  const handleSearchClick = () => void search();
 
   function selectedKeyword() {
     const selection = dom.getSelection()?.toString().trim();
@@ -116,24 +117,66 @@ export function createConcordanceController(options) {
     visibleButtons[activeIndex]?.focus?.();
   }
 
-  async function open() {
-    if (navigation.getView() !== "editor" || !session.getProject()) return;
-    const keyword = selectedKeyword();
+  function selectedResourceEntries(entries) {
+    const hasResourceLinks = typeof tm.getLinks === "function";
+    const links = hasResourceLinks ? tm.getLinks() || [] : [];
+    if (hasResourceLinks && !links.length) return [];
+    const allowedNames = new Set(
+      hasResourceLinks ? links.map((link) => link.cachedName || link.name).filter(Boolean) : tm.getNames()
+    );
+    const allowedIds = new Set(
+      links
+        .filter((link) => link.lookup !== false)
+        .map((link) => link.resourceId)
+        .filter(Boolean)
+    );
+    const selectedResourceId = elements.resourceSelect?.value || "";
+    return entries.filter(
+      (entry) =>
+        (allowedIds.has(entry.resourceId) || allowedNames.has(entry.tmName)) &&
+        (!selectedResourceId || entry.resourceId === selectedResourceId)
+    );
+  }
+
+  function renderResourceOptions() {
+    if (!elements.resourceSelect?.replaceChildren) return;
+    const current = elements.resourceSelect.value;
+    const all = dom.createElement("option");
+    all.value = "";
+    all.textContent = localization.source("All linked TMs");
+    const options = (typeof tm.getLinks === "function" ? tm.getLinks() : [])
+      .filter((link) => link.lookup !== false)
+      .map((link) => {
+        const option = dom.createElement("option");
+        option.value = link.resourceId || "";
+        option.textContent = link.cachedName || link.name;
+        return option;
+      });
+    elements.resourceSelect.replaceChildren(all, ...options);
+    if (options.some((option) => option.value === current)) elements.resourceSelect.value = current;
+  }
+
+  async function search(keyword = elements.queryInput?.value || selectedKeyword()) {
+    const project = session.getProject();
+    if (!project) return;
+    keyword = String(keyword || "")
+      .trim()
+      .replace(/\s+/g, " ");
     if (!keyword) {
       status.set("Select source or target text, then press F4 or Ctrl/Cmd+Shift+K.", "dirty");
       return;
     }
-    returnTarget = dom.getActiveElement();
+    if (elements.queryInput) elements.queryInput.value = keyword;
     const query = text.normalizeCase(keyword);
     const entries = await tm.listEntries();
-    const tmNames = new Set(tm.getNames());
-    const results = entries
+    const scope = elements.scopeSelect?.value || "source";
+    const results = selectedResourceEntries(entries)
+      .filter((entry) => entry.sourceLang === project.sourceLang && entry.targetLang === project.targetLang)
       .filter(
         (entry) =>
-          entry.sourceLang === session.getProject().sourceLang && entry.targetLang === session.getProject().targetLang
+          (scope !== "target" && text.normalizeCase(entry.source).includes(query)) ||
+          (scope !== "source" && text.normalizeCase(entry.target).includes(query))
       )
-      .filter((entry) => tmNames.has(entry.tmName))
-      .filter((entry) => text.normalizeCase(entry.source).includes(query))
       .sort(
         (left, right) =>
           new Date(right.updatedAt || right.createdAt || 0).getTime() -
@@ -188,6 +231,14 @@ export function createConcordanceController(options) {
     syncActive();
   }
 
+  async function open() {
+    if (navigation.getView() !== "editor" || !session.getProject()) return;
+    const keyword = selectedKeyword();
+    returnTarget = dom.getActiveElement();
+    renderResourceOptions();
+    await search(keyword);
+  }
+
   const handleClose = () => close();
   const handleOverlayClick = (event) => {
     if (event.target === elements.overlay) close();
@@ -218,6 +269,8 @@ export function createConcordanceController(options) {
     elements.closeButton.addEventListener("click", handleClose);
     elements.overlay.addEventListener("click", handleOverlayClick);
     elements.overlay.addEventListener("keydown", handleKeydown);
+    elements.searchButton?.addEventListener?.("click", handleSearchClick);
+    elements.queryInput?.addEventListener?.("keydown", handleSearchKeydown);
     mounted = true;
     return true;
   }
@@ -227,9 +280,17 @@ export function createConcordanceController(options) {
     elements.closeButton.removeEventListener("click", handleClose);
     elements.overlay.removeEventListener("click", handleOverlayClick);
     elements.overlay.removeEventListener("keydown", handleKeydown);
+    elements.searchButton?.removeEventListener?.("click", handleSearchClick);
+    elements.queryInput?.removeEventListener?.("keydown", handleSearchKeydown);
     mounted = false;
     return true;
   }
 
-  return Object.freeze({ close, handleKeydown, highlight, mount, open, selectedKeyword, unmount });
+  function handleSearchKeydown(event) {
+    if (event.key !== "Enter") return;
+    event.preventDefault?.();
+    void search();
+  }
+
+  return Object.freeze({ close, handleKeydown, highlight, mount, open, search, selectedKeyword, unmount });
 }

@@ -11,6 +11,8 @@ export const AI_CREDENTIAL_STORAGE_KEYS = Object.freeze({
  * remain injected.
  *
  * @param {{
+ *   secure?: { saveCredential: (request: any) => Promise<any> },
+ *   sessionOnly?: boolean,
  *   storage: { get: (kind: "local" | "session") => Storage },
  *   settings: {
  *     readLocal: () => any,
@@ -41,6 +43,31 @@ export function createAiCredentialStorageService(options) {
 
   const failures = options.failures || {};
   const logger = options.logger || console;
+  const secure = options.secure;
+  const keyGenerations = new Map();
+
+  async function protect(scope, baseUrl, secret) {
+    const generation = (keyGenerations.get(scope) || 0) + 1;
+    keyGenerations.set(scope, generation);
+    const result = await secure.saveCredential({ scope, baseUrl, secret });
+    if (keyGenerations.get(scope) !== generation) return result;
+    if (!result.verified) {
+      if (
+        !result.stored &&
+        secret &&
+        writeStorageItem("AI", "session", scope, secret) &&
+        readStorageItem("AI", "session", scope) === secret
+      )
+        removeStorageItem("AI", "local", scope);
+      return result;
+    }
+    if (secret && result.stored) {
+      if (!writeStorageItem("AI", "local", scope, result.reference))
+        throw new Error("Protected credential reference could not be saved.");
+      if (readStorageItem("AI", "session", scope) === secret) removeStorageItem("AI", "session", scope);
+    } else removeStorageItem("AI", "local", scope);
+    return result;
+  }
 
   function storageFor(label, kind) {
     try {
@@ -122,6 +149,10 @@ export function createAiCredentialStorageService(options) {
   }
 
   function saveOpenAiKey(value, remember) {
+    keyGenerations.set(
+      AI_CREDENTIAL_STORAGE_KEYS.openAi,
+      (keyGenerations.get(AI_CREDENTIAL_STORAGE_KEYS.openAi) || 0) + 1
+    );
     const key = String(value || "").trim();
     const previousKey = openAiSnapshot();
     try {
@@ -132,11 +163,22 @@ export function createAiCredentialStorageService(options) {
           typeof forcedKeyStorageFailure === "string" ? forcedKeyStorageFailure : "Simulated OpenAI key storage failure"
         );
       }
-      if (!key) return;
-      const saved = remember
-        ? writeStorageItem("OpenAI", "local", AI_CREDENTIAL_STORAGE_KEYS.openAi, key)
-        : writeStorageItem("OpenAI", "session", AI_CREDENTIAL_STORAGE_KEYS.openAi, key);
+      if (!key)
+        return secure?.saveCredential({
+          scope: AI_CREDENTIAL_STORAGE_KEYS.openAi,
+          baseUrl: defaults.openAiBaseUrl,
+          secret: ""
+        });
+      const saved =
+        remember && !secure && !options.sessionOnly
+          ? writeStorageItem("OpenAI", "local", AI_CREDENTIAL_STORAGE_KEYS.openAi, key)
+          : writeStorageItem("OpenAI", "session", AI_CREDENTIAL_STORAGE_KEYS.openAi, key);
       if (!saved) throw new Error("OpenAI key could not be saved in this browser.");
+      if (secure && remember && !key.startsWith("loopcat-credential:")) {
+        if (previousKey.local)
+          writeStorageItem("OpenAI", "local", AI_CREDENTIAL_STORAGE_KEYS.openAi, previousKey.local);
+        return protect(AI_CREDENTIAL_STORAGE_KEYS.openAi, defaults.openAiBaseUrl, key);
+      }
     } catch (error) {
       safeRestoreOpenAiSnapshot(previousKey);
       throw error;
@@ -145,6 +187,7 @@ export function createAiCredentialStorageService(options) {
 
   function openAiStorageLabel() {
     const snapshot = openAiSnapshot();
+    if (snapshot.local?.startsWith("loopcat-credential:")) return "Protected by the operating system";
     if (snapshot.local) return "Saved in this browser";
     if (snapshot.session) return "Saved for this tab";
     return "Not saved";
@@ -222,17 +265,29 @@ export function createAiCredentialStorageService(options) {
   }
 
   function saveLocalAiKey(value, remember, settings = settingsBoundary.readLocal()) {
+    const scope = localAiStorageKey(settings);
+    keyGenerations.set(scope, (keyGenerations.get(scope) || 0) + 1);
     const key = String(value || "").trim();
     const previousKey = localAiSnapshot(settings);
     try {
       const localOk = removeLocalAiStorage("local", settings);
       const sessionOk = removeLocalAiStorage("session", settings);
       if (!localOk || !sessionOk) throw new Error("Local AI key storage could not be cleared.");
-      if (!key) return;
-      const saved = remember
-        ? writeLocalAiStorage("local", key, settings)
-        : writeLocalAiStorage("session", key, settings);
+      if (!key)
+        return secure?.saveCredential({
+          scope: localAiStorageKey(settings),
+          baseUrl: settings.baseUrl || defaults.ollamaBaseUrl,
+          secret: ""
+        });
+      const saved =
+        remember && !secure && !options.sessionOnly
+          ? writeLocalAiStorage("local", key, settings)
+          : writeLocalAiStorage("session", key, settings);
       if (!saved) throw new Error("Local AI key could not be saved in this browser.");
+      if (secure && remember && !key.startsWith("loopcat-credential:")) {
+        if (previousKey.local) writeStorageItem("Local AI", "local", localAiStorageKey(settings), previousKey.local);
+        return protect(localAiStorageKey(settings), settings.baseUrl || defaults.ollamaBaseUrl, key);
+      }
     } catch (error) {
       safeRestoreLocalAiSnapshot(previousKey);
       throw error;
@@ -241,12 +296,30 @@ export function createAiCredentialStorageService(options) {
 
   function localAiStorageLabel(settings = settingsBoundary.readLocal()) {
     const snapshot = localAiSnapshot(settings);
+    if (snapshot.local?.startsWith("loopcat-credential:")) return "Protected by the operating system for this provider";
     if (snapshot.local) return "Saved in this browser for this provider";
     if (snapshot.session) return "Saved for this tab and provider";
     return "Not saved";
   }
 
+  async function migrateRemembered() {
+    if (!secure) return;
+    const local = storageFor("AI", "local");
+    if (!local) return;
+    const keys = Array.from({ length: local.length }, (_, index) => local.key(index)).filter(Boolean);
+    for (const key of keys) {
+      const value = local.getItem(key);
+      if (!value || value.startsWith("loopcat-credential:")) continue;
+      if (key === AI_CREDENTIAL_STORAGE_KEYS.openAi) await protect(key, defaults.openAiBaseUrl, value);
+      else if (key.startsWith(`${AI_CREDENTIAL_STORAGE_KEYS.localAiLegacy}:`)) {
+        const scoped = key.slice(AI_CREDENTIAL_STORAGE_KEYS.localAiLegacy.length + 1);
+        const baseUrl = scoped.slice(scoped.indexOf(":") + 1);
+        await protect(key, baseUrl, value);
+      }
+    }
+  }
   return Object.freeze({
+    migrateRemembered,
     localAiSnapshot,
     localAiStorageKey,
     localAiStorageLabel,

@@ -32,6 +32,8 @@ function normalizeSelection(selection, targetLength) {
  *   undo?: () => Promise<unknown> | unknown,
  *   redo?: () => Promise<unknown> | unknown,
  *   quickInsert?: { hasSuggestions?: () => boolean, open?: () => Promise<unknown> | unknown },
+ *   termCapture?: { open?: () => Promise<unknown> | unknown },
+ *   predictiveTyping?: { prepare?: () => unknown, onInput?: (editor: any, index: number, event?: any) => unknown, handleKeydown?: (event: any) => boolean, hide?: () => unknown },
  *   protectedTags?: { missing?: (segment: any) => any[], insert?: (tagTexts: string[]) => Promise<unknown> | unknown }
  * }} options
  */
@@ -91,6 +93,8 @@ export function createTargetEditController(options) {
   const undo = typeof options.undo === "function" ? options.undo : () => {};
   const redo = typeof options.redo === "function" ? options.redo : () => {};
   const quickInsert = options.quickInsert || {};
+  const termCapture = options.termCapture || {};
+  const predictiveTyping = options.predictiveTyping || {};
   const protectedTags = options.protectedTags || {};
   const composingEditors = new WeakSet();
 
@@ -114,6 +118,7 @@ export function createTargetEditController(options) {
   }
 
   function updateDraft(index, target) {
+    globalThis.window?.CatHan?.ownership?.assertWritable(editorSessionStore.getProject()?.id);
     const segment = editorSessionStore.getSegments()[index];
     if (!segment) return null;
     if (!editTargetSessions.has(segment.id)) {
@@ -158,6 +163,7 @@ export function createTargetEditController(options) {
 
   function handleKeydown(event, index) {
     if (!isUsableShortcutEvent(event)) return;
+    if (predictiveTyping.handleKeydown?.(event)) return;
     if (
       matchesShortcut(event, KEYBOARD_SHORTCUTS.undo, normalizeKey) ||
       matchesShortcut(event, KEYBOARD_SHORTCUTS.redo, normalizeKey)
@@ -178,6 +184,12 @@ export function createTargetEditController(options) {
       void confirmSegment();
       return;
     }
+    if (matchesShortcut(event, KEYBOARD_SHORTCUTS["term-capture"], normalizeKey)) {
+      event.preventDefault();
+      event.stopPropagation();
+      void termCapture.open?.();
+      return;
+    }
     if (
       matchesShortcut(event, KEYBOARD_SHORTCUTS["visible-next"], normalizeKey) ||
       matchesShortcut(event, KEYBOARD_SHORTCUTS["visible-previous"], normalizeKey)
@@ -191,7 +203,11 @@ export function createTargetEditController(options) {
       void Promise.resolve(activateSegment(next)).then(() => focusActive());
       return;
     }
-    if (matchesShortcut(event, KEYBOARD_SHORTCUTS["quick-insert"], normalizeKey) && quickInsert.hasSuggestions?.()) {
+    if (
+      (matchesShortcut(event, KEYBOARD_SHORTCUTS["quick-insert"], normalizeKey) ||
+        matchesShortcut(event, KEYBOARD_SHORTCUTS["quick-insert-alternate"], normalizeKey)) &&
+      quickInsert.hasSuggestions?.()
+    ) {
       event.preventDefault();
       event.stopPropagation();
       void quickInsert.open?.();
@@ -216,26 +232,39 @@ export function createTargetEditController(options) {
     if (!textarea?.addEventListener) {
       throw new TypeError("TargetEditController requires a target textarea.");
     }
+    textarea.readOnly = Boolean(globalThis.window?.CatHan?.ownership?.isReadOnly(editorSessionStore.getProject()?.id));
     textarea.setAttribute?.(
       "aria-keyshortcuts",
-      "Control+Enter Meta+Enter Alt+ArrowDown Alt+ArrowUp Tab F8 Control+Shift+F8 Meta+Shift+F8"
+      "Control+Enter Meta+Enter Control+Shift+G Meta+Shift+G Alt+ArrowDown Alt+ArrowUp Tab Alt+Insert F8 Control+Shift+F8 Meta+Shift+F8"
     );
     textarea.setAttribute?.(
       "title",
-      "Confirm: Ctrl/Cmd+Enter · Quick Insert: Tab · Navigate: Alt+Up/Down · Insert tags: F8"
+      "Confirm: Ctrl/Cmd+Enter · Add term: Ctrl/Cmd+Shift+G · Quick Insert: Tab or Alt+Insert · Navigate: Alt+Up/Down · Insert tags: F8"
     );
     const listeners = {
       focus: () => {
         editingCell?.classList?.add?.("editing");
-        void activateSegment(index);
+        void Promise.resolve(activateSegment(index)).then(() => predictiveTyping.prepare?.());
       },
       blur: () => {
         editingCell?.classList?.remove?.("editing");
         finalize(segmentId);
+        predictiveTyping.hide?.();
       },
-      compositionstart: () => composingEditors.add(textarea),
-      compositionend: () => composingEditors.delete(textarea),
-      input: () => updateDraft(index, textarea.value),
+      compositionstart: () => {
+        composingEditors.add(textarea);
+        predictiveTyping.hide?.();
+      },
+      compositionend: () => {
+        composingEditors.delete(textarea);
+        predictiveTyping.onInput?.(textarea, index);
+      },
+      input: (event) => {
+        updateDraft(index, textarea.value);
+        predictiveTyping.onInput?.(textarea, index, {
+          isComposing: composingEditors.has(textarea) || event?.isComposing
+        });
+      },
       keydown: (event) => handleKeydown(event, index)
     };
     Object.entries(listeners).forEach(([type, listener]) => textarea.addEventListener(type, listener));

@@ -512,13 +512,13 @@ test("ProjectImportRestoreController restores disconnected backups with exact re
     [
       ["flush", undefined],
       ["importAllData", backupRecord],
-      ["rebuildTm"],
-      ["rebuildTerms"],
       ["replaceProject", null],
       ["replaceSegments", []],
       ["openProjects"],
       ["clearSelection"],
       ["loadProjects", false],
+      ["rebuildTm"],
+      ["rebuildTerms"],
       ["getProjects"],
       ["isWorkspaceConnected"],
       ["isWorkspaceConnected"]

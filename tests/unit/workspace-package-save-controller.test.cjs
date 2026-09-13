@@ -233,6 +233,7 @@ function createHarness(createWorkspacePackageSaveController, overrides = {}) {
   };
   return {
     calls,
+    options,
     controller: createWorkspacePackageSaveController(options),
     setConnected(value) {
       connected = value;
@@ -271,6 +272,43 @@ test("WorkspacePackageSaveController preserves unsupported and connected folder-
     ["renderWorkspaceStatus"],
     ["status", "Workspace folder connected; 2 local project packages need to be saved", "dirty"]
   ]);
+});
+
+test("R1 delayed folder saves leave later generations dirty and serialize manual/background writes", async () => {
+  const { createWorkspacePackageSaveController } = await loadFactory();
+  const harness = createHarness(createWorkspacePackageSaveController);
+  let generation = 1;
+  let dirty = true;
+  let active = 0;
+  let maxActive = 0;
+  let release;
+  let entered;
+  const start = new Promise((resolve) => {
+    entered = resolve;
+  });
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  harness.options.workspace.generation = () => generation;
+  harness.options.workspace.clearDirty = (_id, savedGeneration) => {
+    if (savedGeneration === generation) dirty = false;
+  };
+  harness.options.storage.saveProjectPackage = async () => {
+    maxActive = Math.max(maxActive, ++active);
+    entered();
+    await gate;
+    active--;
+    return { verified: true };
+  };
+  const first = harness.controller.saveById("project-1");
+  await start;
+  generation++;
+  release();
+  await first;
+  assert.equal(dirty, true);
+  await Promise.all([harness.controller.saveById("project-1"), harness.controller.saveById("project-1")]);
+  assert.equal(maxActive, 1);
+  assert.equal(dirty, false);
 });
 
 test("WorkspacePackageSaveController preserves singular folder-selection grammar and delegate failures", async () => {

@@ -77,10 +77,35 @@ export function createResourcesPresentationService(options) {
   function renderDashboard(type, resourceState) {
     const isTm = type === "tm";
     const dashboard = isTm ? tmDashboard : tbDashboard;
-    const summaries = summarizeResources(
-      isTm ? resourceState.tmEntries : resourceState.terms,
-      isTm ? "tmName" : "termBaseName"
+    const entries = isTm ? resourceState.tmEntries : resourceState.terms;
+    const stableResources = (resourceState.resources || []).filter(
+      (resource) => resource.type === (isTm ? "tm" : "termbase")
     );
+    const summaries = stableResources.length
+      ? stableResources
+          .map((resource) => {
+            const resourceEntries = entries.filter(
+              (entry) =>
+                entry.resourceId === resource.id ||
+                (!entry.resourceId && entry[isTm ? "tmName" : "termBaseName"] === resource.name)
+            );
+            const updatedAt = resourceEntries.reduce(
+              (latest, entry) => {
+                const timestamp = entry.updatedAt || entry.createdAt || "";
+                return timestamp > latest ? timestamp : latest;
+              },
+              resource.updatedAt || resource.createdAt || ""
+            );
+            return {
+              ...resource,
+              key: resource.id,
+              count: resourceEntries.length,
+              updatedAt,
+              languagePair: resource.languagePair || `${resource.sourceLang || ""}::${resource.targetLang || ""}`
+            };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name))
+      : summarizeResources(entries, isTm ? "tmName" : "termBaseName");
     if (!summaries.length) {
       const empty = ownerDocument.createElement("div");
       empty.className = "empty-file-state actionable-empty-state";
@@ -99,7 +124,15 @@ export function createResourcesPresentationService(options) {
     const fragment = ownerDocument.createDocumentFragment();
     summaries.forEach((resource) => {
       const card = ownerDocument.createElement("article");
-      card.className = "resource-card";
+      card.className = `resource-card${resource.archived ? " archived" : ""}`;
+      const usageBadges = [
+        resource.usage?.main ? "Main" : "",
+        resource.usage?.reference ? "Reference" : "",
+        resource.usage?.lookup ? "Lookup" : "",
+        resource.usage?.qa ? "QA" : "",
+        resource.usage?.write ? "Write" : "",
+        resource.archived ? "Archived" : ""
+      ].filter(Boolean);
       replaceSafeHtml(
         card,
         `
@@ -115,24 +148,35 @@ export function createResourcesPresentationService(options) {
         <div><strong>${escapeHtml(resource.sourceLang || "-")}</strong><span>${localization.labelHtml("source")}</span></div>
         <div><strong>${escapeHtml(resource.targetLang || "-")}</strong><span>${localization.labelHtml("target")}</span></div>
       </div>
+      <div class="resource-usage-badges">${usageBadges.map((badge) => `<span class="language-badge">${escapeHtml(badge)}</span>`).join("")}</div>
+      <p>${escapeHtml(`${resource.linkedProjects?.length || 0} linked project${resource.linkedProjects?.length === 1 ? "" : "s"}`)}</p>
       <footer>
         <span>${localization.labelHtml("updatedAt", { date: formatDate(resource.updatedAt) })}</span>
         <div class="resource-card-actions"></div>
       </footer>
     `
       );
-      const deleteButton = ownerDocument.createElement("button");
       const resourceLabel = displaySafeText(resource.name, localization.source("resource"));
-      deleteButton.className = "danger-small";
-      deleteButton.type = "button";
-      deleteButton.textContent = localization.source("Delete");
-      deleteButton.setAttribute(
-        "aria-label",
-        localization.source("Delete resource {value1}", { value1: resourceLabel })
+      const actionButton = (action, label, className = "") => {
+        const button = ownerDocument.createElement("button");
+        button.type = "button";
+        button.className = className;
+        button.textContent = localization.source(label);
+        button.setAttribute("aria-label", localization.source(`${label} resource {value1}`, { value1: resourceLabel }));
+        button.dataset.resourceAction = action;
+        button.dataset.resourceType = type;
+        button.dataset.resourceKey = resource.key;
+        button.dataset.resourceId = resource.id || "";
+        return button;
+      };
+      const renameButton = actionButton("rename", "Rename");
+      const duplicateButton = actionButton("duplicate", "Duplicate");
+      const archiveButton = actionButton(
+        resource.archived ? "restore" : "archive",
+        resource.archived ? "Restore" : "Archive",
+        resource.archived ? "" : "danger-small"
       );
-      deleteButton.dataset.resourceAction = "delete-resource";
-      deleteButton.dataset.resourceType = type;
-      deleteButton.dataset.resourceKey = resource.key;
+      const legacyDeleteButton = actionButton("delete-resource", "Delete", "danger-small");
       const exportButton = ownerDocument.createElement("button");
       exportButton.type = "button";
       exportButton.textContent = localization.source("Export");
@@ -143,6 +187,7 @@ export function createResourcesPresentationService(options) {
       exportButton.dataset.resourceAction = "export";
       exportButton.dataset.resourceType = type;
       exportButton.dataset.resourceKey = resource.key;
+      exportButton.dataset.resourceId = resource.id || "";
       const openButton = ownerDocument.createElement("button");
       openButton.className = "primary";
       openButton.type = "button";
@@ -151,7 +196,14 @@ export function createResourcesPresentationService(options) {
       openButton.dataset.resourceAction = "open";
       openButton.dataset.resourceType = type;
       openButton.dataset.resourceKey = resource.key;
-      card.querySelector(".resource-card-actions").append(deleteButton, exportButton, openButton);
+      openButton.dataset.resourceId = resource.id || "";
+      if (resource.archived) card.querySelector(".resource-card-actions").append(archiveButton);
+      else if (!resource.id)
+        card.querySelector(".resource-card-actions").append(legacyDeleteButton, exportButton, openButton);
+      else
+        card
+          .querySelector(".resource-card-actions")
+          .append(renameButton, duplicateButton, archiveButton, exportButton, openButton);
       fragment.append(card);
     });
     dashboard.replaceChildren(fragment);
@@ -232,7 +284,9 @@ export function createResourcesPresentationService(options) {
       tmDetail.classList.add("hidden");
       return;
     }
-    const info = labelFromKey(resourceState.openKey);
+    const info =
+      (resourceState.resources || []).find((resource) => resource.id === resourceState.openKey) ||
+      labelFromKey(resourceState.openKey);
     const entries = items("tm", resourceState.openKey);
     tmDetail.classList.remove("hidden");
     replaceSafeHtml(
@@ -243,7 +297,10 @@ export function createResourcesPresentationService(options) {
         <h3>${displaySafeHtml(info.name)}</h3>
         <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${localization.labelHtml("entryCount", { count: entries.length })}</p>
       </div>
-      <button id="closeTmResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tm">${localization.sourceHtml("Close")}</button>
+      <div class="toolbar-actions">
+        ${info.id ? `<button type="button" data-resource-action="add-entry" data-resource-type="tm" data-resource-key="${escapeHtml(resourceState.openKey)}" data-resource-id="${escapeHtml(info.id)}">${localization.sourceHtml("Add entry")}</button>` : ""}
+        <button id="closeTmResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tm">${localization.sourceHtml("Close")}</button>
+      </div>
     </div>
     <div class="resource-table"></div>
   `
@@ -256,7 +313,9 @@ export function createResourcesPresentationService(options) {
       tbDetail.classList.add("hidden");
       return;
     }
-    const info = labelFromKey(resourceState.openKey);
+    const info =
+      (resourceState.resources || []).find((resource) => resource.id === resourceState.openKey) ||
+      labelFromKey(resourceState.openKey);
     const terms = items("tb", resourceState.openKey);
     tbDetail.classList.remove("hidden");
     replaceSafeHtml(
@@ -267,7 +326,10 @@ export function createResourcesPresentationService(options) {
         <h3>${displaySafeHtml(info.name)}</h3>
         <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${localization.labelHtml("termCount", { count: terms.length })}</p>
       </div>
-      <button id="closeTbResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tb">${localization.sourceHtml("Close")}</button>
+      <div class="toolbar-actions">
+        ${info.id ? `<button type="button" data-resource-action="add-entry" data-resource-type="tb" data-resource-key="${escapeHtml(resourceState.openKey)}" data-resource-id="${escapeHtml(info.id)}">${localization.sourceHtml("Add term")}</button>` : ""}
+        <button id="closeTbResourceBtn" type="button" data-resource-action="close-detail" data-resource-type="tb">${localization.sourceHtml("Close")}</button>
+      </div>
     </div>
     <div class="resource-table"></div>
   `

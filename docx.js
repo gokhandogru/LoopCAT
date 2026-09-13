@@ -89,15 +89,31 @@ function findEndOfCentralDirectory(bytes) {
   throw new Error("Could not read DOCX zip directory.");
 }
 
-async function inflateRaw(bytes) {
+async function inflateRaw(bytes, limit = MAX_DOCX_UNZIPPED_BYTES) {
   if (!("DecompressionStream" in window)) {
     throw new Error("This browser cannot decompress DOCX files locally. Try a recent Chromium, Edge, or Safari version.");
   }
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  const reader = stream.getReader();
+  const chunks = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      length += value.length;
+      if (length > limit) throw new Error("DOCX expanded beyond its declared size or limit.");
+      chunks.push(value);
+    }
+  } catch (error) { await reader.cancel(error); throw error; }
+  const result = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.length; }
+  return result;
 }
 
 async function unzipEntries(arrayBufferOrBytes) {
+  if (window.CatHan?.archive) return window.CatHan.archive.readEntries(arrayBufferOrBytes);
   const bytes = arrayBufferOrBytes instanceof Uint8Array ? arrayBufferOrBytes : new Uint8Array(arrayBufferOrBytes);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const eocd = findEndOfCentralDirectory(bytes);
@@ -110,6 +126,7 @@ async function unzipEntries(arrayBufferOrBytes) {
   for (let i = 0; i < entryCount; i += 1) {
     if (readUint32(view, ptr) !== 0x02014b50) throw new Error("Invalid DOCX central directory.");
     const compressionMethod = readUint16(view, ptr + 10);
+    const expectedCrc = readUint32(view, ptr + 16);
     const compressedSize = readUint32(view, ptr + 20);
     const uncompressedSize = readUint32(view, ptr + 24);
     const fileNameLength = readUint16(view, ptr + 28);
@@ -118,6 +135,8 @@ async function unzipEntries(arrayBufferOrBytes) {
     const localHeaderOffset = readUint32(view, ptr + 42);
     const nameBytes = bytes.slice(ptr + 46, ptr + 46 + fileNameLength);
     const name = textDecoder.decode(nameBytes).replaceAll("\\", "/");
+    if (/^[\/]|[\x00-\x1f:]/.test(name) || name.replace(/\/$/, "").split("/").some((part) => !part || part === "." || part === "..")) throw new Error("Unsafe DOCX archive path.");
+    if (entries.has(name)) throw new Error("Duplicate DOCX archive entry.");
     totalUncompressedSize += uncompressedSize;
     if (totalUncompressedSize > MAX_DOCX_UNZIPPED_BYTES) {
       throw new Error("DOCX package is too large after decompression. Try splitting the document or removing embedded content.");
@@ -126,14 +145,16 @@ async function unzipEntries(arrayBufferOrBytes) {
     const localNameLength = readUint16(view, localHeaderOffset + 26);
     const localExtraLength = readUint16(view, localHeaderOffset + 28);
     const dataStart = localHeaderOffset + 30 + localNameLength + localExtraLength;
+    if (readUint32(view, localHeaderOffset) !== 0x04034b50 || dataStart + compressedSize > centralDirectoryOffset) throw new Error("Invalid DOCX local header or compressed range.");
     const compressed = bytes.slice(dataStart, dataStart + compressedSize);
     let data;
     if (compressionMethod === 0) data = compressed;
-    else if (compressionMethod === 8) data = await inflateRaw(compressed);
+    else if (compressionMethod === 8) data = await inflateRaw(compressed, uncompressedSize);
     else throw new Error(`Unsupported DOCX compression method: ${compressionMethod}`);
-    if (data.length !== uncompressedSize && uncompressedSize > 0) {
+    if (data.length !== uncompressedSize) {
       throw new Error(`DOCX entry ${name} has an unexpected decompressed size.`);
     }
+    if (crc32(data) !== expectedCrc) throw new Error(`DOCX entry ${name} failed CRC integrity validation.`);
     entries.set(name, { name, data });
     ptr += 46 + fileNameLength + extraLength + commentLength;
   }
@@ -251,23 +272,6 @@ function xmlUnescape(value) {
     .replaceAll("&gt;", ">")
     .replaceAll("&lt;", "<")
     .replaceAll("&amp;", "&");
-}
-
-function nodeText(node, scopeParagraph = null) {
-  const parts = [];
-  node.childNodes.forEach((child) => {
-    if (child.nodeType === Node.TEXT_NODE) {
-      parts.push(child.nodeValue);
-    } else if (child.nodeType === Node.ELEMENT_NODE) {
-      if (scopeParagraph && child.localName === "p" && child !== scopeParagraph) return;
-      const name = child.localName;
-      if (name === "del" || name === "moveFrom" || name === "delText") return;
-      if (name === "tab") parts.push("\t");
-      if (name === "br" || name === "cr") parts.push("\n");
-      parts.push(nodeText(child, scopeParagraph));
-    }
-  });
-  return parts.join("");
 }
 
 const SEMANTIC_INLINE_TAGS = new Map([

@@ -14,6 +14,8 @@ export function createWorkspaceDirtyStateController({
   recovery,
   presentation
 }) {
+  const generations = new Map();
+  const generation = (projectId) => generations.get(projectId) || 0;
   if (
     typeof state?.getDirty !== "function" ||
     typeof state?.setDirty !== "function" ||
@@ -95,6 +97,7 @@ export function createWorkspaceDirtyStateController({
 
   function mark(projectId = session.getProject()?.id) {
     if (!projectId) return;
+    generations.set(projectId, generation(projectId) + 1);
     const changed = !state.getDirty().has(projectId);
     state.getDirty().add(projectId);
     summary.markDirty(projectId);
@@ -107,6 +110,7 @@ export function createWorkspaceDirtyStateController({
     let changed = false;
     projectIds.forEach((projectId) => {
       if (!projectId) return;
+      generations.set(projectId, generation(projectId) + 1);
       summary.markDirty(projectId);
       if (state.getDirty().has(projectId)) return;
       state.getDirty().add(projectId);
@@ -116,27 +120,33 @@ export function createWorkspaceDirtyStateController({
     if (changed) presentation.renderStatus();
   }
 
-  function usesResource(project, type, name, sourceLang = "", targetLang = "") {
-    if (!project || !type || !name) return false;
+  function usesResource(project, type, name, sourceLang = "", targetLang = "", resourceId = "") {
+    if (!project || !type || (!name && !resourceId)) return false;
     if (sourceLang && project.sourceLang !== sourceLang) return false;
     if (targetLang && project.targetLang !== targetLang) return false;
-    return resources.links(project).some((link) => link.type === type && link.name === name);
+    return resources
+      .links(project)
+      .some(
+        (link) => link.type === type && ((resourceId && link.resourceId === resourceId) || (name && link.name === name))
+      );
   }
 
-  function markProjectsUsingResource(type, name, sourceLang = "", targetLang = "") {
+  function markProjectsUsingResource(type, name, sourceLang = "", targetLang = "", resourceId = "") {
     const projectIds = session
       .getProjects()
-      .filter((project) => usesResource(project, type, name, sourceLang, targetLang))
+      .filter((project) => usesResource(project, type, name, sourceLang, targetLang, resourceId))
       .map((project) => project.id);
     markProjects(projectIds);
     return projectIds.length;
   }
 
-  function clear(projectId = session.getProject()?.id) {
+  function clear(projectId = session.getProject()?.id, expectedGeneration = generation(projectId)) {
+    if (generation(projectId) !== expectedGeneration) return false;
     if (projectId) state.getDirty().delete(projectId);
     if (projectId) state.getRecovery().delete(projectId);
     persist();
     presentation.renderStatus();
+    return true;
   }
 
   function clearAll() {
@@ -155,6 +165,7 @@ export function createWorkspaceDirtyStateController({
 
   return Object.freeze({
     ids,
+    generation,
     readStored,
     persist,
     restore,

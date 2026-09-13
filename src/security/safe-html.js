@@ -32,7 +32,7 @@ function localScriptUrl(value) {
   }
   if (currentOrigin && url.origin !== currentOrigin)
     throw new TypeError("LoopCAT script URLs must stay on the app origin.");
-  if (!/\/(?:service-worker|cat-worker)\.js$/i.test(url.pathname)) {
+  if (!/\/(?:service-worker|cat-worker|regex-worker|archive-worker)\.js$/i.test(url.pathname)) {
     throw new TypeError("LoopCAT rejected an unrecognized executable asset URL.");
   }
   return text;

@@ -31,8 +31,9 @@ export function createSegmentConfirmationStateService(options) {
     Object.assign(segment, snapshot);
   }
 
-  function preparePersistedRollback(segment, savedConfirmedRevision) {
+  function preparePersistedRollback(segment, savedConfirmedRevision, savedStorageVersion = 0) {
     segment.revision = Math.max(Number(segment.revision || 0), Number(savedConfirmedRevision || 0)) + 1;
+    if (Number(savedStorageVersion) > 0) segment.storageVersion = Number(savedStorageVersion);
     segment.updatedAt = now();
   }
 

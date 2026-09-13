@@ -205,7 +205,7 @@ test("ProjectResourceContextService preserves main-first TM names, termbase orde
   assert.equal(service.primaryTermBase(project), "Terms B");
   assert.deepEqual(service.tmNames(null), ["Default TM"]);
   assert.deepEqual(service.termBaseNames(null), []);
-  assert.equal(service.primaryTermBase(null), "Default TB");
+  assert.equal(service.primaryTermBase(null), "");
 });
 
 test("ProjectResourceContextService preserves exact singular and plural summary shapes", async () => {
@@ -307,9 +307,14 @@ test("ProjectResourceContextService validates boundaries and exposes an immutabl
     "cleanLinks",
     "links",
     "mainTm",
+    "mainTmLink",
     "tmNames",
     "termBaseNames",
     "primaryTermBase",
+    "lookupTmLinks",
+    "lookupTermbaseLinks",
+    "qaTermbaseLinks",
+    "contributionTermbaseLinks",
     "summary"
   ]);
   for (const [options, error] of [

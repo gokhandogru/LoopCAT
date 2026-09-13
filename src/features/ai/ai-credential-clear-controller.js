@@ -18,9 +18,9 @@ export function createAiCredentialClearController(dependencies = {}) {
     );
   }
 
-  function clearOpenAi() {
+  async function clearOpenAi() {
     try {
-      credentials.saveOpenAi("", false);
+      await credentials.saveOpenAi("", false);
     } catch (error) {
       presentation.renderOpenStatus?.(redaction.sanitize(error.message || "OpenAI key could not be cleared."));
       return false;
@@ -32,10 +32,10 @@ export function createAiCredentialClearController(dependencies = {}) {
     return true;
   }
 
-  function clearLocal() {
+  async function clearLocal() {
     const localSettings = settings.readLocal();
     try {
-      credentials.saveLocal("", false, localSettings);
+      await credentials.saveLocal("", false, localSettings);
     } catch (error) {
       presentation.renderLocalStatus(
         "error",

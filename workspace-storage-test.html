@@ -497,7 +497,7 @@
           "workspace health counts project folders missing from a stale manifest without rewriting it"
         );
         removePath(root, "projects/Unlisted-Workspace-Package/project.loopcat.json");
-        const statusAfterRemovingUnlisted = await workspace.getStatus();
+        const statusAfterRemovingUnlisted = await workspace.getStatus({ refresh: true });
         assert(statusAfterRemovingUnlisted.projectCount === 1, "workspace status ignores stale project refs when package files are missing");
         assert(!statusAfterRemovingUnlisted.warnings.some((warning) => warning.includes("Unlisted-Workspace-Package")), "workspace status ignores empty project folders without package files");
 
@@ -724,9 +724,14 @@
             exportedAt: now,
             projects: [pkg.project],
             segments: pkg.segments,
+            resources: pkg.resources.resources || [],
             tmEntries: pkg.resources.tmEntries,
+            tmContributions: pkg.resources.tmContributions || [],
             terms: pkg.resources.terms,
-            activityEvents: []
+            termConcepts: pkg.resources.termConcepts || [],
+            termDesignations: pkg.resources.termDesignations || [],
+            activityEvents: [],
+            trashEntries: []
           });
         } catch (error) {
           futureBackupWriteRejected = error.name === "WorkspaceBackupValidationError" && error.message.includes("newer than this LoopCAT build supports");
@@ -737,7 +742,7 @@
         );
 
         await writeFakeFile(root, "backups/Bearer workspace-backup-file-token-that-must-not-count.json", "{\"type\":\"full-backup\"}");
-        const statusAfterUnsafeBackup = await workspace.getStatus();
+        const statusAfterUnsafeBackup = await workspace.getStatus({ refresh: true });
         const healthAfterUnsafeBackup = await workspace.buildHealthReport({
           projects: [pkg.project],
           tmEntries: pkg.resources.tmEntries,
@@ -769,9 +774,14 @@
             exportedAt: now,
             projects: [pkg.project],
             segments: pkg.segments,
+            resources: pkg.resources.resources || [],
             tmEntries: pkg.resources.tmEntries,
+            tmContributions: pkg.resources.tmContributions || [],
             terms: pkg.resources.terms,
-            activityEvents: []
+            termConcepts: pkg.resources.termConcepts || [],
+            termDesignations: pkg.resources.termDesignations || [],
+            activityEvents: [],
+            trashEntries: []
           });
         } finally {
           delete backupManifestNode.failOnClose;
@@ -799,13 +809,18 @@
           exportedAt: now,
           projects: [pkg.project],
           segments: pkg.segments,
+          resources: pkg.resources.resources || [],
           tmEntries: pkg.resources.tmEntries,
+          tmContributions: pkg.resources.tmContributions || [],
           terms: pkg.resources.terms,
-          activityEvents: []
+          termConcepts: pkg.resources.termConcepts || [],
+          termDesignations: pkg.resources.termDesignations || [],
+          activityEvents: [],
+          trashEntries: []
         });
         const statusAfterSavedBackup = await workspace.getStatus();
         removePath(root, savedBackup.path);
-        const statusAfterMissingBackup = await workspace.getStatus();
+        const statusAfterMissingBackup = await workspace.getStatus({ refresh: true });
         assert(
           statusAfterMissingBackup.backupCount === statusAfterSavedBackup.backupCount - 1,
           "workspace backup status ignores stale manifest refs when backup files are missing"

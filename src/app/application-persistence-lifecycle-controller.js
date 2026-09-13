@@ -4,7 +4,10 @@ export function createApplicationPersistenceLifecycleController({
   pending,
   autosave,
   workspace,
-  logger
+  logger,
+  emergencyText = () => "",
+  flushMutations = () => Promise.resolve(),
+  pauseEditing = () => () => {}
 }) {
   if (
     !targets?.window?.addEventListener ||
@@ -22,6 +25,10 @@ export function createApplicationPersistenceLifecycleController({
   }
 
   let mounted = false;
+  let closing = false;
+  let removeDesktopListener;
+  let resumeEditing;
+  let closeEpoch = 0;
 
   function shouldWarn() {
     return Boolean(pending.hasImport() || autosave.size() || workspace.hasUnsaved());
@@ -35,6 +42,7 @@ export function createApplicationPersistenceLifecycleController({
   }
 
   const beforeUnloadListener = (event) => {
+    if (closing) return;
     if (!shouldWarn()) return;
     event.preventDefault();
     event.returnValue = "";
@@ -55,6 +63,37 @@ export function createApplicationPersistenceLifecycleController({
     targets.window.addEventListener("beforeunload", beforeUnloadListener);
     targets.document.addEventListener("visibilitychange", visibilityChangeListener);
     targets.window.addEventListener("pagehide", pageHideListener);
+    removeDesktopListener = targets.window.LoopCATDesktop?.onPrepareClose?.(async ({ mode }) => {
+      if (mode === "resume") {
+        closeEpoch++;
+        closing = false;
+        resumeEditing?.();
+        resumeEditing = null;
+        return {};
+      }
+      if (mode === "emergency") {
+        closeEpoch++;
+        closing = false;
+        resumeEditing ||= pauseEditing();
+        return { text: emergencyText() };
+      }
+      if (pending.hasImport()) throw new Error("Wait for the current import to finish.");
+      const epoch = ++closeEpoch;
+      resumeEditing ||= pauseEditing();
+      try {
+        await autosave.flush();
+        await flushMutations();
+        if (epoch !== closeEpoch) throw new Error("Close request was superseded.");
+        closing = true;
+        return {};
+      } catch (error) {
+        if (epoch === closeEpoch) {
+          resumeEditing?.();
+          resumeEditing = null;
+        }
+        throw error;
+      }
+    });
     mounted = true;
     return true;
   }
@@ -64,6 +103,10 @@ export function createApplicationPersistenceLifecycleController({
     targets.window.removeEventListener("beforeunload", beforeUnloadListener);
     targets.document.removeEventListener("visibilitychange", visibilityChangeListener);
     targets.window.removeEventListener("pagehide", pageHideListener);
+    removeDesktopListener?.();
+    closeEpoch++;
+    resumeEditing?.();
+    resumeEditing = null;
     mounted = false;
     return true;
   }

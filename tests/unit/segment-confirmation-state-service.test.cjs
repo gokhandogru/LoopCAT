@@ -78,9 +78,10 @@ test("SegmentConfirmationStateService preserves persisted rollback coercion, mon
     "src/features/editor/segment-confirmation-state-service.js"
   );
   const { service } = createHarness(createSegmentConfirmationStateService);
-  const segment = { revision: "7", updatedAt: "old" };
-  assert.equal(service.preparePersistedRollback(segment, "11"), undefined);
+  const segment = { revision: "7", storageVersion: 3, updatedAt: "old" };
+  assert.equal(service.preparePersistedRollback(segment, "11", "9"), undefined);
   assert.equal(segment.revision, 12);
+  assert.equal(segment.storageVersion, 9);
   assert.equal(segment.updatedAt, "2026-08-20T14:00:00.000Z");
   service.preparePersistedRollback(segment, "not-finite");
   assert.equal(Number.isNaN(segment.revision), true);

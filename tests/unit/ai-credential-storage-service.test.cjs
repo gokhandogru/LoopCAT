@@ -13,6 +13,12 @@ function createMemoryStorage(initial = {}, failures = {}) {
   const values = new Map(Object.entries(initial));
   return {
     values,
+    get length() {
+      return values.size;
+    },
+    key(index) {
+      return [...values.keys()][index] ?? null;
+    },
     getItem(key) {
       const error = failures.read?.(key);
       if (error) throw error;
@@ -41,6 +47,8 @@ function createHarness(createService, overrides = {}) {
     baseUrl: "https://api.deepseek.example/"
   };
   const service = createService({
+    secure: overrides.secure,
+    sessionOnly: overrides.sessionOnly,
     storage: {
       get(kind) {
         if (overrides.accessError?.[kind]) throw overrides.accessError[kind];
@@ -84,6 +92,34 @@ test("AI credential storage preserves exact key constants and provider/base scop
     harness.service.localAiStorageKey({ providerId: "gemini", baseUrl: "" }),
     "loopcat.localAi.apiKey:gemini:https://api.openai.com/v1"
   );
+});
+
+test("R16 migration deletes plaintext only after verified OS storage; unavailable protection falls back to session", async () => {
+  const { AI_CREDENTIAL_STORAGE_KEYS, createAiCredentialStorageService } = await loadModule();
+  const key = AI_CREDENTIAL_STORAGE_KEYS.openAi;
+  let complete;
+  const harness = createHarness(createAiCredentialStorageService, {
+    localValues: { [key]: "legacy-secret" },
+    secure: {
+      saveCredential: () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        })
+    }
+  });
+  const migration = harness.service.migrateRemembered();
+  await new Promise(setImmediate);
+  assert.equal(harness.local.getItem(key), "legacy-secret");
+  complete({ stored: true, verified: true, reference: "loopcat-credential:reference" });
+  await migration;
+  assert.equal(harness.local.getItem(key), "loopcat-credential:reference");
+  const fallback = createHarness(createAiCredentialStorageService, {
+    localValues: { [key]: "legacy-secret" },
+    secure: { saveCredential: () => Promise.resolve({ stored: false }) }
+  });
+  await fallback.service.migrateRemembered();
+  assert.equal(fallback.local.getItem(key), null);
+  assert.equal(fallback.session.getItem(key), "legacy-secret");
 });
 
 test("OpenAI credential storage preserves session precedence, labels, remember routing, and blank clearing", async () => {

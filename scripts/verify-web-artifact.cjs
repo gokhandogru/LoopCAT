@@ -165,8 +165,10 @@ for (const marker of ["runAppWorkflowTest", "app-workflow-test", "_TEST_FLAG", "
 
 for (const entry of entries.keys()) {
   const allowedScript = entry === "scripts/opus-cat-web-bridge.cjs";
+  const allowedGuide = entry === "docs/beginner-guide/index.html" || entry === "docs/beginner-guide/LoopCAT-Beginners-Guide.docx";
   if (
-    /^(desktop|docs|dist|dist-web|test-artifacts)\//i.test(entry) ||
+    /^(desktop|dist|dist-web|test-artifacts)\//i.test(entry) ||
+    (/^docs\//i.test(entry) && !allowedGuide) ||
     (/^scripts\//i.test(entry) && !allowedScript) ||
     /(?:test|runner|fixture)\.html$/i.test(entry)
   ) {

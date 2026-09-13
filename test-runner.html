@@ -44,6 +44,8 @@
       const requestedTest = new URLSearchParams(window.location.search).get("test");
       const requestedTimeout = Number(new URLSearchParams(window.location.search).get("timeout")) || 0;
       const tests = [
+        { name: "Performance", url: "./reliability-test.html?performance&soakMs=" + (new URLSearchParams(location.search).get("soakMs") || "0"), pass: "PERFORMANCE TEST PASS", fail: "PERFORMANCE TEST FAIL", timeout: 1800000, optIn: true },
+        { name: "Reliability", url: "./reliability-test.html", pass: "RELIABILITY TEST PASS", fail: "RELIABILITY TEST FAIL", timeout: 180000 },
         {
           name: "Security policy",
           url: "./security-policy-test.html",
@@ -88,7 +90,7 @@
           fail: "LARGE PROJECT TEST FAIL",
           timeout: 300000
         }
-      ].filter((test) => !requestedTest || test.name === requestedTest);
+      ].filter((test) => requestedTest ? test.name === requestedTest : !test.optIn);
 
       const summary = document.querySelector("#summary");
       const frames = document.querySelector("#frames");
@@ -123,6 +125,7 @@
       function runTest(test) {
         return new Promise((resolve) => {
           const frame = document.createElement("iframe");
+          if (test.name === "Performance") frame.style.cssText = "position:fixed;inset:0;width:100%;height:100%;border:0";
           frame.title = `${test.name} test`;
           const startedAt = Date.now();
           let timer = null;

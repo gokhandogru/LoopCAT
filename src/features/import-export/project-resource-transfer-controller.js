@@ -28,8 +28,10 @@ import { validateProjectResourceTransferControllerOptions } from "./project-reso
  *   },
  *   resources: {
  *     mainTmName: () => string,
+ *     mainTmLink?: () => any,
  *     projectTmNames: () => string[],
  *     selectedTermBaseName: () => string,
+ *     selectedTermBaseLink?: () => any,
  *     primaryTermBaseName: () => string,
  *     projectTermBaseNames: () => string[],
  *     markProjectsUsingDirty: (type: string, name: string, sourceLang: string, targetLang: string) => unknown
@@ -98,6 +100,11 @@ export function createProjectResourceTransferController(options) {
       );
   }
 
+  function attachResourceIdentity(records, link) {
+    const resourceId = typeof link?.resourceId === "string" ? link.resourceId.trim() : "";
+    return resourceId ? records.map((record) => ({ ...record, resourceId: record.resourceId || resourceId })) : records;
+  }
+
   async function parseTermListFile(file, parseOptions) {
     const isWorkbook =
       /\.xlsx$/i.test(file?.name || "") ||
@@ -113,7 +120,7 @@ export function createProjectResourceTransferController(options) {
     await files.reportProgress("Reading TMX", file);
     const text = await files.readText(file);
     await files.reportProgress("Parsing TMX", file);
-    const entries = await parsers.parseTmx(
+    const parsedEntries = await parsers.parseTmx(
       text,
       {
         sourceLang: session.getProject().sourceLang,
@@ -131,6 +138,7 @@ export function createProjectResourceTransferController(options) {
           )
       }
     );
+    const entries = attachResourceIdentity(parsedEntries, resources.mainTmLink?.());
     await files.reportProgress("Saving TM entries", file, `${entries.length} ${tmEntryLabel(entries.length)}`);
     await repositories.importTmEntries(entries, {
       onProgress: tmImportProgress(file, "Saving TM entries"),
@@ -196,7 +204,7 @@ export function createProjectResourceTransferController(options) {
     await files.reportProgress("Reading TBX", file);
     const text = await files.readText(file);
     await files.reportProgress("Parsing TBX", file);
-    const importedTerms = await parsers.parseTbx(
+    const parsedTerms = await parsers.parseTbx(
       text,
       {
         sourceLang: session.getProject().sourceLang,
@@ -213,6 +221,7 @@ export function createProjectResourceTransferController(options) {
           )
       }
     );
+    const importedTerms = attachResourceIdentity(parsedTerms, resources.selectedTermBaseLink?.());
     await files.reportProgress("Saving terms", file, `${importedTerms.length} ${termLabel(importedTerms.length)}`);
     await repositories.importTerms(importedTerms, {
       onProgress: termImportProgress(file, "Saving terms"),
@@ -248,12 +257,13 @@ export function createProjectResourceTransferController(options) {
     files.assertSize(file, "Term list file");
     const termBaseName = resources.selectedTermBaseName();
     await files.reportProgress("Reading term list", file);
-    const importedTerms = await parseTermListFile(file, {
+    const parsedTerms = await parseTermListFile(file, {
       sourceLang: session.getProject().sourceLang,
       targetLang: session.getProject().targetLang,
       termBaseName,
       fileName: file.name
     });
+    const importedTerms = attachResourceIdentity(parsedTerms, resources.selectedTermBaseLink?.());
     await files.reportProgress("Saving terms", file, `${importedTerms.length} ${termLabel(importedTerms.length)}`);
     await repositories.importTerms(importedTerms, {
       onProgress: termImportProgress(file, "Saving terms"),

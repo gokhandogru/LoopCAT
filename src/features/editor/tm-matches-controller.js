@@ -6,7 +6,7 @@
  * @param {{
  *   root: any,
  *   session: { getProject: () => any, getActiveSegment: () => any },
- *   tm: { getNames: () => string[], findMatches: (options: object) => Promise<any[]> },
+ *   tm: { getNames: () => string[], getLinks?: () => any[], context?: (segment: any) => object, findMatches: (options: object) => Promise<any[]> },
  *   localization: {
  *     source: (text: string) => string,
  *     label: (key: string) => string,
@@ -66,11 +66,15 @@ export function createTmMatchesController(options) {
     }
     const segmentId = segment.id;
     const projectId = session.getProject().id;
+    const hasResourceLinks = typeof tm.getLinks === "function";
+    const hasContext = typeof tm.context === "function";
     const matches = await tm.findMatches({
       source: segment.source,
       sourceLang: session.getProject().sourceLang,
       targetLang: session.getProject().targetLang,
-      tmNames: tm.getNames()
+      tmNames: tm.getNames(),
+      ...(hasResourceLinks ? { resourceLinks: tm.getLinks() || [] } : {}),
+      ...(hasContext ? { context: tm.context(segment) || {} } : {})
     });
     if (session.getProject()?.id !== projectId || session.getActiveSegment()?.id !== segmentId) return;
     currentResults = matches.slice();
@@ -84,12 +88,33 @@ export function createTmMatchesController(options) {
     matches.forEach((match) => {
       const card = dom.createElement("article");
       card.className = "match-card";
+      const matchKind = match.matchKind ? `${text.escapeHtml(match.matchKind)} · ` : "";
+      const sourceDifferenceSummary = (match.sourceDifferences || [])
+        .slice(0, 6)
+        .map((difference) => `${difference.source || "∅"} → ${difference.candidate || "∅"}`)
+        .join(", ");
+      const details = [
+        match.penalty
+          ? `<p class="muted">Raw ${match.rawScore}% − ${match.penalty} penalty = ${match.effectiveScore}%</p>`
+          : "",
+        match.adaptedTarget
+          ? `<p class="adapted-match-preview"><span class="language-badge">Adapted preview</span> <strong>${text.escapeHtml(match.adaptedTarget)}</strong></p>`
+          : "",
+        match.provenance?.length > 1
+          ? `<p class="muted">Also found in ${match.provenance.length - 1} other resource${match.provenance.length === 2 ? "" : "s"}</p>`
+          : "",
+        sourceDifferenceSummary
+          ? `<p class="muted">Source differences: ${text.escapeHtml(sourceDifferenceSummary)}</p>`
+          : ""
+      ]
+        .filter(Boolean)
+        .join("\n      ");
       safeHtml.replace(
         card,
-        `<header><strong>${localization.labelHtml("matchPercent", { score: match.score })}</strong><span>${text.escapeHtml(match.tmName || "")}</span></header>
+        `<header><strong>${localization.labelHtml("matchPercent", { score: match.effectiveScore ?? match.score })}</strong><span>${matchKind}${text.escapeHtml(match.tmName || match.resourceName || "")}</span></header>
       <p>${text.escapeHtml(match.source)}</p>
       <p><strong>${text.escapeHtml(match.target)}</strong></p>
-      ${match.projectName ? `<p class="muted">${text.escapeHtml(match.projectName)}</p>` : ""}`
+      ${details ? `${details}\n      ` : ""}${match.projectName ? `<p class="muted">${text.escapeHtml(match.projectName)}</p>` : ""}`
       );
       const button = dom.createElement("button");
       button.textContent = localization.label("insert");
@@ -100,6 +125,18 @@ export function createTmMatchesController(options) {
         })
       );
       card.append(button);
+      if (match.adaptedTarget) {
+        const adaptedButton = dom.createElement("button");
+        adaptedButton.textContent = localization.source("Insert adapted");
+        adaptedButton.addEventListener("click", () =>
+          target.insert(match.adaptedTarget, {
+            channel: "match",
+            resourceId: match.id || "",
+            adapted: true
+          })
+        );
+        card.append(adaptedButton);
+      }
       fragment.append(card);
     });
     root.replaceChildren(fragment);

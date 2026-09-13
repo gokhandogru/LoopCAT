@@ -1,5 +1,5 @@
 (() => {
-const { bulkPut, countByIndex, deleteByKey, deleteStoresWhereAtomically, deleteWhere, get, getMany, getAll, getAllByIndex, getAllByIndexMany, makeId, put, constants } = window.CatHan.storage;
+const { bulkPut, commitMutation, countByIndex, deleteByKey, deleteStoresWhereAtomically, deleteWhere, get, getMany, getAll, getAllByIndex, getAllByIndexMany, makeId, put, writeStoresAtomically, constants } = window.CatHan.storage;
 const { normalizeText } = window.CatHan.tm;
 const LOCAL_WORKSPACE_ID = constants?.LOCAL_WORKSPACE_ID || "local-workspace";
 const LOCAL_USER_ID = constants?.LOCAL_USER_ID || "local-user";
@@ -63,6 +63,7 @@ function indexRecordsForTerm(term) {
   return termTokens(term).map((token) => ({
     id: `${term.id}::${token}`,
     termId: term.id,
+    resourceId: term.resourceId || "",
     languagePair,
     termBaseName: term.termBaseName || "",
     token,
@@ -179,6 +180,40 @@ function containsNormalizedTerm(text, term) {
   return ` ${normalizeText(text)} `.includes(` ${normalizedTerm} `);
 }
 
+function containsCaseAwareTerm(text, term) {
+  const source = String(text || "");
+  const candidate = String(term?.sourceTerm || "");
+  if (!candidate) return false;
+  if (term?.caseSensitivity === "sensitive") return source.includes(candidate);
+  if (term?.caseSensitivity === "initial-sensitive") {
+    const normalizedCandidate = normalizeText(candidate);
+    const match = source.match(new RegExp(candidate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu"));
+    return Boolean(match && normalizeText(match[0]) === normalizedCandidate && match[0][0] === candidate[0]);
+  }
+  return containsNormalizedTerm(source, candidate);
+}
+
+function designationMatches(text, term) {
+  if (term?.matchMode === "prefix") {
+    const sourceTokens = normalizeText(text).split(" ").filter(Boolean);
+    const termTokensValue = normalizeText(term.sourceTerm).split(" ").filter(Boolean);
+    if (!termTokensValue.length) return false;
+    return sourceTokens.some((_, index) => termTokensValue.every((token, offset) => sourceTokens[index + offset]?.startsWith(token)));
+  }
+  if (term?.matchMode === "fuzzy") {
+    const sourceTokens = normalizeText(text).split(" ").filter(Boolean);
+    const termTokensValue = normalizeText(term.sourceTerm).split(" ").filter(Boolean);
+    if (!termTokensValue.length || sourceTokens.length < termTokensValue.length) return false;
+    const threshold = Math.max(50, Math.min(100, Number(term.fuzzyThreshold) || 85));
+    for (let index = 0; index <= sourceTokens.length - termTokensValue.length; index += 1) {
+      const phrase = sourceTokens.slice(index, index + termTokensValue.length).join(" ");
+      if (window.CatHan.tm.similarity(phrase, termTokensValue.join(" ")) >= threshold) return true;
+    }
+    return false;
+  }
+  return containsCaseAwareTerm(text, term);
+}
+
 function tokenSpans(text) {
   const spans = [];
   const pattern = /[\p{L}\p{N}]+/gu;
@@ -252,6 +287,23 @@ function termRecord(term = {}, { requireId = false, preserveUpdatedAt = false, n
     targetLang,
     languagePair: `${sourceLang}::${targetLang}`,
     termBaseName,
+    resourceId: cleanText(term.resourceId),
+    conceptId: cleanText(term.conceptId) || `concept-${id}`,
+    status: ["preferred", "admitted", "forbidden"].includes(term.status)
+      ? term.status
+      : term.isForbidden
+        ? "forbidden"
+        : "preferred",
+    caseSensitivity: ["sensitive", "initial-sensitive", "insensitive"].includes(term.caseSensitivity)
+      ? term.caseSensitivity
+      : "insensitive",
+    matchMode: ["exact", "prefix", "fuzzy"].includes(term.matchMode) ? term.matchMode : "exact",
+    fuzzyThreshold: Math.max(50, Math.min(100, Number(term.fuzzyThreshold) || 85)),
+    definition: cleanText(term.definition),
+    subject: cleanText(term.subject),
+    domain: cleanText(term.domain),
+    partOfSpeech: cleanText(term.partOfSpeech),
+    usageExample: cleanText(term.usageExample),
     createdBy: cleanText(term.createdBy) || LOCAL_USER_ID,
     updatedBy: LOCAL_USER_ID,
     createdAt: cleanText(term.createdAt) || now,
@@ -517,14 +569,180 @@ async function parseTermWorkbook(arrayBufferOrBytes, options = {}) {
   return rowsToTerms(rows, { sourceLang, targetLang, termBaseName });
 }
 
+async function matchingTermbaseResourceId(input = {}) {
+  if (cleanText(input.resourceId)) return cleanText(input.resourceId);
+  const termBaseName = cleanPortableLabel(input.termBaseName);
+  const languagePair = languagePairFromFields(input.sourceLang, input.targetLang);
+  if (!termBaseName || !languagePair) return "";
+  const matches = (await getAllByIndex("resources", "typeName", ["termbase", termBaseName])).filter(
+    (resource) => languagePairOf(resource) === languagePair
+  );
+  return matches.length === 1 ? matches[0].id : "";
+}
+
 async function saveTerm(input = {}) {
-  const { sourceTerm, targetTerm, sourceLang, targetLang, notes, termBaseName, isForbidden = false } = input || {};
-  const term = termRecord({ sourceTerm, targetTerm, sourceLang, targetLang, notes, termBaseName, isForbidden });
+  const resourceId = await matchingTermbaseResourceId(input);
+  const term = termRecord({ ...input, resourceId });
   await ensureTermIndex(term.languagePair);
-  await put("terms", term);
-  await putTermIndexRecords([term]);
+  const concept = {
+    id: term.conceptId,
+    resourceId: term.resourceId,
+    definition: term.definition || "",
+    subject: term.subject || "",
+    domain: term.domain || "",
+    notes: term.notes || "",
+    createdAt: term.createdAt,
+    updatedAt: term.updatedAt
+  };
+  const designations = [
+    {
+      id: makeId("term-designation"),
+      conceptId: concept.id,
+      resourceId: term.resourceId,
+      language: term.sourceLang,
+      text: term.sourceTerm,
+      normalizedText: normalizeText(term.sourceTerm),
+      status: "preferred",
+      caseSensitivity: term.caseSensitivity,
+      matchMode: term.matchMode,
+      fuzzyThreshold: term.fuzzyThreshold,
+      partOfSpeech: term.partOfSpeech,
+      usageExample: term.usageExample,
+      createdAt: term.createdAt,
+      updatedAt: term.updatedAt
+    },
+    {
+      id: makeId("term-designation"),
+      conceptId: concept.id,
+      resourceId: term.resourceId,
+      language: term.targetLang,
+      text: term.targetTerm,
+      normalizedText: normalizeText(term.targetTerm),
+      status: term.status,
+      caseSensitivity: term.caseSensitivity,
+      matchMode: "exact",
+      fuzzyThreshold: term.fuzzyThreshold,
+      partOfSpeech: term.partOfSpeech,
+      usageExample: term.usageExample,
+      createdAt: term.createdAt,
+      updatedAt: term.updatedAt
+    }
+  ];
+  term.sourceDesignationId = designations[0].id;
+  term.targetDesignationId = designations[1].id;
+  const resource = term.resourceId ? await get("resources", term.resourceId) : null;
+  if (writeStoresAtomically) {
+    await writeStoresAtomically({
+      terms: [term],
+      termConcepts: [concept],
+      termDesignations: designations,
+      termTokenIndex: indexRecordsForTerm(term),
+      ...(resource ? { resources: [{ ...resource, updatedAt: term.updatedAt }] } : {})
+    });
+  } else {
+    Object.assign(term, await put("terms", term));
+    await putTermIndexRecords([term]);
+  }
   await writeTermIndexMetaClean(term.languagePair);
   return term;
+}
+
+async function saveTermPair(input = {}) {
+  const project = await get("projects", input.projectId);
+  if (!project) throw new Error("Project not found.");
+  const activeTermBaseId = cleanText(input.activeTermBaseId || project.activeTermBaseId);
+  if (!activeTermBaseId) throw new Error("Term capture is disabled. Enable contribution for a termbase in Optional Resource Settings.");
+  const writableLinks = (project.resourceLinks || []).filter((link) => link.type === "termbase" && link.contribute);
+  const requestedIds = Array.from(new Set([activeTermBaseId, ...(input.extraTermBaseIds || [])].map(cleanText).filter(Boolean)));
+  const destinations = writableLinks.filter((link) => requestedIds.includes(link.resourceId));
+  if (!destinations.some((link) => link.resourceId === activeTermBaseId)) {
+    throw new Error("The active termbase is not contribution-enabled. Review Optional Resource Settings.");
+  }
+  const resources = await Promise.all(destinations.map((link) => get("resources", link.resourceId)));
+  if (resources.some((resource) => !resource)) throw new Error("A selected termbase is unavailable. Review project resources.");
+  const source = requiredText(input.source, "Source term is required.");
+  const target = requiredText(input.target, "Target term is required.");
+  const normalizedSource = normalizeText(source);
+  const normalizedTarget = normalizeText(target);
+  const now = new Date().toISOString();
+  const allTerms = await getAllByIndex("terms", "languagePair", `${project.sourceLang}::${project.targetLang}`);
+  const skipped = [];
+  const alternatives = [];
+  const records = {
+    terms: [],
+    termConcepts: [],
+    termDesignations: [],
+    termTokenIndex: [],
+    resources: resources.map((resource) => ({ ...resource, updatedAt: now }))
+  };
+  destinations.forEach((link, index) => {
+    const resource = resources[index];
+    const resourceTerms = allTerms.filter((term) => term.resourceId === resource.id || !term.resourceId && term.termBaseName === resource.name);
+    const relatedTerms = resourceTerms.filter((term) => normalizeText(term.sourceTerm) === normalizedSource);
+    const duplicate = relatedTerms.find((term) => normalizeText(term.targetTerm) === normalizedTarget);
+    if (duplicate) {
+      skipped.push({ resourceId: resource.id, resourceName: resource.name, termId: duplicate.id });
+      return;
+    }
+    alternatives.push(...relatedTerms
+      .filter((term) => normalizeText(term.targetTerm) !== normalizedTarget)
+      .map((term) => ({ resourceId: resource.id, resourceName: resource.name, target: term.targetTerm, termId: term.id })));
+    const existingConceptId = relatedTerms.find((term) => term.conceptId)?.conceptId || "";
+    const conceptId = existingConceptId || makeId("term-concept");
+    const sourceDesignationId = relatedTerms.find((term) => term.sourceDesignationId)?.sourceDesignationId || makeId("term-designation");
+    const targetDesignationId = makeId("term-designation");
+    const term = termRecord({
+      sourceTerm: source,
+      targetTerm: target,
+      sourceLang: project.sourceLang,
+      targetLang: project.targetLang,
+      termBaseName: resource.name,
+      resourceId: resource.id,
+      conceptId,
+      sourceDesignationId,
+      targetDesignationId,
+      notes: input.metadata?.notes || "",
+      definition: input.metadata?.definition || "",
+      subject: input.metadata?.subject || "",
+      domain: input.metadata?.domain || project.domain || "",
+      status: input.metadata?.status || "preferred",
+      caseSensitivity: input.metadata?.caseSensitivity || "insensitive",
+      matchMode: input.metadata?.matchMode || "exact",
+      fuzzyThreshold: input.metadata?.fuzzyThreshold || 85,
+      partOfSpeech: input.metadata?.partOfSpeech || "",
+      usageExample: input.metadata?.usageExample || ""
+    }, { now });
+    const concept = {
+      id: conceptId,
+      resourceId: resource.id,
+      definition: term.definition,
+      subject: term.subject,
+      domain: term.domain,
+      notes: term.notes,
+      createdAt: now,
+      updatedAt: now
+    };
+    const sourceDesignation = {
+      id: sourceDesignationId, conceptId, resourceId: resource.id, language: project.sourceLang,
+      text: source, normalizedText: normalizedSource, status: "preferred", caseSensitivity: term.caseSensitivity,
+      matchMode: term.matchMode, fuzzyThreshold: term.fuzzyThreshold, partOfSpeech: term.partOfSpeech,
+      usageExample: term.usageExample, createdAt: now, updatedAt: now
+    };
+    const targetDesignation = {
+      id: targetDesignationId, conceptId, resourceId: resource.id, language: project.targetLang,
+      text: target, normalizedText: normalizedTarget, status: term.status, caseSensitivity: term.caseSensitivity,
+      matchMode: "exact", fuzzyThreshold: term.fuzzyThreshold, partOfSpeech: term.partOfSpeech,
+      usageExample: term.usageExample, createdAt: now, updatedAt: now
+    };
+    records.terms.push(term);
+    if (!existingConceptId) records.termConcepts.push(concept);
+    if (!relatedTerms.some((related) => related.sourceDesignationId)) records.termDesignations.push(sourceDesignation);
+    records.termDesignations.push(targetDesignation);
+    records.termTokenIndex.push(...indexRecordsForTerm(term));
+  });
+  if (records.terms.length) await writeStoresAtomically(records);
+  await writeTermIndexMetaClean(`${project.sourceLang}::${project.targetLang}`);
+  return { saved: records.terms, skipped, alternatives, destinationCount: destinations.length };
 }
 
 async function importTerms(terms, options = {}) {
@@ -542,8 +760,58 @@ async function importTerms(terms, options = {}) {
   let saved = 0;
   for (let index = 0; index < normalizedTerms.length; index += chunkSize) {
     const chunk = normalizedTerms.slice(index, index + chunkSize);
-    await bulkPut("terms", chunk);
-    await putTermIndexRecords(chunk);
+    const concepts = chunk.map((term) => ({
+      id: term.conceptId,
+      resourceId: term.resourceId,
+      definition: term.definition,
+      subject: term.subject,
+      domain: term.domain,
+      notes: term.notes,
+      createdAt: term.createdAt,
+      updatedAt: term.updatedAt
+    }));
+    const designations = chunk.flatMap((term) => {
+      term.sourceDesignationId ||= makeId("term-designation");
+      term.targetDesignationId ||= makeId("term-designation");
+      return [
+      {
+        id: term.sourceDesignationId, conceptId: term.conceptId, resourceId: term.resourceId,
+        language: term.sourceLang, text: term.sourceTerm, normalizedText: normalizeText(term.sourceTerm),
+        status: "preferred", caseSensitivity: term.caseSensitivity, matchMode: term.matchMode,
+        fuzzyThreshold: term.fuzzyThreshold, partOfSpeech: term.partOfSpeech, usageExample: term.usageExample,
+        createdAt: term.createdAt, updatedAt: term.updatedAt
+      },
+      {
+        id: term.targetDesignationId, conceptId: term.conceptId, resourceId: term.resourceId,
+        language: term.targetLang, text: term.targetTerm, normalizedText: normalizeText(term.targetTerm),
+        status: term.status, caseSensitivity: term.caseSensitivity, matchMode: "exact",
+        fuzzyThreshold: term.fuzzyThreshold, partOfSpeech: term.partOfSpeech, usageExample: term.usageExample,
+        createdAt: term.createdAt, updatedAt: term.updatedAt
+      }
+    ];
+    });
+    const tokenRows = chunk.flatMap(indexRecordsForTerm);
+    if (writeStoresAtomically) {
+      const resources = (
+        await Promise.all(
+          Array.from(new Set(chunk.map((term) => term.resourceId).filter(Boolean)), (resourceId) =>
+            get("resources", resourceId)
+          )
+        )
+      ).filter(Boolean);
+      await writeStoresAtomically({
+        terms: chunk,
+        termConcepts: concepts,
+        termDesignations: designations,
+        termTokenIndex: tokenRows,
+        ...(resources.length
+          ? { resources: resources.map((resource) => ({ ...resource, updatedAt: new Date().toISOString() })) }
+          : {})
+      });
+    } else {
+      await bulkPut("terms", chunk);
+      await putTermIndexRecords(chunk);
+    }
     saved += chunk.length;
     if (typeof options.onProgress === "function") {
       await options.onProgress({ saved, total: normalizedTerms.length, chunkSize: chunk.length });
@@ -570,10 +838,29 @@ async function deleteTerms(ids) {
   const idSet = new Set((ids || []).map((id) => String(id || "")).filter(Boolean));
   if (!idSet.size) return 0;
   const existingTerms = (await Promise.all(Array.from(idSet, (id) => get("terms", id)))).filter(Boolean);
+  const conceptIds = new Set(existingTerms.map((term) => term.conceptId).filter(Boolean));
+  const conceptTerms = (
+    await Promise.all(Array.from(conceptIds, (conceptId) => getAllByIndex("terms", "conceptId", conceptId)))
+  ).flat();
+  const remainingTerms = conceptTerms.filter((term) => !idSet.has(term.id));
+  const orphanConceptIds = new Set(
+    Array.from(conceptIds).filter((conceptId) => !remainingTerms.some((term) => term.conceptId === conceptId))
+  );
+  const retainedDesignationIds = new Set(
+    remainingTerms.flatMap((term) => [term.sourceDesignationId, term.targetDesignationId]).filter(Boolean)
+  );
+  const deletedDesignationIds = new Set(
+    existingTerms
+      .flatMap((term) => [term.sourceDesignationId, term.targetDesignationId])
+      .filter((id) => id && !retainedDesignationIds.has(id))
+  );
   if (deleteStoresWhereAtomically) {
     await deleteStoresWhereAtomically({
       terms: (term) => idSet.has(term.id),
-      termTokenIndex: (record) => idSet.has(record.termId)
+      termTokenIndex: (record) => idSet.has(record.termId),
+      termConcepts: (concept) => orphanConceptIds.has(concept.id),
+      termDesignations: (designation) =>
+        orphanConceptIds.has(designation.conceptId) || deletedDesignationIds.has(designation.id)
     });
   } else {
     for (const id of idSet) {
@@ -584,7 +871,11 @@ async function deleteTerms(ids) {
   const languagePairs = new Set(existingTerms.map(languagePairOf).filter(Boolean));
   for (const languagePair of languagePairs) await ensureTermIndex(languagePair);
   for (const languagePair of languagePairs) await writeTermIndexMetaClean(languagePair);
-  return idSet.size;
+  for (const resourceId of new Set(existingTerms.map((term) => term.resourceId).filter(Boolean))) {
+    const resource = await get("resources", resourceId);
+    if (resource) await put("resources", { ...resource, updatedAt: new Date().toISOString() });
+  }
+  return existingTerms.length;
 }
 
 async function updateTerm(term = {}) {
@@ -592,9 +883,49 @@ async function updateTerm(term = {}) {
   const previous = await get("terms", updated.id);
   const languagePairsToEnsure = new Set([languagePairOf(previous), updated.languagePair].filter(Boolean));
   for (const languagePair of languagePairsToEnsure) await ensureTermIndex(languagePair);
-  await deleteWhere("termTokenIndex", (record) => record.termId === updated.id);
-  await put("terms", updated);
-  await putTermIndexRecords([updated]);
+  const [previousConcept, previousDesignations] = await Promise.all([
+    get("termConcepts", updated.conceptId),
+    getAllByIndex("termDesignations", "conceptId", updated.conceptId)
+  ]);
+  const concept = {
+    ...(previousConcept || {}), id: updated.conceptId, resourceId: updated.resourceId,
+    definition: updated.definition, subject: updated.subject, domain: updated.domain, notes: updated.notes,
+    createdAt: previousConcept?.createdAt || updated.createdAt, updatedAt: updated.updatedAt
+  };
+  const sourceDesignation = previousDesignations.find((designation) =>
+    previous?.sourceDesignationId
+      ? designation.id === previous.sourceDesignationId
+      : designation.language === previous?.sourceLang && normalizeText(designation.text) === normalizeText(previous?.sourceTerm)
+  );
+  const targetDesignation = previousDesignations.find((designation) =>
+    previous?.targetDesignationId
+      ? designation.id === previous.targetDesignationId
+      : designation.language === previous?.targetLang && normalizeText(designation.text) === normalizeText(previous?.targetTerm)
+  );
+  const designation = (language, value, status, matchMode, existing) => ({
+    ...(existing || {}),
+    id: existing?.id || makeId("term-designation"), conceptId: updated.conceptId,
+    resourceId: updated.resourceId, language, text: value, normalizedText: normalizeText(value), status,
+    caseSensitivity: updated.caseSensitivity, matchMode, fuzzyThreshold: updated.fuzzyThreshold,
+    partOfSpeech: updated.partOfSpeech, usageExample: updated.usageExample,
+    createdAt: existing?.createdAt || updated.createdAt, updatedAt: updated.updatedAt
+  });
+  const designations = [
+    designation(updated.sourceLang, updated.sourceTerm, "preferred", updated.matchMode, sourceDesignation),
+    designation(updated.targetLang, updated.targetTerm, updated.status, "exact", targetDesignation)
+  ];
+  updated.sourceDesignationId = designations[0].id;
+  updated.targetDesignationId = designations[1].id;
+  const resource = updated.resourceId ? await get("resources", updated.resourceId) : null;
+  const result = await commitMutation(null, null, { rebaseLocal: true, changes: [
+    { store: "terms", value: updated },
+    { store: "termConcepts", value: concept },
+    ...designations.map((value) => ({ store: "termDesignations", value })),
+    { store: "termTokenIndex", where: { termId: updated.id } },
+    ...indexRecordsForTerm(updated).map((value) => ({ store: "termTokenIndex", value })),
+    ...(resource ? [{ store: "resources", value: { ...resource, updatedAt: updated.updatedAt } }] : [])
+  ] });
+  Object.assign(updated, result.values[0] || updated);
   const languagePairs = new Set([languagePairOf(previous), updated.languagePair].filter(Boolean));
   for (const languagePair of languagePairs) await writeTermIndexMetaClean(languagePair);
   return updated;
@@ -605,7 +936,11 @@ function resourceNameSet(names, legacyName) {
 }
 
 async function findTerms(options = {}) {
-  const { source, sourceLang, targetLang, termBaseName, termBaseNames } = options || {};
+  const { source, sourceLang, targetLang, termBaseName, termBaseNames, resourceLinks = [] } = options || {};
+  if (
+    Object.prototype.hasOwnProperty.call(options, "resourceLinks") &&
+    !resourceLinks.some((link) => link?.type === "termbase" && link.lookup !== false)
+  ) return [];
   const languagePair = languagePairFromFields(sourceLang, targetLang);
   if (!languagePair || !normalizeText(source)) return [];
   const sourceTokens = tokens(source).slice(0, MAX_TERM_SOURCE_TOKENS);
@@ -613,12 +948,13 @@ async function findTerms(options = {}) {
   if (sourceTokens.length) {
     await ensureTermIndex(languagePair);
     const allowedNames = resourceNameSet(termBaseNames, termBaseName);
+    const allowedResourceIds = new Set(resourceLinks.filter((link) => link?.type === "termbase" && link.lookup !== false).map((link) => link.resourceId).filter(Boolean));
     const candidateHits = new Map();
     const tokenRows = getAllByIndexMany
       ? await getAllByIndexMany("termTokenIndex", "languagePairToken", sourceTokens.map((token) => [languagePair, token]))
       : await Promise.all(sourceTokens.map((token) => getAllByIndex("termTokenIndex", "languagePairToken", [languagePair, token])));
     tokenRows.flat().forEach((record) => {
-      if (allowedNames.size && !allowedNames.has(record.termBaseName)) return;
+      if (allowedResourceIds.size ? !allowedResourceIds.has(record.resourceId) : allowedNames.size && !allowedNames.has(record.termBaseName)) return;
       candidateHits.set(record.termId, (candidateHits.get(record.termId) || 0) + 1);
     });
     const candidateIds = Array.from(candidateHits.entries())
@@ -628,23 +964,43 @@ async function findTerms(options = {}) {
     terms = ((getMany
       ? await getMany("terms", candidateIds)
       : await Promise.all(candidateIds.map((id) => get("terms", id))))).filter(Boolean);
+    const flexibleTerms = (await getAllByIndex("terms", "languagePair", languagePair))
+      .filter((term) => ["prefix", "fuzzy"].includes(term.matchMode));
+    terms = Array.from(new Map([...terms, ...flexibleTerms].map((term) => [term.id, term])).values());
   } else {
     terms = await getAllByIndex("terms", "languagePair", languagePair);
   }
   const allowedNames = resourceNameSet(termBaseNames, termBaseName);
+  const allowedResourceIds = new Set(resourceLinks.filter((link) => link?.type === "termbase" && link.lookup !== false).map((link) => link.resourceId).filter(Boolean));
+  const linkByResource = new Map(resourceLinks.map((link, index) => [link.resourceId || link.name, { ...link, priority: link.priority ?? index }]));
   return terms
-    .filter((term) => !allowedNames.size || allowedNames.has(term.termBaseName))
-    .filter((term) => containsNormalizedTerm(source, term.sourceTerm))
-    .sort((a, b) => b.sourceTerm.length - a.sourceTerm.length);
+    .filter((term) => allowedResourceIds.size ? allowedResourceIds.has(term.resourceId) : !allowedNames.size || allowedNames.has(term.termBaseName))
+    .filter((term) => designationMatches(source, term))
+    .map((term) => ({ ...term, resourcePriority: linkByResource.get(term.resourceId || term.termBaseName)?.priority ?? 999 }))
+    .sort((a, b) => b.sourceTerm.length - a.sourceTerm.length || a.resourcePriority - b.resourcePriority);
 }
 
 async function listTerms(options = {}) {
-  const { sourceLang, targetLang, termBaseName, termBaseNames } = options || {};
+  const { sourceLang, targetLang, termBaseName, termBaseNames, resourceLinks = [] } = options || {};
   const languagePair = languagePairFromFields(sourceLang, targetLang);
   if (!languagePair) return [];
+  if (
+    Object.prototype.hasOwnProperty.call(options, "resourceLinks") &&
+    !resourceLinks.some((link) => link?.type === "termbase" && link.qa !== false)
+  ) return [];
   const terms = await getAllByIndex("terms", "languagePair", languagePair);
   const allowedNames = resourceNameSet(termBaseNames, termBaseName);
-  return terms.filter((term) => !allowedNames.size || allowedNames.has(term.termBaseName));
+  const allowedResourceIds = new Set(
+    resourceLinks
+      .filter((link) => link?.type === "termbase" && link.qa !== false)
+      .map((link) => link.resourceId)
+      .filter(Boolean)
+  );
+  return terms.filter((term) =>
+    allowedResourceIds.size
+      ? allowedResourceIds.has(term.resourceId)
+      : !allowedNames.size || allowedNames.has(term.termBaseName)
+  );
 }
 
 window.CatHan.termbase = {
@@ -656,6 +1012,7 @@ window.CatHan.termbase = {
   parseTermList,
   parseTermWorkbook,
   saveTerm,
+  saveTermPair,
   importTerms,
   deleteTerm,
   deleteTerms,

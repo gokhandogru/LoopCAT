@@ -57,14 +57,17 @@ export function createAiOpenAiSuggestionController(options) {
     );
   }
 
-  async function restoreProject(previousProject, previousProjects, projectPersisted) {
+  async function restoreProject(previousProject, previousProjects, projectPersisted, committedVersion) {
     if (!projectPersisted) {
       editorSessionStore.replaceProject(previousProject);
       editorSessionStore.replaceProjects(previousProjects);
       return;
     }
     try {
-      const restoredProject = await persistence.updateProject(previousProject);
+      const restoredProject = await persistence.updateProject({
+        ...previousProject,
+        ...(committedVersion !== undefined ? { storageVersion: committedVersion } : {})
+      });
       editorSessionStore.replaceProject(restoredProject);
       replaceProjectInList(restoredProject);
     } catch (rollbackError) {
@@ -139,18 +142,20 @@ export function createAiOpenAiSuggestionController(options) {
     const previousProjects = editorSessionStore.getProjects().map((item) => structuredClone(item));
     const previousKey = keys.snapshot();
     let projectPersisted = false;
+    let committedVersion;
     try {
       beforeProjectSave(project);
       const savedProject = await persistence.updateProject({ ...project, aiSettings });
+      committedVersion = savedProject.storageVersion;
       editorSessionStore.replaceProject(savedProject);
       projectPersisted = true;
       replaceProjectInList(savedProject);
-      keys.save(apiKey, Boolean(secrets.rememberOpenAiKey));
+      await keys.save(apiKey, Boolean(secrets.rememberOpenAiKey));
       workspace.markDirty();
       presentation.renderEditor();
       status.set("Requesting OpenAI suggestion...");
     } catch (error) {
-      await restoreProject(previousProject, previousProjects, projectPersisted);
+      await restoreProject(previousProject, previousProjects, projectPersisted, committedVersion);
       keys.restore(previousKey);
       presentation.renderEditor();
       status.set(error.message || "OpenAI suggestion setup failed", "dirty");

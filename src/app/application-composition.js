@@ -1,5 +1,17 @@
 /* eslint-disable no-use-before-define -- Composition preserves call-time adapters to later checked boundaries. */
 /* eslint-disable no-unused-vars -- The isolated workflow driver consumes test-only lexical bindings at build time. */
+import { createReliabilityControls } from "./reliability-controls.js";
+import { createVerifiedOutputService } from "../features/import-export/verified-output-service.js";
+import { createCommandPersistenceService } from "../features/editor/command-persistence-service.js";
+
+function tmDocumentContextKey(segment, documentIndex = -1) {
+  const explicit = String(segment?.contextKey || "").trim();
+  if (explicit) return explicit;
+  const documentName = String(segment?.documentName || segment?.documentId || "").trim();
+  const stableIndex = Number.isFinite(Number(segment?.index)) ? Number(segment.index) : documentIndex;
+  return documentName && stableIndex >= 0 ? `${documentName}#${stableIndex}` : documentName;
+}
+
 export function installApplicationComposition({ appRuntime, browserGlobals, compatibilityModules, window }) {
   const {
     Blob,
@@ -29,15 +41,20 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   const {
     appendProjectSegments,
     appendProjectSegmentsAndUpdateProject,
+    createResource,
     createProject,
     deleteProject,
     deleteProjectDocument,
     deleteSegment,
     getProjectSegments,
+    listResources,
     listProjects,
+    duplicateResource,
+    renameResource,
+    setResourceArchived,
     replaceProjectSegments,
-    saveSegment,
-    saveSegments,
+    saveSegment: saveSegmentRecord,
+    saveSegments: saveSegmentRecords,
     saveSegmentStructure,
     updateProject
   } = compatibilityModules.project;
@@ -56,6 +73,8 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     sanitizePortableValue
   } = storageApi;
   const {
+    confirmSegmentWithMainTm,
+    restoreSegmentWithMainTm,
     deleteTmEntry,
     deleteTmEntries,
     getTmMatchCandidates,
@@ -78,6 +97,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     parseTermWorkbook,
     rebuildAllTermIndexes,
     saveTerm,
+    saveTermPair,
     termRanges,
     updateTerm
   } = compatibilityModules.termbase;
@@ -1089,9 +1109,11 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     tmResourceDetail: document.querySelector("#tmResourceDetail"),
     tbResourceDetail: document.querySelector("#tbResourceDetail"),
     tmResourceNameInput: document.querySelector("#tmResourceNameInput"),
+    createTmResourceBtn: document.querySelector("#createTmResourceBtn"),
     tmResourceSourceLangInput: document.querySelector("#tmResourceSourceLangInput"),
     tmResourceTargetLangInput: document.querySelector("#tmResourceTargetLangInput"),
     tbResourceNameInput: document.querySelector("#tbResourceNameInput"),
+    createTbResourceBtn: document.querySelector("#createTbResourceBtn"),
     tbResourceSourceLangInput: document.querySelector("#tbResourceSourceLangInput"),
     tbResourceTargetLangInput: document.querySelector("#tbResourceTargetLangInput"),
     resourceTmxImportInput: document.querySelector("#resourceTmxImportInput"),
@@ -1101,6 +1123,22 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     projectTbResourceList: document.querySelector("#projectTbResourceList"),
     newTmNameInput: document.querySelector("#newTmNameInput"),
     newTermBaseNameInput: document.querySelector("#newTermBaseNameInput"),
+    optionalResourceSettingsBtn: document.querySelector("#optionalResourceSettingsBtn"),
+    projectResourceSummary: document.querySelector("#projectResourceSummary"),
+    projectResourceDefaultNotice: document.querySelector("#projectResourceDefaultNotice"),
+    resourceSettingsDialog: document.querySelector("#resourceSettingsDialog"),
+    resourceSettingsForm: document.querySelector("#resourceSettingsForm"),
+    resourceSettingsPair: document.querySelector("#resourceSettingsPair"),
+    resourceSettingsSearchInput: document.querySelector("#resourceSettingsSearchInput"),
+    resourceSettingsTmTab: document.querySelector("#resourceSettingsTmTab"),
+    resourceSettingsTbTab: document.querySelector("#resourceSettingsTbTab"),
+    resourceSettingsTmPanel: document.querySelector("#resourceSettingsTmPanel"),
+    resourceSettingsTbPanel: document.querySelector("#resourceSettingsTbPanel"),
+    resourceSettingsMessage: document.querySelector("#resourceSettingsMessage"),
+    addNewTmBtn: document.querySelector("#addNewTmBtn"),
+    addNewTermBaseBtn: document.querySelector("#addNewTermBaseBtn"),
+    recommendedResourceSettingsBtn: document.querySelector("#recommendedResourceSettingsBtn"),
+    cancelResourceSettingsBtn: document.querySelector("#cancelResourceSettingsBtn"),
     projectStorageStatus: document.querySelector("#projectStorageStatus"),
     projectChooseWorkspaceBtn: document.querySelector("#projectChooseWorkspaceBtn"),
     saveProjectToFolderInput: document.querySelector("#saveProjectToFolderInput"),
@@ -1111,11 +1149,36 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     concordanceOverlay: document.querySelector("#concordanceOverlay"),
     concordanceMeta: document.querySelector("#concordanceMeta"),
     concordanceResults: document.querySelector("#concordanceResults"),
+    concordanceQueryInput: document.querySelector("#concordanceQueryInput"),
+    concordanceScopeSelect: document.querySelector("#concordanceScopeSelect"),
+    concordanceResourceSelect: document.querySelector("#concordanceResourceSelect"),
+    concordanceSearchBtn: document.querySelector("#concordanceSearchBtn"),
     closeConcordanceBtn: document.querySelector("#closeConcordanceBtn"),
     quickInsertOverlay: document.querySelector("#quickInsertOverlay"),
     quickInsertMeta: document.querySelector("#quickInsertMeta"),
     quickInsertResults: document.querySelector("#quickInsertResults"),
     closeQuickInsertBtn: document.querySelector("#closeQuickInsertBtn"),
+    predictiveTypingList: document.querySelector("#predictiveTypingList"),
+    predictiveTypingAnnouncer: document.querySelector("#predictiveTypingAnnouncer"),
+    predictiveTypingInput: document.querySelector("#predictiveTypingInput"),
+    quickTermCaptureDialog: document.querySelector("#quickTermCaptureDialog"),
+    quickTermCaptureForm: document.querySelector("#quickTermCaptureForm"),
+    quickTermSourceInput: document.querySelector("#quickTermSourceInput"),
+    quickTermTargetInput: document.querySelector("#quickTermTargetInput"),
+    quickTermExtras: document.querySelector("#quickTermExtraTermbases"),
+    quickTermStatusSelect: document.querySelector("#quickTermStatusSelect"),
+    quickTermCaseSelect: document.querySelector("#quickTermCaseSelect"),
+    quickTermMatchModeSelect: document.querySelector("#quickTermMatchModeSelect"),
+    quickTermFuzzyThresholdInput: document.querySelector("#quickTermFuzzyThresholdInput"),
+    quickTermSubjectInput: document.querySelector("#quickTermSubjectInput"),
+    quickTermDomainInput: document.querySelector("#quickTermDomainInput"),
+    quickTermPartOfSpeechInput: document.querySelector("#quickTermPartOfSpeechInput"),
+    quickTermDefinitionInput: document.querySelector("#quickTermDefinitionInput"),
+    quickTermUsageExampleInput: document.querySelector("#quickTermUsageExampleInput"),
+    quickTermNotesInput: document.querySelector("#quickTermNotesInput"),
+    quickTermCaptureMessage: document.querySelector("#quickTermCaptureMessage"),
+    closeQuickTermCaptureBtn: document.querySelector("#closeQuickTermCaptureBtn"),
+    cancelQuickTermCaptureBtn: document.querySelector("#cancelQuickTermCaptureBtn"),
     projectDashboard: document.querySelector("#projectDashboard"),
     projectSearchInput: document.querySelector("#projectSearchInput"),
     projectsImportProjectBtn: document.querySelector("#projectsImportProjectBtn"),
@@ -1355,6 +1418,19 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   applicationStore.subscribe((next, previous) => {
     applicationSaveStatusController.navigationChanged(next.navigation, previous.navigation);
   });
+  const dialogLifecycleController = appRuntime?.featureFactories?.createDialogController?.({
+    focusController,
+    getActiveElement: () => document.activeElement,
+    onError: (error, context) => {
+      if (context?.id === "diagnostics" && els.diagnosticsMessage) {
+        els.diagnosticsMessage.textContent = uiLocalizationService.source(
+          error?.message || "Diagnostics could not be collected."
+        );
+        return;
+      }
+      applicationSaveStatusController.set(error?.message || "Dialog could not be opened.", "dirty");
+    }
+  });
   const applicationImportProgressController = appRuntime.featureFactories.createApplicationImportProgressController({
     context: {
       getTask: () => state.importTask,
@@ -1560,6 +1636,8 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   });
 
   const segmentFilterService = appRuntime.featureFactories.createSegmentFilterService({
+    onResults: () => segmentGridPresentationController.render({ preserveScroll: true }),
+    onError: (error) => applicationSaveStatusController.set(error.message, "dirty"),
     getSegments: () => editorSessionStore.getSegments(),
     getFilters: () => editorFilterStore.getState(),
     getDocumentId: () => applicationStore.getState().navigation.documentId,
@@ -1700,7 +1778,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   const termbaseSelectPresentationController = appRuntime.featureFactories.createTermbaseSelectPresentationController({
     select: els.termBaseSelect,
     resources: {
-      termBaseNames: projectResourceContextService.termBaseNames,
+      termBaseNames: () => projectResourceContextService.contributionTermbaseLinks().map((link) => link.name),
       primaryTermBase: projectResourceContextService.primaryTermBase
     },
     dom: {
@@ -1849,7 +1927,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   const projectTermQueryService = appRuntime.featureFactories.createProjectTermQueryService({
     session: { getProject: editorSessionStore.getProject },
     repository: { listTerms },
-    resources: { termBaseNames: projectResourceContextService.termBaseNames }
+    resources: { termBaseNames: () => projectResourceContextService.qaTermbaseLinks().map((link) => link.name) }
   });
 
   const projectActivityController = appRuntime.featureFactories.createProjectActivityController({
@@ -1915,6 +1993,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     });
 
   const projectOpenController = appRuntime.featureFactories.createProjectOpenController({
+    ownership: { open: (id) => reliabilityControls.open(id) },
     autosave: { flush: (...args) => autosaveService.flush(...args) },
     session: {
       getProject: editorSessionStore.getProject,
@@ -1931,6 +2010,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     repository: {
       listSegments: getProjectSegments,
+      getProject: (id) => compatibilityModules.project.getProject(id),
       listActivity: listActivityEvents
     },
     histories: { prepare: (...args) => segmentTargetStateService.prepareHistories(...args) },
@@ -1985,7 +2065,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   const resourceCatalogRefreshController = appRuntime.featureFactories.createResourceCatalogRefreshController({
     repository: {
       listTmEntries,
-      listTerms: () => getAll("terms")
+      listTerms: () => getAll("terms"),
+      listResources: () => listResources({ includeArchived: true }),
+      listProjects
     },
     presentation: {
       setResources: (...args) => resourcesController?.setResources?.(...args)
@@ -2104,6 +2186,17 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     tm: {
       getNames: projectResourceContextService.tmNames,
+      getLinks: projectResourceContextService.lookupTmLinks,
+      context: (segment) => {
+        const segments = editorSessionStore.getSegments().filter((item) => item.documentId === segment.documentId);
+        const index = segments.findIndex((item) => item.id === segment.id);
+        return {
+          documentKey: tmDocumentContextKey(segment, index),
+          previousSource: segments[index - 1]?.source || "",
+          nextSource: segments[index + 1]?.source || "",
+          domain: editorSessionStore.getProject()?.domain || ""
+        };
+      },
       findMatches: projectTmMatchService.find
     },
     localization: uiLocalizationService,
@@ -2124,6 +2217,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     terms: {
       getNames: projectResourceContextService.termBaseNames,
+      getLinks: projectResourceContextService.lookupTermbaseLinks,
       find: findTerms
     },
     localization: uiLocalizationService,
@@ -2151,7 +2245,24 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       primaryName: projectResourceContextService.primaryTermBase,
       markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource
     },
-    repository: { save: saveTerm },
+    repository: {
+      save: async (term) => {
+        const project = editorSessionStore.getProject();
+        const activeTermBaseId = project?.activeTermBaseId || null;
+        const selected = projectResourceContextService
+          .contributionTermbaseLinks(project)
+          .find((link) => link.name === term.termBaseName && link.resourceId !== activeTermBaseId);
+        const result = await saveTermPair({
+          projectId: project?.id,
+          activeTermBaseId,
+          extraTermBaseIds: selected ? [selected.resourceId] : [],
+          source: term.sourceTerm,
+          target: term.targetTerm,
+          metadata: { notes: term.notes, status: term.isForbidden ? "forbidden" : "preferred" }
+        });
+        return result.saved[0] || { ...term, id: result.skipped[0]?.termId || "", resourceId: activeTermBaseId };
+      }
+    },
     presentation: {
       renderTermbaseSelect: termbaseSelectPresentationController.render,
       refreshProjectTerms: projectTermRefreshController.refresh,
@@ -2199,6 +2310,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     tm: {
       saveEntry: saveTmEntry,
       mainName: projectResourceContextService.mainTm,
+      mainLink: projectResourceContextService.mainTmLink,
       refreshMatches: tmMatchesController.refresh
     },
     workspace: { markDirty: workspaceDirtyStateController.mark },
@@ -2410,35 +2522,74 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   const autosaveService = appRuntime.featureFactories.createAutosaveService({
     editorSessionStore,
     repository: {
-      save: saveSegment,
-      saveMany: saveSegments
+      save: saveSegmentRecord,
+      saveMany: saveSegmentRecords
     },
     editLifecycle: {
       finalize: (segmentId) => targetEditController?.finalize?.(segmentId),
       finalizeProject: (projectId) => targetEditController?.finalizeProject?.(projectId) || [],
       finalizeAll: () => targetEditController?.finalizeAll?.() || []
     },
-    status: { set: applicationSaveStatusController.set },
+    status: { set: applicationSaveStatusController.setPersistence },
     onSaved: revisionHistoryPresentationService.render,
     testHooks: {
       beforeSave: (segment) => {
-        if (LOOPCAT_TEST_BUILD && segment[AUTOSAVE_SAVE_FAILURE_TEST_FLAG]) {
+        const current = LOOPCAT_TEST_BUILD && editorSessionStore.getSegments().find((item) => item.id === segment.id);
+        if (LOOPCAT_TEST_BUILD && (current || segment)[FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG]) {
+          throw new Error("Simulated pending save flush failure");
+        }
+        if (LOOPCAT_TEST_BUILD && (current || segment)[AUTOSAVE_SAVE_FAILURE_TEST_FLAG]) {
           Reflect.deleteProperty(segment, AUTOSAVE_SAVE_FAILURE_TEST_FLAG);
+          if (current) Reflect.deleteProperty(current, AUTOSAVE_SAVE_FAILURE_TEST_FLAG);
           throw new Error("Simulated autosave save failure");
         }
       },
       beforeFlush: (segments) => {
-        if (LOOPCAT_TEST_BUILD && segments.some((segment) => segment[FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG])) {
+        if (
+          LOOPCAT_TEST_BUILD &&
+          segments.some(
+            (segment) =>
+              (editorSessionStore.getSegments().find((item) => item.id === segment.id) || segment)[
+                FLUSH_PENDING_SAVE_FAILURE_TEST_FLAG
+              ]
+          )
+        ) {
           throw new Error("Simulated pending save flush failure");
         }
       }
     }
   });
+  const commandPersistence = createCommandPersistenceService({
+    autosave: autosaveService,
+    session: editorSessionStore,
+    repository: { save: saveSegmentRecord, saveMany: saveSegmentRecords },
+    setTimer: setTimeout
+  });
+  function saveSegment(segment) {
+    return commandPersistence.save(segment);
+  }
+  function saveSegments(segments) {
+    return commandPersistence.saveMany(segments);
+  }
   const segmentCommandRestorationController = appRuntime.featureFactories.createSegmentCommandRestorationController({
+    onPresentationError: (error) =>
+      applicationSaveStatusController.set(`Saved; display refresh failed: ${error.message}`, "dirty"),
     editorSessionStore,
     targetState: segmentTargetStateService,
-    autosave: { clear: autosaveService.clear },
-    persistence: { save: saveSegment, saveMany: saveSegments },
+    autosave: { clear: autosaveService.clear, retry: autosaveService.debounce },
+    persistence: {
+      save: saveSegment,
+      saveMany: saveSegments,
+      restoreResourceSegment: (segment) => {
+        const segments = editorSessionStore.getSegments().filter((item) => item.documentId === segment.documentId);
+        const index = segments.findIndex((item) => item.id === segment.id);
+        return restoreSegmentWithMainTm(editorSessionStore.getProject(), segment, {
+          documentKey: tmDocumentContextKey(segment, index),
+          previousSource: segments[index - 1]?.source || "",
+          nextSource: segments[index + 1]?.source || ""
+        });
+      }
+    },
     selection: {
       getActiveSegment: applicationActiveSegmentService.get,
       select: (index, segmentId) => applicationNavigation.selectSegment({ activeIndex: index, segmentId }),
@@ -2531,7 +2682,11 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       replaceQaChecks: editorSessionStore.replaceQaChecks,
       replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue
     },
-    terms: { list: listTerms, getNames: projectResourceContextService.termBaseNames },
+    terms: {
+      list: listTerms,
+      getNames: projectResourceContextService.termBaseNames,
+      getLinks: projectResourceContextService.qaTermbaseLinks
+    },
     documents: { currentSegments: projectDocumentCatalogService.currentSegments },
     tags: {
       sourceTags: protectedTagInspectionService.sourceTags,
@@ -2660,8 +2815,17 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     repositories: { importTmEntries, importTerms, getAllByIndex, listTerms },
     resources: {
       mainTmName: projectResourceContextService.mainTm,
+      mainTmLink: projectResourceContextService.mainTmLink,
       projectTmNames: projectResourceContextService.tmNames,
       selectedTermBaseName: () => els.termBaseSelect.value || projectResourceContextService.primaryTermBase(),
+      selectedTermBaseLink: () => {
+        const selectedName = els.termBaseSelect.value || projectResourceContextService.primaryTermBase();
+        return (
+          projectResourceContextService
+            .links(editorSessionStore.getProject())
+            .find((link) => link.type === "termbase" && link.name === selectedName) || null
+        );
+      },
       primaryTermBaseName: projectResourceContextService.primaryTermBase,
       projectTermBaseNames: projectResourceContextService.termBaseNames,
       markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource
@@ -2705,8 +2869,14 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       preparePersistedRollback: segmentConfirmationStateService.preparePersistedRollback
     },
     persistence: {
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       save: saveSegment,
+      confirmAtomic: (project, segment, context) => {
+        if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG]) {
+          throw new Error("Simulated TM save failure");
+        }
+        return confirmSegmentWithMainTm(project, segment, context);
+      },
       saveToTm: segmentTmSaveController.save,
       logActivity: (segment, project) =>
         projectActivityController.log(
@@ -2766,6 +2936,8 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     workspace: { markDirty: workspaceDirtyStateController.mark }
   });
   let quickInsertController = null;
+  let quickTermCaptureController = null;
+  let predictiveTypingController = null;
   targetEditController = appRuntime.featureFactories.createTargetEditController({
     editorSessionStore,
     commandBus: appRuntime.commands.bus,
@@ -2792,11 +2964,88 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       hasSuggestions: () => Boolean(quickInsertController?.hasSuggestions?.()),
       open: () => quickInsertController?.open?.()
     },
+    termCapture: {
+      open: () => quickTermCaptureController?.open?.()
+    },
+    predictiveTyping: {
+      prepare: () => predictiveTypingController?.prepare?.(),
+      onInput: (...args) => predictiveTypingController?.onInput?.(...args),
+      handleKeydown: (event) => Boolean(predictiveTypingController?.handleKeydown?.(event)),
+      hide: () => predictiveTypingController?.hide?.()
+    },
     protectedTags: {
       missing: protectedTagInspectionService.missing,
       insert: (tagTexts) => targetProducerController.insertProtectedTags(tagTexts)
     }
   });
+  predictiveTypingController = appRuntime.featureFactories.createPredictiveTypingController({
+    elements: {
+      listbox: els.predictiveTypingList,
+      announcer: els.predictiveTypingAnnouncer,
+      toggle: els.predictiveTypingInput
+    },
+    session: {
+      getProject: editorSessionStore.getProject,
+      getSegment: applicationActiveSegmentService.get
+    },
+    sources: {
+      getTm: tmMatchesController.getResults,
+      getTerms: termSuggestionsController.getResults
+    },
+    apply: (index, value, selection) => {
+      targetEditController.updateDraft(index, value);
+      targetEditController.focusActive(selection);
+    },
+    modal: { isOpen: () => Boolean(document.querySelector("dialog[open]")) },
+    preferences: appRuntime.preferencesRepository
+  });
+  void predictiveTypingController.mount();
+  quickTermCaptureController = appRuntime.featureFactories.createQuickTermCaptureController({
+    elements: {
+      dialog: els.quickTermCaptureDialog,
+      form: els.quickTermCaptureForm,
+      source: els.quickTermSourceInput,
+      target: els.quickTermTargetInput,
+      extras: els.quickTermExtras,
+      status: els.quickTermStatusSelect,
+      caseSensitivity: els.quickTermCaseSelect,
+      matchMode: els.quickTermMatchModeSelect,
+      fuzzyThreshold: els.quickTermFuzzyThresholdInput,
+      subject: els.quickTermSubjectInput,
+      domain: els.quickTermDomainInput,
+      partOfSpeech: els.quickTermPartOfSpeechInput,
+      definition: els.quickTermDefinitionInput,
+      usageExample: els.quickTermUsageExampleInput,
+      notes: els.quickTermNotesInput,
+      message: els.quickTermCaptureMessage,
+      close: els.closeQuickTermCaptureBtn,
+      cancel: els.cancelQuickTermCaptureBtn,
+      submit: els.quickTermCaptureForm?.querySelector?.('button[type="submit"]')
+    },
+    dialogLifecycle: dialogLifecycleController,
+    session: {
+      getProject: editorSessionStore.getProject,
+      getSegment: applicationActiveSegmentService.get
+    },
+    resources: { links: projectResourceContextService.links },
+    repository: { savePair: saveTermPair },
+    selection: {
+      targetEditor: () =>
+        verticalFeatureState.segmentGrid.findTargetEditor(
+          els.segmentBody,
+          applicationStore.getState().navigation.activeIndex
+        ),
+      sourceText: () => window.getSelection?.()?.toString?.() || ""
+    },
+    refresh: {
+      projectTerms: projectTermRefreshController.refresh,
+      suggestions: termSuggestionsController.refresh
+    },
+    workspace: { markDirty: workspaceDirtyStateController.mark },
+    status: { set: applicationSaveStatusController.set },
+    preferences: appRuntime.preferencesRepository
+  });
+  quickTermCaptureController.mount();
   const targetProducerController = appRuntime.featureFactories.createTargetProducerController({
     copySourceElement: els.copySourceBtn,
     editorSessionStore,
@@ -2810,7 +3059,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     editLifecycle: { finalize: targetEditController.finalize },
     persistence: {
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       debounce: autosaveService.debounce
     },
     selection: {
@@ -2842,11 +3091,19 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       overlay: els.concordanceOverlay,
       closeButton: els.closeConcordanceBtn,
       meta: els.concordanceMeta,
-      results: els.concordanceResults
+      results: els.concordanceResults,
+      queryInput: els.concordanceQueryInput,
+      scopeSelect: els.concordanceScopeSelect,
+      resourceSelect: els.concordanceResourceSelect,
+      searchButton: els.concordanceSearchBtn
     },
     session: { getProject: editorSessionStore.getProject },
     navigation: { getView: () => applicationStore.getState().navigation.view },
-    tm: { listEntries: listTmEntries, getNames: projectResourceContextService.tmNames },
+    tm: {
+      listEntries: listTmEntries,
+      getNames: projectResourceContextService.tmNames,
+      getLinks: projectResourceContextService.lookupTmLinks
+    },
     resources: { summary: projectResourceContextService.summary },
     languages: { display: projectLanguageContextController.display },
     localization: uiLocalizationService,
@@ -2883,7 +3140,10 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       getIndexes: (scope) =>
         scope === "all" ? segmentFilterService.allIndexes() : segmentFilterService.visibleIndexes()
     },
-    transform: { replace: protectedTextReplacementService.replace },
+    transform: {
+      replace: protectedTextReplacementService.replaceAsync,
+      replaceMany: protectedTextReplacementService.replaceMany
+    },
     commands: {
       bus: appRuntime.commands.bus,
       create: appRuntime.commands.createReplaceTargetsCommand,
@@ -2891,7 +3151,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     persistence: {
       flush: autosaveService.flush,
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       save: saveSegments
     },
     mutation: {
@@ -2948,6 +3208,17 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     tm: {
       getNames: projectResourceContextService.tmNames,
+      getLinks: projectResourceContextService.lookupTmLinks,
+      context: (segment) => {
+        const segments = editorSessionStore.getSegments().filter((item) => item.documentId === segment.documentId);
+        const index = segments.findIndex((item) => item.id === segment.id);
+        return {
+          documentKey: tmDocumentContextKey(segment, index),
+          previousSource: segments[index - 1]?.source || "",
+          nextSource: segments[index + 1]?.source || "",
+          domain: editorSessionStore.getProject()?.domain || ""
+        };
+      },
       findMatchesBatch: projectTmMatchService.findBatch
     },
     commands: {
@@ -2998,6 +3269,8 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   });
   tmPretranslationController.mount();
   const aiCredentialStorageService = appRuntime.featureFactories.createAiCredentialStorageService({
+    secure: window.LoopCATDesktop?.saveCredential ? window.LoopCATDesktop : undefined,
+    sessionOnly: true,
     storage: {
       get: (kind) => (kind === "local" ? browserGlobals.localStorage : browserGlobals.sessionStorage)
     },
@@ -3294,7 +3567,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     mutation: {
       capturePatch: segmentTargetStateService.capturePatch,
       applyPatch: segmentTargetStateService.applyPatch,
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       recordHistory: (segment) =>
         segmentTargetStateService.recordHistory(segment, segment.target, segment.status, "ai-pretranslate"),
       touch: segmentTargetStateService.touch,
@@ -3376,7 +3649,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     mutation: {
       touch: segmentTargetStateService.touch,
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       restore: (segment, snapshot) => {
         Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
         Object.assign(segment, snapshot);
@@ -3460,7 +3733,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     mutation: {
       touch: segmentTargetStateService.touch,
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       restore: (segment, snapshot) => {
         Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
         Object.assign(segment, snapshot);
@@ -3539,7 +3812,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     mutation: {
       touch: segmentTargetStateService.touch,
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       restore: (segment, snapshot) => {
         Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
         Object.assign(segment, snapshot);
@@ -3617,7 +3890,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     mutation: {
       touch: segmentTargetStateService.touch,
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       restore: (segment, snapshot) => {
         Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
         Object.assign(segment, snapshot);
@@ -3696,7 +3969,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     mutation: {
       touch: segmentTargetStateService.touch,
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       restore: (segment, snapshot) => {
         Reflect.ownKeys(segment).forEach((key) => delete segment[key]);
         Object.assign(segment, snapshot);
@@ -3852,7 +4125,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     persistence: {
       flush: autosaveService.flush,
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       save: saveSegment
     },
     activity: {
@@ -3898,7 +4171,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       prepareHistory: segmentTargetStateService.prepareHistory
     },
     persistence: {
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       save: saveSegment
     },
     activity: { log: projectActivityController.log },
@@ -4217,8 +4490,14 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     renderHistory: revisionHistoryPresentationService.render,
     renderAi: aiSuggestionListController.render,
     renderQuality: qualityWorkbenchController.render,
-    refreshMatches: tmMatchesController.refresh,
-    refreshTerms: termSuggestionsController.refresh
+    refreshMatches: async () => {
+      await tmMatchesController.refresh();
+      predictiveTypingController?.prepare?.();
+    },
+    refreshTerms: async () => {
+      await termSuggestionsController.refresh();
+      predictiveTypingController?.prepare?.();
+    }
   });
 
   segmentNavigationController = appRuntime.featureFactories.createSegmentNavigationController({
@@ -4353,7 +4632,11 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       warmup: (window.LoopCATProductionAssets?.offlineAssets || []).map((asset) => `./${asset}`)
     },
     persistence: {
-      flush: () => autosaveService.flush(),
+      pauseEditing: () => reliabilityControls.pauseEditing(),
+      flush: async () => {
+        await autosaveService.flush();
+        await storageApi.flushMutations();
+      },
       shouldSaveRecovery: () => Boolean(state.workspaceStatus?.connected && state.workspaceDirtyProjectIds.size),
       saveRecovery: () => workspacePackageSaveController.saveRecovery()
     },
@@ -4608,6 +4891,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   });
   const applicationPersistenceLifecycleController =
     appRuntime.featureFactories.createApplicationPersistenceLifecycleController({
+      emergencyText: () => reliabilityControls.emergencyText(),
+      pauseEditing: () => reliabilityControls.pauseEditing(),
+      flushMutations: () => storageApi.flushMutations(),
       targets: { window, document },
       visibility: { getState: () => document.visibilityState },
       pending: { hasImport: () => Boolean(state.importTask) },
@@ -4733,19 +5019,6 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     translate: uiLocalizationService.source
   });
 
-  const dialogLifecycleController = appRuntime?.featureFactories?.createDialogController?.({
-    focusController,
-    getActiveElement: () => document.activeElement,
-    onError: (error, context) => {
-      if (context?.id === "diagnostics" && els.diagnosticsMessage) {
-        els.diagnosticsMessage.textContent = uiLocalizationService.source(
-          error?.message || "Diagnostics could not be collected."
-        );
-        return;
-      }
-      applicationSaveStatusController.set(error?.message || "Dialog could not be opened.", "dirty");
-    }
-  });
   dialogLifecycleController?.register?.({
     id: "ai-provider",
     dialog: els.aiProviderDialog,
@@ -4867,7 +5140,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   recoveryWorkspaceController?.mount?.();
   const projectPackagePortabilityService = appRuntime.featureFactories.createProjectPackagePortabilityService({
     validation: { validate: validatePackage },
-    storage: { getAll },
+    storage: { getAll, getMany: storageApi.getMany },
     records: { sanitize: sanitizePortableValue },
     ids: { make: makeId },
     projects: { getAll: editorSessionStore.getProjects },
@@ -4884,7 +5157,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       getAllByIndex,
       listTerms,
       listActivityEvents,
-      exportAllData
+      exportAllData,
+      createArchiveExport: storageApi.createArchiveExport,
+      exportProjectSnapshot: storageApi.exportProjectSnapshot
     },
     resources: {
       getLinks: projectResourceContextService.links,
@@ -4914,7 +5189,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     build: projectExportBuildService,
     storage: {
-      exportFullBackup: (backup) => workspaceStorage.exportFullBackup(backup),
+      exportFullBackup: (backup, options) => workspaceStorage.exportFullBackup(backup, options),
       getStatus: () => workspaceStorage.getStatus()
     },
     workspace: {
@@ -4962,6 +5237,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     build: projectExportBuildService,
     session: editorSessionStore,
     persistence: {
+      getProject: (id) => storageApi.get("projects", id),
       updateProject,
       bulkPut,
       listActivityEvents
@@ -4972,7 +5248,8 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     files: {
       safeName: applicationTextSafetyService.fileSafeName,
-      download: applicationDownloadController.download
+      download: applicationDownloadController.download,
+      choose: (filename, mime) => createVerifiedOutputService(window).choose(filename, mime)
     },
     validation: {
       count: reportCount,
@@ -5023,6 +5300,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
         state.workspaceStatus = status;
       },
       markMissingLocalDirty: workspaceProjectCoverageService.markMissingLocalDirty,
+      generation: workspaceDirtyStateController.generation,
       clearDirty: workspaceDirtyStateController.clear,
       markDirty: workspaceDirtyStateController.mark,
       hasDirty: () => Boolean(state.workspaceDirtyProjectIds.size),
@@ -5068,7 +5346,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     autosave: { flush: autosaveService.flush },
     persistence: {
       importProjectPackageRecords,
-      importAllData
+      importAllData,
+      prepareRestore: storageApi.prepareRestore,
+      commitRestore: (plan) => reliabilityControls.withEditingPaused(() => storageApi.commitRestore(plan))
     },
     indexes: {
       rebuildTm: rebuildAllTmIndexes,
@@ -5255,17 +5535,34 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   });
   importExportController?.mount?.();
   const resourceCatalogService = appRuntime.featureFactories.createResourceCatalogService({
-    getState: () => resourcesController?.getState?.() || { tmEntries: [], terms: [] }
+    getState: () => resourcesController?.getState?.() || { tmEntries: [], terms: [], resources: [] }
   });
   const projectResourceSelectionController = appRuntime.featureFactories.createProjectResourceSelectionController({
     elements: {
       dialog: els.projectDialog,
+      resourceDialog: els.resourceSettingsDialog,
+      resourceForm: els.resourceSettingsForm,
+      projectNameInput: els.projectNameInput,
       sourceLanguageInput: els.sourceLangInput,
       targetLanguageInput: els.targetLangInput,
       tmResourceList: els.projectTmResourceList,
       tbResourceList: els.projectTbResourceList,
       newTmNameInput: els.newTmNameInput,
-      newTermBaseNameInput: els.newTermBaseNameInput
+      newTermBaseNameInput: els.newTermBaseNameInput,
+      openButton: els.optionalResourceSettingsBtn,
+      summary: els.projectResourceSummary,
+      defaultNotice: els.projectResourceDefaultNotice,
+      pairLabel: els.resourceSettingsPair,
+      searchInput: els.resourceSettingsSearchInput,
+      tmTab: els.resourceSettingsTmTab,
+      tbTab: els.resourceSettingsTbTab,
+      tmPanel: els.resourceSettingsTmPanel,
+      tbPanel: els.resourceSettingsTbPanel,
+      message: els.resourceSettingsMessage,
+      addTmButton: els.addNewTmBtn,
+      addTbButton: els.addNewTermBaseBtn,
+      recommendedButton: els.recommendedResourceSettingsBtn,
+      cancelButton: els.cancelResourceSettingsBtn
     },
     getProject: () => editorSessionStore.getProject(),
     getMode: () => projectDialogController?.getMode?.() || null,
@@ -5286,7 +5583,15 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       languagePairDisplay: languageInputService.pairDisplay
     },
     names: { unique: projectNameService.unique, clean: projectNameService.clean },
-    makeId
+    makeId,
+    dialogLifecycle: dialogLifecycleController,
+    resumeProject: () =>
+      projectDialogController?.open?.(projectDialogController.getMode(), {
+        resume: true,
+        returnTarget: els.optionalResourceSettingsBtn
+      }),
+    onError: (error) =>
+      applicationSaveStatusController.set(error?.message || "Resource settings could not be opened.", "dirty")
   });
   const projectLanguagePairShortcutsController =
     appRuntime.featureFactories.createProjectLanguagePairShortcutsController({
@@ -5406,6 +5711,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     setLanguageValue: languageInputService.setInput,
     normalizeLanguageValue: languageInputService.normalizeElement,
     renderStorageStatus: workspaceRecoveryPresentationService.renderProjectStorage,
+    prepareResourcePlan: projectResourceSelectionController.prepare,
     renderResourcePickers: projectResourceSelectionController.render,
     renderFrequentPairs: projectLanguagePairShortcutsController.render,
     save: projectDialogSaveController.save,
@@ -5417,6 +5723,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     onError: (error) => applicationSaveStatusController.set(error?.message || "Dialog could not be opened.", "dirty")
   });
   projectDialogController.mount();
+  projectResourceSelectionController.mount();
   const tmPretranslationDialogController = appRuntime?.featureFactories?.createTmPretranslationDialogController?.({
     dialogLifecycle: dialogLifecycleController,
     elements: {
@@ -5450,8 +5757,12 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       tbName: () => els.tbResourceNameInput.value,
       tmSourceLanguageInput: els.tmResourceSourceLangInput,
       tmTargetLanguageInput: els.tmResourceTargetLangInput,
+      tmNameInput: els.tmResourceNameInput,
+      createTmButton: els.createTmResourceBtn,
       tbSourceLanguageInput: els.tbResourceSourceLangInput,
       tbTargetLanguageInput: els.tbResourceTargetLangInput,
+      tbNameInput: els.tbResourceNameInput,
+      createTbButton: els.createTbResourceBtn,
       normalizeLanguageInput: languageInputService.normalizeElement
     },
     files: {
@@ -5467,7 +5778,19 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       parseTermList,
       parseTermWorkbook
     },
-    repositories: { importTmEntries, importTerms },
+    repositories: {
+      importTmEntries,
+      importTerms,
+      createResource: async (input) => {
+        const existing = (await listResources({ type: input.type, includeArchived: false })).find(
+          (resource) =>
+            resource.name === input.name &&
+            resource.sourceLang === input.sourceLang &&
+            resource.targetLang === input.targetLang
+        );
+        return existing || createResource(input);
+      }
+    },
     resources: {
       markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource,
       open: (...args) => resourcesController?.openResource?.(...args),
@@ -5479,7 +5802,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   });
   const resourceLibraryExportController = appRuntime.featureFactories.createResourceLibraryExportController({
     resources: {
-      labelFromKey: resourceCatalogService.labelFromKey,
+      labelFromKey: (key) =>
+        resourcesController?.getState?.().resources.find((resource) => resource.id === key) ||
+        resourceCatalogService.labelFromKey(key),
       items: (type, key) => resourcesController?.getItems?.(type, key) || []
     },
     builders: { buildTmx, buildTbx },
@@ -5494,7 +5819,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource,
       refresh: resourceCatalogRefreshController.refresh,
       refreshProjectTerms: projectTermRefreshController.refresh,
-      labelFromKey: resourceCatalogService.labelFromKey,
+      labelFromKey: (key) =>
+        resourcesController?.getState?.().resources.find((resource) => resource.id === key) ||
+        resourceCatalogService.labelFromKey(key),
       items: (type, key) => resourcesController?.getItems?.(type, key) || []
     },
     commands: {
@@ -5580,12 +5907,78 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     navigate: () => applicationViewController.show("resources"),
     render: resourcesPresentationService.render,
-    keyForItem: (item, type) => resourceCatalogService.key(item, type === "tm" ? "tmName" : "termBaseName"),
+    keyForItem: (item, type) =>
+      item.resourceId || resourceCatalogService.key(item, type === "tm" ? "tmName" : "termBaseName"),
     normalizeLanguageInput: languageInputService.normalizeElement,
     runImportTask: fileImportService.runTask,
     importTm: resourceLibraryImportController.importTmx,
     importTb: resourceLibraryImportController.importTbx,
     importTermList: resourceLibraryImportController.importTermList,
+    createResource: async (type, values) => {
+      const resource = await createResource({
+        ...values,
+        type: type === "tm" ? "tm" : "termbase",
+        languages: [values.sourceLang, values.targetLang]
+      });
+      await resourceCatalogRefreshController.refresh();
+      resourcesController?.openResource?.(type, resource.id);
+      applicationSaveStatusController.set(`${type === "tm" ? "Translation memory" : "Termbase"} created`, "saved");
+      return resource;
+    },
+    renameResource: async (type, resourceId) => {
+      const current = (resourcesController?.getState?.().resources || []).find(
+        (resource) => resource.id === resourceId
+      );
+      const name = window.prompt(`Rename ${type === "tm" ? "translation memory" : "termbase"}`, current?.name || "");
+      if (!String(name || "").trim()) return current;
+      const renamed = await renameResource(resourceId, name);
+      await resourceCatalogRefreshController.refresh();
+      return renamed;
+    },
+    duplicateResource: async (_type, resourceId) => {
+      const duplicated = await duplicateResource(resourceId);
+      await resourceCatalogRefreshController.refresh();
+      applicationSaveStatusController.set(`Created ${duplicated.name}`, "saved");
+      return duplicated;
+    },
+    setResourceArchived: async (_type, resourceId, archived) => {
+      const updated = await setResourceArchived(resourceId, archived);
+      await resourceCatalogRefreshController.refresh();
+      applicationSaveStatusController.set(`${updated.name} ${archived ? "archived" : "restored"}`, "saved");
+      return updated;
+    },
+    addEntry: async (type, resourceId) => {
+      const resource = (resourcesController?.getState?.().resources || []).find(
+        (candidate) => candidate.id === resourceId
+      );
+      if (!resource) throw new Error("Resource not found.");
+      const source = window.prompt(type === "tm" ? "Source segment" : "Source term", "");
+      if (!String(source || "").trim()) return null;
+      const target = window.prompt(type === "tm" ? "Target segment" : "Target term", "");
+      if (!String(target || "").trim()) return null;
+      const record =
+        type === "tm"
+          ? await saveTmEntry({
+              source,
+              target,
+              sourceLang: resource.sourceLang,
+              targetLang: resource.targetLang,
+              tmName: resource.name,
+              resourceId: resource.id,
+              isSeeded: true
+            })
+          : await saveTerm({
+              sourceTerm: source,
+              targetTerm: target,
+              sourceLang: resource.sourceLang,
+              targetLang: resource.targetLang,
+              termBaseName: resource.name,
+              resourceId: resource.id
+            });
+      await resourceCatalogRefreshController.refresh();
+      applicationSaveStatusController.set(type === "tm" ? "TM entry added" : "Term added", "saved");
+      return record;
+    },
     deleteResource: resourceMutationController.deleteResource,
     exportResource: resourceLibraryExportController.exportResource,
     saveTmEntry: resourceMutationController.saveTmEntry,
@@ -5683,7 +6076,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       prepareHistory: segmentTargetStateService.prepareHistory
     },
     persistence: {
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       save: saveSegment
     },
     activity: {
@@ -5728,7 +6121,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       prepareHistory: segmentTargetStateService.prepareHistory
     },
     persistence: {
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       save: saveSegment
     },
     risk: { buildQueue: qualityWorkbenchController.buildQueue },
@@ -5779,7 +6172,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       prepareHistory: segmentTargetStateService.prepareHistory
     },
     persistence: {
-      clearPending: autosaveService.clear,
+      clearPending: commandPersistence.clear,
       save: saveSegment
     },
     restoration: {
@@ -5860,5 +6253,44 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
 
   /* LOOPCAT_TEST_WORKFLOW_DRIVER */
 
-  applicationStartupController.start();
+  const reliabilityControls = createReliabilityControls({
+    window,
+    document,
+    storage: storageApi,
+    saveState: appRuntime.status.save,
+    session: editorSessionStore,
+    autosave: autosaveService,
+    status: applicationSaveStatusController,
+    render: applicationAggregatePresentationController.render,
+    reopen: projectOpenController.open,
+    exports: {
+      download: applicationDownloadController.download,
+      project: projectExportController.exportProjectPackage,
+      backup: projectExportController.exportBrowserBackup,
+      restore: projectImportRestoreController.restoreBackupData
+    },
+    workspace: {
+      connected: () => Boolean(state.workspaceStatus?.connected),
+      backup: workspaceBackupExportController.exportBackup
+    }
+  });
+  reliabilityControls.mount();
+  aiCredentialStorageService
+    .migrateRemembered()
+    .catch(() =>
+      applicationSaveStatusController.set(
+        "Remembered key migration could not finish; the original key was retained",
+        "dirty"
+      )
+    );
+  if (window.LoopCATDesktop?.consumeRecoveryRequest) {
+    window.LoopCATDesktop.consumeRecoveryRequest()
+      .then(async ({ needed }) => {
+        if (needed) await storageApi.replayCommittedJournal();
+      })
+      .catch((error) =>
+        applicationSaveStatusController.setPersistence(`Recovery needs attention: ${error.message}`, "dirty")
+      )
+      .finally(() => applicationStartupController.start());
+  } else applicationStartupController.start();
 }

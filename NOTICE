@@ -4,5 +4,9 @@ Copyright 2026 Dr. Gokhan Dogru
 Created by Dr. Gokhan Dogru.
 Co-created with Codex.
 
+Includes @zip.js/zip.js 2.11.4, Copyright (c) 2023 Gildas Lormeau,
+licensed under the BSD 3-Clause License. The full license is reproduced
+in docs/zip-js-LICENSE.txt in source and distributed builds.
+
 Author profile:
 https://www.linkedin.com/in/gokhan-dogru-localization/

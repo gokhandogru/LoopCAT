@@ -14,6 +14,61 @@ function containsTerm(text, term) {
   return ` ${normalizeText(text)} `.includes(` ${normalizedTerm} `);
 }
 
+function containsDesignation(text, value, caseSensitivity = "insensitive") {
+  const source = String(text || "");
+  const designation = String(value || "");
+  if (!designation) return false;
+  if (caseSensitivity === "sensitive") return source.includes(designation);
+  if (caseSensitivity === "initial-sensitive") {
+    const index = source.toLocaleLowerCase().indexOf(designation.toLocaleLowerCase());
+    return index >= 0 && source[index] === designation[0];
+  }
+  return containsTerm(source, designation);
+}
+
+function sourceDesignationMatches(text, term) {
+  if (term.matchMode === "prefix") {
+    const sourceTokens = String(text || "").normalize("NFKC").toLocaleLowerCase().match(/[\p{L}\p{N}_'-]+/gu) || [];
+    const termTokens = String(term.text || "").normalize("NFKC").toLocaleLowerCase().match(/[\p{L}\p{N}_'-]+/gu) || [];
+    return Boolean(termTokens.length && sourceTokens.some((_, index) =>
+      termTokens.every((token, offset) => sourceTokens[index + offset]?.startsWith(token))
+    ));
+  }
+  if (term.matchMode === "fuzzy") {
+    const normalizeText = window.CatHan.tm?.normalizeText || ((value) => String(value || "").normalize("NFKC").toLowerCase().trim());
+    const similarity = window.CatHan.tm?.similarity;
+    if (typeof similarity !== "function") return containsDesignation(text, term.text, term.caseSensitivity);
+    const sourceTokens = normalizeText(text).split(" ").filter(Boolean);
+    const termTokens = normalizeText(term.text).split(" ").filter(Boolean);
+    if (!termTokens.length || sourceTokens.length < termTokens.length) return false;
+    const threshold = Math.max(50, Math.min(100, Number(term.fuzzyThreshold) || 85));
+    for (let index = 0; index <= sourceTokens.length - termTokens.length; index += 1) {
+      if (similarity(sourceTokens.slice(index, index + termTokens.length).join(" "), termTokens.join(" ")) >= threshold) return true;
+    }
+    return false;
+  }
+  return containsDesignation(text, term.text, term.caseSensitivity);
+}
+
+function termConceptGroups(terms) {
+  const groups = new Map();
+  (terms || []).forEach((term) => {
+    const key = term.conceptId || `${term.resourceId || term.termBaseName}:${term.sourceTerm}`;
+    if (!groups.has(key)) groups.set(key, { sourceTerms: [], accepted: [], forbidden: [] });
+    const group = groups.get(key);
+    if (!group.sourceTerms.some((item) => item.text === term.sourceTerm)) group.sourceTerms.push({
+      text: term.sourceTerm,
+      caseSensitivity: term.caseSensitivity,
+      matchMode: term.matchMode,
+      fuzzyThreshold: term.fuzzyThreshold
+    });
+    const designation = { text: term.targetTerm, caseSensitivity: term.caseSensitivity };
+    if (term.isForbidden || term.status === "forbidden") group.forbidden.push(designation);
+    else if (!group.accepted.some((item) => item.text === designation.text)) group.accepted.push(designation);
+  });
+  return Array.from(groups.values());
+}
+
 function issue({ type, severity, segment, index, message, messageValues, fixHint, fixHintValues }) {
   return {
     id: `qa-${segment.id || index}-${type}`,
@@ -54,6 +109,7 @@ function defaultMissingTags(segment) {
 
 function runQaChecks(segments, terms = [], tagHelpers = {}) {
   const checks = [];
+  const concepts = termConceptGroups(terms);
   segments.forEach((segment, index) => {
     const target = segment.target || "";
     if (!target.trim()) {
@@ -113,10 +169,11 @@ function runQaChecks(segments, terms = [], tagHelpers = {}) {
         fixHint: "Check whether punctuation should match the source."
       }));
     }
-    terms.forEach((term) => {
-      const sourceHasTerm = containsTerm(segment.source, term.sourceTerm);
-      if (!sourceHasTerm || !term.targetTerm) return;
-      if (term.isForbidden && containsTerm(target, term.targetTerm)) {
+    concepts.forEach((concept) => {
+      const source = concept.sourceTerms.find((term) => sourceDesignationMatches(segment.source, term));
+      if (!source) return;
+      concept.forbidden.forEach((term) => {
+        if (!containsDesignation(target, term.text, term.caseSensitivity)) return;
         checks.push(issue({
           type: "forbidden-term",
           severity: "error",
@@ -124,13 +181,12 @@ function runQaChecks(segments, terms = [], tagHelpers = {}) {
           index,
           message: "Forbidden term used: {value1}.",
           messageValues: {
-            value1: term.targetTerm
+            value1: term.text
           },
           fixHint: "Replace this with the approved wording or document a termbase exception before delivery."
         }));
-        return;
-      }
-      if (!term.isForbidden && !containsTerm(target, term.targetTerm)) {
+      });
+      if (concept.accepted.length && !concept.accepted.some((term) => containsDesignation(target, term.text, term.caseSensitivity))) {
         checks.push(issue({
           type: "term",
         severity: "warning",
@@ -138,8 +194,8 @@ function runQaChecks(segments, terms = [], tagHelpers = {}) {
         index,
           message: "Term may be missing: {sourceTerm} -> {targetTerm}.",
           messageValues: {
-            sourceTerm: term.sourceTerm,
-            targetTerm: term.targetTerm
+            sourceTerm: source.text,
+            targetTerm: concept.accepted.map((term) => term.text).join(" / ")
           },
           fixHint: "Use the approved term or update the termbase if this is a valid exception."
         }));

@@ -26,7 +26,7 @@ const HOSTED_COMPATIBLE_ENDPOINT_ERROR =
  *   endpoints: { isAllowedHostedCompatible: (baseUrl: string) => boolean },
  *   providers: { needsApiKey: (providerId: string, baseUrl: string) => boolean },
  *   credentials: {
- *     saveLocal: (value: string, remember: boolean, settings: any) => void,
+ *     saveLocal: (value: string, remember: boolean, settings: any) => any,
  *     readLocal: (settings: any) => string,
  *     readOpenAi: () => string
  *   },
@@ -174,7 +174,9 @@ export function createAiRuntimeSettingsService(options) {
     const secrets = administration.readSecrets() || {};
     const typedKey = String(secrets.localAiKey || "").trim();
     if (typedKey) {
-      credentials.saveLocal(typedKey, Boolean(secrets.rememberLocalAiKey), settings);
+      const saving = credentials.saveLocal(typedKey, Boolean(secrets.rememberLocalAiKey), settings);
+      // Runtime requests can use the typed session key while protected storage finishes.
+      saving?.catch?.(() => {});
     }
     const apiKey =
       typedKey || credentials.readLocal(settings) || (settings.providerId === "openai" ? credentials.readOpenAi() : "");

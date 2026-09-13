@@ -1525,7 +1525,11 @@ async function fetchJsonWithTimeout(url, options = {}, config = {}) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response = null;
   try {
-    response = await fetchImpl(url, { ...options, signal: controller.signal });
+    const reference = Object.values(options.headers || {}).map(String).join(" ").match(/loopcat-credential:[a-f0-9]{64}/)?.[0];
+    if (reference && window.LoopCATDesktop?.performProviderOperation && !config.fetchImpl) {
+      const result = await window.LoopCATDesktop.performProviderOperation({ reference, url, method: options.method || "GET", body: options.body, headers: options.headers || {}, timeoutMs });
+      response = new Response(result.text, { status: result.status, headers: { "Content-Type": "application/json" } });
+    } else response = await fetchImpl(url, { ...options, signal: controller.signal });
   } catch (error) {
     if (externalAborted || config.signal?.aborted) throw new Error("Local AI request canceled.");
     if (isAbortError(error)) throw new Error("Local AI request timed out. Try a smaller model or increase the timeout.");
@@ -1757,48 +1761,48 @@ function applyAiPretranslation(segment, result) {
   return segment;
 }
 
-async function unavailableAiCommandDomain() {
-  throw new Error("AI command implementation is not installed.");
+function unavailableAiCommandDomain() {
+  return Promise.reject(new Error("AI command implementation is not installed."));
 }
 
 async function openAiSuggestion(...args) {
-  return unavailableAiCommandDomain(...args);
+  return await unavailableAiCommandDomain(...args);
 }
 
 async function pretranslateSegments(...args) {
-  return unavailableAiCommandDomain(...args);
+  return await unavailableAiCommandDomain(...args);
 }
 
 async function reviewSegmentWithAi(...args) {
-  return unavailableAiCommandDomain(...args);
+  return await unavailableAiCommandDomain(...args);
 }
 
 async function repairSegmentTagsWithAi(...args) {
-  return unavailableAiCommandDomain(...args);
+  return await unavailableAiCommandDomain(...args);
 }
 
 async function suggestSegmentVariantsWithAi(...args) {
-  return unavailableAiCommandDomain(...args);
+  return await unavailableAiCommandDomain(...args);
 }
 
 async function polishSegmentStyleWithAi(...args) {
-  return unavailableAiCommandDomain(...args);
+  return await unavailableAiCommandDomain(...args);
 }
 
 async function adaptSegmentDraftWithAi(...args) {
-  return unavailableAiCommandDomain(...args);
+  return await unavailableAiCommandDomain(...args);
 }
 
 async function extractSegmentTermsWithAi(...args) {
-  return unavailableAiCommandDomain(...args);
+  return await unavailableAiCommandDomain(...args);
 }
 
 async function applyTerminologyWithAi(...args) {
-  return unavailableAiCommandDomain(...args);
+  return await unavailableAiCommandDomain(...args);
 }
 
 async function generateProjectBriefWithAi(...args) {
-  return unavailableAiCommandDomain(...args);
+  return await unavailableAiCommandDomain(...args);
 }
 
 const preTranslationService = {

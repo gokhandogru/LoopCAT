@@ -22,6 +22,20 @@
   let lastErrorScope = "";
   let lastSkippedProjectPackages = [];
   let lastSkippedBackupFiles = [];
+  let archiveStore;
+  let archiveRoot;
+  let statusProjectCache = null;
+  let statusBackupCache = null;
+  async function archives() {
+    if (!window.CatHan.archive || !directoryHandle) return null;
+    if (archiveRoot !== directoryHandle) {
+      archiveStore = await window.CatHan.archive.createWorkspaceStore(directoryHandle);
+      archiveRoot = directoryHandle;
+      statusProjectCache = null;
+      statusBackupCache = null;
+    }
+    return archiveStore;
+  }
 
   function nowIso() {
     return new Date().toISOString();
@@ -190,8 +204,11 @@
     try {
       const handle = await getFileHandle(pathParts, { create: true });
       writable = await handle.createWritable();
-      await writable.write(new Blob([JSON.stringify(value, null, 2)], { type: "application/json" }));
+      const content = JSON.stringify(value, null, 2);
+      if (new Blob([content]).size > MAX_WORKSPACE_JSON_BYTES) throw new Error("JSON compatibility files are limited to 50 MiB. Use an archive package.");
+      await writable.write(new Blob([content], { type: "application/json" }));
       await writable.close();
+      if (await (await handle.getFile()).text() !== content) throw new Error("Workspace JSON readback verification failed.");
     } catch (error) {
       lastError = workspaceSafeLabel(
         error.message || `Could not write ${pathParts.join("/")}.`,
@@ -646,6 +663,8 @@
     });
     await writeJson([MANIFEST_FILE], preparedManifest);
     manifest = preparedManifest;
+    statusProjectCache = [...new Map([...(statusProjectCache || []), ...preparedManifest.projects].map((ref) => [ref.id, ref])).values()];
+    statusBackupCache = [...new Map([...(statusBackupCache || []), ...preparedManifest.backups].map((ref) => [ref.path, ref])).values()];
     clearWorkspaceWriteError();
     return manifest;
   }
@@ -788,7 +807,8 @@
     directoryHandle = handle;
     if (persist) await rememberWorkspaceHandle(handle);
     await loadManifest({ create: true });
-    return getStatus();
+    window.dispatchEvent?.(new CustomEvent("loopcat-workspace-connected"));
+    return getStatus({ refresh: true });
   }
 
   async function chooseWorkspaceFolder(options = {}) {
@@ -804,7 +824,8 @@
     if (!handle || !(await hasPermission(handle))) return getStatus();
     directoryHandle = handle;
     await loadManifest({ create: true });
-    return getStatus();
+    window.dispatchEvent?.(new CustomEvent("loopcat-workspace-connected"));
+    return getStatus({ refresh: true });
   }
 
   async function ensureConnected() {
@@ -819,6 +840,8 @@
     if (!pkg?.project?.id) throw new Error("Project package is missing project metadata.");
     const validation = validateWorkspaceProjectPackage(pkg, pkg.project.name || "Workspace project package");
     const validatedPackage = withWorkspaceValidation(pkg, validation);
+    const archive = await archives();
+    if (archive) return archive.saveProjectPackage(validatedPackage);
     const packagePath = projectPackagePath(validatedPackage.project);
     const savedAt = nowIso();
     const packageWithMetadata = {
@@ -870,11 +893,18 @@
 
   async function listProjectPackages() {
     await ensureConnected();
-    return mergeManifestAndDiscoveredProjectRefs(manifest.projects || [], await scanProjectPackages());
+    const discovered = await scanProjectPackages();
+    const legacy = mergeManifestAndDiscoveredProjectRefs(manifest.projects || [], discovered);
+    statusProjectCache = visibleProjectRefsFromDiscovered(manifest.projects || [], discovered);
+    const archive = await archives();
+    const current = archive ? (await archive.load()).projects : [];
+    const ids = new Set(current.map((ref) => ref.id));
+    return [...current, ...legacy.filter((ref) => !ids.has(ref.id))];
   }
 
   async function readProjectPackage(projectRef) {
     await ensureConnected();
+    if (projectRef.packagePath?.startsWith("loopcat-v2/")) return (await archives()).read(projectRef.packagePath);
     const path = projectPackagePathParts(projectRef);
     const pkg = await readJson(path);
     const validation = validateWorkspaceProjectPackage(pkg, projectRef.name || path.join("/"));
@@ -907,9 +937,12 @@
     };
   }
 
-  async function exportFullBackup(data) {
+  async function exportFullBackup(data, options = {}) {
     await ensureConnected();
-    validateWorkspaceBackupFile(data, "Workspace backup");
+    const archive = await archives();
+    if (!data.checkpointId) validateWorkspaceBackupFile(data, "Workspace backup");
+    else if (!archive) throw new Error("The archive backup writer is unavailable.");
+    if (archive) return archive.exportFullBackup(data, options);
     const fileName = `loopcat-backup-${new Date().toISOString().slice(0, 10)}-${Date.now()}.json`;
     const backupPath = [BACKUP_DIR, fileName];
     await writeJson(backupPath, data);
@@ -921,6 +954,7 @@
       segmentCount: (data.segments || []).length,
       schemaVersion: data.schemaVersion || BACKUP_SCHEMA_VERSION
     };
+    statusBackupCache = [...(statusBackupCache || []).filter((ref) => ref.path !== backupRef.path), backupRef];
     const nextManifest = defaultManifest({
       ...(manifest || {}),
       backups: upsertById(manifest?.backups || [], backupRef).slice(-25),
@@ -938,27 +972,31 @@
     }
   }
 
-  async function getStatus() {
+  async function getStatus({ refresh = false } = {}) {
     const supported = isSupported();
     const connected = Boolean(directoryHandle);
     const previousWriteError = lastErrorScope === "write" ? lastError : "";
+    const archive = await archives();
+    const archiveManifest = archive ? await archive.load() : { projects: [], backups: [] };
+    if (refresh) { statusProjectCache = null; statusBackupCache = null; }
     const visibleProjects = connected
-      ? visibleProjectRefsFromDiscovered(manifest?.projects || [], await scanProjectPackages())
+      ? statusProjectCache || (statusProjectCache = visibleProjectRefsFromDiscovered(manifest?.projects || [], await scanProjectPackages()))
       : manifest?.projects || [];
     const visibleBackups = connected
-      ? mergeBackupRefs(manifest?.backups || [], await scanBackupFiles())
+      ? statusBackupCache || (statusBackupCache = mergeBackupRefs(manifest?.backups || [], await scanBackupFiles()))
       : manifest?.backups || [];
-    const warnings = [...workspacePackageWarnings(), ...workspaceBackupWarnings()];
+    const warnings = [...workspacePackageWarnings(), ...workspaceBackupWarnings(), ...(archiveManifest.recoveryWarning ? [archiveManifest.recoveryWarning] : [])];
     return {
       supported,
       connected,
       mode: connected ? "workspace-folder" : "browser-cache",
       name: connected ? workspaceSafeLabel(directoryHandle.name, "Workspace folder") : "Browser cache",
-      manifest,
+      manifest: { ...manifest, projects: [...visibleProjects.filter((ref) => !archiveManifest.projects.some((item) => item.id === ref.id)), ...archiveManifest.projects], backups: [...visibleBackups, ...archiveManifest.backups] },
+      latestVerifiedBackup: archiveManifest.backups.filter((ref) => ref.verified).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] || null,
       lastSyncedAt: manifest?.lastSyncedAt || "",
-      projectCount: visibleProjects.length,
+      projectCount: new Set([...visibleProjects, ...archiveManifest.projects].map((ref) => ref.id)).size,
       resourceCount: manifest?.resources?.length || 0,
-      backupCount: visibleBackups.length,
+      backupCount: visibleBackups.length + archiveManifest.backups.length,
       skippedProjectCount: lastSkippedProjectPackages.length,
       warnings,
       lastError: previousWriteError || lastError
@@ -970,6 +1008,7 @@
     const discovered = await scanProjectPackages();
     await scanBackupFiles();
     const visibleProjects = visibleProjectRefsFromDiscovered(manifest?.projects || [], discovered);
+    statusProjectCache = visibleProjects;
     const visibleResources = upsertResources(
       manifest?.resources || [],
       dedupeProjectPackages(discovered).flatMap(({ pkg }) => summarizePackageResources(pkg))
@@ -1082,6 +1121,13 @@
     readAllProjectPackages,
     repairWorkspaceManifest,
     exportFullBackup,
+    listRecoveryBackups: async () => { await ensureConnected(); return (await archives())?.discoverBackups() || []; },
+    stageBackup: async (path) => {
+      await ensureConnected();
+      const archive = await archives();
+      if (!archive) throw new Error("Connect an archive workspace folder first.");
+      return window.CatHan.archive.stageBackup(await archive.file(path), { externalRoot: archive.root });
+    },
     buildHealthReport,
     getStatus
   };

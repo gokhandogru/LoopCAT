@@ -68,6 +68,7 @@ export function createApplicationDownloadController({ redaction, blobs, urls, do
       link.remove();
       clickAccepted ? scheduler.timer(revokeDownloadUrl, 1000) : revokeDownloadUrl();
     }
+    return { requested: true, written: false, verified: false };
   }
 
   return Object.freeze({ safeFilename, download });

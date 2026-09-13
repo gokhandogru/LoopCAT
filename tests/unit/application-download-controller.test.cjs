@@ -180,7 +180,11 @@ test("ApplicationDownloadController preserves exact accepted-click construction 
     clickResult: "ignored",
     removeResult: "ignored"
   });
-  assert.equal(harness.controller.download("../CON.txt", content, "text/plain"), undefined);
+  assert.deepEqual(harness.controller.download("../CON.txt", content, "text/plain"), {
+    requested: true,
+    written: false,
+    verified: false
+  });
   assert.equal(harness.link.href, harness.url);
   assert.equal(harness.link.download, "loopcat_CON.txt");
   assert.equal(harness.link.hidden, true);
@@ -215,7 +219,11 @@ test("ApplicationDownloadController preserves default MIME type and synchronous 
     timerImmediately: true,
     revokeThrows: true
   });
-  assert.equal(harness.controller.download("report.bin", "content"), undefined);
+  assert.deepEqual(harness.controller.download("report.bin", "content"), {
+    requested: true,
+    written: false,
+    verified: false
+  });
   assert.deepEqual(harness.calls[0], ["blobs.create", ["content"], { type: "application/octet-stream" }]);
   assert.deepEqual(
     harness.calls.slice(-2).map(([name]) => name),

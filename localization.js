@@ -127,15 +127,31 @@ function safeArchiveEntryName(rawName) {
   return isDirectory ? "" : fileParts.join("/");
 }
 
-async function inflateRaw(bytes) {
+async function inflateRaw(bytes, limit = MAX_LOCALIZATION_UNZIPPED_BYTES) {
   if (!("DecompressionStream" in window)) {
     throw new Error("This browser cannot decompress package files locally. Try a recent Chromium, Edge, or Safari version.");
   }
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  const reader = stream.getReader();
+  const chunks = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      length += value.length;
+      if (length > limit) throw new Error("Localization archive expanded beyond its declared size or limit.");
+      chunks.push(value);
+    }
+  } catch (error) { await reader.cancel(error); throw error; }
+  const result = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.length; }
+  return result;
 }
 
 async function unzipPackageEntries(arrayBufferOrBytes) {
+  if (window.CatHan?.archive) return window.CatHan.archive.readEntries(arrayBufferOrBytes);
   const bytes = arrayBufferOrBytes instanceof Uint8Array ? arrayBufferOrBytes : new Uint8Array(arrayBufferOrBytes);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const eocd = findEndOfCentralDirectory(bytes);
@@ -186,9 +202,9 @@ async function unzipPackageEntries(arrayBufferOrBytes) {
     const compressed = bytes.slice(dataStart, dataStart + compressedSize);
     let data;
     if (compressionMethod === 0) data = compressed;
-    else if (compressionMethod === 8) data = await inflateRaw(compressed);
+    else if (compressionMethod === 8) data = await inflateRaw(compressed, uncompressedSize);
     else throw new Error(`Unsupported localization package compression method: ${compressionMethod}`);
-    if (data.length !== uncompressedSize && uncompressedSize > 0) throw new Error(`Localization package entry ${name} has an unexpected decompressed size.`);
+    if (data.length !== uncompressedSize) throw new Error(`Localization package entry ${name} has an unexpected decompressed size.`);
     if (crc32(data) !== expectedCrc) throw new Error(`Localization package entry ${name} failed CRC integrity validation.`);
     if (entries.has(name)) throw new Error(`Localization package has duplicate archive entry path: ${name}.`);
     entries.set(name, { name, data });
@@ -2413,7 +2429,7 @@ function parseSubtitleText(text, format) {
   return { structure: { format, blocks: rawBlocks, sourceEndedWithNewline: /\n$/.test(source) }, segments };
 }
 
-function buildSubtitleText(segments, structure = null, format = "vtt") {
+function buildSubtitleText(segments, structure = null, _format = "vtt") {
   const blocks = (structure?.blocks || []).map((block) => [...block]);
   segments.forEach((segment) => {
     const item = segment.structure || {};

@@ -8,7 +8,7 @@
  *   elements: { menu: any, findInput: any, replacementInput: any, visibleButton: any, allButton: any },
  *   editorSessionStore: { getProject: () => any, getSegments: () => any[] },
  *   filters: { getOptions: () => { regex: boolean, caseSensitive: boolean }, getIndexes: (scope: string) => number[] },
- *   transform: { replace: (target: string, findText: string, replacement: string, options: object) => { text: string, count: number } },
+ *   transform: { replace: (target: string, findText: string, replacement: string, options: object) => { text: string, count: number } | Promise<{ text: string, count: number }>, replaceMany?: (targets: string[], find: string, replacement: string, options: any) => Promise<any[]> },
  *   commands: { bus: { execute: (command: any) => Promise<any> }, create: (options: object) => any, changed: () => void },
  *   persistence: { flush: (projectId: string) => Promise<unknown>, clearPending: (segment: any) => unknown, save: (segments: any[]) => Promise<unknown> },
  *   mutation: { applyTarget: (segment: any, target: string, status: string, reason: string) => void, touch: (segment: any) => unknown, restore: (segment: any, snapshot: any) => void, prepareHistory: (segment: any) => unknown, hasTagIssue: (segment: any) => boolean },
@@ -114,15 +114,42 @@ export function createTargetReplacementController(options) {
     const indexes = filters.getIndexes(scope);
     let replacementCount = 0;
     const proposals = [];
+    const sourceSegments = editorSessionStore.getSegments();
     try {
-      indexes.forEach((index) => {
-        const segment = editorSessionStore.getSegments()[index];
-        if (!segment) return;
-        const result = transform.replace(segment.target || "", findText, replacement, replaceOptions);
-        if (!result.count || result.text === segment.target) return;
-        proposals.push({ segment, text: result.text, count: result.count });
-        replacementCount += result.count;
-      });
+      const input = indexes
+        .map((index) => sourceSegments[index])
+        .filter(Boolean)
+        .map((segment) => ({ segment, target: segment.target || "", revision: segment.revision }));
+      const batch =
+        replaceOptions.regex && transform.replaceMany
+          ? await transform.replaceMany(
+              input.map((item) => item.target),
+              findText,
+              replacement,
+              replaceOptions
+            )
+          : null;
+      if (batch) {
+        input.forEach(({ segment, target, revision }, index) => {
+          const result = batch[index];
+          if (result.count && result.text !== target) {
+            proposals.push({ segment, text: result.text, count: result.count, originalTarget: target, revision });
+            replacementCount += result.count;
+          }
+        });
+      }
+      if (!batch) {
+        for (const index of indexes) {
+          const segment = sourceSegments[index];
+          if (!segment) continue;
+          const originalTarget = segment.target || "";
+          const revision = segment.revision;
+          const result = await transform.replace(originalTarget, findText, replacement, replaceOptions);
+          if (!result.count || result.text === originalTarget) continue;
+          proposals.push({ segment, text: result.text, count: result.count, originalTarget, revision });
+          replacementCount += result.count;
+        }
+      }
     } catch (error) {
       status.set(error.message || "Replace failed.", "dirty");
       return { segmentCount: 0, replacementCount: 0 };
@@ -134,8 +161,16 @@ export function createTargetReplacementController(options) {
 
     const snapshots = new Map();
     const updated = [];
+    let committed = false;
     try {
       await persistence.flush(editorSessionStore.getProject().id);
+      if (
+        editorSessionStore.getProject()?.id !== project.id ||
+        proposals.some(
+          ({ segment, originalTarget, revision }) => segment.target !== originalTarget || segment.revision !== revision
+        )
+      )
+        throw new Error("Targets changed during replacement evaluation. Retry replacement against the latest output.");
       proposals.forEach(({ segment }) => snapshots.set(segment.id, structuredClone(segment)));
       const command = commands.create({
         projectId: editorSessionStore.getProject().id,
@@ -152,6 +187,7 @@ export function createTargetReplacementController(options) {
           updated.forEach(persistence.clearPending);
           beforeSave(updated);
           await persistence.save(updated);
+          committed = true;
           presentation.renderSegments({ preserveScroll: true });
           presentation.renderProgress();
           await presentation.refreshSidebar();
@@ -184,6 +220,10 @@ export function createTargetReplacementController(options) {
       );
       return { segmentCount: updated.length, replacementCount };
     } catch (error) {
+      if (committed) {
+        status.set("Replacement saved; the display needs a refresh", "dirty");
+        return { segmentCount: updated.length, replacementCount };
+      }
       updated.forEach((segment) => {
         const snapshot = snapshots.get(segment.id);
         if (!snapshot) return;

@@ -5,6 +5,7 @@ const REQUEST_TIMEOUT_MS = 15000;
 let worker = null;
 let nextRequestId = 1;
 const pending = new Map();
+const queue = [];
 let disabledReason = "";
 
 function canUseWorker() {
@@ -17,6 +18,7 @@ function rejectPending(error) {
     reject(error);
   });
   pending.clear();
+  for (const request of queue.splice(0)) request.reject(error);
 }
 
 function getWorker() {
@@ -33,10 +35,10 @@ function getWorker() {
       clearTimeout(request.timer);
       if (ok) request.resolve(result);
       else request.reject(new Error(error || "Worker request failed."));
+      pump();
     });
     worker.addEventListener("error", (error) => {
-      disabledReason = error.message || "Worker failed.";
-      rejectPending(new Error(disabledReason));
+      rejectPending(new Error(error.message || "Worker failed."));
       worker?.terminate();
       worker = null;
     });
@@ -47,17 +49,32 @@ function getWorker() {
   return worker;
 }
 
-function requestWorker(type, payload) {
+function pump() {
+  if (pending.size || !queue.length) return;
+  const queued = queue.shift();
   const activeWorker = getWorker();
-  if (!activeWorker) return Promise.reject(new Error(disabledReason || "Workers are unavailable."));
+  if (!activeWorker) { queued.reject(new Error(disabledReason || "Workers are unavailable.")); pump(); return; }
   const id = `worker-${nextRequestId++}`;
-  return new Promise((resolve, reject) => {
+  const { type, payload, resolve, reject } = queued;
     const timer = setTimeout(() => {
-      pending.delete(id);
-      reject(new Error("Worker request timed out."));
+      activeWorker.terminate();
+      if (worker === activeWorker) worker = null;
+      rejectPending(new Error("Worker request timed out. The worker was reset; retry the operation."));
     }, REQUEST_TIMEOUT_MS);
     pending.set(id, { resolve, reject, timer });
-    activeWorker.postMessage({ id, type, payload });
+    try { activeWorker.postMessage({ id, type, payload }); }
+    catch (error) { clearTimeout(timer); pending.delete(id); reject(error); pump(); }
+}
+
+function requestWorker(type, payload) {
+  return new Promise((resolve, reject) => {
+    if (type === "tm-match") {
+      const outdated = queue.findIndex((request) => request.type === type);
+      if (outdated >= 0) queue.splice(outdated, 1)[0].reject(new DOMException("Lookup superseded by the latest query.", "AbortError"));
+    }
+    if (queue.length >= 16) { reject(new Error("Worker queue is full. Retry when current work finishes.")); return; }
+    queue.push({ type, payload, resolve, reject });
+    pump();
   });
 }
 
@@ -65,12 +82,18 @@ async function findTmMatches({ entries, options, fallback }) {
   try {
     return await requestWorker("tm-match", { entries, options });
   } catch (error) {
-    return fallback();
+    if (!canUseWorker() && (entries?.length || 0) <= 50 && String(options?.source || "").length <= 1000) return fallback();
+    throw error;
   }
 }
 
 async function findTmMatchesBatch({ entries, options, fallback }) {
   try {
+    if (entries.length > 32) {
+      const results = [];
+      for (let start = 0; start < entries.length; start += 32) results.push(...await findTmMatchesBatch({ entries: entries.slice(start, start + 32), options: Array.isArray(options) ? options.slice(start, start + 32) : options, fallback }));
+      return results;
+    }
     const uniqueEntries = new Map();
     const candidateIds = (entries || []).map((items) => (items || []).map((entry) => {
       uniqueEntries.set(entry.id, entry);
@@ -82,15 +105,22 @@ async function findTmMatchesBatch({ entries, options, fallback }) {
       options
     });
   } catch (error) {
-    return fallback();
+    if (!canUseWorker() && (entries?.length || 0) <= 5 && entries.every((items) => items.length <= 10)) return fallback();
+    throw error;
   }
 }
 
 async function runQaChecks({ segments, terms, fallback }) {
   try {
+    if (segments.length > 250) {
+      const results = [];
+      for (let start = 0; start < segments.length; start += 250) results.push(...await requestWorker("qa", { segments: segments.slice(start, start + 250), terms }));
+      return results;
+    }
     return await requestWorker("qa", { segments, terms });
   } catch (error) {
-    return fallback();
+    if (!canUseWorker() && (segments?.length || 0) <= 10 && (terms?.length || 0) <= 50) return fallback();
+    throw error;
   }
 }
 

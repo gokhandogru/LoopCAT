@@ -67,7 +67,7 @@ export function createWorkspaceBackupReminderService({ session, storage, clock, 
 
   function latestExport(project = session.getProject()) {
     const history = (project?.exportHistory || []).filter(
-      (entry) => entry.type === "project-package" && entry.createdAt
+      (entry) => entry.type === "project-package" && entry.createdAt && entry.verified === true
     );
     return history.sort((a, b) => clock.create(b.createdAt || 0) - clock.create(a.createdAt || 0))[0] || null;
   }

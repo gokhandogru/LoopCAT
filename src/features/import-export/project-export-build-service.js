@@ -12,6 +12,8 @@
  *     listTerms: (options: any) => Promise<any[]>,
  *     listActivityEvents: (projectId: string) => Promise<any[]>,
  *     exportAllData: () => Promise<any>
+ *     createArchiveExport?: () => Promise<any>,
+ *     exportProjectSnapshot?: (projectId: string) => Promise<any>
  *   },
  *   resources: {
  *     getLinks: (project: any) => any[],
@@ -80,20 +82,35 @@ export function createProjectExportBuildService(options) {
   async function buildProjectPackage(project = session.getProject(), segmentRecords = null, buildOptions = {}) {
     if (!project) return null;
     await autosave.flush(project.id);
+    const committed = storage.exportProjectSnapshot ? await storage.exportProjectSnapshot(project.id) : null;
+    if (committed)
+      project = {
+        ...committed.project,
+        ...(buildOptions.exportHistory ? { exportHistory: buildOptions.exportHistory } : {})
+      };
     const projectSegments =
+      committed?.segments ||
       segmentRecords ||
       (project.id === session.getProject()?.id ? session.getSegments() : await storage.getProjectSegments(project.id));
-    const [tmEntries, terms, activityEvents] = await Promise.all([
-      storage.getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`),
-      storage.listTerms({
-        sourceLang: project.sourceLang,
-        targetLang: project.targetLang,
-        termBaseNames: resources.getTermBaseNames(project)
-      }),
-      storage.listActivityEvents(project.id)
-    ]);
+    const [tmEntries, terms, activityEvents] = committed
+      ? [
+          committed.tmEntries,
+          committed.terms.filter((term) => resources.getTermBaseNames(project).includes(term.termBaseName)),
+          committed.activityEvents
+        ]
+      : await Promise.all([
+          storage.getAllByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`),
+          storage.listTerms({
+            sourceLang: project.sourceLang,
+            targetLang: project.targetLang,
+            termBaseNames: resources.getTermBaseNames(project)
+          }),
+          storage.listActivityEvents(project.id)
+        ]);
+    const resourceLinks = resources.getLinks(project);
+    const resourceIds = new Set(resourceLinks.map((link) => link.resourceId).filter(Boolean));
     const tmNames = new Set(resources.getTmNames(project));
-    const scopedTm = tmEntries.filter((entry) => tmNames.has(entry.tmName));
+    const scopedTm = tmEntries.filter((entry) => resourceIds.has(entry.resourceId) || tmNames.has(entry.tmName));
     const portableContext = portable.createContext();
     const pkg = {
       app: constants.appName,
@@ -122,18 +139,32 @@ export function createProjectExportBuildService(options) {
       resources: portable.sanitize(
         {
           tmEntries: scopedTm,
-          terms
+          terms,
+          ...(Array.isArray(committed?.resources) ? { resources: committed.resources } : {}),
+          ...(Array.isArray(committed?.tmContributions) ? { tmContributions: committed.tmContributions } : {}),
+          ...(Array.isArray(committed?.termConcepts) ? { termConcepts: committed.termConcepts } : {}),
+          ...(Array.isArray(committed?.termDesignations) ? { termDesignations: committed.termDesignations } : {})
         },
         "",
         [],
         portableContext
       ),
       resourceReferences: portable.sanitize(
-        resources.getLinks(project).map((link) => ({
+        resourceLinks.map((link) => ({
           id: link.id,
           type: link.type,
-          name: link.name,
+          name: link.cachedName || link.name,
           role: link.role || "",
+          ...(link.resourceId
+            ? {
+                resourceId: link.resourceId,
+                lookup: link.lookup !== false,
+                qa: link.type === "termbase" ? link.qa !== false : undefined,
+                contribute: link.type === "termbase" ? Boolean(link.contribute) : undefined,
+                priority: Number(link.priority) || 0,
+                penalty: link.type === "tm" ? Number(link.penalty) || 0 : undefined
+              }
+            : {}),
           sourceLang: project.sourceLang,
           targetLang: project.targetLang
         })),
@@ -196,8 +227,23 @@ export function createProjectExportBuildService(options) {
     throw error;
   }
 
-  async function buildBackupExport() {
+  async function buildBackupExport({ format = "json" } = {}) {
     await autosave.flush();
+    if (format === "archive" && storage.createArchiveExport) {
+      const record = await storage.createArchiveExport();
+      return {
+        backup: record,
+        validation: {
+          ok: true,
+          errors: [],
+          warnings: [],
+          preserved: ["Exported from one verified committed checkpoint."],
+          simplified: [],
+          skipped: [],
+          risky: []
+        }
+      };
+    }
     const backupRecord = await storage.exportAllData();
     const backupValidation = assertValidBackupForWrite(backupRecord, "export backup");
     return { backup: backupRecord, validation: backupValidation };

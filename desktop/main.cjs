@@ -4,6 +4,10 @@ const os = require("node:os");
 const { spawn } = require("node:child_process");
 const { fileURLToPath, pathToFileURL } = require("node:url");
 const { loadRuntimeSettings, saveRuntimeSettings } = require("./runtime-settings.cjs");
+const { createProtectedCredentials } = require("./protected-credentials.cjs");
+const { attachPersistenceClose } = require("./persistence-close.cjs");
+const { createVerifiedExports } = require("./verified-export.cjs");
+let journalRecoveryNeeded = true;
 
 let electron = {};
 try {
@@ -80,6 +84,14 @@ const DESKTOP_SMOKE_NO_SANDBOX = DESKTOP_SMOKE_MODE && process.env.LOOPCAT_DESKT
 const DESKTOP_RENDERER_SANDBOX_DEFAULT = true;
 const { runtimeAssets: LOOPCAT_RUNTIME_ASSETS } = require("../config/production-assets.js");
 const ALLOWED_APP_FILES = new Set(LOOPCAT_RUNTIME_ASSETS);
+const DEVELOPMENT_RENDERER = path.join(APP_ROOT, ".cache", "renderer", "production");
+const DEVELOPMENT_FILES = new Map();
+if (app && !app.isPackaged && fs.existsSync(path.join(DEVELOPMENT_RENDERER, "assets.json"))) {
+  for (const name of [...JSON.parse(fs.readFileSync(path.join(DEVELOPMENT_RENDERER, "assets.json"), "utf8")), "index.html", "config/production-assets.js"]) {
+    DEVELOPMENT_FILES.set(name, path.join(DEVELOPMENT_RENDERER, name === "index.html" ? "desktop-index.html" : name));
+    ALLOWED_APP_FILES.add(name);
+  }
+}
 
 function registerPrivilegedSchemes() {
   protocol.registerSchemesAsPrivileged([
@@ -174,6 +186,7 @@ function resolveAppFile(requestUrl) {
     const rawPath = url.hostname === APP_HOST ? url.pathname : `/${url.hostname}${url.pathname}`;
     const relativePath = normalizeAppRelativePath(decodeURIComponent(rawPath).replace(/^\/+/, "") || "index.html");
     if (!relativePath || !isAllowedAppPath(relativePath)) return null;
+    if (DEVELOPMENT_FILES.has(relativePath)) return DEVELOPMENT_FILES.get(relativePath);
     const resolved = path.resolve(APP_ROOT, relativePath);
     const rootWithSeparator = `${APP_ROOT}${path.sep}`;
     if (resolved !== APP_ROOT && !resolved.startsWith(rootWithSeparator)) return null;
@@ -187,6 +200,7 @@ function isAllowedLocalFileUrl(url) {
   try {
     const filePath = fileURLToPath(url);
     const resolved = path.resolve(filePath);
+    if ([...DEVELOPMENT_FILES.values()].includes(resolved)) return true;
     const relativePath = normalizeAppRelativePath(path.relative(APP_ROOT, resolved).replaceAll(path.sep, "/"));
     return Boolean(relativePath && isAllowedAppPath(relativePath) && path.resolve(APP_ROOT, relativePath) === resolved);
   } catch {
@@ -514,6 +528,7 @@ function runLmStudioStartCommand(command, options = {}) {
     let settled = false;
     let output = "";
     let child = null;
+    let timeout;
     const finish = (result) => {
       if (settled) return;
       settled = true;
@@ -524,7 +539,7 @@ function runLmStudioStartCommand(command, options = {}) {
         output: output.trim()
       });
     };
-    const timeout = setTimeout(() => {
+    timeout = setTimeout(() => {
       try {
         child?.kill?.();
       } catch {}
@@ -607,11 +622,34 @@ function desktopCreatorIdentity() {
 
 function configureDesktopBridge() {
   if (!ipcMain?.handle) return;
+  ipcMain.handle("loopcat:consume-recovery-request", (event) => {
+    if (!isAllowedDesktopBridgeRequest(event)) throw new Error("Recovery request rejected.");
+    const needed = journalRecoveryNeeded;
+    journalRecoveryNeeded = false;
+    return { needed };
+  });
+  const exports = createVerifiedExports({ dialog: electronRuntime.dialog, windowFor: (sender) => BrowserWindow.fromWebContents(sender) });
+  for (const [channel, operation] of [["begin-export", "begin"], ["write-export-chunk", "write"], ["finish-export", "finish"], ["abort-export", "abort"]]) {
+    ipcMain.handle(`loopcat:${channel}`, (event, request) => {
+      if (!isAllowedDesktopBridgeRequest(event)) throw new Error("Export request rejected.");
+      return exports[operation](event.sender, operation === "abort" ? request.id : request);
+    });
+  }
+  const credentials = createProtectedCredentials({ directory: app.getPath("userData"), safeStorage: electronRuntime.safeStorage,
+    fetchImpl: (...args) => net.fetch(...args), isAllowedUrl: isAllowedNetworkRequest });
+  ipcMain.handle("loopcat:save-credential", (event, request) => {
+    if (!isAllowedDesktopBridgeRequest(event)) throw new Error("Credential request rejected.");
+    return credentials.save(request);
+  });
+  ipcMain.handle("loopcat:provider-operation", (event, request) => {
+    if (!isAllowedDesktopBridgeRequest(event)) throw new Error("Provider request rejected.");
+    return credentials.perform(request);
+  });
   ipcMain.handle("loopcat:start-lm-studio-server", async (event) => {
     if (!isAllowedDesktopBridgeRequest(event)) {
       return { ok: false, message: "LoopCAT desktop helper rejected a non-LoopCAT request." };
     }
-    return startLmStudioServerFromDesktop();
+    return await startLmStudioServerFromDesktop();
   });
   ipcMain.handle("loopcat:get-creator-identity", (event) =>
     isAllowedDesktopBridgeRequest(event)
@@ -630,7 +668,7 @@ function configureDesktopBridge() {
       return {
         ok: true,
         hardwareAccelerationEnabled: saved.hardwareAccelerationEnabled,
-        restartRequired: saved.hardwareAccelerationEnabled !== DESKTOP_HARDWARE_ACCELERATION_ENABLED
+        restartRequired: saved.hardwareAccelerationEnabled !== desktopRuntimeStatus().hardwareAccelerationEnabled
       };
     } catch {
       return { ok: false, message: "LoopCAT could not save the local runtime setting." };
@@ -694,7 +732,7 @@ function finishDesktopSmoke(code, payload) {
   app.exit(code);
 }
 
-function attachDesktopSmokeProbe(mainWindow, options = {}) {
+function attachDesktopSmokeProbe(mainWindow, _options = {}) {
   if (!DESKTOP_SMOKE_MODE) return;
   let finished = false;
   const desktopRuntime = () => desktopRuntimeStatus();
@@ -1293,18 +1331,27 @@ function createWindow() {
     openExternalUrl(url);
   });
   attachSpellCheckerContextMenu(mainWindow);
+  if (!DESKTOP_SMOKE_MODE) attachPersistenceClose(mainWindow, { ipcMain, dialog: electronRuntime.dialog, isAllowedRequest: isAllowedDesktopBridgeRequest });
 
   if (DESKTOP_SMOKE_MODE) {
     attachDesktopSmokeProbe(mainWindow);
   } else {
-    mainWindow.webContents.once("render-process-gone", (_event, details) => {
+    mainWindow.webContents.on("render-process-gone", (_event, details) => {
       console.error("LoopCAT renderer exited unexpectedly.", details);
+      journalRecoveryNeeded = true;
+      if (!mainWindow.isDestroyed()) mainWindow.reload();
     });
   }
   mainWindow.loadURL(`${APP_SCHEME}://${APP_HOST}/index.html`);
 }
 
 function boot() {
+  if (!app.requestSingleInstanceLock()) { app.quit(); return; }
+  app.on("second-instance", () => {
+    const existing = BrowserWindow.getAllWindows()[0];
+    if (existing?.isMinimized()) existing.restore();
+    existing?.focus();
+  });
   registerPrivilegedSchemes();
   app.whenReady().then(() => {
     registerAppProtocol();

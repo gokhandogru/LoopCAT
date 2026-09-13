@@ -52,8 +52,9 @@ export function createUpdateController({
     if (!worker) return false;
     deferred = false;
     publish("saving");
+    let resumeEditing;
     try {
-      await beforeActivate?.();
+      resumeEditing = await beforeActivate?.();
       publish("activating");
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error("Timed out activating the offline update.")), 10000);
@@ -65,12 +66,18 @@ export function createUpdateController({
           },
           { once: true }
         );
-        worker.postMessage({ type: "SKIP_WAITING" });
+        try {
+          worker.postMessage({ type: "SKIP_WAITING" });
+        } catch (error) {
+          clearTimeout(timeout);
+          reject(error);
+        }
       });
       publish("reloading");
       location.reload();
       return true;
     } catch (error) {
+      resumeEditing?.();
       publish("error", { message: error?.message || String(error) });
       onError(error);
       return false;

@@ -4,8 +4,8 @@
   const PACKAGE_TYPE = "project-package";
   const PACKAGE_VERSION = 1;
   const MIN_SCHEMA_VERSION = 3;
-  const MAX_PACKAGE_SCHEMA_VERSION = 5;
-  const MAX_BACKUP_SCHEMA_VERSION = 6;
+  const MAX_PACKAGE_SCHEMA_VERSION = 6;
+  const MAX_BACKUP_SCHEMA_VERSION = 7;
   const PACKAGE_FORMAT = "loopcat-project-package";
   const CONTRACT_VERSION = "loopcat-package-v1";
   const STORAGE_MODES = new Set(["browser-cache", "workspace-folder"]);
@@ -1136,6 +1136,16 @@
     } else if (Array.isArray(pkg.resources?.terms)) {
       validateUniqueRecordIds(report, pkg.resources.terms, "Termbase resources");
     }
+    [
+      ["resources", "Stable resources"],
+      ["tmContributions", "TM contributions"],
+      ["termConcepts", "Term concepts"],
+      ["termDesignations", "Term designations"]
+    ].forEach(([field, label]) => {
+      const value = pkg.resources?.[field];
+      if (value !== undefined && !Array.isArray(value)) add(report, "warnings", `${label} must be an array.`);
+      else if (Array.isArray(value)) validateUniqueRecordIds(report, value, label);
+    });
     if (pkg.resourceReferences && !Array.isArray(pkg.resourceReferences))
       add(report, "warnings", "Resource references must be an array.");
     if (pkg.sourceAssets && !Array.isArray(pkg.sourceAssets))
@@ -1190,16 +1200,25 @@
     [
       ["projects", "Projects"],
       ["segments", "Segments"],
+      ["resources", "Resources"],
       ["tmEntries", "Translation memory entries"],
+      ["tmContributions", "TM contributions"],
       ["terms", "Termbase entries"],
+      ["termConcepts", "Term concepts"],
+      ["termDesignations", "Term designations"],
       ["activityEvents", "Activity events"],
       ["trashEntries", "Trash entries"]
     ].forEach(([field, label]) => {
       if (data[field] === undefined) {
-        if (field === "trashEntries" && Number(data.schemaVersion) < 6) return;
+        if (
+          (field === "trashEntries" && Number(data.schemaVersion) < 6) ||
+          (["resources", "tmContributions", "termConcepts", "termDesignations"].includes(field) &&
+            Number(data.schemaVersion) < 7)
+        )
+          return;
         add(
           report,
-          ["activityEvents", "trashEntries"].includes(field) ? "warnings" : "errors",
+          ["activityEvents", "trashEntries", "tmContributions"].includes(field) ? "warnings" : "errors",
           `${label} are missing.`
         );
       } else if (!Array.isArray(data[field])) {

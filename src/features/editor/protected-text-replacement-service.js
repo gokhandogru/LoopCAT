@@ -1,3 +1,5 @@
+import { evaluateRegex } from "./regex-worker-client.js";
+
 /**
  * Owns pure literal/regex target replacement while preserving protected-token
  * spans. Form state, scope, commands, persistence, activity, and rendering
@@ -66,5 +68,35 @@ export function createProtectedTextReplacementService(options) {
     return { text: output + tail.text, count: count + tail.count };
   }
 
-  return Object.freeze({ replacePlain, replace });
+  async function replaceAsync(text, findText, replacement, replaceOptions = {}) {
+    if (!replaceOptions.regex) return replace(text, findText, replacement, replaceOptions);
+    const result = await evaluateRegex({
+      type: "replace",
+      pattern: findText,
+      replacement,
+      caseSensitive: replaceOptions.caseSensitive,
+      records: [
+        {
+          id: "target",
+          text,
+          tokens: detectTags(text).sort((a, b) => a.index - b.index || b.text.length - a.text.length)
+        }
+      ]
+    });
+    return result[0];
+  }
+  function replaceMany(texts, findText, replacement, replaceOptions = {}) {
+    return evaluateRegex({
+      type: "replace",
+      pattern: findText,
+      replacement,
+      caseSensitive: replaceOptions.caseSensitive,
+      records: texts.map((text, id) => ({
+        id,
+        text,
+        tokens: detectTags(text).sort((a, b) => a.index - b.index || b.text.length - a.text.length)
+      }))
+    });
+  }
+  return Object.freeze({ replacePlain, replace, replaceAsync, replaceMany });
 }

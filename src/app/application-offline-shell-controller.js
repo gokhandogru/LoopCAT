@@ -15,7 +15,7 @@
  *   },
  *   updates: { create: (options: object) => any, trustScriptUrl: (value: string) => any },
  *   assets: { cachePrefix: string, warmup: readonly string[] },
- *   persistence: { flush: () => Promise<unknown>, shouldSaveRecovery: () => boolean, saveRecovery: () => Promise<unknown> },
+ *   persistence: { flush: () => Promise<unknown>, shouldSaveRecovery: () => boolean, saveRecovery: () => Promise<unknown>, pauseEditing?: () => (() => void) },
  *   presentation: {
  *     elements?: { banner?: any, title?: any, message?: any, reloadButton?: any, deferButton?: any },
  *     localize: (value: string) => string,
@@ -168,8 +168,15 @@ export function createApplicationOfflineShellController(options) {
       location: browser.location,
       trustScriptUrl: updates.trustScriptUrl,
       beforeActivate: async () => {
-        await persistence.flush();
-        if (persistence.shouldSaveRecovery()) await persistence.saveRecovery();
+        const resume = persistence.pauseEditing?.();
+        try {
+          await persistence.flush();
+          if (persistence.shouldSaveRecovery()) await persistence.saveRecovery();
+          return resume;
+        } catch (error) {
+          resume?.();
+          throw error;
+        }
       },
       onStateChange: renderUpdateState,
       onError: (error) =>

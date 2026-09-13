@@ -6,7 +6,7 @@
  * @param {{
  *   root: any,
  *   session: { getProject: () => any, getActiveSegment: () => any },
- *   terms: { getNames: () => string[], find: (options: object) => Promise<any[]> },
+ *   terms: { getNames: () => string[], getLinks?: () => any[], find: (options: object) => Promise<any[]> },
  *   localization: {
  *     source: (text: string) => string,
  *     labelHtml: (key: string) => string
@@ -70,7 +70,8 @@ export function createTermSuggestionsController(options) {
       source: segment.source,
       sourceLang: session.getProject().sourceLang,
       targetLang: session.getProject().targetLang,
-      termBaseNames: terms.getNames()
+      termBaseNames: terms.getNames(),
+      ...(typeof terms.getLinks === "function" ? { resourceLinks: terms.getLinks() || [] } : {})
     });
     if (session.getProject()?.id !== projectId || session.getActiveSegment()?.id !== segmentId) return;
     currentResults = suggestions.slice();

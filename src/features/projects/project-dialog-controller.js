@@ -22,6 +22,7 @@ function normalizeMode(mode) {
  *   setLanguageValue?: (input: any, value: string) => void,
  *   normalizeLanguageValue?: (input: any) => string,
  *   renderStorageStatus?: () => void,
+ *   prepareResourcePlan?: (project: any) => void,
  *   renderResourcePickers?: (project: any) => void,
  *   renderFrequentPairs?: () => void,
  *   save?: () => Promise<unknown>,
@@ -54,6 +55,7 @@ export function createProjectDialogController(options) {
   const listeners = [];
   let mode = "create";
   let focusAiAfterOpen = false;
+  let resumeWithoutPrepare = false;
   let mounted = false;
 
   function listen(target, type, listener) {
@@ -77,6 +79,13 @@ export function createProjectDialogController(options) {
   }
 
   async function prepare() {
+    if (resumeWithoutPrepare) {
+      resumeWithoutPrepare = false;
+      options.renderStorageStatus?.();
+      options.renderResourcePickers?.(editingProject());
+      options.renderFrequentPairs?.();
+      return;
+    }
     await options.refreshResources?.();
     const project = editingProject();
     const editing = Boolean(project);
@@ -98,12 +107,14 @@ export function createProjectDialogController(options) {
       elements.saveToFolderInput.checked = Boolean(editing && options.workspaceSupported?.());
     }
     options.renderStorageStatus?.();
+    options.prepareResourcePlan?.(project);
     options.renderResourcePickers?.(project);
     options.renderFrequentPairs?.();
   }
 
   async function open(nextMode = "create", openOptions = {}) {
     mode = normalizeMode(nextMode);
+    resumeWithoutPrepare = Boolean(openOptions.resume);
     focusAiAfterOpen = Boolean(openOptions.focusAi && mode === "edit" && getProject());
     const hasReturnTarget = Object.prototype.hasOwnProperty.call(openOptions, "returnTarget");
     const activeReturnTarget = hasReturnTarget ? null : getActiveElement() || null;

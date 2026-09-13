@@ -88,6 +88,7 @@ export function createTrashRepository(storageRepository) {
       return entry;
     },
     async moveDocument(project, documentId) {
+      project = (await storageRepository.get("projects", project?.id)) || project;
       const documentInfo = (project?.documents || []).find((documentRecord) => documentRecord.id === documentId);
       if (!project?.id || !documentInfo) throw new Error("Project file no longer exists.");
       const projectSegments = await storageRepository.getAllByIndex("segments", "projectId", project.id);

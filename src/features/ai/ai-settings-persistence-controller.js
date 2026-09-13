@@ -83,14 +83,17 @@ export function createAiSettingsPersistenceController(options) {
     store.replaceProjects(store.getProjects().map((item) => (item.id === project.id ? project : item)));
   }
 
-  async function restoreProject(previousProject, previousProjects, projectPersisted) {
+  async function restoreProject(previousProject, previousProjects, projectPersisted, committedVersion) {
     if (!projectPersisted) {
       store.replaceProject(previousProject);
       store.replaceProjects(previousProjects);
       return;
     }
     try {
-      const restored = await persistence.updateProject(previousProject);
+      const restored = await persistence.updateProject({
+        ...previousProject,
+        ...(committedVersion !== undefined ? { storageVersion: committedVersion } : {})
+      });
       store.replaceProject(restored);
       replaceProjectInList(restored);
     } catch (rollbackError) {
@@ -116,6 +119,7 @@ export function createAiSettingsPersistenceController(options) {
     const localSettings = forms.readLocalSettings();
     const previousLocalKey = keys.local.snapshot(localSettings);
     let projectPersisted = false;
+    let committedVersion;
     let activityLogged = true;
     const aiSettings = settingsBoundary.normalize({
       enabled: Boolean(globalForm.enabled),
@@ -133,11 +137,12 @@ export function createAiSettingsPersistenceController(options) {
       endpoint.assertAllowed(localSettings);
       beforeSave(project);
       const savedProject = await persistence.updateProject({ ...project, aiSettings });
+      committedVersion = savedProject.storageVersion;
       store.replaceProject(savedProject);
       projectPersisted = true;
       replaceProjectInList(savedProject);
-      if (shouldUpdateOpenAiKey) keys.openAi.save(apiKeyInput, rememberApiKey);
-      if (shouldUpdateLocalKey) keys.local.save(localAiKeyInput, rememberLocalAiKey, localSettings);
+      if (shouldUpdateOpenAiKey) await keys.openAi.save(apiKeyInput, rememberApiKey);
+      if (shouldUpdateLocalKey) await keys.local.save(localAiKeyInput, rememberLocalAiKey, localSettings);
       try {
         beforeActivity(project);
         await activity.log({
@@ -161,7 +166,7 @@ export function createAiSettingsPersistenceController(options) {
       );
       return true;
     } catch (error) {
-      await restoreProject(previousProject, previousProjects, projectPersisted);
+      await restoreProject(previousProject, previousProjects, projectPersisted, committedVersion);
       keys.openAi.restore(previousOpenAiKey);
       keys.local.restore(previousLocalKey);
       status.set(error.message || "AI settings save failed", "dirty");

@@ -65,6 +65,8 @@
             <summary id="workspaceMenuSummary">Workspace</summary>
             <div class="menu-panel workspace-menu-panel">
               <div id="workspaceHealth" class="workspace-health"></div>
+              <p id="protectionStatus" role="status">Local saving · External backup not configured</p>
+              <button id="requestEditingBtn" type="button" hidden>Request editing in this window</button>
               <div class="workspace-primary-actions">
                 <button id="chooseWorkspaceBtn" type="button">Choose storage folder</button>
                 <button id="saveWorkspaceProjectBtn" type="button">Save current project</button>
@@ -77,7 +79,7 @@
                     <input
                       id="projectPackageImportInput"
                       type="file"
-                      accept="application/json,.json,.loopcat,.cathan"
+                      accept="application/json,application/zip,.json,.zip,.loopcat,.cathan"
                     />
                   </label>
                   <button id="syncWorkspaceBtn" type="button">Sync from folder</button>
@@ -87,11 +89,27 @@
                 <summary>Backups</summary>
                 <div class="workspace-submenu-body">
                   <button id="backupExportBtn" type="button">Export browser backup</button>
+                  <button id="backupJsonExportBtn" type="button">Export backup as legacy JSON (50 MiB maximum)</button>
+                  <button id="projectPackageJsonExportBtn" type="button">Export project as legacy JSON (50 MiB maximum)</button>
+                  <button id="emergencyExportBtn" type="button">Emergency bilingual text export</button>
                   <label class="menu-item">
                     Restore browser backup
-                    <input id="backupImportInput" type="file" accept="application/json,.json" />
+                    <input id="backupImportInput" type="file" accept="application/json,application/zip,.json,.zip" />
                   </label>
                   <button id="workspaceBackupBtn" type="button">Export folder backup</button>
+                  <button id="refreshCheckpointsBtn" type="button">Show local recovery checkpoints</button>
+                  <label class="menu-item">Recovery checkpoint
+                    <select id="checkpointSelect"><option value="">Show checkpoints to choose a recovery point</option></select>
+                  </label>
+                  <button id="restoreCheckpointBtn" type="button">Recover selected checkpoint</button>
+                  <button id="refreshFolderBackupsBtn" type="button">Show verified folder backups</button>
+                  <label class="menu-item">Folder recovery generation
+                    <select id="folderBackupSelect"><option value="">Connect a folder and show its backups</option></select>
+                  </label>
+                  <button id="restoreFolderBackupBtn" type="button">Recover selected folder backup</button>
+                  <button id="exportConflictsBtn" type="button">Export preserved conflicting targets</button>
+                  <button id="retryLocalSaveBtn" type="button">Retry local saving</button>
+                  <button id="cancelArchiveBtn" type="button" disabled>Cancel archive processing</button>
                 </div>
               </details>
               <details class="workspace-submenu">
@@ -125,6 +143,10 @@
                       <option value="balanced">Balanced</option>
                       <option value="compact">Compact</option>
                     </select>
+                  </label>
+                  <label class="menu-item checkbox-row">
+                    <input id="predictiveTypingInput" type="checkbox" checked />
+                    Predictive typing from TM and terminology
                   </label>
                   <button id="resetLayoutBtn" type="button">Reset workspace layout</button>
                 </div>
@@ -265,6 +287,7 @@
                   Import TMX
                   <input id="resourceTmxImportInput" type="file" accept=".tmx,application/xml,text/xml" />
                 </label>
+                <button id="createTmResourceBtn" type="button">Create empty TM</button>
               </div>
               <div id="tmResourceDashboard" class="resource-dashboard"></div>
               <div id="tmResourceDetail" class="resource-detail hidden"></div>
@@ -303,6 +326,7 @@
                   Import TBX
                   <input id="resourceTbxImportInput" type="file" accept=".tbx,application/xml,text/xml" />
                 </label>
+                <button id="createTbResourceBtn" type="button">Create empty termbase</button>
                 <label class="file-button">
                   Import CSV/TSV/XLSX
                   <input
@@ -1360,6 +1384,16 @@
           </div>
           <button id="closeConcordanceBtn" type="button" aria-label="Close concordance">Close</button>
         </header>
+        <div class="concordance-controls">
+          <input id="concordanceQueryInput" type="search" aria-label="Concordance search" placeholder="Search translation memories" />
+          <select id="concordanceScopeSelect" aria-label="Search in">
+            <option value="both">Source and target</option>
+            <option value="source">Source only</option>
+            <option value="target">Target only</option>
+          </select>
+          <select id="concordanceResourceSelect" aria-label="Translation memory"><option value="">All linked TMs</option></select>
+          <button id="concordanceSearchBtn" type="button">Search</button>
+        </div>
         <div id="concordanceResults" class="concordance-results"></div>
       </section>
     </div>
@@ -1387,6 +1421,54 @@
         </footer>
       </section>
     </div>
+    <div id="predictiveTypingList" class="predictive-typing-list hidden" role="listbox" aria-label="Translation suggestions"></div>
+    <div id="predictiveTypingAnnouncer" class="sr-only" role="status" aria-live="polite"></div>
+
+    <dialog id="quickTermCaptureDialog" class="quick-term-capture-dialog" aria-labelledby="quickTermCaptureTitle">
+      <form id="quickTermCaptureForm" class="dialog-card" method="dialog">
+        <div class="resource-settings-heading">
+          <div>
+            <h2 id="quickTermCaptureTitle">Add terminology</h2>
+            <p class="muted">Save the selected pair to the active termbase.</p>
+          </div>
+          <button id="closeQuickTermCaptureBtn" type="button" aria-label="Close term capture">Close</button>
+        </div>
+        <div class="two-col">
+          <label>Source term <input id="quickTermSourceInput" required autocomplete="off" /></label>
+          <label>Target term <input id="quickTermTargetInput" required autocomplete="off" /></label>
+        </div>
+        <fieldset id="quickTermDestinations" class="quick-term-destinations">
+          <legend>Also save to</legend>
+          <div id="quickTermExtraTermbases" class="resource-option-list"></div>
+        </fieldset>
+        <details>
+          <summary>Advanced metadata</summary>
+          <div class="term-metadata-grid">
+            <label>Status
+              <select id="quickTermStatusSelect"><option value="preferred">Preferred</option><option value="admitted">Admitted</option><option value="forbidden">Forbidden</option></select>
+            </label>
+            <label>Case sensitivity
+              <select id="quickTermCaseSelect"><option value="insensitive">Insensitive</option><option value="initial-sensitive">Initial-sensitive</option><option value="sensitive">Sensitive</option></select>
+            </label>
+            <label>Source matching
+              <select id="quickTermMatchModeSelect"><option value="exact">Exact</option><option value="prefix">Prefix</option><option value="fuzzy">Fuzzy</option></select>
+            </label>
+            <label>Fuzzy threshold <input id="quickTermFuzzyThresholdInput" type="number" min="50" max="100" value="85" /></label>
+            <label>Subject <input id="quickTermSubjectInput" autocomplete="off" /></label>
+            <label>Domain <input id="quickTermDomainInput" autocomplete="off" /></label>
+            <label>Part of speech <input id="quickTermPartOfSpeechInput" autocomplete="off" /></label>
+            <label class="wide">Definition <textarea id="quickTermDefinitionInput" rows="2"></textarea></label>
+            <label class="wide">Usage example <textarea id="quickTermUsageExampleInput" rows="2"></textarea></label>
+            <label class="wide">Notes <textarea id="quickTermNotesInput" rows="2"></textarea></label>
+          </div>
+        </details>
+        <p id="quickTermCaptureMessage" class="muted" role="status" aria-live="polite"></p>
+        <div class="dialog-actions">
+          <button id="cancelQuickTermCaptureBtn" type="button">Cancel</button>
+          <button class="primary" type="submit">Save term <span class="shortcut-hint">Ctrl/Cmd+Enter</span></button>
+        </div>
+      </form>
+    </dialog>
 
     <div id="commandPaletteOverlay" class="command-palette-overlay hidden" aria-hidden="true">
       <section class="command-palette" role="dialog" aria-modal="true" aria-labelledby="commandPaletteTitle">
@@ -1631,29 +1713,11 @@
             <section class="project-resource-config">
               <div class="resource-config-header">
                 <h3>Project resources</h3>
-                <p>Select resources already in Resources. New units are saved to the main TM.</p>
+                <p>Choose which local memories and termbases support this project.</p>
               </div>
-              <div class="resource-picker-block">
-                <div class="resource-picker-title">
-                  <strong>Translation memories</strong>
-                  <span>Main</span>
-                </div>
-                <div id="projectTmResourceList" class="resource-option-list"></div>
-                <label>
-                  New main TM
-                  <input id="newTmNameInput" autocomplete="off" placeholder="Create a new project TM" />
-                </label>
-              </div>
-              <div class="resource-picker-block">
-                <div class="resource-picker-title">
-                  <strong>Termbases</strong>
-                </div>
-                <div id="projectTbResourceList" class="resource-option-list"></div>
-                <label>
-                  New termbase
-                  <input id="newTermBaseNameInput" autocomplete="off" placeholder="Create a new project termbase" />
-                </label>
-              </div>
+              <div id="projectResourceSummary" class="project-resource-summary" aria-live="polite"></div>
+              <p id="projectResourceDefaultNotice" class="muted"></p>
+              <button id="optionalResourceSettingsBtn" type="button">Optional Resource Settings</button>
             </section>
             <details id="projectAiOptions" class="project-resource-config project-ai-options">
               <summary>
@@ -1667,6 +1731,48 @@
         <div class="dialog-actions">
           <button type="button" id="cancelProjectBtn">Cancel</button>
           <button id="saveProjectBtn" class="primary" value="default">Create</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="resourceSettingsDialog" class="resource-settings-dialog" aria-labelledby="resourceSettingsDialogTitle">
+      <form id="resourceSettingsForm" method="dialog" class="dialog-card resource-settings-card">
+        <div class="resource-settings-heading">
+          <div>
+            <h2 id="resourceSettingsDialogTitle">Optional Resource Settings</h2>
+            <p id="resourceSettingsPair" class="muted"></p>
+          </div>
+          <label class="resource-settings-search">
+            Search resources
+            <input id="resourceSettingsSearchInput" type="search" autocomplete="off" placeholder="Search by resource name" />
+          </label>
+        </div>
+        <div class="resource-settings-tabs" role="tablist" aria-label="Resource type">
+          <button id="resourceSettingsTmTab" type="button" role="tab" aria-controls="resourceSettingsTmPanel" aria-selected="true">Translation memories</button>
+          <button id="resourceSettingsTbTab" type="button" role="tab" aria-controls="resourceSettingsTbPanel" aria-selected="false">Terminology</button>
+        </div>
+        <section id="resourceSettingsTmPanel" role="tabpanel" aria-labelledby="resourceSettingsTmTab">
+          <p class="muted">Select any number of TMs. Exactly one main TM receives confirmed segments; references are read-only for this project.</p>
+          <div id="projectTmResourceList" class="resource-option-list resource-policy-list"></div>
+          <div class="resource-create-row">
+            <label>New TM <input id="newTmNameInput" autocomplete="off" placeholder="Project translation memory" /></label>
+            <button id="addNewTmBtn" type="button">Add TM</button>
+          </div>
+        </section>
+        <section id="resourceSettingsTbPanel" role="tabpanel" aria-labelledby="resourceSettingsTbTab" hidden>
+          <p class="muted">Lookup, QA, and term contribution can be controlled independently. A project may have no termbase.</p>
+          <div id="projectTbResourceList" class="resource-option-list resource-policy-list"></div>
+          <div class="resource-create-row">
+            <label>New termbase <input id="newTermBaseNameInput" autocomplete="off" placeholder="Project terminology" /></label>
+            <button id="addNewTermBaseBtn" type="button">Add termbase</button>
+          </div>
+        </section>
+        <p id="resourceSettingsMessage" class="muted" role="status" aria-live="polite"></p>
+        <div class="dialog-actions resource-settings-actions">
+          <button id="recommendedResourceSettingsBtn" type="button">Use recommended settings</button>
+          <span class="dialog-action-spacer"></span>
+          <button id="cancelResourceSettingsBtn" type="button">Cancel</button>
+          <button id="useResourceSettingsBtn" class="primary" type="submit">Use these resources</button>
         </div>
       </form>
     </dialog>

@@ -312,7 +312,7 @@ test("ApplicationSaveStatusController validates boundaries and exposes immutable
   const { createApplicationSaveStatusController } = await loadFactory();
   const valid = createHarness(createApplicationSaveStatusController);
   assert.equal(Object.isFrozen(valid.controller), true);
-  assert.deepEqual(Object.keys(valid.controller), ["set", "navigationChanged"]);
+  assert.deepEqual(Object.keys(valid.controller), ["set", "setPersistence", "navigationChanged"]);
 
   const create = (changes = {}) =>
     createApplicationSaveStatusController({

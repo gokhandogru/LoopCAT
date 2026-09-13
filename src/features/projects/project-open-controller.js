@@ -4,6 +4,7 @@
  * navigation, rendering, and editor context remain injected owners.
  *
  * @param {{
+ *   ownership?: { open: (projectId: string) => Promise<unknown> },
  *   autosave: { flush: () => Promise<unknown> | unknown },
  *   session: {
  *     getProject: () => any,
@@ -15,6 +16,7 @@
  *   },
  *   command: { setProjectId: (projectId: any) => unknown },
  *   repository: {
+ *     getProject?: (projectId: string) => Promise<any>,
  *     listSegments: (projectId: any) => Promise<any[]> | any[],
  *     listActivity: (projectId: any) => Promise<any[]> | any[]
  *   },
@@ -76,7 +78,12 @@ export function createProjectOpenController(options) {
 
   async function open(projectId) {
     await autosave.flush();
-    session.replaceProject(session.getProjects().find((project) => project.id === projectId) || null);
+    if (options.ownership) await options.ownership.open(projectId);
+    session.replaceProject(
+      repository.getProject
+        ? await repository.getProject(projectId)
+        : session.getProjects().find((project) => project.id === projectId) || null
+    );
     command.setProjectId(session.getProject()?.id || projectId || "");
     session.replaceSegments(histories.prepare(session.getProject() ? await repository.listSegments(projectId) : []));
     session.replaceActivityEvents(session.getProject() ? await repository.listActivity(projectId) : []);

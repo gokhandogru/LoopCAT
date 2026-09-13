@@ -295,6 +295,94 @@ test("ProjectPackagePortabilityService prepares copies with one shared timestamp
   assert.deepEqual(pkg.project.exportHistory, [{ at: "old" }]);
 });
 
+test("ProjectPackagePortabilityService remaps an incompatible stable resource collision through the full graph", async () => {
+  const { createProjectPackagePortabilityService } = await loadFactory();
+  const pkg = {
+    schemaVersion: 6,
+    project: {
+      id: "project-1",
+      name: "Portable",
+      resourceLinks: [{ id: "link-1", resourceId: "resource-1", type: "tm", cachedName: "Portable TM", role: "main" }]
+    },
+    segments: [{ id: "segment-1", projectId: "project-1" }],
+    activityEvents: [],
+    resources: {
+      resources: [{ id: "resource-1", type: "tm", name: "Portable TM", sourceLang: "en", targetLang: "tr" }],
+      tmEntries: [{ id: "tm-1", resourceId: "resource-1", source: "Source", target: "Target" }],
+      tmContributions: [
+        {
+          id: "contribution-1",
+          resourceId: "resource-1",
+          tmEntryId: "tm-1",
+          projectId: "project-1",
+          segmentId: "segment-1"
+        }
+      ],
+      terms: [],
+      termConcepts: [],
+      termDesignations: []
+    }
+  };
+  const harness = createHarness(createProjectPackagePortabilityService, {
+    stores: {
+      segments: [],
+      activityEvents: [],
+      resources: [{ id: "resource-1", type: "tm", name: "Different pair", sourceLang: "en", targetLang: "de" }],
+      tmEntries: [],
+      tmContributions: [],
+      terms: [],
+      termConcepts: [],
+      termDesignations: []
+    }
+  });
+
+  const prepared = await harness.service.prepare(pkg);
+  assert.equal(prepared.resources.resources[0].id, "resource-generated-1");
+  assert.equal(prepared.project.resourceLinks[0].resourceId, "resource-generated-1");
+  assert.equal(prepared.resources.tmEntries[0].resourceId, "resource-generated-1");
+  assert.equal(prepared.resources.tmContributions[0].resourceId, "resource-generated-1");
+  assert.equal(prepared.resources.tmContributions[0].tmEntryId, "tm-1");
+  assert.equal(prepared.resources.tmContributions[0].segmentId, "segment-1");
+});
+
+test("ProjectPackagePortabilityService reuses a compatible known resource ID and its local identity", async () => {
+  const { createProjectPackagePortabilityService } = await loadFactory();
+  const pkg = {
+    schemaVersion: 6,
+    project: {
+      id: "project-1",
+      name: "Portable",
+      resourceLinks: [{ id: "link-1", resourceId: "resource-1", type: "tm", cachedName: "Packaged name", role: "main" }]
+    },
+    resources: {
+      resources: [{ id: "resource-1", type: "tm", name: "Packaged name", sourceLang: "en", targetLang: "tr" }],
+      tmEntries: [],
+      tmContributions: [],
+      terms: [],
+      termConcepts: [],
+      termDesignations: []
+    }
+  };
+  const harness = createHarness(createProjectPackagePortabilityService, {
+    stores: {
+      segments: [],
+      activityEvents: [],
+      resources: [{ id: "resource-1", type: "tm", name: "Local name", sourceLang: "en", targetLang: "tr" }],
+      tmEntries: [],
+      tmContributions: [],
+      terms: [],
+      termConcepts: [],
+      termDesignations: []
+    }
+  });
+
+  const prepared = await harness.service.prepare(pkg);
+  assert.equal(prepared.resources.resources[0].id, "resource-1");
+  assert.equal(prepared.resources.resources[0].name, "Local name");
+  assert.equal(prepared.project.resourceLinks[0].resourceId, "resource-1");
+  assert.equal(prepared.project.resourceLinks[0].cachedName, "Local name");
+});
+
 test("ProjectPackagePortabilityService preserves empty defaults, failure timing, and immutable API", async () => {
   const { createProjectPackagePortabilityService } = await loadFactory();
   const empty = createHarness(createProjectPackagePortabilityService);

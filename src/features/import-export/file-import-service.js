@@ -59,6 +59,11 @@ export function createFileImportService(options) {
   }
 
   async function parseJson(file, label) {
+    if (/\.zip$/i.test(file?.name || "")) {
+      const { archiveJob } = await import("./archive-worker-client.js");
+      if (/backup/i.test(label)) return archiveJob("stage", file);
+      return (await archiveJob("read", file)).value;
+    }
     if (file?.size > limits.portableJsonBytes) {
       throw new Error(`${label} is too large. Choose a LoopCAT JSON file under 50 MB.`);
     }

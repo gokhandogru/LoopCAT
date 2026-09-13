@@ -186,17 +186,33 @@ async function main() {
     outdir: testDir,
     plugins: [testSourcePlugin()]
   });
+  const archiveWorkerMeta = await buildVariant({
+    entry: "src/features/import-export/archive-worker-runtime.js",
+    outdir: productionDir,
+    entryNames: "archive-worker",
+    format: "iife",
+    splitting: false,
+    minify: true
+  });
   const productionAssets = rendererAssets(
     {
       outputs: {
         ...(productionMeta.outputs || {}),
         ...(fileProductionMeta.outputs || {}),
-        ...(bootstrapMeta.outputs || {})
+        ...(bootstrapMeta.outputs || {}),
+        ...(archiveWorkerMeta.outputs || {})
       }
     },
     productionDir
   );
-  const testAssets = rendererAssets(testMeta, testDir);
+  const reliabilityMeta = await buildVariant({
+    entry: "tests/reliability/browser-driver.js",
+    outdir: testDir,
+    entryNames: "reliability-test",
+    format: "iife",
+    splitting: false
+  });
+  const testAssets = rendererAssets({ outputs: { ...testMeta.outputs, ...reliabilityMeta.outputs } }, testDir);
   fs.writeFileSync(path.join(productionDir, "index.html"), rendererIndex('<script src="./bootstrap.js"></script>'));
   fs.writeFileSync(
     path.join(productionDir, "desktop-index.html"),

@@ -6,6 +6,45 @@ const test = require("node:test");
 const root = path.resolve(__dirname, "../..");
 const moduleAt = (relativePath) => import(pathToFileURL(path.join(root, relativePath)).href);
 
+test("R11 update activation keeps editing paused through reload and releases it on activation failure", async () => {
+  const { createUpdateController } = await moduleAt("src/features/update/update-controller.js");
+  let paused = false;
+  let fail = false;
+  let listener;
+  const waiting = {
+    postMessage() {
+      if (fail) throw new Error("activation rejected");
+      queueMicrotask(() => listener());
+    }
+  };
+  const controller = createUpdateController({
+    serviceWorker: {
+      controller: {},
+      register: () => Promise.resolve({ waiting }),
+      addEventListener: (_name, value) => {
+        listener = value;
+      }
+    },
+    location: {
+      reload() {
+        assert.equal(paused, true);
+      }
+    },
+    beforeActivate: () => {
+      paused = true;
+      return () => {
+        paused = false;
+      };
+    }
+  });
+  await controller.initialize();
+  assert.equal(await controller.activate(), true);
+  assert.equal(paused, true);
+  fail = true;
+  assert.equal(await controller.activate(), false);
+  assert.equal(paused, false);
+});
+
 test("update activation saves first and asks only the waiting worker to activate", async () => {
   const { createUpdateController } = await moduleAt("src/features/update/update-controller.js");
   const events = new Map();

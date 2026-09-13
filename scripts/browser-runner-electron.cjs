@@ -75,6 +75,7 @@ const allowedFiles = new Set([
   "LICENSE",
   "NOTICE",
   "test-runner.html",
+  "reliability-test.html",
   "security-policy-test.html",
   "offline-shell-test.html",
   "smoke-test.html",
@@ -207,6 +208,7 @@ app
     const query = new URLSearchParams();
     if (requestedTest) query.set("test", requestedTest);
     if (requestedTimeout > 0) query.set("timeout", String(requestedTimeout));
+    if (process.env.LOOPCAT_SOAK_MS) query.set("soakMs", process.env.LOOPCAT_SOAK_MS);
     const url = `http://127.0.0.1:${port}/test-runner.html${query.size ? `?${query}` : ""}`;
     windowRef = new BrowserWindow({
       width: 1280,
@@ -215,14 +217,27 @@ app
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: true
+        sandbox: true,
+        backgroundThrottling: false,
+        offscreen: requestedTest === "Performance"
       }
     });
+    if (requestedTest === "Performance") {
+      windowRef.webContents.on("paint", () => {});
+      windowRef.webContents.setFrameRate(60);
+      windowRef.webContents.startPainting();
+    }
     windowRef.webContents.on("page-title-updated", (event, title) => {
       event.preventDefault();
       handleTitle(title);
     });
     windowRef.webContents.on("console-message", (details) => {
+      if (details.message.startsWith("LOOPCAT_PERFORMANCE ")) {
+        const measurements = JSON.parse(details.message.slice("LOOPCAT_PERFORMANCE ".length));
+        const result = { device: { platform: process.platform, arch: process.arch, cpus: os.cpus()[0]?.model, logicalCpus: os.cpus().length, memoryBytes: os.totalmem(), electron: process.versions.electron, chrome: process.versions.chrome }, ...measurements };
+        require("node:fs").mkdirSync(path.join(root, "output"), { recursive: true });
+        require("node:fs").writeFileSync(path.join(root, "output", "reliability-performance.json"), JSON.stringify(result, null, 2));
+      }
       if (details.level !== "error") return;
       const source = details.sourceId ? ` (${details.sourceId}:${details.lineNumber || 0})` : "";
       send(`LoopCAT Browser Test Runner - renderer error${source}: ${details.message}`);
@@ -241,6 +256,13 @@ app
     });
     await windowRef.loadURL(url);
     handleTitle(await windowRef.webContents.getTitle());
+    if (requestedTest === "Performance") {
+      let lastProgress = "";
+      setInterval(async () => {
+        const progress = await runnerDiagnostic();
+        if (progress !== lastProgress) { lastProgress = progress; send("Performance progress: " + progress.slice(-1500)); }
+      }, 30000).unref();
+    }
     setTimeout(async () => {
       const diagnostic = await runnerDiagnostic();
       finish(

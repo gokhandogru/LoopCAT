@@ -11,7 +11,7 @@
  *     replaceQaChecks: (checks: any[]) => unknown,
  *     replaceQualityRiskQueue: (queue: any[]) => unknown
  *   },
- *   terms: { list: (query: object) => Promise<any[]>, getNames: () => string[] },
+ *   terms: { list: (query: object) => Promise<any[]>, getNames: () => string[], getLinks?: () => any[] },
  *   documents: { currentSegments: () => any[] },
  *   tags: { sourceTags: (segment: any) => any[], missing: (segment: any) => any[] },
  *   qa: { runChecks: (segments: any[], terms: any[], options: object) => any[] },
@@ -90,7 +90,8 @@ export function createProjectQaController(options) {
       const termRecords = await terms.list({
         sourceLang: session.getProject().sourceLang,
         targetLang: session.getProject().targetLang,
-        termBaseNames: terms.getNames()
+        termBaseNames: terms.getNames(),
+        ...(typeof terms.getLinks === "function" ? { resourceLinks: terms.getLinks() || [] } : {})
       });
       const qaSegments = documents.currentSegments().map((segment) => ({
         ...segment,

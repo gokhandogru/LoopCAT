@@ -2101,7 +2101,7 @@ for (const snippet of [
   "ProjectOpenController requires filter, navigation, presentation, and context boundaries.",
   "async function open(projectId)",
   "await autosave.flush();",
-  "session.replaceProject(session.getProjects().find((project) => project.id === projectId) || null);",
+  "await repository.getProject(projectId)",
   'command.setProjectId(session.getProject()?.id || projectId || "");',
   "session.getProject() ? await repository.listSegments(projectId) : []",
   "session.replaceSegments(histories.prepare(",
@@ -2146,9 +2146,9 @@ for (const boundary of [
 }
 assert(
   (appJs.match(/createProjectOpenController\(/g) || []).length === 1 &&
-    (appJs.match(/\bprojectOpenController\.open\b/g) || []).length === 6 &&
+    (appJs.match(/\bprojectOpenController\.open\b/g) || []).length === 7 &&
     (appWorkflowDriverJs.match(/\bprojectOpenController\.open\b/g) || []).length === 12,
-  "app.js must compose one project-open controller and all six application and twelve workflow consumers must call it directly."
+  "app.js must compose one project-open controller and all characterized application and workflow consumers must call it directly."
 );
 const appWithoutInjectedNavigationOpen = appJs.replace("applicationNavigation?.openProject?.(...args)", "");
 assert(
@@ -2789,7 +2789,7 @@ for (const snippet of [
   'function markProjectsUsingResource(type, name, sourceLang = "", targetLang = "")',
   "markProjects(projectIds);",
   "return projectIds.length;",
-  "function clear(projectId = session.getProject()?.id)",
+  "function clear(projectId = session.getProject()?.id, expectedGeneration = generation(projectId))",
   "function clearAll()",
   "function clearMemory()",
   "return Object.freeze({"
@@ -7273,7 +7273,7 @@ assert(
   "SegmentGridPresentationController must follow virtual feature creation and precede all direct controller consumers."
 );
 assert(
-  (appJs.match(/\bsegmentGridPresentationController\.render\b/g) || []).length === 18 &&
+  (appJs.match(/\bsegmentGridPresentationController\.render\b/g) || []).length === 19 &&
     (appWorkflowDriverJs.match(/\bsegmentGridPresentationController\.render\b/g) || []).length === 15 &&
     (appJs.match(/\bsegmentGridPresentationController\.scheduleRowUpdate\b/g) || []).length === 1 &&
     (appJs.match(/\bsegmentGridPresentationController\.cancelRowUpdate\b/g) || []).length === 1,
@@ -7562,8 +7562,8 @@ assert(
 
 assertIncludes(
   storageJs,
-  "const DB_VERSION = 6;",
-  "storage.js local database schema must be version 6 after the additive Trash migration."
+  "const DB_VERSION = 7;",
+  "storage.js local database schema must be version 7 after the additive recovery migration."
 );
 assertIncludes(
   validationJs,
@@ -10838,7 +10838,7 @@ assert(
 );
 for (const directBoundary of [
   "editLifecycle: { finalize: targetEditController.finalize }",
-  "clearPending: autosaveService.clear",
+  "clearPending: commandPersistence.clear",
   "flush: autosaveService.flush",
   "focusTarget: targetEditController.focusActive"
 ]) {
@@ -11879,7 +11879,7 @@ for (const snippet of [
   "if (token.index < cursor) return",
   "output += chunk.text + token.text",
   "return { text: output + tail.text, count: count + tail.count }",
-  "return Object.freeze({ replacePlain, replace })"
+  "return Object.freeze({ replacePlain, replace, replaceAsync, replaceMany })"
 ]) {
   assertIncludes(
     protectedTextReplacementServiceJs,
@@ -11897,7 +11897,7 @@ for (const boundary of ["detectTags: detectProtectedTags", "normalizeCase: appli
 }
 assertIncludes(
   appJs,
-  "transform: { replace: protectedTextReplacementService.replace }",
+  "replace: protectedTextReplacementService.replaceAsync",
   "TargetReplacementController must consume the protected-text replacement service directly."
 );
 assert(
@@ -12016,7 +12016,7 @@ for (const snippet of [
   'if (filter === "ai-suggestions") return provenance.hasAiSuggestions(segment)',
   'if (filter === "ai-review-risk") return Boolean(provenance.aiRiskLevel(segment))',
   '["high", "critical"].includes(provenance.aiRiskLevel(segment))',
-  'const pattern = new RegExp(query, filters.caseSensitive ? "" : "i")',
+  "const result = await (options.evaluateRegex || evaluateRegex)(",
   "return () => false",
   "return normalizeCase(haystack).includes(foldedQuery)",
   "segment.documentId !== getDocumentId()",
@@ -12458,7 +12458,7 @@ assertIncludes(
 );
 for (const boundary of [
   "targetState: segmentTargetStateService",
-  "autosave: { clear: autosaveService.clear }",
+  "autosave: { clear: autosaveService.clear, retry: autosaveService.debounce }",
   "persistence: { save: saveSegment, saveMany: saveSegments }",
   "getActiveSegment: applicationActiveSegmentService.get",
   "applicationNavigation.selectSegment({ activeIndex: index, segmentId })",
@@ -13634,14 +13634,14 @@ assertIncludes(
 );
 for (const snippet of [
   "ProjectExportController requires build, session, persistence, activity, file, validation, presentation, workspace, status, clock, test, and logger boundaries.",
-  "async function exportBrowserBackup()",
-  "await build.buildBackupExport()",
-  "`loopcat-backup-${clock.now().slice(0, 10)}.json`",
+  "async function exportBrowserBackup({ format = \"archive\" } = {})",
+  "await build.buildBackupExport({ format })",
+  "`loopcat-backup-${clock.now().slice(0, 10)}${archive ? \".loopcat-backup.zip\" : \".json\"}`",
   "JSON.stringify(backup, null, 2)",
   '"application/json"',
   "presentation.renderValidation(backupValidation)",
   "const noteCount = validation.count(backupValidation)",
-  '`Backup exported with ${noteCount} validation note${noteCount === 1 ? "" : "s"}`',
+  "`${delivery?.verified ? \"Backup verified\" : \"Download requested\"} with ${noteCount} validation note${noteCount === 1 ? \"\" : \"s\"}`",
   'const message = error.message || "Backup export failed."',
   "error.validation || validation.errorReport(message)",
   "return false",
@@ -13660,14 +13660,14 @@ for (const snippet of [
   "build.buildProjectPackage(pendingProject, null, {",
   "activityEvents: pendingActivityEvent ? [pendingActivityEvent] : []",
   "const finalWarnings = validation.count(pkg.validation)",
-  'files.download(filename, JSON.stringify(pkg, null, 2), "application/json")',
-  "session.replaceProject(await persistence.updateProject(pendingProject))",
-  "project.id === session.getProject().id ? session.getProject() : project",
+  "await files.download(filename, content, archive ? \"application/zip\" : \"application/json\")",
+  "if (session.getProject()?.id === saved.id) session.replaceProject(saved)",
+  "project.id === saved.id ? saved : project",
   'logger.warn("Project package export history update failed.", error)',
   'status.set("Project package exported; local export history failed", "dirty")',
   'throw new Error("Simulated export activity log failure")',
   'await persistence.bulkPut("activityEvents", [pendingActivityEvent])',
-  "session.replaceActivityEvents(await persistence.listActivityEvents(session.getProject().id))",
+  "session.replaceActivityEvents(await persistence.listActivityEvents(pendingProject.id))",
   "presentation.renderBackupReminder()",
   'logger.warn("Project package export activity log failed.", activityError)',
   "activity.appendWarning(successMessage, activityLogged)",
@@ -13736,8 +13736,8 @@ for (const removedHelper of ["exportBrowserBackup", "reportProjectPackageExportF
   );
 }
 assert(
-  (appJs.match(/\bprojectExportController\.exportProjectPackage\b/g) || []).length === 2 &&
-    (appJs.match(/\bprojectExportController\.exportBrowserBackup\b/g) || []).length === 1 &&
+  (appJs.match(/\bprojectExportController\.exportProjectPackage\b/g) || []).length === 3 &&
+    (appJs.match(/\bprojectExportController\.exportBrowserBackup\b/g) || []).length === 2 &&
     (appWorkflowDriverJs.match(/\bprojectExportController\.exportProjectPackage\b/g) || []).length === 3 &&
     !appWorkflowDriverJs.includes("projectExportController.exportBrowserBackup"),
   "ImportExportController, recovery, and all workflow manual-export consumers must call ProjectExportController directly."
@@ -13850,7 +13850,7 @@ for (const snippet of [
   'files.parseJson(file, "Project package")',
   "async function restoreBackupData(backupRecord)",
   'await files.progress("Validating backup")',
-  "const backupReport = backup.validate(backupRecord)",
+  "const backupReport = backupRecord.archiveStagingId ? backupRecord.validation : backup.validate(backupRecord)",
   'status.set("Backup restore failed validation", "dirty")',
   "await autosave.flush()",
   '"Restoring backup stores"',
@@ -13941,7 +13941,7 @@ for (const removedHelper of [
 assert(
   (appJs.match(/\bprojectImportRestoreController\.importProjectPackageData\b/g) || []).length === 1 &&
     (appJs.match(/\bprojectImportRestoreController\.importProjectPackage\b/g) || []).length === 1 &&
-    !appJs.includes("projectImportRestoreController.restoreBackupData") &&
+    (appJs.match(/\bprojectImportRestoreController\.restoreBackupData\b/g) || []).length === 1 &&
     (appJs.match(/\bprojectImportRestoreController\.restoreBackupFile\b/g) || []).length === 1 &&
     (appWorkflowDriverJs.match(/\bprojectImportRestoreController\.importProjectPackageData\b/g) || []).length === 5 &&
     (appWorkflowDriverJs.match(/\bprojectImportRestoreController\.importProjectPackage\b/g) || []).length === 2 &&
@@ -14118,10 +14118,10 @@ assertIncludes(
 );
 for (const snippet of [
   "WorkspaceBackupExportController requires connection, build, storage, workspace, validation, presentation, and status boundaries.",
-  "async function exportBackup()",
+  "async function exportBackup(exportOptions = {})",
   "if (!connection.isConnected()) return",
-  "const { backup, validation: validationReport } = await build.buildBackupExport()",
-  "const reference = await storage.exportFullBackup(backup)",
+  "const { backup, validation: validationReport } = await build.buildBackupExport({ format: \"archive\" })",
+  "const reference = await storage.exportFullBackup(backup, exportOptions)",
   "const workspaceStatus = await storage.getStatus()",
   "workspace.setStatus(workspaceStatus)",
   "presentation.renderWorkspaceStatus()",
@@ -14157,7 +14157,7 @@ for (const boundary of [
   "appRuntime.featureFactories.createWorkspaceBackupExportController({",
   "isConnected: () => Boolean(workspaceStorage && state.workspaceStatus?.connected)",
   "build: projectExportBuildService",
-  "exportFullBackup: (backup) => workspaceStorage.exportFullBackup(backup)",
+  "exportFullBackup: (backup, options) => workspaceStorage.exportFullBackup(backup, options)",
   "getStatus: () => workspaceStorage.getStatus()",
   "state.workspaceStatus = workspaceStatus",
   "count: reportCount",
@@ -14174,7 +14174,7 @@ assert(
   "exportWorkspaceBackupToFolder must not return to app.js or the workflow driver."
 );
 assert(
-  (appJs.match(/\bworkspaceBackupExportController\.exportBackup\b/g) || []).length === 1 &&
+  (appJs.match(/\bworkspaceBackupExportController\.exportBackup\b/g) || []).length === 2 &&
     (appWorkflowDriverJs.match(/\bworkspaceBackupExportController\.exportBackup\b/g) || []).length === 1,
   "RecoveryWorkspaceController and the workflow workspace backup-export consumer must call WorkspaceBackupExportController directly."
 );
@@ -14327,7 +14327,7 @@ for (const snippet of [
   'storage.chooseFolder({ startIn: "documents" })',
   "const missingPackageCount = await workspace.markMissingLocalDirty()",
   '"Workspace folder connected"',
-  "async function saveById(projectId, saveOptions = {})",
+  "function saveById(projectId, saveOptions = {})",
   "projects.knownById(projectId) || (await projects.list()).find((item) => item.id === projectId)",
   'throw new Error("Project package could not be found.")',
   "await autosave.flush(projectId)",
@@ -14689,10 +14689,10 @@ for (const snippet of [
   ".filter((record) => !ignoredProjectId || record.projectId !== ignoredProjectId)",
   "if (forceNewId || !currentId || existingIds.has(currentId) || reservedIds.has(currentId))",
   "reservedIds.add(next.id)",
-  'storage.getAll("segments")',
-  'storage.getAll("activityEvents")',
-  'storage.getAll("tmEntries")',
-  'storage.getAll("terms")',
+  "collisions(\"segments\", pkg.segments || [])",
+  "collisions(\"activityEvents\", pkg.activityEvents || [])",
+  "collisions(\"tmEntries\", pkg.resources?.tmEntries || [])",
+  "collisions(\"terms\", pkg.resources?.terms || [])",
   'project.id = ids.make("project")',
   "project.name = importedCopyName(project.name)",
   "project.createdAt = clock.now()",
@@ -14723,7 +14723,7 @@ assert(
 for (const boundary of [
   "appRuntime.featureFactories.createProjectPackagePortabilityService({",
   "validation: { validate: validatePackage }",
-  "storage: { getAll }",
+  "storage: { getAll, getMany: storageApi.getMany }",
   "records: { sanitize: sanitizePortableValue }",
   "ids: { make: makeId }",
   "projects: { getAll: editorSessionStore.getProjects }",
@@ -15147,7 +15147,7 @@ for (const boundary of [
   "elements.findInput.focus()",
   "const findText = elements.findInput.value",
   "const indexes = filters.getIndexes(scope)",
-  'transform.replace(segment.target || "", findText, replacement, replaceOptions)',
+  "await transform.replace(originalTarget, findText, replacement, replaceOptions)",
   "await persistence.flush(editorSessionStore.getProject().id)",
   "const command = commands.create({",
   "await persistence.save(updated)",
@@ -16990,7 +16990,7 @@ for (const testName of [
   "AI project brief routes bounded context and appends normalized style instructions",
   "AI project brief creates a first style block when no existing guide is present",
   "primary AI project brief persistence failure restores exact project and project-list state",
-  "post-save AI administration failure restores in-memory project state and visible style input",
+  "post-save AI administration failure preserves the committed brief",
   "secondary AI project brief activity failure keeps persisted guidance durable and reports dirty"
 ]) {
   assertIncludes(
@@ -17196,7 +17196,7 @@ for (const boundary of [
   "const previousKey = keys.snapshot()",
   "const savedProject = await persistence.updateProject({ ...project, aiSettings })",
   "keys.save(apiKey, Boolean(secrets.rememberOpenAiKey))",
-  "await restoreProject(previousProject, previousProjects, projectPersisted)",
+  "await restoreProject(previousProject, previousProjects, projectPersisted, committedVersion)",
   "keys.restore(previousKey)",
   "const [tmMatches, terms] = await context.forSegment(segment, aiSettings)",
   "const suggestion = await provider.request({",
@@ -17352,11 +17352,11 @@ for (const boundary of [
   "...settingsBoundary.projectUpdateFields(localSettings, project)",
   "endpoint.assertAllowed(localSettings)",
   "const savedProject = await persistence.updateProject({ ...project, aiSettings })",
-  "if (shouldUpdateOpenAiKey) keys.openAi.save(apiKeyInput, rememberApiKey)",
-  "if (shouldUpdateLocalKey) keys.local.save(localAiKeyInput, rememberLocalAiKey, localSettings)",
+  "if (shouldUpdateOpenAiKey) await keys.openAi.save(apiKeyInput, rememberApiKey)",
+  "if (shouldUpdateLocalKey) await keys.local.save(localAiKeyInput, rememberLocalAiKey, localSettings)",
   "await activity.log({",
   "workspace.markActivityWarningDirty()",
-  "await restoreProject(previousProject, previousProjects, projectPersisted)",
+  "await restoreProject(previousProject, previousProjects, projectPersisted, committedVersion)",
   "keys.openAi.restore(previousOpenAiKey)",
   "keys.local.restore(previousLocalKey)",
   "workspace.markRollbackDirty(previousProject.id)"
@@ -21462,7 +21462,7 @@ for (const workflowConsumer of [
   );
 }
 assert(
-  (appJs.match(/\bapplicationDownloadController\.download\b/g) || []).length === 7 &&
+  (appJs.match(/\bapplicationDownloadController\.download\b/g) || []).length === 8 &&
     (appWorkflowDriverJs.match(/\bapplicationDownloadController\.download\b/g) || []).length === 3,
   "all application and workflow browser-download consumers must call ApplicationDownloadController directly or through the exact argument-order adapter."
 );
@@ -21991,8 +21991,8 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `aggregate-presentation composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  (appJs.match(/\bapplicationAggregatePresentationController\.render\b/g) || []).length === 16,
-  "all 16 application aggregate-presentation consumers must call ApplicationAggregatePresentationController.render directly."
+  (appJs.match(/\bapplicationAggregatePresentationController\.render\b/g) || []).length === 17,
+  "all characterized application aggregate-presentation consumers must call ApplicationAggregatePresentationController.render directly."
 );
 assert(
   (appWorkflowDriverJs.match(/\bapplicationAggregatePresentationController\.render\b/g) || []).length === 5,
@@ -22677,7 +22677,7 @@ assertIncludes(
 );
 assertIncludes(
   autosaveServiceJs,
-  "queue(latest, retryDelayMs)",
+  "queue(record.segment, retryDelayMs)",
   "AutosaveService background failures must schedule a retry instead of leaving a dead pending timer."
 );
 assertIncludes(
@@ -23032,14 +23032,14 @@ for (const snippet of [
   "view.setClass(`save-status ${mode}`)",
   'mode !== "saved" && OPERATION_PATTERN.test(displayText) && !COMPLETED_PATTERN.test(displayText)',
   "view.setBusy(String(operationActive))",
-  "persistent = operationActive || PENDING_SAVE_PATTERN.test(displayText)",
+  "persistent = Boolean(persistenceNotice) || operationActive || PENDING_SAVE_PATTERN.test(displayText)",
   "noticeTimer = timers.set(() => {",
   "if (revision !== noticeRevision) return",
   'view.setText("")',
   'view.setClass("save-status")',
   "}, NOTICE_DURATION_MS)",
   "function navigationChanged(next, previous)",
-  "return Object.freeze({ set, navigationChanged })"
+  "return Object.freeze({ set, setPersistence, navigationChanged })"
 ]) {
   assertIncludes(
     applicationSaveStatusControllerJs,
@@ -23074,7 +23074,7 @@ assert(
 );
 assert(
   (appJs.match(/\bapplicationSaveStatusController\.set\b/g) || []).length >= 60 &&
-    (appWorkflowDriverJs.match(/\bapplicationSaveStatusController\.set\b/g) || []).length === 5,
+    (appWorkflowDriverJs.match(/\bapplicationSaveStatusController\.set\b/g) || []).length === 6,
   "application and workflow save-status consumers must remain wired directly to ApplicationSaveStatusController."
 );
 for (const forbiddenOwner of [
@@ -24756,7 +24756,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "schema 6 adds Trash while project packages remain schema 5",
+  "schema 8 adds durable shared resources while portable schemas remain versioned independently",
   "app workflow test must verify the split storage/package schema contract."
 );
 assertIncludes(
@@ -24776,12 +24776,12 @@ assertIncludes(
 );
 assertIncludes(
   storageJs,
-  'db.transaction([config.entityStore, config.indexStore, "trashEntries"], "readwrite")',
+  "{ store: config.indexStore, where: { [config.indexRecordId]: value.id } }",
   "resource deletion must remove live records and token indexes in the same Trash transaction."
 );
 assertIncludes(
   storageJs,
-  'db.transaction([config.entityStore, "appMeta", "trashEntries"], "readwrite")',
+  "{ store: \"trashEntries\", value: entry, delete: true }",
   "resource restoration must recreate records, dirty search indexes, and consume Trash atomically."
 );
 assertIncludes(
