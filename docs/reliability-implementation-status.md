@@ -1,5 +1,7 @@
 # Reliability implementation and qualification
 
+Release follow-up: the [13 September preview](releases/0.0.4-dev.20260913.md) packages this implementation and Resources 2.0. The legacy static release characterization has been updated for stable resource IDs, transactional confirmation and the new schemas. Fresh artifact checks are recorded in [downloads/verification.md](../downloads/verification.md). The implementation-time results below remain historical evidence, not new artifact qualification.
+
 Implementation of the accepted R1–R16 review plan, based on commit `a1e6871880e26651df74637bd75368f46d863da3`. The original review and probes remain under `output/`. This document describes the working source tree, not previously published installers. No release was published by this work.
 
 ## Finding-to-implementation checklist

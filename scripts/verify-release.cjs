@@ -2784,9 +2784,9 @@ for (const snippet of [
   "const changed = !state.getDirty().has(projectId);",
   "summary.markDirty(projectId);",
   "function markProjects(projectIds = [])",
-  'function usesResource(project, type, name, sourceLang = "", targetLang = "")',
-  "return resources.links(project).some((link) => link.type === type && link.name === name);",
-  'function markProjectsUsingResource(type, name, sourceLang = "", targetLang = "")',
+  'function usesResource(project, type, name, sourceLang = "", targetLang = "", resourceId = "")',
+  '(link) => link.type === type && ((resourceId && link.resourceId === resourceId) || (name && link.name === name))',
+  'function markProjectsUsingResource(type, name, sourceLang = "", targetLang = "", resourceId = "")',
   "markProjects(projectIds);",
   "return projectIds.length;",
   "function clear(projectId = session.getProject()?.id, expectedGeneration = generation(projectId))",
@@ -2825,7 +2825,7 @@ for (const [method, appCount, workflowCount] of [
   ["clearMemory", 0, 1],
   ["hasUnsaved", 1, 0],
   ["ids", 2, 0],
-  ["mark", 37, 6],
+  ["mark", 38, 6],
   ["markProjects", 2, 0],
   ["markProjectsUsingResource", 6, 1],
   ["prune", 1, 1],
@@ -3407,7 +3407,7 @@ for (const snippet of [
   "Array.isArray(resourceLinks) ? resourceLinks : []",
   'if (!link || typeof link !== "object" || Array.isArray(link)) return null',
   'const type = String(link.type || "").trim()',
-  'const name = String(link.name || "").trim()',
+  'const name = String(link.cachedName || link.name || "").trim()',
   "if (!RESOURCE_LINK_TYPES.has(type) || !name) return null",
   'id: typeof link.id === "string" && link.id.trim() ? link.id : ""',
   "function links(project)",
@@ -3423,7 +3423,9 @@ for (const snippet of [
   "function summary(project = session.getProject())",
   'tmLabel: `${tmNamesValue.length} TM${tmNamesValue.length === 1 ? "" : "s"}`',
   'tbLabel: `${termBaseNamesValue.length} TB${termBaseNamesValue.length === 1 ? "" : "s"}`',
-  "return Object.freeze({ cleanLinks, links, mainTm, tmNames, termBaseNames, primaryTermBase, summary })"
+  "function lookupTmLinks(project = session.getProject())",
+  "function qaTermbaseLinks(project = session.getProject())",
+  "function contributionTermbaseLinks(project = session.getProject())"
 ]) {
   assertIncludes(
     projectResourceContextServiceJs,
@@ -3446,11 +3448,11 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `project resource-context composition must retain ${boundary}.`);
 }
 for (const [method, appCount, workflowCount] of [
-  ["links", 3, 0],
-  ["mainTm", 4, 13],
+  ["links", 4, 0],
+  ["mainTm", 4, 12],
   ["tmNames", 10, 0],
-  ["termBaseNames", 14, 2],
-  ["primaryTermBase", 5, 15],
+  ["termBaseNames", 12, 2],
+  ["primaryTermBase", 6, 15],
   ["summary", 4, 1]
 ]) {
   assert(
@@ -5178,8 +5180,8 @@ for (const snippet of [
 assertIncludes(appJs, "createResourceCatalogService({", "app.js must compose the checked resource-catalog service.");
 assertIncludes(
   appJs,
-  "getState: () => resourcesController?.getState?.() || { tmEntries: [], terms: [] }",
-  "resource-catalog composition must inject current Resources state with the original empty fallback."
+  "getState: () => resourcesController?.getState?.() || { tmEntries: [], terms: [], resources: [] }",
+  "resource-catalog composition must inject a stable-resource catalog, including empty resources."
 );
 for (const method of ["key", "labelFromKey", "summarize", "matching"]) {
   const consumerSnippet =
@@ -5218,8 +5220,11 @@ for (const snippet of [
   "ResourceCatalogRefreshController requires resource repository boundaries.",
   "ResourceCatalogRefreshController requires a Resources presentation boundary.",
   "async function refresh()",
-  "const [tmEntries, terms] = await Promise.all([repository.listTmEntries(), repository.listTerms()]);",
-  "return presentation.setResources({ tmEntries, terms }) || { tmEntries, terms };",
+  "const pending = [repository.listTmEntries(), repository.listTerms()];",
+  "if (hasStableResources) pending.push(repository.listResources());",
+  "const settled = await Promise.all(pending);",
+  "return presentation.setResources(legacy) || { ...legacy };",
+  "presentation.setResources({ tmEntries, terms, resources: enrichedResources })",
   "return Object.freeze({ refresh });"
 ]) {
   assertIncludes(
@@ -5239,9 +5244,9 @@ for (const boundary of [
 }
 assert(
   (appJs.match(/createResourceCatalogRefreshController\(/g) || []).length === 1 &&
-    (appJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 5 &&
+    (appJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 10 &&
     (appWorkflowDriverJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 4,
-  "app.js must compose one resource-catalog refresh controller and all five application and four workflow consumers must call it directly."
+  "app.js must compose one resource-catalog refresh controller and all ten application and four workflow consumers must call it directly."
 );
 assert(
   !/async\s+function\s+refreshResources\b/.test(appJs) && !/\brefreshResources\s*\(/.test(appWorkflowDriverJs),
@@ -5314,9 +5319,9 @@ for (const boundary of [
 }
 assert(
   (appJs.match(/createProjectTermRefreshController\(/g) || []).length === 1 &&
-    (appJs.match(/\bprojectTermRefreshController\.refresh\b/g) || []).length === 8 &&
+    (appJs.match(/\bprojectTermRefreshController\.refresh\b/g) || []).length === 9 &&
     (appWorkflowDriverJs.match(/\bprojectTermRefreshController\.refresh\b/g) || []).length === 1,
-  "app.js must compose one project-term refresh controller and all eight application and one workflow consumers must call it directly."
+  "app.js must compose one project-term refresh controller and all nine application and one workflow consumers must call it directly."
 );
 assert(
   !/async\s+function\s+refreshProjectTerms\b/.test(appJs) && !/\brefreshProjectTerms\s*\(/.test(appWorkflowDriverJs),
@@ -5856,7 +5861,7 @@ for (const snippet of [
   'data-main-tm="${presentation.escapeHtml(resource.name)}"',
   'localization.labelHtml("noMatchingTms")',
   'localization.labelHtml("noMatchingTbs")',
-  'dialog.querySelectorAll(`[data-resource-type="${type}"]:checked`)',
+  'projectDialog.querySelectorAll(`[data-resource-type="${type}"]:checked`)',
   "const sourceLang = normalizeLanguageInput(sourceLanguageInput)",
   "const targetLang = normalizeLanguageInput(targetLanguageInput)",
   "const existingLinks = projectResources.links(existingProject)",
@@ -5864,14 +5869,15 @@ for (const snippet of [
   'let tbNames = names.unique(checkedNames("tb"))',
   "const newTmName = newTmNameInput.value.trim()",
   "const newTbName = newTermBaseNameInput.value.trim()",
-  'dialog.querySelector("[data-main-tm]:checked")?.dataset.mainTm || ""',
+  'projectDialog.querySelector("[data-main-tm]:checked")?.dataset.mainTm || ""',
   'names.clean(existingProject?.tmName, "Default TM")',
   'names.clean(existingProject?.termBaseName, "Default TB")',
   "if (!main || !tmNames.includes(main)) main = tmNames[0]",
   'makeId("resource-link")',
   'role: name === main ? "main" : "reference"',
   'type: "termbase"',
-  "return Object.freeze({ values, render, collect })"
+  "getPlan: () => copy(savedPlan)",
+  "isAccepted: () => accepted"
 ]) {
   assertIncludes(
     projectResourceSelectionControllerJs,
@@ -6322,9 +6328,9 @@ for (const snippet of [
   'renderDashboard("tb", resourceState)',
   'isTm ? "noTranslationMemories" : "noTermbases"',
   'action.dataset.resourceAction = "import"',
-  'card.className = "resource-card"',
+  'card.className = `resource-card${resource.archived ? " archived" : ""}`',
   'localization.labelHtml("updatedAt", { date: formatDate(resource.updatedAt) })',
-  'deleteButton.dataset.resourceAction = "delete-resource"',
+  'const legacyDeleteButton = actionButton("delete-resource", "Delete", "danger-small")',
   'exportButton.dataset.resourceAction = "export"',
   'openButton.dataset.resourceAction = "open"',
   'tmDetail.classList.add("hidden")',
@@ -6476,7 +6482,7 @@ for (const snippet of [
   "parsers.parseTmx",
   'projectName: "Resources import"',
   "repositories.importTmEntries",
-  'resources.markProjectsUsingDirty("tm"',
+  'markProjectsUsingResource("tm"',
   'resources.open("tm"',
   "await resources.refresh()",
   'files.assertSize(file, "TBX resource file")',
@@ -6484,7 +6490,7 @@ for (const snippet of [
   "Enter a TB name, source language, and target language before importing.",
   "parsers.parseTbx",
   "repositories.importTerms",
-  'resources.markProjectsUsingDirty("termbase"',
+  'markProjectsUsingResource("termbase"',
   'resources.open("tb"',
   "await resources.refreshProjectTerms({ rerender: true })",
   'files.assertSize(file, "Term list resource file")',
@@ -6519,7 +6525,8 @@ for (const boundary of [
   "yieldToUi: applicationImportProgressController.yieldToUi",
   "parseTmx: parseTmxAsync",
   "parseTbx: parseTbxAsync",
-  "repositories: { importTmEntries, importTerms }",
+  "createResource: async (input) => {",
+  "return existing || createResource(input);",
   "markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource",
   "open: (...args) => resourcesController?.openResource?.(...args)",
   "refresh: resourceCatalogRefreshController.refresh",
@@ -7562,8 +7569,8 @@ assert(
 
 assertIncludes(
   storageJs,
-  "const DB_VERSION = 7;",
-  "storage.js local database schema must be version 7 after the additive recovery migration."
+  "const DB_VERSION = 8;",
+  "storage.js local database schema must be version 8 after the additive recovery and stable-resource migrations."
 );
 assertIncludes(
   validationJs,
@@ -7572,13 +7579,13 @@ assertIncludes(
 );
 assertIncludes(
   validationJs,
-  "const MAX_PACKAGE_SCHEMA_VERSION = 5;",
-  "validation.js must identify package schema version 5 as the current maximum."
+  "const MAX_PACKAGE_SCHEMA_VERSION = 6;",
+  "validation.js must identify package schema version 6 as the current maximum."
 );
 assertIncludes(
   validationJs,
-  "const MAX_BACKUP_SCHEMA_VERSION = 6;",
-  "validation.js must accept default backups containing schema-6 Trash data."
+  "const MAX_BACKUP_SCHEMA_VERSION = 7;",
+  "validation.js must accept schema-7 resource backups while preserving legacy Trash data."
 );
 assertIncludes(
   workspaceStorageJs,
@@ -12459,7 +12466,8 @@ assertIncludes(
 for (const boundary of [
   "targetState: segmentTargetStateService",
   "autosave: { clear: autosaveService.clear, retry: autosaveService.debounce }",
-  "persistence: { save: saveSegment, saveMany: saveSegments }",
+  "restoreResourceSegment: (segment) => {",
+  "return restoreSegmentWithMainTm(editorSessionStore.getProject(), segment, {",
   "getActiveSegment: applicationActiveSegmentService.get",
   "applicationNavigation.selectSegment({ activeIndex: index, segmentId })",
   "verticalFeatureState?.segmentGrid?.selectSegment(index, segmentId)",
@@ -12693,8 +12701,8 @@ for (const snippet of [
   'root.classList.toggle("muted", !matches.length)',
   'root.textContent = localization.source("No TM matches.")',
   'card.className = "match-card"',
-  'localization.labelHtml("matchPercent", { score: match.score })',
-  'text.escapeHtml(match.tmName || "")',
+  'localization.labelHtml("matchPercent", { score: match.effectiveScore ?? match.score })',
+  'text.escapeHtml(match.tmName || match.resourceName || "")',
   'match.projectName ? `<p class="muted">${text.escapeHtml(match.projectName)}</p>` : ""',
   'button.textContent = localization.label("insert")',
   "target.insert(match.target, {",
@@ -12840,7 +12848,7 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `term-suggestions composition must inject the checked ${boundary} boundary.`);
 }
 assert(
-  (appJs.match(/\btermSuggestionsController\.refresh\b/g) || []).length === 6 &&
+  (appJs.match(/\btermSuggestionsController\.refresh\b/g) || []).length === 7 &&
     (appWorkflowDriverJs.match(/\btermSuggestionsController\.refresh\b/g) || []).length === 1,
   "project transfer, AI extraction, editor context, Trash, term save, Quick Insert, and workflow consumers must call TermSuggestionsController directly."
 );
@@ -12936,7 +12944,8 @@ for (const boundary of [
   "getProject: editorSessionStore.getProject",
   "primaryName: projectResourceContextService.primaryTermBase",
   "markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource",
-  "repository: { save: saveTerm }",
+  "const result = await saveTermPair({",
+  "extraTermBaseIds: selected ? [selected.resourceId] : [],",
   "renderTermbaseSelect: termbaseSelectPresentationController.render,",
   "refreshProjectTerms: projectTermRefreshController.refresh",
   "refreshSuggestions: termSuggestionsController.refresh",
@@ -13051,7 +13060,7 @@ for (const boundary of [
   "getProject: editorSessionStore.getProject",
   "replaceQaChecks: editorSessionStore.replaceQaChecks",
   "replaceQualityRiskQueue: editorSessionStore.replaceQualityRiskQueue",
-  "terms: { list: listTerms, getNames: projectResourceContextService.termBaseNames }",
+  "getLinks: projectResourceContextService.qaTermbaseLinks",
   "currentSegments: projectDocumentCatalogService.currentSegments",
   "sourceTags: protectedTagInspectionService.sourceTags",
   "missing: protectedTagInspectionService.missing",
@@ -13509,7 +13518,7 @@ for (const snippet of [
   "termBaseNames: resources.getTermBaseNames(project)",
   "storage.listActivityEvents(project.id)",
   "const tmNames = new Set(resources.getTmNames(project))",
-  "const scopedTm = tmEntries.filter((entry) => tmNames.has(entry.tmName))",
+  "const scopedTm = tmEntries.filter((entry) => resourceIds.has(entry.resourceId) || tmNames.has(entry.tmName))",
   "const portableContext = portable.createContext()",
   "app: constants.appName",
   'type: "project-package"',
@@ -13830,7 +13839,7 @@ for (const snippet of [
   '"Saving project package records"',
   '`Imported as a separate project copy named "${text.safe(prepared.project.name)}".`',
   "await persistence.importProjectPackageRecords({",
-  "tmEntries: prepared.resources?.tmEntries || []",
+  "tmEntries: resourceRecords.tmEntries || []",
   "activityEvents: prepared.activityEvents || []",
   "await indexes.rebuildTm()",
   "await indexes.rebuildTerms()",
@@ -14691,8 +14700,12 @@ for (const snippet of [
   "reservedIds.add(next.id)",
   "collisions(\"segments\", pkg.segments || [])",
   "collisions(\"activityEvents\", pkg.activityEvents || [])",
-  "collisions(\"tmEntries\", pkg.resources?.tmEntries || [])",
-  "collisions(\"terms\", pkg.resources?.terms || [])",
+  "collisions(\"tmEntries\", packagedResources.tmEntries || [])",
+  "collisions(\"terms\", packagedResources.terms || [])",
+  "collisions(\"resources\", packagedResources.resources || [])",
+  "collisions(\"tmContributions\", packagedResources.tmContributions || [])",
+  "collisions(\"termConcepts\", packagedResources.termConcepts || [])",
+  "collisions(\"termDesignations\", packagedResources.termDesignations || [])",
   'project.id = ids.make("project")',
   "project.name = importedCopyName(project.name)",
   "project.createdAt = clock.now()",
@@ -14794,11 +14807,12 @@ for (const snippet of [
   'status.set("Select source or target text, then press F4 or Ctrl/Cmd+Shift+K.", "dirty")',
   "const query = text.normalizeCase(keyword)",
   "const entries = await tm.listEntries()",
-  "const tmNames = new Set(tm.getNames())",
-  "entry.sourceLang === session.getProject().sourceLang",
-  "entry.targetLang === session.getProject().targetLang",
-  ".filter((entry) => tmNames.has(entry.tmName))",
-  ".filter((entry) => text.normalizeCase(entry.source).includes(query))",
+  "const results = selectedResourceEntries(entries)",
+  "entry.sourceLang === project.sourceLang",
+  "entry.targetLang === project.targetLang",
+  "if (hasResourceLinks && !links.length) return []",
+  '(scope !== "target" && text.normalizeCase(entry.source).includes(query))',
+  '(scope !== "source" && text.normalizeCase(entry.target).includes(query))',
   "new Date(right.updatedAt || right.createdAt || 0).getTime()",
   "new Date(left.updatedAt || left.createdAt || 0).getTime()",
   'localization.label("concordanceResultSummary", {',
@@ -14818,7 +14832,7 @@ for (const snippet of [
   'elements.closeButton.addEventListener("click", handleClose)',
   'elements.overlay.addEventListener("click", handleOverlayClick)',
   "if (event.target === elements.overlay) close()",
-  "return Object.freeze({ close, handleKeydown, highlight, mount, open, selectedKeyword, unmount })"
+  "return Object.freeze({ close, handleKeydown, highlight, mount, open, search, selectedKeyword, unmount })"
 ]) {
   assertIncludes(
     concordanceControllerJs,
@@ -14842,7 +14856,7 @@ for (const boundary of [
   "results: els.concordanceResults",
   "session: { getProject: editorSessionStore.getProject }",
   "navigation: { getView: () => applicationStore.getState().navigation.view }",
-  "tm: { listEntries: listTmEntries, getNames: projectResourceContextService.tmNames }",
+  "getLinks: projectResourceContextService.lookupTmLinks",
   "resources: { summary: projectResourceContextService.summary }",
   "languages: { display: projectLanguageContextController.display }",
   "localization: uiLocalizationService",
@@ -15484,8 +15498,9 @@ assertIncludes(
 for (const boundary of [
   "if (!editorSessionStore.getProject() || busy) return null",
   "const raw = await threshold.request()",
-  "const uniqueSources = Array.from(new Set(candidates.map((segment) => segment.source)))",
-  "for (let offset = 0; offset < uniqueSources.length; offset += batchSize)",
+  "const uniqueLookups = Array.from(",
+  'const key = hasContext ? `${segment.source}\\u0000${JSON.stringify(context)}` : segment.source;',
+  "for (let offset = 0; offset < uniqueLookups.length; offset += batchSize)",
   "const batches = await tm.findMatchesBatch(matchOptions)",
   "await persistence.flush(editorSessionStore.getProject().id)",
   "const command = commands.create({",
@@ -22075,8 +22090,8 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `application active-segment composition and consumers must retain ${boundary}.`);
 }
 assert(
-  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 29,
-  "all 29 application active-segment consumers must call ApplicationActiveSegmentService directly."
+  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 31,
+  "all 31 application active-segment consumers must call ApplicationActiveSegmentService directly."
 );
 assert(
   (appWorkflowDriverJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 9,
@@ -23670,8 +23685,8 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "confirm TM save failure keeps segment confirmed and reports warning",
-  "app workflow test must verify segment confirmation is not undone when the secondary TM save fails."
+  "atomic confirm TM failure preserves the persisted draft",
+  "app workflow test must verify a failed atomic main-TM confirmation retains the translator's persisted draft."
 );
 assertIncludes(
   appJs,
@@ -23765,7 +23780,7 @@ assertIncludes(
 );
 assertIncludes(
   readText("project.js"),
-  "const name = cleanPortableLabel(link.name);",
+  "const name = cleanPortableLabel(link.cachedName || link.name);",
   "project.js project-save resource links must redact credential-shaped resource labels."
 );
 assertIncludes(
@@ -24848,7 +24863,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "schema-6 backup preserves resource Trash while project-package schema remains independent",
+  "current backup schema preserves resource Trash while project-package schema remains independent",
   "the app workflow must characterize resource Trash backup compatibility without changing project packages."
 );
 assertIncludes(

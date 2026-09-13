@@ -17,7 +17,9 @@ LoopCAT's shortcut system is optimized for the translator's main loop: edit, ins
 | Action                            | Windows / Linux   | macOS                | Behavior                                                                                                                 |
 | --------------------------------- | ----------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Confirm current segment           | `Ctrl+Enter`      | `Cmd+Enter`          | Confirms the active segment. In the comment field, the same shortcut saves the comment form.                             |
-| Quick Insert                      | `Tab`             | `Tab`                | Opens ranked suggestions when the active segment has results. Ordinary Tab behavior is retained when none are available. |
+| Predictive completion             | `Tab`             | `Tab`                | Accepts the highlighted word or phrase when the predictive list is visible. |
+| Quick Insert                      | `Alt+Insert` or `Tab` | `Option+Insert` or `Tab` | Opens full resource alternatives. Tab uses Quick Insert only when no predictive list is visible; ordinary Tab is retained if there are no results. |
+| Quick term capture                | `Ctrl+Shift+G`    | `Cmd+Shift+G`        | Opens compact term capture; Ctrl/Cmd+Enter saves to the active termbase and selected extras. |
 | Insert next protected tag         | `F8`              | `F8`                 | Inserts the next missing protected tag at the target caret.                                                              |
 | Insert all missing protected tags | `Ctrl+Shift+F8`   | `Cmd+Shift+F8`       | Inserts every missing tag as one undoable action.                                                                        |
 | Copy source to target             | `Ctrl+Shift+S`    | `Cmd+Shift+S`        | Replaces the active target with its source text.                                                                         |
@@ -44,6 +46,10 @@ LoopCAT's shortcut system is optimized for the translator's main loop: edit, ins
 | Toggle Focus mode   | `Ctrl+Shift+F`               | `Cmd+Shift+F`               | Enters or exits the translation-only Focus view.                                                                              |
 
 `Escape` closes Quick Insert, concordance, the command palette, or Focus mode, starting with the topmost active surface.
+
+## Predictive typing
+
+With predictive typing enabled in Preferences, start typing in the target to see local word and phrase suggestions from matched TM and terminology resources. Use Up/Down to select, Tab or click to accept, and Escape to dismiss. Completion replaces only the typed prefix. Forbidden terms are excluded, and suggestions are suppressed during composition and protected-tag editing. This feature never calls AI or sends text over the network.
 
 ## Quick Insert
 

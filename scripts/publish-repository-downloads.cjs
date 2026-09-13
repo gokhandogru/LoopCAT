@@ -103,7 +103,7 @@ writeJson(path.join(downloadsDirectory, "release.json"), {
 
 const readme = `# LoopCAT ${version} Downloads
 
-This is an **unsigned development preview**, not a tagged or production-qualified release.
+This is an **unsigned development preview**, not a signed or production-qualified release.
 
 Build: \`${identity.buildId}\`
 
@@ -111,7 +111,7 @@ Base commit: \`${identity.baseCommit}\`
 
 Source snapshot SHA-256: \`${identity.sourceSha256}\`
 
-The source snapshot includes the base commit plus local release-preparation changes; it is not claimed to be the unchanged base commit. All three ZIPs were built from this same snapshot. Each ZIP contains \`build-info.json\`; the desktop application also embeds it inside \`resources/app.asar\`. The [release manifest](./release.json) records the complete source fingerprint and ZIP hashes.
+All three ZIPs were built from the same fingerprinted source snapshot rooted at the base commit. Each ZIP contains \`build-info.json\`; the desktop application also embeds it inside \`resources/app.asar\`. The [release manifest](./release.json) records the complete source fingerprint and ZIP hashes. A later download-only commit may publish these artifacts without changing their source snapshot.
 
 | Download | File |
 | --- | --- |

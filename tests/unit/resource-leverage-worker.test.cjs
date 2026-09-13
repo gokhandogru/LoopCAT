@@ -6,7 +6,7 @@ const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "..", "..");
 
-function loadWorker() {
+function loadWorker(setup = "") {
   let listener;
   const messages = [];
   const context = {
@@ -19,7 +19,7 @@ function loadWorker() {
       }
     }
   };
-  vm.runInNewContext(fs.readFileSync(path.join(root, "cat-worker.js"), "utf8"), context, {
+  vm.runInNewContext(setup + fs.readFileSync(path.join(root, "cat-worker.js"), "utf8"), context, {
     filename: "cat-worker.js"
   });
   return {
@@ -95,6 +95,28 @@ test("CAT worker applies concept alternatives, forbidden status, prefix, and fuz
     assert.equal(
       response.result.some((issue) => issue.type === "term"),
       false
+    );
+  }
+});
+
+test("CAT worker initial-sensitive terminology never depends on the UI locale", () => {
+  const worker = loadWorker('String.prototype.toLocaleLowerCase = () => { throw new Error("UI locale used"); };\n');
+  for (const [target, missing] of [
+    ["LATIN", false],
+    ["latin", true]
+  ]) {
+    const response = worker.request({
+      id: `initial-${target}`,
+      type: "qa",
+      payload: {
+        segments: [{ id: "segment-1", source: "Loan", target }],
+        terms: [{ sourceTerm: "Loan", targetTerm: "Latin", status: "preferred", caseSensitivity: "initial-sensitive" }]
+      }
+    });
+    assert.equal(response.ok, true);
+    assert.equal(
+      response.result.some((issue) => issue.type === "term"),
+      missing
     );
   }
 });

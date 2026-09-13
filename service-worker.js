@@ -1,6 +1,6 @@
-const APP_VERSION = "0.0.4-dev.20260831";
+const APP_VERSION = "0.0.4-dev.20260913";
 // Bump when a cached UI asset changes so installed PWAs refresh their shell.
-const STATIC_ASSET_REVISION = "2026-08-31-ui-polish";
+const STATIC_ASSET_REVISION = "2026-09-13-resources-recovery";
 const CACHE_PREFIX = "loopcat-offline-";
 const CACHE_NAME = `${CACHE_PREFIX}${APP_VERSION}-${STATIC_ASSET_REVISION}`;
 

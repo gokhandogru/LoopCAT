@@ -205,7 +205,7 @@ function containsDesignation(text, value, caseSensitivity = "insensitive") {
   if (!designation) return false;
   if (caseSensitivity === "sensitive") return source.includes(designation);
   if (caseSensitivity === "initial-sensitive") {
-    const index = source.toLocaleLowerCase().indexOf(designation.toLocaleLowerCase());
+    const index = source.toLowerCase().indexOf(designation.toLowerCase());
     return index >= 0 && source[index] === designation[0];
   }
   return containsTerm(source, designation);

@@ -4,7 +4,7 @@ LoopCAT can run as a static browser app, an installable offline web app, or a bu
 
 ## Current Checkpoint State
 
-- The repository currently packages LoopCAT `0.0.4-dev.20260831` with Electron 43.3.0 and electron-builder 26.15.3.
+- The repository currently packages LoopCAT `0.0.4-dev.20260913` with Electron 43.3.0 and electron-builder 26.15.3.
 - The current Windows repository mirror is intentionally unsigned and is suitable for trusted prerelease testing, not production release qualification.
 - Native CI has completed the static-web and Linux AppImage/DEB build, sandboxed smoke, artifact, fuse, download-policy, and checksum gates. Windows and macOS reach the fail-closed signing-credential boundary; completed signed/notarized clean-machine evidence is still required.
 - The files under `downloads/` are regenerated from the current repository checkout. The binaries attached to the older `draft-0.0.3` GitHub prerelease tag are a historical tagged build and must not be silently replaced with binaries from a different commit.
@@ -56,7 +56,7 @@ pnpm run verify:provenance -- --allow-untagged
 
 This check fails before packaging if `.git` is missing, `.git/HEAD` is missing, the checkout is dirty, or the checked-out commit does not match the release tag or CI SHA.
 
-For the explicitly labeled [0.0.4-dev.20260831 development preview](releases/0.0.4-dev.20260831.md), local packaging records a **working-tree snapshot** instead of claiming clean-tag provenance. `build-info.json` records the base commit and full source fingerprint; web and Windows build receipts must agree before `downloads:prepare` can update the mirror. This local preview route does not pass or weaken the clean-tree check above and must not be used as formal signed-release evidence. Prepare all source and documentation changes before building, then build web and Windows sequentially without changing those inputs. Rebuild both if the fingerprint changes.
+For the explicitly labeled [0.0.4-dev.20260913 development preview](releases/0.0.4-dev.20260913.md), local packaging records a **working-tree snapshot** instead of claiming clean-tag provenance. `build-info.json` records the base commit and full source fingerprint; web and Windows build receipts must agree before `downloads:prepare` can update the mirror. This local preview route does not pass or weaken the clean-tree check above and must not be used as formal signed-release evidence. Prepare all source and documentation changes before building, then build web and Windows sequentially without changing those inputs. Rebuild both if the fingerprint changes.
 
 Run the release contract verifier first:
 

@@ -8,19 +8,19 @@ LoopCAT is a local-first computer-assisted translation (CAT) tool for translator
 
 LoopCAT is designed for a complete single-user workflow: create a project, import source files, translate or post-edit, use TM and terminology, run QA, review changes, recover from packages or backups, and export target files without requiring an internet connection. Local or hosted AI can be added explicitly, but it is optional and does not replace the offline workflow.
 
-The current source includes a new saving and recovery system. Read [Saving and recovery](docs/saving-and-recovery.md) for local save status, verified archive backups, read-only windows, reversible restore, and emergency export. [Implementation status](docs/reliability-implementation-status.md) records validation and remaining release qualification; existing download packages are unchanged.
+The current preview includes Resources 2.0 and a new saving and recovery system. Read [Saving and recovery](docs/saving-and-recovery.md) for local save status, verified archive backups, read-only windows, reversible restore, and emergency export. [Implementation status](docs/reliability-implementation-status.md) records validation and remaining release qualification; [release verification](downloads/verification.md) records checks of the current downloads.
 
 [Beginner Guide](docs/beginner-guide/index.html) ([Word](docs/beginner-guide/LoopCAT-Beginners-Guide.docx)) | [Install](#how-to-install) | [Current status](#current-project-status) | [What works today](#what-works-today) | [Keyboard shortcuts](docs/keyboard-shortcuts.md) | [AI providers](#local-ai-command-centre) | [Tests](#browser-tests) | [Documentation](docs/README.md) | [Roadmap](ROADMAP.md) | [Brand](docs/brand-guidelines.md) | [How to cite](#how-to-cite) | [License](#license)
 
 ## Current Project Status
 
-LoopCAT is beyond a proof-of-concept MVP: the core offline CAT workflow, recovery model, modern editor shell, reversible command model, and modular application architecture are implemented. Version `0.0.4-dev.20260831` is the current unsigned development preview. Its web and Windows packages share one recorded source snapshot; the [release notes](docs/releases/0.0.4-dev.20260831.md) and [download manifest](downloads/release.json) identify that build. The older `draft-0.0.3` tag remains a historical July build. This preview is not a production-qualified cross-platform desktop release.
+LoopCAT is beyond a proof-of-concept MVP: the core offline CAT workflow, recovery model, modern editor shell, reversible command model, and modular application architecture are implemented. Version `0.0.4-dev.20260913` is the current unsigned development preview. Its web and Windows packages share one recorded source snapshot; the [release notes](docs/releases/0.0.4-dev.20260913.md) and [download manifest](downloads/release.json) identify that build. The older `draft-0.0.3` tag remains a historical July build. This preview is not a production-qualified cross-platform desktop release.
 
 | Area | Current state |
 | --- | --- |
 | Core translation workflow | Implemented: multi-file projects, segmentation, CAT-grid editing, statuses, comments, revision history, QA, TM, terminology, analysis, and target export. |
 | Offline and recovery | Implemented: IndexedDB autosave, portable project packages, full browser backups, visible workspace-folder packages where supported, and offline web/desktop shells. |
-| Repository downloads | Version `0.0.4-dev.20260831` provides a current web bundle plus unsigned Windows installer and portable packages with SHA-256 checksums in [`downloads/`](downloads/). |
+| Repository downloads | Version `0.0.4-dev.20260913` provides a current web bundle plus unsigned Windows installer and portable packages with SHA-256 checksums in [`downloads/`](downloads/). |
 | Cross-platform desktop | Electron 43 packaging targets Windows, macOS, and Linux with the renderer sandbox and hardware acceleration enabled by default. Native CI builds and verifies Linux AppImage/DEB artifacts; signed/notarized public artifacts and recorded clean-machine evidence for every platform remain release-qualification work. |
 | Format support | Broad import/export coverage is implemented, including XLIFF 1.2 and XLIFF 2.0/2.1/2.2 Core, DOCX, localization formats, publishing formats, subtitles, resources, and terminology exchange. Perfect reconstruction of every complex Office, OpenDocument, and DTP structure is not claimed. |
 | Scale | Browser tests cover projects with thousands of segments and indexed TM lookup. True chunked document import, deeper persistent indexes, and long-duration autosave/memory profiling remain. |
@@ -31,12 +31,12 @@ The detailed distinction between shipped behavior, release blockers, near-term p
 
 ## How to Install
 
-Use the current versioned files in the repository's [`downloads/`](downloads/) directory. They are application packages, unlike GitHub's automatic source-code ZIP:
+Use the [current GitHub preview release](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20260913) or the versioned ZIPs in the repository's [`downloads/`](downloads/) directory. They are application packages, unlike GitHub's automatic source-code ZIP:
 
-- Web version: download [`LoopCAT.Web.0.0.4-dev.20260831.zip`](downloads/LoopCAT.Web.0.0.4-dev.20260831.zip), extract it, and open `index.html`. For installable offline PWA behavior, serve the extracted folder from a local or hosted HTTP/HTTPS origin; direct `file://` opening still runs the app, but browsers do not allow service-worker installation from local files.
-- Windows desktop installer: download [`LoopCAT.Windows.Setup.0.0.4-dev.20260831.zip`](downloads/LoopCAT.Windows.Setup.0.0.4-dev.20260831.zip), extract it, and run `LoopCAT Setup 0.0.4-dev.20260831.exe`.
-- Windows portable desktop: download [`LoopCAT.0.0.4-dev.20260831.Portable.zip`](downloads/LoopCAT.0.0.4-dev.20260831.Portable.zip), extract it, and run `LoopCAT 0.0.4-dev.20260831.exe` without installation.
-- Checksums: download [`LoopCAT.0.0.4-dev.20260831.SHA256SUMS.txt`](downloads/LoopCAT.0.0.4-dev.20260831.SHA256SUMS.txt) and verify the three ZIP files before opening them.
+- Web version: download [`LoopCAT.Web.0.0.4-dev.20260913.zip`](downloads/LoopCAT.Web.0.0.4-dev.20260913.zip), extract it, and open `index.html`. For installable offline PWA behavior, serve the extracted folder from a local or hosted HTTP/HTTPS origin; direct `file://` opening still runs the app, but browsers do not allow service-worker installation from local files.
+- Windows desktop installer: download [`LoopCAT.Windows.Setup.0.0.4-dev.20260913.zip`](downloads/LoopCAT.Windows.Setup.0.0.4-dev.20260913.zip), extract it, and run `LoopCAT Setup 0.0.4-dev.20260913.exe`.
+- Windows portable desktop: download [`LoopCAT.0.0.4-dev.20260913.Portable.zip`](downloads/LoopCAT.0.0.4-dev.20260913.Portable.zip), extract it, and run `LoopCAT 0.0.4-dev.20260913.exe` without installation.
+- Checksums: download [`LoopCAT.0.0.4-dev.20260913.SHA256SUMS.txt`](downloads/LoopCAT.0.0.4-dev.20260913.SHA256SUMS.txt) and verify the three ZIP files before opening them.
 
 The Windows packages are currently unsigned, so Windows may display an unknown-publisher or SmartScreen warning. LoopCAT does not bypass that warning; verify the checksum from the same repository checkpoint and proceed only if you trust this repository. The [LoopCAT 0.0.3 GitHub prerelease](https://github.com/gokhandogru/LoopCAT/releases/tag/draft-0.0.3) and its attached binaries are retained as the historical build made from tag commit `6f9754d`; they are not the current repository mirror.
 
@@ -44,7 +44,7 @@ The Windows packages are currently unsigned, so Windows may display an unknown-p
 
 Keep the three ZIPs, their checksum list, and `release.json` from the same repository checkpoint. On Windows, run `Get-FileHash -Algorithm SHA256 -LiteralPath 'path-to-downloaded.zip'` and compare the full hash with the matching filename in the checksum list. On Linux use `sha256sum -c LoopCAT.VERSION.SHA256SUMS.txt`, or on macOS use `shasum -a 256 -c LoopCAT.VERSION.SHA256SUMS.txt`, replacing `VERSION` with the downloaded preview version.
 
-Extract the selected ZIP before running it. Every ZIP contains `build-info.json`, with the same version, build ID, base commit, and source-snapshot hash as `release.json`. The snapshot includes local release-preparation changes and is not represented as an unchanged tagged commit. The Windows executable also embeds that identity inside `resources/app.asar`. SHA-256 detects mismatched or corrupted files; it does not replace publisher signing or establish authenticity independently of the trusted download source.
+Extract the selected ZIP before running it. Every ZIP contains `build-info.json`, with the same version, build ID, base commit, and source-snapshot hash as `release.json`. A later download-only commit may publish these artifacts without changing their fingerprinted source. The Windows executable also embeds that identity inside `resources/app.asar`. SHA-256 detects mismatched or corrupted files; it does not replace publisher signing or establish authenticity independently of the trusted download source.
 
 ## How to Cite
 
@@ -87,7 +87,7 @@ The following capabilities are implemented in the current codebase and covered b
 - Choose the LoopCAT interface language from the Workspace menu, including built-in Catalan, English, and Turkish, import custom UI translation JSON, and export the English UI source catalog for translators.
 - Use System, Light, or Dark themes, Balanced or Compact density, Focus mode, and a remembered 280–420 px contextual inspector that becomes an overlay on narrower screens.
 - Open the fuzzy, grouped command palette with browser-safe `F2` or `Ctrl/Cmd+Shift+P`, navigate it with the keyboard, and reuse recent commands without adding permanent editor clutter.
-- Use the [keyboard-first translation workflow](docs/keyboard-shortcuts.md), including `Tab` Quick Insert for TM, approved terminology, and saved AI suggestions; `Ctrl/Cmd+Enter` confirmation; filtered and open-segment navigation; protected-tag insertion; search, review, QA, and structural commands.
+- Use the [keyboard-first translation workflow](docs/keyboard-shortcuts.md), including `Tab` predictive completion, `Alt+Insert` Quick Insert for full resource alternatives, `Ctrl/Cmd+Shift+G` term capture, `Ctrl/Cmd+Enter` confirmation, segment navigation, protected-tag insertion, search, review, QA, and structural commands. Without a visible completion, `Tab` still opens Quick Insert.
 - Undo and redo ordinary target typing, Copy Source, TM/concordance/tag insertion, target replacement, confirmation, review-state changes, AI suggestion application, TM/AI pretranslation, and compatible split/merge operations through bounded transactional commands.
 - Keep bounded per-segment target revision history for post-editing review.
 - Search and filter segments while translating, including AI-generated pretranslations, AI suggestions, and risk-ranked AI review comments. AI-pretranslated rows display as `AI initiated`; confirming one clears `Needs review` while keeping the AI origin visible.
@@ -112,6 +112,10 @@ The following capabilities are implemented in the current codebase and covered b
 
 ### Translation Memories And Terminology
 
+- Configure multiple resources through Optional Resource Settings before creating a project. Untouched settings create a project-named main TM and active termbase; termbases can also be deliberately omitted.
+- Confirm into exactly one main TM; other project TMs remain reference resources. Configure lookup, order, and penalties independently, and choose termbase lookup, QA, contribution, and active-resource roles.
+- Capture terms into the active termbase and selected extra destinations; use concept terminology, preferred/admitted alternatives, forbidden terms, and opt-in prefix/fuzzy matching.
+- Use local predictive typing from matched terminology and TM target fragments, with keyboard acceptance and a Preferences switch. Typeahead never requests AI or sends text over the network.
 - Show exact and fuzzy TM matches for the active segment.
 - Add local termbase entries and show terms found in the active source segment.
 - Mark target terms as forbidden and block delivery exports when forbidden terminology appears.
@@ -165,7 +169,7 @@ The current implementation is usable for substantial single-user offline project
 
 ### Release Qualification
 
-- Version `0.0.4-dev.20260831` currently provides the repository web bundle and unsigned Windows installer/portable downloads described above. Native CI has built and verified Linux AppImage/DEB packages, but a formal all-platform release still requires versioned publication, signing/notarization where applicable, checksum verification, and recorded clean-machine evidence.
+- Version `0.0.4-dev.20260913` currently provides the repository web bundle and unsigned Windows installer/portable downloads described above. Native CI has built and verified Linux AppImage/DEB packages, but a formal all-platform release still requires versioned publication, signing/notarization where applicable, checksum verification, and recorded clean-machine evidence.
 - A public cross-platform desktop release still requires signed Windows artifacts, signed and notarized macOS artifacts, checksum-verified Linux artifacts, and completed clean-machine evidence for every public download.
 - Disk-full and permission-denied workspace-save results must be recorded for release candidates. The automated gates and evidence template exist, but they do not replace real platform testing.
 
