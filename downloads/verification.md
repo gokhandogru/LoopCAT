@@ -50,6 +50,6 @@ GitHub normalizes spaces in the two standalone EXE filenames to dots. The execut
 
 ## Limits and retained history
 
-No NSIS install/upgrade was performed over the owner's existing installation. Independent clean-machine installation, signing, manual assistive-technology checks, long-duration soak and the full multi-platform failure matrix remain outstanding. Native macOS and Linux packages are not part of this preview.
+No NSIS install/upgrade was performed over the owner's existing installation. Independent clean-machine installation, signing, manual assistive-technology checks, long-duration soak and the full multi-platform failure matrix remain outstanding. Native macOS packages are not part of this preview. Linux x64 packages were subsequently added as GitHub Release assets with separate evidence in [the Linux supplement](../docs/releases/0.0.4-dev.20260913-linux.md); this report's artifact hashes and original verification results cover Windows/web only.
 
 Test profiles were isolated from personal projects. Raw test logs remain in ignored local cache directories and are not shipped. The previous August download mirror is recoverable from Git history; historical GitHub releases and tags are unchanged. Checksums detect corruption and mismatched assets, but do not independently authenticate an unsigned publisher.

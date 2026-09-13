@@ -19,6 +19,8 @@ All three ZIPs were built from the same fingerprinted source snapshot rooted at 
 
 The Windows installer and portable application are unsigned. Windows may show an unknown-publisher or SmartScreen warning. Verify these ZIP files against the checksum list in this directory and proceed only if you trust the [LoopCAT repository](https://github.com/gokhandogru/LoopCAT).
 
+Linux x64 DEB and AppImage packages are available as assets on the [same GitHub preview release](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20260913), not as binaries in this repository mirror. Use their separate `Linux-SHA256SUMS.txt` and [Linux installation and verification instructions](../docs/releases/0.0.4-dev.20260913-linux.md). The original mirror manifest and verification report describe Windows/web only.
+
 The older `draft-0.0.3` tag points to July commit `6f9754d`. Its historical assets are not this preview; do not mix ZIPs or checksum lists. Prior untagged 0.0.3 mirror files have been superseded here without changing that historical tag.
 
 For installation and checksum instructions, see the [main README](../README.md). The authoritative release notes are [LoopCAT 0.0.4-dev.20260913](../docs/releases/0.0.4-dev.20260913.md). After preparing downloads, run `pnpm run verify:repository-downloads` to detect changed sources, mixed builds, modified ZIPs, incorrect checksums, or leftover older downloads.
