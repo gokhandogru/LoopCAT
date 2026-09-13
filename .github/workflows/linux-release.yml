@@ -37,7 +37,9 @@ jobs:
           sudo gem install --no-document fpm
       - name: Verify source and quality
         run: |
-          pnpm run verify:provenance -- --allow-untagged
+          # The workflow commit differs from the explicitly selected release source.
+          # Bind the provenance check to checkout's resolved commit, not the workflow ref.
+          GITHUB_SHA="$(git rev-parse HEAD)" pnpm run verify:provenance -- --allow-untagged
           pnpm run verify:release
           pnpm run verify:quality
           pnpm run verify:xliff22-schema
@@ -48,7 +50,7 @@ jobs:
           xvfb-run -a pnpm run verify:browser-runner
           xvfb-run -a pnpm run verify:a11y
       - name: Build Linux x64 packages
-        run: pnpm run dist:linux -- --x64
+        run: node scripts/build-desktop.cjs --linux AppImage deb --x64
       - name: Verify payload and unpacked application
         run: |
           sudo chown root:root dist/linux-unpacked/chrome-sandbox
