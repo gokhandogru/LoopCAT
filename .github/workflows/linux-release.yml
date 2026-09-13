@@ -1,0 +1,97 @@
+name: Linux release packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Existing release tag or full commit to package
+        required: true
+        default: preview-0.0.4-dev.20260913
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Build and verify Linux x64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          sudo apt-get update
+          sudo apt-get install -y xvfb ruby ruby-dev build-essential rpm libarchive-tools libfuse2t64
+          sudo gem install --no-document fpm
+      - name: Verify source and quality
+        run: |
+          pnpm run verify:provenance -- --allow-untagged
+          pnpm run verify:release
+          pnpm run verify:quality
+          pnpm run verify:xliff22-schema
+          pnpm run verify:desktop-wrapper
+          pnpm run verify:signing-env -- linux
+      - name: Verify browser and accessibility behavior
+        run: |
+          xvfb-run -a pnpm run verify:browser-runner
+          xvfb-run -a pnpm run verify:a11y
+      - name: Build Linux x64 packages
+        run: pnpm run dist:linux -- --x64
+      - name: Verify payload and unpacked application
+        run: |
+          sudo chown root:root dist/linux-unpacked/chrome-sandbox
+          sudo chmod 4755 dist/linux-unpacked/chrome-sandbox
+          xvfb-run -a pnpm run verify:desktop-smoke
+          pnpm run verify:artifact
+          pnpm run verify:fuses
+          pnpm run verify:download-artifacts -- linux
+          pnpm run verify:platform-signatures -- linux
+      - name: Install DEB and test installed application
+        shell: bash
+        run: |
+          sudo apt-get install -y ./dist/*.deb
+          test -x /opt/LoopCAT/loopcat
+          mv dist/linux-unpacked dist/linux-build-verified
+          ln -s /opt/LoopCAT dist/linux-unpacked
+          xvfb-run -a pnpm run verify:desktop-smoke
+          unlink dist/linux-unpacked
+          mv dist/linux-build-verified dist/linux-unpacked
+      - name: Test portable AppImage
+        shell: bash
+        run: |
+          mv dist/linux-unpacked dist/linux-build-verified
+          mkdir dist/linux-unpacked
+          appimage=$(realpath dist/*.AppImage)
+          chmod +x "$appimage"
+          ln -s "$appimage" dist/linux-unpacked/loopcat
+          CHROME_DEVEL_SANDBOX=/opt/LoopCAT/chrome-sandbox xvfb-run -a pnpm run verify:desktop-smoke
+          unlink dist/linux-unpacked/loopcat
+          rmdir dist/linux-unpacked
+          mv dist/linux-build-verified dist/linux-unpacked
+      - name: Generate Linux checksums and embedded build identity
+        run: |
+          pnpm run checksums
+          pnpm run verify:checksums
+          cp .cache/desktop-app/build-info.json dist/Linux-build-info.json
+          mv dist/SHA256SUMS.txt dist/Linux-SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LoopCAT-Linux-x64
+          if-no-files-found: error
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/Linux-SHA256SUMS.txt
+            dist/Linux-build-info.json
