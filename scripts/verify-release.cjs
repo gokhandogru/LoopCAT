@@ -17957,6 +17957,15 @@ for (const dependencyName of [
 
 const buildFiles = packageJson.build && Array.isArray(packageJson.build.files) ? packageJson.build.files : [];
 assert(
+  buildFiles.includes("!node_modules/**"),
+  "Desktop packages must exclude raw dependencies already bundled into the renderer and archive worker."
+);
+assertIncludes(
+  desktopMain,
+  'project = await storage.get("projects", project.id);',
+  "Packaged smoke must refresh the project revision after appending segments before its next metadata update."
+);
+assert(
   packageJson.build?.directories?.app === ".cache/desktop-app",
   "Desktop packaging must consume the production-only staged app."
 );

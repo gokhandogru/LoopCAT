@@ -138,6 +138,7 @@
       "LICENSE",
       "NOTICE",
       "docs/**",
+      "!node_modules/**",
       "!docs/loopcat-modern-software-review-*.md",
       "!docs/loopcat-modernization-plan-prompt-*.md"
     ],

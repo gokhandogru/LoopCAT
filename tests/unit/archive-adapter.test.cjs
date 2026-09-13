@@ -5,6 +5,16 @@ const path = require("node:path");
 const load = () =>
   import(pathToFileURL(path.join(__dirname, "../../src/features/import-export/archive-adapter.js")).href);
 
+test("packaged desktop DOCX smoke fixture passes the production safe archive reader", async () => {
+  const source = require("node:fs").readFileSync(path.join(__dirname, "../../desktop/main.cjs"), "utf8");
+  const fixture = source.match(/const docxBase64 = "([^"]+)";/);
+  assert.ok(fixture, "desktop smoke fixture is present");
+  const archive = await load();
+  const entries = await archive.readEntries(Buffer.from(fixture[1], "base64"));
+  assert.deepEqual([...entries.keys()], ["[Content_Types].xml", "word/document.xml", "_rels/.rels"]);
+  assert.match(new TextDecoder().decode(entries.get("word/document.xml").data), /<w:document/);
+});
+
 test("R3 archive round trip exceeds the legacy 50 MiB limit with bounded ZIP64 chunks", async () => {
   const archive = await load();
   const target = "İstanbul 🌍 <ph id='7'/> ".repeat(700);
