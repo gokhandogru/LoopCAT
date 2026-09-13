@@ -38,13 +38,15 @@ The browser, accessibility and screenshot runs cover the final renderer implemen
 
 The GitHub release includes all five application assets below and SHA256SUMS.txt covering them. The repository mirror includes the three ZIPs and its separate versioned ZIP-only checksum list.
 
+GitHub normalizes spaces in the two standalone EXE filenames to dots. The executable names inside the ZIP wrappers retain spaces; their bytes are identical to the standalone downloads.
+
 | File | Bytes | SHA-256 |
 | --- | ---: | --- |
 | `LoopCAT.Web.0.0.4-dev.20260913.zip` | 5,784,384 | `74fda09e4f20c0c3a8ed289a22daca43b50c2f588cdd4df2d067d7106af3d406` |
 | `LoopCAT.Windows.Setup.0.0.4-dev.20260913.zip` | 100,470,008 | `62a179f5cc782404ea91fbfb5bfe5b215a7821a17192ede2c53a6a2d25229674` |
 | `LoopCAT.0.0.4-dev.20260913.Portable.zip` | 100,315,617 | `7a0c8976d7623c482e791ae95660636e3e61f0b39e56ebf7bf8405b3e691b216` |
-| `LoopCAT Setup 0.0.4-dev.20260913.exe` | 100,426,501 | `d05e22034c78a95fde5c593561dac030debf221c138d1736276c47114321abfe` |
-| `LoopCAT 0.0.4-dev.20260913.exe` | 100,266,143 | `deb5fad4a6db667062949b4bb7d8ad9b2bceeb8a15beda1e6096efb34c01c113` |
+| `LoopCAT.Setup.0.0.4-dev.20260913.exe` | 100,426,501 | `d05e22034c78a95fde5c593561dac030debf221c138d1736276c47114321abfe` |
+| `LoopCAT.0.0.4-dev.20260913.exe` | 100,266,143 | `deb5fad4a6db667062949b4bb7d8ad9b2bceeb8a15beda1e6096efb34c01c113` |
 
 ## Limits and retained history
 
