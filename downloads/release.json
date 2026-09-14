@@ -4,10 +4,10 @@
   "identity": {
     "schemaVersion": 1,
     "version": "0.0.4-dev.20260914.5",
-    "buildId": "0.0.4-dev.20260914.5+source.d597e71f604d",
+    "buildId": "0.0.4-dev.20260914.5+source.e60e7568f12e",
     "sourceKind": "working-tree-snapshot",
-    "baseCommit": "8675cf59f8d669f2d48071630fbb08383de7bc45",
-    "sourceSha256": "d597e71f604d63bd8b6288b9f32f0449174d24bc8dddf218343d2aecd60dad2e",
+    "baseCommit": "22ee30522acc23b882a738720bc9922525c348fb",
+    "sourceSha256": "e60e7568f12ed045c098a82fcfc4fd8e6228f0c7d78744d9c0eab89dc28c647f",
     "sourceFiles": [
       {
         "path": ".gitattributes",
@@ -546,8 +546,8 @@
       },
       {
         "path": "scripts/verify-accessibility.cjs",
-        "bytes": 22733,
-        "sha256": "ec44bea51b6441c8535f3f0d9b654ee8bde765db9aaed55650117efa6bfa5ca3"
+        "bytes": 22718,
+        "sha256": "44683eb2470c7b714005dc949bc459e0d7323a689e3256b58ec2558e7cf39d03"
       },
       {
         "path": "scripts/verify-ai-sidebar-ux.cjs",
@@ -651,8 +651,8 @@
       },
       {
         "path": "scripts/verify-release.cjs",
-        "bytes": 1296528,
-        "sha256": "31c42323ccdb5a3e0698a3a2051d04ee74d61069dba68feaac352d1a80f99114"
+        "bytes": 1296730,
+        "sha256": "5c0f6f04c20913795e69240edc6f369ddc53a008e167406101cc19fb993a1f48"
       },
       {
         "path": "scripts/verify-renderer-build.cjs",
@@ -3557,17 +3557,17 @@
     {
       "name": "LoopCAT.Web.0.0.4-dev.20260914.5.zip",
       "bytes": 5905705,
-      "sha256": "8c73ca792942ba32f8c6e21830770b64296bdb8716ac2d7ef183485507a4260d"
+      "sha256": "038a4ac82a3d8e21b020a7be04991bbb376c05fd74510db901cfba5985c3316f"
     },
     {
       "name": "LoopCAT.Windows.Setup.0.0.4-dev.20260914.5.zip",
-      "bytes": 100499785,
-      "sha256": "6d2dbabadf42c371d604dae72ef2e76afb1552dfd9d7bdddf9faf43a56641553"
+      "bytes": 100499718,
+      "sha256": "44fde50ce5371132a2d2663456806ce9b8e477eb44953e997d64194b3f47d3f5"
     },
     {
       "name": "LoopCAT.0.0.4-dev.20260914.5.Portable.zip",
-      "bytes": 100345214,
-      "sha256": "26ea4f53b6d863d6f1ab6f4d27b12a8ca9505d45cf3001fe070088fb2f23e8ec"
+      "bytes": 100345212,
+      "sha256": "63294e7a2203fa7cd618da450e0e7e7d9d5365f88d9fc79384ae1e76035f5384"
     }
   ]
 }
