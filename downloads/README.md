@@ -2,11 +2,11 @@
 
 This is an **unsigned development preview**, not a signed or production-qualified release.
 
-Build: `0.0.4-dev.20260914.5+source.95b049f3ffd1`
+Build: `0.0.4-dev.20260914.5+source.d597e71f604d`
 
-Base commit: `3c924f45bfe4ccb51228c1f5d7178b8158aca21f`
+Base commit: `8675cf59f8d669f2d48071630fbb08383de7bc45`
 
-Source snapshot SHA-256: `95b049f3ffd17cf193e3e26784a40870cb2257b34dd133d82d6af0c2116b3344`
+Source snapshot SHA-256: `d597e71f604d63bd8b6288b9f32f0449174d24bc8dddf218343d2aecd60dad2e`
 
 All three ZIPs were built from the same fingerprinted source snapshot rooted at the base commit. Each ZIP contains `build-info.json`; the desktop application also embeds it inside `resources/app.asar`. The [release manifest](./release.json) records the complete source fingerprint and ZIP hashes. A later download-only commit may publish these artifacts without changing their source snapshot.
 
@@ -19,6 +19,6 @@ All three ZIPs were built from the same fingerprinted source snapshot rooted at 
 
 The Windows installer and portable application are unsigned. Windows may show an unknown-publisher or SmartScreen warning. Verify these ZIP files against the checksum list in this directory and proceed only if you trust the [LoopCAT repository](https://github.com/gokhandogru/LoopCAT).
 
-Older download mirrors and GitHub prereleases are superseded by this build. Use only files whose names contain `0.0.4-dev.20260914.5` and verify them against the checksum list from the same download location.
+The older `draft-0.0.3` tag points to July commit `6f9754d`. Its historical assets are not this preview; do not mix ZIPs or checksum lists. Prior untagged 0.0.3 mirror files have been superseded here without changing that historical tag.
 
 For installation and checksum instructions, see the [main README](../README.md). The authoritative release notes are [LoopCAT 0.0.4-dev.20260914.5](../docs/releases/0.0.4-dev.20260914.5.md). After preparing downloads, run `pnpm run verify:repository-downloads` to detect changed sources, mixed builds, modified ZIPs, incorrect checksums, or leftover older downloads.
