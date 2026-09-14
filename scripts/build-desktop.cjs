@@ -12,6 +12,22 @@ const env = {
   ELECTRON_CACHE: process.env.ELECTRON_CACHE || path.join(root, ".cache", "electron"),
   ELECTRON_BUILDER_CACHE: process.env.ELECTRON_BUILDER_CACHE || path.join(root, ".cache", "electron-builder")
 };
+const optionalSigningEnvironmentNames = [
+  "CSC_LINK",
+  "CSC_KEY_PASSWORD",
+  "WIN_CSC_LINK",
+  "WIN_CSC_KEY_PASSWORD",
+  "APPLE_API_KEY",
+  "APPLE_API_KEY_ID",
+  "APPLE_API_ISSUER",
+  "APPLE_ID",
+  "APPLE_APP_SPECIFIC_PASSWORD",
+  "APPLE_KEYCHAIN",
+  "APPLE_KEYCHAIN_PROFILE"
+];
+for (const name of optionalSigningEnvironmentNames) {
+  if (typeof env[name] === "string" && !env[name].trim()) delete env[name];
+}
 const builderSidecarPattern = /^builder-(?:debug|effective-config)\.ya?ml$/i;
 
 function requestedPlatforms(args) {

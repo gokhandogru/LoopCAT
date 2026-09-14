@@ -27070,6 +27070,16 @@ assertIncludes(
 );
 assertIncludes(
   desktopBuildScript,
+  "optionalSigningEnvironmentNames",
+  "scripts/build-desktop.cjs must normalize optional signing variables before invoking Electron Builder."
+);
+assertIncludes(
+  desktopBuildScript,
+  '!env[name].trim()) delete env[name]',
+  "scripts/build-desktop.cjs must remove empty CI signing variables instead of passing them as invalid file paths."
+);
+assertIncludes(
+  desktopBuildScript,
   "assertPlatformBuildHost",
   "scripts/build-desktop.cjs must reject platform artifact builds on the wrong OS before cleaning dist."
 );
