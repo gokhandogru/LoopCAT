@@ -27581,6 +27581,11 @@ assertIncludes(
   "document.documentElement.dataset.themePreference",
   "Accessibility automation must apply the requested theme deterministically before cross-platform contrast checks."
 );
+assertIncludes(
+  accessibilityVerificationScript,
+  'executeJavaScript("delete window.axe"',
+  "Accessibility automation must reset axe between themes so cached styles cannot mix contrast results."
+);
 assert(
   packageJson.scripts?.["verify:visual"] === "pnpm verify:baseline",
   "package.json must expose deterministic visual-regression verification."
