@@ -24,7 +24,10 @@ if (!process.versions.electron) {
 }
 
 const { app, BrowserWindow } = require("electron");
+app.disableHardwareAcceleration();
 if (process.env.LOOPCAT_ACCESSIBILITY_NO_SANDBOX === "1") app.commandLine.appendSwitch("no-sandbox");
+app.commandLine.appendSwitch("disable-gpu");
+app.commandLine.appendSwitch("disable-dev-shm-usage");
 const rendererProductionRoot = path.join(root, ".cache", "renderer", "production");
 const { runtimeAssets } = require(path.join(rendererProductionRoot, "config", "production-assets.js"));
 const axeSource = require("axe-core").source;
@@ -119,6 +122,30 @@ async function auditCurrentTheme(name) {
   );
 }
 
+async function waitForThemePaint(theme) {
+  const expected =
+    theme === "dark"
+      ? { textToken: "#e8edf2", canvasToken: "#111820", textColor: "rgb(232, 237, 242)" }
+      : { textToken: "#15322f", canvasToken: "#f6f7f6", textColor: "rgb(21, 50, 47)" };
+  await waitFor(
+    `(() => {
+      const rootStyle = getComputedStyle(document.documentElement);
+      const visibleHeadings = Array.from(document.querySelectorAll(
+        ".brand h1, .projects-header h2, .resources-header h2, .project-home-header h2, .actionable-empty-state h3"
+      )).filter((element) => element.getClientRects().length > 0);
+      return rootStyle.getPropertyValue("--color-text").trim().toLowerCase() === ${JSON.stringify(expected.textToken)} &&
+        rootStyle.getPropertyValue("--color-canvas").trim().toLowerCase() === ${JSON.stringify(expected.canvasToken)} &&
+        getComputedStyle(document.body).color === ${JSON.stringify(expected.textColor)} &&
+        visibleHeadings.every((element) => getComputedStyle(element).color === ${JSON.stringify(expected.textColor)});
+    })()`,
+    `${theme} theme paint`
+  );
+  await windowRef.webContents.executeJavaScript(
+    "new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))",
+    true
+  );
+}
+
 async function audit(name) {
   for (const theme of ["light", "dark"]) {
     await windowRef.webContents.executeJavaScript(
@@ -126,6 +153,9 @@ async function audit(name) {
         const select = document.querySelector("#themeSelect");
         select.value = ${JSON.stringify(theme)};
         select.dispatchEvent(new Event("change", { bubbles: true }));
+        document.documentElement.dataset.themePreference = ${JSON.stringify(theme)};
+        document.documentElement.dataset.theme = ${JSON.stringify(theme)};
+        document.documentElement.style.colorScheme = ${JSON.stringify(theme)};
       })()`,
       true
     );
@@ -138,6 +168,7 @@ async function audit(name) {
       "document.getAnimations().forEach((animation) => animation.finish())",
       true
     );
+    await waitForThemePaint(theme);
     await auditCurrentTheme(`${name} (${theme})`);
   }
 }

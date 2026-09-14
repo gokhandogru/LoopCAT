@@ -27556,6 +27556,31 @@ assertIncludes(
   '["--no-sandbox"]',
   "Accessibility automation must pass the test-only no-sandbox switch before Electron starts on Linux."
 );
+assertIncludes(
+  accessibilityVerificationScript,
+  "app.disableHardwareAcceleration()",
+  "Accessibility automation must disable hardware acceleration before running hidden cross-platform audits."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'app.commandLine.appendSwitch("disable-gpu")',
+  "Accessibility automation must pass Chromium's explicit software-rendering switch before hidden audits."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  'app.commandLine.appendSwitch("disable-dev-shm-usage")',
+  "Accessibility automation must avoid shared-memory GPU surfaces during hidden cross-platform audits."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  "waitForThemePaint(theme)",
+  "Accessibility automation must wait for theme tokens and visible heading colors to settle before contrast checks."
+);
+assertIncludes(
+  accessibilityVerificationScript,
+  "document.documentElement.dataset.themePreference",
+  "Accessibility automation must apply the requested theme deterministically before cross-platform contrast checks."
+);
 assert(
   packageJson.scripts?.["verify:visual"] === "pnpm verify:baseline",
   "package.json must expose deterministic visual-regression verification."
