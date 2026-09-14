@@ -303,8 +303,16 @@ test("SegmentMarkupPresentationService preserves tag tray guard, order, identity
     ["BUTTON", "tag-chip tag-chip-html tag-chip-action", "Bold", "Insert protected text: <b>"],
     ["BUTTON", "tag-chip tag-chip-placeholder tag-chip-action", "{0}", "Insert protected text: {0}"]
   ]);
-  tray.children[1].dispatch("click");
+  tray.children[1].dispatch("click", { stopPropagation() {} });
+  await Promise.resolve();
   assert.deepEqual(calls.slice(-1), [["insertProtectedTag", "{0}"]]);
+  let focusPreserved = false;
+  tray.children[1].dispatch("mousedown", {
+    preventDefault() {
+      focusPreserved = true;
+    }
+  });
+  assert.equal(focusPreserved, true);
 
   const empty = createHarness(createSegmentMarkupPresentationService);
   assert.equal(empty.service.renderTagTray({ querySelector: () => assert.fail("target queried") }, {}), undefined);

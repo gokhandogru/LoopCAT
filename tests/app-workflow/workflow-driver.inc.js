@@ -200,6 +200,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await Promise.resolve();
     assert(document.activeElement === els.newProjectBtn, "project dialog restores focus to its opener");
 
+    els.workspaceMenuSummary.click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     els.aboutBtn.focus();
     els.aboutBtn.click();
     await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -210,10 +212,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.closeAboutBtn.click();
     await new Promise((resolve) => requestAnimationFrame(resolve));
     assert(
-      !els.aboutDialog.open && document.activeElement === els.aboutBtn,
-      "dialog lifecycle controller restores the About opener after close"
+      !els.aboutDialog.open && document.activeElement === els.workspaceMenuSummary,
+      "dialog lifecycle controller restores Workspace after About closes"
     );
 
+    els.workspaceMenuSummary.click();
+    els.diagnosticsBtn.closest(".workspace-submenu").querySelector("summary").click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     els.diagnosticsBtn.focus();
     els.diagnosticsBtn.click();
     await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -761,9 +766,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     applicationSaveStatusController.set("Checking save status layout", "saved");
     const saveStatusStyle = getComputedStyle(els.saveStatus);
+    const saveStatusBounds = els.saveStatus.getBoundingClientRect();
+    const topbarBounds = document.querySelector(".topbar").getBoundingClientRect();
     assert(
-      saveStatusStyle.display.endsWith("flex") && saveStatusStyle.alignItems === "center" && saveStatusStyle.justifyContent === "center",
-      "save status pill centers its label in both axes"
+      saveStatusStyle.display === "block" && saveStatusStyle.whiteSpace === "normal" &&
+        saveStatusBounds.top >= topbarBounds.bottom - 1 &&
+        saveStatusBounds.right <= window.innerWidth + 1 && !els.saveStatus.closest(".topbar-actions"),
+      "operation notices wrap below navigation without displacing workspace actions"
     );
     assert(
       els.saveStatus.getAttribute("role") === "status" &&
@@ -771,6 +780,19 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         els.saveStatus.getAttribute("aria-atomic") === "true",
       "save and operation status exposes one polite atomic live region"
     );
+    for (const [menuId, control] of [
+      ["segmentSearchOptionsMenu", els.segmentSearchScope],
+      ["segmentFiltersMenu", els.reviewStateFilter]
+    ]) {
+      const menu = document.getElementById(menuId);
+      const opener = menu.querySelector("summary");
+      opener.click();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      control.focus();
+      assert(menu.open && document.activeElement === control, `${menuId} exposes its controls to keyboard focus`);
+      control.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      assert(!menu.open && document.activeElement === opener, `${menuId} closes with Escape and restores focus`);
+    }
     els.confirmBtn.focus();
     paletteController?.open?.();
     await Promise.resolve();
@@ -807,7 +829,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "Project analysis can be expanded"
     );
     await projectDocumentOpenController.open(documentInfo.id);
-    const activeTargetEditor = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
+    const activeTargetEditor = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] .target-editor`);
     assert(
       activeTargetEditor?.getAttribute("aria-label") === uiLocalizationService.source("Target translation for segment {value1}", { value1: segmentIndex + 1 }),
       "segment target editors expose a segment-specific accessible name"
@@ -824,7 +846,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         els.workspace.classList.contains("focus-mode") &&
         els.focusModeBtn.getAttribute("aria-pressed") === "true" &&
         !els.exitFocusModeBtn.classList.contains("hidden") &&
-        Boolean(els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`)),
+        Boolean(els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] .target-editor`)),
       "focus view switches the editor into a noise-free segment layout"
     );
     focusModeController.set(false);
@@ -837,7 +859,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "focus view returns to the full editor layout"
     );
     const compositionTarget = `Bilesim girdisi hedefi ${Date.now()}`;
-    const compositionTextarea = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
+    const compositionTextarea = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] .target-editor`);
     compositionTextarea.focus();
     compositionTextarea.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true, data: "B" }));
     compositionTextarea.value = compositionTarget;
@@ -917,7 +939,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     const keyboardEditBefore = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[segmentIndex]);
     const keyboardEditTarget = `Klavye geri alma hedefi ${Date.now()}`;
-    const keyboardEditTextarea = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
+    const keyboardEditTextarea = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] .target-editor`);
     keyboardEditTextarea.value = keyboardEditTarget;
     keyboardEditTextarea.dispatchEvent(new Event("input", { bubbles: true }));
     const keyboardUndoEvent = new KeyboardEvent("keydown", {
@@ -932,7 +954,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       () =>
         editorSessionStore.getSegments()[segmentIndex]?.target === keyboardEditBefore.target &&
         els.saveStatus.textContent.includes("Undo target edit") &&
-        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] textarea`),
+        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] .target-editor`),
       "coalesced EditTarget keyboard Undo"
     );
     const keyboardUndoStored = (await getProjectSegments(project.id)).find(
@@ -941,10 +963,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(
       keyboardUndoEvent.defaultPrevented &&
         keyboardUndoStored?.target === keyboardEditBefore.target &&
-        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] textarea`),
+        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] .target-editor`),
       "Ctrl/Cmd+Z inside the target editor uses coalesced EditTarget Undo and restores focus"
     );
-    const keyboardRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] textarea`);
+    const keyboardRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${segmentIndex}"] .target-editor`);
     const keyboardRedoEvent = new KeyboardEvent("keydown", {
       key: "z",
       code: "KeyZ",
@@ -958,7 +980,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       () =>
         editorSessionStore.getSegments()[segmentIndex]?.target === keyboardEditTarget &&
         els.saveStatus.textContent.includes("Redid target edit") &&
-        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] textarea`),
+        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] .target-editor`),
       "coalesced EditTarget keyboard Redo"
     );
     const keyboardRedoStored = (await getProjectSegments(project.id)).find(
@@ -967,7 +989,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(
       keyboardRedoEvent.defaultPrevented &&
         keyboardRedoStored?.target === keyboardEditTarget &&
-        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] textarea`),
+        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] .target-editor`),
       "Ctrl/Cmd+Shift+Z inside the target editor redoes the coalesced EditTarget command"
     );
     const targetText = `Aninda yedeklenen hedef ${Date.now()}`;
@@ -4427,7 +4449,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       );
       await resourceCatalogRefreshController.refresh();
       const xmlDownloadsBeforeResourceTmx = statusDownloads.filter((item) => item.type === "application/xml").length;
-      resourceLibraryExportController.exportResource("tm", projectResourceContextService.mainTmLink()?.resourceId);
+      await resourceLibraryExportController.exportResource("tm", projectResourceContextService.mainTmLink()?.resourceId);
       const resourceTmxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
       const resourceTmxDownload = resourceTmxDownloads[resourceTmxDownloads.length - 1];
       const resourceTmxText = await resourceTmxDownload.blob.text();
@@ -4455,7 +4477,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const primaryTermbaseLink = projectResourceContextService
         .lookupTermbaseLinks()
         .find((link) => link.name === primaryTermbaseName);
-      resourceLibraryExportController.exportResource("tb", primaryTermbaseLink?.resourceId);
+      await resourceLibraryExportController.exportResource("tb", primaryTermbaseLink?.resourceId);
       const resourceTbxDownloads = statusDownloads.filter((item) => item.type === "application/xml");
       const resourceTbxDownload = resourceTbxDownloads[resourceTbxDownloads.length - 1];
       const resourceTbxText = await resourceTbxDownload.blob.text();
@@ -4502,7 +4524,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "project TMX export failure reports visible status");
       await projectResourceTransferController.exportTbx();
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "project TBX export failure reports visible status");
-      resourceLibraryExportController.exportResource("tm", `${projectResourceContextService.mainTm()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
+      await resourceLibraryExportController.exportResource("tm", `${projectResourceContextService.mainTm()}::${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`);
       assert(els.saveStatus.textContent.includes("Simulated download failure"), "resource export failure reports visible status");
     } finally {
       URL.createObjectURL = originalStatusCreateObjectUrl;
@@ -4537,6 +4559,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const workflowTmOpenButton = workflowTmCard?.querySelector('[data-resource-action="open"]');
     workflowTmOpenButton?.click();
     await applicationImportProgressController.yieldToUi();
+    await waitFor(() => !resourcesController.getState().page.loading, "first resource page loaded");
+    assert(els.tmResourceDetail.querySelectorAll(".resource-row").length <= 100, "resource detail bounds rendered entries to one page");
     const resourceOpenFocusState = {
       view: applicationStore.getState().navigation.view,
       detailHidden: els.tmResourceDetail.classList.contains("hidden"),
@@ -4580,10 +4604,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     applicationViewController.show("editor");
     await applicationImportProgressController.yieldToUi();
-    const editableResourceState = resourcesController.getState();
-    const editableTmEntry = editableResourceState.tmEntries.find((entry) => entry.id === resourceTmEntry.id);
-    const editableTerm = editableResourceState.terms.find((term) => term.id === resourceTerm.id);
-    assert(Boolean(editableTmEntry && editableTerm), "resource row edit fixtures are visible in resource state");
+    const editableTmEntry = await storageApi.get("tmEntries", resourceTmEntry.id);
+    const editableTerm = await storageApi.get("terms", resourceTerm.id);
+    assert(Boolean(editableTmEntry && editableTerm), "resource row edit fixtures remain available through on-demand reads");
     segmentTargetStateService.setHiddenField(editableTmEntry, RESOURCE_TM_SAVE_FAILURE_TEST_FLAG, true);
     const failedResourceTmSave = await resourceMutationController.saveTmEntry(editableTmEntry, {
       source: resourceTmEntry.source,
@@ -4800,7 +4823,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         languagePair: `${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`,
         label: bulkTmName,
         deletedAt: new Date().toISOString(),
-        payload: { records: resourcesController?.getItems?.("tm", bulkTmKey) || [] }
+        payload: { records: (await loadResourceEntries("tm", bulkTmKey)).rows }
       });
     } catch (error) {
       atomicResourceTrashFailure = error;
@@ -4811,10 +4834,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         (await storageApi.get("trashEntries", atomicConflictTrashId))?.entityType === "project",
       "resource Trash transaction conflict rolls back every live record and preserves the existing Trash item"
     );
-    // Resolve the deliberate conflict through the production retry action before
-    // testing independent command warnings. Unrelated notices cannot clear it.
+    // A no-op retry must retain this deliberate multi-record conflict. Resolve
+    // it by explicitly retaining the live records and removing the placeholder.
     document.getElementById("retryLocalSaveBtn").click();
     await new Promise((resolve) => setTimeout(resolve, 50));
+    assert(els.saveStatus.textContent.includes("Save conflict"), "no-op retry preserves the unresolved resource conflict");
+    await storageApi.bulkPut("tmEntries", (await listTmEntries()).filter((entry) => entry.tmName === bulkTmName));
     await storageApi.deleteByKey("trashEntries", atomicConflictTrashId);
     RESOURCE_BULK_DELETE_FAILURE_TEST_KEYS.add(`tm:${bulkTmKey}`);
     const failedBulkTmDelete = await resourceMutationController.deleteResource("tm", bulkTmKey);
@@ -5168,7 +5193,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     workspaceRecoveryPresentationService.renderStatus();
     const disconnectedBeforeUnloadEvent = new Event("beforeunload", { cancelable: true });
     const disconnectedBeforeUnloadResult = window.dispatchEvent(disconnectedBeforeUnloadEvent);
-    assert(!els.workspaceMenuSummary.textContent.includes("unsaved") && disconnectedBeforeUnloadResult && !disconnectedBeforeUnloadEvent.defaultPrevented, "browser-cache dirty recovery marker stays hidden until a workspace is connected");
+    assert(
+      els.workspaceMenuSummary.textContent === uiLocalizationService.translate("workspace.menu.summary") &&
+        !els.workspaceMenuSummary.hasAttribute("title") &&
+        disconnectedBeforeUnloadResult && !disconnectedBeforeUnloadEvent.defaultPrevented,
+      "browser-cache dirty recovery marker does not imply unsaved local edits or pending connected-folder copies"
+    );
 
     const originalConnectChooseWorkspaceFolder = workspaceStorage.chooseWorkspaceFolder;
     const originalConnectListWorkspacePackages = workspaceStorage.listProjectPackages;
@@ -5178,12 +5208,18 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       workspaceStorage.chooseWorkspaceFolder = async () => ({ supported: true, connected: true, mode: "workspace-folder", name: "Mock Workspace", lastSyncedAt: "", projectCount: 1, resourceCount: 0, backupCount: 0 });
       workspaceStorage.listProjectPackages = async () => [{ id: "other-project", name: "Other Project", packagePath: "projects/other/project.loopcat.json" }];
       await workspacePackageSaveController.chooseFolder();
+      const pendingFolderCopyWarning = uiLocalizationService.translate("workspace.status.dirtyWarning", {
+        count: recoveryWorkspaceController.getState().dirtyCount
+      });
       assert(
         state.workspaceDirtyProjectIds.has(project.id) &&
-          els.workspaceMenuSummary.textContent.includes("unsaved") &&
+          recoveryWorkspaceController.getState().dirtyCount > 0 &&
+          els.workspaceMenuSummary.textContent === uiLocalizationService.translate("workspace.menu.summary") &&
+          els.workspaceMenuSummary.getAttribute("title") === pendingFolderCopyWarning &&
+          els.workspaceHealth.textContent.includes(pendingFolderCopyWarning) &&
           els.saveStatus.textContent.includes("local project package") &&
           els.saveStatus.textContent.includes("to be saved"),
-        "workspace folder connection marks local projects missing from the folder dirty"
+        "workspace folder connection reports pending external copies inside Workspace without renaming navigation"
       );
       workspaceDirtyStateController.clearAll();
       workspaceStorage.listProjectPackages = async () => [{ id: project.id, name: project.name, packagePath: `projects/${project.id}/project.loopcat.json` }];
@@ -5499,9 +5535,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "linked TM resource import normalizes friendly language labels before memory lookup"
     );
     workspaceDirtyStateController.clearAll();
-    const linkedTmRow = Array.from(els.tmResourceDetail.querySelectorAll("[data-resource-row]")).find(
+    const linkedTmRow = await waitFor(() => Array.from(els.tmResourceDetail.querySelectorAll("[data-resource-row]")).find(
       (row) => row.dataset.resourceId === linkedTmEntry.id
-    );
+    ), "linked TM page loaded");
     assert(Boolean(linkedTmRow), "linked TM resource edit renders through the Resources controller detail root");
     linkedTmRow.querySelector('[data-field="target"]').value = "Linked resource TM target updated";
     linkedTmRow.querySelector('[data-resource-action="save-entry"]').click();
@@ -5557,9 +5593,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const linkedCsvTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] });
     assert(linkedCsvTerms.some((term) => term.sourceTerm === "linked csv term") && linkedCsvTerms.some((term) => term.sourceTerm === "linked forbidden csv term" && term.isForbidden), "CSV term resource import creates editable approved and forbidden terms");
     workspaceDirtyStateController.clearAll();
-    const linkedTermRow = Array.from(els.tbResourceDetail.querySelectorAll("[data-resource-row]")).find(
+    const linkedTermRow = await waitFor(() => Array.from(els.tbResourceDetail.querySelectorAll("[data-resource-row]")).find(
       (row) => row.dataset.resourceId === linkedTerm.id
-    );
+    ), "linked termbase page loaded");
     assert(Boolean(linkedTermRow), "linked term resource edit renders through the Resources controller detail root");
     linkedTermRow.querySelector('[data-field="targetTerm"]').value = "guncel bagli kaynak terimi";
     linkedTermRow.querySelector('[data-resource-action="save-entry"]').click();
@@ -5756,7 +5792,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(
         state.lastValidationReport?.warnings?.some((item) => item.includes("imported with") && item.includes("validation note")) &&
           els.saveStatus.textContent === "Workspace sync completed with warnings",
-        "workspace sync reports validation notes from imported packages"
+        `workspace sync reports validation notes from imported packages (${JSON.stringify(state.lastValidationReport)}; ${els.saveStatus.textContent})`
       );
     } finally {
       workspaceStorage.listProjectPackages = originalWarningSyncListWorkspacePackages;
@@ -5931,7 +5967,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const structuralSegmentIdsBeforeSplit = new Set(structuralSegmentsBefore.map((segment) => segment.id));
     let splitIndex = editorSessionStore.getSegments().findIndex((segment) => segment.id === structuralSegmentsBefore[0].id);
     await segmentNavigationController.select(splitIndex);
-    let splitTextarea = els.segmentBody.querySelector(`tr[data-index="${splitIndex}"] textarea`);
+    let splitTextarea = els.segmentBody.querySelector(`tr[data-index="${splitIndex}"] .target-editor`);
     splitTextarea?.setSelectionRange(24, 24);
     segmentTargetStateService.setHiddenField(editorSessionStore.getSegments()[splitIndex], SPLIT_SAVE_FAILURE_TEST_FLAG, true);
     await structuralSegmentController.split();
@@ -5945,7 +5981,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     splitIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === structuralDocument.id);
     await segmentNavigationController.select(splitIndex);
-    splitTextarea = els.segmentBody.querySelector(`tr[data-index="${splitIndex}"] textarea`);
+    splitTextarea = els.segmentBody.querySelector(`tr[data-index="${splitIndex}"] .target-editor`);
     splitTextarea?.setSelectionRange(24, 24);
     const splitCommandResult = await structuralSegmentController.split();
     const splitAppliedVisible = editorSessionStore.getSegments().filter((segment) => segment.documentId === structuralDocument.id);
@@ -5974,7 +6010,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       (segment) => segment.documentId === structuralDocument.id
     );
     const splitUndoOriginal = splitUndoVisible.find((segment) => segment.id === structuralSegmentsBefore[0].id);
-    const splitUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] textarea`);
+    const splitUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] .target-editor`);
     assert(
       splitUndoVisible.length === 3 &&
         splitUndoStored.length === 3 &&
@@ -5996,7 +6032,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     const splitRedoCreated = splitRedoVisible.find((segment) => segment.id === splitCreatedSegment?.id);
     const splitRedoOriginal = splitRedoVisible.find((segment) => segment.id === structuralSegmentsBefore[0].id);
-    const splitRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] textarea`);
+    const splitRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] .target-editor`);
     assert(
       splitRedoVisible.length === 4 &&
         splitRedoStored.length === 4 &&
@@ -6060,7 +6096,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const mergeAppliedVisible = editorSessionStore.getSegments().filter((segment) => segment.documentId === structuralDocument.id);
     const mergeSuccessStored = (await getProjectSegments(project.id)).filter((segment) => segment.documentId === structuralDocument.id);
     const mergeAppliedSurvivor = mergeAppliedVisible.find((segment) => segment.id === mergeFirstBefore.id);
-    const mergeAppliedTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] textarea`);
+    const mergeAppliedTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] .target-editor`);
     const mergeAppliedRevision = Number(mergeAppliedSurvivor?.revision || 0);
     const mergeAppliedHistory = structuredClone(mergeAppliedSurvivor?.targetHistory || []);
     assert(
@@ -6091,7 +6127,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     const mergeUndoFirst = mergeUndoVisible.find((segment) => segment.id === mergeFirstBefore.id);
     const mergeUndoSecond = mergeUndoVisible.find((segment) => segment.id === mergeSecondBefore.id);
-    const mergeUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] textarea`);
+    const mergeUndoTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] .target-editor`);
     const mergeUndoFirstRevision = Number(mergeUndoFirst?.revision || 0);
     assert(
       mergeUndoResult?.receipt?.commandId === "merge-segments" &&
@@ -6118,7 +6154,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       (segment) => segment.documentId === structuralDocument.id
     );
     const mergeRedoSurvivor = mergeRedoVisible.find((segment) => segment.id === mergeFirstBefore.id);
-    const mergeRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] textarea`);
+    const mergeRedoTextarea = els.segmentBody.querySelector(`tr[data-index="${applicationStore.getState().navigation.activeIndex}"] .target-editor`);
     assert(
       mergeRedoResult?.receipt?.commandId === "merge-segments" &&
         mergeRedoVisible.length === 3 &&
@@ -6147,7 +6183,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const sourceChipLabels = Array.from(taggedRow?.querySelectorAll(".source-cell .tag-chip") || []).map((chip) => chip.textContent);
     assert(sourceChipLabels.includes("<b>") && sourceChipLabels.includes("</b>") && !sourceChipLabels.includes("<strong>"), "editor displays semantic inline tag labels for HTML formatting");
     await segmentNavigationController.select(taggedIndex);
-    let taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
+    let taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] .target-editor`);
     taggedTextarea?.focus();
     taggedTextarea?.setSelectionRange(0, 0);
     const beforeProtectedTagInsert = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[taggedIndex]);
@@ -6155,7 +6191,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const protectedTagCommand = await targetProducerController.insertProtectedTag("<strong>");
     await autosaveService.flush(project.id);
     const protectedTagApplied = segmentTargetStateService.capturePatch(editorSessionStore.getSegments()[taggedIndex]);
-    taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
+    taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] .target-editor`);
     assert(
       protectedTagCommand?.receipt?.commandId === "insert-protected-tag" &&
         protectedTagCommand.receipt.provenance?.producer === "protected-tag" &&
@@ -6172,7 +6208,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const storedAfterProtectedTagUndo = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[taggedIndex].id
     );
-    taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
+    taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] .target-editor`);
     assert(
       undoProtectedTag?.receipt?.commandId === "insert-protected-tag" &&
         editorSessionStore.getSegments()[taggedIndex].target === beforeProtectedTagInsert.target &&
@@ -6187,7 +6223,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const storedAfterProtectedTagRedo = (await getProjectSegments(project.id)).find(
       (segment) => segment.id === editorSessionStore.getSegments()[taggedIndex].id
     );
-    taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] textarea`);
+    taggedTextarea = els.segmentBody.querySelector(`tr[data-index="${taggedIndex}"] .target-editor`);
     assert(
       editorSessionStore.getSegments()[taggedIndex].target === protectedTagApplied.target &&
         JSON.stringify(editorSessionStore.getSegments()[taggedIndex].targetHistory) === JSON.stringify(protectedTagApplied.targetHistory) &&

@@ -5,6 +5,103 @@ const path = require("node:path");
 const load = () =>
   import(pathToFileURL(path.join(__dirname, "../../src/features/import-export/archive-adapter.js")).href);
 
+function resourceRecords() {
+  return {
+    resources: [
+      { id: "tm", type: "tm", name: "Shared memory" },
+      { id: "tb", type: "termbase", name: "Shared terminology" }
+    ],
+    tmEntries: [{ id: "entry", resourceId: "tm", source: "A friend", target: "Bir arkadaş" }],
+    tmContributions: [{ id: "contribution", resourceId: "tm", tmEntryId: "entry", projectId: "p", segmentId: "s" }],
+    terms: [{ id: "term", resourceId: "tb", conceptId: "concept", sourceTerm: "friend", targetTerm: "arkadaş" }],
+    termConcepts: [{ id: "concept", resourceId: "tb", note: "Preserve shared concept" }],
+    termDesignations: [
+      { id: "source", resourceId: "tb", conceptId: "concept", language: "en", term: "friend" },
+      { id: "target", resourceId: "tb", conceptId: "concept", language: "tr", term: "arkadaş" }
+    ]
+  };
+}
+
+test("project ZIP preserves linked resource identities, contributions and multilingual terminology", async () => {
+  const archive = await load();
+  const value = {
+    app: "LoopCAT",
+    schemaVersion: 6,
+    project: {
+      id: "p",
+      name: "Project",
+      resourceLinks: [
+        { type: "tm", role: "main", resourceId: "tm" },
+        { type: "termbase", resourceId: "tb" }
+      ]
+    },
+    segments: [{ id: "s", projectId: "p", source: "A friend", target: "Bir arkadaş", status: "confirmed" }],
+    resources: resourceRecords(),
+    activityEvents: []
+  };
+  const written = await archive.writePackage(value);
+  const checked = await archive.readPackage(written.data);
+  assert.deepEqual(checked.value, value);
+  for (const [store, records] of Object.entries(value.resources)) {
+    assert.equal(written.manifest.counts[store], records.length);
+  }
+  assert.equal((await archive.readPackage(written.data, { verifyOnly: true })).verified, true);
+});
+
+test("workspace ZIP streams every authoritative checkpoint store after the Resources upgrade", async (t) => {
+  const { IDBFactory, IDBKeyRange } = require("fake-indexeddb");
+  const context = require("node:vm").createContext({
+    window: {},
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    crypto,
+    structuredClone,
+    setInterval,
+    clearInterval,
+    console,
+    Blob,
+    TextEncoder,
+    CustomEvent
+  });
+  require("node:vm").runInContext(
+    require("node:fs").readFileSync(path.join(__dirname, "../../storage.js"), "utf8"),
+    context
+  );
+  const storage = context.window.CatHan.storage;
+  const db = await storage.openDatabase();
+  t.after(async () => {
+    await storage.releaseProject("p");
+    db.close();
+  });
+  const stores = {
+    projects: [{ id: "p", name: "Project", documents: [] }],
+    segments: [{ id: "s", projectId: "p", source: "A friend", target: "Bir arkadaş" }],
+    ...resourceRecords(),
+    activityEvents: [{ id: "event", projectId: "p", summary: "Confirmed" }],
+    trashEntries: [{ id: "trash", kind: "test" }]
+  };
+  await storage.writeStoresAtomically(stores);
+  const checkpoint = await storage.createCheckpoint("archive-round-trip");
+  const archive = await load();
+  const written = await archive.writePackage(await storage.checkpointArchiveSource(checkpoint.id));
+  const checked = await archive.readPackage(written.data);
+  for (const [store, records] of Object.entries(stores)) {
+    assert.equal(written.manifest.counts[store], records.length, `${store} count`);
+    assert.deepEqual(
+      checked.value[store],
+      JSON.parse(JSON.stringify(records)).sort((left, right) => left.id.localeCompare(right.id)),
+      `${store} records`
+    );
+  }
+  const staged = [];
+  await archive.readPackage(written.data, { onRecord: (record) => staged.push(record) });
+  for (const store of Object.keys(stores))
+    assert.ok(
+      staged.some((record) => record.store === store),
+      store
+    );
+});
+
 test("packaged desktop DOCX smoke fixture passes the production safe archive reader", async () => {
   const source = require("node:fs").readFileSync(path.join(__dirname, "../../desktop/main.cjs"), "utf8");
   const fixture = source.match(/const docxBase64 = "([^"]+)";/);

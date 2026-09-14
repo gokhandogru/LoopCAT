@@ -54,8 +54,12 @@ export function createWorkspaceBackupExportController(options) {
         reference.manifestSaved === false || validation.count(validationReport) ? "dirty" : "saved"
       );
     } catch (error) {
-      const message = error.message || "Workspace backup failed.";
-      presentation.renderValidation(error.validation || validation.errorReport(message));
+      const message = error.validation
+        ? error.message || "Workspace backup failed."
+        : error.message
+          ? `Workspace backup failed: ${error.message}`
+          : "Workspace backup failed.";
+      if (error.validation) presentation.renderValidation(error.validation);
       status.set(message, "dirty");
       throw error;
     }

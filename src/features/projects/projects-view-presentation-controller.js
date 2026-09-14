@@ -82,17 +82,17 @@ export function createProjectsViewPresentationController(options) {
       <span class="language-badge">${text.escapeHtml(language.display(project))}</span>
     </header>
     <div class="project-stats">
-      <div><strong>${project.progress.percent}%</strong><span>${localization.labelHtml("confirmed")}</span></div>
-      <div><strong>${project.progress.total}</strong><span>${localization.labelHtml("segments")}</span></div>
-      <div><strong>${project.wordCount}</strong><span>${localization.labelHtml("words")}</span></div>
+      <div><strong>${project.progress.percent == null ? "…" : `${project.progress.percent}%`}</strong><span>${localization.labelHtml("confirmed")}</span></div>
+      <div><strong>${project.progress.total ?? "…"}</strong><span>${localization.labelHtml("segments")}</span></div>
+      <div><strong>${project.wordCount ?? "…"}</strong><span>${localization.labelHtml("words")}</span></div>
     </div>
-    <div class="progress-bar"><div style="width:${project.progress.percent}%"></div></div>
+    <div class="progress-bar"><div style="width:${project.progress.percent || 0}%"></div></div>
     <footer>
       <span>${localization.labelHtml("updatedAt", { date: date.format(project.updatedAt) })}</span>
     </footer>
   `
     );
-    tile.querySelector(".progress-bar > div").style.width = `${project.progress.percent}%`;
+    tile.querySelector(".progress-bar > div").style.width = `${project.progress.percent || 0}%`;
     const deleteButton = dom.createElement("button");
     const projectLabel = text.displaySafeText(project.name, localization.source("project"));
     deleteButton.className = "danger-small";
@@ -106,6 +106,7 @@ export function createProjectsViewPresentationController(options) {
     openButton.textContent = localization.source("Open");
     openButton.setAttribute("aria-label", localization.source("Open project {value1}", { value1: projectLabel }));
     openButton.addEventListener("click", () => actions.open(project.id));
+    openButton.disabled = deleteButton.disabled = Boolean(project.catalogUnverified);
     tile.querySelector("footer").append(deleteButton, openButton);
     return tile;
   }

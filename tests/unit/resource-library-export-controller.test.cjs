@@ -52,12 +52,23 @@ function createHarness(createResourceLibraryExportController, overrides = {}) {
 const names = (calls) => calls.map(([name]) => name);
 const firstCall = (calls, name) => calls.find(([callName]) => callName === name);
 
+test("Resource export awaits the entire selected library beyond the visible page", async () => {
+  const { createResourceLibraryExportController } = await moduleAt(
+    "src/features/resources/resource-library-export-controller.js"
+  );
+  const rows = Array.from({ length: 251 }, (_, id) => ({ id }));
+  const harness = createHarness(createResourceLibraryExportController, { items: Promise.resolve(rows) });
+  await harness.controller.exportResource("tm", "Library::en::tr");
+  assert.deepEqual(firstCall(harness.calls, "buildTmx")[1], rows);
+  assert.deepEqual(harness.calls.at(-1), ["set", "Exported 251 TM entries", "saved"]);
+});
+
 test("ResourceLibraryExportController preserves TMX lookup, metadata, filename, XML download, singular copy, and return", async () => {
   const { createResourceLibraryExportController } = await moduleAt(
     "src/features/resources/resource-library-export-controller.js"
   );
   const harness = createHarness(createResourceLibraryExportController, { items: [{ id: "one" }] });
-  assert.equal(harness.controller.exportResource("tm", "Library::en::tr"), undefined);
+  assert.equal(await harness.controller.exportResource("tm", "Library::en::tr"), undefined);
   assert.deepEqual(names(harness.calls), ["labelFromKey", "items", "fileSafeName", "buildTmx", "download", "set"]);
   assert.deepEqual(firstCall(harness.calls, "buildTmx").slice(1), [harness.items, harness.info]);
   assert.deepEqual(firstCall(harness.calls, "download").slice(1), [
@@ -73,7 +84,7 @@ test("ResourceLibraryExportController preserves TBX lookup, metadata, filename, 
     "src/features/resources/resource-library-export-controller.js"
   );
   const harness = createHarness(createResourceLibraryExportController);
-  harness.controller.exportResource("tb", "Library::en::tr");
+  await harness.controller.exportResource("tb", "Library::en::tr");
   assert.equal(names(harness.calls).includes("buildTmx"), false);
   assert.deepEqual(firstCall(harness.calls, "buildTbx").slice(1), [harness.items, harness.info]);
   assert.deepEqual(firstCall(harness.calls, "download").slice(1), [
@@ -90,13 +101,13 @@ test("ResourceLibraryExportController contains lookup and download failures and 
   );
   const lookupFailure = new Error("lookup failed");
   const lookup = createHarness(createResourceLibraryExportController, { lookupFailure });
-  lookup.controller.exportResource("tm", "bad");
+  await lookup.controller.exportResource("tm", "bad");
   assert.deepEqual(lookup.calls.at(-1), ["set", "lookup failed", "dirty"]);
   assert.equal(names(lookup.calls).includes("download"), false);
 
   const downloadFailure = new Error("download failed");
   const download = createHarness(createResourceLibraryExportController, { downloadFailure });
-  download.controller.exportResource("tb", "Library::en::tr");
+  await download.controller.exportResource("tb", "Library::en::tr");
   assert.deepEqual(download.calls.at(-1), ["set", "download failed", "dirty"]);
   assert.equal(Object.isFrozen(download.controller), true);
   assert.throws(

@@ -44,7 +44,7 @@
       const requestedTest = new URLSearchParams(window.location.search).get("test");
       const requestedTimeout = Number(new URLSearchParams(window.location.search).get("timeout")) || 0;
       const tests = [
-        { name: "Performance", url: "./reliability-test.html?performance&soakMs=" + (new URLSearchParams(location.search).get("soakMs") || "0"), pass: "PERFORMANCE TEST PASS", fail: "PERFORMANCE TEST FAIL", timeout: 1800000, optIn: true },
+        { name: "Performance", url: "./reliability-test.html?performance&soakMs=" + (new URLSearchParams(location.search).get("soakMs") || "0") + "&segments=" + (new URLSearchParams(location.search).get("segments") || ""), pass: "PERFORMANCE TEST PASS", fail: "PERFORMANCE TEST FAIL", timeout: 1800000, optIn: true },
         { name: "Reliability", url: "./reliability-test.html", pass: "RELIABILITY TEST PASS", fail: "RELIABILITY TEST FAIL", timeout: 180000 },
         {
           name: "Security policy",

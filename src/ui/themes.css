@@ -193,7 +193,9 @@
   background: var(--color-hover);
 }
 
-:root[data-theme="dark"] .liquid-glass-edition :is(input, select, textarea, .target-cell textarea) {
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(input, select, textarea, .target-cell :is(textarea, .target-editor)) {
   border-color: var(--color-control-line);
   background: var(--color-input);
   color: var(--color-text);
@@ -210,7 +212,9 @@
   border-color: var(--color-line-strong);
 }
 
-:root[data-theme="dark"] .liquid-glass-edition :is(input, select, textarea, .target-cell textarea):focus {
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(input, select, textarea, .target-cell :is(textarea, .target-editor)):focus {
   border-color: var(--color-focus);
   background: var(--color-input);
 }
@@ -297,12 +301,17 @@
     inset 0 -1px var(--color-line);
 }
 
-:root[data-theme="dark"] .liquid-glass-edition .segment-grid tr.active .target-cell textarea {
+:root[data-theme="dark"] .liquid-glass-edition .segment-grid tr.active .target-cell :is(textarea, .target-editor) {
   background: var(--color-input);
   border-color: var(--color-control-line);
 }
 
-:root[data-theme="dark"] .liquid-glass-edition .segment-grid tr.active .target-cell textarea:focus {
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  .segment-grid
+  tr.active
+  .target-cell
+  :is(textarea, .target-editor):focus {
   border-color: var(--color-focus);
 }
 
@@ -327,7 +336,6 @@
   :is(
     .status-pill.confirmed,
     .review-pill.reviewed,
-    .save-status,
     .local-ai-status.connected,
     .tm-match-badge,
     .language-badge,
@@ -484,11 +492,11 @@
   background: var(--color-surface-subtle);
 }
 
-:root[data-theme="dark"] .liquid-glass-edition .workspace.focus-mode .target-cell textarea {
+:root[data-theme="dark"] .liquid-glass-edition .workspace.focus-mode .target-cell :is(textarea, .target-editor) {
   border-color: var(--color-control-line);
   background: var(--color-input);
 }
 
-:root[data-theme="dark"] .liquid-glass-edition .workspace.focus-mode .target-cell textarea:focus {
+:root[data-theme="dark"] .liquid-glass-edition .workspace.focus-mode .target-cell :is(textarea, .target-editor):focus {
   border-color: var(--color-focus);
 }

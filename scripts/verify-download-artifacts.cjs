@@ -54,6 +54,10 @@ function isWindowsDesktopZipName(name) {
   return isWindowsInstallerZipName(name) || isWindowsPortableZipName(name);
 }
 
+function isWebZipName(name) {
+  return exactFile(`${productName} Web ${packageJson.version}.zip`).test(name);
+}
+
 function debFile() {
   return new RegExp(`^${escapedPackageName}_${escapedVersion}_[a-z0-9.+~-]+\\.deb$`, "i");
 }
@@ -97,6 +101,12 @@ const artifactRules = {
     {
       label: "Linux DEB",
       match: (file) => file.ext === ".deb" && debFile().test(file.name)
+    }
+  ],
+  web: [
+    {
+      label: "Static web ZIP",
+      match: (file) => file.ext === ".zip" && isWebZipName(file.name)
     }
   ]
 };
@@ -156,7 +166,7 @@ function artifactInfo(filePath) {
 }
 
 if (!platformsToVerify.every((item) => artifactRules[item])) {
-  console.error("Usage: node scripts/verify-download-artifacts.cjs <win|mac|linux|all> [--all] [--dist path]");
+  console.error("Usage: node scripts/verify-download-artifacts.cjs <win|mac|linux|web|all> [--all] [--dist path]");
   process.exit(1);
 }
 

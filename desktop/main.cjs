@@ -7,7 +7,9 @@ const { loadRuntimeSettings, saveRuntimeSettings } = require("./runtime-settings
 const { createProtectedCredentials } = require("./protected-credentials.cjs");
 const { attachPersistenceClose } = require("./persistence-close.cjs");
 const { createVerifiedExports } = require("./verified-export.cjs");
-let journalRecoveryNeeded = true;
+// A normal launch reads the atomically committed database. Reconstruction is
+// reserved for the renderer-crash route and explicit recovery operations.
+let journalRecoveryNeeded = false;
 
 let electron = {};
 try {
@@ -804,6 +806,12 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
         await waitFor(() => window.CatHan?.localization?.parseLocalizationFile, "LoopCAT localization API");
         await waitFor(() => window.CatHan?.xliff?.buildTargetXliff, "LoopCAT XLIFF API");
         await waitFor(() => window.CatHan?.docx?.buildBilingualDocx, "LoopCAT DOCX API");
+        await waitFor(() => document.querySelector("#newProjectBtn"), "New Project button");
+        document.querySelector("#newProjectBtn").click();
+        await waitFor(() => document.querySelector("#projectDialog")?.open, "New Project dialog after clicking its button");
+        const newProjectDialogOpened = true;
+        document.querySelector("#cancelProjectBtn").click();
+        await waitFor(() => !document.querySelector("#projectDialog")?.open, "New Project dialog to close");
         const storage = window.CatHan.storage;
         const projectApi = window.CatHan.project;
         const localizationApi = window.CatHan.localization;
@@ -952,6 +960,36 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
         await projectApi.deleteProject(project.id);
         projectProbe.cleanedUp = (await projectApi.getProjectSegments(project.id)).length === 0 &&
           !(await storage.get("projects", project.id));
+        // Exercise the same typing + Confirm path as the desktop user report.
+        // API-only persistence probes do not cover autosave/confirmation races.
+        let editorProject = await projectApi.createProject({
+          name: "Desktop confirmation regression", sourceLang: "en", targetLang: "tr",
+          tmName: "Confirmation TM", termBaseName: "Confirmation TB"
+        });
+        const editorDocumentId = "desktop-confirmation-document";
+        editorProject = (await projectApi.appendProjectSegmentsAndUpdateProject({
+          ...editorProject,
+          documents: [{ id: editorDocumentId, name: "confirmation.txt", type: "text" }]
+        }, [{ text: "I have <g id='friend'>a friend</g>." }, { text: "I have many friends." }], {
+          documentId: editorDocumentId, documentName: "confirmation.txt", documentType: "text"
+        })).project;
+        const expectedViews = { projects: "list", files: "list", resources: "list",
+          "resource-entries": "card", "resource-selection": "card", trash: "card" };
+        await waitFor(() => document.documentElement.hasAttribute("data-projects-view"), "collection view preferences");
+        for (const [scope, mode] of Object.entries(expectedViews)) {
+          document.querySelector('[data-collection-scope="' + scope + '"] [data-view-mode="' + mode + '"]').click();
+        }
+        let viewPreferencesSaved = false;
+        const preferenceDeadline = Date.now() + 10000;
+        while (Date.now() < preferenceDeadline) {
+          const preferences = (await storage.get("appMeta", "modernization.preferences"))?.preferences?.collectionViews || {};
+          if (Object.entries(expectedViews).every(([scope, mode]) => preferences[scope] === mode)) {
+            viewPreferencesSaved = true;
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        const collectionViewProbe = { expected: expectedViews, saved: viewPreferencesSaved };
         const appShellAssetProbe = {
           index: await fetchAppShellAsset("./index.html", "LoopCAT"),
           liquidGlassCss: await fetchAppShellAsset("./liquid-glass/styles.css", "liquid-glass-edition"),
@@ -998,6 +1036,7 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
           hasProjectList: selectorPresent("#projectList"),
           hasSaveStatus: selectorPresent("#saveStatus"),
           hasNewProjectButton: selectorPresent("#newProjectBtn"),
+          newProjectDialogOpened,
           storageProbe: {
             databaseName: db?.name || "",
             objectStores: Array.from(db?.objectStoreNames || []),
@@ -1006,6 +1045,8 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
           },
           projectProbe,
           workflowProbe,
+          confirmationProjectId: editorProject.id,
+          collectionViewProbe,
           appShellAssetProbe,
           visualProbe: {
             liquidGlassBodyClass: document.body?.classList.contains("liquid-glass-edition") || false,
@@ -1030,7 +1071,256 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
       })()`,
         true
       );
+      // Reload so the application loads the API-created fixture through its normal
+      // startup path. This also checks that the fixture survives reopening storage.
+      await new Promise((resolve) => {
+        mainWindow.webContents.once("did-finish-load", resolve);
+        mainWindow.webContents.reload();
+      });
+      const editorWorkflow = await mainWindow.webContents.executeJavaScript(
+        `(async () => {
+          const waitFor = async (predicate, label) => {
+            const deadline = Date.now() + 10000;
+            while (Date.now() < deadline) {
+              if (predicate()) return;
+              await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+            throw new Error("Timed out waiting for " + label);
+          };
+          const projectTile = () => Array.from(document.querySelectorAll(".project-tile"))
+            .find((tile) => tile.querySelector("h3")?.textContent === "Desktop confirmation regression");
+          await waitFor(projectTile, "confirmation project after reload");
+          const expectedViews = ${JSON.stringify(result.collectionViewProbe.expected)};
+          await waitFor(() => document.documentElement.hasAttribute("data-projects-view"), "restored collection view preferences");
+          const viewsRestored = Object.entries(expectedViews).every(([scope, mode]) =>
+            document.documentElement.getAttribute("data-" + scope + "-view") === mode &&
+            Array.from(document.querySelectorAll('[data-collection-scope="' + scope + '"] [data-view-mode="' + mode + '"]'))
+              .every((button) => button.getAttribute("aria-pressed") === "true"));
+          const storage = window.CatHan.storage;
+          const projectApi = window.CatHan.project;
+          const projectId = ${JSON.stringify(result.confirmationProjectId)};
+          projectTile().querySelector("button.primary").click();
+          await waitFor(() => document.querySelector(".file-card button.primary"), "confirmation file");
+          document.querySelector(".file-card button.primary").click();
+          await waitFor(() => document.querySelectorAll("#segmentBody .target-editor").length === 2, "confirmation editor");
+          const targets = ["Bir <g id='friend'>arkadaşım</g> var.", "Arkadaşlarım var."];
+          for (let index = 0; index < targets.length; index++) {
+            const field = document.querySelectorAll("#segmentBody .target-editor")[index];
+            field.click();
+          field.focus();
+            field.value = targets[index];
+            field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: targets[index] }));
+            document.querySelector("#confirmBtn").click();
+            await waitFor(() => !document.querySelector("#confirmBtn").disabled, "confirmation completion");
+            // Let any accidental recovery autosave fire before the next command.
+            await new Promise((resolve) => setTimeout(resolve, 650));
+          }
+          await storage.flushMutations();
+          const confirmedSegments = await projectApi.getProjectSegments(projectId);
+          const passed = confirmedSegments.length === 2 &&
+            confirmedSegments.every((record, index) => record.status === "confirmed" && record.target === targets[index]) &&
+            !(await storage.getAll("conflictCopies")).length &&
+            !document.querySelector("#saveStatus").textContent.trim();
+          const field = document.querySelectorAll("#segmentBody .target-editor")[0];
+          field.click();
+          field.focus();
+          await waitFor(() => field.closest("tr").classList.contains("active"), "active protected-tag segment");
+          const original = targets[0];
+          const token = "<g id='friend'>";
+          const tagStart = original.indexOf(token);
+          field.setSelectionRange(tagStart + 3, tagStart + 3);
+          // A noncancelable IME/autocorrect-style input must never reach autosave
+          // with damaged tag contents, even if beforeinput was not available.
+          field.value = original.replace("id='friend'", "id='changed'");
+          field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertCompositionText", isComposing: true }));
+          const partialEditBlocked = field.value === original;
+          field.setSelectionRange(tagStart, tagStart + token.length);
+          const cut = new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "deleteByCut" });
+          if (field.dispatchEvent(cut)) {
+            field.setRangeText("", field.selectionStart, field.selectionEnd, "end");
+            field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "deleteByCut" }));
+          }
+          const wholeTagRemoved = field.value === original.replace(token, "");
+          // Move the complete token through plain-text paste, then keep editing
+          // the surrounding translation without making the token editable.
+          field.setSelectionRange(0, 0);
+          const paste = new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertFromPaste", data: token });
+          if (field.dispatchEvent(paste)) {
+            field.setRangeText(token, field.selectionStart, field.selectionEnd, "end");
+            field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertFromPaste", data: token }));
+          }
+          const movedTarget = token + original.replace(token, "");
+          const wholeTagMoved = field.value === movedTarget;
+          field.value += " Yeni.";
+          field.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: " Yeni." }));
+          document.querySelector("#confirmBtn").click();
+          await waitFor(() => !document.querySelector("#confirmBtn").disabled, "confirmation after protected-tag editing");
+          await new Promise((resolve) => setTimeout(resolve, 650));
+          const editedSegments = await projectApi.getProjectSegments(projectId);
+          const tagEditingPassed = partialEditBlocked && wholeTagRemoved && wholeTagMoved &&
+            editedSegments[0]?.target === movedTarget + " Yeni." && editedSegments[0]?.status === "confirmed" &&
+            !(await storage.getAll("conflictCopies")).length && !document.querySelector("#saveStatus").textContent.trim();
+          return { confirmationPassed: passed, tagEditingPassed, viewsRestored,
+            tagEditingProbe: { partialEditBlocked, wholeTagRemoved, wholeTagMoved,
+              finalTarget: editedSegments[0]?.target, finalStatus: editedSegments[0]?.status,
+              notice: document.querySelector("#saveStatus").textContent } };
+        })()`,
+        true
+      );
+      result.workflowProbe.editorConfirmationPassed = editorWorkflow.confirmationPassed;
+      result.workflowProbe.protectedTagEditingPassed = editorWorkflow.tagEditingPassed;
+      result.tagEditingProbe = editorWorkflow.tagEditingProbe;
+      result.collectionViewProbe.restored = editorWorkflow.viewsRestored;
+      // Drive Chromium's native key handling as well as synthetic input events.
+      // The hidden smoke window does not require taking focus from the user.
+      await mainWindow.webContents.executeJavaScript(`(async () => {
+        const field = document.querySelector("#segmentBody .target-editor");
+        field.click();
+        field.focus();
+        const deadline = Date.now() + 3000;
+        while (!field.closest("tr").classList.contains("active")) {
+          if (Date.now() >= deadline) throw new Error("Protected-tag row did not activate");
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        field.setSelectionRange("<g id='friend'>".length, "<g id='friend'>".length);
+        window.__desktopKeyProbe = [];
+        for (const eventType of ["keydown", "beforeinput", "input"]) field.addEventListener(eventType,
+          (event) => window.__desktopKeyProbe.push({ type: event.type, key: event.key, inputType: event.inputType }));
+      })()`, true);
+      mainWindow.webContents.debugger.attach("1.3");
+      try {
+        for (const type of ["keyDown", "keyUp"]) {
+          await mainWindow.webContents.debugger.sendCommand("Input.dispatchKeyEvent", {
+            type, key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8
+          });
+        }
+        result.nativeTagDeletionProbe = await mainWindow.webContents.executeJavaScript(`(async () => {
+          const expected = ${JSON.stringify(editorWorkflow.tagEditingProbe.finalTarget)}.replace("<g id='friend'>", "");
+          const deadline = Date.now() + 3000;
+          while (Date.now() < deadline) {
+            if (document.querySelector("#segmentBody .target-editor").value === expected) return { passed: true };
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+          return { passed: false, value: document.querySelector("#segmentBody .target-editor").value,
+            events: window.__desktopKeyProbe, activeElement: document.activeElement?.tagName };
+        })()`, true);
+        result.workflowProbe.nativeTagDeletionPassed = result.nativeTagDeletionProbe.passed;
+        result.tagSuggestionProbe = await mainWindow.webContents.executeJavaScript(`(async () => {
+          const field = document.querySelector("#segmentBody .target-editor");
+          field.setSelectionRange(4, 4);
+          const before = field.value;
+          field.closest("tr").querySelector(".tag-tray button").click();
+          const token = "<g id='friend'>";
+          const expected = before.slice(0, 4) + token + before.slice(4);
+          const deadline = Date.now() + 3000;
+          while (Date.now() < deadline) {
+            const current = document.querySelector("#segmentBody .target-editor");
+            if (current.value === expected && document.activeElement === current) {
+              window.__inlineTagExpected = expected.slice(0, 4 + token.length) + "TEST" + expected.slice(4 + token.length);
+              await new Promise(resolve => setTimeout(resolve, 100));
+              window.__inlineDebug = [];
+              for(const type of ["beforeinput", "input", "focus", "blur"]) current.addEventListener(type, () => window.__inlineDebug.push({type, start:current.selectionStart, node:document.getSelection()?.anchorNode?.nodeName, offset:document.getSelection()?.anchorOffset}));
+              return { passed: current.selectionStart === 4 + token.length && current.selectionEnd === 4 + token.length, start:current.selectionStart, node:document.getSelection()?.anchorNode?.nodeName, offset:document.getSelection()?.anchorOffset };
+            }
+            await new Promise(resolve => setTimeout(resolve, 25));
+          }
+          return { passed: false };
+        })()`, true);
+        await mainWindow.webContents.debugger.sendCommand("Input.insertText", { text: "TEST" });
+        result.nativeInlineTypingProbe = await mainWindow.webContents.executeJavaScript(`(() => {
+          const field = document.querySelector("#segmentBody .target-editor");
+          const chips = Array.from(field.querySelectorAll(".target-protected-tag"));
+          const greenChips = chips.length === 2 && chips.every(chip =>
+            chip.contentEditable === "false" && getComputedStyle(chip).backgroundColor === "rgb(224, 244, 233)");
+          return { passed: field.value === window.__inlineTagExpected && greenChips,
+            value: field.value, expected: window.__inlineTagExpected, greenChips, events: window.__inlineDebug };
+        })()`, true);
+        result.workflowProbe.tagSuggestionCaretPassed = result.tagSuggestionProbe.passed;
+        result.workflowProbe.nativeInlineTypingPassed = result.nativeInlineTypingProbe.passed;
+        result.inlineClipboardProbe = await mainWindow.webContents.executeJavaScript(`(() => {
+          const field = document.querySelector("#segmentBody .target-editor");
+          const original = field.value;
+          const token = "<g id='friend'>";
+          const start = original.indexOf(token);
+          field.setSelectionRange(start, start + token.length);
+          const clipboard = new DataTransfer();
+          field.dispatchEvent(new ClipboardEvent("copy", { bubbles: true, cancelable: true, clipboardData: clipboard }));
+          const copiedRawMarkup = clipboard.getData("text/plain") === token;
+          field.dispatchEvent(new ClipboardEvent("cut", { bubbles: true, cancelable: true, clipboardData: clipboard }));
+          const cutWholeTag = field.value === original.replace(token, "");
+          clipboard.setData("text/html", '<img src="invalid" onerror="window.__unsafeInlinePaste = true">');
+          field.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: clipboard }));
+          return { passed: copiedRawMarkup && cutWholeTag && field.value === original &&
+            !field.querySelector("img") && !window.__unsafeInlinePaste, copiedRawMarkup, cutWholeTag };
+        })()`, true);
+        result.workflowProbe.inlineClipboardPassed = result.inlineClipboardProbe.passed;
+        await mainWindow.webContents.debugger.sendCommand("Input.imeSetComposition", {
+          text: "ığ", selectionStart: 2, selectionEnd: 2
+        });
+        result.inlineCompositionProbe = await mainWindow.webContents.executeJavaScript(`(() => {
+          const field = document.querySelector("#segmentBody .target-editor");
+          return { passed: field.querySelectorAll('.target-protected-tag[contenteditable="false"]').length === 2 &&
+            field.value.includes("<g id='friend'>ığTEST") };
+        })()`, true);
+        await mainWindow.webContents.debugger.sendCommand("Input.insertText", { text: "ığ" });
+        result.workflowProbe.inlineCompositionPassed = result.inlineCompositionProbe.passed;
+        result.sourceTagSuggestionProbe = await mainWindow.webContents.executeJavaScript(`(async () => {
+          const field = document.querySelector("#segmentBody .target-editor");
+          const before = field.value;
+          field.setSelectionRange(before.length, before.length);
+          field.closest("tr").querySelector(".source-cell button").click();
+          const expected = before + "<g id='friend'>";
+          const deadline = Date.now() + 3000;
+          while (Date.now() < deadline) {
+            const current = document.querySelector("#segmentBody .target-editor");
+            if (current.value === expected && document.activeElement === current) return {
+              passed: current.selectionStart === expected.length && current.selectionEnd === expected.length,
+              before, after: expected };
+            await new Promise(resolve => setTimeout(resolve, 25));
+          }
+          return { passed: false };
+        })()`, true);
+        result.workflowProbe.sourceTagSuggestionPassed = result.sourceTagSuggestionProbe.passed;
+        for (const key of ["z", "y"]) {
+          for (const type of ["keyDown", "keyUp"]) await mainWindow.webContents.debugger.sendCommand("Input.dispatchKeyEvent", {
+            type, key: "z", code: "KeyZ", modifiers: key === "z" ? 2 : 10, windowsVirtualKeyCode: 90
+          });
+          const expected = key === "z" ? result.sourceTagSuggestionProbe.before : result.sourceTagSuggestionProbe.after;
+          result.workflowProbe[key === "z" ? "inlineUndoPassed" : "inlineRedoPassed"] =
+            await mainWindow.webContents.executeJavaScript(`(async () => {
+              const deadline = Date.now() + 3000;
+              while (Date.now() < deadline) {
+                if (document.querySelector("#segmentBody .target-editor").value === ${JSON.stringify(expected)} &&
+                  ${key === "z" ? 'document.querySelector("#saveStatus").textContent === "Undo protected-tag insertion"' : "true"} &&
+                  document.activeElement === document.querySelector("#segmentBody .target-editor")) return true;
+                await new Promise(resolve => setTimeout(resolve, 25));
+              }
+              return false;
+            })()`, true);
+        }
+        if (process.env.LOOPCAT_DESKTOP_SMOKE_SCREENSHOT) {
+          await new Promise(resolve => { setTimeout(resolve, 300); });
+          const capture = await mainWindow.webContents.capturePage();
+          fs.writeFileSync(process.env.LOOPCAT_DESKTOP_SMOKE_SCREENSHOT, capture.toPNG());
+        }
+      } finally {
+        mainWindow.webContents.debugger.detach();
+      }
+      await mainWindow.webContents.executeJavaScript(`(async () => {
+        document.querySelector("#projectsViewBtn").click();
+        const deadline = Date.now() + 10000;
+        while (document.querySelector("#projectsView").classList.contains("hidden")) {
+          if (Date.now() >= deadline) throw new Error("Timed out leaving confirmation editor");
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        await window.CatHan.project.deleteProject(${JSON.stringify(result.confirmationProjectId)});
+      })()`, true);
       const missing = [];
+      if (!result.workflowProbe.tagSuggestionCaretPassed) missing.push("caret after suggested tag");
+      if (!result.workflowProbe.nativeInlineTypingPassed) missing.push("green protected chips during native typing");
+      for (const probe of ["inlineClipboardPassed", "inlineCompositionPassed", "sourceTagSuggestionPassed", "inlineUndoPassed", "inlineRedoPassed"]) {
+        if (!result.workflowProbe[probe]) missing.push(probe);
+      }
       for (const [key, label] of [
         ["hasAppShell", ".app-shell"],
         ["hasWorkspace", "#workspace"],
@@ -1044,6 +1334,7 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
       if (!result?.storageProbe?.wroteAndRead) missing.push("IndexedDB write/read");
       if (!result?.storageProbe?.cleanedUp) missing.push("IndexedDB cleanup");
       if (!result?.projectProbe?.createdProject) missing.push("project creation");
+      if (!result?.newProjectDialogOpened) missing.push("New Project button opens its dialog");
       if (!result?.projectProbe?.appendedSegment) missing.push("segment creation");
       if (!result?.projectProbe?.savedTarget) missing.push("segment target save");
       if (!result?.projectProbe?.readBackTarget) missing.push("segment target readback");
@@ -1058,6 +1349,11 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
       if (!result?.workflowProbe?.docxTargetExported) missing.push("DOCX target export");
       if (!result?.workflowProbe?.bilingualDocxGenerated) missing.push("bilingual DOCX generation");
       if (!result?.workflowProbe?.backupIncludesSavedTargets) missing.push("backup includes saved targets");
+      if (!result?.workflowProbe?.editorConfirmationPassed) missing.push("two typed segments confirm without save conflicts");
+      if (!result?.workflowProbe?.protectedTagEditingPassed) missing.push("active target tags stay immutable while whole tags can be moved");
+      if (!result?.workflowProbe?.nativeTagDeletionPassed) missing.push("native Backspace removes a whole protected tag");
+      if (!result?.collectionViewProbe?.saved || !result?.collectionViewProbe?.restored)
+        missing.push("card/list choices persist across reload for every collection scope");
       if (!result?.appShellAssetProbe?.index?.fetchOk) missing.push("packaged index.html fetch");
       if (!result?.appShellAssetProbe?.index?.includesExpectedText) missing.push("packaged index.html content");
       if (!result?.appShellAssetProbe?.liquidGlassCss?.fetchOk) missing.push("packaged Liquid Glass stylesheet fetch");
@@ -1080,7 +1376,7 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
       if (!result?.appShellAssetProbe?.catWorker?.includesExpectedText) missing.push("packaged CAT worker content");
       if (!result?.appShellAssetProbe?.testRunnerBlocked) missing.push("test runner excluded from desktop protocol");
       if (!result?.i18nProbe?.runtimeReady) missing.push("i18n runtime");
-      if (result?.i18nProbe?.storageLabel !== "Storage") missing.push("workspace storage i18n label");
+      if (result?.i18nProbe?.storageLabel !== "Workspace") missing.push("workspace i18n label");
       if (result?.i18nProbe?.confirmedLabel !== "confirmed") missing.push("confirmed i18n label");
       if (result?.i18nProbe?.workspaceSummaryText === "workspace.menu.summary")
         missing.push("raw workspace i18n key hidden");

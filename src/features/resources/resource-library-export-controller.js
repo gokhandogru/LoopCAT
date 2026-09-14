@@ -3,7 +3,7 @@
  * Resource lookup, builders, downloads, and status remain injected boundaries.
  *
  * @param {{
- *   resources: { labelFromKey: (key: string) => any, items: (type: string, key: string) => any[] },
+ *   resources: { labelFromKey: (key: string) => any, items: (type: string, key: string) => any[] | Promise<any[]> },
  *   builders: { buildTmx: (items: any[], info: any) => any, buildTbx: (items: any[], info: any) => any },
  *   fileSafeName: (value: string) => string,
  *   download: (filename: string, content: any, type: string) => unknown,
@@ -30,10 +30,10 @@ export function createResourceLibraryExportController(options) {
     );
   }
 
-  function exportResource(type, key) {
+  async function exportResource(type, key) {
     try {
       const info = resources.labelFromKey(key);
-      const items = resources.items(type, key);
+      const items = await resources.items(type, key);
       if (type === "tm") {
         download(
           `${fileSafeName(info.name)}_${info.sourceLang}-${info.targetLang}.tmx`,

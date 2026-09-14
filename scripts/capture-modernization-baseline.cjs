@@ -96,6 +96,7 @@ let failed = false;
 const pageErrors = [];
 const screenshots = [];
 const editorSpaceMeasurements = {};
+const workspaceLayoutMeasurements = [];
 
 app.disableHardwareAcceleration();
 if (process.env.LOOPCAT_BASELINE_NO_SANDBOX === "1") app.commandLine.appendSwitch("no-sandbox");
@@ -175,14 +176,105 @@ async function setExactViewport(viewport) {
   }
 }
 
-async function captureState(number, slug) {
+async function captureState(number, slug, beforeCapture = null) {
   for (const viewport of viewports) {
     await setExactViewport(viewport);
+    if (beforeCapture) await beforeCapture();
     const fileName = `${number}-${slug}-${viewport.name}.png`;
     const image = await windowRef.webContents.capturePage();
     await fsPromises.writeFile(path.join(outputDir, fileName), image.toPNG());
     screenshots.push(fileName);
   }
+}
+
+async function captureCollectionMode(number, slug, scope, mode, restoreMode) {
+  await windowRef.webContents.executeJavaScript(`(() => {
+    const button = document.querySelector('[data-collection-scope="' + ${JSON.stringify(scope)} + '"] [data-view-mode="' + ${JSON.stringify(mode)} + '"]');
+    const containers = button.getAttribute("aria-controls").split(" ").map((id) => document.getElementById(id));
+    const nodes = containers.flatMap((container) => Array.from(container.children));
+    const inputs = containers.flatMap((container) => Array.from(container.querySelectorAll("input, textarea, select")));
+    const values = inputs.map((input) => [input, input.value, input.checked]);
+    button.click();
+    if (button.getAttribute("aria-pressed") !== "true" || nodes.some((node) => !node.isConnected) ||
+      values.some(([input, value, checked]) => input.value !== value || input.checked !== checked)) {
+      throw new Error("Collection layout switch changed its data or failed to select the requested mode");
+    }
+  })()`, true);
+  const itemSelector = scope === "files" ? "#projectFileList .file-card" :
+    scope === "resource-entries" ? "#tmResourceDetail .resource-row" : "";
+  await captureState(number, slug, itemSelector ? async () => {
+    await windowRef.webContents.executeJavaScript(
+      `document.querySelector(${JSON.stringify(itemSelector)}).scrollIntoView({ block: "center" })`, true);
+    await settle();
+  } : null);
+  await windowRef.webContents.executeJavaScript(
+    `document.querySelector('[data-collection-scope="' + ${JSON.stringify(scope)} + '"] [data-view-mode="' + ${JSON.stringify(restoreMode)} + '"]').click()`, true);
+  if (itemSelector) await windowRef.webContents.executeJavaScript(`(() => {
+    for (let item = document.querySelector(${JSON.stringify(itemSelector)}); item; item = item.parentElement) item.scrollTop = 0;
+  })()`, true);
+}
+
+async function verifyWorkspaceLayout() {
+  const longNotice = "Save could not be completed. Your latest edits are still available in this window. Open Workspace to retry local saving or export a recovery copy. ".repeat(3);
+  for (const viewport of [...viewports, { name: "768x768", width: 768, height: 768 }]) {
+    await setExactViewport(viewport);
+    const measurement = await windowRef.webContents.executeJavaScript(
+      `(() => {
+        const status = document.querySelector("#saveStatus");
+        const header = document.querySelector(".topbar");
+        const original = { text: status.textContent, className: status.className };
+        status.textContent = "";
+        const headerHeight = header.getBoundingClientRect().height;
+        status.className = "save-status error";
+        status.textContent = ${JSON.stringify(longNotice)};
+        const noticeRect = status.getBoundingClientRect();
+        const navRect = document.querySelector(".topbar-actions").getBoundingClientRect();
+        const navItems = [...document.querySelector(".topbar-actions").children].map((element) => element.getBoundingClientRect());
+        const workspace = document.querySelector("#workspace").getBoundingClientRect();
+        const inspector = document.querySelector("#editorInspector").getBoundingClientRect();
+        const scroller = document.querySelector(".segment-grid-wrap").getBoundingClientRect();
+        const result = {
+          viewport: { width: innerWidth, height: innerHeight },
+          headerHeight,
+          headerHeightWithNotice: header.getBoundingClientRect().height,
+          navInsideViewport: navItems.every((rect) => rect.left >= 0 && rect.right <= innerWidth + 1),
+          navRows: new Set(navItems.map((rect) => Math.round(rect.top))).size,
+          noticeBelowNavigation: noticeRect.top >= navRect.bottom,
+          noticeInsideViewport: noticeRect.left >= 0 && noticeRect.right <= innerWidth + 1,
+          guideInWorkspace: Boolean(document.querySelector(".workspace-menu .workspace-guide-link")),
+          hiddenControlsVisible: [...document.querySelectorAll("[hidden]")].some((element) => getComputedStyle(element).display !== "none"),
+          workspaceLabel: document.querySelector("#workspaceMenuSummary").textContent,
+          workspaceBottom: workspace.bottom,
+          inspectorTop: inspector.top,
+          workspaceTop: workspace.top,
+          segmentViewportHeight: scroller.height,
+          documentWidth: document.documentElement.scrollWidth
+        };
+        status.textContent = original.text;
+        status.className = original.className;
+        return result;
+      })()`,
+      true
+    );
+    if (
+      measurement.headerHeight !== measurement.headerHeightWithNotice ||
+      !measurement.navInsideViewport ||
+      (viewport.width >= 800 && measurement.navRows !== 1) ||
+      !measurement.noticeBelowNavigation ||
+      !measurement.noticeInsideViewport ||
+      !measurement.guideInWorkspace ||
+      measurement.hiddenControlsVisible ||
+      measurement.workspaceLabel !== "Workspace" ||
+      measurement.workspaceBottom > viewport.height + 1 ||
+      measurement.inspectorTop < measurement.workspaceTop - 1 ||
+      measurement.segmentViewportHeight < 100 ||
+      measurement.documentWidth > viewport.width + 1
+    ) {
+      throw new Error(`Workspace layout is clipped or displaced at ${viewport.name}: ${JSON.stringify(measurement)}`);
+    }
+    workspaceLayoutMeasurements.push(measurement);
+  }
+  console.log("Workspace navigation, long save errors, and editor/inspector sizing passed at 1440, 1366, 1024, and 768 pixels.");
 }
 
 async function measureEditorWorkspace(state, minimumRatio) {
@@ -231,6 +323,45 @@ async function measureEditorWorkspace(state, minimumRatio) {
   console.log(
     `Editor source/target width uses ${(measurement.sourceAndTargetRatio * 100).toFixed(2)}% of the 1366x768 workspace with the inspector ${state}.`
   );
+}
+
+async function verifyEditorOptionMenus() {
+  for (const viewport of [viewports[1], { name: "768x768", width: 768, height: 768 }]) {
+    await setExactViewport(viewport);
+    for (const [menuId, selectId, activeValue] of [
+      ["segmentSearchOptionsMenu", "segmentSearchScope", "source"],
+      ["segmentFiltersMenu", "reviewStateFilter", "needs-review"]
+    ]) {
+      const result = await windowRef.webContents.executeJavaScript(
+        `(() => {
+          const menu = document.getElementById(${JSON.stringify(menuId)});
+          const select = document.getElementById(${JSON.stringify(selectId)});
+          const originalValue = select.value;
+          select.value = ${JSON.stringify(activeValue)};
+          menu.open = true;
+          const panel = menu.querySelector(".menu-panel").getBoundingClientRect();
+          const editor = document.querySelector(".editor-area").getBoundingClientRect();
+          const activeIndicatorVisible = getComputedStyle(menu.querySelector(".control-active-indicator")).display !== "none";
+          select.focus();
+          select.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+          const result = {
+            activeIndicatorVisible,
+            closedWithEscape: !menu.open,
+            focusReturned: document.activeElement === menu.querySelector("summary"),
+            insideEditor: panel.left >= editor.left - 1 && panel.right <= editor.right + 1,
+            visibleCoreControls: ["documentFilter", "segmentSearchInput", "segmentStatusFilter", "nextOpenBtn"].every((id) => document.getElementById(id).getClientRects().length > 0)
+          };
+          select.value = originalValue;
+          return result;
+        })()`,
+        true
+      );
+      if (Object.values(result).some((value) => !value)) {
+        throw new Error(`Editor options failed at ${viewport.name} (${menuId}): ${JSON.stringify(result)}`);
+      }
+    }
+  }
+  console.log("Advanced search/filter menus preserve active indicators, core controls, viewport bounds, and Escape focus return.");
 }
 
 function fileMetrics() {
@@ -301,6 +432,7 @@ app
     await windowRef.reload();
     await waitFor("document.querySelector('.project-tile button.primary')", "populated projects");
     await captureState("01", "projects-populated");
+    await captureCollectionMode("01", "projects-list", "projects", "list", "card");
 
     const recoveryProjectId = fixture.projects?.[0]?.id;
     if (!recoveryProjectId) throw new Error("Modernization fixture has no project for workspace recovery capture.");
@@ -334,12 +466,14 @@ app
     await windowRef.webContents.executeJavaScript("document.querySelector('#resourcesViewBtn').click()", true);
     await waitFor("document.querySelector('#tmResourceDashboard .resource-card')", "TM resources dashboard");
     await captureState("02", "resources-translation-memories");
+    await captureCollectionMode("02", "resources-translation-memories-list", "resources", "list", "card");
     await windowRef.webContents.executeJavaScript(
       "document.querySelector('#tmResourceDashboard [data-resource-action=\"open\"]').click()",
       true
     );
     await waitFor("!document.querySelector('#tmResourceDetail').classList.contains('hidden')", "TM resource detail");
     await captureState("02", "resource-translation-memory-detail");
+    await captureCollectionMode("02", "resource-translation-memory-entry-cards", "resource-entries", "card", "list");
     await windowRef.webContents.executeJavaScript(
       "document.querySelector('#tmResourceDetail [data-resource-action=\"delete-entry\"]').click()",
       true
@@ -349,6 +483,7 @@ app
     await waitFor("document.querySelector('#trashDialog').open", "resource Trash dialog");
     await waitFor("document.querySelector('#trashList .trash-item')", "resource Trash item");
     await captureState("03", "resource-trash-populated");
+    await captureCollectionMode("03", "resource-trash-cards", "trash", "card", "list");
     await windowRef.webContents.executeJavaScript(
       "document.querySelector('#trashList .trash-item-actions button').click()",
       true
@@ -361,6 +496,7 @@ app
     await waitFor("document.querySelector('#tbResourceTab').getAttribute('aria-selected') === 'true'", "Termbase tab");
     await waitFor("document.querySelector('#tbResourceDashboard .resource-card')", "Termbase resources dashboard");
     await captureState("02", "resources-termbases");
+    await captureCollectionMode("02", "resources-termbases-list", "resources", "list", "card");
     await windowRef.webContents.executeJavaScript("document.querySelector('#projectsViewBtn').click()", true);
     await waitFor("document.querySelector('.project-tile button.primary')", "populated projects return");
 
@@ -373,6 +509,18 @@ app
       "project dashboard"
     );
     await captureState("02", "project-dashboard");
+    await captureCollectionMode("02", "project-files-list", "files", "list", "card");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#projectSettingsBtn').click()", true);
+    await waitFor("document.querySelector('#projectDialog').open", "project settings");
+    await windowRef.webContents.executeJavaScript(`(() => {
+      const button = document.querySelector("#optionalResourceSettingsBtn");
+      button.closest("details").open = true;
+      button.click();
+    })()`, true);
+    await waitFor("document.querySelector('#resourceSettingsDialog').open && document.querySelector('#projectTmResourceList .resource-policy-row')", "project resource choices");
+    await captureState("02", "project-resource-selection-list");
+    await captureCollectionMode("02", "project-resource-selection-cards", "resource-selection", "card", "list");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#cancelResourceSettingsBtn').click(); document.querySelector('#cancelProjectBtn').click()", true);
 
     await windowRef.webContents.executeJavaScript("document.querySelector('#newProjectBtn').click()", true);
     await waitFor("document.querySelector('#projectDialog').open", "new-project dialog");
@@ -408,11 +556,13 @@ app
 
     await windowRef.webContents.executeJavaScript("document.querySelector('.file-card button.primary').click()", true);
     await waitFor(
-      "!document.querySelector('#editorView').classList.contains('hidden') && document.querySelector('#segmentBody textarea')",
+      "!document.querySelector('#editorView').classList.contains('hidden') && document.querySelector('#segmentBody .target-editor')",
       "translation editor"
     );
     await measureEditorWorkspace("open", 0.55);
     await captureState("03", "translation-editor");
+    await verifyWorkspaceLayout();
+    await verifyEditorOptionMenus();
 
     await windowRef.webContents.executeJavaScript(
       `(() => {
@@ -460,7 +610,7 @@ app
 
     const typingDispatchMs = await windowRef.webContents.executeJavaScript(
       `(() => {
-    const textarea = document.querySelector('#segmentBody textarea');
+    const textarea = document.querySelector('#segmentBody .target-editor');
     textarea.focus();
     const started = performance.now();
     textarea.value = textarea.value + ' ';
@@ -588,6 +738,7 @@ app
       },
       viewports,
       screenshots,
+      workspaceLayoutMeasurements,
       measurements: {
         startupMs: Number(startupMs.toFixed(2)),
         typingDispatchMs: Number(typingDispatchMs.toFixed(2)),
@@ -609,7 +760,7 @@ app
     };
     await fsPromises.writeFile(path.join(outputDir, "baseline.json"), `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 
-    const expectedScreenshotCount = 87;
+    const expectedScreenshotCount = 111;
     if (screenshots.length !== expectedScreenshotCount) {
       throw new Error(`Expected ${expectedScreenshotCount} screenshots, captured ${screenshots.length}.`);
     }

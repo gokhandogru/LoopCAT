@@ -1,7 +1,32 @@
 const assert = require("node:assert/strict");
+const test = require("node:test");
+
+test("Catalog refresh renders descriptors without loading any translation units", async () => {
+  const { createResourceCatalogRefreshController } =
+    await import("../../src/features/resources/resource-catalog-refresh-controller.js");
+  let rendered;
+  const controller = createResourceCatalogRefreshController({
+    repository: {
+      readCatalog: () => Promise.resolve({ resources: [{ id: "r", entryCount: 1000000 }], projects: [] }),
+      listTmEntries: () => {
+        throw new Error("TM scan on catalog path");
+      },
+      listTerms: () => {
+        throw new Error("Term scan on catalog path");
+      }
+    },
+    presentation: {
+      setResources: (value) => {
+        rendered = value;
+      }
+    }
+  });
+  await controller.refresh();
+  assert.equal(rendered.resources[0].entryCount, 1000000);
+  assert.deepEqual(rendered.tmEntries, []);
+});
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
-const test = require("node:test");
 
 const root = path.resolve(__dirname, "../..");
 

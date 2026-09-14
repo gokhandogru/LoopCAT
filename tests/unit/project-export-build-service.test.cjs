@@ -191,6 +191,32 @@ test("ProjectExportBuildService preserves the default no-project guard before ev
   assert.deepEqual(calls, [["getProject"]]);
 });
 
+test("ProjectExportBuildService keeps stable-ID terminology after its linked termbase is renamed", async () => {
+  const { createProjectExportBuildService } = await loadFactory();
+  const links = [{ id: "link-tb", type: "termbase", resourceId: "tb", cachedName: "New name" }];
+  const { options, currentProject, service } = createHarness(createProjectExportBuildService, {
+    links,
+    termBaseNames: ["New name"]
+  });
+  const linked = {
+    id: "term-linked",
+    resourceId: "tb",
+    termBaseName: "Old name",
+    sourceTerm: "friend",
+    targetTerm: "arkadaş"
+  };
+  options.storage.exportProjectSnapshot = () =>
+    Promise.resolve({
+      project: { ...currentProject, resourceLinks: links },
+      segments: [],
+      tmEntries: [],
+      activityEvents: [],
+      terms: [linked, { id: "term-other", resourceId: "other-tb", termBaseName: "Unlinked" }]
+    });
+  const pkg = await service.buildProjectPackage();
+  assert.deepEqual(pkg.resources.terms, [linked]);
+});
+
 test("ProjectExportBuildService builds the current project with exact store queries, scoping, and metadata", async () => {
   const { createProjectExportBuildService } = await loadFactory();
   const project = {

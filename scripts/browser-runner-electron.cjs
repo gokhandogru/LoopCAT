@@ -209,6 +209,7 @@ app
     if (requestedTest) query.set("test", requestedTest);
     if (requestedTimeout > 0) query.set("timeout", String(requestedTimeout));
     if (process.env.LOOPCAT_SOAK_MS) query.set("soakMs", process.env.LOOPCAT_SOAK_MS);
+    if (process.env.LOOPCAT_PERFORMANCE_SEGMENTS === "10000") query.set("segments", "10000");
     const url = `http://127.0.0.1:${port}/test-runner.html${query.size ? `?${query}` : ""}`;
     windowRef = new BrowserWindow({
       width: 1280,

@@ -16,7 +16,7 @@ import { validateResourceMutationControllerOptions } from "./resource-mutation-c
  *     refresh: () => Promise<any>,
  *     refreshProjectTerms: (options: { rerender: boolean }) => Promise<any>,
  *     labelFromKey: (key: string) => any,
- *     items: (type: string, key: string) => any[]
+ *     items: (type: string, key: string) => any[] | Promise<any[]>
  *   },
  *   commands: {
  *     execute: (command: any) => Promise<any>,
@@ -152,7 +152,7 @@ export function createResourceMutationController(options) {
     const info = resources.labelFromKey(key);
     try {
       testHooks.beforeDeleteResource?.(type, key);
-      const items = resources.items(type, key);
+      const items = await resources.items(type, key);
       const command = commands.createDeleteResource({
         resourceType: type,
         descriptor: {

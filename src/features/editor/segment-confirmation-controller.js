@@ -167,6 +167,7 @@ export function createSegmentConfirmationController(options) {
     const previousStatus = segment.status;
     const passedFiltersBefore = filters.matches(segment);
     const previous = structuredClone(segment);
+    let confirmingRevision = 0;
     let savedConfirmedRevision = 0;
     let savedConfirmedStorageVersion = 0;
     const warnings = [];
@@ -185,6 +186,7 @@ export function createSegmentConfirmationController(options) {
           }),
         applyFirst: async () => {
           mutation.confirm(segment);
+          confirmingRevision = Number(segment.revision || 0);
           persistence.clearPending(segment);
           status.set("Saving...");
           if (passedFiltersBefore !== filters.matches(segment)) view.renderSegments({ preserveScroll: true });
@@ -202,14 +204,20 @@ export function createSegmentConfirmationController(options) {
             nextSource: documentSegments[documentIndex + 1]?.source || ""
           };
           const atomicConfirmation = typeof persistence.confirmAtomic === "function";
-          if (atomicConfirmation) await persistence.confirmAtomic(project, segment, context);
-          else await persistence.save(segment);
-          savedConfirmedRevision = Number(segment.revision || 0);
-          savedConfirmedStorageVersion = Number(segment.storageVersion || 0);
+          const committed = atomicConfirmation
+            ? await persistence.confirmAtomic(project, segment, context)
+            : await persistence.save(segment);
+          const confirmedSnapshot = structuredClone(
+            committed && typeof committed === "object" && "segment" in committed ? committed.segment : segment
+          );
+          savedConfirmedRevision = Number(confirmedSnapshot.revision || 0);
+          savedConfirmedStorageVersion = Number(confirmedSnapshot.storageVersion || 0);
           afterSave(segment);
           workspace.markDirty(project.id);
 
-          const navigation = selection.goToNextOpen().catch((error) => {
+          const navigation = (
+            Number(segment.revision || 0) > savedConfirmedRevision ? Promise.resolve() : selection.goToNextOpen()
+          ).catch((error) => {
             warn("Confirm navigation refresh failed.", error);
             selection.focusTarget();
           });
@@ -232,7 +240,7 @@ export function createSegmentConfirmationController(options) {
           if (!tmSaved) warnings.push("TM save failed");
           if (!activitySaved) warnings.push("activity log failed");
           return {
-            snapshot: structuredClone(segment),
+            snapshot: confirmedSnapshot,
             activeSegmentId: currentSegmentId() || segment.id
           };
         }
@@ -241,12 +249,13 @@ export function createSegmentConfirmationController(options) {
       await commands.bus.execute(command);
       commands.changed();
       status.set(
-        warnings.length ? `Saved; ${warnings.join("; ")}; Undo is available` : "Saved; Undo is available",
+        warnings.length ? `Saved; ${warnings.join("; ")}; Undo is available` : "Saved",
         warnings.length ? "dirty" : "saved"
       );
       return true;
     } catch (error) {
-      mutation.restore(segment, previous);
+      if (!confirmingRevision || Number(segment.revision || 0) <= confirmingRevision)
+        mutation.restore(segment, previous);
       if (savedConfirmedRevision) {
         mutation.preparePersistedRollback(segment, savedConfirmedRevision, savedConfirmedStorageVersion);
         try {

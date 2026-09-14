@@ -130,6 +130,7 @@ function createHarness(createTargetEditController, overrides = {}) {
       open: () => calls.push(["quickInsert"])
     },
     protectedTags: {
+      targetTags: overrides.targetTags,
       missing: () => overrides.missingTags || [{ text: "<b>" }, { text: "</b>" }],
       insert: (tagTexts) => calls.push(["insertTags", tagTexts])
     }
@@ -180,6 +181,148 @@ test("target editor owns focus, composition input, coalescing, blur finalization
   harness.textarea.value = "ignored after cleanup";
   harness.textarea.dispatch("input");
   assert.equal(harness.segment.target, "composing two");
+});
+
+function xmlTags(segment) {
+  return Array.from(String(segment.target || "").matchAll(/<[^>]+>/g), (match) => ({
+    text: match[0],
+    index: match.index
+  }));
+}
+
+async function protectedHarness(target = 'Hello <g id="fmt1">world</g>.') {
+  const { createTargetEditController } = await loadFactory();
+  const harness = createHarness(createTargetEditController, { targetTags: xmlTags });
+  harness.segment.target = target;
+  harness.textarea.value = target;
+  harness.unbind = harness.controller.bindTargetEditor({
+    textarea: harness.textarea,
+    editingCell: harness.editingCell,
+    index: 0,
+    segmentId: "s1"
+  });
+  return harness;
+}
+
+function beforeInput(harness, inputType, data = null) {
+  const event = {
+    inputType,
+    data,
+    cancelable: true,
+    prevented: false,
+    preventDefault() {
+      this.prevented = true;
+    }
+  };
+  harness.textarea.dispatch("beforeinput", event);
+  return event;
+}
+
+test("protected target selections snap insertions outside raw tag attributes and expand partial selections", async () => {
+  const h = await protectedHarness();
+  const token = xmlTags(h.segment)[0];
+  h.textarea.setSelectionRange(token.index + 2, token.index + 2);
+  assert.deepEqual(h.controller.activeSelection(h.segment), { start: token.index, end: token.index });
+  const typed = beforeInput(h, "insertText", "X");
+  assert.equal(typed.prevented, true);
+  assert.equal(h.segment.target, 'Hello X<g id="fmt1">world</g>.');
+  assert.equal(h.textarea.value, h.segment.target);
+  assert.equal(h.calls.filter(([name]) => name === "debounce").length, 1);
+  const shifted = xmlTags(h.segment)[0];
+  h.textarea.setSelectionRange(shifted.index + 2, shifted.index + 5);
+  assert.deepEqual(h.controller.activeSelection(h.segment), {
+    start: shifted.index,
+    end: shifted.index + shifted.text.length
+  });
+});
+
+test("Backspace and Delete at tag boundaries remove exactly the whole raw token", async () => {
+  for (const inputType of ["deleteContentBackward", "deleteContentForward"]) {
+    const h = await protectedHarness();
+    const token = xmlTags(h.segment)[0];
+    const caret = inputType.endsWith("Backward") ? token.index + token.text.length : token.index;
+    h.textarea.setSelectionRange(caret, caret);
+    assert.equal(beforeInput(h, inputType).prevented, true);
+    assert.equal(h.segment.target, "Hello world</g>.");
+    assert.equal(h.textarea.selectionStart, token.index);
+    assert.equal(h.calls.filter(([name]) => name === "debounce").length, 1);
+  }
+});
+
+test("whole-tag paste replacement is permitted even when attributes share a long prefix and suffix", async () => {
+  const h = await protectedHarness();
+  const token = xmlTags(h.segment)[0];
+  h.textarea.setSelectionRange(token.index + 2, token.index + 8);
+  h.textarea.dispatch("paste", { clipboardData: { getData: () => '<g id="fmt2">' } });
+  assert.equal(h.textarea.selectionStart, token.index);
+  assert.equal(h.textarea.selectionEnd, token.index + token.text.length);
+  beforeInput(h, "insertFromPaste");
+  h.textarea.value = 'Hello <g id="fmt2">world</g>.';
+  h.textarea.dispatch("input", { inputType: "insertFromPaste" });
+  assert.equal(h.segment.target, h.textarea.value);
+  assert.equal(h.calls.filter(([name]) => name === "debounce").length, 1);
+  assert.equal(
+    h.controller.updateDraft(0, 'Hello <g id="fmt3">world</g>.'),
+    null,
+    "direct updates cannot silently change tag attributes"
+  );
+  assert.equal(h.segment.target, 'Hello <g id="fmt2">world</g>.');
+});
+
+test("cut selections expand atomically and native token moves preserve every raw attribute", async () => {
+  const h = await protectedHarness();
+  const token = xmlTags(h.segment)[0];
+  h.textarea.setSelectionRange(token.index + 1, token.index + 5);
+  h.textarea.dispatch("cut");
+  assert.equal(h.textarea.selectionStart, token.index);
+  assert.equal(h.textarea.selectionEnd, token.index + token.text.length);
+  h.textarea.value = "Hello world</g>.";
+  h.textarea.dispatch("input", { inputType: "deleteByCut" });
+  assert.equal(h.segment.target, "Hello world</g>.");
+
+  const moved = await protectedHarness();
+  moved.textarea.value = '<g id="fmt1">Hello world</g>.';
+  moved.textarea.dispatch("input", { inputType: "insertFromDrop" });
+  assert.equal(moved.segment.target, '<g id="fmt1">Hello world</g>.');
+});
+
+test("missing/noncancelable beforeinput cannot persist a damaged token from paste, drop, or IME", async () => {
+  for (const inputType of ["insertFromPaste", "insertFromDrop", "insertCompositionText", "insertReplacementText"]) {
+    const h = await protectedHarness();
+    const original = h.segment.target;
+    h.textarea.value = 'Hello <g id="broken">world</g>.';
+    h.textarea.setSelectionRange(15, 15);
+    h.textarea.dispatch("input", { inputType, isComposing: inputType === "insertCompositionText" });
+    assert.equal(h.segment.target, original, inputType);
+    assert.equal(h.textarea.value, original, inputType);
+    assert.equal(h.calls.filter(([name]) => name === "debounce").length, 0, inputType);
+    assert.equal(h.sessions.calls.length, 0, inputType);
+  }
+});
+
+test("noncancelable deletion that crosses part of a tag expands to one complete-token deletion", async () => {
+  const h = await protectedHarness();
+  h.textarea.value = 'Hello <g id="fmt1"world</g>.';
+  h.textarea.dispatch("input", { inputType: "deleteWordBackward" });
+  assert.equal(h.segment.target, "Hello world</g>.");
+  assert.equal(h.textarea.value, h.segment.target);
+  assert.equal(h.calls.filter(([name]) => name === "debounce").length, 1);
+});
+
+test("IME text outside protected tags still updates drafts and autosave before composition ends", async () => {
+  const h = await protectedHarness('😀 <g id="fmt1">世界</g>');
+  const position = h.segment.target.indexOf("世界");
+  h.textarea.setSelectionRange(position, position + 2);
+  h.textarea.dispatch("compositionstart");
+  h.textarea.value = '😀 <g id="fmt1">世</g>';
+  h.textarea.dispatch("input", { inputType: "insertCompositionText", isComposing: true });
+  h.textarea.value = '😀 <g id="fmt1">世界中</g>';
+  h.textarea.dispatch("input", { inputType: "insertCompositionText", isComposing: true });
+  assert.equal(h.segment.target, '😀 <g id="fmt1">世界中</g>');
+  assert.equal(h.controller.isComposing(h.textarea), true);
+  assert.equal(h.calls.filter(([name]) => name === "debounce").length, 2);
+  h.textarea.dispatch("compositionend");
+  assert.equal(h.controller.isComposing(h.textarea), false);
 });
 
 test("target editor normalizes caret selection and routes Undo, Redo, confirm, and row navigation", async () => {

@@ -6,6 +6,44 @@ const test = require("node:test");
 const root = path.resolve(__dirname, "../..");
 const moduleAt = (relativePath) => import(pathToFileURL(path.join(root, relativePath)).href);
 
+test("Paged resources ignore obsolete navigation and preserve forward/backward cursors", async () => {
+  const { createResourcesController } = await moduleAt("src/features/resources/resources-controller.js");
+  const elements = resourceElements();
+  const requests = [];
+  const controller = createResourcesController({
+    elements,
+    render: () => {},
+    keyForItem: (item) => item.resourceId,
+    loadPage: (type, key, page) =>
+      new Promise((resolve) => {
+        requests.push({ type, key, page, resolve });
+      })
+  });
+  const settle = async () => {
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+  };
+  controller.mount();
+  controller.setResources({ resources: [{ id: "a" }, { id: "b" }] });
+  controller.openResource("tm", "a");
+  controller.openResource("tm", "b");
+  requests[1].resolve({ rows: [{ id: "b1", resourceId: "b" }], next: "b1" });
+  await settle();
+  requests[0].resolve({ rows: [{ id: "a1", resourceId: "a" }], next: null });
+  await settle();
+  assert.equal(controller.getItems("tm", "b")[0].id, "b1");
+  elements.tmDetail.dispatch("click", { target: createActionButton("next-page", "tm") });
+  assert.deepEqual(requests[2].page, { after: "b1", limit: 100 });
+  requests[2].resolve({ rows: [{ id: "b2", resourceId: "b" }], next: null });
+  await settle();
+  assert.equal(controller.getState().page.index, 1);
+  elements.tmDetail.dispatch("click", { target: createActionButton("previous-page", "tm") });
+  assert.equal(requests[3].page.after, null);
+  controller.closeResource();
+  requests[3].resolve({ rows: [{ id: "b1", resourceId: "b" }], next: "b1" });
+  await settle();
+  assert.equal(controller.getState().openKey, null);
+});
+
 function fakeElement(properties = {}) {
   const listeners = new Map();
   const classes = new Set(properties.classes || []);

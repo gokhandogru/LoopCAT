@@ -97,6 +97,9 @@ function fakeElement(ownerDocument, tagName = "div") {
     getAttribute(name) {
       return attributes.get(name) ?? null;
     },
+    removeAttribute(name) {
+      attributes.delete(name);
+    },
     toggleAttribute(name, force) {
       if (force === true || (force === undefined && !attributes.has(name))) attributes.set(name, "");
       else attributes.delete(name);
@@ -235,7 +238,9 @@ test("RecoveryWorkspaceController renders connected health, recovery, project st
   });
   controller.renderBackupReminder({ info: { reason: "This project has no recovery copy." } });
 
-  assert.equal(elements.menuSummary.textContent, "Workspace (2 unsaved)");
+  assert.equal(elements.menuSummary.textContent, "Workspace");
+  assert.equal(elements.menuSummary.getAttribute("title"), "2 project packages need saving");
+  assert.match(elements.health.textContent, /2 project packages need saving/);
   assert.match(elements.health.textContent, /Workspace folderFolder: Client \[redacted\] folder/);
   assert.match(elements.health.textContent, /2 packages, 3 resources, 4 backups/);
   assert.match(elements.health.textContent, /One package was skipped \(2 total\)/);
@@ -251,6 +256,9 @@ test("RecoveryWorkspaceController renders connected health, recovery, project st
     importBusy: false,
     recoveryDismissed: false
   });
+  controller.renderStatus({ status, dirtyCount: 0 });
+  assert.equal(elements.menuSummary.textContent, "Workspace");
+  assert.equal(elements.menuSummary.getAttribute("title"), null);
 });
 
 test("RecoveryWorkspaceController exposes deterministic unsupported and busy states", async () => {

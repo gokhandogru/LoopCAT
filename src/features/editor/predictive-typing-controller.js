@@ -143,6 +143,8 @@ export function createPredictiveTypingController(options) {
   }
 
   function caretRectangle(editor) {
+    const inlineRect = editor.getCaretRect?.();
+    if (inlineRect) return inlineRect;
     const rect = editor.getBoundingClientRect?.();
     const ownerDocument = editor.ownerDocument || globalThis.document;
     const view = ownerDocument?.defaultView || globalThis;

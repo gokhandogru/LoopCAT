@@ -49,6 +49,147 @@
   ]);
 
   let dbPromise;
+  const CATALOG_KEY = "workspace-catalog:v1";
+  let catalogJob = null;
+  let catalogTimer = null;
+  function invalidateCatalog(tx) {
+    tx.objectStore("appMeta").delete(CATALOG_KEY);
+    tx.objectStore("appMeta").put({ key: "catalog-epoch", value: makeId("catalog") });
+    tx.addEventListener("complete", () => {
+      try { window.localStorage?.removeItem(CATALOG_KEY); } catch { /* Optional preview. */ }
+    });
+  }
+  function catalogProject(project) {
+    const fields = ["id", "name", "domain", "sourceLang", "targetLang", "sourceFileName", "createdAt", "updatedAt", "tmName", "mainTmName", "termBaseName", "activeTermBaseId", "resourceLinks"];
+    return { ...Object.fromEntries(fields.filter(key => project[key] !== undefined).map(key => [key, project[key]])),
+      documents: (Array.isArray(project.documents) ? project.documents : []).filter(value => value && typeof value === "object").map(({ id, name, fileName, sourceFileName, format }) => ({ id, name, fileName, sourceFileName, format })) };
+  }
+  function emptyProgress() { return { total: 0, confirmed: 0, draft: 0, words: 0, percent: 0 }; }
+  function catalogDelta(catalog, changes, generation, rebuilding = false) {
+    const projects = new Map(catalog.projects.map(value => [value.id, value]));
+    const resources = new Map(catalog.resources.map(value => [value.id, value]));
+    for (const change of changes) {
+      if (change.store === "projects") {
+        if (!change.after) projects.delete(change.key);
+        else projects.set(change.key, { ...catalogProject(change.after), catalogProgress: projects.get(change.key)?.catalogProgress || emptyProgress() });
+      }
+      if (change.store === "resources") {
+        if (!change.after) resources.delete(change.key);
+        else resources.set(change.key, { ...change.after, entryCount: resources.get(change.key)?.entryCount || 0 });
+      }
+    }
+    for (const change of changes) {
+      for (const [record, sign] of [[change.before, -1], [change.after, 1]]) {
+        if (!record) continue;
+        if (change.store === "segments") {
+          const summary = projects.get(record.projectId)?.catalogProgress;
+          if (summary) {
+            summary.total += sign;
+            summary.confirmed += sign * Number(record.status === "confirmed");
+            summary.draft += sign * Number(record.status === "draft");
+            summary.words += sign * String(record.source || "").trim().split(/\s+/).filter(Boolean).length;
+            summary.percent = summary.total ? Math.round(100 * summary.confirmed / summary.total) : 0;
+          }
+        }
+        if (change.store === "tmEntries" || change.store === "terms") {
+          const resource = resources.get(record.resourceId);
+          if (resource) {
+            resource.entryCount += sign;
+            const updatedAt = record.updatedAt || record.createdAt || "";
+            resource.updatedAt = rebuilding ? [resource.updatedAt || "", updatedAt].sort().at(-1) : new Date().toISOString();
+          }
+        }
+      }
+    }
+    return { version: 1, database: DB_NAME, workspaceId: LOCAL_WORKSPACE_ID, generation, projects: [...projects.values()], resources: [...resources.values()] };
+  }
+  function saveCatalogPreview(catalog) {
+    try {
+      const text = JSON.stringify({ ...catalog, database: DB_NAME, workspaceId: LOCAL_WORKSPACE_ID });
+      if (text.length < 512000) window.localStorage?.setItem(CATALOG_KEY, text);
+      else window.localStorage?.removeItem(CATALOG_KEY);
+    } catch { /* The verified IndexedDB catalog remains available. */ }
+  }
+  function readCatalogPreview() {
+    try {
+      const value = JSON.parse(window.localStorage?.getItem(CATALOG_KEY) || "null");
+      return value?.version === 1 && value.database === DB_NAME && value.workspaceId === LOCAL_WORKSPACE_ID && Number.isSafeInteger(value.generation) && Array.isArray(value.projects) && value.projects.every(project => typeof project?.id === "string" && typeof project?.name === "string" && project.catalogProgress) && Array.isArray(value.resources) ? value : null;
+    } catch { return null; }
+  }
+  function rebuildCatalog() {
+    if (catalogJob) return catalogJob;
+    catalogJob = (async () => {
+      const db = await openDatabase();
+      const generation = Number((await get("appMeta", "committed-generation"))?.value || 0);
+      const epoch = (await get("appMeta", "catalog-epoch"))?.value;
+      let catalog = { version: 1, database: DB_NAME, workspaceId: LOCAL_WORKSPACE_ID, generation, projects: (await getAll("projects")).map(project => ({ ...catalogProject(project), catalogProgress: emptyProgress() })), resources: (await getAll("resources")).map(resource => ({ ...resource, entryCount: 0 })) };
+      // Short transactions let editing proceed during a summary rebuild.
+      for (const name of ["segments", "tmEntries", "terms"]) {
+        let last;
+        while (true) {
+          const tx = db.transaction(name, "readonly");
+          const rows = await requestToPromise(tx.objectStore(name).getAll(last === undefined ? undefined : IDBKeyRange.lowerBound(last, true), 512));
+          if (!rows.length) break;
+          catalog = catalogDelta(catalog, rows.map(after => ({ store: name, key: after.id, after })), generation, true);
+          last = rows.at(-1).id;
+          await new Promise(resolve => { setTimeout(resolve, 0); });
+        }
+      }
+      const tx = strictTransaction(db, ["appMeta"]);
+      const done = txDone(tx);
+      const current = Number((await requestToPromise(tx.objectStore("appMeta").get("committed-generation")))?.value || 0);
+      const currentEpoch = (await requestToPromise(tx.objectStore("appMeta").get("catalog-epoch")))?.value;
+      if (current !== generation || currentEpoch !== epoch) { await done; return null; }
+      tx.objectStore("appMeta").put({ key: CATALOG_KEY, value: catalog });
+      await done;
+      saveCatalogPreview(catalog);
+      if (typeof CustomEvent === "function") window.dispatchEvent?.(new CustomEvent("loopcat-catalog-ready"));
+      return catalog;
+    })().finally(() => { catalogJob = null; });
+    return catalogJob;
+  }
+  function scheduleCatalogRebuild() {
+    if (catalogTimer || catalogJob) return;
+    catalogTimer = setTimeout(() => {
+      catalogTimer = null;
+      rebuildCatalog().then(value => { if (!value) scheduleCatalogRebuild(); }).catch(error => console.warn("Catalog refresh failed", error));
+    }, 1000);
+  }
+  async function readCatalog() {
+    const db = await openDatabase();
+    const meta = db.transaction("appMeta", "readonly").objectStore("appMeta");
+    const [stored, committed] = await Promise.all([requestToPromise(meta.get(CATALOG_KEY)), requestToPromise(meta.get("committed-generation"))]);
+    if (stored?.value?.version === 1 && stored.value.generation === Number(committed?.value || 0)) { saveCatalogPreview(stored.value); return stored.value; }
+    const [projects, resources] = await Promise.all([getAll("projects"), getAll("resources")]);
+    scheduleCatalogRebuild();
+    return { version: 1, pending: true, projects: projects.map(project => ({ ...catalogProject(project), catalogPending: true })), resources: resources.map(resource => ({ ...resource, catalogPending: true })) };
+  }
+  async function resourceEntries(type, resource, { after = null, limit = 100 } = {}) {
+    const db = await openDatabase();
+    const store = type === "tm" ? "tmEntries" : "terms";
+    const tx = db.transaction(store, "readonly");
+    const index = tx.objectStore(store).index(type === "tm" ? "tmName" : "termBaseName");
+    const rows = [];
+    return await new Promise((resolve, reject) => {
+      const request = index.openCursor(IDBKeyRange.only(resource.name));
+      let sought = false;
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) { resolve({ rows, next: null }); return; }
+        if (after !== null && !sought && indexedDB.cmp(cursor.primaryKey, after) < 0) {
+          sought = true; cursor.continuePrimaryKey(resource.name, after); return;
+        }
+        const record = cursor.value;
+        if ((after === null || indexedDB.cmp(cursor.primaryKey, after) > 0) &&
+          (record.resourceId === resource.id || ((!resource.id || !record.resourceId) && record.sourceLang === resource.sourceLang && record.targetLang === resource.targetLang))) {
+          if (rows.length === limit) { resolve({ rows, next: rows.at(-1).id }); return; }
+          rows.push(record);
+        }
+        cursor.continue();
+      };
+    });
+  }
   const AUTHORITATIVE_STORES = [
     "projects",
     "segments",
@@ -161,33 +302,56 @@
       createdAt: new Date().toISOString(), counts: {}, projects: [], recordCount: 0 };
     const tx = strictTransaction(db, [...AUTHORITATIVE_STORES, "appMeta", "checkpoints", "restoreStaging", "binaryAssets"]);
     const done = txDone(tx);
+    // A failed preparatory read can reject before capture callbacks are queued.
+    done.catch(() => {});
     const generationRead = requestToPromise(tx.objectStore("appMeta").get("committed-generation"));
+    const [, assetCount] = await Promise.all([generationRead, requestToPromise(tx.objectStore("binaryAssets").count())]);
+    const hasAssets = assetCount > 0;
     const captures = AUTHORITATIVE_STORES.map((storeName) => new Promise((resolve, reject) => {
       checkpoint.counts[storeName] = 0;
-      const cursor = tx.objectStore(storeName).openCursor();
-      cursor.onerror = () => reject(cursor.error);
-      cursor.onsuccess = () => {
-        const row = cursor.result;
-        if (!row) { resolve(undefined); return; }
-        const record = row.value;
-        const asset = "record:" + JSON.stringify([storeName, row.key, record.storageGeneration || 0, record.storageVersion || 0, record.storageWriter || "legacy"]);
-        const found = tx.objectStore("binaryAssets").get(asset);
-        found.onerror = () => reject(found.error);
-        found.onsuccess = () => {
-          const rawJson = found.result ? null : JSON.stringify(record);
-          const rawBlob = rawJson && rawJson.length > 256 * 1024 ? new Blob([rawJson], { type: "application/json" }) : null;
-          if (rawJson !== null) tx.objectStore("binaryAssets").put({ id: asset, ...(rawBlob ? { rawBlob } : { rawJson }) });
-          tx.objectStore("restoreStaging").put({ id: id + ":" + String(checkpoint.recordCount++).padStart(12, "0"), checkpointId: id, store: storeName, key: row.key, asset, bytes: rawBlob?.size || (rawJson?.length || found.result?.json?.length || found.result?.rawJson?.length || 0) * 4 || found.result?.blob?.size || found.result?.rawBlob?.size || 0 });
-          checkpoint.counts[storeName]++;
-          if (storeName === "projects") checkpoint.projects.push({ id: record.id, name: record.name, documents: Array.isArray(record.documents) ? record.documents.map((document) => ({ id: document.id })) : record.documents });
-          row.continue();
+      // Queue bounded reads together: a cursor followed by an awaited asset read
+      // makes every record require two serial browser/database round trips.
+      // Enqueue the next batch from the final request callback to keep this one
+      // atomic snapshot transaction active. Source document records stay single.
+      function captureBatch(after) {
+        const request = tx.objectStore(storeName).getAll(after === undefined ? undefined : IDBKeyRange.lowerBound(after, true), storeName === "projects" ? 1 : 128);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const records = request.result;
+          if (!records.length) { resolve(undefined); return; }
+          let remaining = records.length;
+          for (const record of records) {
+            const asset = "record:" + JSON.stringify([storeName, record.id, record.storageGeneration || 0, record.storageVersion || 0, record.storageWriter || "legacy"]);
+            const capture = (existing) => {
+              const rawJson = existing ? null : JSON.stringify(record);
+              const rawBlob = rawJson && rawJson.length > 256 * 1024 ? new Blob([rawJson], { type: "application/json" }) : null;
+              if (rawJson !== null) tx.objectStore("binaryAssets").put({ id: asset, ...(rawBlob ? { rawBlob } : { rawJson }) });
+              tx.objectStore("restoreStaging").put({ id: id + ":" + String(checkpoint.recordCount++).padStart(12, "0"), checkpointId: id, store: storeName, key: record.id, asset, bytes: rawBlob?.size || (rawJson?.length || existing?.json?.length || existing?.rawJson?.length || 0) * 4 || existing?.blob?.size || existing?.rawBlob?.size || 0 });
+              checkpoint.counts[storeName]++;
+              if (storeName === "projects") checkpoint.projects.push({ id: record.id, name: record.name, documents: Array.isArray(record.documents) ? record.documents.map((document) => ({ id: document.id })) : record.documents });
+              if (--remaining === 0) captureBatch(records.at(-1).id);
+            };
+            if (!hasAssets) capture(null);
+            else {
+              const found = tx.objectStore("binaryAssets").get(asset);
+              found.onerror = () => reject(found.error);
+              found.onsuccess = () => capture(found.result);
+            }
+          }
         };
-      };
+      }
+      captureBatch();
     }));
-    await Promise.all(captures);
-    checkpoint.generation = Number((await generationRead)?.value) || 0;
-    tx.objectStore("checkpoints").put(checkpoint);
-    await done;
+    try {
+      await Promise.race([Promise.all(captures), done]);
+      checkpoint.generation = Number((await generationRead)?.value) || 0;
+      tx.objectStore("checkpoints").put(checkpoint);
+      await done;
+    } catch (error) {
+      try { tx.abort(); } catch { /* The transaction may already be aborted. */ }
+      await done.catch(() => {});
+      throw error;
+    }
     const hashes = [];
     const verifiedParts = new Set();
     const exportErrors = [];
@@ -291,7 +455,7 @@
       if (rows.length && (row.store === "projects" || bytes + size > 4 * 1024 * 1024)) { yield await loadRows(); rows = []; bytes = 0; }
       rows.push(row);
       bytes += size;
-      if (row.store === "projects" || rows.length >= 64) { yield await loadRows(); rows = []; bytes = 0; }
+      if (row.store === "projects" || rows.length >= 256) { yield await loadRows(); rows = []; bytes = 0; }
     }
     if (rows.length) yield await loadRows();
   }
@@ -1060,6 +1224,12 @@
     return [type, cleanText(name).toLocaleLowerCase("en-US"), cleanText(sourceLang), cleanText(targetLang)].join("::");
   }
 
+  function reportInitialization(message = "") {
+    if (typeof CustomEvent === "function") {
+      window.dispatchEvent?.(new CustomEvent("loopcat-storage-initialization", { detail: { message } }));
+    }
+  }
+
   async function ensureResourceMigration(db) {
     const markerKey = "resources-v2-migration";
     const read = db.transaction("appMeta", "readonly");
@@ -1070,27 +1240,39 @@
       "projects",
       "resources",
       "tmEntries",
-      "tmTokenIndex",
       "terms",
-      "termTokenIndex",
       "termConcepts",
       "termDesignations",
       "appMeta"
     ];
     const tx = strictTransaction(db, storeNames);
     const done = txDone(tx);
+    reportInitialization("Updating existing local translation resources. This can take a few minutes for a large library.");
     try {
-      const [projects, existingResources, tmEntries, tmTokens, terms, termTokens, existingConcepts, existingDesignations] =
+      const [projects, existingResources, existingConceptIds, existingDesignationIds] =
         await Promise.all([
           requestToPromise(tx.objectStore("projects").getAll()),
           requestToPromise(tx.objectStore("resources").getAll()),
-          requestToPromise(tx.objectStore("tmEntries").getAll()),
-          requestToPromise(tx.objectStore("tmTokenIndex").getAll()),
-          requestToPromise(tx.objectStore("terms").getAll()),
-          requestToPromise(tx.objectStore("termTokenIndex").getAll()),
-          requestToPromise(tx.objectStore("termConcepts").getAll()),
-          requestToPromise(tx.objectStore("termDesignations").getAll())
+          requestToPromise(tx.objectStore("termConcepts").getAllKeys()),
+          requestToPromise(tx.objectStore("termDesignations").getAllKeys())
         ]);
+      // Keep the upgrade atomic without retaining every entry/token or queuing
+      // hundreds of thousands of writes in the renderer. Each next IDB request
+      // keeps the transaction alive and waits for the preceding batch's writes.
+      async function migrateBatches(storeName, migrate) {
+        const store = tx.objectStore(storeName);
+        let after;
+        let count = 0;
+        while (true) {
+          const range = after === undefined ? undefined : IDBKeyRange.lowerBound(after, true);
+          const records = await requestToPromise(store.getAll(range, 128));
+          if (!records.length) return count;
+          for (const record of records) migrate(record);
+          count += records.length;
+          if (count % 1024 === 0) reportInitialization(`Updating local resources: ${count} ${storeName === "tmEntries" ? "translation-memory entries" : "terms"} processed...`);
+          after = records[records.length - 1].id;
+        }
+      }
       const resourcesByIdentity = new Map();
       const resourcesById = new Map();
       const warnings = [];
@@ -1152,10 +1334,10 @@
         resourcesById.set(resource.id, resource);
       }
 
-      const resourceIdByTmEntry = new Map();
-      for (const entry of tmEntries) {
+      const tmLanguagePairs = new Set();
+      const tmEntryCount = await migrateBatches("tmEntries", (entry) => {
         const resource = registerResource("tm", entry.tmName, entry.sourceLang, entry.targetLang, entry.resourceId);
-        resourceIdByTmEntry.set(entry.id, resource.id);
+        tmLanguagePairs.add(entry.languagePair || `${entry.sourceLang}::${entry.targetLang}`);
         tx.objectStore("tmEntries").put({
           ...entry,
           resourceId: resource.id,
@@ -1163,16 +1345,18 @@
           normalizedTarget: entry.normalizedTarget || normalizedResourceText(entry.target),
           isSeeded: entry.isSeeded !== false
         });
-      }
-      for (const token of tmTokens) {
-        const resourceId = token.resourceId || resourceIdByTmEntry.get(token.tmEntryId) || "";
-        if (resourceId) tx.objectStore("tmTokenIndex").put({ ...token, resourceId });
+      });
+      // Search indexes are derived data. Existing query paths rebuild dirty
+      // language pairs before using resource-scoped tokens. Do not rewrite a
+      // potentially huge token index while opening the application database.
+      for (const languagePair of tmLanguagePairs) {
+        tx.objectStore("appMeta").put({ key: TM_INDEX_META_PREFIX + languagePair, languagePair, dirty: true, updatedAt: now });
       }
 
-      const conceptIds = new Set(existingConcepts.map((concept) => concept.id));
-      const designationIds = new Set(existingDesignations.map((designation) => designation.id));
-      const resourceIdByTerm = new Map();
-      for (const term of terms) {
+      const conceptIds = new Set(existingConceptIds);
+      const designationIds = new Set(existingDesignationIds);
+      const termLanguagePairs = new Set();
+      const legacyTermCount = await migrateBatches("terms", (term) => {
         const resource = registerResource(
           "termbase",
           term.termBaseName,
@@ -1181,7 +1365,7 @@
           term.resourceId
         );
         const conceptId = term.conceptId || `concept-${term.id}`;
-        resourceIdByTerm.set(term.id, resource.id);
+        termLanguagePairs.add(term.languagePair || `${term.sourceLang}::${term.targetLang}`);
         const sourceDesignationId = term.sourceDesignationId || `designation-source-${term.id}`;
         const targetDesignationId = term.targetDesignationId || `designation-target-${term.id}`;
         tx.objectStore("terms").put({
@@ -1239,10 +1423,9 @@
           );
           designationIds.add(designation.id);
         }
-      }
-      for (const token of termTokens) {
-        const resourceId = token.resourceId || resourceIdByTerm.get(token.termId) || "";
-        if (resourceId) tx.objectStore("termTokenIndex").put({ ...token, resourceId });
+      });
+      for (const languagePair of termLanguagePairs) {
+        tx.objectStore("appMeta").put({ key: TERM_INDEX_META_PREFIX + languagePair, languagePair, dirty: true, updatedAt: now });
       }
 
       for (const project of projects) {
@@ -1322,14 +1505,15 @@
         key: markerKey,
         complete: true,
         resourceCount: resourcesById.size,
-        tmEntryCount: tmEntries.length,
-        legacyTermCount: terms.length,
+        tmEntryCount,
+        legacyTermCount,
         conceptCount: conceptIds.size,
         designationCount: designationIds.size,
         warnings,
         updatedAt: now
       };
       tx.objectStore("appMeta").put(report);
+      invalidateCatalog(tx);
       await done;
       return report;
     } catch (error) {
@@ -1340,6 +1524,10 @@
       }
       await done.catch(() => {});
       throw error;
+    } finally {
+      // Package imports also run migration after the database is already open.
+      // Own the entire notice lifetime here, not just in openDatabase.
+      reportInitialization();
     }
   }
 
@@ -1348,6 +1536,7 @@
     dbPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = (event) => {
+        reportInitialization("Updating the local database. Please keep LoopCAT open...");
         const db = request.result;
         runMigrations(db, request.transaction, event.oldVersion);
       };
@@ -1360,6 +1549,7 @@
         db.onclose = () => { dbPromise = undefined; };
         try {
           await ensureResourceMigration(db);
+          reportInitialization();
           resolve(db);
         } catch (error) {
           db.close();
@@ -1367,7 +1557,7 @@
         }
       };
       request.onerror = () => reject(request.error);
-    }).catch((error) => { dbPromise = undefined; throw error; });
+    }).catch((error) => { dbPromise = undefined; reportInitialization(); throw error; });
     return dbPromise;
   }
 
@@ -1776,6 +1966,7 @@
       }
       const meta = tx.objectStore("appMeta");
       const current = await requestToPromise(meta.get("committed-generation"));
+      const catalog = await requestToPromise(meta.get(CATALOG_KEY));
       generation = (Number(current?.value) || 0) + 1;
       const expanded = [];
       for (const guard of mutation.guards || []) {
@@ -1834,7 +2025,10 @@
       meta.put({ key: "committed-generation", value: generation });
       tx.objectStore("journal").put({ id: makeId("journal"), generation, projectId: projectIds[0] || "", projectIds,
         createdAt: new Date().toISOString(), changes: journal });
+      const nextCatalog = catalog?.value?.version === 1 ? catalogDelta(catalog.value, journal, generation) : null;
+      if (nextCatalog) meta.put({ key: CATALOG_KEY, value: nextCatalog });
       await done;
+      if (nextCatalog) saveCatalogPreview(nextCatalog);
     } catch (error) {
       try { tx.abort(); } catch { /* Already aborted or completed. */ }
       await done.catch(() => {});
@@ -1843,14 +2037,22 @@
         const conflictDone = txDone(conflictTx);
         conflictTx.objectStore("conflictCopies").put({ id: makeId("conflict"), createdAt: new Date().toISOString(), changes });
         await conflictDone;
-        window.dispatchEvent?.(new CustomEvent("loopcat-storage-status", { detail: error.message }));
+        window.dispatchEvent?.(new CustomEvent("loopcat-storage-status", { detail: {
+          message: error.message,
+          code: "conflict",
+          recordKeys: changes.filter((change) => AUTHORITATIVE_STORES.includes(change.store))
+            .map((change) => JSON.stringify([change.store, change.key ?? change.value?.id]))
+        } }));
       }
       throw error;
     }
     changes.forEach((change, index) => {
       if (values[index]) knownVersions.set(`${change.store}:${values[index].id}`, values[index].storageVersion);
     });
-    window.dispatchEvent?.(new CustomEvent("loopcat-committed", { detail: { generation, projectIds } }));
+    window.dispatchEvent?.(new CustomEvent("loopcat-committed", { detail: { generation, projectIds,
+      recordKeys: changes.filter((change) => AUTHORITATIVE_STORES.includes(change.store))
+        .map((change) => JSON.stringify([change.store, change.key ?? change.value?.id]))
+    } }));
     return { generation, values };
   }
 
@@ -2025,6 +2227,7 @@
           }
         });
         tx.objectStore("restoreStaging").put({ id: restoreStageId, journalPinned: true, format: 2 });
+        invalidateCatalog(tx);
         meta.put({ key: "committed-generation", value: generation });
         tx.objectStore("journal").put({ id: makeId("restore"), generation, createdAt: new Date().toISOString(),
           type: "restore", mode: "replace", restoreStageId, rollbackCheckpoint: rollback.id });
@@ -2390,6 +2593,19 @@
     return events.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }
 
+  async function readProjectCacheStamp() {
+    const db = await openDatabase();
+    const tx = db.transaction("appMeta", "readonly");
+    const done = txDone(tx);
+    const meta = tx.objectStore("appMeta");
+    const [generation, epoch] = await Promise.all([
+      requestToPromise(meta.get("committed-generation")),
+      requestToPromise(meta.get("catalog-epoch"))
+    ]);
+    await done;
+    return JSON.stringify([DB_NAME, LOCAL_WORKSPACE_ID, generation?.value || 0, epoch?.value || ""]);
+  }
+
   async function exportProjectSnapshot(projectId) {
     await mutationTail;
     const db = await openDatabase();
@@ -2686,6 +2902,7 @@
       try {
         const lease = await requestToPromise(tx.objectStore("ownershipLeases").get("workspace"));
         if (lease?.owner !== writerId || lease.token !== token) throw new Error("Recovery ownership was lost.");
+        invalidateCatalog(tx);
         async function applyChange(change, generation) {
           if (!AUTHORITATIVE_STORES.includes(change.store)) throw new Error("Journal contains an unsupported store.");
           const store = tx.objectStore(change.store);
@@ -2836,6 +3053,7 @@
         tx.objectStore("journal").put({ id: makeId("restore"), generation, createdAt: new Date().toISOString(), type: "restore",
           mode: staged.mode, restoreStageId: staged.id, rollbackCheckpoint: rollback?.id || null });
         tx.objectStore("restoreStaging").put({ ...staged, journalPinned: true });
+        invalidateCatalog(tx);
         await done;
       } catch (error) { try { tx.abort(); } catch { /* Preserve original error. */ } await done.catch(() => {}); throw error; }
       knownVersions.clear();
@@ -2894,6 +3112,10 @@
 
   window.CatHan = window.CatHan || {};
   window.CatHan.storage = {
+    readCatalog,
+    readCatalogPreview,
+    rebuildCatalog,
+    resourceEntries,
     openDatabase,
     commitMutation,
     acquireProject,
@@ -2905,7 +3127,10 @@
     migrateCheckpointAssets,
     checkpointArchiveSource,
     createArchiveExport,
-    flushMutations: () => mutationTail,
+    flushMutations: async () => {
+      if (dbPromise) await dbPromise;
+      await mutationTail;
+    },
     prepareRestore,
     stageBackupRecords,
     stageCheckpoint,
@@ -2940,6 +3165,7 @@
     updateProjectAndPutSegments,
     recordActivityEvent,
     listActivityEvents,
+    readProjectCacheStamp,
     createPortableSanitizerContext,
     sanitizePortableValue,
     constants: {

@@ -1,3 +1,5 @@
+import { createInlineTagEditor } from "./inline-tag-editor.js";
+
 /**
  * Owns initial segment-row construction and live row presentation updates.
  * Segment state, navigation, target mutation, markup, and status policy remain
@@ -8,7 +10,7 @@
  *   body: { querySelector: (selector: string) => any },
  *   session: { getSegments: () => any[] },
  *   application: { getActiveIndex: () => number },
- *   protectedTags: { hasIssue: (segment: any) => boolean },
+ *   protectedTags: { hasIssue: (segment: any) => boolean, targetTags?: (segment: any) => any[] },
  *   markup: {
  *     appendSource: (container: any, segment: any) => void,
  *     renderTargetPreview: (row: any, segment: any) => void,
@@ -65,7 +67,9 @@ export function createSegmentRowPresentationService(options) {
     sourceCell.textContent = "";
     sourceCell.dir = "auto";
     markup.appendSource(sourceCell, segment);
-    const textarea = row.querySelector("textarea");
+    const textarea = createInlineTagEditor(row.querySelector("textarea"), {
+      detectTags: (target) => protectedTags.targetTags?.({ target }) || []
+    });
     textarea.dir = "auto";
     textarea.setAttribute(
       "aria-label",

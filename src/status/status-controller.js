@@ -5,6 +5,7 @@ const OPERATION_PATTERN =
   /^(saving|starting|requesting|sending|running|generating|extracting|polishing|adapting|pretranslating|canceling)|:\s*(reading|parsing|importing|saving)/i;
 const SAVE_PATTERN = /^(saved|saving|unsaved)|save\s+(pending|failed)|retrying autosave/i;
 const ERROR_PATTERN = /failed|blocked|cannot|missing|required|offline|invalid|error/i;
+const ROUTINE_SAVE_PATTERN = /^(Saved|Saving(?:\.{3}|…)?|Unsaved changes|\d+ saves? pending)$/i;
 
 export function createStatusController({ saveStore, jobStore, noticeStore, events }) {
   let lastError = null;
@@ -23,7 +24,7 @@ export function createStatusController({ saveStore, jobStore, noticeStore, event
     }
 
     const activeJob = jobStore.get(LEGACY_JOB_ID);
-    if (activeJob?.status === "running") {
+    if (activeJob?.status === "running" && !ROUTINE_SAVE_PATTERN.test(message)) {
       const job = ERROR_PATTERN.test(message)
         ? jobStore.fail(LEGACY_JOB_ID, { label: message })
         : /cancel/i.test(message)
@@ -35,9 +36,11 @@ export function createStatusController({ saveStore, jobStore, noticeStore, event
     if (SAVE_PATTERN.test(message)) {
       const value = /^saving/i.test(message)
         ? saveStore.setSaving(detail)
-        : mode === "dirty" || /failed|pending|unsaved|retry/i.test(message)
+        : /failed|retry|conflict/i.test(message)
           ? saveStore.setFailed(detail)
-          : saveStore.setSaved(detail);
+          : mode === "dirty" || /pending|unsaved/i.test(message)
+            ? saveStore.setDirty(detail)
+            : saveStore.setSaved(detail);
       return { channel: "save", value };
     }
 

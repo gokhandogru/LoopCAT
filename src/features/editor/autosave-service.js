@@ -69,7 +69,9 @@ export function createAutosaveService(options) {
   function size() {
     return new Set([
       ...pending.keys(),
-      ...Array.from(inFlight).flatMap((operation) => operation.records.map((record) => record.id))
+      ...Array.from(inFlight).flatMap((operation) =>
+        operation.records.filter((record) => !record.cancelled).map((record) => record.id)
+      )
     ]).size;
   }
 
@@ -81,8 +83,17 @@ export function createAutosaveService(options) {
 
   function discard(segmentId) {
     const record = pending.get(segmentId);
+    let cancelled = false;
+    for (const operation of inFlight) {
+      if (operation.started) continue;
+      for (const queued of operation.records) {
+        if (queued.id !== segmentId) continue;
+        queued.cancelled = true;
+        cancelled = true;
+      }
+    }
     latestGenerations.delete(segmentId);
-    if (!record) return false;
+    if (!record) return cancelled;
     clearTimer(record.timer);
     pending.delete(segmentId);
     latestGenerations.delete(segmentId);
@@ -97,6 +108,9 @@ export function createAutosaveService(options) {
 
   function clearAll() {
     editLifecycle.finalizeAll();
+    for (const operation of inFlight) {
+      if (!operation.started) operation.records.forEach((record) => (record.cancelled = true));
+    }
     pending.forEach((record) => clearTimer(record.timer));
     pending.clear();
     latestGenerations.clear();
@@ -107,9 +121,15 @@ export function createAutosaveService(options) {
       clearTimer(record.timer);
       if (pending.get(record.id)?.generation === record.generation) pending.delete(record.id);
     });
-    const operation = { records, promise: null };
+    const operation = { records, promise: null, started: false };
     inFlight.add(operation);
     const write = writeTail.then(async () => {
+      operation.started = true;
+      records = records.filter((record) => !record.cancelled);
+      if (!records.length) {
+        inFlight.delete(operation);
+        return [];
+      }
       publish("Saving...");
       try {
         const segments = records.map((record) => record.segment);
@@ -204,8 +224,29 @@ export function createAutosaveService(options) {
     return queue(segment, Math.min(saveDelayMs, Math.max(0, maxWaitMs - (now() - firstQueuedAt))), firstQueuedAt);
   }
 
+  function trackCommand(segments, command) {
+    const operation = {
+      records: segments.map((segment) => ({ id: segment.id, segment: structuredClone(segment), generation })),
+      started: true,
+      promise: null
+    };
+    inFlight.add(operation);
+    operation.promise = Promise.resolve(command)
+      .then(() => [])
+      .finally(() => inFlight.delete(operation));
+    // A confirmation includes asynchronous resource reads before its atomic
+    // commit. New typing must wait for that commit, and close/flush must wait too.
+    // One failed command must not release the barrier for an earlier command
+    // that is still reading or committing its records.
+    writeTail = Promise.allSettled([writeTail, operation.promise]).then(() => {});
+  }
+
   function clearDocument(projectId, documentId) {
-    pendingRecords(projectId)
+    [
+      ...pendingRecords(projectId),
+      ...Array.from(inFlight).flatMap((operation) => (operation.started ? [] : operation.records))
+    ]
+      .filter((record) => record.segment.projectId === projectId)
       .filter((record) => record.segment.documentId === documentId)
       .forEach((record) => {
         editLifecycle.finalize(record.id);
@@ -237,9 +278,12 @@ export function createAutosaveService(options) {
     flush,
     has: (segmentId) =>
       pending.has(segmentId) ||
-      Array.from(inFlight).some((operation) => operation.records.some((record) => record.id === segmentId)),
+      Array.from(inFlight).some((operation) =>
+        operation.records.some((record) => record.id === segmentId && !record.cancelled)
+      ),
     pendingRecords,
     queue,
+    trackCommand,
     enqueueEdit(projectId, mutation) {
       if (mutation?.projectId !== projectId) throw new TypeError("Edit project does not match its segment.");
       debounce(mutation);

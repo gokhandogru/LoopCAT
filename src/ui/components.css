@@ -69,13 +69,168 @@
   box-shadow: var(--elevation-none);
 }
 
+.liquid-glass-edition .save-status {
+  display: block;
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 0;
+  max-height: 25dvh;
+  overflow: auto;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-bottom: 1px solid var(--color-line);
+  border-radius: 0;
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: var(--line-height-body);
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.liquid-glass-edition .collection-view-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+}
+
+.liquid-glass-edition .collection-view-switch button {
+  min-height: 30px;
+  padding-inline: var(--space-3);
+  border-color: transparent;
+  background: transparent;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.liquid-glass-edition .collection-view-switch button[aria-pressed="true"] {
+  border-color: var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-accent-hover);
+  font-weight: 700;
+}
+
+.liquid-glass-edition .collection-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-block: var(--space-2);
+}
+
+.liquid-glass-edition .collection-toolbar > .collection-view-switch:only-child {
+  margin-inline-start: auto;
+}
+
+.liquid-glass-edition .resource-panel:has(> .resource-detail.hidden) > .resource-entry-view-controls {
+  display: none;
+}
+
+.liquid-glass-edition .resource-policy-identity > label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.liquid-glass-edition .resource-policy-identity > label > input[type="checkbox"] {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+}
+
+.liquid-glass-edition .save-status.dirty,
+.liquid-glass-edition .save-status.error {
+  border-inline-start: 4px solid var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+  color: var(--color-danger);
+}
+
 .liquid-glass-edition .save-status:empty {
   display: none;
+}
+
+.liquid-glass-edition .workspace-guide-link {
+  text-decoration: none;
+}
+
+.liquid-glass-edition #protectionStatus {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
 }
 
 .liquid-glass-edition .analysis-panel,
 .liquid-glass-edition .file-list-header {
   padding: var(--space-3) var(--space-4);
+}
+
+.liquid-glass-edition .segment-options-menu .menu-panel {
+  width: min(300px, calc(100vw - var(--space-8)));
+  min-width: 0;
+  max-height: min(60dvh, 400px);
+  overflow-y: auto;
+  padding: var(--space-3);
+  gap: var(--space-3);
+}
+
+.liquid-glass-edition .menu-field {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.liquid-glass-edition .menu-field select {
+  width: 100%;
+  min-width: 0;
+}
+
+.liquid-glass-edition .control-active-indicator {
+  display: none;
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-hover);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.liquid-glass-edition .search-options-menu:has(input:checked) .control-active-indicator,
+.liquid-glass-edition .search-options-menu:has(option:checked:not([value="both"])) .control-active-indicator,
+.liquid-glass-edition .advanced-filters-menu:has(option:checked:not([value=""])) .control-active-indicator {
+  display: inline;
+}
+
+.liquid-glass-edition .backup-reminder {
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-2) var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+}
+
+.liquid-glass-edition .backup-reminder h3 {
+  margin-bottom: 2px;
+  font-size: var(--font-size-sm);
+}
+
+.liquid-glass-edition .backup-reminder p {
+  font-size: var(--font-size-xs);
+}
+
+.liquid-glass-edition .backup-reminder button {
+  min-height: 32px;
+  font-size: var(--font-size-xs);
 }
 
 .liquid-glass-edition .analysis-header,

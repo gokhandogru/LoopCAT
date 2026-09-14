@@ -42,6 +42,7 @@ export function createApplicationStartupController({
     ui.initialize();
     reporting.checkpoint("rendering UI locale options");
     ui.renderLocaleOptions();
+    await projects.preview?.();
     reporting.checkpoint("binding local AI drawer");
     reporting.checkpoint("wiring UI events");
     wiring.wire();
@@ -51,13 +52,6 @@ export function createApplicationStartupController({
 
     reporting.progress("startup: restoring workspace state");
     workspace.restoreDirty();
-    reporting.progress("startup: checking storage durability");
-    await durability.refresh();
-    if (workspace.reconnect) {
-      reporting.progress("startup: reconnecting workspace");
-      workspace.assignStatus(await workspace.reconnect());
-      workspace.renderStatus();
-    }
     reporting.progress("startup: loading projects");
     await projects.load(false);
     reporting.progress("startup: loading interface preferences");
@@ -65,6 +59,27 @@ export function createApplicationStartupController({
       preferences?.theme?.initialize?.({ freshProfile: projects.count() === 0 }),
       preferences?.layout?.initialize?.()
     ]);
+    // Wait until the catalog can paint; optional storage/folder work must not
+    // prevent either local project visibility or other background checks.
+    const background = () => {
+      const guarded = (task) =>
+        Promise.resolve()
+          .then(task)
+          .catch((error) => {
+            errors.log(error);
+            errors.setStatus(error.message || "Startup check failed", "dirty");
+          });
+      void guarded(() => durability.refresh());
+      if (workspace.reconnect)
+        void guarded(async () => {
+          const status = await workspace.reconnect();
+          workspace.assignStatus(status);
+          workspace.renderStatus();
+        });
+    };
+    if (typeof globalThis.requestAnimationFrame === "function")
+      globalThis.requestAnimationFrame(() => setTimeout(background, 0));
+    else setTimeout(background, 0);
     reporting.progress("startup: starting workflow characterization");
     await workflow.run();
     offline.register();

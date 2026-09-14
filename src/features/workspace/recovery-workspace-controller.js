@@ -170,9 +170,10 @@ export function createRecoveryWorkspaceController(options) {
     importBusy = false,
     hasProject = false
   } = {}) {
-    menuSummary.textContent = dirtyCount
-      ? translate("workspace.menu.summaryDirty", { count: dirtyCount })
-      : translate("workspace.menu.summary");
+    menuSummary.textContent = translate("workspace.menu.summary");
+    const folderCopyWarning = dirtyCount ? translate("workspace.status.dirtyWarning", { count: dirtyCount }) : "";
+    if (folderCopyWarning) menuSummary.setAttribute("title", folderCopyWarning);
+    else menuSummary.removeAttribute("title");
     const mode = status.connected
       ? translate("workspace.status.folderTitle")
       : translate("workspace.status.localTitle");

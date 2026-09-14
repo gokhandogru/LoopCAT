@@ -24,6 +24,12 @@ test("status controller keeps save and background jobs in separate channels", as
   assert.equal(saveStore.getState().status, "saving");
   assert.equal(jobStore.get("legacy-operation").status, "running");
 
+  controller.fromLegacy({ text: "Unsaved changes", mode: "dirty" });
+  assert.equal(saveStore.getState().status, "dirty");
+  controller.fromLegacy({ text: "Saved", mode: "saved" });
+  assert.equal(saveStore.getState().status, "saved");
+  assert.equal(jobStore.get("legacy-operation").status, "running", "autosave must not complete an active import");
+
   controller.fromLegacy({ text: "Project package imported", mode: "saved" });
   assert.equal(jobStore.get("legacy-operation").status, "completed");
   assert.equal(noticeStore.list().at(-1).message, "Project package imported");

@@ -3,7 +3,9 @@ import { separateAssets, combineAssets, digest, externalAsset } from "./record-a
 const CHUNK = 4 * 1024 * 1024;
 const MAX_RECORD = 64 * 1024 * 1024;
 const LIMIT = 32 * 1024 * 1024 * 1024;
-const STORES = ["projects", "segments", "tmEntries", "terms", "activityEvents", "trashEntries"];
+const RESOURCE_STORES = ["resources", "tmEntries", "tmContributions", "terms", "termConcepts", "termDesignations"];
+const STORES = ["projects", "segments", ...RESOURCE_STORES, "activityEvents", "trashEntries"];
+const RECORD_STORES = new Set(["metadata", ...STORES]);
 const encoder = new TextEncoder();
 
 async function* objectRecords(value) {
@@ -17,7 +19,7 @@ async function* objectRecords(value) {
     for (const record of value[store] || []) yield { store, value: record };
   }
   if (value.project)
-    for (const store of ["tmEntries", "terms"]) {
+    for (const store of RESOURCE_STORES) {
       for (const record of value.resources?.[store] || []) yield { store, value: record };
     }
 }
@@ -70,7 +72,7 @@ export async function writeRecordPackage(
   try {
     for await (const record of objectRecords(value)) {
       signal?.throwIfAborted();
-      if (!["metadata", ...STORES].includes(record.store)) throw new Error("Unsupported archive record store.");
+      if (!RECORD_STORES.has(record.store)) throw new Error("Unsupported archive record store.");
       const separated = await separateAssets(record.value, savePart, signal);
       const bytes = encoder.encode(JSON.stringify({ store: record.store, ...separated }) + "\n");
       if (bytes.length > MAX_RECORD)
@@ -164,7 +166,7 @@ export async function readRecordPackage(
   async function accept(line) {
     const record = JSON.parse(line);
     if (
-      !["metadata", ...STORES].includes(record.store) ||
+      !RECORD_STORES.has(record.store) ||
       !record.value ||
       typeof record.value !== "object" ||
       Array.isArray(record.value)
@@ -237,7 +239,8 @@ export async function readRecordPackage(
     !metadata ||
     counts.metadata !== 1 ||
     Object.entries(manifest.counts).some(
-      ([store, count]) => !Number.isSafeInteger(count) || count < 0 || (counts[store] || 0) !== count
+      ([store, count]) =>
+        !RECORD_STORES.has(store) || !Number.isSafeInteger(count) || count < 0 || (counts[store] || 0) !== count
     )
   )
     throw new Error("Incomplete archive record stream.");
@@ -247,10 +250,11 @@ export async function readRecordPackage(
     STORES.filter((store) => Object.hasOwn(manifest.counts, store)).map((store) => [store, stores[store]])
   );
   if (manifest.kind === "workspace") return { ...metadata, ...included };
-  const { tmEntries, terms, ...records } = included;
+  const resources = Object.fromEntries(Object.entries(included).filter(([store]) => RESOURCE_STORES.includes(store)));
+  const records = Object.fromEntries(Object.entries(included).filter(([store]) => !RESOURCE_STORES.includes(store)));
   return {
     ...metadata,
     ...records,
-    ...(tmEntries || terms ? { resources: { ...(tmEntries ? { tmEntries } : {}), ...(terms ? { terms } : {}) } } : {})
+    ...(Object.keys(resources).length ? { resources } : {})
   };
 }

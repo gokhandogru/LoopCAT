@@ -313,7 +313,7 @@ test("ProjectCollectionLoadController validates every boundary and exposes an im
   const { createProjectCollectionLoadController } = await loadFactory();
   const valid = createHarness(createProjectCollectionLoadController);
   assert.equal(Object.isFrozen(valid.controller), true);
-  assert.deepEqual(Object.keys(valid.controller), ["load"]);
+  assert.deepEqual(Object.keys(valid.controller), ["load", "preview"]);
 
   for (const options of [
     undefined,

@@ -49,10 +49,15 @@ function isWindowsDesktopZipName(name) {
   return isWindowsInstallerZipName(name) || isWindowsPortableZipName(name);
 }
 
+function isWebZipName(name) {
+  return exactFile(`${productName} Web ${packageJson.version}.zip`).test(name);
+}
+
 function isExpectedPublicDownloadArtifactName(name) {
   if (/(?:^|[._\s-])(?:source|src|symbols|debug)(?:[._\s-]|$)/i.test(name)) return false;
   return exactFile(`${productName} Setup ${packageJson.version}.exe`).test(name) ||
     exactFile(`${productName} ${packageJson.version}.exe`).test(name) ||
+    isWebZipName(name) ||
     productVersionFile("dmg").test(name) ||
     isWindowsDesktopZipName(name) ||
     (productVersionFile("zip").test(name) && !isWindowsDesktopZipName(name)) ||

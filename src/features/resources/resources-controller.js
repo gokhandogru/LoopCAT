@@ -16,6 +16,7 @@ function resourceType(value) {
  *   elements: Record<string, any>,
  *   render: (state: { type: "tm" | "tb", openKey: string | null, tmEntries: any[], terms: any[] }) => void,
  *   keyForItem: (item: any, type: "tm" | "tb") => string,
+ *   loadPage?: (type: "tm" | "tb", key: string, page: { after: string | null, limit: number }) => Promise<{ rows: any[], next: string | null }>,
  *   navigate?: () => Promise<unknown> | unknown,
  *   normalizeLanguageInput?: (input: any) => unknown,
  *   runImportTask?: (label: string, task: () => Promise<unknown>) => Promise<unknown>,
@@ -65,6 +66,32 @@ export function createResourcesController(options) {
   let tmEntries = [];
   let terms = [];
   let resourceRecords = [];
+  let pageRevision = 0;
+  let pageCursors = [null];
+  let page = { index: 0, next: null, loading: false, error: "" };
+
+  async function loadPage(index = 0) {
+    if (!options.loadPage || !openKey) return;
+    const revision = ++pageRevision;
+    const selectedType = type;
+    const selectedKey = openKey;
+    page = { index, next: null, loading: true, error: "" };
+    tmEntries = [];
+    terms = [];
+    render();
+    try {
+      const result = await options.loadPage(selectedType, selectedKey, { after: pageCursors[index], limit: 100 });
+      if (revision !== pageRevision || type !== selectedType || openKey !== selectedKey) return;
+      if (type === "tm") tmEntries = result.rows;
+      else terms = result.rows;
+      page = { index, next: result.next, loading: false, error: "" };
+    } catch (error) {
+      if (revision !== pageRevision) return;
+      page = { index, next: null, loading: false, error: error.message || "Resource loading failed" };
+      reportError(error, { phase: "load-page", type: selectedType });
+    }
+    render();
+  }
 
   function listen(target, eventType, listener) {
     if (!target?.addEventListener) return;
@@ -78,7 +105,8 @@ export function createResourcesController(options) {
       openKey,
       tmEntries: [...tmEntries],
       terms: [...terms],
-      resources: [...resourceRecords]
+      resources: [...resourceRecords],
+      ...(options.loadPage ? { page: { ...page } } : {})
     });
   }
 
@@ -114,6 +142,11 @@ export function createResourcesController(options) {
 
   function restoreFocusedAction(descriptor) {
     if (!descriptor) return;
+    if (["next-page", "previous-page", "retry-page"].includes(descriptor.action)) {
+      const detail = type === "tm" ? tmDetail : tbDetail;
+      detail.querySelector?.(`[data-resource-action="${descriptor.action}"]`)?.focus?.();
+      return;
+    }
     if (descriptor.action === "close-detail") {
       if (!openKey || descriptor.type !== type) return;
       const detail = type === "tm" ? tmDetail : tbDetail;
@@ -141,10 +174,12 @@ export function createResourcesController(options) {
     if (openKey && !items(type, openKey).length && !resourceRecords.some((resource) => resource.id === openKey))
       openKey = null;
     if (renderAfter) render();
+    if (options.loadPage && openKey) void loadPage(page.index);
     return snapshot();
   }
 
   function selectType(nextType, options = {}) {
+    pageRevision++;
     type = resourceType(nextType);
     openKey = null;
     if (options.render !== false) render();
@@ -157,8 +192,11 @@ export function createResourcesController(options) {
   }
 
   function openResource(nextType, key, options = {}) {
+    pageRevision++;
+    pageCursors = [null];
     type = resourceType(nextType);
     openKey = String(key || "") || null;
+    void loadPage();
     if (options.render !== false) render();
     if (options.focus !== false) {
       const focusClose = () => {
@@ -181,6 +219,7 @@ export function createResourcesController(options) {
   }
 
   function closeResource(options = {}) {
+    pageRevision++;
     const closingType = type;
     const closingKey = openKey || "";
     openKey = null;
@@ -276,6 +315,15 @@ export function createResourcesController(options) {
     if (!button) return;
     const action = button.dataset.resourceAction;
     const actionType = resourceType(button.dataset.resourceType || type);
+    if (["next-page", "previous-page", "retry-page"].includes(action)) {
+      if (page.loading) return;
+      if (action === "next-page" && page.next) {
+        pageCursors[page.index + 1] = page.next;
+        await loadPage(page.index + 1);
+      } else if (action === "previous-page" && page.index > 0) await loadPage(page.index - 1);
+      else if (action === "retry-page") await loadPage(page.index);
+      return;
+    }
     if (action === "close-detail") {
       closeResource();
       return;

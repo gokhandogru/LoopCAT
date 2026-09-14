@@ -8,6 +8,7 @@ const MAX_INDEX_CANDIDATES = 600;
 const RESOURCE_IMPORT_CHUNK_SIZE = 1000;
 const SENSITIVE_TEXT_VALUE_PATTERN = /(sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._~+/=-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|npm_[A-Za-z0-9_]{8,}|(?:session|cookie)[=:][A-Za-z0-9._~+/=-]{8,})/i;
 let tmSignatureIndexAvailable = true;
+let confirmationTail = Promise.resolve();
 
 function redactSensitiveText(value) {
   return String(value || "").replace(new RegExp(SENSITIVE_TEXT_VALUE_PATTERN.source, "gi"), "[redacted secret]");
@@ -406,6 +407,21 @@ async function saveTmEntry(input = {}) {
 }
 
 async function confirmSegmentWithMainTm(project, segment, context = {}) {
+  const snapshot = structuredClone(segment);
+  const result = await serializeConfirmation(() => commitSegmentWithMainTm(project, snapshot, context));
+  acknowledgeSegmentCommit(segment, result.segment);
+  return result;
+}
+
+function serializeConfirmation(action) {
+  // Two rapid confirmations can both read the same resource/contribution
+  // versions before either commits. Keep their read/modify/write phases ordered.
+  const operation = confirmationTail.then(action);
+  confirmationTail = operation.catch(() => {});
+  return operation;
+}
+
+async function commitSegmentWithMainTm(project, segment, context) {
   if (!project?.id || !segment?.id || !cleanText(segment.source) || !cleanText(segment.target)) {
     throw new Error("A project and a translated segment are required for TM confirmation.");
   }
@@ -482,7 +498,6 @@ async function confirmSegmentWithMainTm(project, segment, context = {}) {
   }
   const committed = await commitMutation(null, null, { changes, rebaseLocal: true });
   const savedSegment = committed.values[0] || segmentRecord;
-  Object.assign(segment, savedSegment);
   return { segment: savedSegment, entry: committed.values[1] || entry, contribution: committed.values[2] || contribution };
 }
 
@@ -491,6 +506,13 @@ async function restoreSegmentWithMainTm(project, segment, context = {}) {
   if (segment.status === "confirmed" && cleanText(segment.target)) {
     return confirmSegmentWithMainTm(project, segment, context);
   }
+  const snapshot = structuredClone(segment);
+  const result = await serializeConfirmation(() => commitRestoredSegmentWithMainTm(project, snapshot));
+  acknowledgeSegmentCommit(segment, result.segment);
+  return result;
+}
+
+async function commitRestoredSegmentWithMainTm(project, segment) {
   const contributions = await getAllByIndex("tmContributions", "projectSegment", [project.id, segment.id]);
   const changes = [{ store: "segments", value: segment }];
   const now = new Date().toISOString();
@@ -517,8 +539,19 @@ async function restoreSegmentWithMainTm(project, segment, context = {}) {
     }
   }
   const committed = await commitMutation(null, null, { changes, rebaseLocal: true });
-  Object.assign(segment, committed.values[0] || segment);
-  return { segment, removedContributions: contributions.length };
+  const savedSegment = committed.values[0] || segment;
+  return { segment: savedSegment, removedContributions: contributions.length };
+}
+
+function acknowledgeSegmentCommit(segment, saved) {
+  if (Number(segment.revision || 0) === Number(saved.revision || 0)) {
+    Object.assign(segment, saved);
+  } else if (Number(segment.storageVersion || 0) <= Number(saved.storageVersion || 0)) {
+    // Newer typing retains its own target, status, history, and timestamp.
+    for (const key of ["storageVersion", "storageWriter", "storageGeneration"]) {
+      if (saved[key] !== undefined) segment[key] = saved[key];
+    }
+  }
 }
 
 async function importTmEntries(entries, options = {}) {

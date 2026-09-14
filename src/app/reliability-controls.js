@@ -20,6 +20,8 @@ export function createReliabilityControls({
   let dirtySinceCheckpoint = false;
   let channel;
   let storageError = "";
+  let genericStorageError = "";
+  const conflictingRecords = new Map();
   let lastVerifiedBackup = null;
   let backupError = "";
   let wasConnected = false;
@@ -183,6 +185,9 @@ export function createReliabilityControls({
       }
     };
   function mount() {
+    window.addEventListener("loopcat-storage-initialization", (event) => {
+      status.setInitialization?.(event.detail?.message || "");
+    });
     storage
       .get("appMeta", "committed-generation")
       .then((value) => {
@@ -191,7 +196,7 @@ export function createReliabilityControls({
       })
       .catch(() => {});
     const run = (action) => () => {
-      Promise.resolve()
+      return Promise.resolve()
         .then(action)
         .catch((error) => {
           status.set(error.message, "dirty");
@@ -280,8 +285,12 @@ export function createReliabilityControls({
       run(async () => {
         await autosave.flush();
         await storage.flushMutations();
-        storageError = "";
-        status.setPersistence("Saved", "saved");
+        // A no-op flush does not prove a previously failed database reopened.
+        await storage.get("appMeta", "committed-generation");
+        genericStorageError = "";
+        storageError = Array.from(conflictingRecords.values()).at(-1) || "";
+        status.setStorage?.(storageError);
+        if (!storageError && !autosave.size()) status.setPersistence("Saved", "saved");
         refresh();
       })
     );
@@ -301,6 +310,12 @@ export function createReliabilityControls({
     });
     window.addEventListener("loopcat-committed", (event) => {
       committedGeneration = Math.max(committedGeneration, event.detail.generation || 0);
+      // A successful write acknowledges only its own records. Saving another
+      // segment must never dismiss an unresolved conflict or database error.
+      const previousError = storageError;
+      for (const key of event.detail.recordKeys || []) conflictingRecords.delete(key);
+      storageError = genericStorageError || Array.from(conflictingRecords.values()).at(-1) || "";
+      if (storageError !== previousError) status.setStorage?.(storageError);
       dirtySinceCheckpoint = true;
       scheduleCheckpoint();
       if (!autosave.size() && !storageError) status.setPersistence("Saved", "saved");
@@ -312,8 +327,14 @@ export function createReliabilityControls({
       refresh();
     });
     window.addEventListener("loopcat-storage-status", (event) => {
-      storageError = event.detail;
-      status.setPersistence(event.detail, "dirty");
+      const detail = event.detail;
+      const message = typeof detail === "string" ? detail : detail?.message || "Local storage needs attention.";
+      if (detail?.code === "conflict" && detail.recordKeys?.length) {
+        for (const key of detail.recordKeys) conflictingRecords.set(key, message);
+      } else genericStorageError = message;
+      storageError = genericStorageError || message;
+      if (status.setStorage) status.setStorage(storageError);
+      else status.setPersistence(storageError, "dirty");
       refresh();
     });
     window.addEventListener("loopcat-ownership-lost", (event) => {

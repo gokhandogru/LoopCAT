@@ -662,7 +662,7 @@ body.liquid-glass-edition {
   line-height: 1.55;
 }
 
-.liquid-glass-edition .target-cell textarea {
+.liquid-glass-edition .target-cell :is(textarea, .target-editor) {
   min-height: 72px;
   padding: 11px 12px;
   border-color: transparent;
@@ -673,7 +673,7 @@ body.liquid-glass-edition {
   resize: vertical;
 }
 
-.liquid-glass-edition .target-cell textarea:focus {
+.liquid-glass-edition .target-cell :is(textarea, .target-editor):focus {
   border-color: var(--glass-accent);
   background: #ffffff;
 }

@@ -1,3 +1,5 @@
+import { createCollectionViewController } from "../../ui/collection-view-controller.js";
+
 const VALID_DENSITIES = new Set(["balanced", "compact"]);
 const DEFAULT_INSPECTOR_WIDTH = 320;
 const MIN_INSPECTOR_WIDTH = 280;
@@ -17,6 +19,8 @@ export function createWorkspaceLayoutController({
   inspector,
   inspectorResizer,
   preferencesRepository,
+  collectionDocument,
+  onCollectionPreferenceError,
   onInspectorPreference
 }) {
   if (!documentRoot || !workspace || !preferencesRepository) {
@@ -26,6 +30,13 @@ export function createWorkspaceLayoutController({
   let density = "balanced";
   let inspectorOpen = true;
   let inspectorWidth = DEFAULT_INSPECTOR_WIDTH;
+  const collectionViews = collectionDocument
+    ? createCollectionViewController({
+        documentRoot: collectionDocument,
+        preferencesRepository,
+        onError: onCollectionPreferenceError
+      })
+    : null;
 
   function apply() {
     documentRoot.dataset.density = density;
@@ -68,7 +79,10 @@ export function createWorkspaceLayoutController({
     inspectorOpen = true;
     inspectorWidth = DEFAULT_INSPECTOR_WIDTH;
     apply();
-    await preferencesRepository.patch({ density, inspectorOpen, inspectorWidth });
+    await Promise.all([
+      preferencesRepository.patch({ density, inspectorOpen, inspectorWidth }),
+      collectionViews?.reset()
+    ]);
   }
 
   function bindInspectorResizer() {
@@ -107,6 +121,7 @@ export function createWorkspaceLayoutController({
 
   async function initialize() {
     const preferences = await preferencesRepository.read();
+    collectionViews?.initialize(preferences);
     density = VALID_DENSITIES.has(preferences.density) ? preferences.density : "balanced";
     inspectorOpen = preferences.inspectorOpen !== false;
     inspectorWidth = normalizeInspectorWidth(preferences.inspectorWidth);

@@ -1556,7 +1556,7 @@ for (const snippet of [
   "text.displaySafeHtml(project.name)",
   "text.escapeHtml(language.display(project))",
   'localization.labelHtml("updatedAt", { date: date.format(project.updatedAt) })',
-  'tile.querySelector(".progress-bar > div").style.width = `${project.progress.percent}%`;',
+  'tile.querySelector(".progress-bar > div").style.width = `${project.progress.percent || 0}%`;',
   'const projectLabel = text.displaySafeText(project.name, localization.source("project"));',
   'deleteButton.addEventListener("click", () => actions.deleteProject(project.id));',
   'openButton.addEventListener("click", () => actions.open(project.id));',
@@ -1981,7 +1981,8 @@ for (const snippet of [
   "session.getProjects().map((project) => {",
   "const revision = session.getProjectSummaryRevision(project.id);",
   "const cached = cachedById.get(project.id);",
-  "cached.updatedAt === project.updatedAt && cached.summaryRevision === revision",
+  "!project.catalogProgress &&",
+  "cached.summaryRevision === revision",
   "...cached,",
   "progress: cached.progress,",
   "wordCount: cached.wordCount,",
@@ -2103,9 +2104,10 @@ for (const snippet of [
   "await autosave.flush();",
   "await repository.getProject(projectId)",
   'command.setProjectId(session.getProject()?.id || projectId || "");',
-  "session.getProject() ? await repository.listSegments(projectId) : []",
-  "session.replaceSegments(histories.prepare(",
-  "session.replaceActivityEvents(session.getProject() ? await repository.listActivity(projectId) : []);",
+  "prepared ? prepared.segments : await repository.listSegments(projectId)",
+  "session.replaceSegments(",
+  "prepared ? prepared.activity : await repository.listActivity(projectId)",
+  "await options.preload.take(projectId)",
   "await terms.refresh();",
   "const activeIndex = session.getSegments().length ? 0 : -1;",
   "await filters.ready();",
@@ -2311,8 +2313,8 @@ for (const snippet of [
   "ProjectCollectionLoadController requires project session boundaries.",
   "ProjectCollectionLoadController requires dirty-state and summary boundaries.",
   "ProjectCollectionLoadController requires presentation and selection boundaries.",
-  "async function load(selectFirst = false)",
-  "session.replaceProjects(await repository.list());",
+  "async function load(selectFirst = false, { catalog = false } = {})",
+  "session.replaceProjects(records);",
   "const knownProjectIds = new Set(session.getProjects().map((project) => project.id));",
   "session.pruneProjectSummaryRevisions(knownProjectIds);",
   "dirty.prune();",
@@ -2322,7 +2324,7 @@ for (const snippet of [
   "void presentation.renderTrashSummary();",
   "if (selectFirst && !session.getProject() && session.getProjects()[0])",
   "await selection.open(session.getProjects()[0].id);",
-  "return Object.freeze({ load });"
+  "return Object.freeze({ load, preview });"
 ]) {
   assertIncludes(
     projectCollectionLoadControllerJs,
@@ -2333,7 +2335,7 @@ for (const snippet of [
 for (const boundary of [
   "const projectCollectionLoadController =",
   "appRuntime.featureFactories.createProjectCollectionLoadController({",
-  "repository: { list: listProjects }",
+  "listCatalog: async () => (await storageApi.readCatalog()).projects",
   "getProject: editorSessionStore.getProject",
   "getProjects: editorSessionStore.getProjects",
   "replaceProjects: editorSessionStore.replaceProjects",
@@ -2349,7 +2351,7 @@ for (const boundary of [
 }
 assert(
   (appJs.match(/createProjectCollectionLoadController\(/g) || []).length === 1 &&
-    (appJs.match(/\bprojectCollectionLoadController\.load\b/g) || []).length === 7 &&
+    (appJs.match(/\bprojectCollectionLoadController\.load\b/g) || []).length === 8 &&
     (appWorkflowDriverJs.match(/\bprojectCollectionLoadController\.load\b/g) || []).length === 12,
   "app.js must compose one project-collection load controller and all seven application and twelve workflow consumers must call it directly."
 );
@@ -3450,7 +3452,7 @@ for (const boundary of [
 for (const [method, appCount, workflowCount] of [
   ["links", 4, 0],
   ["mainTm", 4, 12],
-  ["tmNames", 10, 0],
+  ["tmNames", 11, 0],
   ["termBaseNames", 12, 2],
   ["primaryTermBase", 6, 15],
   ["summary", 4, 1]
@@ -5219,9 +5221,9 @@ for (const testName of [
 for (const snippet of [
   "ResourceCatalogRefreshController requires resource repository boundaries.",
   "ResourceCatalogRefreshController requires a Resources presentation boundary.",
-  "async function refresh()",
-  "const pending = [repository.listTmEntries(), repository.listTerms()];",
-  "if (hasStableResources) pending.push(repository.listResources());",
+  "function refresh()",
+  "const catalog = repository.readCatalog ? await repository.readCatalog() : null;",
+  "if (!catalog && hasStableResources) pending.push(repository.listResources());",
   "const settled = await Promise.all(pending);",
   "return presentation.setResources(legacy) || { ...legacy };",
   "presentation.setResources({ tmEntries, terms, resources: enrichedResources })",
@@ -5244,7 +5246,7 @@ for (const boundary of [
 }
 assert(
   (appJs.match(/createResourceCatalogRefreshController\(/g) || []).length === 1 &&
-    (appJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 10 &&
+    (appJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 11 &&
     (appWorkflowDriverJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 4,
   "app.js must compose one resource-catalog refresh controller and all ten application and four workflow consumers must call it directly."
 );
@@ -5612,7 +5614,8 @@ for (const snippet of [
   'tm.listByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`)',
   'if (run !== analysisRun || navigation.getView() !== "project" || session.getProject()?.id !== project.id) return;',
   "const tmNames = new Set(resources.tmNames(project));",
-  "const result = analysis.build(",
+  "result = await analysis.buildAsync(project, segments, linked, controller.signal)",
+  "pendingAnalysis?.abort()",
   "tmEntries.filter((entry) => tmNames.has(entry.tmName))",
   "const ai = result.ai || {};",
   'localization.label("generatedAt", {',
@@ -5641,9 +5644,11 @@ for (const boundary of [
   "getProject: editorSessionStore.getProject",
   "getSegments: editorSessionStore.getSegments",
   "getView: () => applicationStore.getState().navigation.view",
-  "tm: { listByIndex: getAllByIndex }",
+  "listByIndex: getAllByIndex",
+  'getAllByIndex("tmEntries", "tmName", name)',
   "resources: { tmNames: projectResourceContextService.tmNames }",
-  "analysis: { build: analyzeProject }",
+  "workerClient.analyzeTm({",
+  "return analyzeProject(project, segments, [], scores)",
   "date: { format: applicationDateTimeService.date }",
   "localization: uiLocalizationService",
   "hasRoot: () => Boolean(els.projectAnalysis)",
@@ -6335,8 +6340,8 @@ for (const snippet of [
   'openButton.dataset.resourceAction = "open"',
   'tmDetail.classList.add("hidden")',
   'tbDetail.classList.add("hidden")',
-  'localization.labelHtml("entryCount", { count: entries.length })',
-  'localization.labelHtml("termCount", { count: terms.length })',
+  'localization.labelHtml("entryCount", { count: info.catalogPending ? "…" : (info.entryCount ?? entries.length) })',
+  'localization.labelHtml("termCount", { count: info.catalogPending ? "…" : (info.entryCount ?? terms.length) })',
   'row.dataset.resourceRow = "tm"',
   'row.dataset.resourceRow = "tb"',
   'term.isForbidden ? "checked" : ""',
@@ -7596,13 +7601,13 @@ assert(
   !appJs.includes("storageConstants?.SCHEMA_VERSION ||"),
   "app.js must not use a stale numeric schema fallback when writing packages or backups."
 );
-assertIncludes(packageFormatDocs, "Current version: `5`", "Project-package documentation must name schema version 5.");
+assertIncludes(packageFormatDocs, "Current version: `6`", "Project-package documentation must name schema version 6.");
 assertIncludes(
   packageFormatDocs,
-  "`3` through `5`",
-  "Project-package documentation must describe the accepted schema range 3 through 5."
+  "`3` through `6`",
+  "Project-package documentation must describe the accepted schema range 3 through 6."
 );
-assert(modernizationFixture.schemaVersion === 5, "Modernization fixture must use the current schema version 5.");
+assert(modernizationFixture.schemaVersion === 5, "Modernization fixture must retain schema 5 to exercise legacy import.");
 assert(
   Array.isArray(modernizationFixture.projects) && modernizationFixture.projects.length === 1,
   "Modernization fixture must contain one deterministic project."
@@ -8369,9 +8374,10 @@ assert(
   "UI-locale and workflow Resources rendering must use the late checked ResourcesController receiver directly."
 );
 assert(
-  appJs.split("resourcesController?.getItems?.(type, key) || []").length - 1 === 3 &&
-    appWorkflowDriverJs.split('resourcesController?.getItems?.("tm", bulkTmKey) || []').length - 1 === 1,
-  "resource export, mutation, presentation, and workflow lookup must call ResourcesController directly with the original empty fallback."
+  appJs.split("resourcesController?.getItems?.(type, key) || []").length - 1 === 1 &&
+    appJs.split("(await loadResourceEntries(type, key)).rows").length - 1 === 2 &&
+    appWorkflowDriverJs.split('(await loadResourceEntries("tm", bulkTmKey)).rows').length - 1 === 1,
+  "Resource presentation uses the loaded page; export and deletion explicitly load the complete selected resource."
 );
 assert(
   !/function\s+renderResourcesView\b/.test(appJs) &&
@@ -11383,7 +11389,9 @@ assert(
 );
 assert(
   appJs.split("targetProducerController.insertProtectedTag(").length - 1 === 1 &&
-    segmentMarkupPresentationServiceJs.split("targetProducer.insertProtectedTag(").length - 1 === 2,
+    segmentMarkupPresentationServiceJs.split("targetProducer.insertProtectedTag(").length - 1 === 1 &&
+    segmentMarkupPresentationServiceJs.includes("insertAfterSelection(container, marker.tag.text, event)") &&
+    segmentMarkupPresentationServiceJs.includes("insertAfterSelection(row, tag.text, event)"),
   "protected-tag source and tray UI paths must route through SegmentMarkupPresentationService to the injected TargetProducerController."
 );
 for (const directWorkflowCall of [
@@ -12467,7 +12475,8 @@ for (const boundary of [
   "targetState: segmentTargetStateService",
   "autosave: { clear: autosaveService.clear, retry: autosaveService.debounce }",
   "restoreResourceSegment: (segment) => {",
-  "return restoreSegmentWithMainTm(editorSessionStore.getProject(), segment, {",
+  "return commandPersistence.run([segment], () =>",
+  "restoreSegmentWithMainTm(editorSessionStore.getProject(), segment, {",
   "getActiveSegment: applicationActiveSegmentService.get",
   "applicationNavigation.selectSegment({ activeIndex: index, segmentId })",
   "verticalFeatureState?.segmentGrid?.selectSegment(index, segmentId)",
@@ -13651,8 +13660,8 @@ for (const snippet of [
   "presentation.renderValidation(backupValidation)",
   "const noteCount = validation.count(backupValidation)",
   "`${delivery?.verified ? \"Backup verified\" : \"Download requested\"} with ${noteCount} validation note${noteCount === 1 ? \"\" : \"s\"}`",
-  'const message = error.message || "Backup export failed."',
-  "error.validation || validation.errorReport(message)",
+  '`Backup export failed: ${error.message}`',
+  "if (error.validation) presentation.renderValidation(error.validation)",
   "return false",
   "function reportProjectPackageExportFailure(error, pkg = null)",
   "error?.validation || pkg?.validation || validation.errorReport(message)",
@@ -14138,8 +14147,8 @@ for (const snippet of [
   'const manifestWarning = reference.manifestSaved === false ? "; manifest update failed" : ""',
   "Workspace backup saved: ${reference.path}${manifestWarning}",
   'reference.manifestSaved === false || validation.count(validationReport) ? "dirty" : "saved"',
-  'const message = error.message || "Workspace backup failed."',
-  "presentation.renderValidation(error.validation || validation.errorReport(message))",
+  '`Workspace backup failed: ${error.message}`',
+  "if (error.validation) presentation.renderValidation(error.validation)",
   'status.set(message, "dirty")',
   "throw error",
   "return Object.freeze({ exportBackup })"
@@ -14193,7 +14202,7 @@ for (const testName of [
   "WorkspaceBackupExportController preserves manifest-warning suffix and validation-count short circuit",
   "WorkspaceBackupExportController marks a manifest-success backup dirty for validation notes",
   "WorkspaceBackupExportController preserves attached validation on primary build failure",
-  "WorkspaceBackupExportController generates a fallback report and fallback message for write failure",
+  "WorkspaceBackupExportController reports a write failure without an unrelated file validation report",
   "WorkspaceBackupExportController preserves durable write before a late workspace-refresh failure",
   "WorkspaceBackupExportController contains late rendering and validation-count failures with exact rethrow",
   "WorkspaceBackupExportController preserves first status failure recovery and original error identity",
@@ -14799,7 +14808,7 @@ for (const snippet of [
   'throw new TypeError("ConcordanceController requires browser DOM boundaries.")',
   "const selection = dom.getSelection()?.toString().trim()",
   'if (selection) return selection.replace(/\\s+/g, " ")',
-  'if (active?.tagName === "TEXTAREA" || active?.tagName === "INPUT")',
+  'if (active?.matches?.(".target-editor") || active?.tagName === "TEXTAREA" || active?.tagName === "INPUT")',
   "value.slice(active.selectionStart || 0, active.selectionEnd || 0).trim()",
   "const escaped = text.escapeHtml(textValue)",
   'new RegExp(text.escapeRegExp(text.escapeHtml(keyword)), "gi")',
@@ -23053,17 +23062,19 @@ for (const snippet of [
   "projectId: context.getProjectId()",
   "segmentId: context.getSegmentId()",
   'view.setText(displayText ? localization.source(displayText) : "")',
-  "view.setClass(`save-status ${mode}`)",
+  'view.setClass(`save-status ${(persistenceNotice || storageNotice) && !initializationNotice ? "error" : mode}`)',
   'mode !== "saved" && OPERATION_PATTERN.test(displayText) && !COMPLETED_PATTERN.test(displayText)',
-  "view.setBusy(String(operationActive))",
-  "persistent = Boolean(persistenceNotice) || operationActive || PENDING_SAVE_PATTERN.test(displayText)",
+  "view.setBusy(String(Boolean(initializationNotice) || operationActive))",
+  "Boolean(initializationNotice || persistenceNotice || storageNotice)",
+  "ROUTINE_SAVE_PATTERN.test(displayText)",
+  'function setStorage(text = "")',
   "noticeTimer = timers.set(() => {",
   "if (revision !== noticeRevision) return",
   'view.setText("")',
   'view.setClass("save-status")',
   "}, NOTICE_DURATION_MS)",
   "function navigationChanged(next, previous)",
-  "return Object.freeze({ set, setPersistence, navigationChanged })"
+  "return Object.freeze({ set, setPersistence, setInitialization, setStorage, navigationChanged })"
 ]) {
   assertIncludes(
     applicationSaveStatusControllerJs,
@@ -23122,9 +23133,10 @@ for (const forbiddenOwner of [
 for (const testName of [
   "ApplicationSaveStatusController preserves redaction, live context, model, and visible presentation order",
   "ApplicationSaveStatusController preserves falsy text normalization and every operation-busy branch",
-  "ApplicationSaveStatusController cancels notice expiry when unsaved work replaces it",
+  "Routine autosave updates the durability model without interrupting notices",
   "ApplicationSaveStatusController dismisses completed successes, failures, and warnings without claiming a save",
-  "ApplicationSaveStatusController preserves running operations and pending autosave indicators",
+  "ApplicationSaveStatusController preserves running operations and save failures",
+  "Unrelated autosave acknowledgements cannot clear a durable storage error",
   "ApplicationSaveStatusController clears notices when changing screens, projects, or files but not segments",
   "ApplicationSaveStatusController ignores expired callbacks after navigation or a newer operation",
   "ApplicationSaveStatusController preserves synchronous failure timing",
@@ -23178,11 +23190,10 @@ for (const snippet of [
   'reporting.checkpoint("starting application bootstrap")',
   'reporting.progress("startup: restoring workspace state")',
   "workspace.restoreDirty()",
-  'reporting.progress("startup: checking storage durability")',
-  "await durability.refresh()",
+  "void guarded(() => durability.refresh())",
   "if (workspace.reconnect)",
-  'reporting.progress("startup: reconnecting workspace")',
-  "workspace.assignStatus(await workspace.reconnect())",
+  "const status = await workspace.reconnect()",
+  "workspace.assignStatus(status)",
   "workspace.renderStatus()",
   'reporting.progress("startup: loading projects")',
   "await projects.load(false)",
@@ -24917,8 +24928,8 @@ assertIncludes(
 );
 assertIncludes(
   baselineCaptureScript,
-  "const expectedScreenshotCount = 87;",
-  "the deterministic visual checkpoint count must include validation, quality, review, recovery/workspace, and AI administration states."
+  "const expectedScreenshotCount = 111;",
+  "the deterministic visual checkpoint count must include both collection layouts, validation, quality, review, recovery/workspace, and AI administration states."
 );
 assertIncludes(
   baselineCaptureScript,
@@ -24957,7 +24968,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "workspace folder connection marks local projects missing from the folder dirty",
+  "workspace folder connection reports pending external copies inside Workspace without renaming navigation",
   "app workflow test must verify connecting a folder marks local browser-cache projects missing from that folder as needing package saves."
 );
 assertIncludes(
@@ -28298,6 +28309,21 @@ assertIncludes(
 assertIncludes(desktopWorkflow, "web:", "Desktop release workflow must include a separate static HTML artifact job.");
 assertIncludes(
   desktopWorkflow,
+  "release_profile:",
+  "Desktop release workflow must require an explicit preview or production qualification profile for manual builds."
+);
+assertIncludes(
+  desktopWorkflow,
+  "inputs.release_profile == 'production'",
+  "Desktop release workflow must keep production-profile builds gated on signing credentials and verification."
+);
+assertIncludes(
+  desktopWorkflow,
+  "--artifact-selection-only",
+  "Desktop release workflow must still verify public artifact selection for unsigned manual preview builds."
+);
+assertIncludes(
+  desktopWorkflow,
   "Build static HTML artifact",
   "Desktop release workflow must build the static HTML distribution separately from desktop artifacts."
 );
@@ -28415,6 +28441,11 @@ assertIncludes(
   desktopWorkflow,
   "pattern: LoopCAT-*",
   "Desktop release bundle job must keep downloading only LoopCAT-* desktop artifacts."
+);
+assertIncludes(
+  desktopWorkflow,
+  "path: release-dist/Static-Web-Bundle",
+  "Desktop release bundle job must download the static web artifact into the verified release bundle."
 );
 assertIncludes(
   desktopWorkflow,
@@ -28574,6 +28605,10 @@ assert(
   "Desktop release bundle job must download desktop artifacts after the separate web artifact upload block."
 );
 assert(
+  desktopWorkflow.indexOf("path: release-dist/Static-Web-Bundle") > desktopWorkflow.indexOf("pattern: LoopCAT-*"),
+  "Desktop release bundle job must download the web artifact after the desktop artifacts."
+);
+assert(
   desktopWorkflow.indexOf("pnpm run verify:provenance-selftest") > desktopWorkflow.indexOf("pnpm run verify:release"),
   "Desktop release workflow must self-test provenance validation after the release contract check."
 );
@@ -28631,9 +28666,10 @@ assert(
     desktopWorkflow.indexOf("${{ matrix.browserCommand }}"),
   "Desktop release workflow must self-test signing environment verification before browser tests and packaging."
 );
-assert(
-  !desktopWorkflow.includes("--artifact-selection-only"),
-  "Desktop release workflow must run real platform signature checks, not artifact-selection-only mode."
+assertIncludes(
+  desktopWorkflow,
+  "Verify platform signatures and notarization",
+  "Desktop release workflow must retain real platform signature checks for production builds."
 );
 assert(
   desktopWorkflow.indexOf("${{ matrix.browserCommand }}") > desktopWorkflow.indexOf("pnpm run verify:release"),
@@ -28682,6 +28718,10 @@ assert(
 assert(
   desktopWorkflow.indexOf("${{ matrix.platformSignatureCommand }}") < desktopWorkflow.indexOf("pnpm run checksums"),
   "Desktop release workflow must verify signatures/notarization before checksum generation."
+);
+assert(
+  desktopWorkflow.indexOf("--artifact-selection-only") < desktopWorkflow.indexOf("pnpm run checksums"),
+  "Desktop release workflow must verify preview artifact selection before checksum generation."
 );
 assert(
   desktopWorkflow.indexOf("${{ matrix.downloadArtifactCommand }}") < desktopWorkflow.indexOf("pnpm run checksums"),

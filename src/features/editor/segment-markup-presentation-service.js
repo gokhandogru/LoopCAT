@@ -61,6 +61,7 @@ export function createSegmentMarkupPresentationService(options) {
       chip.textContent = protectedTags.displayText(tag);
       chip.title = interactive ? `Insert protected text: ${tag.text}` : `Protected text: ${tag.text}`;
       if (interactive) {
+        chip.addEventListener("mousedown", (event) => event.preventDefault());
         chip.addEventListener("click", (event) => insertAfterSelection(container, tag.text, event));
       }
       container.append(chip);
@@ -104,6 +105,7 @@ export function createSegmentMarkupPresentationService(options) {
         chip.className = `tag-chip tag-chip-${marker.tag.type || "placeholder"} tag-chip-action`;
         chip.textContent = protectedTags.displayText(marker.tag);
         chip.title = `Insert protected text: ${marker.tag.text}`;
+        chip.addEventListener("mousedown", (event) => event.preventDefault());
         chip.addEventListener("click", (event) => insertAfterSelection(container, marker.tag.text, event));
         container.append(chip);
       } else {
@@ -129,7 +131,8 @@ export function createSegmentMarkupPresentationService(options) {
       chip.className = `tag-chip tag-chip-${tag.type || "placeholder"} tag-chip-action`;
       chip.textContent = protectedTags.displayText(tag);
       chip.title = `Insert protected text: ${tag.text}`;
-      chip.addEventListener("click", () => targetProducer.insertProtectedTag(tag.text));
+      chip.addEventListener("mousedown", (event) => event.preventDefault());
+      chip.addEventListener("click", (event) => insertAfterSelection(row, tag.text, event));
       tray.append(chip);
     });
     const targetCell = row.querySelector(".target-cell");
@@ -140,6 +143,12 @@ export function createSegmentMarkupPresentationService(options) {
     const preview = row.querySelector(".target-tag-preview");
     const targetCell = row.querySelector(".target-cell");
     if (!preview) return;
+    if (row.querySelector(".target-editor")) {
+      preview.textContent = "";
+      preview.classList.add("hidden");
+      targetCell?.classList.remove("has-target-preview");
+      return;
+    }
     const tags = protectedTags.targetTags(segment);
     preview.textContent = "";
     targetCell?.classList.toggle("has-target-preview", Boolean(tags.length));

@@ -155,6 +155,35 @@ function createHarness(createProjectAnalysisController, overrides = {}) {
   };
 }
 
+test("Project analysis is skipped on immediate editor navigation and cancels obsolete background work", async () => {
+  const { createProjectAnalysisController } = await loadFactory();
+  const h = createHarness(createProjectAnalysisController);
+  let signal;
+  const pending = deferred();
+  h.options.analysis.buildAsync = (_project, _segments, _entries, nextSignal) => {
+    signal = nextSignal;
+    return pending.promise;
+  };
+  const skipped = h.controller.render();
+  h.setView("editor");
+  await h.controller.render();
+  await skipped;
+  assert.equal(signal, undefined);
+  assert.equal(h.calls.filter(([name]) => name === "tm.listByIndex").length, 0);
+  h.setView("project");
+  const old = h.controller.render();
+  await new Promise((resolve) => {
+    setTimeout(resolve, 300);
+  });
+  assert.equal(signal.aborted, false);
+  h.setView("editor");
+  await h.controller.render();
+  assert.equal(signal.aborted, true);
+  pending.resolve(defaultAnalysis());
+  await old;
+  assert.equal(h.presentationState.html, "");
+});
+
 test("ProjectAnalysisController preserves no-project, view, and root guard order", async () => {
   const { createProjectAnalysisController } = await loadFactory();
   const noProject = createHarness(createProjectAnalysisController, { project: null });

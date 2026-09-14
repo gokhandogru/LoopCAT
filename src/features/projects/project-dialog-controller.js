@@ -57,6 +57,7 @@ export function createProjectDialogController(options) {
   let focusAiAfterOpen = false;
   let resumeWithoutPrepare = false;
   let mounted = false;
+  let opening = false;
 
   function listen(target, type, listener) {
     if (!target?.addEventListener) return;
@@ -113,12 +114,26 @@ export function createProjectDialogController(options) {
   }
 
   async function open(nextMode = "create", openOptions = {}) {
+    if (opening) return false;
     mode = normalizeMode(nextMode);
     resumeWithoutPrepare = Boolean(openOptions.resume);
     focusAiAfterOpen = Boolean(openOptions.focusAi && mode === "edit" && getProject());
     const hasReturnTarget = Object.prototype.hasOwnProperty.call(openOptions, "returnTarget");
     const activeReturnTarget = hasReturnTarget ? null : getActiveElement() || null;
+    const opener = openers.find((item) => item.element === (openOptions.returnTarget || activeReturnTarget))?.element;
+    const previousDisabled = opener?.getAttribute?.("aria-disabled");
+    const previousText = opener?.textContent;
+    const previousBusy = opener?.getAttribute?.("aria-busy");
+    const replaceLabel = opener && !opener.childElementCount;
+    opening = true;
     try {
+      if (opener) {
+        // Keep the native opener focusable so showModal() records the element
+        // that must regain focus immediately when the dialog closes.
+        opener.setAttribute?.("aria-disabled", "true");
+        opener.setAttribute?.("aria-busy", "true");
+        if (replaceLabel) opener.textContent = translate("Opening project...");
+      }
       return await dialogLifecycle.open("project", {
         initialFocus: nameInput,
         returnTarget: hasReturnTarget ? openOptions.returnTarget || null : activeReturnTarget
@@ -126,6 +141,15 @@ export function createProjectDialogController(options) {
     } catch (error) {
       onError(error, { phase: "open" });
       return false;
+    } finally {
+      opening = false;
+      if (opener) {
+        if (previousDisabled == null) opener.removeAttribute?.("aria-disabled");
+        else opener.setAttribute?.("aria-disabled", previousDisabled);
+        if (previousBusy == null) opener.removeAttribute?.("aria-busy");
+        else opener.setAttribute?.("aria-busy", previousBusy);
+        if (replaceLabel) opener.textContent = previousText;
+      }
     }
   }
 

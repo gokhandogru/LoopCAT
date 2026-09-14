@@ -84,11 +84,14 @@ export function createResourcesPresentationService(options) {
     const summaries = stableResources.length
       ? stableResources
           .map((resource) => {
-            const resourceEntries = entries.filter(
-              (entry) =>
-                entry.resourceId === resource.id ||
-                (!entry.resourceId && entry[isTm ? "tmName" : "termBaseName"] === resource.name)
-            );
+            const resourceEntries =
+              resource.entryCount !== undefined || resource.catalogPending
+                ? []
+                : entries.filter(
+                    (entry) =>
+                      entry.resourceId === resource.id ||
+                      (!entry.resourceId && entry[isTm ? "tmName" : "termBaseName"] === resource.name)
+                  );
             const updatedAt = resourceEntries.reduce(
               (latest, entry) => {
                 const timestamp = entry.updatedAt || entry.createdAt || "";
@@ -99,7 +102,7 @@ export function createResourcesPresentationService(options) {
             return {
               ...resource,
               key: resource.id,
-              count: resourceEntries.length,
+              count: resource.catalogPending ? "…" : (resource.entryCount ?? resourceEntries.length),
               updatedAt,
               languagePair: resource.languagePair || `${resource.sourceLang || ""}::${resource.targetLang || ""}`
             };
@@ -215,6 +218,32 @@ export function createResourcesPresentationService(options) {
     table.replaceChildren(fragment);
   }
 
+  function renderPaging(detail, state) {
+    if (!state.page) return;
+    const paging = ownerDocument.createElement("div");
+    paging.className = "toolbar-actions resource-pagination";
+    const status = ownerDocument.createElement("span");
+    status.setAttribute("role", "status");
+    status.textContent = state.page.loading
+      ? localization.source("Loading…")
+      : state.page.error || String(state.page.index + 1);
+    paging.append(status);
+    for (const [action, label, disabled] of [
+      ["previous-page", "Previous", state.page.loading || state.page.index === 0],
+      ["next-page", "Next", state.page.loading || !state.page.next],
+      ...(state.page.error ? [["retry-page", "Retry", false]] : [])
+    ]) {
+      const button = ownerDocument.createElement("button");
+      button.type = "button";
+      button.textContent = localization.source(String(label));
+      button.dataset.resourceAction = action;
+      button.disabled = Boolean(disabled);
+      paging.append(button);
+    }
+    detail.setAttribute("aria-busy", String(state.page.loading));
+    detail.append(paging);
+  }
+
   function renderTmEntryRow(entry) {
     const row = ownerDocument.createElement("article");
     row.className = "resource-row";
@@ -295,7 +324,7 @@ export function createResourcesPresentationService(options) {
     <div class="resource-detail-header">
       <div>
         <h3>${displaySafeHtml(info.name)}</h3>
-        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${localization.labelHtml("entryCount", { count: entries.length })}</p>
+        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${localization.labelHtml("entryCount", { count: info.catalogPending ? "…" : (info.entryCount ?? entries.length) })}</p>
       </div>
       <div class="toolbar-actions">
         ${info.id ? `<button type="button" data-resource-action="add-entry" data-resource-type="tm" data-resource-key="${escapeHtml(resourceState.openKey)}" data-resource-id="${escapeHtml(info.id)}">${localization.sourceHtml("Add entry")}</button>` : ""}
@@ -306,6 +335,7 @@ export function createResourcesPresentationService(options) {
   `
     );
     replaceRows(tmDetail.querySelector(".resource-table"), entries, renderTmEntryRow);
+    renderPaging(tmDetail, resourceState);
   }
 
   function renderTbDetail(resourceState) {
@@ -324,7 +354,7 @@ export function createResourcesPresentationService(options) {
     <div class="resource-detail-header">
       <div>
         <h3>${displaySafeHtml(info.name)}</h3>
-        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${localization.labelHtml("termCount", { count: terms.length })}</p>
+        <p>${escapeHtml(languagePairDisplay(info.sourceLang, info.targetLang))} - ${localization.labelHtml("termCount", { count: info.catalogPending ? "…" : (info.entryCount ?? terms.length) })}</p>
       </div>
       <div class="toolbar-actions">
         ${info.id ? `<button type="button" data-resource-action="add-entry" data-resource-type="tb" data-resource-key="${escapeHtml(resourceState.openKey)}" data-resource-id="${escapeHtml(info.id)}">${localization.sourceHtml("Add term")}</button>` : ""}
@@ -335,6 +365,7 @@ export function createResourcesPresentationService(options) {
   `
     );
     replaceRows(tbDetail.querySelector(".resource-table"), terms, renderTermRow);
+    renderPaging(tbDetail, resourceState);
   }
 
   function render(resourceState) {

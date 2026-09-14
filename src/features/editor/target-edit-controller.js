@@ -1,4 +1,11 @@
 import { KEYBOARD_SHORTCUTS, isUsableShortcutEvent, matchesShortcut } from "../../app/keyboard-shortcuts.js";
+import {
+  protectedTokenRanges,
+  normalizeProtectedSelection,
+  protectedInputSelection,
+  permitsProtectedEdit,
+  expandProtectedDeletion
+} from "./protected-token-edit-guard.js";
 
 function normalizeSelection(selection, targetLength) {
   if (!selection) return null;
@@ -34,7 +41,7 @@ function normalizeSelection(selection, targetLength) {
  *   quickInsert?: { hasSuggestions?: () => boolean, open?: () => Promise<unknown> | unknown },
  *   termCapture?: { open?: () => Promise<unknown> | unknown },
  *   predictiveTyping?: { prepare?: () => unknown, onInput?: (editor: any, index: number, event?: any) => unknown, handleKeydown?: (event: any) => boolean, hide?: () => unknown },
- *   protectedTags?: { missing?: (segment: any) => any[], insert?: (tagTexts: string[]) => Promise<unknown> | unknown }
+ *   protectedTags?: { missing?: (segment: any) => any[], targetTags?: (segment: any) => any[], insert?: (tagTexts: string[]) => Promise<unknown> | unknown }
  * }} options
  */
 export function createTargetEditController(options) {
@@ -117,10 +124,16 @@ export function createTargetEditController(options) {
     return recorded;
   }
 
-  function updateDraft(index, target) {
+  function tokenRanges(segment) {
+    return protectedTokenRanges(segment?.target || "", protectedTags.targetTags?.(segment) || []);
+  }
+
+  function updateDraft(index, target, intent = null) {
     globalThis.window?.CatHan?.ownership?.assertWritable(editorSessionStore.getProject()?.id);
     const segment = editorSessionStore.getSegments()[index];
     if (!segment) return null;
+    if (!permitsProtectedEdit(String(segment.target || ""), String(target || ""), tokenRanges(segment), intent))
+      return null;
     if (!editTargetSessions.has(segment.id)) {
       editTargetSessions.begin({
         projectId: segment.projectId || editorSessionStore.getProject()?.id,
@@ -144,7 +157,11 @@ export function createTargetEditController(options) {
     const editor = selection.findEditor(index);
     editor?.focus?.();
     if (editor && targetSelection) {
-      const normalized = normalizeSelection(targetSelection, String(editor.value || "").length);
+      const normalized = normalizeProtectedSelection(
+        targetSelection,
+        String(editor.value || "").length,
+        tokenRanges(editorSessionStore.getSegments()[index])
+      );
       editor.setSelectionRange?.(normalized.start, normalized.end);
     }
     return editor || null;
@@ -153,11 +170,12 @@ export function createTargetEditController(options) {
   function activeSelection(segment) {
     const editor = selection.findEditor(selection.getActiveIndex());
     const length = String(segment?.target || "").length;
-    return normalizeSelection(
+    return normalizeProtectedSelection(
       editor
         ? { start: editor.selectionStart ?? length, end: editor.selectionEnd ?? length }
         : { start: length, end: length },
-      length
+      length,
+      tokenRanges(segment)
     );
   }
 
@@ -241,6 +259,66 @@ export function createTargetEditController(options) {
       "title",
       "Confirm: Ctrl/Cmd+Enter · Add term: Ctrl/Cmd+Shift+G · Quick Insert: Tab or Alt+Insert · Navigate: Alt+Up/Down · Insert tags: F8"
     );
+    let inputIntent = null;
+    function prepareInput(inputType = "", replacement = undefined) {
+      const segment = editorSessionStore.getSegments()[index];
+      if (!segment || /^(historyUndo|historyRedo)$/.test(inputType)) {
+        inputIntent = null;
+        return;
+      }
+      const value = String(segment.target || "");
+      const nextSelection = protectedInputSelection(
+        { start: textarea.selectionStart, end: textarea.selectionEnd },
+        value.length,
+        tokenRanges(segment),
+        inputType
+      );
+      if (nextSelection.start !== textarea.selectionStart || nextSelection.end !== textarea.selectionEnd) {
+        textarea.setSelectionRange?.(nextSelection.start, nextSelection.end);
+      }
+      if (/^delete/.test(inputType)) replacement = "";
+      else if (/^(insertLineBreak|insertParagraph)$/.test(inputType)) replacement = "\n";
+      else if (replacement == null && inputIntent?.value === value && inputIntent.inputType === inputType)
+        replacement = inputIntent.replacement;
+      inputIntent = {
+        value,
+        selection: nextSelection,
+        inputType,
+        replacement: typeof replacement === "string" ? replacement.replace(/\r\n?/g, "\n") : undefined
+      };
+    }
+    function applyInput(event) {
+      let result = updateDraft(index, textarea.value, inputIntent);
+      inputIntent = null;
+      if (!result && /^delete/.test(event?.inputType || "")) {
+        const segment = editorSessionStore.getSegments()[index];
+        const expanded = expandProtectedDeletion(String(segment?.target || ""), textarea.value, tokenRanges(segment));
+        if (expanded) {
+          result = updateDraft(index, expanded.value, expanded.intent);
+          if (result) {
+            textarea.value = expanded.value;
+            textarea.setSelectionRange?.(expanded.caret, expanded.caret);
+          }
+        }
+      }
+      if (!result) {
+        const segment = editorSessionStore.getSegments()[index];
+        const restoredSelection = { start: textarea.selectionStart, end: textarea.selectionEnd };
+        textarea.value = segment?.target || "";
+        const safeSelection = normalizeProtectedSelection(
+          restoredSelection,
+          textarea.value.length,
+          tokenRanges(segment)
+        );
+        textarea.setSelectionRange?.(safeSelection.start, safeSelection.end);
+        predictiveTyping.hide?.();
+        return;
+      }
+      textarea.refreshTokens?.();
+      predictiveTyping.onInput?.(textarea, index, {
+        isComposing: composingEditors.has(textarea) || event?.isComposing
+      });
+    }
     const listeners = {
       focus: () => {
         editingCell?.classList?.add?.("editing");
@@ -252,19 +330,47 @@ export function createTargetEditController(options) {
         predictiveTyping.hide?.();
       },
       compositionstart: () => {
+        prepareInput("insertCompositionText");
         composingEditors.add(textarea);
         predictiveTyping.hide?.();
       },
       compositionend: () => {
         composingEditors.delete(textarea);
+        textarea.refreshTokens?.();
         predictiveTyping.onInput?.(textarea, index);
       },
-      input: (event) => {
-        updateDraft(index, textarea.value);
-        predictiveTyping.onInput?.(textarea, index, {
-          isComposing: composingEditors.has(textarea) || event?.isComposing
-        });
+      input: applyInput,
+      beforeinput: (event) => {
+        if (textarea.refreshTokens && /^(historyUndo|historyRedo)$/.test(event.inputType)) {
+          event.preventDefault();
+          finalize(segmentId);
+          void (event.inputType === "historyUndo" ? undo() : redo());
+          return;
+        }
+        const beforeSelection = { start: textarea.selectionStart, end: textarea.selectionEnd };
+        prepareInput(event?.inputType || "", event?.data ?? event?.dataTransfer?.getData?.("text/plain"));
+        if (
+          !inputIntent ||
+          typeof inputIntent.replacement !== "string" ||
+          event?.cancelable === false ||
+          !event?.preventDefault
+        )
+          return;
+        const { value, selection: safe, replacement } = inputIntent;
+        if (safe.start === beforeSelection.start && safe.end === beforeSelection.end) return;
+        event.preventDefault();
+        // Some engines compute their replacement range before beforeinput.
+        // Apply an expanded/snap-to-boundary edit ourselves rather than trust it.
+        if (textarea.setRangeText) textarea.setRangeText(replacement, safe.start, safe.end, "end");
+        else {
+          textarea.value = value.slice(0, safe.start) + replacement + value.slice(safe.end);
+          textarea.setSelectionRange?.(safe.start + replacement.length, safe.start + replacement.length);
+        }
+        applyInput(event);
       },
+      paste: (event) => prepareInput("insertFromPaste", event?.clipboardData?.getData?.("text/plain")),
+      cut: () => prepareInput("deleteByCut"),
+      drop: (event) => prepareInput("insertFromDrop", event?.dataTransfer?.getData?.("text/plain")),
       keydown: (event) => handleKeydown(event, index)
     };
     Object.entries(listeners).forEach(([type, listener]) => textarea.addEventListener(type, listener));

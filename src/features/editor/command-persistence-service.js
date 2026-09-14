@@ -26,7 +26,9 @@ export function createCommandPersistenceService({ autosave, session, repository,
     for (const record of records) active.set(record.id, token);
     let committed = false;
     try {
-      const result = await action();
+      const operation = action();
+      autosave.trackCommand?.(records, operation);
+      const result = await operation;
       committed = true;
       return result;
     } finally {
@@ -40,6 +42,8 @@ export function createCommandPersistenceService({ autosave, session, repository,
   }
   return Object.freeze({
     clear,
+    // Atomic commands own the same pending typing obligation as ordinary saves.
+    run: write,
     save: (record) => write([record], () => repository.save(record)),
     saveMany: (records) => write(records, () => repository.saveMany(records))
   });

@@ -3,6 +3,7 @@
 import { createReliabilityControls } from "./reliability-controls.js";
 import { createVerifiedOutputService } from "../features/import-export/verified-output-service.js";
 import { createCommandPersistenceService } from "../features/editor/command-persistence-service.js";
+import { createRecentProjectCache } from "../features/projects/recent-project-cache.js";
 
 function tmDocumentContextKey(segment, documentIndex = -1) {
   const explicit = String(segment?.contextKey || "").trim();
@@ -1403,7 +1404,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     view: {
       setText: (value) => {
-        els.saveStatus.textContent = value;
+        if (els.saveStatus.textContent !== value) els.saveStatus.textContent = value;
       },
       setClass: (value) => {
         els.saveStatus.className = value;
@@ -1509,9 +1510,26 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       getSegments: editorSessionStore.getSegments
     },
     navigation: { getView: () => applicationStore.getState().navigation.view },
-    tm: { listByIndex: getAllByIndex },
+    tm: {
+      listByIndex: getAllByIndex,
+      listLinked: async (project) => {
+        const names = [...new Set(projectResourceContextService.tmNames(project))];
+        const records = await Promise.all(names.map((name) => getAllByIndex("tmEntries", "tmName", name)));
+        return records.flat().filter((entry) => entry.languagePair === `${project.sourceLang}::${project.targetLang}`);
+      }
+    },
     resources: { tmNames: projectResourceContextService.tmNames },
-    analysis: { build: analyzeProject },
+    analysis: {
+      build: analyzeProject,
+      buildAsync: async (project, segments, entries, signal) => {
+        const scores = await workerClient.analyzeTm({
+          sources: segments.map((segment) => segment.source),
+          entries: entries.map((entry) => entry.source),
+          signal
+        });
+        return analyzeProject(project, segments, [], scores);
+      }
+    },
     date: { format: applicationDateTimeService.date },
     localization: uiLocalizationService,
     presentation: {
@@ -1992,7 +2010,18 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       }
     });
 
+  const recentProjectCache = createRecentProjectCache({
+    repository: {
+      stamp: () => storageApi.readProjectCacheStamp(),
+      segments: getProjectSegments,
+      activity: listActivityEvents
+    },
+    preferences: localStorage,
+    preferenceKey: `loopcat-recent-projects:${storageConstants.DB_NAME || "local"}`
+  });
+  window.addEventListener("loopcat-committed", () => recentProjectCache.invalidate());
   const projectOpenController = appRuntime.featureFactories.createProjectOpenController({
+    preload: recentProjectCache,
     ownership: { open: (id) => reliabilityControls.open(id) },
     autosave: { flush: (...args) => autosaveService.flush(...args) },
     session: {
@@ -2064,6 +2093,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
 
   const resourceCatalogRefreshController = appRuntime.featureFactories.createResourceCatalogRefreshController({
     repository: {
+      readCatalog: () => storageApi.readCatalog(),
       listTmEntries,
       listTerms: () => getAll("terms"),
       listResources: () => listResources({ includeArchived: true }),
@@ -2075,7 +2105,12 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   });
 
   const projectCollectionLoadController = appRuntime.featureFactories.createProjectCollectionLoadController({
-    repository: { list: listProjects },
+    preload: recentProjectCache,
+    repository: {
+      list: listProjects,
+      listCatalog: async () => (await storageApi.readCatalog()).projects,
+      preview: () => storageApi.readCatalogPreview()?.projects || []
+    },
     session: {
       getProject: editorSessionStore.getProject,
       getProjects: editorSessionStore.getProjects,
@@ -2583,11 +2618,13 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       restoreResourceSegment: (segment) => {
         const segments = editorSessionStore.getSegments().filter((item) => item.documentId === segment.documentId);
         const index = segments.findIndex((item) => item.id === segment.id);
-        return restoreSegmentWithMainTm(editorSessionStore.getProject(), segment, {
-          documentKey: tmDocumentContextKey(segment, index),
-          previousSource: segments[index - 1]?.source || "",
-          nextSource: segments[index + 1]?.source || ""
-        });
+        return commandPersistence.run([segment], () =>
+          restoreSegmentWithMainTm(editorSessionStore.getProject(), segment, {
+            documentKey: tmDocumentContextKey(segment, index),
+            previousSource: segments[index - 1]?.source || "",
+            nextSource: segments[index + 1]?.source || ""
+          })
+        );
       }
     },
     selection: {
@@ -2875,7 +2912,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
         if (LOOPCAT_TEST_BUILD && segment[SAVE_TM_FAILURE_TEST_FLAG]) {
           throw new Error("Simulated TM save failure");
         }
-        return confirmSegmentWithMainTm(project, segment, context);
+        return commandPersistence.run([segment], () => confirmSegmentWithMainTm(project, segment, context));
       },
       saveToTm: segmentTmSaveController.save,
       logActivity: (segment, project) =>
@@ -2975,6 +3012,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     protectedTags: {
       missing: protectedTagInspectionService.missing,
+      targetTags: protectedTagInspectionService.targetTags,
       insert: (tagTexts) => targetProducerController.insertProtectedTags(tagTexts)
     }
   });
@@ -4436,7 +4474,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     selection: {
       getActiveIndex: () => applicationStore.getState().navigation.activeIndex,
-      findEditor: (index) => els.segmentBody.querySelector(`tr[data-index="${index}"] textarea`),
+      findEditor: (index) => els.segmentBody.querySelector(`tr[data-index="${index}"] .target-editor`),
       select: (index) =>
         applicationNavigation.selectSegment({
           activeIndex: index,
@@ -4824,6 +4862,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
 
   const workspaceLayoutController = appRuntime?.featureFactories?.createWorkspaceLayoutController?.({
     documentRoot: document.documentElement,
+    collectionDocument: document,
+    onCollectionPreferenceError: () =>
+      applicationSaveStatusController.set("View changed, but the preference could not be saved.", "dirty"),
     workspace: els.workspace,
     densitySelect: els.densitySelect,
     resetButton: els.resetLayoutBtn,
@@ -4966,7 +5007,8 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     durability: { refresh: applicationStorageDurabilityController.refresh },
     projects: {
-      load: projectCollectionLoadController.load,
+      load: () => projectCollectionLoadController.load(false, { catalog: true }),
+      preview: projectCollectionLoadController.preview,
       count: () => editorSessionStore.getProjects().length
     },
     preferences: {
@@ -5033,7 +5075,8 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     dialog: els.aboutDialog,
     opener: els.aboutBtn,
     closer: els.closeAboutBtn,
-    initialFocus: els.closeAboutBtn
+    initialFocus: els.closeAboutBtn,
+    returnTarget: els.workspaceMenuSummary
   });
   dialogLifecycleController?.register?.({
     id: "diagnostics",
@@ -5720,7 +5763,11 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     getActiveElement: () => document.activeElement,
     translate: uiLocalizationService.source,
     scheduleFrame: requestAnimationFrame,
-    onError: (error) => applicationSaveStatusController.set(error?.message || "Dialog could not be opened.", "dirty")
+    onError: (error) =>
+      applicationSaveStatusController.setPersistence(
+        `Project dialog could not be opened: ${error?.message || "Local storage is unavailable. Close LoopCAT completely and try again."}`,
+        "dirty"
+      )
   });
   projectDialogController.mount();
   projectResourceSelectionController.mount();
@@ -5800,12 +5847,16 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     alert: uiLocalizationService.alert,
     status: { set: applicationSaveStatusController.set }
   });
+  async function loadResourceEntries(type, key, page = { after: null, limit: Infinity }) {
+    const resource = (await storageApi.get("resources", key)) || resourceCatalogService.labelFromKey(key);
+    return storageApi.resourceEntries(type, resource, page);
+  }
   const resourceLibraryExportController = appRuntime.featureFactories.createResourceLibraryExportController({
     resources: {
       labelFromKey: (key) =>
         resourcesController?.getState?.().resources.find((resource) => resource.id === key) ||
         resourceCatalogService.labelFromKey(key),
-      items: (type, key) => resourcesController?.getItems?.(type, key) || []
+      items: async (type, key) => (await loadResourceEntries(type, key)).rows
     },
     builders: { buildTmx, buildTbx },
     fileSafeName: applicationTextSafetyService.fileSafeName,
@@ -5822,7 +5873,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       labelFromKey: (key) =>
         resourcesController?.getState?.().resources.find((resource) => resource.id === key) ||
         resourceCatalogService.labelFromKey(key),
-      items: (type, key) => resourcesController?.getItems?.(type, key) || []
+      items: async (type, key) => (await loadResourceEntries(type, key)).rows
     },
     commands: {
       execute: (...args) => appRuntime.commands.bus.execute(...args),
@@ -5887,6 +5938,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     replaceSafeHtml
   });
   const resourcesController = appRuntime?.featureFactories?.createResourcesController?.({
+    loadPage: loadResourceEntries,
     elements: {
       viewButton: els.resourcesViewBtn,
       tmTab: els.tmResourceTab,
@@ -6275,6 +6327,12 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     }
   });
   reliabilityControls.mount();
+  window.addEventListener("loopcat-catalog-ready", () => {
+    const view = applicationStore.getState().navigation.view;
+    if (view === "projects") void projectCollectionLoadController.load(false, { catalog: true }).catch(console.error);
+    if (view === "resources" && !resourcesController.getState().openKey)
+      void resourceCatalogRefreshController.refresh().catch(console.error);
+  });
   aiCredentialStorageService
     .migrateRemembered()
     .catch(() =>

@@ -2,6 +2,15 @@ name: Desktop release
 
 on:
   workflow_dispatch:
+    inputs:
+      release_profile:
+        description: Release qualification profile
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - production
   push:
     tags:
       - "v*"
@@ -133,6 +142,7 @@ jobs:
         run: pnpm run verify:desktop-wrapper
 
       - name: Verify signing environment
+        if: github.event_name != 'workflow_dispatch' || inputs.release_profile == 'production'
         run: pnpm run verify:signing-env -- ${{ matrix.signingPlatform }}
 
       - name: Build desktop artifact
@@ -158,7 +168,12 @@ jobs:
         run: ${{ matrix.downloadArtifactCommand }}
 
       - name: Verify platform signatures and notarization
+        if: github.event_name != 'workflow_dispatch' || inputs.release_profile == 'production'
         run: ${{ matrix.platformSignatureCommand }}
+
+      - name: Verify preview artifact selection
+        if: github.event_name == 'workflow_dispatch' && inputs.release_profile == 'preview'
+        run: ${{ matrix.platformSignatureCommand }} --artifact-selection-only
 
       - name: Generate checksums
         run: pnpm run checksums
@@ -256,6 +271,12 @@ jobs:
         with:
           pattern: LoopCAT-*
           path: release-dist
+
+      - name: Download web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Static-Web-Bundle
+          path: release-dist/Static-Web-Bundle
 
       - name: Verify all-platform download bundle
         run: pnpm run verify:download-bundle -- --dist release-dist

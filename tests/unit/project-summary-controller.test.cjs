@@ -9,6 +9,28 @@ function loadFactory() {
   return import(pathToFileURL(path.join(root, "src/features/projects/project-summary-controller.js")).href);
 }
 
+test("Verified catalog summaries replace previews and obsolete segment reads cannot overwrite them", async () => {
+  const { createProjectSummaryController } = await loadFactory();
+  let finish;
+  const settings = {
+    projects: [{ id: "p", name: "Old" }],
+    listSegments: () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  };
+  const harness = createHarness(createProjectSummaryController, settings);
+  const previous = harness.controller.refresh();
+  settings.projects = [
+    { id: "p", name: "Verified", catalogProgress: { total: 10, confirmed: 5, words: 30, percent: 50 } }
+  ];
+  await harness.controller.refresh();
+  finish([]);
+  await previous;
+  assert.equal(harness.getReplaced()[0].name, "Verified");
+  assert.equal(harness.getReplaced()[0].progress.total, 10);
+});
+
 function createHarness(createProjectSummaryController, overrides = {}) {
   const calls = [];
   let replaced;

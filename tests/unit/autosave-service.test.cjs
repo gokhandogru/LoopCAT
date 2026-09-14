@@ -157,6 +157,38 @@ test("continuous typing requests a checkpoint within two seconds", async () => {
   assert.equal(harness.saved[0].target, "1800");
 });
 
+test("a command cancels an autosave waiting behind another write before it can overwrite confirmation", async () => {
+  const { createAutosaveService } = await loadFactory();
+  let finishFirst;
+  const writes = [];
+  const harness = createHarness(createAutosaveService, {
+    saveMany: (records) => {
+      writes.push(records);
+      if (writes.length === 1)
+        return new Promise((resolve) => {
+          finishFirst = resolve;
+        });
+      return Promise.resolve();
+    }
+  });
+  harness.service.queue({ id: "first", projectId: "p", target: "first" });
+  const firstFlush = harness.service.flush("p");
+  await Promise.resolve();
+  const draft = { id: "second", projectId: "p", target: "draft", revision: 1 };
+  harness.service.queue(draft);
+  const secondFlush = harness.service.flush("p");
+  assert.equal(harness.service.has(draft.id), true);
+  assert.equal(harness.service.clear(draft), true);
+  assert.equal(harness.service.has(draft.id), false);
+  finishFirst();
+  await Promise.all([firstFlush, secondFlush]);
+  assert.deepEqual(
+    writes.map((records) => records.map((record) => record.id)),
+    [["first"]]
+  );
+  assert.equal(harness.service.size(), 0);
+});
+
 test("timed autosave failure remains pending and retries after two seconds", async () => {
   const { createAutosaveService } = await loadFactory();
   const segment = { id: "s1", projectId: "p1", documentId: "d1", target: "retry" };
@@ -180,6 +212,31 @@ test("timed autosave failure remains pending and retries after two seconds", asy
   assert.equal(attempts, 2);
   assert.equal(harness.service.has(segment.id), false);
   assert.deepEqual(harness.statuses.at(-1), ["Saved", "saved"]);
+});
+
+test("a failed later command cannot release autosaves before an earlier command finishes", async () => {
+  const { createAutosaveService } = await loadFactory();
+  const harness = createHarness(createAutosaveService);
+  let finishEarlier;
+  const earlier = new Promise((resolve) => {
+    finishEarlier = resolve;
+  });
+  harness.service.trackCommand([{ id: "s1", projectId: "p1" }], earlier);
+  const failed = Promise.reject(new Error("other command failed"));
+  harness.service.trackCommand([{ id: "s2", projectId: "p2" }], failed);
+  const failedFlush = assert.rejects(harness.service.flush("p2"), /other command failed/);
+  harness.service.queue({ id: "s1", projectId: "p1", target: "newer typing", revision: 2 });
+  const flushing = harness.service.flush("p1");
+  await failedFlush;
+  await new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+  assert.equal(harness.savedBatches.length, 0, "the earlier command must still hold the write barrier");
+  finishEarlier();
+  await flushing;
+  assert.equal(harness.savedBatches.length, 1);
+  assert.equal(harness.savedBatches[0][0].target, "newer typing");
+  assert.equal(harness.service.size(), 0);
 });
 
 test("failed project flush requeues only its records and a recovered flush persists them", async () => {

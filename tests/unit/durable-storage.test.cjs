@@ -243,6 +243,24 @@ test("R15 a failed database open can be retried without deleting data", async ()
   (await storage.openDatabase()).close();
 });
 
+test("desktop flush waits for database initialization and does not acknowledge an opening failure", async () => {
+  let request;
+  const storage = loadStorage({ open: () => (request = {}) });
+  const opening = assert.rejects(storage.openDatabase(), /opening failed/);
+  let completed = false;
+  const flushing = assert.rejects(
+    storage.flushMutations().then(() => {
+      completed = true;
+    }),
+    /opening failed/
+  );
+  await new Promise(setImmediate);
+  assert.equal(completed, false);
+  request.error = new Error("opening failed");
+  request.onerror();
+  await Promise.all([opening, flushing]);
+});
+
 test("R5 replacing with an empty backup keeps a verified rollback checkpoint", async () => {
   const storage = loadStorage();
   await storage.put("projects", { id: "p", name: "Latest" });

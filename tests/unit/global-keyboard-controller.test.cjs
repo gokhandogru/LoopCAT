@@ -40,7 +40,7 @@ function keyboardEvent(overrides = {}) {
     shiftKey: false,
     target: {
       matches: (selector) =>
-        selector === ".segment-grid textarea"
+        [".segment-grid textarea", ".segment-grid .target-editor"].includes(selector)
           ? Boolean(overrides.targetEditor)
           : Boolean(overrides.editable || overrides.targetEditor)
     },

@@ -102,7 +102,7 @@ export function createSegmentGridController({
 
   function findTargetEditor(root, index) {
     if (!root?.querySelector || !Number.isInteger(index) || index < 0) return null;
-    return root.querySelector(`tr[data-index="${index}"] textarea`);
+    return root.querySelector(`tr[data-index="${index}"] .target-editor`);
   }
 
   return Object.freeze({

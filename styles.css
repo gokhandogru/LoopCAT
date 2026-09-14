@@ -1590,7 +1590,7 @@ input[type="file"] {
   line-height: 1.3;
 }
 
-.target-cell textarea {
+.target-cell :is(textarea, .target-editor) {
   width: 100%;
   min-height: 58px;
   resize: vertical;
@@ -1602,10 +1602,39 @@ input[type="file"] {
   line-height: 1.45;
 }
 
-.target-cell textarea:focus {
+.target-cell :is(textarea, .target-editor):focus {
   outline: 2px solid rgba(47, 111, 237, 0.22);
   border-color: var(--focus);
   background: #fff;
+}
+
+.target-editor {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: auto;
+  cursor: text;
+  font: inherit;
+}
+
+.target-editor .target-protected-tag {
+  display: inline-block;
+  margin: 0 2px;
+  padding: 1px 5px;
+  border: 1px solid #8ccbb1;
+  border-radius: 5px;
+  background: #e0f4e9;
+  color: #146044;
+  font-size: 0.85em;
+  line-height: 1.35;
+  vertical-align: baseline;
+  white-space: nowrap;
+  user-select: all;
+}
+
+:root[data-theme="dark"] .target-editor .target-protected-tag {
+  border-color: #458f73;
+  background: #193e30;
+  color: #a9efd0;
 }
 
 .concordance-overlay {
@@ -1879,7 +1908,7 @@ input[type="file"] {
   background: #edf8f5;
 }
 
-.segment-grid tr.active .target-cell textarea {
+.segment-grid tr.active .target-cell :is(textarea, .target-editor) {
   background: #fff;
 }
 
@@ -3620,7 +3649,7 @@ body.focus-mode .topbar {
   width: 150px;
 }
 
-.workspace.focus-mode .target-cell textarea {
+.workspace.focus-mode .target-cell :is(textarea, .target-editor) {
   min-height: 72px;
   border-color: #e1e7ee;
   background: #fff;

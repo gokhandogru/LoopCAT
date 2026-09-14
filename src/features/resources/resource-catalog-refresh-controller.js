@@ -5,6 +5,7 @@
  *
  * @param {{
  *   repository: {
+ *     readCatalog?: () => Promise<any>,
  *     listTmEntries: () => Promise<unknown> | unknown,
  *     listTerms: () => Promise<unknown> | unknown,
  *     listResources?: () => Promise<unknown> | unknown,
@@ -24,20 +25,42 @@ export function createResourceCatalogRefreshController(options) {
     throw new TypeError("ResourceCatalogRefreshController requires a Resources presentation boundary.");
   }
 
-  async function refresh() {
+  let pendingCatalog = null;
+  let refreshAgain = false;
+  function refresh() {
+    if (!repository.readCatalog) return read();
+    if (pendingCatalog) refreshAgain = true;
+    else
+      pendingCatalog = (async () => {
+        let result;
+        do {
+          refreshAgain = false;
+          result = await read();
+        } while (refreshAgain);
+        return result;
+      })().finally(() => {
+        pendingCatalog = null;
+      });
+    return pendingCatalog;
+  }
+
+  async function read() {
+    const catalog = repository.readCatalog ? await repository.readCatalog() : null;
     const hasStableResources = typeof repository.listResources === "function";
     /** @type {Array<Promise<unknown> | unknown>} */
-    const pending = [repository.listTmEntries(), repository.listTerms()];
-    if (hasStableResources) pending.push(repository.listResources());
-    if (typeof repository.listProjects === "function") pending.push(repository.listProjects());
+    const pending = catalog
+      ? [[], [], catalog.resources, catalog.projects]
+      : [repository.listTmEntries(), repository.listTerms()];
+    if (!catalog && hasStableResources) pending.push(repository.listResources());
+    if (!catalog && typeof repository.listProjects === "function") pending.push(repository.listProjects());
     const settled = await Promise.all(pending);
     const [tmEntries, terms] = settled;
-    if (!hasStableResources) {
+    if (!catalog && !hasStableResources) {
       const legacy = { tmEntries, terms };
       return presentation.setResources(legacy) || { ...legacy };
     }
     const resources = Array.isArray(settled[2]) ? settled[2] : [];
-    const projects = typeof repository.listProjects === "function" && Array.isArray(settled[3]) ? settled[3] : [];
+    const projects = Array.isArray(settled[3]) ? settled[3] : [];
     const enrichedResources = (resources || []).map((resource) => {
       const links = (projects || []).flatMap((project) =>
         (project.resourceLinks || [])

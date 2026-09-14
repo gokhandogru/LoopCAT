@@ -132,8 +132,36 @@ function status() {
   };
 }
 
+// Analysis has its own disposable worker: exhaustive project scoring must
+// never queue in front of the active segment's TM lookup or QA request.
+function analyzeTm({ sources, entries, signal }) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new DOMException("Analysis canceled", "AbortError")); return; }
+    if (!canUseWorker()) { reject(new Error("Background analysis is unavailable.")); return; }
+    let analysisWorker;
+    let timer;
+    const finish = (error, result) => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+      analysisWorker?.terminate();
+      if (error) reject(error); else resolve(result);
+    };
+    function abort() { finish(new DOMException("Analysis canceled", "AbortError")); }
+    try {
+      const url = window.CatHan?.appRuntime?.safeHtml?.trustedScriptUrl?.(WORKER_URL) || WORKER_URL;
+      analysisWorker = new Worker(url);
+      signal?.addEventListener("abort", abort, { once: true });
+      analysisWorker.addEventListener("message", ({ data }) => finish(data.ok ? null : new Error(data.error), data.result));
+      analysisWorker.addEventListener("error", (error) => finish(new Error(error.message || "Analysis failed.")));
+      timer = setTimeout(() => finish(new Error("Project analysis timed out. Reopen the file view to retry.")), 60000);
+      analysisWorker.postMessage({ id: "analysis", type: "tm-analysis", payload: { sources, entries } });
+    } catch (error) { finish(error); }
+  });
+}
+
 window.CatHan = window.CatHan || {};
 window.CatHan.workerClient = {
+  analyzeTm,
   findTmMatches,
   findTmMatchesBatch,
   runQaChecks,

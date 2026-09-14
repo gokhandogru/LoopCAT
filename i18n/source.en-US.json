@@ -57,6 +57,13 @@
         "app.js:10017"
       ]
     },
+    "auto.a.project.must.have.one.main.tm.c5e8437f": {
+      "message": "A project must have one main TM.",
+      "description": "Generated interface text from src/features/projects/project-resource-selection-controller.js.",
+      "locations": [
+        "src/features/projects/project-resource-selection-controller.js:317"
+      ]
+    },
     "auto.a.project.named.value1.already.exists.repl.b0f51d4d": {
       "message": "A project named \"{value1}\" already exists. Replace it with this package?",
       "description": "Generated interface text from app.js.",
@@ -209,6 +216,13 @@
         "src/app/application-offline-shell-controller.js:146"
       ]
     },
+    "auto.active.a733b809": {
+      "message": "Active",
+      "description": "Editor search and filter menu label.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.activityevents.043a4fa3": {
       "message": "activityEvents",
       "description": "Generated interface text from app.js.",
@@ -267,7 +281,11 @@
         "app.js:12370",
         "app.js:12377",
         "src/features/import-export/project-export-controller.js:152",
-        "src/features/workspace/workspace-package-save-controller.js:136"
+        "src/features/import-export/project-export-controller.js:199",
+        "src/features/import-export/project-package-portability-service.js:148",
+        "src/features/import-export/project-package-portability-service.js:201",
+        "src/features/workspace/workspace-package-save-controller.js:136",
+        "src/features/workspace/workspace-package-save-controller.js:151"
       ]
     },
     "auto.adapt.active.draft.with.ai.ed3ca584": {
@@ -470,6 +488,27 @@
         "index.html"
       ]
     },
+    "auto.add.termbase.1d1cb53f": {
+      "message": "Add termbase",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.add.terminology.2590e152": {
+      "message": "Add terminology",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.add.tm.4c5eb9a3": {
+      "message": "Add TM",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.add.your.openai.api.key.first.330aed92": {
       "message": "Add your OpenAI API key first.",
       "description": "Generated interface text from app.js.",
@@ -500,6 +539,13 @@
         "app.js:8418"
       ]
     },
+    "auto.admitted.50c02630": {
+      "message": "Admitted",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.advanced.4d064726": {
       "message": "Advanced",
       "description": "Static interface text from index.html.",
@@ -509,6 +555,13 @@
     },
     "auto.advanced.batch.settings.0540a33b": {
       "message": "Advanced batch settings",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.advanced.metadata.91ecd940": {
+      "message": "Advanced metadata",
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
@@ -1943,6 +1996,13 @@
         "src/reports/report-document-composition-service.js:184"
       ]
     },
+    "auto.ai.settings.6dcf51d7": {
+      "message": "AI settings",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.ai.settings.save.failed.72a0165c": {
       "message": "AI settings save failed",
       "description": "Generated interface text from app.js.",
@@ -2527,6 +2587,13 @@
         "app.js:9980"
       ]
     },
+    "auto.ai.tools.cd70703d": {
+      "message": "AI tools",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.ai.triage.96f00581": {
       "message": "AI Triage",
       "description": "Generated interface text from app.js.",
@@ -2687,6 +2754,14 @@
         "src/features/projects/language-pair-filter-presentation-controller.js:57"
       ]
     },
+    "auto.all.linked.tms.8ec2c1fa": {
+      "message": "All linked TMs",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html",
+        "src/features/editor/concordance-controller.js:146"
+      ]
+    },
     "auto.all.project.segments.af71bfa0": {
       "message": "All project segments",
       "description": "Static interface text from index.html.",
@@ -2754,6 +2829,13 @@
     },
     "auto.allow.source.text.to.be.sent.to.ai.f22ee36d": {
       "message": "Allow source text to be sent to AI",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.also.save.to.933e0f74": {
+      "message": "Also save to",
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
@@ -2855,7 +2937,8 @@
         "app.js:6338",
         "app.js:6383",
         "app.js:6423",
-        "src/features/editor/segment-command-restoration-controller.js:144"
+        "src/features/editor/segment-command-restoration-controller.js:144",
+        "src/features/editor/segment-command-restoration-controller.js:169"
       ]
     },
     "auto.an.affected.segment.is.no.longer.available.f9d53cd7": {
@@ -2868,7 +2951,8 @@
         "app.js:6389",
         "app.js:6434",
         "app.js:6474",
-        "src/features/editor/segment-command-restoration-controller.js:194"
+        "src/features/editor/segment-command-restoration-controller.js:194",
+        "src/features/editor/segment-command-restoration-controller.js:232"
       ]
     },
     "auto.anii.d777a2db": {
@@ -4402,7 +4486,8 @@
         "app.js:6333",
         "app.js:6378",
         "app.js:6418",
-        "src/features/editor/segment-command-restoration-controller.js:139"
+        "src/features/editor/segment-command-restoration-controller.js:139",
+        "src/features/editor/segment-command-restoration-controller.js:164"
       ]
     },
     "auto.be.986b1bc1": {
@@ -4417,6 +4502,13 @@
         "app.js:592",
         "app.js:596",
         "app.js:604"
+      ]
+    },
+    "auto.beginner.guide.97cd5918": {
+      "message": "Beginner Guide",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.belarusian.2c720559": {
@@ -4861,8 +4953,11 @@
         "app.js:4324",
         "app.js:4412",
         "app.js:4457",
+        "src/features/projects/project-resource-selection-controller.js:291",
         "src/features/resources/resources-presentation-service.js:246",
-        "src/features/resources/resources-presentation-service.js:270"
+        "src/features/resources/resources-presentation-service.js:270",
+        "src/features/resources/resources-presentation-service.js:331",
+        "src/features/resources/resources-presentation-service.js:361"
       ]
     },
     "auto.by.level.6054dcd3": {
@@ -5037,6 +5132,13 @@
         "index.html"
       ]
     },
+    "auto.cancel.archive.processing.d517f519": {
+      "message": "Cancel archive processing",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.canceling.local.ai.batch.c5729819": {
       "message": "Canceling local AI batch...",
       "description": "Generated interface text from app.js.",
@@ -5155,7 +5257,9 @@
         "app.js:12123",
         "app.js:12131",
         "src/features/import-export/project-export-build-service.js:183",
-        "src/features/import-export/project-export-build-service.js:193"
+        "src/features/import-export/project-export-build-service.js:193",
+        "src/features/import-export/project-export-build-service.js:222",
+        "src/features/import-export/project-export-build-service.js:232"
       ]
     },
     "auto.cantonese.b75dba35": {
@@ -5923,8 +6027,23 @@
         "src/reports/report-document-composition-service.js:407"
       ]
     },
+    "auto.cards.0f830bc2": {
+      "message": "Cards",
+      "description": "Collection card/list layout control.",
+      "locations": [
+        "index.html",
+        "src/ui/collection-view-controller.js"
+      ]
+    },
     "auto.case.9254c4bb": {
       "message": "Case",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.case.sensitivity.a5c2f31f": {
+      "message": "Case sensitivity",
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
@@ -6136,6 +6255,7 @@
       "description": "Generated interface text from qa.js.",
       "locations": [
         "qa.js:101",
+        "qa.js:157",
         "qa.js:98"
       ]
     },
@@ -6151,7 +6271,8 @@
       "description": "Generated interface text from qa.js.",
       "locations": [
         "qa.js:110",
-        "qa.js:113"
+        "qa.js:113",
+        "qa.js:169"
       ]
     },
     "auto.checking.28cfb479": {
@@ -6591,6 +6712,13 @@
         "index.html"
       ]
     },
+    "auto.choose.which.local.memories.and.termbases..873923e9": {
+      "message": "Choose which local memories and termbases support this project.",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.chuj.caf1f2e5": {
       "message": "Chuj",
       "description": "Generated interface text from app.js.",
@@ -6671,7 +6799,8 @@
         "app.js:5370",
         "app.js:5415",
         "app.js:5455",
-        "src/features/projects/projects-view-presentation-controller.js:123"
+        "src/features/projects/projects-view-presentation-controller.js:123",
+        "src/features/projects/projects-view-presentation-controller.js:124"
       ]
     },
     "auto.clear.hosted.key.f9016e86": {
@@ -6699,7 +6828,8 @@
         "app.js:5369",
         "app.js:5414",
         "app.js:5454",
-        "src/features/projects/projects-view-presentation-controller.js:122"
+        "src/features/projects/projects-view-presentation-controller.js:122",
+        "src/features/projects/projects-view-presentation-controller.js:123"
       ]
     },
     "auto.click.b93ec566": {
@@ -6722,7 +6852,9 @@
       "locations": [
         "index.html",
         "src/features/resources/resources-presentation-service.js:246",
-        "src/features/resources/resources-presentation-service.js:270"
+        "src/features/resources/resources-presentation-service.js:270",
+        "src/features/resources/resources-presentation-service.js:331",
+        "src/features/resources/resources-presentation-service.js:361"
       ]
     },
     "auto.close.commands.c3608c3a": {
@@ -6746,18 +6878,27 @@
         "index.html"
       ]
     },
+    "auto.close.term.capture.d228fb51": {
+      "message": "Close term capture",
+      "description": "Static aria-label attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.closetbresourcebtn.f6b7024d": {
       "message": "closeTbResourceBtn",
       "description": "Generated interface text from src/features/resources/resources-presentation-service.js.",
       "locations": [
-        "src/features/resources/resources-presentation-service.js:270"
+        "src/features/resources/resources-presentation-service.js:270",
+        "src/features/resources/resources-presentation-service.js:361"
       ]
     },
     "auto.closetmresourcebtn.409a7a06": {
       "message": "closeTmResourceBtn",
       "description": "Generated interface text from src/features/resources/resources-presentation-service.js.",
       "locations": [
-        "src/features/resources/resources-presentation-service.js:246"
+        "src/features/resources/resources-presentation-service.js:246",
+        "src/features/resources/resources-presentation-service.js:331"
       ]
     },
     "auto.cloud.suggestion.5cb21b22": {
@@ -7031,6 +7172,13 @@
         "index.html"
       ]
     },
+    "auto.concordance.search.2b995860": {
+      "message": "Concordance search",
+      "description": "Static aria-label attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.concordanceresultsummary.010142e2": {
       "message": "concordanceResultSummary",
       "description": "Generated interface text from app.js.",
@@ -7054,7 +7202,8 @@
         "app.js:7086",
         "app.js:7131",
         "app.js:7171",
-        "src/features/editor/concordance-controller.js:142"
+        "src/features/editor/concordance-controller.js:142",
+        "src/features/editor/concordance-controller.js:185"
       ]
     },
     "auto.concurrency.2ec390bf": {
@@ -7543,6 +7692,7 @@
       "message": "Confirm this is intentional or translate the segment.",
       "description": "Generated interface text from qa.js.",
       "locations": [
+        "qa.js:147",
         "qa.js:88",
         "qa.js:91"
       ]
@@ -7679,6 +7829,13 @@
         "app.js:8208",
         "app.js:8248",
         "app.js:8280"
+      ]
+    },
+    "auto.connect.a.folder.and.show.its.backups.7aa65d39": {
+      "message": "Connect a folder and show its backups",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.connect.opus.cat.to.loopcat.web.8d3a34b6": {
@@ -7975,6 +8132,20 @@
         "index.html"
       ]
     },
+    "auto.create.empty.termbase.ee8bba72": {
+      "message": "Create empty termbase",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.create.empty.tm.6e1ce75f": {
+      "message": "Create empty TM",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.create.openai.suggestion.f4ddba41": {
       "message": "Create OpenAI suggestion",
       "description": "Generated interface text from app.js.",
@@ -8173,6 +8344,7 @@
         "app.js:9117",
         "app.js:9149",
         "src/features/editor/segment-filter-service.js:56",
+        "src/features/editor/segment-filter-service.js:65",
         "src/features/editor/segment-provenance-service.js:16"
       ]
     },
@@ -8210,6 +8382,13 @@
         "app.js:597",
         "app.js:601",
         "app.js:609"
+      ]
+    },
+    "auto.current.document.45c553c6": {
+      "message": "Current document",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.current.file.2c44db00": {
@@ -8847,7 +9026,15 @@
         "app.js:4258",
         "app.js:4303",
         "app.js:4355",
-        "src/features/projects/project-resource-selection-controller.js:181"
+        "src/features/projects/project-resource-selection-controller.js:181",
+        "src/features/projects/project-resource-selection-controller.js:385"
+      ]
+    },
+    "auto.definition.bf1be2b7": {
+      "message": "Definition",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.delete.f6fdbe48": {
@@ -8983,11 +9170,14 @@
         "app.js:7796",
         "app.js:7828",
         "src/features/editor/term-suggestions-controller.js:105",
+        "src/features/editor/term-suggestions-controller.js:106",
         "src/features/projects/project-home-presentation-controller.js:128",
         "src/features/projects/projects-view-presentation-controller.js:100",
         "src/features/resources/resources-presentation-service.js:128",
         "src/features/resources/resources-presentation-service.js:189",
-        "src/features/resources/resources-presentation-service.js:222"
+        "src/features/resources/resources-presentation-service.js:222",
+        "src/features/resources/resources-presentation-service.js:270",
+        "src/features/resources/resources-presentation-service.js:303"
       ]
     },
     "auto.delete.file.value1.a393a65a": {
@@ -14050,7 +14240,8 @@
         "app.js:9936",
         "app.js:9944",
         "src/features/import-export/delivery-export-controller.js:249",
-        "src/features/import-export/project-export-build-service.js:147"
+        "src/features/import-export/project-export-build-service.js:147",
+        "src/features/import-export/project-export-build-service.js:186"
       ]
     },
     "auto.docx.import.80414d6a": {
@@ -14162,6 +14353,14 @@
         "app.js:2016",
         "app.js:2066",
         "app.js:2118"
+      ]
+    },
+    "auto.down.77346d04": {
+      "message": "down",
+      "description": "Generated interface text from src/features/projects/project-resource-selection-controller.js.",
+      "locations": [
+        "src/features/projects/project-resource-selection-controller.js:291",
+        "src/features/projects/project-resource-selection-controller.js:566"
       ]
     },
     "auto.download.recovery.copy.e7ab66a3": {
@@ -14430,6 +14629,13 @@
         "app.js:245"
       ]
     },
+    "auto.emergency.bilingual.text.export.25ae3569": {
+      "message": "Emergency bilingual text export",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.empty.3159fe42": {
       "message": "Empty",
       "description": "Static interface text from index.html.",
@@ -14577,7 +14783,8 @@
       "description": "Generated interface text from qa.js.",
       "locations": [
         "qa.js:109",
-        "qa.js:112"
+        "qa.js:112",
+        "qa.js:168"
       ]
     },
     "auto.english.649df08a": {
@@ -15094,6 +15301,13 @@
         "app.js:6630"
       ]
     },
+    "auto.entries.f056d0d5": {
+      "message": "Entries",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.eo.f4c975cb": {
       "message": "eo",
       "description": "Generated interface text from app.js.",
@@ -15511,7 +15725,8 @@
         "app.js:5782",
         "app.js:5827",
         "app.js:5867",
-        "src/features/resources/resources-presentation-service.js:207"
+        "src/features/resources/resources-presentation-service.js:207",
+        "src/features/resources/resources-presentation-service.js:288"
       ]
     },
     "auto.escapehtml.term.sourceterm.48842522": {
@@ -15623,6 +15838,13 @@
         "app.js:263",
         "app.js:267",
         "app.js:275"
+      ]
+    },
+    "auto.exact.0cae7474": {
+      "message": "Exact",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.exit.focus.2ebbef4e": {
@@ -15780,6 +16002,13 @@
         "app.js:3634",
         "app.js:3686",
         "src/features/import-export/delivery-export-controller.js:175"
+      ]
+    },
+    "auto.export.backup.as.legacy.json.50.mib.maximu.90e4f762": {
+      "message": "Export backup as legacy JSON (50 MiB maximum)",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.export.blocked.fix.missing.protected.place.20fa3c4b": {
@@ -15940,7 +16169,8 @@
         "app.js:5586",
         "app.js:5626",
         "index.html",
-        "src/features/resources/resources-presentation-service.js:138"
+        "src/features/resources/resources-presentation-service.js:138",
+        "src/features/resources/resources-presentation-service.js:185"
       ]
     },
     "auto.export.folder.backup.69b62e1e": {
@@ -15950,8 +16180,22 @@
         "index.html"
       ]
     },
+    "auto.export.preserved.conflicting.targets.5b0a75ef": {
+      "message": "Export preserved conflicting targets",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.export.project.5eff3aab": {
       "message": "Export project",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.export.project.as.legacy.json.50.mib.maxim.5bc15d33": {
+      "message": "Export project as legacy JSON (50 MiB maximum)",
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
@@ -16093,7 +16337,8 @@
         "app.js:5542",
         "app.js:5587",
         "app.js:5627",
-        "src/features/resources/resources-presentation-service.js:141"
+        "src/features/resources/resources-presentation-service.js:141",
+        "src/features/resources/resources-presentation-service.js:188"
       ]
     },
     "auto.export.tbx.400983bc": {
@@ -16122,6 +16367,13 @@
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
+      ]
+    },
+    "auto.exported.from.one.verified.committed.check.850a48ba": {
+      "message": "Exported from one verified committed checkpoint.",
+      "description": "Generated interface text from src/features/import-export/project-export-build-service.js.",
+      "locations": [
+        "src/features/import-export/project-export-build-service.js:248"
       ]
     },
     "auto.exported.value1.project.term.value2.f00b71c0": {
@@ -16652,6 +16904,14 @@
         "app.js:5555"
       ]
     },
+    "auto.file.view.7349bc81": {
+      "message": "File view",
+      "description": "Collection card/list layout control.",
+      "locations": [
+        "index.html",
+        "src/ui/collection-view-controller.js"
+      ]
+    },
     "auto.filecount.95bdebd5": {
       "message": "fileCount",
       "description": "Generated interface text from app.js.",
@@ -16776,6 +17036,13 @@
         "index.html"
       ]
     },
+    "auto.filtered.segments.6b5ac492": {
+      "message": "Filtered segments",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.filters.96e57821": {
       "message": "Filters",
       "description": "Generated interface text from app.js.",
@@ -16811,7 +17078,8 @@
         "app.js:3737",
         "app.js:3738",
         "app.js:3739",
-        "app.js:3740"
+        "app.js:3740",
+        "index.html"
       ]
     },
     "auto.find.and.replace.target.text.4faaaba3": {
@@ -16879,7 +17147,8 @@
         "app.js:3492",
         "app.js:3542",
         "app.js:3594",
-        "src/features/editor/protected-text-replacement-service.js:34"
+        "src/features/editor/protected-text-replacement-service.js:34",
+        "src/features/editor/protected-text-replacement-service.js:36"
       ]
     },
     "auto.find.target.text.e8547e76": {
@@ -17009,6 +17278,13 @@
         "index.html"
       ]
     },
+    "auto.folder.recovery.generation.9f58eab7": {
+      "message": "Folder recovery generation",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.folder.saving.is.unavailable.in.this.brows.e7976e01": {
       "message": "Folder saving is unavailable in this browser. Project packages can still be imported and exported manually.",
       "description": "Generated interface text from app.js.",
@@ -17129,7 +17405,8 @@
       "description": "Generated interface text from qa.js.",
       "locations": [
         "qa.js:122",
-        "qa.js:125"
+        "qa.js:125",
+        "qa.js:182"
       ]
     },
     "auto.forbidden.terms.bf19aa69": {
@@ -17461,6 +17738,20 @@
       "locations": [
         "app.js:2341",
         "app.js:2349"
+      ]
+    },
+    "auto.fuzzy.9114c000": {
+      "message": "Fuzzy",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.fuzzy.threshold.e46b24d2": {
+      "message": "Fuzzy threshold",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.ga.72b6ef47": {
@@ -18232,6 +18523,7 @@
         "app.js:9117",
         "app.js:9149",
         "src/features/editor/segment-filter-service.js:56",
+        "src/features/editor/segment-filter-service.js:65",
         "src/features/editor/segment-provenance-service.js:16"
       ]
     },
@@ -18793,6 +19085,7 @@
         "app.js:5501",
         "app.js:5546",
         "app.js:5586",
+        "src/features/resources/resources-presentation-service.js:120",
         "src/features/resources/resources-presentation-service.js:92"
       ]
     },
@@ -18807,6 +19100,7 @@
         "app.js:5501",
         "app.js:5546",
         "app.js:5586",
+        "src/features/resources/resources-presentation-service.js:120",
         "src/features/resources/resources-presentation-service.js:92"
       ]
     },
@@ -18890,7 +19184,8 @@
         "app.js:5425",
         "app.js:5465",
         "index.html",
-        "src/features/projects/projects-view-presentation-controller.js:130"
+        "src/features/projects/projects-view-presentation-controller.js:130",
+        "src/features/projects/projects-view-presentation-controller.js:131"
       ]
     },
     "auto.import.tbx.67e61598": {
@@ -19326,6 +19621,13 @@
         "src/reports/report-presentation-service.js:71"
       ]
     },
+    "auto.insensitive.4d983f44": {
+      "message": "Insensitive",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.insert.95802daa": {
       "message": "Insert",
       "description": "Generated interface text from app.js.",
@@ -19359,7 +19661,15 @@
         "app.js:7715",
         "app.js:7755",
         "app.js:7787",
+        "src/features/editor/tm-matches-controller.js:120",
         "src/features/editor/tm-matches-controller.js:95"
+      ]
+    },
+    "auto.insert.adapted.9a41f25c": {
+      "message": "Insert adapted",
+      "description": "Generated interface text from src/features/editor/tm-matches-controller.js.",
+      "locations": [
+        "src/features/editor/tm-matches-controller.js:130"
       ]
     },
     "auto.insert.target.8473ef4e": {
@@ -19388,13 +19698,15 @@
         "app.js:7106",
         "app.js:7151",
         "app.js:7191",
-        "src/features/editor/concordance-controller.js:170"
+        "src/features/editor/concordance-controller.js:170",
+        "src/features/editor/concordance-controller.js:213"
       ]
     },
     "auto.insert.the.missing.protected.placeholder.i.81f26631": {
       "message": "Insert the missing protected placeholder into the target.",
       "description": "Generated interface text from qa.js.",
       "locations": [
+        "qa.js:137",
         "qa.js:78",
         "qa.js:81"
       ]
@@ -19741,6 +20053,14 @@
         "app.js:10817",
         "app.js:10818",
         "app.js:10825"
+      ]
+    },
+    "auto.json.compatibility.exports.are.limited.to..af651d71": {
+      "message": "JSON compatibility exports are limited to 50 MiB. Use the archive format.",
+      "description": "Generated interface text from src/features/import-export/project-export-controller.js.",
+      "locations": [
+        "src/features/import-export/project-export-controller.js:160",
+        "src/features/import-export/project-export-controller.js:68"
       ]
     },
     "auto.k.iche.fa788503": {
@@ -20727,6 +21047,14 @@
         "index.html"
       ]
     },
+    "auto.list.a1fffaaa": {
+      "message": "List",
+      "description": "Collection card/list layout control.",
+      "locations": [
+        "index.html",
+        "src/ui/collection-view-controller.js"
+      ]
+    },
     "auto.literal.fluent.terminology.strict.b290c957": {
       "message": "Literal, fluent, terminology-strict",
       "description": "Static interface text from index.html.",
@@ -20818,6 +21146,13 @@
         "app.js:631",
         "app.js:635",
         "app.js:643"
+      ]
+    },
+    "auto.loading.33ce4174": {
+      "message": "Loading…",
+      "description": "Generated interface text from src/features/resources/resources-presentation-service.js.",
+      "locations": [
+        "src/features/resources/resources-presentation-service.js:228"
       ]
     },
     "auto.local.ai.key.cleared.for.this.provider.e39a4c65": {
@@ -21209,6 +21544,13 @@
         "index.html"
       ]
     },
+    "auto.local.saving.external.backup.not.configure.8be634bb": {
+      "message": "Local saving · External backup not configured",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.locale.0e038a42": {
       "message": "locale",
       "description": "Generated interface text from app.js.",
@@ -21327,7 +21669,12 @@
         "src/features/resources/resources-presentation-service.js:175",
         "src/features/resources/resources-presentation-service.js:205",
         "src/features/resources/resources-presentation-service.js:206",
-        "src/features/resources/resources-presentation-service.js:207"
+        "src/features/resources/resources-presentation-service.js:207",
+        "src/features/resources/resources-presentation-service.js:255",
+        "src/features/resources/resources-presentation-service.js:256",
+        "src/features/resources/resources-presentation-service.js:286",
+        "src/features/resources/resources-presentation-service.js:287",
+        "src/features/resources/resources-presentation-service.js:288"
       ]
     },
     "auto.localize.ec8bde7b": {
@@ -21382,6 +21729,13 @@
         "app.js:362",
         "app.js:366",
         "app.js:374"
+      ]
+    },
+    "auto.lookup.qa.and.term.contribution.can.be.con.ba8f72bd": {
+      "message": "Lookup, QA, and term contribution can be controlled independently. A project may have no termbase.",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.loopcat.653f06b6": {
@@ -21821,6 +22175,14 @@
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
+      ]
+    },
+    "auto.main.b28b7af6": {
+      "message": "main",
+      "description": "Generated interface text from src/features/projects/project-resource-selection-controller.js.",
+      "locations": [
+        "src/features/projects/project-resource-selection-controller.js:469",
+        "src/features/projects/project-resource-selection-controller.js:511"
       ]
     },
     "auto.maithili.fce09f3f": {
@@ -22604,6 +22966,7 @@
       "message": "Missing protected placeholder {value1}.",
       "description": "Generated interface text from qa.js.",
       "locations": [
+        "qa.js:133",
         "qa.js:77"
       ]
     },
@@ -23344,6 +23707,20 @@
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
+      ]
+    },
+    "auto.new.tm.2a3839f5": {
+      "message": "New TM",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.next.bc981983": {
+      "message": "Next",
+      "description": "Generated interface text from src/features/resources/resources-presentation-service.js.",
+      "locations": [
+        "src/features/resources/resources-presentation-service.js:233"
       ]
     },
     "auto.next.open.e9a38871": {
@@ -24299,7 +24676,8 @@
         "app.js:5368",
         "app.js:5413",
         "app.js:5453",
-        "src/features/projects/projects-view-presentation-controller.js:121"
+        "src/features/projects/projects-view-presentation-controller.js:121",
+        "src/features/projects/projects-view-presentation-controller.js:122"
       ]
     },
     "auto.no.project.53580ca7": {
@@ -24796,7 +25174,8 @@
         "app.js:7746",
         "app.js:7786",
         "app.js:7818",
-        "src/features/editor/term-suggestions-controller.js:80"
+        "src/features/editor/term-suggestions-controller.js:80",
+        "src/features/editor/term-suggestions-controller.js:81"
       ]
     },
     "auto.no.terms.yet.1bc93bfe": {
@@ -24833,7 +25212,8 @@
         "app.js:7703",
         "app.js:7743",
         "app.js:7775",
-        "src/features/editor/tm-matches-controller.js:80"
+        "src/features/editor/tm-matches-controller.js:80",
+        "src/features/editor/tm-matches-controller.js:84"
       ]
     },
     "auto.no.tm.matches.at.value1.or.higher.83622adb": {
@@ -25206,6 +25586,7 @@
         "app.js:5497",
         "app.js:5542",
         "app.js:5582",
+        "src/features/resources/resources-presentation-service.js:116",
         "src/features/resources/resources-presentation-service.js:88"
       ]
     },
@@ -25234,7 +25615,8 @@
         "app.js:5782",
         "app.js:5827",
         "app.js:5867",
-        "src/features/resources/resources-presentation-service.js:207"
+        "src/features/resources/resources-presentation-service.js:207",
+        "src/features/resources/resources-presentation-service.js:288"
       ]
     },
     "auto.notes.70440046": {
@@ -25283,6 +25665,7 @@
         "app.js:5497",
         "app.js:5542",
         "app.js:5582",
+        "src/features/resources/resources-presentation-service.js:116",
         "src/features/resources/resources-presentation-service.js:88"
       ]
     },
@@ -25313,6 +25696,7 @@
       "description": "Generated interface text from qa.js.",
       "locations": [
         "qa.js:100",
+        "qa.js:156",
         "qa.js:97"
       ]
     },
@@ -25743,7 +26127,8 @@
         "app.js:5634",
         "src/features/projects/project-home-presentation-controller.js:134",
         "src/features/projects/projects-view-presentation-controller.js:106",
-        "src/features/resources/resources-presentation-service.js:149"
+        "src/features/resources/resources-presentation-service.js:149",
+        "src/features/resources/resources-presentation-service.js:197"
       ]
     },
     "auto.open.concordance.38d2ae1e": {
@@ -25853,12 +26238,20 @@
         "app.js:5550",
         "app.js:5595",
         "app.js:5635",
-        "src/features/resources/resources-presentation-service.js:150"
+        "src/features/resources/resources-presentation-service.js:150",
+        "src/features/resources/resources-presentation-service.js:198"
       ]
     },
     "auto.open.segments.ad176116": {
       "message": "Open segments",
       "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.open.the.loopcat.beginner.s.guide.03085b96": {
+      "message": "Open the LoopCAT Beginner's Guide",
+      "description": "Static title attribute from index.html.",
       "locations": [
         "index.html"
       ]
@@ -26333,6 +26726,13 @@
         "index.html"
       ]
     },
+    "auto.optional.resource.settings.3a2ef038": {
+      "message": "Optional Resource Settings",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.optional.setup.72007810": {
       "message": "Optional setup",
       "description": "Static interface text from index.html.",
@@ -26618,6 +27018,13 @@
         "app.js:435",
         "app.js:439",
         "app.js:447"
+      ]
+    },
+    "auto.part.of.speech.69631f68": {
+      "message": "Part of speech",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.pashto.cc50b325": {
@@ -27189,6 +27596,27 @@
         "app.js:2118"
       ]
     },
+    "auto.predictive.typing.from.tm.and.terminology.47514c43": {
+      "message": "Predictive typing from TM and terminology",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.preferred.0a3e0d9c": {
+      "message": "Preferred",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.prefix.90eceb01": {
+      "message": "Prefix",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.preserved.4133ef96": {
       "message": "Preserved",
       "description": "Generated interface text from app.js.",
@@ -27370,6 +27798,13 @@
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
+      ]
+    },
+    "auto.previous.50f94286": {
+      "message": "Previous",
+      "description": "Generated interface text from src/features/resources/resources-presentation-service.js.",
+      "locations": [
+        "src/features/resources/resources-presentation-service.js:232"
       ]
     },
     "auto.profile.ff4fc027": {
@@ -28056,7 +28491,8 @@
         "app.js:12325",
         "app.js:12390",
         "app.js:12397",
-        "src/features/workspace/workspace-package-save-controller.js:103"
+        "src/features/workspace/workspace-package-save-controller.js:103",
+        "src/features/workspace/workspace-package-save-controller.js:116"
       ]
     },
     "auto.project.package.export.failed.60eb7842": {
@@ -28421,6 +28857,13 @@
         "index.html"
       ]
     },
+    "auto.project.terminology.21a591f1": {
+      "message": "Project terminology",
+      "description": "Static placeholder attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.project.terminology.hints.b08426c2": {
       "message": "project terminology hints",
       "description": "Generated interface text from app.js.",
@@ -28446,6 +28889,21 @@
         "app.js:4665",
         "app.js:4710",
         "app.js:4750"
+      ]
+    },
+    "auto.project.translation.memory.1d426e66": {
+      "message": "Project translation memory",
+      "description": "Static placeholder attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.project.view.16cca57e": {
+      "message": "Project view",
+      "description": "Collection card/list layout control.",
+      "locations": [
+        "index.html",
+        "src/ui/collection-view-controller.js"
       ]
     },
     "auto.projects.53e890d5": {
@@ -29908,6 +30366,27 @@
         "src/reports/report-presentation-service.js:78"
       ]
     },
+    "auto.recover.selected.checkpoint.4546f54d": {
+      "message": "Recover selected checkpoint",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.recover.selected.folder.backup.f23fd762": {
+      "message": "Recover selected folder backup",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.recovery.checkpoint.0c88ad0b": {
+      "message": "Recovery checkpoint",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.recovery.copy.export.failed.6f57778f": {
       "message": "Recovery copy export failed",
       "description": "Generated interface text from app.js.",
@@ -30368,7 +30847,8 @@
       "description": "Generated interface text from qa.js.",
       "locations": [
         "qa.js:123",
-        "qa.js:129"
+        "qa.js:129",
+        "qa.js:186"
       ]
     },
     "auto.replace.visible.targets.6a50249f": {
@@ -30406,6 +30886,13 @@
         "app.js:6188",
         "app.js:6223",
         "app.js:6225"
+      ]
+    },
+    "auto.request.editing.in.this.window.871c8277": {
+      "message": "Request editing in this window",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.requesting.ai.draft.adaptation.3371f280": {
@@ -30592,7 +31079,8 @@
         "app.js:5531",
         "app.js:5576",
         "app.js:5616",
-        "src/features/resources/resources-presentation-service.js:125"
+        "src/features/resources/resources-presentation-service.js:125",
+        "src/features/resources/resources-presentation-service.js:162"
       ]
     },
     "auto.resource.action.failed.cf41efa1": {
@@ -30602,6 +31090,14 @@
         "app.js:1399",
         "app.js:1453",
         "app.js:1522"
+      ]
+    },
+    "auto.resource.entry.view.c2a78893": {
+      "message": "Resource entry view",
+      "description": "Collection card/list layout control.",
+      "locations": [
+        "index.html",
+        "src/ui/collection-view-controller.js"
       ]
     },
     "auto.resource.export.failed.6206984a": {
@@ -30662,11 +31158,27 @@
         "src/reports/report-document-composition-service.js:209"
       ]
     },
+    "auto.resource.selection.view.a5a19c7d": {
+      "message": "Resource selection view",
+      "description": "Collection card/list layout control.",
+      "locations": [
+        "index.html",
+        "src/ui/collection-view-controller.js"
+      ]
+    },
     "auto.resource.type.1782c3c8": {
       "message": "Resource type",
       "description": "Static aria-label attribute from index.html.",
       "locations": [
         "index.html"
+      ]
+    },
+    "auto.resource.view.425f83c6": {
+      "message": "Resource view",
+      "description": "Collection card/list layout control.",
+      "locations": [
+        "index.html",
+        "src/ui/collection-view-controller.js"
       ]
     },
     "auto.resourcereferences.40b7dc92": {
@@ -30700,6 +31212,15 @@
         "app.js:12029",
         "app.js:12069",
         "app.js:12101"
+      ]
+    },
+    "auto.resources.0189424a": {
+      "message": "resources",
+      "description": "Generated interface text from src/features/import-export/project-import-restore-controller.js.",
+      "locations": [
+        "src/features/import-export/project-import-restore-controller.js:101",
+        "src/features/import-export/project-package-portability-service.js:142",
+        "src/features/import-export/project-package-portability-service.js:202"
       ]
     },
     "auto.resources.87df60de": {
@@ -30840,6 +31361,20 @@
         "app.js:2014",
         "app.js:2064",
         "app.js:2116"
+      ]
+    },
+    "auto.retry.9f5cd8a2": {
+      "message": "Retry",
+      "description": "Generated interface text from src/features/resources/resources-presentation-service.js.",
+      "locations": [
+        "src/features/resources/resources-presentation-service.js:234"
+      ]
+    },
+    "auto.retry.local.saving.6a4f5dfd": {
+      "message": "Retry local saving",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.review.61e62b21": {
@@ -31918,7 +32453,9 @@
       "description": "Generated interface text from src/features/import-export/project-import-restore-controller.js.",
       "locations": [
         "src/features/import-export/project-import-restore-controller.js:185",
-        "src/features/import-export/project-import-restore-controller.js:188"
+        "src/features/import-export/project-import-restore-controller.js:188",
+        "src/features/import-export/project-import-restore-controller.js:220",
+        "src/features/import-export/project-import-restore-controller.js:223"
       ]
     },
     "auto.s.gaw.karen.myanmar.358873eb": {
@@ -32289,7 +32826,9 @@
         "app.js:5874",
         "index.html",
         "src/features/resources/resources-presentation-service.js:182",
-        "src/features/resources/resources-presentation-service.js:215"
+        "src/features/resources/resources-presentation-service.js:215",
+        "src/features/resources/resources-presentation-service.js:263",
+        "src/features/resources/resources-presentation-service.js:296"
       ]
     },
     "auto.save.packages.217bddf9": {
@@ -32682,6 +33221,20 @@
     },
     "auto.save.target.to.tm.b2477c84": {
       "message": "Save target to TM",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.save.term.2a6c805d": {
+      "message": "Save term",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.save.the.selected.pair.to.the.active.termb.4ea84637": {
+      "message": "Save the selected pair to the active termbase.",
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
@@ -35175,6 +35728,34 @@
         "app.js:140"
       ]
     },
+    "auto.search.bce06414": {
+      "message": "Search",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.search.by.resource.name.3145b7f3": {
+      "message": "Search by resource name",
+      "description": "Static placeholder attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.search.in.ff061189": {
+      "message": "Search in",
+      "description": "Static aria-label attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.search.options.5616c872": {
+      "message": "Search options",
+      "description": "Editor search and filter menu label.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.search.projects.30c3c368": {
       "message": "Search projects",
       "description": "Static placeholder attribute from index.html.",
@@ -35182,9 +35763,23 @@
         "index.html"
       ]
     },
+    "auto.search.resources.d92b91c0": {
+      "message": "Search resources",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.search.scope.8dbe8487": {
       "message": "Search scope",
       "description": "Static aria-label attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.search.translation.memories.6fce880d": {
+      "message": "Search translation memories",
+      "description": "Static placeholder attribute from index.html.",
       "locations": [
         "index.html"
       ]
@@ -35745,6 +36340,20 @@
         "app.js:7160"
       ]
     },
+    "auto.select.any.number.of.tms.exactly.one.main..4efacfdc": {
+      "message": "Select any number of TMs. Exactly one main TM receives confirmed segments; references are read-only for this project.",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.select.or.create.a.translation.memory.5555c219": {
+      "message": "Select or create a translation memory.",
+      "description": "Generated interface text from src/features/projects/project-resource-selection-controller.js.",
+      "locations": [
+        "src/features/projects/project-resource-selection-controller.js:466"
+      ]
+    },
     "auto.select.resources.already.in.resources.new..56d51ecf": {
       "message": "Select resources already in Resources. New units are saved to the main TM.",
       "description": "Static interface text from index.html.",
@@ -35826,6 +36435,13 @@
         "app.js:9926"
       ]
     },
+    "auto.selected.segment.11fbd9ed": {
+      "message": "Selected segment",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.selected.segment.only.8ef5f00b": {
       "message": "Selected segment only",
       "description": "Static interface text from index.html.",
@@ -35905,6 +36521,13 @@
         "app.js:8640",
         "app.js:8680",
         "app.js:8712"
+      ]
+    },
+    "auto.sensitive.561a19cf": {
+      "message": "Sensitive",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.serbian.a75ee848": {
@@ -36112,6 +36735,13 @@
         "index.html"
       ]
     },
+    "auto.show.checkpoints.to.choose.a.recovery.poin.99f730b1": {
+      "message": "Show checkpoints to choose a recovery point",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.show.inspector.b79225d9": {
       "message": "Show inspector",
       "description": "Generated interface text from app.js.",
@@ -36129,6 +36759,13 @@
         "src/features/editor/editor-shell-presentation-controller.js:154"
       ]
     },
+    "auto.show.local.recovery.checkpoints.d74e73fc": {
+      "message": "Show local recovery checkpoints",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.show.only.translation.segments.9d295e04": {
       "message": "Show only translation segments",
       "description": "Static title attribute from index.html.",
@@ -36139,6 +36776,13 @@
     "auto.show.only.translation.segments.ctrl.cmd.sh.99beac0a": {
       "message": "Show only translation segments (Ctrl/Cmd+Shift+F)",
       "description": "Static title attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.show.verified.folder.backups.612b6dd1": {
+      "message": "Show verified folder backups",
+      "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
       ]
@@ -36669,7 +37313,8 @@
         "app.js:4342",
         "app.js:4387",
         "app.js:4439",
-        "src/features/import-export/project-export-controller.js:150"
+        "src/features/import-export/project-export-controller.js:150",
+        "src/features/import-export/project-export-controller.js:197"
       ]
     },
     "auto.simulated.file.delete.activity.failure.053e0bf6": {
@@ -37476,7 +38121,8 @@
         "app.js:12303",
         "app.js:12368",
         "app.js:12375",
-        "src/features/workspace/workspace-package-save-controller.js:134"
+        "src/features/workspace/workspace-package-save-controller.js:134",
+        "src/features/workspace/workspace-package-save-controller.js:149"
       ]
     },
     "auto.sindhi.e0330c53": {
@@ -37770,6 +38416,13 @@
         "index.html"
       ]
     },
+    "auto.source.matching.cf1be369": {
+      "message": "Source matching",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.source.only.d5790eeb": {
       "message": "Source only",
       "description": "Static interface text from index.html.",
@@ -37901,7 +38554,8 @@
         "app.js:5780",
         "app.js:5825",
         "app.js:5865",
-        "src/features/resources/resources-presentation-service.js:205"
+        "src/features/resources/resources-presentation-service.js:205",
+        "src/features/resources/resources-presentation-service.js:286"
       ]
     },
     "auto.sourcewordcount.776873ac": {
@@ -38464,7 +39118,8 @@
         "app.js:5378",
         "app.js:5423",
         "app.js:5463",
-        "src/features/projects/projects-view-presentation-controller.js:126"
+        "src/features/projects/projects-view-presentation-controller.js:126",
+        "src/features/projects/projects-view-presentation-controller.js:127"
       ]
     },
     "auto.starting.lm.studio.server.b50d0a8d": {
@@ -38584,6 +39239,27 @@
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
+      ]
+    },
+    "auto.storagegeneration.90d52caa": {
+      "message": "storageGeneration",
+      "description": "Generated interface text from src/features/import-export/project-package-portability-service.js.",
+      "locations": [
+        "src/features/import-export/project-package-portability-service.js:92"
+      ]
+    },
+    "auto.storageversion.d9cd14c0": {
+      "message": "storageVersion",
+      "description": "Generated interface text from src/features/import-export/project-package-portability-service.js.",
+      "locations": [
+        "src/features/import-export/project-package-portability-service.js:92"
+      ]
+    },
+    "auto.storagewriter.ef0de9f7": {
+      "message": "storageWriter",
+      "description": "Generated interface text from src/features/import-export/project-package-portability-service.js.",
+      "locations": [
+        "src/features/import-export/project-package-portability-service.js:92"
       ]
     },
     "auto.strict.47ed8fde": {
@@ -38710,6 +39386,13 @@
     },
     "auto.style.99a0efc6": {
       "message": "Style",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.subject.8d183dbd": {
+      "message": "Subject",
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
@@ -38884,6 +39567,13 @@
     },
     "auto.suggestions.stay.inspectable.and.do.not.re.02606f20": {
       "message": "Suggestions stay inspectable and do not replace confirmed or locked text.",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.suggestions.stay.inspectable.confirmed.and.ac37adff": {
+      "message": "Suggestions stay inspectable. Confirmed and locked text is preserved.",
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
@@ -39177,7 +39867,9 @@
         "app.js:5972",
         "app.js:5986",
         "src/features/editor/segment-markup-presentation-service.js:79",
-        "src/features/editor/segment-markup-presentation-service.js:95"
+        "src/features/editor/segment-markup-presentation-service.js:80",
+        "src/features/editor/segment-markup-presentation-service.js:95",
+        "src/features/editor/segment-markup-presentation-service.js:96"
       ]
     },
     "auto.tag.chip.tag.chip.value1.tag.chip.action.8df6f9ff": {
@@ -39226,7 +39918,9 @@
         "app.js:5994",
         "app.js:6024",
         "src/features/editor/segment-markup-presentation-service.js:104",
-        "src/features/editor/segment-markup-presentation-service.js:129"
+        "src/features/editor/segment-markup-presentation-service.js:105",
+        "src/features/editor/segment-markup-presentation-service.js:129",
+        "src/features/editor/segment-markup-presentation-service.js:131"
       ]
     },
     "auto.tag.chip.tag.chip.value1.value2.405b207a": {
@@ -39413,6 +40107,7 @@
       "message": "Target is empty.",
       "description": "Generated interface text from qa.js.",
       "locations": [
+        "qa.js:121",
         "qa.js:65"
       ]
     },
@@ -39420,6 +40115,7 @@
       "message": "Target is identical to source.",
       "description": "Generated interface text from qa.js.",
       "locations": [
+        "qa.js:146",
         "qa.js:87",
         "qa.js:90"
       ]
@@ -39603,7 +40299,8 @@
         "app.js:5995",
         "app.js:6040",
         "app.js:6080",
-        "src/features/editor/segment-row-presentation-service.js:72"
+        "src/features/editor/segment-row-presentation-service.js:72",
+        "src/features/editor/segment-row-presentation-service.js:76"
       ]
     },
     "auto.target.txt.9c1f04e1": {
@@ -39692,7 +40389,8 @@
         "app.js:5781",
         "app.js:5826",
         "app.js:5866",
-        "src/features/resources/resources-presentation-service.js:206"
+        "src/features/resources/resources-presentation-service.js:206",
+        "src/features/resources/resources-presentation-service.js:287"
       ]
     },
     "auto.taroko.578b2510": {
@@ -39729,7 +40427,8 @@
       "locations": [
         "src/features/projects/project-resource-selection-controller.js:33",
         "src/features/resources/resources-presentation-service.js:23",
-        "src/features/resources/resources-presentation-service.js:270"
+        "src/features/resources/resources-presentation-service.js:270",
+        "src/features/resources/resources-presentation-service.js:361"
       ]
     },
     "auto.tb.name.b09f7471": {
@@ -39844,7 +40543,8 @@
         "app.js:1581",
         "app.js:1635",
         "app.js:1704",
-        "src/features/import-export/project-package-portability-service.js:121"
+        "src/features/import-export/project-package-portability-service.js:121",
+        "src/features/import-export/project-package-portability-service.js:185"
       ]
     },
     "auto.term.could.not.be.moved.to.trash.existing..b4407f72": {
@@ -39909,7 +40609,8 @@
       "description": "Generated interface text from qa.js.",
       "locations": [
         "qa.js:133",
-        "qa.js:139"
+        "qa.js:139",
+        "qa.js:195"
       ]
     },
     "auto.term.notes.df1935d6": {
@@ -40422,11 +41123,36 @@
         "app.js:9997"
       ]
     },
+    "auto.termbasename.6133671e": {
+      "message": "termBaseName",
+      "description": "Generated interface text from src/features/resources/resources-presentation-service.js.",
+      "locations": [
+        "src/features/resources/resource-catalog-service.js:83",
+        "src/features/resources/resources-presentation-service.js:93"
+      ]
+    },
     "auto.termbases.a525f211": {
       "message": "Termbases",
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
+      ]
+    },
+    "auto.termconcepts.857f2fe9": {
+      "message": "termConcepts",
+      "description": "Generated interface text from src/features/import-export/project-import-restore-controller.js.",
+      "locations": [
+        "src/features/import-export/project-import-restore-controller.js:105",
+        "src/features/import-export/project-package-portability-service.js:142",
+        "src/features/import-export/project-package-portability-service.js:206"
+      ]
+    },
+    "auto.termdesignations.2b145057": {
+      "message": "termDesignations",
+      "description": "Generated interface text from src/features/import-export/project-package-portability-service.js.",
+      "locations": [
+        "src/features/import-export/project-package-portability-service.js:142",
+        "src/features/import-export/project-package-portability-service.js:207"
       ]
     },
     "auto.terminology.21d27883": {
@@ -41001,7 +41727,9 @@
         "app.js:8222",
         "app.js:8262",
         "app.js:8294",
+        "src/features/editor/segment-command-restoration-controller.js:112",
         "src/features/editor/segment-command-restoration-controller.js:232",
+        "src/features/editor/segment-command-restoration-controller.js:280",
         "src/features/editor/segment-command-restoration-controller.js:96"
       ]
     },
@@ -41031,6 +41759,20 @@
         "app.js:3621",
         "app.js:3673",
         "src/features/import-export/delivery-export-controller.js:150"
+      ]
+    },
+    "auto.the.exported.project.was.removed.while.the.c259ebc6": {
+      "message": "The exported project was removed while the file was being written.",
+      "description": "Generated interface text from src/features/import-export/project-export-controller.js.",
+      "locations": [
+        "src/features/import-export/project-export-controller.js:177"
+      ]
+    },
+    "auto.the.language.pair.changed.review.optional..7df8aceb": {
+      "message": "The language pair changed. Review Optional Resource Settings before saving.",
+      "description": "Generated interface text from src/features/projects/project-resource-selection-controller.js.",
+      "locations": [
+        "src/features/projects/project-resource-selection-controller.js:416"
       ]
     },
     "auto.the.local.first.translation.workspace.3213bfcc": {
@@ -41630,9 +42372,11 @@
         "app.js:2805",
         "app.js:2857",
         "src/features/import-export/project-package-portability-service.js:120",
+        "src/features/projects/project-resource-selection-controller.js:317",
         "src/features/projects/project-resource-selection-controller.js:33",
         "src/features/resources/resources-presentation-service.js:23",
-        "src/features/resources/resources-presentation-service.js:246"
+        "src/features/resources/resources-presentation-service.js:246",
+        "src/features/resources/resources-presentation-service.js:331"
       ]
     },
     "auto.tm.entry.could.not.be.moved.to.trash.exist.5964f583": {
@@ -42070,6 +42814,30 @@
         "app.js:1474"
       ]
     },
+    "auto.tmcontributions.922eba68": {
+      "message": "tmContributions",
+      "description": "Generated interface text from src/features/import-export/project-package-portability-service.js.",
+      "locations": [
+        "src/features/import-export/project-package-portability-service.js:142",
+        "src/features/import-export/project-package-portability-service.js:204"
+      ]
+    },
+    "auto.tmentries.ccb93db5": {
+      "message": "tmEntries",
+      "description": "Generated interface text from src/features/import-export/project-package-portability-service.js.",
+      "locations": [
+        "src/features/import-export/project-package-portability-service.js:149",
+        "src/features/import-export/project-package-portability-service.js:203"
+      ]
+    },
+    "auto.tmname.50695c5e": {
+      "message": "tmName",
+      "description": "Generated interface text from src/features/resources/resources-presentation-service.js.",
+      "locations": [
+        "src/features/resources/resource-catalog-service.js:83",
+        "src/features/resources/resources-presentation-service.js:93"
+      ]
+    },
     "auto.tmx.export.failed.9c5d7385": {
       "message": "TMX export failed",
       "description": "Generated interface text from app.js.",
@@ -42387,6 +43155,7 @@
       "message": "Translate this segment or copy the source if it must remain unchanged.",
       "description": "Generated interface text from qa.js.",
       "locations": [
+        "qa.js:122",
         "qa.js:66"
       ]
     },
@@ -42546,7 +43315,15 @@
         "app.js:1718",
         "app.js:1772",
         "app.js:1841",
+        "index.html",
         "src/app/application-trash-controller.js:97"
+      ]
+    },
+    "auto.translation.suggestions.0adabe7f": {
+      "message": "Translation suggestions",
+      "description": "Static aria-label attribute from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.trash.6aa46034": {
@@ -42675,6 +43452,14 @@
         "app.js:1728",
         "app.js:1797",
         "src/app/application-trash-controller.js:50"
+      ]
+    },
+    "auto.trash.view.ecab5a00": {
+      "message": "Trash view",
+      "description": "Collection card/list layout control.",
+      "locations": [
+        "index.html",
+        "src/ui/collection-view-controller.js"
       ]
     },
     "auto.try.again.042c862e": {
@@ -43356,11 +44141,26 @@
         "src/reports/report-document-composition-service.js:190"
       ]
     },
+    "auto.untranslated.in.document.e92524fa": {
+      "message": "Untranslated in document",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.untranslated.segments.only.f21e4116": {
       "message": "Untranslated segments only",
       "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
+      ]
+    },
+    "auto.up.7c0a25c0": {
+      "message": "up",
+      "description": "Generated interface text from src/features/projects/project-resource-selection-controller.js.",
+      "locations": [
+        "src/features/projects/project-resource-selection-controller.js:291",
+        "src/features/projects/project-resource-selection-controller.js:566"
       ]
     },
     "auto.update.paused.ba46006e": {
@@ -43394,6 +44194,13 @@
         "app.js:2690",
         "index.html",
         "src/app/application-offline-shell-controller.js:137"
+      ]
+    },
+    "auto.updatedat.ecdd2601": {
+      "message": "updatedAt",
+      "description": "Generated interface text from src/features/import-export/project-package-portability-service.js.",
+      "locations": [
+        "src/features/import-export/project-package-portability-service.js:92"
       ]
     },
     "auto.upper.sorbian.3dcd2223": {
@@ -43466,6 +44273,13 @@
         "app.js:572"
       ]
     },
+    "auto.usage.example.3439e83e": {
+      "message": "Usage example",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.use.a.browser.readable.opus.cat.build.f0547e22": {
       "message": "Use a browser-readable OPUS-CAT build",
       "description": "Static interface text from index.html.",
@@ -43529,6 +44343,13 @@
         "app.js:3739"
       ]
     },
+    "auto.use.recommended.settings.0afd568c": {
+      "message": "Use recommended settings",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.use.regular.expressions.42fb00d1": {
       "message": "Use regular expressions",
       "description": "Static interface text from index.html.",
@@ -43555,7 +44376,15 @@
       "description": "Generated interface text from qa.js.",
       "locations": [
         "qa.js:138",
-        "qa.js:144"
+        "qa.js:144",
+        "qa.js:200"
+      ]
+    },
+    "auto.use.these.resources.e39f99f8": {
+      "message": "Use these resources",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
       ]
     },
     "auto.use.translate.filter.preset.5642db8b": {
@@ -44187,7 +45016,9 @@
         "app.js:7707",
         "app.js:7739",
         "qa.js:24",
+        "qa.js:79",
         "src/features/editor/concordance-controller.js:152",
+        "src/features/editor/concordance-controller.js:195",
         "src/features/projects/project-home-presentation-controller.js:93",
         "src/features/projects/project-list-presentation-controller.js:61",
         "src/features/quality/qa-results-controller.js:122",
@@ -44398,7 +45229,8 @@
         "app.js:11939",
         "app.js:11979",
         "app.js:12011",
-        "src/features/import-export/file-import-service.js:71"
+        "src/features/import-export/file-import-service.js:71",
+        "src/features/import-export/file-import-service.js:76"
       ]
     },
     "auto.value1.is.still.running.wait.for.it.to.fin.e3b8ef72": {
@@ -44499,7 +45331,8 @@
         "app.js:11931",
         "app.js:11971",
         "app.js:12003",
-        "src/features/import-export/file-import-service.js:63"
+        "src/features/import-export/file-import-service.js:63",
+        "src/features/import-export/file-import-service.js:68"
       ]
     },
     "auto.value1.item.languagepair.fd58e223": {
@@ -44694,7 +45527,8 @@
         "app.js:12226",
         "app.js:12291",
         "app.js:12298",
-        "src/features/import-export/project-import-restore-controller.js:157"
+        "src/features/import-export/project-import-restore-controller.js:157",
+        "src/features/import-export/project-import-restore-controller.js:166"
       ]
     },
     "auto.value1.project.value2.restored.dfc26f63": {
@@ -44788,6 +45622,13 @@
         "app.js:8589",
         "app.js:8629",
         "app.js:8661"
+      ]
+    },
+    "auto.value1.resource.value1.521ab333": {
+      "message": "{value1} resource {value1}",
+      "description": "Generated interface text from src/features/resources/resources-presentation-service.js.",
+      "locations": [
+        "src/features/resources/resources-presentation-service.js:168"
       ]
     },
     "auto.value1.restored.from.trash.f181d62b": {
@@ -45657,6 +46498,13 @@
         "src/features/projects/project-home-presentation-controller.js:77"
       ]
     },
+    "auto.value10.dbce96cb": {
+      "message": "{value10}",
+      "description": "Generated interface text from src/features/projects/project-resource-selection-controller.js HTML template.",
+      "locations": [
+        "src/features/projects/project-resource-selection-controller.js:291"
+      ]
+    },
     "auto.value2.35535dde": {
       "message": ": {value2}",
       "description": "Generated interface text from app.js HTML template.",
@@ -45765,7 +46613,9 @@
         "app.js:7667",
         "app.js:7707",
         "app.js:7739",
-        "src/features/quality/qa-results-controller.js:122"
+        "src/features/quality/qa-results-controller.js:122",
+        "src/features/resources/resources-presentation-service.js:330",
+        "src/features/resources/resources-presentation-service.js:360"
       ]
     },
     "auto.value5.c769091e": {
@@ -45796,6 +46646,20 @@
         "app.js:7707",
         "app.js:7739",
         "src/features/quality/qa-results-controller.js:122"
+      ]
+    },
+    "auto.value6.54727ee7": {
+      "message": "{value6}",
+      "description": "Generated interface text from src/features/projects/project-resource-selection-controller.js HTML template.",
+      "locations": [
+        "src/features/projects/project-resource-selection-controller.js:291"
+      ]
+    },
+    "auto.value7.value8.updated.value9.afc996a4": {
+      "message": "{value7} {value8} · Updated {value9}",
+      "description": "Generated interface text from src/features/projects/project-resource-selection-controller.js HTML template.",
+      "locations": [
+        "src/features/projects/project-resource-selection-controller.js:291"
       ]
     },
     "auto.venda.928ceab0": {
@@ -45860,6 +46724,14 @@
         "app.js:665",
         "app.js:669",
         "app.js:677"
+      ]
+    },
+    "auto.view.changed.but.the.preference.could.not..c25efa14": {
+      "message": "View changed, but the preference could not be saved.",
+      "description": "Collection card/list layout control.",
+      "locations": [
+        "index.html",
+        "src/ui/collection-view-controller.js"
       ]
     },
     "auto.vincentian.creole.english.1ca84823": {
@@ -46260,6 +47132,13 @@
     "auto.who.created.this.project.98edcc33": {
       "message": "Who created this project",
       "description": "Static placeholder attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.whole.project.a904eae8": {
+      "message": "Whole project",
+      "description": "Static interface text from index.html.",
       "locations": [
         "index.html"
       ]
@@ -47331,7 +48210,8 @@
       "message": "Forbidden",
       "description": "Reusable UI label used by dynamic LoopCAT renderers.",
       "locations": [
-        "app.js"
+        "app.js",
+        "index.html"
       ]
     },
     "ui.label.generatedAt": {
@@ -47481,7 +48361,8 @@
       "locations": [
         "app.js",
         "index.html",
-        "src/features/editor/term-suggestions-controller.js:95"
+        "src/features/editor/term-suggestions-controller.js:95",
+        "src/features/editor/term-suggestions-controller.js:96"
       ]
     },
     "ui.label.languages": {
@@ -47936,7 +48817,9 @@
         "app.js:3590",
         "app.js:3635",
         "app.js:3685",
-        "app.js:3737"
+        "app.js:3737",
+        "src/features/import-export/project-package-portability-service.js:147",
+        "src/features/import-export/project-package-portability-service.js:200"
       ]
     },
     "ui.label.segmentsTitle": {
@@ -48034,7 +48917,8 @@
         "app.js:5752",
         "app.js:5797",
         "app.js:5837",
-        "src/features/resources/resources-presentation-service.js:174"
+        "src/features/resources/resources-presentation-service.js:174",
+        "src/features/resources/resources-presentation-service.js:255"
       ]
     },
     "ui.label.sourceFile": {
@@ -48088,7 +48972,8 @@
         "app.js:5753",
         "app.js:5798",
         "app.js:5838",
-        "src/features/resources/resources-presentation-service.js:175"
+        "src/features/resources/resources-presentation-service.js:175",
+        "src/features/resources/resources-presentation-service.js:256"
       ]
     },
     "ui.label.termbase": {
@@ -48163,7 +49048,9 @@
         "app.js:4194",
         "app.js:4284",
         "app.js:4329",
-        "app.js:4381"
+        "app.js:4381",
+        "src/features/import-export/project-package-portability-service.js:150",
+        "src/features/import-export/project-package-portability-service.js:205"
       ]
     },
     "ui.label.tools": {
@@ -48284,15 +49171,17 @@
       ]
     },
     "workspace.menu.summary": {
-      "message": "Storage",
-      "description": "Top navigation menu label for local browser storage and workspace folder actions.",
+      "message": "Workspace",
+      "description": "Top navigation menu for workspace settings, help, local storage, and folder actions.",
       "locations": [
-        "app.js"
+        "app.js",
+        "index.html",
+        "src/features/editor/editor-shell-presentation-controller.js:171"
       ]
     },
     "workspace.menu.summaryDirty": {
-      "message": "Storage ({count} unsaved)",
-      "description": "Top navigation menu label when connected workspace packages have unsaved folder copies.",
+      "message": "Workspace ({count} folder copies pending)",
+      "description": "Legacy workspace label with the number of pending external folder copies.",
       "locations": [
         "app.js"
       ]

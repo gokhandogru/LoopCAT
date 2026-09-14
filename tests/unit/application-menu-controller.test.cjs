@@ -14,6 +14,10 @@ function createMenu(name, calls, { open = false, addError = null } = {}) {
   return {
     name,
     open,
+    querySelector(selector) {
+      assert.equal(selector, ":scope > summary");
+      return { focus: () => calls.push([name, "summary", "focus"]) };
+    },
     addEventListener(type, listener) {
       calls.push([name, "addEventListener", type]);
       if (addError) throw addError;
@@ -91,23 +95,52 @@ test("ApplicationMenuController owns exact mount, repeated-mount, unmount, and i
   assert.equal(Object.isFrozen(harness.controller), true);
   assert.equal(harness.controller.mount(), true);
   assert.equal(harness.controller.mount(), false);
-  assert.deepEqual(harness.calls.slice(0, 6), [
+  assert.deepEqual(harness.calls.slice(0, 8), [
     ["document", "querySelectorAll", ".menu"],
     ["first", "addEventListener", "toggle"],
     ["first", "addEventListener", "click"],
+    ["first", "addEventListener", "keydown"],
     ["second", "addEventListener", "toggle"],
     ["second", "addEventListener", "click"],
+    ["second", "addEventListener", "keydown"],
     ["document", "addEventListener", "click"]
   ]);
   assert.equal(harness.controller.unmount(), true);
   assert.equal(harness.controller.unmount(), false);
-  assert.deepEqual(harness.calls.slice(6), [
+  assert.deepEqual(harness.calls.slice(8), [
     ["first", "removeEventListener", "toggle", true],
     ["first", "removeEventListener", "click", true],
+    ["first", "removeEventListener", "keydown", true],
     ["second", "removeEventListener", "toggle", true],
     ["second", "removeEventListener", "click", true],
+    ["second", "removeEventListener", "keydown", true],
     ["document", "removeEventListener", "click", true]
   ]);
+});
+
+test("ApplicationMenuController closes keyboard menus with Escape and returns focus to the opener", async () => {
+  const { createApplicationMenuController } = await loadFactory();
+  const harness = createHarness(createApplicationMenuController, { first: { open: true } });
+  harness.controller.mount();
+  harness.calls.length = 0;
+  const event = {
+    key: "Escape",
+    preventDefault: () => harness.calls.push(["event", "preventDefault"]),
+    stopPropagation: () => harness.calls.push(["event", "stopPropagation"])
+  };
+  harness.first.dispatch("keydown", { ...event, key: "Enter" });
+  assert.equal(harness.first.open, true);
+  harness.first.dispatch("keydown", event);
+  assert.equal(harness.first.open, false);
+  assert.deepEqual(harness.calls, [
+    ["event", "preventDefault"],
+    ["event", "stopPropagation"],
+    ["first", "removeAttribute", "open"],
+    ["first", "summary", "focus"]
+  ]);
+  harness.calls.length = 0;
+  harness.first.dispatch("keydown", event);
+  assert.deepEqual(harness.calls, []);
 });
 
 test("ApplicationMenuController preserves closed-toggle no-op and exclusive open behavior", async () => {

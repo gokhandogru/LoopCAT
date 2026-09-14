@@ -71,13 +71,23 @@ export function createProjectSummaryController(options) {
     return build(project, resolvedSegments, summaryRevision);
   }
 
+  let refreshRevision = 0;
   async function refresh() {
+    const requestRevision = ++refreshRevision;
     const cachedById = new Map(session.getProjectSummaries().map((summary) => [summary.id, summary]));
     const projectSummaries = await Promise.all(
       session.getProjects().map((project) => {
         const revision = session.getProjectSummaryRevision(project.id);
         const cached = cachedById.get(project.id);
-        if (cached && cached.updatedAt === project.updatedAt && cached.summaryRevision === revision) {
+        if (
+          cached &&
+          !project.catalogProgress &&
+          !project.catalogPending &&
+          !cached.catalogUnverified &&
+          !cached.catalogPending &&
+          cached.updatedAt === project.updatedAt &&
+          cached.summaryRevision === revision
+        ) {
           return {
             ...cached,
             ...project,
@@ -89,9 +99,27 @@ export function createProjectSummaryController(options) {
           };
         }
         const inMemorySegments = session.getProject()?.id === project.id ? session.getSegments() : null;
+        if (!inMemorySegments && (project.catalogProgress || project.catalogPending)) {
+          const progress = project.catalogProgress || {
+            total: null,
+            confirmed: null,
+            draft: null,
+            words: null,
+            percent: null
+          };
+          return {
+            ...project,
+            progress,
+            wordCount: progress.words,
+            searchText: search.build(project),
+            languagePairKey: language.key(project),
+            summaryRevision: revision
+          };
+        }
         return summarize(project, inMemorySegments, revision);
       })
     );
+    if (requestRevision !== refreshRevision) return;
     session.replaceProjectSummaries(projectSummaries);
     presentation.renderLanguageFilter();
     presentation.renderProjects();

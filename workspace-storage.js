@@ -17,6 +17,14 @@
     /(sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._~+/=-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|npm_[A-Za-z0-9_]{8,}|(?:session|cookie)[=:][A-Za-z0-9._~+/=-]{8,})/i;
 
   let directoryHandle = null;
+  let connectionJob = null;
+
+  function serializeConnection(task) {
+    const pending = (connectionJob || Promise.resolve()).catch(() => {}).then(task);
+    connectionJob = pending;
+    pending.finally(() => { if (connectionJob === pending) connectionJob = null; }).catch(() => {});
+    return pending;
+  }
   let manifest = null;
   let lastError = "";
   let lastErrorScope = "";
@@ -635,7 +643,7 @@
     return manifest;
   }
 
-  async function loadManifest({ create = false } = {}) {
+  async function loadManifest({ create = false, metadataOnly = false } = {}) {
     try {
       manifest = normalizeManifest(await readJson([MANIFEST_FILE]));
       return manifest;
@@ -643,10 +651,16 @@
       if (!create || !isMissingOrInvalidJson(error)) throw error;
       try {
         manifest = normalizeManifest(await readJson([LEGACY_MANIFEST_FILE]));
-        await writeManifest(manifest);
+        if (!metadataOnly) await writeManifest(manifest);
         return manifest;
       } catch (legacyError) {
         if (!isMissingOrInvalidJson(legacyError)) throw legacyError;
+      }
+      if (metadataOnly) {
+        // Reconnection is not a recovery operation. Keep the folder untouched;
+        // explicit listing/health checks can discover and validate its packages.
+        manifest = null;
+        return null;
       }
       const recovered = await rebuildManifestFromPackages();
       if (recovered) return recovered;
@@ -801,7 +815,8 @@
     );
   }
 
-  async function connect(handle, { persist = true } = {}) {
+  function connect(handle, { persist = true } = {}) {
+    return serializeConnection(async () => {
     if (!isSupported()) throw new Error("Workspace folders are not supported in this browser.");
     if (!(await requestPermission(handle))) throw new Error("Workspace folder permission was not granted.");
     directoryHandle = handle;
@@ -809,6 +824,7 @@
     await loadManifest({ create: true });
     window.dispatchEvent?.(new CustomEvent("loopcat-workspace-connected"));
     return getStatus({ refresh: true });
+    });
   }
 
   async function chooseWorkspaceFolder(options = {}) {
@@ -818,17 +834,22 @@
     return connect(handle);
   }
 
-  async function reconnectSavedWorkspace() {
+  function reconnectSavedWorkspace() {
+    if (connectionJob) return connectionJob;
+    return serializeConnection(async () => {
+    if (directoryHandle) return getStatus();
     if (!isSupported()) return getStatus();
     const handle = await getSavedWorkspaceHandle();
     if (!handle || !(await hasPermission(handle))) return getStatus();
     directoryHandle = handle;
-    await loadManifest({ create: true });
+    await loadManifest({ create: true, metadataOnly: true });
     window.dispatchEvent?.(new CustomEvent("loopcat-workspace-connected"));
-    return getStatus({ refresh: true });
+    return getStatus({ metadataOnly: true });
+    });
   }
 
   async function ensureConnected() {
+    while (connectionJob) await connectionJob;
     if (!directoryHandle) await reconnectSavedWorkspace();
     if (!directoryHandle) throw new Error("Choose a workspace folder first.");
     if (!(await requestPermission(directoryHandle))) throw new Error("Workspace folder permission was not granted.");
@@ -972,12 +993,16 @@
     }
   }
 
-  async function getStatus({ refresh = false } = {}) {
+  async function getStatus({ refresh = false, metadataOnly = false } = {}) {
     const supported = isSupported();
     const connected = Boolean(directoryHandle);
     const previousWriteError = lastErrorScope === "write" ? lastError : "";
     const archive = await archives();
     const archiveManifest = archive ? await archive.load() : { projects: [], backups: [] };
+    if (metadataOnly) {
+      statusProjectCache = manifest?.projects || [];
+      statusBackupCache = manifest?.backups || [];
+    }
     if (refresh) { statusProjectCache = null; statusBackupCache = null; }
     const visibleProjects = connected
       ? statusProjectCache || (statusProjectCache = visibleProjectRefsFromDiscovered(manifest?.projects || [], await scanProjectPackages()))

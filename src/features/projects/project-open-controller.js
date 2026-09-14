@@ -4,6 +4,7 @@
  * navigation, rendering, and editor context remain injected owners.
  *
  * @param {{
+ *   preload?: { take: (id: string) => Promise<{segments: any[], activity: any[]}>, remember: (id: string) => void },
  *   ownership?: { open: (projectId: string) => Promise<unknown> },
  *   autosave: { flush: () => Promise<unknown> | unknown },
  *   session: {
@@ -85,14 +86,22 @@ export function createProjectOpenController(options) {
         : session.getProjects().find((project) => project.id === projectId) || null
     );
     command.setProjectId(session.getProject()?.id || projectId || "");
-    session.replaceSegments(histories.prepare(session.getProject() ? await repository.listSegments(projectId) : []));
-    session.replaceActivityEvents(session.getProject() ? await repository.listActivity(projectId) : []);
+    const prepared = options.preload && session.getProject() ? await options.preload.take(projectId) : null;
+    session.replaceSegments(
+      histories.prepare(
+        session.getProject() ? (prepared ? prepared.segments : await repository.listSegments(projectId)) : []
+      )
+    );
+    session.replaceActivityEvents(
+      session.getProject() ? (prepared ? prepared.activity : await repository.listActivity(projectId)) : []
+    );
     await terms.refresh();
     const activeIndex = session.getSegments().length ? 0 : -1;
     await filters.ready();
     await filters.restore(session.getProject()?.id || projectId);
     navigation.open(session.getProject()?.id || projectId, activeIndex);
     presentation.renderAll();
+    if (options.preload && session.getProject()) options.preload.remember(projectId);
     if (context.getView() === "editor") await context.refreshEditor();
   }
 

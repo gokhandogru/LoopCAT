@@ -187,12 +187,6 @@ test("ApplicationStartupController preserves exact successful startup order and 
       ["checkpoint", "starting application bootstrap"],
       ["progress", "startup: restoring workspace state"],
       ["workspace", "restoreDirty"],
-      ["progress", "startup: checking storage durability"],
-      ["durability", "refresh"],
-      ["progress", "startup: reconnecting workspace"],
-      ["workspace", "reconnect"],
-      ["workspace", "assignStatus"],
-      ["workspace", "renderStatus"],
       ["progress", "startup: loading projects"],
       ["projects", "load"],
       ["progress", "startup: loading interface preferences"],
@@ -233,7 +227,7 @@ test("ApplicationStartupController preserves awaited boundaries and concurrent p
 
   locale.resolve();
   await flushPromises();
-  assert.equal(harness.calls.at(-1)[0], "durability");
+  assert.equal(harness.calls.at(-1)[0], "layout");
   assert.equal(
     harness.calls.some((call) => call[0] === "workspace" && call[1] === "reconnect"),
     false
@@ -298,10 +292,6 @@ test("ApplicationStartupController stops and reports every primary startup failu
     "wiring",
     "workspace.startAutosave",
     "workspace.restoreDirty",
-    "durability",
-    "workspace.reconnect",
-    "workspace.assignStatus",
-    "workspace.renderStatus",
     "projects.load",
     "projects.count",
     "theme",
@@ -316,6 +306,23 @@ test("ApplicationStartupController stops and reports every primary startup failu
       ["errors", "setStatus", `${failAt} failed`, "dirty"]
     ]);
   }
+});
+
+test("Local startup finishes while optional checks remain pending and one failure cannot suppress the other", async () => {
+  const { createApplicationStartupController } = await loadFactory();
+  const reconnect = deferred();
+  const harness = createDependencies({ failAt: "durability", reconnectPromise: reconnect.promise });
+  await createApplicationStartupController(harness.dependencies).start();
+  assert.ok(harness.calls.some((call) => call[0] === "projects" && call[1] === "load"));
+  assert.ok(harness.calls.some((call) => call[0] === "offline"));
+  await new Promise((resolve) => {
+    setTimeout(resolve, 20);
+  });
+  assert.ok(harness.calls.some((call) => call[0] === "workspace" && call[1] === "reconnect"));
+  assert.ok(harness.calls.some((call) => call[0] === "errors" && call[1] === "log"));
+  reconnect.resolve({ connected: true });
+  await flushPromises();
+  assert.ok(harness.calls.some((call) => call[0] === "workspace" && call[1] === "assignStatus"));
 });
 
 test("ApplicationStartupController preserves fallback copy and error-handler failure timing", async () => {

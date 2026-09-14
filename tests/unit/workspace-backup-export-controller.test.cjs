@@ -179,18 +179,18 @@ test("WorkspaceBackupExportController preserves attached validation on primary b
   ]);
 });
 
-test("WorkspaceBackupExportController generates a fallback report and fallback message for write failure", async () => {
+test("WorkspaceBackupExportController reports a write failure without an unrelated file validation report", async () => {
   const { createWorkspaceBackupExportController } = await loadFactory();
   const exportError = new Error("");
   const harness = createHarness(createWorkspaceBackupExportController, { exportError });
 
   await assert.rejects(harness.controller.exportBackup(), exportError);
 
-  assert.deepEqual(harness.calls.slice(-3), [
-    ["errorReport", "Workspace backup failed."],
-    ["renderValidation", 1, harness.generatedErrorReport],
-    ["setStatus", 1, "Workspace backup failed.", "dirty"]
-  ]);
+  assert.deepEqual(harness.calls.at(-1), ["setStatus", 1, "Workspace backup failed.", "dirty"]);
+  assert.equal(
+    harness.calls.some(([name]) => name === "renderValidation" || name === "errorReport"),
+    false
+  );
 });
 
 test("WorkspaceBackupExportController preserves durable write before a late workspace-refresh failure", async () => {
@@ -206,11 +206,11 @@ test("WorkspaceBackupExportController preserves durable write before a late work
     ["exportFullBackup", harness.backup],
     ["getWorkspaceStatus"]
   ]);
-  assert.deepEqual(harness.calls.slice(-3), [
-    ["errorReport", "Workspace status failed"],
-    ["renderValidation", 1, harness.generatedErrorReport],
-    ["setStatus", 1, "Workspace status failed", "dirty"]
-  ]);
+  assert.deepEqual(harness.calls.at(-1), ["setStatus", 1, "Workspace backup failed: Workspace status failed", "dirty"]);
+  assert.equal(
+    harness.calls.some(([name]) => name === "renderValidation"),
+    false
+  );
 });
 
 test("WorkspaceBackupExportController contains late rendering and validation-count failures with exact rethrow", async () => {
@@ -218,20 +218,19 @@ test("WorkspaceBackupExportController contains late rendering and validation-cou
   const renderError = new Error("Workspace render failed");
   const renderHarness = createHarness(createWorkspaceBackupExportController, { renderWorkspaceError: renderError });
   await assert.rejects(renderHarness.controller.exportBackup(), renderError);
-  assert.deepEqual(renderHarness.calls.slice(-3), [
-    ["errorReport", "Workspace render failed"],
-    ["renderValidation", 1, renderHarness.generatedErrorReport],
-    ["setStatus", 1, "Workspace render failed", "dirty"]
+  assert.deepEqual(renderHarness.calls.at(-1), [
+    "setStatus",
+    1,
+    "Workspace backup failed: Workspace render failed",
+    "dirty"
   ]);
 
   const countError = new Error("Validation count failed");
   const countHarness = createHarness(createWorkspaceBackupExportController, { countError });
   await assert.rejects(countHarness.controller.exportBackup(), countError);
-  assert.deepEqual(countHarness.calls.slice(-4), [
+  assert.deepEqual(countHarness.calls.slice(-2), [
     ["countValidation", countHarness.validationReport],
-    ["errorReport", "Validation count failed"],
-    ["renderValidation", 2, countHarness.generatedErrorReport],
-    ["setStatus", 1, "Validation count failed", "dirty"]
+    ["setStatus", 1, "Workspace backup failed: Validation count failed", "dirty"]
   ]);
 });
 
@@ -242,11 +241,9 @@ test("WorkspaceBackupExportController preserves first status failure recovery an
 
   await assert.rejects(harness.controller.exportBackup(), statusError);
 
-  assert.deepEqual(harness.calls.slice(-4), [
+  assert.deepEqual(harness.calls.slice(-2), [
     ["setStatus", 1, "Workspace backup saved: backups/loopcat-backup.json", "saved"],
-    ["errorReport", "Success status failed"],
-    ["renderValidation", 2, harness.generatedErrorReport],
-    ["setStatus", 2, "Success status failed", "dirty"]
+    ["setStatus", 2, "Workspace backup failed: Success status failed", "dirty"]
   ]);
 });
 

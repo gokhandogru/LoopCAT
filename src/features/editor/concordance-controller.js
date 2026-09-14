@@ -83,7 +83,7 @@ export function createConcordanceController(options) {
     const selection = dom.getSelection()?.toString().trim();
     if (selection) return selection.replace(/\s+/g, " ");
     const active = dom.getActiveElement();
-    if (active?.tagName === "TEXTAREA" || active?.tagName === "INPUT") {
+    if (active?.matches?.(".target-editor") || active?.tagName === "TEXTAREA" || active?.tagName === "INPUT") {
       const value = active.value || "";
       const selected = value.slice(active.selectionStart || 0, active.selectionEnd || 0).trim();
       if (selected) return selected.replace(/\s+/g, " ");

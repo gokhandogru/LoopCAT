@@ -65,6 +65,7 @@ export function createProjectListPresentationController(options) {
     session.getProjects().forEach((project) => {
       const button = dom.createElement("button");
       button.className = `project-item ${session.getProject()?.id === project.id ? "active" : ""}`;
+      button.disabled = Boolean(project.catalogUnverified);
       presentation.replaceSafeHtml(
         button,
         `<strong>${text.displaySafeHtml(project.name)}</strong><span>${text.escapeHtml(language.display(project))}</span><span>${project.sourceFileName ? text.displaySafeHtml(project.sourceFileName) : localization.labelHtml("noSourceFile")}</span>`

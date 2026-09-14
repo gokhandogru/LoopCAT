@@ -92,10 +92,18 @@ export function createProjectExportBuildService(options) {
       committed?.segments ||
       segmentRecords ||
       (project.id === session.getProject()?.id ? session.getSegments() : await storage.getProjectSegments(project.id));
+    const committedTermResourceIds = new Set(
+      (committed?.project?.resourceLinks || [])
+        .filter((link) => link.type === "termbase" && link.resourceId)
+        .map((link) => link.resourceId)
+    );
+    const committedTermBaseNames = committed ? new Set(resources.getTermBaseNames(project)) : null;
     const [tmEntries, terms, activityEvents] = committed
       ? [
           committed.tmEntries,
-          committed.terms.filter((term) => resources.getTermBaseNames(project).includes(term.termBaseName)),
+          committed.terms.filter(
+            (term) => committedTermResourceIds.has(term.resourceId) || committedTermBaseNames.has(term.termBaseName)
+          ),
           committed.activityEvents
         ]
       : await Promise.all([

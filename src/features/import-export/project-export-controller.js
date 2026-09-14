@@ -82,8 +82,12 @@ export function createProjectExportController(options) {
       );
       return true;
     } catch (error) {
-      const message = error.message || "Backup export failed.";
-      presentation.renderValidation(error.validation || validation.errorReport(message));
+      const message = error.validation
+        ? error.message || "Backup export failed."
+        : error.message
+          ? `Backup export failed: ${error.message}`
+          : "Backup export failed.";
+      if (error.validation) presentation.renderValidation(error.validation);
       status.set(message, "dirty");
       return false;
     } finally {

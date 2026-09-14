@@ -296,3 +296,50 @@ test("PreferencesRepository ignores unknown versions and stores only its scoped 
   await Promise.all([repository.patch({ theme: "dark" }), repository.patch({ inspectorOpen: false })]);
   assert.deepEqual(await repository.read(), { density: "balanced", theme: "dark", inspectorOpen: false });
 });
+
+test("PreferencesRepository recovers after a failed write and preserves later queued preferences", async () => {
+  const { createPreferencesRepository } = await moduleAt("src/data/preferences-repository.js");
+  const failure = new Error("Temporary write failure");
+  let writes = 0;
+  let stored;
+  const repository = createPreferencesRepository({
+    get: () => Promise.resolve(stored),
+    put: (_store, value) => {
+      if (++writes === 1) return Promise.reject(failure);
+      stored = value;
+      return Promise.resolve(value);
+    }
+  });
+  const failed = repository.patch({ collectionViews: { projects: "list" } });
+  const latest = repository.patch({ collectionViews: { projects: "card", files: "list" } });
+  await assert.rejects(failed, failure);
+  await latest;
+  await repository.patch({ theme: "dark" });
+  assert.deepEqual(await repository.read(), { collectionViews: { projects: "card", files: "list" }, theme: "dark" });
+  assert.equal(stored.preferences.collectionViews.files, "list");
+});
+
+test("PreferencesRepository reads the last committed settings after failure and retries an initial failed read", async () => {
+  const { createPreferencesRepository } = await moduleAt("src/data/preferences-repository.js");
+  const failure = new Error("Temporarily unavailable");
+  let reads = 0;
+  let stored = { version: 1, preferences: { theme: "light" } };
+  let failWrite = true;
+  const repository = createPreferencesRepository({
+    get: () => (++reads === 1 ? Promise.reject(failure) : Promise.resolve(stored)),
+    put: (_store, value) => {
+      if (failWrite) {
+        failWrite = false;
+        return Promise.reject(failure);
+      }
+      stored = value;
+      return Promise.resolve(value);
+    }
+  });
+  await assert.rejects(repository.read(), failure);
+  assert.deepEqual(await repository.read(), { theme: "light" });
+  await assert.rejects(repository.write({ theme: "dark" }), failure);
+  assert.deepEqual(await repository.read(), { theme: "light" });
+  await repository.write({ theme: "dark" });
+  assert.deepEqual(await repository.read(), { theme: "dark" });
+});

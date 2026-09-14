@@ -48,22 +48,21 @@
           </div>
         </a>
         <div class="topbar-actions">
-          <span id="saveStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true">Saved</span>
           <button id="projectsViewBtn">Projects</button>
           <button id="resourcesViewBtn">Resources</button>
-          <a
-            class="file-button topbar-guide-link"
-            href="./docs/beginner-guide/index.html"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open the LoopCAT Beginner's Guide"
-            >Beginner Guide</a
-          >
           <button id="trashBtn" type="button">Trash</button>
-          <button id="aboutBtn" type="button">About</button>
           <details class="menu workspace-menu">
             <summary id="workspaceMenuSummary">Workspace</summary>
             <div class="menu-panel workspace-menu-panel">
+              <a
+                class="menu-item workspace-guide-link"
+                href="./docs/beginner-guide/index.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open the LoopCAT Beginner's Guide"
+                >Beginner Guide</a
+              >
+              <button id="aboutBtn" type="button">About LoopCAT</button>
               <div id="workspaceHealth" class="workspace-health"></div>
               <p id="protectionStatus" role="status">Local saving · External backup not configured</p>
               <button id="requestEditingBtn" type="button" hidden>Request editing in this window</button>
@@ -163,6 +162,7 @@
           <button id="newProjectBtn" class="primary">New project</button>
         </div>
       </header>
+      <span id="saveStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true"></span>
 
       <aside id="updateReadyBanner" class="update-ready-banner hidden" role="status" aria-live="polite">
         <div>
@@ -215,6 +215,7 @@
                 <p>Open a project or create one to start translating.</p>
               </div>
               <div class="toolbar-actions">
+                <div class="collection-view-switch" role="group" aria-label="Project view" data-collection-scope="projects"><button type="button" data-view-mode="card" aria-pressed="true" aria-controls="projectDashboard">Cards</button><button type="button" data-view-mode="list" aria-pressed="false" aria-controls="projectDashboard">List</button></div>
                 <button id="projectsImportProjectBtn" type="button">Import project package</button>
               </div>
             </div>
@@ -235,6 +236,7 @@
                 <h2>Resources</h2>
                 <p>Manage translation memories and termbases across all projects.</p>
               </div>
+              <div class="collection-view-switch" role="group" aria-label="Resource view" data-collection-scope="resources"><button type="button" data-view-mode="card" aria-pressed="true" aria-controls="tmResourceDashboard tbResourceDashboard">Cards</button><button type="button" data-view-mode="list" aria-pressed="false" aria-controls="tmResourceDashboard tbResourceDashboard">List</button></div>
             </div>
 
             <div class="resource-tabs" role="tablist" aria-label="Resource type">
@@ -290,6 +292,7 @@
                 <button id="createTmResourceBtn" type="button">Create empty TM</button>
               </div>
               <div id="tmResourceDashboard" class="resource-dashboard"></div>
+              <div class="collection-toolbar resource-entry-view-controls"><span>Entries</span><div class="collection-view-switch" role="group" aria-label="Resource entry view" data-collection-scope="resource-entries"><button type="button" data-view-mode="card" aria-pressed="false" aria-controls="tmResourceDetail">Cards</button><button type="button" data-view-mode="list" aria-pressed="true" aria-controls="tmResourceDetail">List</button></div></div>
               <div id="tmResourceDetail" class="resource-detail hidden"></div>
             </section>
 
@@ -337,6 +340,7 @@
                 </label>
               </div>
               <div id="tbResourceDashboard" class="resource-dashboard"></div>
+              <div class="collection-toolbar resource-entry-view-controls"><span>Entries</span><div class="collection-view-switch" role="group" aria-label="Resource entry view" data-collection-scope="resource-entries"><button type="button" data-view-mode="card" aria-pressed="false" aria-controls="tbResourceDetail">Cards</button><button type="button" data-view-mode="list" aria-pressed="true" aria-controls="tbResourceDetail">List</button></div></div>
               <div id="tbResourceDetail" class="resource-detail hidden"></div>
             </section>
           </div>
@@ -399,6 +403,7 @@
             <div class="file-list-header">
               <h3>Files</h3>
               <span id="fileCountText"></span>
+              <div class="collection-view-switch" role="group" aria-label="File view" data-collection-scope="files"><button type="button" data-view-mode="card" aria-pressed="true" aria-controls="projectFileList">Cards</button><button type="button" data-view-mode="list" aria-pressed="false" aria-controls="projectFileList">List</button></div>
             </div>
             <div id="projectFileList" class="project-file-list"></div>
           </div>
@@ -535,19 +540,27 @@
                 aria-label="Find in source or target"
                 aria-keyshortcuts="Control+F Meta+F"
               />
-              <select id="segmentSearchScope" aria-label="Search scope">
-                <option value="both">Source and target</option>
-                <option value="source">Source only</option>
-                <option value="target">Target only</option>
-              </select>
-              <label class="checkbox-row compact-checkbox">
-                <input id="segmentRegexInput" type="checkbox" />
-                Use regular expressions
-              </label>
-              <label class="checkbox-row compact-checkbox">
-                <input id="segmentCaseInput" type="checkbox" />
-                Match case
-              </label>
+              <details id="segmentSearchOptionsMenu" class="menu segment-options-menu search-options-menu">
+                <summary>Search options <span class="control-active-indicator">Active</span></summary>
+                <div class="menu-panel">
+                  <label class="menu-field">
+                    Search scope
+                    <select id="segmentSearchScope" aria-label="Search scope">
+                      <option value="both">Source and target</option>
+                      <option value="source">Source only</option>
+                      <option value="target">Target only</option>
+                    </select>
+                  </label>
+                  <label class="checkbox-row compact-checkbox">
+                    <input id="segmentRegexInput" type="checkbox" />
+                    Use regular expressions
+                  </label>
+                  <label class="checkbox-row compact-checkbox">
+                    <input id="segmentCaseInput" type="checkbox" />
+                    Match case
+                  </label>
+                </div>
+              </details>
               <details id="replaceMenu" class="menu replace-menu">
                 <summary>Replace</summary>
                 <div class="menu-panel replace-panel">
@@ -557,13 +570,6 @@
                   <button id="replaceAllBtn" type="button">Replace all targets</button>
                 </div>
               </details>
-              <select id="filterPresetSelect" aria-label="Workflow preset">
-                <option value="">Custom filters</option>
-                <option value="translate">Translate</option>
-                <option value="review">Review</option>
-                <option value="qa-fixes">QA fixes</option>
-                <option value="ai-review">AI review</option>
-              </select>
               <select id="segmentStatusFilter" aria-label="Segment status">
                 <option value="all">All segments</option>
                 <option value="open">Open segments</option>
@@ -571,20 +577,41 @@
                 <option value="draft">Draft</option>
                 <option value="confirmed">Confirmed</option>
               </select>
-              <select id="reviewStateFilter" aria-label="Review state">
-                <option value="">All review states</option>
-                <option value="needs-review">Needs review</option>
-                <option value="reviewed">Reviewed</option>
-                <option value="blocked">Blocked</option>
-                <option value="comments">With notes</option>
-              </select>
-              <select id="aiSegmentFilter" aria-label="AI status">
-                <option value="">All AI states</option>
-                <option value="ai-draft">AI initiated</option>
-                <option value="ai-suggestions">AI suggestions</option>
-                <option value="ai-review-risk">AI review risk</option>
-                <option value="high-ai-risk">High AI risk</option>
-              </select>
+              <details id="segmentFiltersMenu" class="menu segment-options-menu advanced-filters-menu">
+                <summary>Filters <span class="control-active-indicator">Active</span></summary>
+                <div class="menu-panel">
+                  <label class="menu-field">
+                    Workflow preset
+                    <select id="filterPresetSelect" aria-label="Workflow preset">
+                      <option value="">Custom filters</option>
+                      <option value="translate">Translate</option>
+                      <option value="review">Review</option>
+                      <option value="qa-fixes">QA fixes</option>
+                      <option value="ai-review">AI review</option>
+                    </select>
+                  </label>
+                  <label class="menu-field">
+                    Review state
+                    <select id="reviewStateFilter" aria-label="Review state">
+                      <option value="">All review states</option>
+                      <option value="needs-review">Needs review</option>
+                      <option value="reviewed">Reviewed</option>
+                      <option value="blocked">Blocked</option>
+                      <option value="comments">With notes</option>
+                    </select>
+                  </label>
+                  <label class="menu-field">
+                    AI status
+                    <select id="aiSegmentFilter" aria-label="AI status">
+                      <option value="">All AI states</option>
+                      <option value="ai-draft">AI initiated</option>
+                      <option value="ai-suggestions">AI suggestions</option>
+                      <option value="ai-review-risk">AI review risk</option>
+                      <option value="high-ai-risk">High AI risk</option>
+                    </select>
+                  </label>
+                </div>
+              </details>
               <button id="nextOpenBtn" title="Alt+Enter" aria-keyshortcuts="Alt+Enter">Next unconfirmed</button>
             </div>
 
@@ -1631,6 +1658,7 @@
           </div>
           <button id="closeTrashBtn" type="button">Close</button>
         </header>
+        <div class="collection-toolbar"><div class="collection-view-switch" role="group" aria-label="Trash view" data-collection-scope="trash"><button type="button" data-view-mode="card" aria-pressed="false" aria-controls="trashList">Cards</button><button type="button" data-view-mode="list" aria-pressed="true" aria-controls="trashList">List</button></div></div>
         <div id="trashList" class="trash-list"></div>
         <div class="dialog-actions">
           <button id="emptyTrashBtn" class="danger-small" type="button">Empty Trash permanently</button>
@@ -1747,6 +1775,7 @@
             <input id="resourceSettingsSearchInput" type="search" autocomplete="off" placeholder="Search by resource name" />
           </label>
         </div>
+        <div class="collection-toolbar"><div class="collection-view-switch" role="group" aria-label="Resource selection view" data-collection-scope="resource-selection"><button type="button" data-view-mode="card" aria-pressed="false" aria-controls="projectTmResourceList projectTbResourceList">Cards</button><button type="button" data-view-mode="list" aria-pressed="true" aria-controls="projectTmResourceList projectTbResourceList">List</button></div></div>
         <div class="resource-settings-tabs" role="tablist" aria-label="Resource type">
           <button id="resourceSettingsTmTab" type="button" role="tab" aria-controls="resourceSettingsTmPanel" aria-selected="true">Translation memories</button>
           <button id="resourceSettingsTbTab" type="button" role="tab" aria-controls="resourceSettingsTbPanel" aria-selected="false">Terminology</button>

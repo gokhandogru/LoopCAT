@@ -13,13 +13,19 @@ export function createPreferencesRepository(storageRepository) {
   function load() {
     if (cachedPreferences) return Promise.resolve(cachedPreferences);
     if (!loadPromise) {
-      loadPromise = storageRepository.get("appMeta", PREFERENCES_KEY).then((record) => {
-        cachedPreferences =
-          record && record.version === PREFERENCES_VERSION && typeof record.preferences === "object"
-            ? { ...record.preferences }
-            : {};
-        return cachedPreferences;
-      });
+      loadPromise = storageRepository
+        .get("appMeta", PREFERENCES_KEY)
+        .then((record) => {
+          cachedPreferences =
+            record && record.version === PREFERENCES_VERSION && typeof record.preferences === "object"
+              ? { ...record.preferences }
+              : {};
+          return cachedPreferences;
+        })
+        .catch((error) => {
+          loadPromise = null;
+          throw error;
+        });
     }
     return loadPromise;
   }
@@ -37,24 +43,28 @@ export function createPreferencesRepository(storageRepository) {
   }
 
   async function read() {
-    await writeQueue;
+    await writeQueue.catch(() => {});
     const preferences = await load();
     return Object.freeze({ ...preferences });
   }
 
   function write(preferences) {
-    writeQueue = writeQueue.then(async () => {
-      await load();
-      return persist(preferences);
-    });
+    writeQueue = writeQueue
+      .catch(() => {})
+      .then(async () => {
+        await load();
+        return persist(preferences);
+      });
     return writeQueue;
   }
 
   function patch(changes) {
-    writeQueue = writeQueue.then(async () => {
-      const current = await load();
-      return persist({ ...current, ...(changes || {}) });
-    });
+    writeQueue = writeQueue
+      .catch(() => {})
+      .then(async () => {
+        const current = await load();
+        return persist({ ...current, ...(changes || {}) });
+      });
     return writeQueue;
   }
 

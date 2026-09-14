@@ -665,6 +665,7 @@ async function saveTermPair(input = {}) {
   const normalizedSource = normalizeText(source);
   const normalizedTarget = normalizeText(target);
   const now = new Date().toISOString();
+  await ensureTermIndex(`${project.sourceLang}::${project.targetLang}`);
   const allTerms = await getAllByIndex("terms", "languagePair", `${project.sourceLang}::${project.targetLang}`);
   const skipped = [];
   const alternatives = [];

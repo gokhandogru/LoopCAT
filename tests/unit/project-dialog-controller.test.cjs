@@ -281,6 +281,107 @@ test("ProjectDialogController preserves active-target and dialog failure timing"
   assert.deepEqual(reports, [[dialogError, { phase: "open" }]]);
 });
 
+test("ProjectDialogController shows loading, rejects duplicate opens, and permits retry after storage failure", async () => {
+  const { createProjectDialogController } = await moduleAt("src/features/projects/project-dialog-controller.js");
+  const elements = projectElements();
+  const attributes = new Map();
+  const opener = fakeElement({
+    disabled: false,
+    textContent: "New project",
+    setAttribute: (name, value) => attributes.set(name, value),
+    getAttribute: (name) => attributes.get(name) ?? null,
+    removeAttribute: (name) => attributes.delete(name)
+  });
+  let rejectRead;
+  let reads = 0;
+  const reports = [];
+  const controller = createProjectDialogController({
+    dialogLifecycle: fakeDialogLifecycle(),
+    elements,
+    openers: [{ element: opener }],
+    refreshResources: () => {
+      reads++;
+      return reads === 1
+        ? new Promise((_resolve, reject) => {
+            rejectRead = reject;
+          })
+        : Promise.resolve();
+    },
+    onError: (error) => reports.push(error.message)
+  });
+  const pending = controller.open("create", { returnTarget: opener });
+  assert.equal(opener.textContent, "Opening project...");
+  assert.equal(opener.disabled, false, "busy state must preserve native focusability");
+  assert.equal(attributes.get("aria-disabled"), "true");
+  assert.equal(attributes.get("aria-busy"), "true");
+  assert.equal(await controller.open("create", { returnTarget: opener }), false);
+  assert.equal(reads, 1);
+  rejectRead(new Error("Internal error opening backing store for indexedDB.open."));
+  assert.equal(await pending, false);
+  assert.equal(elements.dialog.open, false);
+  assert.equal(opener.disabled, false);
+  assert.equal(opener.textContent, "New project");
+  assert.equal(attributes.has("aria-busy"), false);
+  assert.equal(attributes.has("aria-disabled"), false);
+  assert.equal(reports.length, 1);
+  assert.equal(await controller.open("create", { returnTarget: opener }), true);
+  assert.equal(elements.dialog.open, true);
+});
+
+test("ProjectDialogController preserves opener focus throughout loading and restores existing ARIA state", async () => {
+  const { createProjectDialogController } = await moduleAt("src/features/projects/project-dialog-controller.js");
+  const elements = projectElements();
+  const attributes = new Map([
+    ["aria-disabled", "false"],
+    ["aria-busy", "false"]
+  ]);
+  const opener = fakeElement({
+    textContent: "New project",
+    setAttribute: (name, value) => attributes.set(name, value),
+    getAttribute: (name) => attributes.get(name) ?? null,
+    removeAttribute: (name) => attributes.delete(name)
+  });
+  let activeElement = opener;
+  let disabled = false;
+  Object.defineProperty(opener, "disabled", {
+    get: () => disabled,
+    set: (value) => {
+      disabled = value;
+      if (value) activeElement = null;
+    }
+  });
+  let finishRead;
+  const lifecycle = fakeDialogLifecycle();
+  const nativeOpen = lifecycle.open;
+  let nativeReturnTarget;
+  lifecycle.open = async (...args) => {
+    const opened = await nativeOpen(...args);
+    nativeReturnTarget = activeElement;
+    activeElement = elements.nameInput;
+    return opened;
+  };
+  const controller = createProjectDialogController({
+    dialogLifecycle: lifecycle,
+    elements,
+    openers: [{ element: opener }],
+    getActiveElement: () => activeElement,
+    refreshResources: () =>
+      new Promise((resolve) => {
+        finishRead = resolve;
+      })
+  });
+  const pending = controller.open();
+  assert.equal(activeElement, opener);
+  assert.equal(attributes.get("aria-disabled"), "true");
+  finishRead();
+  assert.equal(await pending, true);
+  assert.equal(nativeReturnTarget, opener, "native dialog focus restoration must retain the opening button");
+  assert.equal(attributes.get("aria-disabled"), "false");
+  assert.equal(attributes.get("aria-busy"), "false");
+  assert.equal(opener.textContent, "New project");
+  assert.equal(opener.disabled, false);
+});
+
 test("ProjectDialogController owns delegated language, resource, workspace, and Enter-key events", async () => {
   const { createProjectDialogController } = await moduleAt("src/features/projects/project-dialog-controller.js");
   const elements = projectElements();

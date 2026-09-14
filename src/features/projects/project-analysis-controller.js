@@ -7,9 +7,9 @@
  * @param {{
  *   session: { getProject: () => any, getSegments: () => any[] },
  *   navigation: { getView: () => unknown },
- *   tm: { listByIndex: (store: string, index: string, key: string) => Promise<any[]> | any[] },
+ *   tm: { listByIndex: (store: string, index: string, key: string) => Promise<any[]> | any[], listLinked?: (project: any) => Promise<any[]> },
  *   resources: { tmNames: (project: unknown) => unknown[] },
- *   analysis: { build: (project: unknown, segments: any[], tmEntries: any[]) => any },
+ *   analysis: { build: (project: unknown, segments: any[], tmEntries: any[]) => any, buildAsync?: (project: any, segments: any[], entries: any[], signal: AbortSignal) => Promise<any> },
  *   date: { format: (value: unknown) => unknown },
  *   localization: {
  *     label: (key: string, values?: unknown) => unknown,
@@ -61,20 +61,50 @@ export function createProjectAnalysisController(options) {
   }
 
   let analysisRun = 0;
+  let pendingAnalysis = null;
 
   async function render() {
     const run = (analysisRun += 1);
+    pendingAnalysis?.abort();
     const project = session.getProject();
     if (!project || navigation.getView() !== "project" || !presentation.hasRoot()) return;
+    const current = () =>
+      run === analysisRun && navigation.getView() === "project" && session.getProject()?.id === project.id;
+    const controller = new AbortController();
+    pendingAnalysis = controller;
+    if (analysis.buildAsync) {
+      presentation.setMeta(localization.sourceHtml("Calculating TM analysis…"));
+      presentation.replace("");
+      // Let the file view paint, and skip analysis when the translator opens a file immediately.
+      await new Promise((resolve) => {
+        setTimeout(resolve, 250);
+      });
+      if (!current()) return;
+    }
     const segments = session.getSegments();
-    const tmEntries = await tm.listByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`);
+    let tmEntries;
+    try {
+      tmEntries = await (tm.listLinked
+        ? tm.listLinked(project)
+        : tm.listByIndex("tmEntries", "languagePair", `${project.sourceLang}::${project.targetLang}`));
+    } catch (error) {
+      if (!analysis.buildAsync) throw error;
+      if (current()) presentation.setMeta(error.message);
+      return;
+    }
     if (run !== analysisRun || navigation.getView() !== "project" || session.getProject()?.id !== project.id) return;
     const tmNames = new Set(resources.tmNames(project));
-    const result = analysis.build(
-      project,
-      segments,
-      tmEntries.filter((entry) => tmNames.has(entry.tmName))
-    );
+    const linked = tmEntries.filter((entry) => tmNames.has(entry.tmName));
+    let result;
+    if (analysis.buildAsync) {
+      try {
+        result = await analysis.buildAsync(project, segments, linked, controller.signal);
+      } catch (error) {
+        if (current() && error.name !== "AbortError") presentation.setMeta(error.message);
+        return;
+      }
+      if (!current()) return;
+    } else result = analysis.build(project, segments, linked);
     const ai = result.ai || {};
     presentation.setMeta(
       localization.label("generatedAt", {

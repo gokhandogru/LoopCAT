@@ -312,7 +312,7 @@ app
         "document.querySelector('.file-card button.primary').click()",
         true
       );
-      await waitFor("document.querySelector('#segmentBody textarea')", "accessibility translation editor");
+      await waitFor("document.querySelector('#segmentBody .target-editor')", "accessibility translation editor");
       await audit("Editor with segments, status badges, and matches");
       await windowRef.webContents.executeJavaScript(
         `(() => {
@@ -429,7 +429,10 @@ app
       await audit("About dialog");
       await windowRef.webContents.executeJavaScript("document.querySelector('#closeAboutBtn').click()", true);
       await waitFor("!document.querySelector('#aboutDialog').open", "About dialog close");
-      await waitFor("document.activeElement === document.querySelector('#aboutBtn')", "About dialog focus return");
+      await waitFor(
+        "document.activeElement === document.querySelector('#workspaceMenuSummary')",
+        "About dialog focus return"
+      );
 
       await windowRef.webContents.executeJavaScript(
         `(() => {

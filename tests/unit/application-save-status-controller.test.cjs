@@ -12,7 +12,7 @@ function loadFactory() {
 function createHarness(createApplicationSaveStatusController, overrides = {}) {
   const calls = [];
   const callbacks = new Map();
-  const state = { text: "", className: "", busy: "" };
+  const state = { text: "", className: "save-status", busy: "false" };
   let nextHandle = 40;
   const fail = (name) => {
     if (overrides.errorAt === name) throw overrides.error || new Error(`${name} failed`);
@@ -181,7 +181,7 @@ test("ApplicationSaveStatusController preserves falsy text normalization and eve
   }
 });
 
-test("ApplicationSaveStatusController cancels notice expiry when unsaved work replaces it", async () => {
+test("Routine autosave updates the durability model without interrupting notices", async () => {
   const { createApplicationSaveStatusController } = await loadFactory();
   const harness = createHarness(createApplicationSaveStatusController);
   harness.controller.set("Project package saved", "saved");
@@ -189,13 +189,19 @@ test("ApplicationSaveStatusController cancels notice expiry when unsaved work re
   assert.deepEqual([...harness.callbacks.keys()], [41]);
 
   harness.calls.length = 0;
-  harness.controller.set("Unsaved changes", "dirty");
-  assert.deepEqual(harness.calls[0], ["timers.clear", 41]);
-  assert.equal(harness.callbacks.size, 0);
-  assert.equal(
-    harness.calls.some(([name]) => name === "timers.set"),
-    false
-  );
+  for (const [text, mode] of [
+    ["Unsaved changes", "dirty"],
+    ["Saving...", ""],
+    ["2 save pending", "dirty"],
+    ["Saved", "saved"]
+  ]) {
+    harness.controller.setPersistence(text, mode);
+    assert.equal(harness.state.text, "source:Project package saved");
+    assert.equal(harness.callbacks.size, 1);
+    assert.equal(harness.calls.filter(([name]) => name === "model.publish").at(-1)[1].text, text);
+  }
+  harness.fire(41);
+  assert.equal(harness.state.text, "");
 });
 
 test("ApplicationSaveStatusController dismisses completed successes, failures, and warnings without claiming a save", async () => {
@@ -204,7 +210,6 @@ test("ApplicationSaveStatusController dismisses completed successes, failures, a
   for (const [text, mode] of [
     ["Completed", "saved"],
     ["Saved to workspace", ""],
-    ["Saved", "saved"],
     ["Local AI pre-translation: no segments updated; 1 failed", "saved"],
     ["Local AI pre-translation failed", "dirty"],
     ["Starting LM Studio server failed", "dirty"],
@@ -224,14 +229,11 @@ test("ApplicationSaveStatusController dismisses completed successes, failures, a
   }
 });
 
-test("ApplicationSaveStatusController preserves running operations and pending autosave indicators", async () => {
+test("ApplicationSaveStatusController preserves running operations and save failures", async () => {
   const { createApplicationSaveStatusController } = await loadFactory();
   for (const [text, mode] of [
-    ["Saving...", ""],
     ["Local AI pre-translating 44 segments...", ""],
     ["Canceling local AI batch...", "dirty"],
-    ["Unsaved changes", "dirty"],
-    ["2 save pending", "saved"],
     ["Save failed; retrying autosave", "dirty"]
   ]) {
     const harness = createHarness(createApplicationSaveStatusController);
@@ -305,14 +307,69 @@ test("ApplicationSaveStatusController preserves synchronous failure timing", asy
     throw clearError;
   };
   assert.throws(() => clearHarness.controller.set("Next"), clearError);
-  assert.deepEqual(clearHarness.calls, [["timers.clear", 41]]);
+  assert.deepEqual(clearHarness.calls.at(-1), ["timers.clear", 41]);
+});
+
+test("Routine save notices stay silent while real persistence failures stay visible until resolved", async () => {
+  const { createApplicationSaveStatusController } = await loadFactory();
+  const harness = createHarness(createApplicationSaveStatusController);
+  for (const [text, mode] of [
+    ["Unsaved changes", "dirty"],
+    ["Saving...", ""],
+    ["1 save pending", "dirty"],
+    ["Saved", "saved"]
+  ]) {
+    harness.controller.setPersistence(text, mode);
+    assert.equal(harness.state.text, "");
+    assert.equal(harness.callbacks.size, 0);
+  }
+  harness.controller.setPersistence("Local save failed; retrying autosave", "dirty");
+  assert.equal(harness.state.className, "save-status error");
+  harness.controller.set("Import completed", "saved");
+  harness.controller.setPersistence("Saving...");
+  assert.equal(harness.state.text, "source:Local save failed; retrying autosave");
+  assert.equal(harness.callbacks.size, 0);
+  harness.controller.setPersistence("Saved", "saved");
+  assert.equal(harness.state.text, "");
+});
+
+test("Unrelated autosave acknowledgements cannot clear a durable storage error", async () => {
+  const { createApplicationSaveStatusController } = await loadFactory();
+  const harness = createHarness(createApplicationSaveStatusController);
+  harness.controller.setStorage("Database upgrade is blocked");
+  harness.controller.setPersistence("Saved", "saved");
+  assert.equal(harness.state.text, "source:Database upgrade is blocked");
+  assert.equal(harness.state.className, "save-status error");
+  harness.controller.setStorage("");
+  assert.equal(harness.state.text, "");
+});
+
+test("database initialization stays visible over Saved notices and preserves underlying errors", async () => {
+  const { createApplicationSaveStatusController } = await loadFactory();
+  const harness = createHarness(createApplicationSaveStatusController);
+  harness.controller.setPersistence("Local saving failed", "dirty");
+  harness.controller.setInitialization("Updating local resources...");
+  harness.controller.set("Saved", "saved");
+  assert.equal(harness.state.text, "source:Updating local resources...");
+  assert.equal(harness.state.busy, "true");
+  harness.controller.navigationChanged({ view: "projects" }, { view: "editor" });
+  assert.equal(harness.state.text, "source:Updating local resources...");
+  harness.controller.setInitialization();
+  assert.equal(harness.state.text, "source:Local saving failed");
+  assert.equal(harness.state.busy, "false");
 });
 
 test("ApplicationSaveStatusController validates boundaries and exposes immutable status actions", async () => {
   const { createApplicationSaveStatusController } = await loadFactory();
   const valid = createHarness(createApplicationSaveStatusController);
   assert.equal(Object.isFrozen(valid.controller), true);
-  assert.deepEqual(Object.keys(valid.controller), ["set", "setPersistence", "navigationChanged"]);
+  assert.deepEqual(Object.keys(valid.controller), [
+    "set",
+    "setPersistence",
+    "setInitialization",
+    "setStorage",
+    "navigationChanged"
+  ]);
 
   const create = (changes = {}) =>
     createApplicationSaveStatusController({

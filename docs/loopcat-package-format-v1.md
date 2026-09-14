@@ -1,6 +1,6 @@
 # LoopCAT Project Package Format v1
 
-LoopCAT project packages are portable JSON files with the `.loopcat.json` extension. They are the stable handoff format between browser storage, workspace folders, future cloud sync, and a future hosted LoopCAT backend.
+LoopCAT project packages use the `.loopcat.zip` archive format by default, with `.loopcat.json` available for compatibility. Both carry the same project contract described below. They are the stable handoff format between browser storage, workspace folders, future cloud sync, and a future hosted LoopCAT backend.
 
 ## Goals
 
@@ -17,7 +17,7 @@ Required fields:
 - `app`: Must be `"LoopCAT"` for new exports. Older `"CatHan"` packages may be imported as legacy packages.
 - `type`: Must be `"project-package"`.
 - `version`: Package contract version. Current value: `1`.
-- `schemaVersion`: Project-package schema version. Current version: `5`. Current accepted range for package import: `3` through `5`; packages from newer schemas must be opened with a newer LoopCAT build. This contract is validated independently from the workspace-manifest version and from any future local-only storage schema.
+- `schemaVersion`: Project-package schema version. Current version: `6`. Current accepted range for package import: `3` through `6`; packages from newer schemas must be opened with a newer LoopCAT build. This contract is validated independently from the workspace-manifest version and from any future local-only storage schema.
 - `exportedAt`: ISO timestamp for package creation.
 - `packageMetadata`: Metadata about the package and storage mode.
 - `project`: Project metadata and settings.
@@ -135,6 +135,17 @@ Structured `comments` may include optional `qualityDecision` metadata with `cate
 
 ## Resources
 
+Schema 6 includes six resource collections in both ZIP and JSON packages:
+
+- `resources.resources`: linked TM and termbase definitions, with stable IDs.
+- `resources.tmEntries`: translation pairs, linked by `resourceId`.
+- `resources.tmContributions`: project and segment contributions to TM entries.
+- `resources.terms`: bilingual terminology records.
+- `resources.termConcepts`: shared terminology concepts.
+- `resources.termDesignations`: language-specific terms belonging to those concepts.
+
+Project links refer to these resources by `resourceId`; contribution and terminology relationships retain their IDs through export/import. Older packages with only TM entries and bilingual terms remain supported.
+
 `resources.tmEntries` embeds TM entries used by the project.
 
 Recommended TM entry fields:
@@ -184,7 +195,7 @@ Derived local indexes, such as the persistent TM token index used for faster mat
 Local Trash and Undo/Redo have different portability rules:
 
 - A single-project `.loopcat.json` package contains the active project state and does not include local Trash entries or the in-memory Undo/Redo command stack.
-- The current full browser-backup/storage schema is version `6` and includes sanitized `trashEntries` so local deleted items can survive a full-profile backup/restore.
+- The current full browser-backup schema is version `7` and includes shared resource collections and sanitized `trashEntries` so local deleted items can survive a full-profile backup/restore. The local IndexedDB schema is version `8`.
 - The bounded Undo/Redo command stack is runtime-only and starts empty after an application restart or restore; durable segment history and Trash records remain available through their own data models.
 
 Before packages and backups are written, LoopCAT defensively removes secret-shaped fields such as API keys, tokens, authorization headers, passwords, AI provider trace fields such as `prompt`, `promptTemplate`, `responseId`, `requestId`, `providerRequestId`, `providerResponseId`, and `customEndpoint`, plus browser-only handle fields such as `fileHandle`, `directoryHandle`, and `workspaceHandle` from exported project, segment, resource, and activity records. Original JSON source reconstruction data under `localizationStructures/<documentId>/sourceJson` is path-aware and preserves source-file keys with those names, including common software-localization keys such as `password`, `accessToken`, and `fileHandle`, because they are real file structure rather than LoopCAT metadata. A `sourceJson` object anywhere else is not treated as reconstruction data and must not bypass privacy stripping or validation. Delimited CSV/TSV reconstruction stores those words as row cell values and preserves them for the same reason. `apiKeyMode` is preserved because it records workflow preference, not a credential.

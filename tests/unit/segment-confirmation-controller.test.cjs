@@ -213,7 +213,7 @@ test("confirmation controller prevents duplicate submission and preserves confir
   assert.equal(harness.segment.reviewState, "");
   assert.equal(harness.controller.isBusy("s1"), false);
   assert.equal(harness.button.disabled, false);
-  assert.deepEqual(harness.statuses.at(-1), ["Saved; Undo is available", "saved"]);
+  assert.deepEqual(harness.statuses.at(-1), ["Saved", "saved"]);
   assert.ok(harness.calls.some(([name]) => name === "clearPending"));
   assert.ok(harness.calls.some(([name]) => name === "goToNextOpen"));
   assert.ok(harness.calls.some(([name]) => name === "saveToTm"));

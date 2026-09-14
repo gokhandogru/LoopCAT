@@ -4,7 +4,8 @@
  * dirtiness, Trash, DOM rendering, and project opening remain injected owners.
  *
  * @param {{
- *   repository: { list: () => Promise<any[]> | any[] },
+ *   preload?: { schedule: (projects: any[]) => void },
+ *   repository: { list: () => Promise<any[]> | any[], listCatalog?: () => Promise<any[]>, preview?: () => any[] },
  *   session: {
  *     getProject: () => any,
  *     getProjects: () => any[],
@@ -52,19 +53,32 @@ export function createProjectCollectionLoadController(options) {
     throw new TypeError("ProjectCollectionLoadController requires presentation and selection boundaries.");
   }
 
-  async function load(selectFirst = false) {
-    session.replaceProjects(await repository.list());
+  let loadRevision = 0;
+  async function preview() {
+    const records = repository.preview?.();
+    if (!records?.length) return;
+    session.replaceProjects(records.map((project) => ({ ...project, catalogUnverified: true })));
+    await summaries.refresh();
+    presentation.renderList();
+  }
+  async function load(selectFirst = false, { catalog = false } = {}) {
+    const revision = ++loadRevision;
+    const records = await (catalog && repository.listCatalog ? repository.listCatalog() : repository.list());
+    if (revision !== loadRevision) return;
+    session.replaceProjects(records);
     const knownProjectIds = new Set(session.getProjects().map((project) => project.id));
     session.pruneProjectSummaryRevisions(knownProjectIds);
     dirty.prune();
     await summaries.refresh();
+    if (revision !== loadRevision) return;
     presentation.renderList();
     presentation.renderEditor();
     void presentation.renderTrashSummary();
+    options.preload?.schedule(session.getProjects());
     if (selectFirst && !session.getProject() && session.getProjects()[0]) {
       await selection.open(session.getProjects()[0].id);
     }
   }
 
-  return Object.freeze({ load });
+  return Object.freeze({ load, preview });
 }

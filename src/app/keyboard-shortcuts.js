@@ -145,7 +145,7 @@ export function isEditableKeyboardTarget(target) {
 }
 
 export function isTargetEditor(target) {
-  return Boolean(target?.matches?.(".segment-grid textarea"));
+  return Boolean(target?.matches?.(".segment-grid textarea") || target?.matches?.(".segment-grid .target-editor"));
 }
 
 export function isUsableShortcutEvent(event) {

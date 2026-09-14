@@ -1,4 +1,18 @@
+body.liquid-glass-edition {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.liquid-glass-edition .app-shell {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .liquid-glass-edition .topbar {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
   min-height: 64px;
   margin: 0;
   padding: var(--space-3) var(--space-4);
@@ -11,12 +25,41 @@
   -webkit-backdrop-filter: none;
 }
 
+.liquid-glass-edition .brand {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.liquid-glass-edition .topbar-actions {
+  width: auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.liquid-glass-edition .workspace-menu {
+  position: static;
+}
+
+.liquid-glass-edition .workspace-menu-panel {
+  inset: 100% var(--space-4) auto auto;
+  width: min(380px, calc(100vw - var(--space-8)));
+  min-width: 0;
+  max-width: none;
+  max-height: min(70dvh, calc(100dvh - 150px));
+  overscroll-behavior: contain;
+}
+
 .liquid-glass-edition .workspace,
 .liquid-glass-edition .workspace.projects-mode {
-  height: calc(100vh - 64px);
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
   padding: 0;
   gap: 0;
   grid-template-columns: 210px minmax(0, 1fr) 320px;
+  grid-template-rows: minmax(0, 1fr);
   background: var(--color-canvas);
 }
 
@@ -81,6 +124,10 @@
 
 .liquid-glass-edition .sidebar {
   position: relative;
+  grid-column: auto;
+  display: flex;
+  height: 100%;
+  max-height: none;
   border-right: 0;
   border-left: 1px solid var(--color-line);
 }
@@ -112,10 +159,40 @@
 }
 
 .liquid-glass-edition .editor-area {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
   border: 0;
   border-radius: 0;
   background: var(--color-surface);
   box-shadow: var(--elevation-none);
+}
+
+.liquid-glass-edition .segment-controls {
+  position: relative;
+  display: flex;
+}
+
+.liquid-glass-edition #documentFilter {
+  flex: 0 1 160px;
+  max-width: 190px;
+}
+
+.liquid-glass-edition #segmentSearchInput {
+  flex: 1 1 150px;
+  min-width: 150px;
+}
+
+.liquid-glass-edition #segmentStatusFilter {
+  flex: 0 1 135px;
+}
+
+.liquid-glass-edition .segment-options-menu {
+  position: static;
+}
+
+.liquid-glass-edition .segment-options-menu > .menu-panel {
+  inset: calc(100% + var(--space-1)) var(--space-4) auto auto;
 }
 
 .liquid-glass-edition .projects-view,
@@ -159,6 +236,162 @@
   box-shadow: var(--elevation-none);
 }
 
+:root[data-projects-view="list"] .liquid-glass-edition .project-dashboard,
+:root[data-files-view="list"] .liquid-glass-edition .project-file-list,
+:root[data-resources-view="list"] .liquid-glass-edition .resource-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+:root[data-projects-view="list"] .liquid-glass-edition .project-tile,
+:root[data-files-view="list"] .liquid-glass-edition .file-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(150px, 1fr) minmax(170px, 1fr);
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+}
+
+:root[data-projects-view="list"] .liquid-glass-edition .project-tile > header,
+:root[data-files-view="list"] .liquid-glass-edition .file-card > header {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+:root[data-projects-view="list"] .liquid-glass-edition .project-tile > .project-stats,
+:root[data-files-view="list"] .liquid-glass-edition .file-card > .project-stats {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+:root[data-projects-view="list"] .liquid-glass-edition .project-tile > footer,
+:root[data-files-view="list"] .liquid-glass-edition .file-card > footer {
+  grid-column: 3;
+  grid-row: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+:root[data-projects-view="list"] .liquid-glass-edition .project-tile > footer > span,
+:root[data-files-view="list"] .liquid-glass-edition .file-card > footer > span {
+  flex-basis: 100%;
+  text-align: end;
+  white-space: normal;
+}
+
+:root[data-projects-view="list"] .liquid-glass-edition .project-tile > .progress-bar,
+:root[data-files-view="list"] .liquid-glass-edition .file-card > .progress-bar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  height: 3px;
+}
+
+:root[data-projects-view="list"] .liquid-glass-edition .project-tile .project-stats > div,
+:root[data-files-view="list"] .liquid-glass-edition .file-card .project-stats > div,
+:root[data-resources-view="list"] .liquid-glass-edition .resource-card .project-stats > div {
+  padding: var(--space-1);
+  border-color: transparent;
+  background: transparent;
+}
+
+:root[data-resources-view="list"] .liquid-glass-edition .resource-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(150px, 1fr) minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+}
+
+:root[data-resources-view="list"] .liquid-glass-edition .resource-card > header {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+:root[data-resources-view="list"] .liquid-glass-edition .resource-card > .project-stats {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+:root[data-resources-view="list"] .liquid-glass-edition .resource-card > .resource-usage-badges {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+:root[data-resources-view="list"] .liquid-glass-edition .resource-card > p {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+:root[data-resources-view="list"] .liquid-glass-edition .resource-card > footer {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+:root[data-resources-view="list"] .liquid-glass-edition .resource-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  width: auto;
+}
+
+:root[data-resource-entries-view="card"] .liquid-glass-edition .resource-table,
+:root[data-resource-selection-view="card"] .liquid-glass-edition .resource-policy-list,
+:root[data-trash-view="card"] .liquid-glass-edition .trash-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  align-items: start;
+  gap: var(--space-3);
+}
+
+:root[data-resource-entries-view="card"] .liquid-glass-edition .resource-row,
+:root[data-resource-selection-view="card"] .liquid-glass-edition .resource-policy-row,
+:root[data-trash-view="card"] .liquid-glass-edition .trash-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+}
+
+:root[data-resource-selection-view="card"] .liquid-glass-edition .resource-policy-controls {
+  justify-content: flex-start;
+}
+
+.liquid-glass-edition .resources-header {
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+@container (max-width: 700px) {
+  :root[data-projects-view="list"] .liquid-glass-edition .project-tile,
+  :root[data-files-view="list"] .liquid-glass-edition .file-card,
+  :root[data-resources-view="list"] .liquid-glass-edition .resource-card {
+    grid-template-columns: minmax(0, 1fr) minmax(120px, 0.7fr);
+  }
+
+  :root[data-projects-view="list"] .liquid-glass-edition .project-tile > footer,
+  :root[data-files-view="list"] .liquid-glass-edition .file-card > footer,
+  :root[data-resources-view="list"] .liquid-glass-edition .resource-card > footer {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+
+  :root[data-projects-view="list"] .liquid-glass-edition .project-tile > .progress-bar,
+  :root[data-files-view="list"] .liquid-glass-edition .file-card > .progress-bar,
+  :root[data-resources-view="list"] .liquid-glass-edition .resource-card > .resource-usage-badges,
+  :root[data-resources-view="list"] .liquid-glass-edition .resource-card > p {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+}
+
 :root[data-density="compact"] .liquid-glass-edition .segment-row,
 :root[data-density="compact"] .liquid-glass-edition .editor-segment-row {
   min-height: 92px;
@@ -193,9 +426,9 @@
   }
 
   .liquid-glass-edition .workspace:not(.projects-mode) .sidebar {
-    position: fixed;
+    position: absolute;
     z-index: 20;
-    inset: 64px 0 0 auto;
+    inset: 0 0 0 auto;
     display: block;
     width: min(360px, calc(100vw - var(--space-8)));
     border-left: 1px solid var(--color-line);
@@ -212,6 +445,43 @@
 }
 
 @media (max-width: 799px) {
+  .liquid-glass-edition .topbar {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .liquid-glass-edition .brand p {
+    display: none;
+  }
+
+  .liquid-glass-edition .topbar-actions {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-1);
+  }
+
+  .liquid-glass-edition .topbar-actions > button,
+  .liquid-glass-edition .topbar-actions > details {
+    flex: 0 0 auto;
+  }
+
+  .liquid-glass-edition .topbar-actions > button,
+  .liquid-glass-edition .topbar-actions > details > summary {
+    padding-inline: var(--space-2);
+    font-size: var(--font-size-sm);
+  }
+
+  .liquid-glass-edition .segment-controls > * {
+    flex: 0 1 auto;
+    max-width: 100%;
+  }
+
+  .liquid-glass-edition .segment-controls #segmentSearchInput {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+
   .liquid-glass-edition .projects-view,
   .liquid-glass-edition .resources-view,
   .liquid-glass-edition .project-home-view {
@@ -249,9 +519,9 @@
   }
 
   .liquid-glass-edition .workspace:not(.projects-mode) .sidebar {
-    position: fixed;
+    position: absolute;
     z-index: 20;
-    inset: 64px 0 0 var(--space-4);
+    inset: 0 0 0 var(--space-4);
     display: block;
     width: auto;
     border-left: 1px solid var(--color-line);
@@ -264,5 +534,12 @@
 
   .liquid-glass-edition .inspector-resizer {
     display: none;
+  }
+}
+
+@media (max-width: 639px) {
+  .liquid-glass-edition .topbar-actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
   }
 }

@@ -30,9 +30,17 @@ export function createApplicationMenuController({ documentRoot, selectors }) {
       const clickListener = (event) => {
         if (event.target.closest(selectors.buttons)) menu.removeAttribute("open");
       };
+      const keydownListener = (event) => {
+        if (event.key !== "Escape" || !menu.open) return;
+        event.preventDefault();
+        event.stopPropagation();
+        menu.removeAttribute("open");
+        menu.querySelector(":scope > summary")?.focus();
+      };
       menu.addEventListener("toggle", toggleListener);
       menu.addEventListener("click", clickListener);
-      menuListeners.push({ menu, toggleListener, clickListener });
+      menu.addEventListener("keydown", keydownListener);
+      menuListeners.push({ menu, toggleListener, clickListener, keydownListener });
     });
     documentClickListener = (event) => {
       if (event.target.closest(selectors.menus)) return;
@@ -49,9 +57,10 @@ export function createApplicationMenuController({ documentRoot, selectors }) {
 
   function unmount() {
     if (!mounted) return false;
-    for (const { menu, toggleListener, clickListener } of menuListeners) {
+    for (const { menu, toggleListener, clickListener, keydownListener } of menuListeners) {
       menu.removeEventListener("toggle", toggleListener);
       menu.removeEventListener("click", clickListener);
+      menu.removeEventListener("keydown", keydownListener);
     }
     menuListeners.length = 0;
     documentRoot.removeEventListener("click", documentClickListener);

@@ -260,11 +260,20 @@ test("ProjectExportController contains browser-backup failures with report prece
     downloadError: {}
   });
   assert.equal(await fallbackHarness.service.exportBrowserBackup(), false);
-  assert.deepEqual(fallbackHarness.calls.slice(-3), [
-    ["errorReport", "Backup export failed."],
-    ["renderValidation", { ok: false, errors: ["Backup export failed."] }],
-    ["status", "Backup export failed.", "dirty"]
-  ]);
+  assert.deepEqual(fallbackHarness.calls.at(-1), ["status", "Backup export failed.", "dirty"]);
+  assert.equal(
+    fallbackHarness.calls.some(([name]) => name === "renderValidation" || name === "errorReport"),
+    false
+  );
+  const ioHarness = createHarness(createProjectExportController, {
+    backupBuildError: new Error("The destination is unavailable")
+  });
+  assert.equal(await ioHarness.service.exportBrowserBackup(), false);
+  assert.deepEqual(ioHarness.calls.at(-1), ["status", "Backup export failed: The destination is unavailable", "dirty"]);
+  assert.equal(
+    ioHarness.calls.some(([name]) => name === "renderValidation"),
+    false
+  );
 });
 
 test("ProjectExportController preserves the project guard and preview failure reporting", async () => {

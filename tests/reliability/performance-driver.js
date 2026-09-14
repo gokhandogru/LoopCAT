@@ -31,7 +31,8 @@ export async function runPerformance(storage, output) {
   };
   await storage.put("projects", project);
   let previousCount = 0;
-  for (const count of [10000, 100000]) {
+  const sizes = new URLSearchParams(location.search).get("segments") === "10000" ? [10000] : [10000, 100000];
+  for (const count of sizes) {
     output.textContent = `Seeding ${count} segments...`;
     const seedStarted = performance.now();
     for (let start = previousCount; start < count; start += 1000) {
@@ -65,9 +66,13 @@ export async function runPerformance(storage, output) {
     const open = await wait(() => doc()?.querySelector(".project-tile button.primary"), "project listing");
     open.click();
     (await wait(() => doc()?.querySelector(".file-card button.primary"), "project dashboard")).click();
-    const field = await wait(() => doc()?.querySelector("#segmentBody textarea:not([readonly])"), "editable segment");
+    const field = await wait(
+      () => doc()?.querySelector("#segmentBody .target-editor[contenteditable=true]"),
+      "editable segment"
+    );
     field.focus();
     const input = [];
+    const dispatch = [];
     const save = [];
     const duration = Number(new URLSearchParams(location.search).get("soakMs")) || 0;
     const end = performance.now() + (count === 100000 ? duration : 0);
@@ -79,6 +84,7 @@ export async function runPerformance(storage, output) {
       field.dispatchEvent(
         new frame.contentWindow.InputEvent("input", { bubbles: true, inputType: "insertText", data: text })
       );
+      dispatch.push(performance.now() - started);
       await Promise.race([
         new Promise((resolve) =>
           frame.contentWindow.requestAnimationFrame(() => frame.contentWindow.requestAnimationFrame(resolve))
@@ -101,6 +107,7 @@ export async function runPerformance(storage, output) {
       edits: index,
       seedMs: performance.now() - seedStarted - save.reduce((sum, value) => sum + value, 0),
       inputP95Ms: percentile(input),
+      inputDispatchP95Ms: percentile(dispatch),
       saveP95Ms: percentile(save),
       rendererHeapBytes: frame.contentWindow.performance.memory?.usedJSHeapSize || null
     });

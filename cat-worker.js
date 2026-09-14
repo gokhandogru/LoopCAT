@@ -374,6 +374,24 @@ function runQaChecks(segments, terms = []) {
 self.addEventListener("message", (event) => {
   const { id, type, payload } = event.data || {};
   try {
+    if (type === "tm-analysis") {
+      const sources = new Set(payload.entries.map(normalizeText));
+      const scores = new Map();
+      const result = payload.sources.map((source) => {
+        if (!source) return 0;
+        const normalized = normalizeText(source);
+        if (scores.has(normalized)) return scores.get(normalized);
+        let best = sources.has(normalized) ? 100 : 0;
+        if (best < 100) for (const candidate of sources) {
+          best = Math.max(best, similarityNormalized(normalized, candidate));
+          if (best === 100) break;
+        }
+        scores.set(normalized, best);
+        return best;
+      });
+      self.postMessage({ id, ok: true, result });
+      return;
+    }
     if (type === "tm-match") {
       self.postMessage({ id, ok: true, result: scoreTmEntries(payload.entries, payload.options) });
       return;

@@ -43,7 +43,7 @@ function segmentHasAiDraft(segment = {}) {
   return Boolean(segment.aiPretranslation?.provider || segment.aiPretranslation?.model);
 }
 
-function analyzeProject(project, segments = [], tmEntries = []) {
+function analyzeProject(project, segments = [], tmEntries = [], tmScores = null) {
   const bySource = new Map();
   const files = new Map();
   const totals = {
@@ -73,7 +73,7 @@ function analyzeProject(project, segments = [], tmEntries = []) {
     risk: { critical: 0, high: 0, medium: 0, low: 0 }
   };
 
-  segments.forEach((segment) => {
+  segments.forEach((segment, segmentIndex) => {
     const words = wordCount(segment.source);
     const key = normalize(segment.source);
     const sourceCount = bySource.get(key) || 0;
@@ -137,7 +137,7 @@ function analyzeProject(project, segments = [], tmEntries = []) {
     if (riskLevel) file.aiReviewRisk += 1;
     if (riskLevel === "high" || riskLevel === "critical") file.highAiRisk += 1;
 
-    leverage[leverageBand(bestTmScore(segment, tmEntries))] += 1;
+    leverage[leverageBand(tmScores ? tmScores[segmentIndex] : bestTmScore(segment, tmEntries))] += 1;
   });
 
   totals.files = files.size;
