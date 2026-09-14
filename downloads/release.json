@@ -4,10 +4,10 @@
   "identity": {
     "schemaVersion": 1,
     "version": "0.0.4-dev.20260914.5",
-    "buildId": "0.0.4-dev.20260914.5+source.e60e7568f12e",
+    "buildId": "0.0.4-dev.20260914.5+source.0e3fcca4bb17",
     "sourceKind": "working-tree-snapshot",
-    "baseCommit": "22ee30522acc23b882a738720bc9922525c348fb",
-    "sourceSha256": "e60e7568f12ed045c098a82fcfc4fd8e6228f0c7d78744d9c0eab89dc28c647f",
+    "baseCommit": "ef0cab59073f567f6f7dbfa1400e801b1503a46c",
+    "sourceSha256": "0e3fcca4bb177fcaa09db2a36c6edc0538650a0257cb13dea62f50072e3c9fd4",
     "sourceFiles": [
       {
         "path": ".gitattributes",
@@ -546,8 +546,8 @@
       },
       {
         "path": "scripts/verify-accessibility.cjs",
-        "bytes": 22718,
-        "sha256": "44683eb2470c7b714005dc949bc459e0d7323a689e3256b58ec2558e7cf39d03"
+        "bytes": 22826,
+        "sha256": "313477281c32f893914d53003423082a2e58f30504e07f42c847dbe571d8fcb0"
       },
       {
         "path": "scripts/verify-ai-sidebar-ux.cjs",
@@ -3557,17 +3557,17 @@
     {
       "name": "LoopCAT.Web.0.0.4-dev.20260914.5.zip",
       "bytes": 5905705,
-      "sha256": "038a4ac82a3d8e21b020a7be04991bbb376c05fd74510db901cfba5985c3316f"
+      "sha256": "1b635b1215b3eaf7eea0338c3a8b19623a18a642b0809ae90fa66f114717f6b2"
     },
     {
       "name": "LoopCAT.Windows.Setup.0.0.4-dev.20260914.5.zip",
-      "bytes": 100499718,
-      "sha256": "44fde50ce5371132a2d2663456806ce9b8e477eb44953e997d64194b3f47d3f5"
+      "bytes": 100499857,
+      "sha256": "82d0223cf5b08cc1e80b12f27d07a820650aeeb44a7a879584d4d714917f989a"
     },
     {
       "name": "LoopCAT.0.0.4-dev.20260914.5.Portable.zip",
-      "bytes": 100345212,
-      "sha256": "63294e7a2203fa7cd618da450e0e7e7d9d5365f88d9fc79384ae1e76035f5384"
+      "bytes": 100345287,
+      "sha256": "c9edfc0f770a6f9c221ba728edf34b6d977ba81573647c13055ae6c478b45fd7"
     }
   ]
 }
