@@ -1,6 +1,6 @@
 # LoopCAT 0.0.4-dev.20260914.5 verification
 
-Verified on 15 September 2026. Build ID: `0.0.4-dev.20260914.5+source.0e3fcca4bb17`.
+Verified on 15 September 2026. Build ID: `0.0.4-dev.20260914.5+source.8732b7716653`.
 
 The Windows installer, portable package, and web ZIP were built from the same source fingerprint. See the [source and artifact manifest](release.json) and [release notes](../docs/releases/0.0.4-dev.20260914.5.md).
 

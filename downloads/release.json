@@ -4,10 +4,10 @@
   "identity": {
     "schemaVersion": 1,
     "version": "0.0.4-dev.20260914.5",
-    "buildId": "0.0.4-dev.20260914.5+source.0e3fcca4bb17",
+    "buildId": "0.0.4-dev.20260914.5+source.8732b7716653",
     "sourceKind": "working-tree-snapshot",
-    "baseCommit": "ef0cab59073f567f6f7dbfa1400e801b1503a46c",
-    "sourceSha256": "0e3fcca4bb177fcaa09db2a36c6edc0538650a0257cb13dea62f50072e3c9fd4",
+    "baseCommit": "a8bb7fb1d74d6e54611542d4ec8a0cfe0b5e2c5d",
+    "sourceSha256": "8732b7716653fe7ff9c8739caf60f8ef5b4584f51a2f3c07965448968c3b535b",
     "sourceFiles": [
       {
         "path": ".gitattributes",
@@ -461,8 +461,8 @@
       },
       {
         "path": "scripts/build-desktop.cjs",
-        "bytes": 8528,
-        "sha256": "0d19c9063a78733af1fc892f878c69c02d2830ba81f4c4d2a464e7f1a97eff91"
+        "bytes": 8942,
+        "sha256": "c03bbc5f1a90cc119225b744645b68e7c406f983492a0359baf8a1e9fe04482a"
       },
       {
         "path": "scripts/build-renderer.cjs",
@@ -651,8 +651,8 @@
       },
       {
         "path": "scripts/verify-release.cjs",
-        "bytes": 1296730,
-        "sha256": "5c0f6f04c20913795e69240edc6f369ddc53a008e167406101cc19fb993a1f48"
+        "bytes": 1297112,
+        "sha256": "4889b71e2f1f49dbc4ea4a61dd5cfc976b42ba009c7772ff5734e6cb51ac0fe7"
       },
       {
         "path": "scripts/verify-renderer-build.cjs",
@@ -3557,17 +3557,17 @@
     {
       "name": "LoopCAT.Web.0.0.4-dev.20260914.5.zip",
       "bytes": 5905705,
-      "sha256": "1b635b1215b3eaf7eea0338c3a8b19623a18a642b0809ae90fa66f114717f6b2"
+      "sha256": "61aed7cc6da9526e1a896cf94b31f917c03456ea7f842b1e204ed0c0810a48a9"
     },
     {
       "name": "LoopCAT.Windows.Setup.0.0.4-dev.20260914.5.zip",
-      "bytes": 100499857,
-      "sha256": "82d0223cf5b08cc1e80b12f27d07a820650aeeb44a7a879584d4d714917f989a"
+      "bytes": 100499712,
+      "sha256": "0efe0c8cb4d30ed04b9a8f42057d7ff4d3e237e9a40edea2c4b07bad0a63c1cc"
     },
     {
       "name": "LoopCAT.0.0.4-dev.20260914.5.Portable.zip",
-      "bytes": 100345287,
-      "sha256": "c9edfc0f770a6f9c221ba728edf34b6d977ba81573647c13055ae6c478b45fd7"
+      "bytes": 100345177,
+      "sha256": "acb154e38b7a67c3bb548e68a6d49acb7b9c84b58ac2f221f199d78440bf758d"
     }
   ]
 }
