@@ -131,9 +131,9 @@ async function waitForThemePaint(theme) {
   await waitFor(
     `(() => {
       const rootStyle = getComputedStyle(document.documentElement);
-      const visibleHeadings = Array.from(document.querySelectorAll("h1, h2, h3, h4")).filter(
-        (element) => element.getClientRects().length > 0
-      );
+      const visibleHeadings = Array.from(document.querySelectorAll(
+        ".brand h1, .projects-header h2, .resources-header h2, .project-home-header h2, .actionable-empty-state h3, .panel-title h2"
+      )).filter((element) => element.getClientRects().length > 0);
       return rootStyle.getPropertyValue("--color-text").trim().toLowerCase() === ${JSON.stringify(expected.textToken)} &&
         rootStyle.getPropertyValue("--color-canvas").trim().toLowerCase() === ${JSON.stringify(expected.canvasToken)} &&
         getComputedStyle(document.body).color === ${JSON.stringify(expected.textColor)} &&
