@@ -231,6 +231,8 @@ jobs:
 
       - name: Smoke test static HTML artifact
         run: xvfb-run -a pnpm run verify:web-smoke
+        env:
+          LOOPCAT_WEB_SMOKE_CHROME: "1"
 
       - name: Upload static HTML artifact
         uses: actions/upload-artifact@v4

@@ -41,7 +41,7 @@ export function archiveJob(
     const trustedUrl = window.CatHan?.appRuntime?.safeHtml?.trustedScriptUrl?.(WORKER_URL) || WORKER_URL;
     let worker;
     try {
-      worker = new Worker(trustedUrl);
+      worker = window.CatHan?.createFileWorker?.(WORKER_URL) || new Worker(trustedUrl);
     } catch (error) {
       if (destination)
         destination

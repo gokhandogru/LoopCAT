@@ -2,7 +2,9 @@ export function evaluateRegex(payload, { signal = undefined, timeoutMs = 2000 } 
   if (typeof Worker === "undefined") return Promise.reject(new Error("Regex search requires worker support."));
   return new Promise((resolve, reject) => {
     const url = "./regex-worker.js";
-    const worker = new Worker(window.CatHan?.appRuntime?.safeHtml?.trustedScriptUrl?.(url) || url);
+    const worker =
+      window.CatHan?.createFileWorker?.(url) ||
+      new Worker(window.CatHan?.appRuntime?.safeHtml?.trustedScriptUrl?.(url) || url);
     let timer;
     const finish = (error, result = undefined) => {
       worker.terminate();

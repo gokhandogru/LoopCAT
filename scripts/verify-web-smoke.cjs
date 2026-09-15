@@ -3,8 +3,9 @@ const fsSync = require("node:fs");
 const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
+const { spawnSync, spawn } = require("node:child_process");
 const { pathToFileURL } = require("node:url");
+const { webWorkflowProbe } = require("./web-workflow-probe.cjs");
 
 const root = path.resolve(__dirname, "..");
 const args = process.argv.slice(2);
@@ -62,6 +63,7 @@ if (!process.versions.electron) {
     cwd: root,
     env: {
       ...process.env,
+      LOOPCAT_NODE_BINARY: process.execPath,
       LOOPCAT_WEB_SMOKE_NO_SANDBOX: noSandbox ? "1" : "0"
     },
     stdio: "inherit"
@@ -75,7 +77,7 @@ if (!process.versions.electron) {
 
 const { app, BrowserWindow } = require("electron");
 const tempRoot = path.join(os.tmpdir(), `loopcat-web-smoke-${process.pid}-${Date.now()}`);
-const extractedRoot = path.join(tempRoot, "web");
+const extractedRoot = path.join(tempRoot, "web package with spaces");
 const runnerUserDataDir = path.join(tempRoot, "profile");
 const servedFiles = new Set();
 const failures = [];
@@ -691,6 +693,10 @@ async function inspectViewports(url) {
     ]) {
       screenshots.push(await inspectViewport(windowRef, url, viewport, pageMessages, loadError));
     }
+    windowRef.setContentSize(1280, 720);
+    console.log(
+      `HTTP workflow passed: ${await windowRef.webContents.executeJavaScript(`(${webWorkflowProbe})()`, true)}`
+    );
     return screenshots;
   } finally {
     if (!windowRef.isDestroyed()) windowRef.destroy();
@@ -708,13 +714,17 @@ async function inspectDirectFile() {
     } catch (error) {
       loadError = `${error.message || error}`;
     }
-    return await inspectViewport(
+    const screenshot = await inspectViewport(
       windowRef,
       url,
       { name: "direct-file", width: 1280, height: 720 },
       pageMessages,
       loadError
     );
+    console.log(
+      `Direct-file workflow passed: ${await windowRef.webContents.executeJavaScript(`(${webWorkflowProbe})()`, true)}`
+    );
+    return screenshot;
   } finally {
     if (!windowRef.isDestroyed()) windowRef.destroy();
   }
@@ -735,6 +745,22 @@ app.whenReady().then(async () => {
     const url = `http://127.0.0.1:${port}/index.html`;
     await probeUrl(url);
     screenshots.push(...(await inspectViewports(url)));
+    if (process.env.LOOPCAT_WEB_SMOKE_CHROME === "1") {
+      await new Promise((resolve, reject) => {
+        const child = spawn(
+          process.env.LOOPCAT_NODE_BINARY,
+          [
+            path.join(__dirname, "verify-web-chrome.cjs"),
+            path.join(tempRoot, "chrome-profile"),
+            pathToFileURL(path.join(extractedRoot, "index.html")).href,
+            url
+          ],
+          { stdio: "inherit", windowsHide: true }
+        );
+        child.on("error", reject);
+        child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`Chrome workflow exited ${code}`))));
+      });
+    }
 
     if (failures.length) {
       writeLine("stderr", "Static web smoke verification failed:");

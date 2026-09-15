@@ -26,7 +26,7 @@ function getWorker() {
   if (worker) return worker;
   try {
     const trustedWorkerUrl = window.CatHan?.appRuntime?.safeHtml?.trustedScriptUrl?.(WORKER_URL) || WORKER_URL;
-    worker = new Worker(trustedWorkerUrl);
+    worker = window.CatHan?.createFileWorker?.(WORKER_URL) || new Worker(trustedWorkerUrl);
     worker.addEventListener("message", (event) => {
       const { id, ok, result, error } = event.data || {};
       const request = pending.get(id);
@@ -149,7 +149,7 @@ function analyzeTm({ sources, entries, signal }) {
     function abort() { finish(new DOMException("Analysis canceled", "AbortError")); }
     try {
       const url = window.CatHan?.appRuntime?.safeHtml?.trustedScriptUrl?.(WORKER_URL) || WORKER_URL;
-      analysisWorker = new Worker(url);
+      analysisWorker = window.CatHan?.createFileWorker?.(WORKER_URL) || new Worker(url);
       signal?.addEventListener("abort", abort, { once: true });
       analysisWorker.addEventListener("message", ({ data }) => finish(data.ok ? null : new Error(data.error), data.result));
       analysisWorker.addEventListener("error", (error) => finish(new Error(error.message || "Analysis failed.")));

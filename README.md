@@ -14,13 +14,13 @@ The current preview includes Resources 2.0 and a new saving and recovery system.
 
 ## Current Project Status
 
-LoopCAT implements the core offline CAT workflow, recovery model, editor, reversible commands, and modular application architecture. Version `0.0.4-dev.20260914.5` is the current unsigned development preview, with [responsive project opening and recent-project preparation](docs/releases/0.0.4-dev.20260914.5.md). The [current GitHub prerelease](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20260914.5) provides web, Windows, macOS, and Linux packages built from one repository revision. The local [download manifest](downloads/release.json) identifies the matching Windows and web repository mirrors. This preview is not yet a signed or notarized production-qualified release.
+LoopCAT implements the core offline CAT workflow, recovery model, editor, reversible commands, and modular application architecture. Version `0.0.4-dev.20260915.1` is the current unsigned development preview, with [repaired direct-file web workflows and recent-project preparation](docs/releases/0.0.4-dev.20260915.1.md). The [current GitHub prerelease](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20260915.1) provides web, Windows, macOS, and Linux packages built from one repository revision. The local [download manifest](downloads/release.json) identifies the matching Windows and web repository mirrors. This preview is not yet a signed or notarized production-qualified release.
 
 | Area | Current state |
 | --- | --- |
 | Core translation workflow | Implemented: multi-file projects, segmentation, CAT-grid editing, statuses, comments, revision history, QA, TM, terminology, analysis, and target export. |
 | Offline and recovery | Implemented: IndexedDB autosave, portable project packages, full browser backups, visible workspace-folder packages where supported, and offline web/desktop shells. |
-| Repository downloads | Version `0.0.4-dev.20260914.5` provides a current web bundle plus unsigned Windows installer and portable packages with SHA-256 checksums in [`downloads/`](downloads/). |
+| Repository downloads | Version `0.0.4-dev.20260915.1` provides a current web bundle plus unsigned Windows installer and portable packages with SHA-256 checksums in [`downloads/`](downloads/). |
 | Cross-platform desktop | Electron 43 packaging targets Windows, macOS, and Linux with the renderer sandbox and hardware acceleration enabled by default. The release workflow builds and verifies Windows installer/portable, macOS DMG/ZIP, and Linux AppImage/DEB packages; signing, notarization, and recorded clean-machine evidence remain release-qualification work. |
 | Format support | Broad import/export coverage is implemented, including XLIFF 1.2 and XLIFF 2.0/2.1/2.2 Core, DOCX, localization formats, publishing formats, subtitles, resources, and terminology exchange. Perfect reconstruction of every complex Office, OpenDocument, and DTP structure is not claimed. |
 | Scale | Browser tests cover projects with thousands of segments and indexed TM lookup. True chunked document import, deeper persistent indexes, and long-duration autosave/memory profiling remain. |
@@ -31,14 +31,14 @@ The detailed distinction between shipped behavior, release blockers, near-term p
 
 ## How to Install
 
-Use the versioned application packages in the [current GitHub prerelease](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20260914.5). Do not use GitHub's automatic **Source code** ZIP or TAR.GZ as an application package. The repository's [`downloads/`](downloads/) directory mirrors the current web and Windows ZIP packages.
+Use the versioned application packages in the [current GitHub prerelease](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20260915.1). Do not use GitHub's automatic **Source code** ZIP or TAR.GZ as an application package. The repository's [`downloads/`](downloads/) directory mirrors the current web and Windows ZIP packages.
 
-- Web: download `LoopCAT Web 0.0.4-dev.20260914.5.zip`, extract it, and open `index.html`. For installable offline PWA behavior, serve the extracted folder from a local or hosted HTTP/HTTPS origin; direct `file://` opening still runs the app, but browsers do not allow service-worker installation from local files.
-- Windows installer: download `LoopCAT Setup 0.0.4-dev.20260914.5.exe` and run it. The repository mirror [`LoopCAT.Windows.Setup.0.0.4-dev.20260914.5.zip`](downloads/LoopCAT.Windows.Setup.0.0.4-dev.20260914.5.zip) contains the same installer.
-- Windows portable: download `LoopCAT 0.0.4-dev.20260914.5.exe` and run it without installation. The repository mirror [`LoopCAT.0.0.4-dev.20260914.5.Portable.zip`](downloads/LoopCAT.0.0.4-dev.20260914.5.Portable.zip) contains the same executable.
+- Web: download `LoopCAT Web 0.0.4-dev.20260915.1.zip`, extract it, and open `index.html`. For installable offline PWA behavior, serve the extracted folder from a local or hosted HTTP/HTTPS origin; direct `file://` opening still runs the app, but browsers do not allow service-worker installation from local files.
+- Windows installer: download `LoopCAT Setup 0.0.4-dev.20260915.1.exe` and run it. The repository mirror [`LoopCAT.Windows.Setup.0.0.4-dev.20260915.1.zip`](downloads/LoopCAT.Windows.Setup.0.0.4-dev.20260915.1.zip) contains the same installer.
+- Windows portable: download `LoopCAT 0.0.4-dev.20260915.1.exe` and run it without installation. The repository mirror [`LoopCAT.0.0.4-dev.20260915.1.Portable.zip`](downloads/LoopCAT.0.0.4-dev.20260915.1.Portable.zip) contains the same executable.
 - macOS: download the versioned DMG for the normal drag-to-Applications flow, or the macOS ZIP when you prefer a directly extracted app bundle.
 - Linux: download the versioned AppImage for a portable launch, or the DEB package and install it with `sudo apt install ./<downloaded-file>.deb`.
-- Checksums: download the release asset `SHA256SUMS.txt` and compare the full SHA-256 value for the exact filename you downloaded. The repository mirror also provides [`LoopCAT.0.0.4-dev.20260914.5.SHA256SUMS.txt`](downloads/LoopCAT.0.0.4-dev.20260914.5.SHA256SUMS.txt) for its three ZIPs.
+- Checksums: download the release asset `SHA256SUMS.txt` and compare the full SHA-256 value for the exact filename you downloaded. The repository mirror also provides [`LoopCAT.0.0.4-dev.20260915.1.SHA256SUMS.txt`](downloads/LoopCAT.0.0.4-dev.20260915.1.SHA256SUMS.txt) for its three ZIPs.
 
 The desktop packages are currently unsigned, and the macOS packages are not notarized. Windows may display an unknown-publisher or SmartScreen warning, and macOS may require an explicit Open action in Privacy & Security. LoopCAT does not bypass operating-system warnings; verify the checksum from the same release and proceed only if you trust this repository.
 
@@ -171,7 +171,7 @@ The current implementation is usable for substantial single-user offline project
 
 ### Release Qualification
 
-- Version `0.0.4-dev.20260914.5` provides web, Windows installer/portable, macOS DMG/ZIP, and Linux AppImage/DEB packages on the GitHub prerelease. A stable all-platform release still requires signing or notarization where applicable and the outstanding clean-machine qualification matrix.
+- Version `0.0.4-dev.20260915.1` provides web, Windows installer/portable, macOS DMG/ZIP, and Linux AppImage/DEB packages on the GitHub prerelease. A stable all-platform release still requires signing or notarization where applicable and the outstanding clean-machine qualification matrix.
 - A public cross-platform desktop release still requires signed Windows artifacts, signed and notarized macOS artifacts, checksum-verified Linux artifacts, and completed clean-machine evidence for every public download.
 - Disk-full and permission-denied workspace-save results must be recorded for release candidates. The automated gates and evidence template exist, but they do not replace real platform testing.
 

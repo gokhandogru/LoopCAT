@@ -158,6 +158,32 @@ function generatedProductionAssetsSource(rendererAssetPaths) {
 
 async function main() {
   fs.rmSync(outputRoot, { recursive: true, force: true });
+  const archiveWorkerMeta = await buildVariant({
+    entry: "src/features/import-export/archive-worker-runtime.js",
+    outdir: productionDir,
+    entryNames: "archive-worker",
+    format: "iife",
+    splitting: false,
+    minify: true
+  });
+  const fileWorkerSources = {
+    "./cat-worker.js": fs.readFileSync(path.join(root, "cat-worker.js"), "utf8"),
+    "./regex-worker.js": fs.readFileSync(path.join(root, "regex-worker.js"), "utf8"),
+    "./archive-worker.js": fs.readFileSync(path.join(productionDir, "archive-worker.js"), "utf8")
+  };
+  const fileWorkerPlugin = {
+    name: "loopcat-file-workers",
+    setup(build) {
+      build.onResolve({ filter: /^loopcat:file-worker-sources$/ }, () => ({
+        path: "sources",
+        namespace: "file-workers"
+      }));
+      build.onLoad({ filter: /.*/, namespace: "file-workers" }, () => ({
+        contents: `export default ${JSON.stringify(fileWorkerSources)}`,
+        loader: "js"
+      }));
+    }
+  };
   const productionMeta = await buildVariant({
     entry: "src/entry/production.js",
     outdir: productionDir,
@@ -167,7 +193,7 @@ async function main() {
   const fileProductionMeta = await buildVariant({
     entry: "src/entry/file-production.js",
     outdir: productionDir,
-    plugins: [productionSourcePlugin()],
+    plugins: [productionSourcePlugin(), fileWorkerPlugin],
     minify: true,
     entryNames: "app-file",
     format: "iife",
@@ -185,14 +211,6 @@ async function main() {
     entry: "src/entry/test.js",
     outdir: testDir,
     plugins: [testSourcePlugin()]
-  });
-  const archiveWorkerMeta = await buildVariant({
-    entry: "src/features/import-export/archive-worker-runtime.js",
-    outdir: productionDir,
-    entryNames: "archive-worker",
-    format: "iife",
-    splitting: false,
-    minify: true
   });
   const productionAssets = rendererAssets(
     {
@@ -213,7 +231,12 @@ async function main() {
     splitting: false
   });
   const testAssets = rendererAssets({ outputs: { ...testMeta.outputs, ...reliabilityMeta.outputs } }, testDir);
-  fs.writeFileSync(path.join(productionDir, "index.html"), rendererIndex('<script src="./bootstrap.js"></script>'));
+  fs.writeFileSync(
+    path.join(productionDir, "index.html"),
+    rendererIndex('<script src="./bootstrap.js"></script>')
+      .replace("worker-src 'self'", "worker-src 'self' blob:")
+      .replace("trusted-types loopcat-bootstrap", "trusted-types loopcat-file-workers loopcat-bootstrap")
+  );
   fs.writeFileSync(
     path.join(productionDir, "desktop-index.html"),
     rendererIndex('<script type="module" src="./app.js"></script>')

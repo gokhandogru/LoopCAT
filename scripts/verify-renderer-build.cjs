@@ -508,6 +508,12 @@ for (const requiredAsset of ["app.js", "app-file.js", "bootstrap.js"]) {
 }
 if (!production.includes("loopcat-bootstrap"))
   failures.push("Production renderer is missing the allowlisted Trusted Types bootstrap policy.");
+if (!productionIndex.includes("worker-src 'self' blob:"))
+  failures.push("Web renderer must allow its bundled file workers.");
+if (desktopIndex.includes("loopcat-file-workers") || desktopIndex.includes("worker-src 'self' blob:"))
+  failures.push("Desktop renderer must retain its external-worker policy.");
+if (Object.keys(rendererMetafile.production.inputs || {}).some((name) => name.endsWith("file-workers.js")))
+  failures.push("HTTP/desktop entry must not embed the direct-file worker sources.");
 if (!productionAssets.every((asset) => fs.existsSync(path.join(rendererRoot, "production", asset))))
   failures.push("Production renderer asset manifest contains a missing file.");
 

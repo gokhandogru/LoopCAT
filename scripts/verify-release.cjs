@@ -17644,6 +17644,8 @@ assertIncludes(
 );
 assertIncludes(webSmokeScript, "desktop", "scripts/verify-web-smoke.cjs must smoke test a desktop viewport.");
 assertIncludes(webSmokeScript, "mobile", "scripts/verify-web-smoke.cjs must smoke test a mobile viewport.");
+assertIncludes(webSmokeScript, "webWorkflowProbe", "The packaged web gate must exercise editing and archive workers, beyond startup dialogs.");
+assertIncludes(readText(".github/workflows/desktop-release.yml"), 'LOOPCAT_WEB_SMOKE_CHROME: "1"', "Web releases must pass the real Chrome file and HTTP workflow gate.");
 assert(
   packageJson.scripts?.pack === "node scripts/build-desktop.cjs --dir",
   "package.json pack script must use the desktop build wrapper."
