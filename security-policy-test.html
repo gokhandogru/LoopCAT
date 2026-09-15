@@ -48,7 +48,12 @@
         assert(!connectSrc.includes("http:"), "CSP connect-src rejects generic insecure network origins");
         assert(!connectSrc.includes("http://example.com:11434"), "CSP connect-src rejects non-loopback local AI origins");
         assert(directives.get("script-src")?.join(" ") === "'self'", "CSP script-src stays local-only");
-        assert(directives.get("worker-src")?.join(" ") === "'self'", "CSP worker-src stays local-only");
+        assert(directives.get("worker-src")?.join(" ") === "'self' blob:", "Web CSP permits only local and bundled Blob workers");
+        assert(directives.get("trusted-types")?.includes("loopcat-file-workers"), "Web CSP permits the bundled worker URL policy");
+        const desktopHtml = await fetch("./desktop-index.html").then((response) => response.text());
+        const desktopPolicy = desktopHtml.match(/http-equiv="Content-Security-Policy"\s+content="([^"]+)"/)?.[1] || "";
+        assert(/(?:^|;)\s*worker-src 'self'\s*(?:;|$)/.test(desktopPolicy), "Desktop CSP worker-src stays local-only");
+        assert(!desktopPolicy.includes("loopcat-file-workers"), "Desktop CSP does not inherit the direct-file worker policy");
         assert(directives.get("object-src")?.join(" ") === "'none'", "CSP object-src disables plugin content");
         assert(directives.get("base-uri")?.join(" ") === "'none'", "CSP base-uri disables base URL injection");
         assert(directives.get("form-action")?.join(" ") === "'none'", "CSP form-action disables form submission");

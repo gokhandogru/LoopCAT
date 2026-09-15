@@ -12,6 +12,7 @@ const testRendererRoot = path.join(root, ".cache", "renderer", "test");
 const { runtimeAssets } = require(path.join(productionRendererRoot, "config", "production-assets.js"));
 const generatedFiles = new Map([
   ["index.html", path.join(productionRendererRoot, "index.html")],
+  ["desktop-index.html", path.join(productionRendererRoot, "desktop-index.html")],
   ["config/production-assets.js", path.join(productionRendererRoot, "config", "production-assets.js")],
   ["renderer-test/index.html", path.join(testRendererRoot, "index.html")]
 ]);
