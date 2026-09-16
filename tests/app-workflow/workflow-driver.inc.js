@@ -967,6 +967,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         );
         return editorSessionStore.getSegments()[segmentIndex]?.target === keyboardEditBefore.target &&
           stored?.target === keyboardEditBefore.target &&
+          !els.redoBtn.disabled &&
           !els.saveStatus.textContent.includes("Undo target edit") &&
           document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] .target-editor`) &&
           document.activeElement.value === keyboardEditBefore.target;
@@ -999,6 +1000,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         );
         return editorSessionStore.getSegments()[segmentIndex]?.target === keyboardEditTarget &&
           stored?.target === keyboardEditTarget &&
+          els.redoBtn.disabled &&
           !els.saveStatus.textContent.includes("Redid target edit") &&
           document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] .target-editor`) &&
           document.activeElement.value === keyboardEditTarget;
