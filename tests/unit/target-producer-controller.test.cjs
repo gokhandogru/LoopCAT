@@ -175,7 +175,7 @@ test("target producer owns Copy Source button lifecycle and finalizes typing bef
   });
   assert.deepEqual(harness.created["copy-source-to-target"].beforeSelection, { start: 1, end: 3 });
   assert.equal(harness.created["copy-source-to-target"].beforePatch.target, "Draft");
-  assert.deepEqual(harness.statuses.at(-1), ["Source copied to target; Undo is available", "dirty"]);
+  assert.deepEqual(harness.statuses, []);
   assert.deepEqual(harness.calls.slice(0, 3), [
     ["finalize", "s1"],
     ["clearPending", "s1", { finalizeEdit: false }],
@@ -221,7 +221,7 @@ test("TM match and concordance producers preserve distinct provenance and defaul
     channel: "match",
     resourceId: "tm-entry"
   });
-  assert.deepEqual(harness.statuses.at(-1), ["TM target inserted; Undo is available", "dirty"]);
+  assert.deepEqual(harness.statuses, []);
   assert.deepEqual(matchResult.applied.selection, { start: "Memory target".length, end: "Memory target".length });
 
   await harness.controller.insertTmTarget("Concordance target", {
@@ -233,7 +233,7 @@ test("TM match and concordance producers preserve distinct provenance and defaul
     channel: "concordance",
     resourceId: "42"
   });
-  assert.deepEqual(harness.statuses.at(-1), ["Concordance target inserted; Undo is available", "dirty"]);
+  assert.deepEqual(harness.statuses, []);
 });
 
 test("approved-term producer inserts at the target selection with termbase provenance", async () => {
@@ -255,7 +255,7 @@ test("approved-term producer inserts at the target selection with termbase prove
     sourceTerm: "Source term"
   });
   assert.deepEqual(result.applied.selection, { start: 5, end: 5 });
-  assert.deepEqual(harness.statuses.at(-1), ["Term inserted; Undo is available", "dirty"]);
+  assert.deepEqual(harness.statuses, []);
 });
 
 test("protected-tag producer replaces the active range and restores a collapsed post-insert caret", async () => {
@@ -272,7 +272,7 @@ test("protected-tag producer replaces the active range and restores a collapsed 
     producer: "protected-tag"
   });
   assert.deepEqual(result.applied.selection, { start: 4, end: 4 });
-  assert.deepEqual(harness.statuses.at(-1), ["Protected tag inserted; Undo is available", "dirty"]);
+  assert.deepEqual(harness.statuses, []);
   assert.ok(
     harness.calls.some(
       ([name, target, status, reason]) =>
@@ -290,6 +290,7 @@ test("protected-tag producer inserts all requested tags through one reversible c
   const result = await harness.controller.insertProtectedTags(["<b>", "</b>"]);
 
   assert.equal(harness.segment.target, "Draft<b></b>");
+  assert.deepEqual(harness.statuses, []);
   assert.deepEqual(harness.created["insert-protected-tag"].provenance, {
     origin: "user",
     producer: "protected-tag",

@@ -148,7 +148,7 @@ test("target editor owns focus, composition input, coalescing, blur finalization
     segmentId: "s1"
   });
   assert.match(harness.textarea.getAttribute("aria-keyshortcuts"), /Control\+Enter/);
-  assert.match(harness.textarea.getAttribute("title"), /Quick Insert: Tab/);
+  assert.ok(!harness.textarea.getAttribute("title"));
 
   harness.textarea.dispatch("focus");
   assert.equal(harness.editingCell.classList.contains("editing"), true);

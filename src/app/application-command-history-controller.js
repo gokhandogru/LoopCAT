@@ -122,7 +122,9 @@ export function createApplicationCommandHistoryController({
       await projects.open(projectId);
     }
     await synchronize(entryFromCommandResult(result));
-    status.set(result.receipt.undoLabel, "saved");
+    if (!result.result?.focusTarget && result.receipt.commandId !== "edit-target") {
+      status.set(result.receipt.undoLabel, "saved");
+    }
     render();
     if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
       edits.focusActive(result.result?.selection || null);
@@ -167,7 +169,9 @@ export function createApplicationCommandHistoryController({
       presentation.renderAll();
     }
     await synchronize(entryFromCommandResult(result));
-    status.set(result.receipt.undoLabel.replace(/^Undo\s+/i, "Redid "), "saved");
+    if (!result.result?.focusTarget && result.receipt.commandId !== "edit-target") {
+      status.set(result.receipt.undoLabel.replace(/^Undo\s+/i, "Redid "), "saved");
+    }
     render();
     if (result.result?.focusTarget || result.receipt.commandId === "edit-target") {
       edits.focusActive(result.result?.selection || null);

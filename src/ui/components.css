@@ -70,6 +70,13 @@
 }
 
 .liquid-glass-edition .save-status {
+  position: fixed;
+  z-index: 50;
+  inset-block-start: var(--space-2);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  width: min(640px, calc(100vw - 32px));
+  box-shadow: var(--elevation-transient);
   display: block;
   flex: 0 0 auto;
   min-width: 0;
@@ -77,9 +84,8 @@
   max-height: 25dvh;
   overflow: auto;
   padding: var(--space-2) var(--space-4);
-  border: 0;
-  border-bottom: 1px solid var(--color-line);
-  border-radius: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
   background: var(--color-surface-subtle);
   color: var(--color-text);
   font-size: var(--font-size-sm);

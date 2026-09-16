@@ -95,7 +95,7 @@ export function createTargetProducerController(options) {
     return editorSessionStore.getSegments()[selection.getActiveIndex()] || null;
   }
 
-  async function run({ createCommand, target, reason, provenance, targetSelection = null, successMessage }) {
+  async function run({ createCommand, target, reason, provenance, targetSelection = null }) {
     const segment = currentSegment();
     const projectId = editorSessionStore.getProject()?.id || segment?.projectId || "";
     if (!segment || !projectId || typeof createCommand !== "function") return null;
@@ -142,7 +142,6 @@ export function createTargetProducerController(options) {
       });
       const result = await commands.bus.execute(command);
       commands.changed();
-      if (successMessage) status.set(`${successMessage}; Undo is available`, "dirty");
       return result;
     } catch (error) {
       mutation.restorePatch(segment, beforePatch);
@@ -166,8 +165,7 @@ export function createTargetProducerController(options) {
         origin: "translation-memory",
         channel,
         ...(insertOptions.resourceId ? { resourceId: String(insertOptions.resourceId) } : {})
-      },
-      successMessage: channel === "concordance" ? "Concordance target inserted" : "TM target inserted"
+      }
     });
   }
 
@@ -178,8 +176,7 @@ export function createTargetProducerController(options) {
       createCommand: commands.createCopySource,
       target: segment.source,
       reason: "copy-source",
-      provenance: { origin: "user", producer: "copy-source" },
-      successMessage: "Source copied to target"
+      provenance: { origin: "user", producer: "copy-source" }
     });
   }
 
@@ -200,8 +197,7 @@ export function createTargetProducerController(options) {
         ...(insertOptions.resourceId ? { resourceId: String(insertOptions.resourceId) } : {}),
         ...(insertOptions.sourceTerm ? { sourceTerm: String(insertOptions.sourceTerm) } : {})
       },
-      targetSelection: { start: nextPosition, end: nextPosition },
-      successMessage: "Term inserted"
+      targetSelection: { start: nextPosition, end: nextPosition }
     });
   }
 
@@ -227,8 +223,7 @@ export function createTargetProducerController(options) {
         producer: "protected-tag",
         ...(tags.length > 1 ? { count: tags.length } : {})
       },
-      targetSelection: { start: nextPosition, end: nextPosition },
-      successMessage: tags.length === 1 ? "Protected tag inserted" : `${tags.length} protected tags inserted`
+      targetSelection: { start: nextPosition, end: nextPosition }
     });
   }
 

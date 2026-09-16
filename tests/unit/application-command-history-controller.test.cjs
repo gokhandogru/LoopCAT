@@ -297,7 +297,7 @@ test("ApplicationCommandHistoryController preserves project or all-edit finaliza
   assert.deepEqual(allRedo.calls, [["context.getProjectId"], ["edits.finalizeAll"], ["commands.redo", null]]);
 });
 
-test("ApplicationCommandHistoryController restores the active project on Undo before status, controls, and focus", async () => {
+test("ApplicationCommandHistoryController restores editing Undo silently with controls and focus", async () => {
   const { createApplicationCommandHistoryController } = await loadFactory();
   const result = {
     receipt: { commandId: "edit-target", undoLabel: "Undo target edit" },
@@ -321,8 +321,11 @@ test("ApplicationCommandHistoryController restores the active project on Undo be
     harness.calls.find(([name]) => name === "navigation.selectSegment"),
     ["navigation.selectSegment", { activeIndex: 1, segmentId: "segment-b" }]
   );
-  assert.deepEqual(harness.calls.slice(-5), [
-    ["status.set", "Undo target edit", "saved"],
+  assert.equal(
+    harness.calls.some(([name]) => name === "status.set"),
+    false
+  );
+  assert.deepEqual(harness.calls.slice(-4), [
     ["context.getProjectId"],
     ["commands.canUndo", "project-1"],
     ["commands.canRedo", "project-1"],
@@ -373,7 +376,7 @@ test("ApplicationCommandHistoryController preserves Redo delete-project and requ
 
   const requestedResult = {
     receipt: { commandId: "copy-source", undoLabel: "Undo copy source" },
-    result: { activeSegmentId: "segment-b" }
+    result: { activeSegmentId: "segment-b", focusTarget: true }
   };
   const requested = createHarness(createApplicationCommandHistoryController, {
     redoResult: requestedResult,
@@ -381,6 +384,10 @@ test("ApplicationCommandHistoryController preserves Redo delete-project and requ
     preparedSegments: [{ id: "segment-a" }, { id: "segment-b" }]
   });
   assert.equal(await requested.controller.redo(), requestedResult);
+  assert.equal(
+    requested.calls.some(([name]) => name === "status.set"),
+    false
+  );
   assert.deepEqual(
     requested.calls.find(([name]) => name === "navigation.selectSegment"),
     ["navigation.selectSegment", { activeIndex: 1, segmentId: "segment-b" }]

@@ -255,10 +255,6 @@ export function createTargetEditController(options) {
       "aria-keyshortcuts",
       "Control+Enter Meta+Enter Control+Shift+G Meta+Shift+G Alt+ArrowDown Alt+ArrowUp Tab Alt+Insert F8 Control+Shift+F8 Meta+Shift+F8"
     );
-    textarea.setAttribute?.(
-      "title",
-      "Confirm: Ctrl/Cmd+Enter · Add term: Ctrl/Cmd+Shift+G · Quick Insert: Tab or Alt+Insert · Navigate: Alt+Up/Down · Insert tags: F8"
-    );
     let inputIntent = null;
     function prepareInput(inputType = "", replacement = undefined) {
       const segment = editorSessionStore.getSegments()[index];

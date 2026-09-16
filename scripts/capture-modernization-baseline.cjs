@@ -225,10 +225,10 @@ async function verifyWorkspaceLayout() {
         const original = { text: status.textContent, className: status.className };
         status.textContent = "";
         const headerHeight = header.getBoundingClientRect().height;
+        const workspaceBefore = document.querySelector("#workspace").getBoundingClientRect().toJSON();
         status.className = "save-status error";
         status.textContent = ${JSON.stringify(longNotice)};
         const noticeRect = status.getBoundingClientRect();
-        const navRect = document.querySelector(".topbar-actions").getBoundingClientRect();
         const navItems = [...document.querySelector(".topbar-actions").children].map((element) => element.getBoundingClientRect());
         const workspace = document.querySelector("#workspace").getBoundingClientRect();
         const inspector = document.querySelector("#editorInspector").getBoundingClientRect();
@@ -239,7 +239,8 @@ async function verifyWorkspaceLayout() {
           headerHeightWithNotice: header.getBoundingClientRect().height,
           navInsideViewport: navItems.every((rect) => rect.left >= 0 && rect.right <= innerWidth + 1),
           navRows: new Set(navItems.map((rect) => Math.round(rect.top))).size,
-          noticeBelowNavigation: noticeRect.top >= navRect.bottom,
+          noticeOutsideFlow: getComputedStyle(status).position === "fixed",
+          workspaceStable: JSON.stringify(workspaceBefore) === JSON.stringify(workspace.toJSON()),
           noticeInsideViewport: noticeRect.left >= 0 && noticeRect.right <= innerWidth + 1,
           guideInWorkspace: Boolean(document.querySelector(".workspace-menu .workspace-guide-link")),
           hiddenControlsVisible: [...document.querySelectorAll("[hidden]")].some((element) => getComputedStyle(element).display !== "none"),
@@ -260,7 +261,8 @@ async function verifyWorkspaceLayout() {
       measurement.headerHeight !== measurement.headerHeightWithNotice ||
       !measurement.navInsideViewport ||
       (viewport.width >= 800 && measurement.navRows !== 1) ||
-      !measurement.noticeBelowNavigation ||
+      !measurement.noticeOutsideFlow ||
+      !measurement.workspaceStable ||
       !measurement.noticeInsideViewport ||
       !measurement.guideInWorkspace ||
       measurement.hiddenControlsVisible ||
