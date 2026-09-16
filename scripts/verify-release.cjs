@@ -23111,7 +23111,7 @@ assert(
 );
 assert(
   (appJs.match(/\bapplicationSaveStatusController\.set\b/g) || []).length >= 60 &&
-    (appWorkflowDriverJs.match(/\bapplicationSaveStatusController\.set\b/g) || []).length === 6,
+    (appWorkflowDriverJs.match(/\bapplicationSaveStatusController\.set\b/g) || []).length === 8,
   "application and workflow save-status consumers must remain wired directly to ApplicationSaveStatusController."
 );
 for (const forbiddenOwner of [

@@ -764,15 +764,25 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       document.querySelectorAll("#newProjectBtn").length === 1 && !document.querySelector("#newProjectFromDashboardBtn"),
       "Projects view exposes one non-duplicated New project action"
     );
+    applicationSaveStatusController.set("");
+    const workspaceBeforeNotice = els.workspace.getBoundingClientRect().toJSON();
+    const focusBeforeNotice = document.activeElement;
     applicationSaveStatusController.set("Checking save status layout", "saved");
     const saveStatusStyle = getComputedStyle(els.saveStatus);
     const saveStatusBounds = els.saveStatus.getBoundingClientRect();
-    const topbarBounds = document.querySelector(".topbar").getBoundingClientRect();
     assert(
       saveStatusStyle.display === "block" && saveStatusStyle.whiteSpace === "normal" &&
-        saveStatusBounds.top >= topbarBounds.bottom - 1 &&
-        saveStatusBounds.right <= window.innerWidth + 1 && !els.saveStatus.closest(".topbar-actions"),
-      "operation notices wrap below navigation without displacing workspace actions"
+        saveStatusStyle.position === "fixed" && saveStatusBounds.left >= 0 &&
+        saveStatusBounds.right <= window.innerWidth + 1 && !els.saveStatus.closest(".topbar-actions") &&
+        JSON.stringify(els.workspace.getBoundingClientRect().toJSON()) === JSON.stringify(workspaceBeforeNotice) &&
+        document.activeElement === focusBeforeNotice,
+      "operation notices float without displacing the workspace or taking focus"
+    );
+    applicationSaveStatusController.set("");
+    assert(
+      JSON.stringify(els.workspace.getBoundingClientRect().toJSON()) === JSON.stringify(workspaceBeforeNotice) &&
+        document.activeElement === focusBeforeNotice,
+      "dismissing operation notices preserves workspace layout and focus"
     );
     assert(
       els.saveStatus.getAttribute("role") === "status" &&
