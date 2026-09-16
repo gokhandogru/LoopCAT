@@ -1290,8 +1290,10 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
             await mainWindow.webContents.executeJavaScript(`(async () => {
               const deadline = Date.now() + 3000;
               while (Date.now() < deadline) {
+                const stored = await window.CatHan.project.getProjectSegments(${JSON.stringify(result.confirmationProjectId)});
                 if (document.querySelector("#segmentBody .target-editor").value === ${JSON.stringify(expected)} &&
-                  ${key === "z" ? 'document.querySelector("#saveStatus").textContent === "Undo protected-tag insertion"' : "true"} &&
+                  stored.some(segment => segment.target === ${JSON.stringify(expected)}) &&
+                  !/^(Undo|Redid) protected-tag insertion$/.test(document.querySelector("#saveStatus").textContent) &&
                   document.activeElement === document.querySelector("#segmentBody .target-editor")) return true;
                 await new Promise(resolve => setTimeout(resolve, 25));
               }
