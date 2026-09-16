@@ -1,6 +1,6 @@
 {
   "name": "loopcat",
-  "version": "0.0.4-dev.20260915.1",
+  "version": "0.0.4-dev.20260916.1",
   "description": "The local-first translation workspace for professional editing, review, resources, and optional AI.",
   "homepage": "https://github.com/gokhandogru/LoopCAT",
   "private": true,

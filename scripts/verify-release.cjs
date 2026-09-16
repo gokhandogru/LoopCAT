@@ -9365,7 +9365,7 @@ for (const testName of [
   "ApplicationCommandHistoryController normalizes resource results and preserves invalid synchronization no-op",
   "ApplicationCommandHistoryController preserves TM and termbase resource refresh branches",
   "ApplicationCommandHistoryController preserves project or all-edit finalization and no-result guards",
-  "ApplicationCommandHistoryController restores the active project on Undo before status, controls, and focus",
+  "ApplicationCommandHistoryController restores editing Undo silently with controls and focus",
   "ApplicationCommandHistoryController reopens a restored project and preserves Undo common effects",
   "ApplicationCommandHistoryController preserves Redo delete-project and requested-segment branches",
   "ApplicationCommandHistoryController preserves Redo deleted-document restoration and bounded selection",
