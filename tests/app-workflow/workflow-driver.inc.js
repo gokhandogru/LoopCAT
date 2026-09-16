@@ -961,10 +961,16 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     });
     keyboardEditTextarea.dispatchEvent(keyboardUndoEvent);
     await waitFor(
-      () =>
-        editorSessionStore.getSegments()[segmentIndex]?.target === keyboardEditBefore.target &&
-        els.saveStatus.textContent.includes("Undo target edit") &&
-        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] .target-editor`),
+      async () => {
+        const stored = (await getProjectSegments(project.id)).find(
+          (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
+        );
+        return editorSessionStore.getSegments()[segmentIndex]?.target === keyboardEditBefore.target &&
+          stored?.target === keyboardEditBefore.target &&
+          !els.saveStatus.textContent.includes("Undo target edit") &&
+          document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] .target-editor`) &&
+          document.activeElement.value === keyboardEditBefore.target;
+      },
       "coalesced EditTarget keyboard Undo"
     );
     const keyboardUndoStored = (await getProjectSegments(project.id)).find(
@@ -987,10 +993,16 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     });
     keyboardRedoTextarea.dispatchEvent(keyboardRedoEvent);
     await waitFor(
-      () =>
-        editorSessionStore.getSegments()[segmentIndex]?.target === keyboardEditTarget &&
-        els.saveStatus.textContent.includes("Redid target edit") &&
-        document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] .target-editor`),
+      async () => {
+        const stored = (await getProjectSegments(project.id)).find(
+          (segment) => segment.id === editorSessionStore.getSegments()[segmentIndex].id
+        );
+        return editorSessionStore.getSegments()[segmentIndex]?.target === keyboardEditTarget &&
+          stored?.target === keyboardEditTarget &&
+          !els.saveStatus.textContent.includes("Redid target edit") &&
+          document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] .target-editor`) &&
+          document.activeElement.value === keyboardEditTarget;
+      },
       "coalesced EditTarget keyboard Redo"
     );
     const keyboardRedoStored = (await getProjectSegments(project.id)).find(
