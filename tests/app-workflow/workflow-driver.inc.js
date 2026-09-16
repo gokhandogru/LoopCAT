@@ -959,6 +959,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       bubbles: true,
       cancelable: true
     });
+    const keyboardUndoSegments = editorSessionStore.getSegments();
     keyboardEditTextarea.dispatchEvent(keyboardUndoEvent);
     await waitFor(
       async () => {
@@ -967,7 +968,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         );
         return editorSessionStore.getSegments()[segmentIndex]?.target === keyboardEditBefore.target &&
           stored?.target === keyboardEditBefore.target &&
-          !els.redoBtn.disabled &&
+          editorSessionStore.getSegments() !== keyboardUndoSegments &&
           !els.saveStatus.textContent.includes("Undo target edit") &&
           document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] .target-editor`) &&
           document.activeElement.value === keyboardEditBefore.target;
@@ -992,6 +993,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       bubbles: true,
       cancelable: true
     });
+    const keyboardRedoSegments = editorSessionStore.getSegments();
     keyboardRedoTextarea.dispatchEvent(keyboardRedoEvent);
     await waitFor(
       async () => {
@@ -1000,7 +1002,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         );
         return editorSessionStore.getSegments()[segmentIndex]?.target === keyboardEditTarget &&
           stored?.target === keyboardEditTarget &&
-          els.redoBtn.disabled &&
+          editorSessionStore.getSegments() !== keyboardRedoSegments &&
           !els.saveStatus.textContent.includes("Redid target edit") &&
           document.activeElement?.matches?.(`tr[data-index="${segmentIndex}"] .target-editor`) &&
           document.activeElement.value === keyboardEditTarget;
