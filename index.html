@@ -89,7 +89,9 @@
                 <div class="workspace-submenu-body">
                   <button id="backupExportBtn" type="button">Export browser backup</button>
                   <button id="backupJsonExportBtn" type="button">Export backup as legacy JSON (50 MiB maximum)</button>
-                  <button id="projectPackageJsonExportBtn" type="button">Export project as legacy JSON (50 MiB maximum)</button>
+                  <button id="projectPackageJsonExportBtn" type="button">
+                    Export project as legacy JSON (50 MiB maximum)
+                  </button>
                   <button id="emergencyExportBtn" type="button">Emergency bilingual text export</button>
                   <label class="menu-item">
                     Restore browser backup
@@ -97,13 +99,19 @@
                   </label>
                   <button id="workspaceBackupBtn" type="button">Export folder backup</button>
                   <button id="refreshCheckpointsBtn" type="button">Show local recovery checkpoints</button>
-                  <label class="menu-item">Recovery checkpoint
-                    <select id="checkpointSelect"><option value="">Show checkpoints to choose a recovery point</option></select>
+                  <label class="menu-item"
+                    >Recovery checkpoint
+                    <select id="checkpointSelect">
+                      <option value="">Show checkpoints to choose a recovery point</option>
+                    </select>
                   </label>
                   <button id="restoreCheckpointBtn" type="button">Recover selected checkpoint</button>
                   <button id="refreshFolderBackupsBtn" type="button">Show verified folder backups</button>
-                  <label class="menu-item">Folder recovery generation
-                    <select id="folderBackupSelect"><option value="">Connect a folder and show its backups</option></select>
+                  <label class="menu-item"
+                    >Folder recovery generation
+                    <select id="folderBackupSelect">
+                      <option value="">Connect a folder and show its backups</option>
+                    </select>
                   </label>
                   <button id="restoreFolderBackupBtn" type="button">Recover selected folder backup</button>
                   <button id="exportConflictsBtn" type="button">Export preserved conflicting targets</button>
@@ -162,7 +170,15 @@
           <button id="newProjectBtn" class="primary">New project</button>
         </div>
       </header>
-      <span id="saveStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true"></span>
+      <div id="saveStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true" hidden>
+        <span id="saveStatusMessage" class="save-status-message"></span>
+        <button
+          id="dismissSaveStatusBtn"
+          class="save-status-dismiss"
+          type="button"
+          aria-label="Dismiss notification"
+        ></button>
+      </div>
 
       <aside id="updateReadyBanner" class="update-ready-banner hidden" role="status" aria-live="polite">
         <div>
@@ -215,7 +231,18 @@
                 <p>Open a project or create one to start translating.</p>
               </div>
               <div class="toolbar-actions">
-                <div class="collection-view-switch" role="group" aria-label="Project view" data-collection-scope="projects"><button type="button" data-view-mode="card" aria-pressed="true" aria-controls="projectDashboard">Cards</button><button type="button" data-view-mode="list" aria-pressed="false" aria-controls="projectDashboard">List</button></div>
+                <div
+                  class="collection-view-switch"
+                  role="group"
+                  aria-label="Project view"
+                  data-collection-scope="projects"
+                >
+                  <button type="button" data-view-mode="card" aria-pressed="true" aria-controls="projectDashboard">
+                    Cards</button
+                  ><button type="button" data-view-mode="list" aria-pressed="false" aria-controls="projectDashboard">
+                    List
+                  </button>
+                </div>
                 <button id="projectsImportProjectBtn" type="button">Import project package</button>
               </div>
             </div>
@@ -236,7 +263,28 @@
                 <h2>Resources</h2>
                 <p>Manage translation memories and termbases across all projects.</p>
               </div>
-              <div class="collection-view-switch" role="group" aria-label="Resource view" data-collection-scope="resources"><button type="button" data-view-mode="card" aria-pressed="true" aria-controls="tmResourceDashboard tbResourceDashboard">Cards</button><button type="button" data-view-mode="list" aria-pressed="false" aria-controls="tmResourceDashboard tbResourceDashboard">List</button></div>
+              <div
+                class="collection-view-switch"
+                role="group"
+                aria-label="Resource view"
+                data-collection-scope="resources"
+              >
+                <button
+                  type="button"
+                  data-view-mode="card"
+                  aria-pressed="true"
+                  aria-controls="tmResourceDashboard tbResourceDashboard"
+                >
+                  Cards</button
+                ><button
+                  type="button"
+                  data-view-mode="list"
+                  aria-pressed="false"
+                  aria-controls="tmResourceDashboard tbResourceDashboard"
+                >
+                  List
+                </button>
+              </div>
             </div>
 
             <div class="resource-tabs" role="tablist" aria-label="Resource type">
@@ -292,7 +340,21 @@
                 <button id="createTmResourceBtn" type="button">Create empty TM</button>
               </div>
               <div id="tmResourceDashboard" class="resource-dashboard"></div>
-              <div class="collection-toolbar resource-entry-view-controls"><span>Entries</span><div class="collection-view-switch" role="group" aria-label="Resource entry view" data-collection-scope="resource-entries"><button type="button" data-view-mode="card" aria-pressed="false" aria-controls="tmResourceDetail">Cards</button><button type="button" data-view-mode="list" aria-pressed="true" aria-controls="tmResourceDetail">List</button></div></div>
+              <div class="collection-toolbar resource-entry-view-controls">
+                <span>Entries</span>
+                <div
+                  class="collection-view-switch"
+                  role="group"
+                  aria-label="Resource entry view"
+                  data-collection-scope="resource-entries"
+                >
+                  <button type="button" data-view-mode="card" aria-pressed="false" aria-controls="tmResourceDetail">
+                    Cards</button
+                  ><button type="button" data-view-mode="list" aria-pressed="true" aria-controls="tmResourceDetail">
+                    List
+                  </button>
+                </div>
+              </div>
               <div id="tmResourceDetail" class="resource-detail hidden"></div>
             </section>
 
@@ -340,7 +402,21 @@
                 </label>
               </div>
               <div id="tbResourceDashboard" class="resource-dashboard"></div>
-              <div class="collection-toolbar resource-entry-view-controls"><span>Entries</span><div class="collection-view-switch" role="group" aria-label="Resource entry view" data-collection-scope="resource-entries"><button type="button" data-view-mode="card" aria-pressed="false" aria-controls="tbResourceDetail">Cards</button><button type="button" data-view-mode="list" aria-pressed="true" aria-controls="tbResourceDetail">List</button></div></div>
+              <div class="collection-toolbar resource-entry-view-controls">
+                <span>Entries</span>
+                <div
+                  class="collection-view-switch"
+                  role="group"
+                  aria-label="Resource entry view"
+                  data-collection-scope="resource-entries"
+                >
+                  <button type="button" data-view-mode="card" aria-pressed="false" aria-controls="tbResourceDetail">
+                    Cards</button
+                  ><button type="button" data-view-mode="list" aria-pressed="true" aria-controls="tbResourceDetail">
+                    List
+                  </button>
+                </div>
+              </div>
               <div id="tbResourceDetail" class="resource-detail hidden"></div>
             </section>
           </div>
@@ -403,7 +479,13 @@
             <div class="file-list-header">
               <h3>Files</h3>
               <span id="fileCountText"></span>
-              <div class="collection-view-switch" role="group" aria-label="File view" data-collection-scope="files"><button type="button" data-view-mode="card" aria-pressed="true" aria-controls="projectFileList">Cards</button><button type="button" data-view-mode="list" aria-pressed="false" aria-controls="projectFileList">List</button></div>
+              <div class="collection-view-switch" role="group" aria-label="File view" data-collection-scope="files">
+                <button type="button" data-view-mode="card" aria-pressed="true" aria-controls="projectFileList">
+                  Cards</button
+                ><button type="button" data-view-mode="list" aria-pressed="false" aria-controls="projectFileList">
+                  List
+                </button>
+              </div>
             </div>
             <div id="projectFileList" class="project-file-list"></div>
           </div>
@@ -1412,13 +1494,20 @@
           <button id="closeConcordanceBtn" type="button" aria-label="Close concordance">Close</button>
         </header>
         <div class="concordance-controls">
-          <input id="concordanceQueryInput" type="search" aria-label="Concordance search" placeholder="Search translation memories" />
+          <input
+            id="concordanceQueryInput"
+            type="search"
+            aria-label="Concordance search"
+            placeholder="Search translation memories"
+          />
           <select id="concordanceScopeSelect" aria-label="Search in">
             <option value="both">Source and target</option>
             <option value="source">Source only</option>
             <option value="target">Target only</option>
           </select>
-          <select id="concordanceResourceSelect" aria-label="Translation memory"><option value="">All linked TMs</option></select>
+          <select id="concordanceResourceSelect" aria-label="Translation memory">
+            <option value="">All linked TMs</option>
+          </select>
           <button id="concordanceSearchBtn" type="button">Search</button>
         </div>
         <div id="concordanceResults" class="concordance-results"></div>
@@ -1448,7 +1537,12 @@
         </footer>
       </section>
     </div>
-    <div id="predictiveTypingList" class="predictive-typing-list hidden" role="listbox" aria-label="Translation suggestions"></div>
+    <div
+      id="predictiveTypingList"
+      class="predictive-typing-list hidden"
+      role="listbox"
+      aria-label="Translation suggestions"
+    ></div>
     <div id="predictiveTypingAnnouncer" class="sr-only" role="status" aria-live="polite"></div>
 
     <dialog id="quickTermCaptureDialog" class="quick-term-capture-dialog" aria-labelledby="quickTermCaptureTitle">
@@ -1471,16 +1565,33 @@
         <details>
           <summary>Advanced metadata</summary>
           <div class="term-metadata-grid">
-            <label>Status
-              <select id="quickTermStatusSelect"><option value="preferred">Preferred</option><option value="admitted">Admitted</option><option value="forbidden">Forbidden</option></select>
+            <label
+              >Status
+              <select id="quickTermStatusSelect">
+                <option value="preferred">Preferred</option>
+                <option value="admitted">Admitted</option>
+                <option value="forbidden">Forbidden</option>
+              </select>
             </label>
-            <label>Case sensitivity
-              <select id="quickTermCaseSelect"><option value="insensitive">Insensitive</option><option value="initial-sensitive">Initial-sensitive</option><option value="sensitive">Sensitive</option></select>
+            <label
+              >Case sensitivity
+              <select id="quickTermCaseSelect">
+                <option value="insensitive">Insensitive</option>
+                <option value="initial-sensitive">Initial-sensitive</option>
+                <option value="sensitive">Sensitive</option>
+              </select>
             </label>
-            <label>Source matching
-              <select id="quickTermMatchModeSelect"><option value="exact">Exact</option><option value="prefix">Prefix</option><option value="fuzzy">Fuzzy</option></select>
+            <label
+              >Source matching
+              <select id="quickTermMatchModeSelect">
+                <option value="exact">Exact</option>
+                <option value="prefix">Prefix</option>
+                <option value="fuzzy">Fuzzy</option>
+              </select>
             </label>
-            <label>Fuzzy threshold <input id="quickTermFuzzyThresholdInput" type="number" min="50" max="100" value="85" /></label>
+            <label
+              >Fuzzy threshold <input id="quickTermFuzzyThresholdInput" type="number" min="50" max="100" value="85"
+            /></label>
             <label>Subject <input id="quickTermSubjectInput" autocomplete="off" /></label>
             <label>Domain <input id="quickTermDomainInput" autocomplete="off" /></label>
             <label>Part of speech <input id="quickTermPartOfSpeechInput" autocomplete="off" /></label>
@@ -1658,7 +1769,12 @@
           </div>
           <button id="closeTrashBtn" type="button">Close</button>
         </header>
-        <div class="collection-toolbar"><div class="collection-view-switch" role="group" aria-label="Trash view" data-collection-scope="trash"><button type="button" data-view-mode="card" aria-pressed="false" aria-controls="trashList">Cards</button><button type="button" data-view-mode="list" aria-pressed="true" aria-controls="trashList">List</button></div></div>
+        <div class="collection-toolbar">
+          <div class="collection-view-switch" role="group" aria-label="Trash view" data-collection-scope="trash">
+            <button type="button" data-view-mode="card" aria-pressed="false" aria-controls="trashList">Cards</button
+            ><button type="button" data-view-mode="list" aria-pressed="true" aria-controls="trashList">List</button>
+          </div>
+        </div>
         <div id="trashList" class="trash-list"></div>
         <div class="dialog-actions">
           <button id="emptyTrashBtn" class="danger-small" type="button">Empty Trash permanently</button>
@@ -1772,27 +1888,80 @@
           </div>
           <label class="resource-settings-search">
             Search resources
-            <input id="resourceSettingsSearchInput" type="search" autocomplete="off" placeholder="Search by resource name" />
+            <input
+              id="resourceSettingsSearchInput"
+              type="search"
+              autocomplete="off"
+              placeholder="Search by resource name"
+            />
           </label>
         </div>
-        <div class="collection-toolbar"><div class="collection-view-switch" role="group" aria-label="Resource selection view" data-collection-scope="resource-selection"><button type="button" data-view-mode="card" aria-pressed="false" aria-controls="projectTmResourceList projectTbResourceList">Cards</button><button type="button" data-view-mode="list" aria-pressed="true" aria-controls="projectTmResourceList projectTbResourceList">List</button></div></div>
+        <div class="collection-toolbar">
+          <div
+            class="collection-view-switch"
+            role="group"
+            aria-label="Resource selection view"
+            data-collection-scope="resource-selection"
+          >
+            <button
+              type="button"
+              data-view-mode="card"
+              aria-pressed="false"
+              aria-controls="projectTmResourceList projectTbResourceList"
+            >
+              Cards</button
+            ><button
+              type="button"
+              data-view-mode="list"
+              aria-pressed="true"
+              aria-controls="projectTmResourceList projectTbResourceList"
+            >
+              List
+            </button>
+          </div>
+        </div>
         <div class="resource-settings-tabs" role="tablist" aria-label="Resource type">
-          <button id="resourceSettingsTmTab" type="button" role="tab" aria-controls="resourceSettingsTmPanel" aria-selected="true">Translation memories</button>
-          <button id="resourceSettingsTbTab" type="button" role="tab" aria-controls="resourceSettingsTbPanel" aria-selected="false">Terminology</button>
+          <button
+            id="resourceSettingsTmTab"
+            type="button"
+            role="tab"
+            aria-controls="resourceSettingsTmPanel"
+            aria-selected="true"
+          >
+            Translation memories
+          </button>
+          <button
+            id="resourceSettingsTbTab"
+            type="button"
+            role="tab"
+            aria-controls="resourceSettingsTbPanel"
+            aria-selected="false"
+          >
+            Terminology
+          </button>
         </div>
         <section id="resourceSettingsTmPanel" role="tabpanel" aria-labelledby="resourceSettingsTmTab">
-          <p class="muted">Select any number of TMs. Exactly one main TM receives confirmed segments; references are read-only for this project.</p>
+          <p class="muted">
+            Select any number of TMs. Exactly one main TM receives confirmed segments; references are read-only for this
+            project.
+          </p>
           <div id="projectTmResourceList" class="resource-option-list resource-policy-list"></div>
           <div class="resource-create-row">
-            <label>New TM <input id="newTmNameInput" autocomplete="off" placeholder="Project translation memory" /></label>
+            <label
+              >New TM <input id="newTmNameInput" autocomplete="off" placeholder="Project translation memory"
+            /></label>
             <button id="addNewTmBtn" type="button">Add TM</button>
           </div>
         </section>
         <section id="resourceSettingsTbPanel" role="tabpanel" aria-labelledby="resourceSettingsTbTab" hidden>
-          <p class="muted">Lookup, QA, and term contribution can be controlled independently. A project may have no termbase.</p>
+          <p class="muted">
+            Lookup, QA, and term contribution can be controlled independently. A project may have no termbase.
+          </p>
           <div id="projectTbResourceList" class="resource-option-list resource-policy-list"></div>
           <div class="resource-create-row">
-            <label>New termbase <input id="newTermBaseNameInput" autocomplete="off" placeholder="Project terminology" /></label>
+            <label
+              >New termbase <input id="newTermBaseNameInput" autocomplete="off" placeholder="Project terminology"
+            /></label>
             <button id="addNewTermBaseBtn" type="button">Add termbase</button>
           </div>
         </section>

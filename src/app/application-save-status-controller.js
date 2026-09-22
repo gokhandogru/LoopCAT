@@ -3,6 +3,8 @@ const OPERATION_PATTERN =
 const COMPLETED_PATTERN = /\b(failed|canceled|cancelled|completed|finished)\b/i;
 const PENDING_SAVE_PATTERN = /^unsaved\b|\bsave pending\b|\bretrying autosave\b/i;
 const NOTICE_DURATION_MS = 2000;
+const ERROR_NOTICE_DURATION_MS = 5000;
+const ERROR_PATTERN = /failed|conflict|blocked|cannot|missing|required|offline|invalid|error/i;
 const ROUTINE_SAVE_PATTERN = /^(Saved|Saving(?:\.{3}|…)?|Unsaved changes|\d+ saves? pending)$/i;
 
 export function createApplicationSaveStatusController({ redaction, model, context, localization, view, timers }) {
@@ -25,6 +27,14 @@ export function createApplicationSaveStatusController({ redaction, model, contex
   let persistenceNotice = null;
   let storageNotice = null;
   let initializationNotice = "";
+  let suppressedDurableNotice = "";
+
+  function durableNoticeKey() {
+    if (initializationNotice) return `initialization:${initializationNotice}`;
+    if (storageNotice) return `storage:${storageNotice.text}`;
+    if (persistenceNotice) return `persistence:${persistenceNotice.text}:${persistenceNotice.mode}`;
+    return "";
+  }
 
   function cancelTimer() {
     if (noticeTimer) timers.clear(noticeTimer);
@@ -34,9 +44,15 @@ export function createApplicationSaveStatusController({ redaction, model, contex
   function clear() {
     cancelTimer();
     revision += 1;
+    persistent = false;
     view.setText("");
     view.setClass("save-status");
     view.setBusy("false");
+  }
+
+  function dismiss() {
+    suppressedDurableNotice = durableNoticeKey();
+    clear();
   }
 
   function navigationChanged(next, previous) {
@@ -71,6 +87,9 @@ export function createApplicationSaveStatusController({ redaction, model, contex
     // Routine autosave acknowledgements belong to the durability model. They
     // must neither interrupt typing nor replace an import/export notification.
     if (!initializationNotice && !persistenceNotice && !storageNotice && ROUTINE_SAVE_PATTERN.test(displayText)) return;
+    const currentDurableNotice = durableNoticeKey();
+    if (currentDurableNotice && currentDurableNotice === suppressedDurableNotice) return;
+    if (currentDurableNotice !== suppressedDurableNotice) suppressedDurableNotice = "";
     cancelTimer();
     const noticeRevision = ++revision;
     view.setText(displayText ? localization.source(displayText) : "");
@@ -78,16 +97,23 @@ export function createApplicationSaveStatusController({ redaction, model, contex
     const operationActive =
       mode !== "saved" && OPERATION_PATTERN.test(displayText) && !COMPLETED_PATTERN.test(displayText);
     persistent =
-      Boolean(initializationNotice || persistenceNotice || storageNotice) ||
+      Boolean(initializationNotice) ||
       operationActive ||
-      PENDING_SAVE_PATTERN.test(displayText);
+      (PENDING_SAVE_PATTERN.test(displayText) &&
+        mode !== "dirty" &&
+        !ERROR_PATTERN.test(displayText) &&
+        !persistenceNotice &&
+        !storageNotice);
     view.setBusy(String(Boolean(initializationNotice) || operationActive));
     if (displayText && !persistent) {
-      noticeTimer = timers.set(() => {
-        if (revision !== noticeRevision) return;
-        noticeTimer = 0;
-        clear();
-      }, NOTICE_DURATION_MS);
+      noticeTimer = timers.set(
+        () => {
+          if (revision !== noticeRevision) return;
+          noticeTimer = 0;
+          dismiss();
+        },
+        mode === "dirty" || ERROR_PATTERN.test(displayText) ? ERROR_NOTICE_DURATION_MS : NOTICE_DURATION_MS
+      );
     }
   }
 
@@ -95,17 +121,27 @@ export function createApplicationSaveStatusController({ redaction, model, contex
     if (mode === "saved") {
       const resolved = Boolean(persistenceNotice);
       persistenceNotice = null;
+      if (resolved) suppressedDurableNotice = "";
       if (resolved && !initializationNotice && !storageNotice) clear();
-    } else if (text && !ROUTINE_SAVE_PATTERN.test(text)) persistenceNotice = { text, mode };
+    } else if (text && !ROUTINE_SAVE_PATTERN.test(text)) {
+      const next = { text, mode };
+      if (!persistenceNotice || persistenceNotice.text !== next.text || persistenceNotice.mode !== next.mode) {
+        suppressedDurableNotice = "";
+      }
+      persistenceNotice = next;
+    }
     set(text, mode);
   }
   function setInitialization(text = "") {
+    if (initializationNotice !== text) suppressedDurableNotice = "";
     initializationNotice = text;
     set("");
   }
   function setStorage(text = "") {
-    storageNotice = text ? { text } : null;
+    const next = text ? { text } : null;
+    if (storageNotice?.text !== next?.text) suppressedDurableNotice = "";
+    storageNotice = next;
     set("");
   }
-  return Object.freeze({ set, setPersistence, setInitialization, setStorage, navigationChanged });
+  return Object.freeze({ set, setPersistence, setInitialization, setStorage, dismiss, navigationChanged });
 }

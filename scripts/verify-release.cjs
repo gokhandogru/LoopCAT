@@ -2787,7 +2787,7 @@ for (const snippet of [
   "summary.markDirty(projectId);",
   "function markProjects(projectIds = [])",
   'function usesResource(project, type, name, sourceLang = "", targetLang = "", resourceId = "")',
-  '(link) => link.type === type && ((resourceId && link.resourceId === resourceId) || (name && link.name === name))',
+  "(link) => link.type === type && ((resourceId && link.resourceId === resourceId) || (name && link.name === name))",
   'function markProjectsUsingResource(type, name, sourceLang = "", targetLang = "", resourceId = "")',
   "markProjects(projectIds);",
   "return projectIds.length;",
@@ -7607,7 +7607,10 @@ assertIncludes(
   "`3` through `6`",
   "Project-package documentation must describe the accepted schema range 3 through 6."
 );
-assert(modernizationFixture.schemaVersion === 5, "Modernization fixture must retain schema 5 to exercise legacy import.");
+assert(
+  modernizationFixture.schemaVersion === 5,
+  "Modernization fixture must retain schema 5 to exercise legacy import."
+);
 assert(
   Array.isArray(modernizationFixture.projects) && modernizationFixture.projects.length === 1,
   "Modernization fixture must contain one deterministic project."
@@ -13652,15 +13655,15 @@ assertIncludes(
 );
 for (const snippet of [
   "ProjectExportController requires build, session, persistence, activity, file, validation, presentation, workspace, status, clock, test, and logger boundaries.",
-  "async function exportBrowserBackup({ format = \"archive\" } = {})",
+  'async function exportBrowserBackup({ format = "archive" } = {})',
   "await build.buildBackupExport({ format })",
-  "`loopcat-backup-${clock.now().slice(0, 10)}${archive ? \".loopcat-backup.zip\" : \".json\"}`",
+  '`loopcat-backup-${clock.now().slice(0, 10)}${archive ? ".loopcat-backup.zip" : ".json"}`',
   "JSON.stringify(backup, null, 2)",
   '"application/json"',
   "presentation.renderValidation(backupValidation)",
   "const noteCount = validation.count(backupValidation)",
-  "`${delivery?.verified ? \"Backup verified\" : \"Download requested\"} with ${noteCount} validation note${noteCount === 1 ? \"\" : \"s\"}`",
-  '`Backup export failed: ${error.message}`',
+  '`${delivery?.verified ? "Backup verified" : "Download requested"} with ${noteCount} validation note${noteCount === 1 ? "" : "s"}`',
+  "`Backup export failed: ${error.message}`",
   "if (error.validation) presentation.renderValidation(error.validation)",
   "return false",
   "function reportProjectPackageExportFailure(error, pkg = null)",
@@ -13678,7 +13681,7 @@ for (const snippet of [
   "build.buildProjectPackage(pendingProject, null, {",
   "activityEvents: pendingActivityEvent ? [pendingActivityEvent] : []",
   "const finalWarnings = validation.count(pkg.validation)",
-  "await files.download(filename, content, archive ? \"application/zip\" : \"application/json\")",
+  'await files.download(filename, content, archive ? "application/zip" : "application/json")',
   "if (session.getProject()?.id === saved.id) session.replaceProject(saved)",
   "project.id === saved.id ? saved : project",
   'logger.warn("Project package export history update failed.", error)',
@@ -14138,7 +14141,7 @@ for (const snippet of [
   "WorkspaceBackupExportController requires connection, build, storage, workspace, validation, presentation, and status boundaries.",
   "async function exportBackup(exportOptions = {})",
   "if (!connection.isConnected()) return",
-  "const { backup, validation: validationReport } = await build.buildBackupExport({ format: \"archive\" })",
+  'const { backup, validation: validationReport } = await build.buildBackupExport({ format: "archive" })',
   "const reference = await storage.exportFullBackup(backup, exportOptions)",
   "const workspaceStatus = await storage.getStatus()",
   "workspace.setStatus(workspaceStatus)",
@@ -14147,7 +14150,7 @@ for (const snippet of [
   'const manifestWarning = reference.manifestSaved === false ? "; manifest update failed" : ""',
   "Workspace backup saved: ${reference.path}${manifestWarning}",
   'reference.manifestSaved === false || validation.count(validationReport) ? "dirty" : "saved"',
-  '`Workspace backup failed: ${error.message}`',
+  "`Workspace backup failed: ${error.message}`",
   "if (error.validation) presentation.renderValidation(error.validation)",
   'status.set(message, "dirty")',
   "throw error",
@@ -14707,14 +14710,14 @@ for (const snippet of [
   ".filter((record) => !ignoredProjectId || record.projectId !== ignoredProjectId)",
   "if (forceNewId || !currentId || existingIds.has(currentId) || reservedIds.has(currentId))",
   "reservedIds.add(next.id)",
-  "collisions(\"segments\", pkg.segments || [])",
-  "collisions(\"activityEvents\", pkg.activityEvents || [])",
-  "collisions(\"tmEntries\", packagedResources.tmEntries || [])",
-  "collisions(\"terms\", packagedResources.terms || [])",
-  "collisions(\"resources\", packagedResources.resources || [])",
-  "collisions(\"tmContributions\", packagedResources.tmContributions || [])",
-  "collisions(\"termConcepts\", packagedResources.termConcepts || [])",
-  "collisions(\"termDesignations\", packagedResources.termDesignations || [])",
+  'collisions("segments", pkg.segments || [])',
+  'collisions("activityEvents", pkg.activityEvents || [])',
+  'collisions("tmEntries", packagedResources.tmEntries || [])',
+  'collisions("terms", packagedResources.terms || [])',
+  'collisions("resources", packagedResources.resources || [])',
+  'collisions("tmContributions", packagedResources.tmContributions || [])',
+  'collisions("termConcepts", packagedResources.termConcepts || [])',
+  'collisions("termDesignations", packagedResources.termDesignations || [])',
   'project.id = ids.make("project")',
   "project.name = importedCopyName(project.name)",
   "project.createdAt = clock.now()",
@@ -15508,7 +15511,7 @@ for (const boundary of [
   "if (!editorSessionStore.getProject() || busy) return null",
   "const raw = await threshold.request()",
   "const uniqueLookups = Array.from(",
-  'const key = hasContext ? `${segment.source}\\u0000${JSON.stringify(context)}` : segment.source;',
+  "const key = hasContext ? `${segment.source}\\u0000${JSON.stringify(context)}` : segment.source;",
   "for (let offset = 0; offset < uniqueLookups.length; offset += batchSize)",
   "const batches = await tm.findMatchesBatch(matchOptions)",
   "await persistence.flush(editorSessionStore.getProject().id)",
@@ -17644,8 +17647,16 @@ assertIncludes(
 );
 assertIncludes(webSmokeScript, "desktop", "scripts/verify-web-smoke.cjs must smoke test a desktop viewport.");
 assertIncludes(webSmokeScript, "mobile", "scripts/verify-web-smoke.cjs must smoke test a mobile viewport.");
-assertIncludes(webSmokeScript, "webWorkflowProbe", "The packaged web gate must exercise editing and archive workers, beyond startup dialogs.");
-assertIncludes(readText(".github/workflows/desktop-release.yml"), 'LOOPCAT_WEB_SMOKE_CHROME: "1"', "Web releases must pass the real Chrome file and HTTP workflow gate.");
+assertIncludes(
+  webSmokeScript,
+  "webWorkflowProbe",
+  "The packaged web gate must exercise editing and archive workers, beyond startup dialogs."
+);
+assertIncludes(
+  readText(".github/workflows/desktop-release.yml"),
+  'LOOPCAT_WEB_SMOKE_CHROME: "1"',
+  "Web releases must pass the real Chrome file and HTTP workflow gate."
+);
 assert(
   packageJson.scripts?.pack === "node scripts/build-desktop.cjs --dir",
   "package.json pack script must use the desktop build wrapper."
@@ -23057,6 +23068,7 @@ for (const snippet of [
   "ApplicationSaveStatusController requires checked view boundaries.",
   "ApplicationSaveStatusController requires checked timer boundaries.",
   "const NOTICE_DURATION_MS = 2000",
+  "const ERROR_NOTICE_DURATION_MS = 5000",
   "let noticeTimer = 0",
   "if (noticeTimer) timers.clear(noticeTimer)",
   'const displayText = redaction.sanitize(text || "").trim()',
@@ -23067,16 +23079,18 @@ for (const snippet of [
   'view.setClass(`save-status ${(persistenceNotice || storageNotice) && !initializationNotice ? "error" : mode}`)',
   'mode !== "saved" && OPERATION_PATTERN.test(displayText) && !COMPLETED_PATTERN.test(displayText)',
   "view.setBusy(String(Boolean(initializationNotice) || operationActive))",
-  "Boolean(initializationNotice || persistenceNotice || storageNotice)",
+  "Boolean(initializationNotice)",
   "ROUTINE_SAVE_PATTERN.test(displayText)",
+  "currentDurableNotice === suppressedDurableNotice",
   'function setStorage(text = "")',
-  "noticeTimer = timers.set(() => {",
+  "function dismiss()",
+  "noticeTimer = timers.set(",
   "if (revision !== noticeRevision) return",
   'view.setText("")',
   'view.setClass("save-status")',
-  "}, NOTICE_DURATION_MS)",
+  'mode === "dirty" || ERROR_PATTERN.test(displayText) ? ERROR_NOTICE_DURATION_MS : NOTICE_DURATION_MS',
   "function navigationChanged(next, previous)",
-  "return Object.freeze({ set, setPersistence, setInitialization, setStorage, navigationChanged })"
+  "return Object.freeze({ set, setPersistence, setInitialization, setStorage, dismiss, navigationChanged })"
 ]) {
   assertIncludes(
     applicationSaveStatusControllerJs,
@@ -23092,11 +23106,13 @@ for (const boundary of [
   "getSegmentId: () => applicationStore.getState().navigation.segmentId",
   "source: (value) => uiLocalizationService.source(value)",
   "translate: (key) => uiLocalizationService.translate(key)",
-  "els.saveStatus.textContent = value",
+  "els.saveStatusMessage.textContent = value",
+  "els.saveStatus.hidden = !value",
   "els.saveStatus.className = value",
   'els.saveStatus.setAttribute("aria-busy", value)',
   "set: (callback, delay) => setTimeout(callback, delay)",
   "clear: (timer) => clearTimeout(timer)",
+  'els.dismissSaveStatusBtn.addEventListener("click", applicationSaveStatusController.dismiss)',
   "status: { set: applicationSaveStatusController.set }",
   "setStatus: applicationSaveStatusController.set"
 ]) {
@@ -23137,7 +23153,8 @@ for (const testName of [
   "ApplicationSaveStatusController preserves falsy text normalization and every operation-busy branch",
   "Routine autosave updates the durability model without interrupting notices",
   "ApplicationSaveStatusController dismisses completed successes, failures, and warnings without claiming a save",
-  "ApplicationSaveStatusController preserves running operations and save failures",
+  "ApplicationSaveStatusController preserves running operations but expires save failures",
+  "Routine save notices stay silent while real persistence failures can be dismissed and expire",
   "Unrelated autosave acknowledgements cannot clear a durable storage error",
   "ApplicationSaveStatusController clears notices when changing screens, projects, or files but not segments",
   "ApplicationSaveStatusController ignores expired callbacks after navigation or a newer operation",
@@ -24818,7 +24835,7 @@ assertIncludes(
 );
 assertIncludes(
   storageJs,
-  "{ store: \"trashEntries\", value: entry, delete: true }",
+  '{ store: "trashEntries", value: entry, delete: true }',
   "resource restoration must recreate records, dirty search indexes, and consume Trash atomically."
 );
 assertIncludes(
@@ -27077,7 +27094,7 @@ assertIncludes(
 );
 assertIncludes(
   desktopBuildScript,
-  '!env[name].trim()) delete env[name]',
+  "!env[name].trim()) delete env[name]",
   "scripts/build-desktop.cjs must remove empty CI signing variables instead of passing them as invalid file paths."
 );
 assertIncludes(

@@ -218,7 +218,8 @@ test("ApplicationSaveStatusController dismisses completed successes, failures, a
     const harness = createHarness(createApplicationSaveStatusController);
     harness.controller.set(text, mode);
     assert.equal(harness.state.busy, "false", text);
-    assert.deepEqual(harness.calls.at(-1), ["timers.set", 2000], text);
+    const expectedDelay = mode === "dirty" || /failed/i.test(text) ? 5000 : 2000;
+    assert.deepEqual(harness.calls.at(-1), ["timers.set", expectedDelay], text);
     const published = harness.calls.filter(([name]) => name === "model.publish");
     harness.fire(41);
     assert.deepEqual(harness.state, { text: "", className: "save-status", busy: "false" }, text);
@@ -229,12 +230,11 @@ test("ApplicationSaveStatusController dismisses completed successes, failures, a
   }
 });
 
-test("ApplicationSaveStatusController preserves running operations and save failures", async () => {
+test("ApplicationSaveStatusController preserves running operations but expires save failures", async () => {
   const { createApplicationSaveStatusController } = await loadFactory();
   for (const [text, mode] of [
     ["Local AI pre-translating 44 segments...", ""],
-    ["Canceling local AI batch...", "dirty"],
-    ["Save failed; retrying autosave", "dirty"]
+    ["Canceling local AI batch...", "dirty"]
   ]) {
     const harness = createHarness(createApplicationSaveStatusController);
     harness.controller.set(text, mode);
@@ -242,6 +242,11 @@ test("ApplicationSaveStatusController preserves running operations and save fail
     harness.controller.navigationChanged({ view: "project" }, { view: "editor" });
     assert.equal(harness.state.text, `source:${text}`);
   }
+  const failure = createHarness(createApplicationSaveStatusController);
+  failure.controller.set("Save failed; retrying autosave", "dirty");
+  assert.deepEqual(failure.calls.at(-1), ["timers.set", 5000]);
+  failure.fire(41);
+  assert.equal(failure.state.text, "");
 });
 
 test("ApplicationSaveStatusController clears notices when changing screens, projects, or files but not segments", async () => {
@@ -310,7 +315,7 @@ test("ApplicationSaveStatusController preserves synchronous failure timing", asy
   assert.deepEqual(clearHarness.calls.at(-1), ["timers.clear", 41]);
 });
 
-test("Routine save notices stay silent while real persistence failures stay visible until resolved", async () => {
+test("Routine save notices stay silent while real persistence failures can be dismissed and expire", async () => {
   const { createApplicationSaveStatusController } = await loadFactory();
   const harness = createHarness(createApplicationSaveStatusController);
   for (const [text, mode] of [
@@ -325,10 +330,15 @@ test("Routine save notices stay silent while real persistence failures stay visi
   }
   harness.controller.setPersistence("Local save failed; retrying autosave", "dirty");
   assert.equal(harness.state.className, "save-status error");
+  assert.deepEqual(harness.calls.at(-1), ["timers.set", 5000]);
   harness.controller.set("Import completed", "saved");
   harness.controller.setPersistence("Saving...");
   assert.equal(harness.state.text, "source:Local save failed; retrying autosave");
-  assert.equal(harness.callbacks.size, 0);
+  assert.equal(harness.callbacks.size, 1);
+  harness.controller.dismiss();
+  assert.equal(harness.state.text, "");
+  harness.controller.setPersistence("Saving...");
+  assert.equal(harness.state.text, "");
   harness.controller.setPersistence("Saved", "saved");
   assert.equal(harness.state.text, "");
 });
@@ -368,6 +378,7 @@ test("ApplicationSaveStatusController validates boundaries and exposes immutable
     "setPersistence",
     "setInitialization",
     "setStorage",
+    "dismiss",
     "navigationChanged"
   ]);
 

@@ -83,7 +83,7 @@
   min-height: 0;
   max-height: 25dvh;
   overflow: auto;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) calc(var(--space-8) + var(--space-2)) var(--space-2) var(--space-4);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   background: var(--color-surface-subtle);
@@ -94,6 +94,31 @@
   text-align: start;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.liquid-glass-edition .save-status-dismiss {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: var(--space-2);
+  transform: translateY(-50%);
+  width: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: currentColor;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.liquid-glass-edition .save-status-dismiss::before {
+  content: "×";
+}
+
+.liquid-glass-edition .save-status-dismiss:hover {
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 8%, transparent);
 }
 
 .liquid-glass-edition .collection-view-switch {
@@ -161,7 +186,7 @@
   color: var(--color-danger);
 }
 
-.liquid-glass-edition .save-status:empty {
+.liquid-glass-edition .save-status[hidden] {
   display: none;
 }
 

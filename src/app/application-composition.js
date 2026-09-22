@@ -1028,6 +1028,8 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
 
   const els = {
     saveStatus: document.querySelector("#saveStatus"),
+    saveStatusMessage: document.querySelector("#saveStatusMessage"),
+    dismissSaveStatusBtn: document.querySelector("#dismissSaveStatusBtn"),
     updateReadyBanner: document.querySelector("#updateReadyBanner"),
     updateReadyTitle: document.querySelector("#updateReadyTitle"),
     updateReadyMessage: document.querySelector("#updateReadyMessage"),
@@ -1404,7 +1406,8 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     view: {
       setText: (value) => {
-        if (els.saveStatus.textContent !== value) els.saveStatus.textContent = value;
+        if (els.saveStatusMessage.textContent !== value) els.saveStatusMessage.textContent = value;
+        els.saveStatus.hidden = !value;
       },
       setClass: (value) => {
         els.saveStatus.className = value;
@@ -1416,6 +1419,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       clear: (timer) => clearTimeout(timer)
     }
   });
+  els.dismissSaveStatusBtn.addEventListener("click", applicationSaveStatusController.dismiss);
   applicationStore.subscribe((next, previous) => {
     applicationSaveStatusController.navigationChanged(next.navigation, previous.navigation);
   });

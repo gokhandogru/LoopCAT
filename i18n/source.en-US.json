@@ -1452,6 +1452,7 @@
         "app.js:2928",
         "index.html",
         "src/features/editor/segment-provenance-service.js:26",
+        "src/features/projects/project-analysis-controller.js:123",
         "src/features/projects/project-analysis-controller.js:93",
         "src/reports/report-document-composition-service.js:178",
         "src/reports/report-document-composition-service.js:393"
@@ -5123,6 +5124,13 @@
         "app.js:674",
         "app.js:678",
         "app.js:686"
+      ]
+    },
+    "auto.calculating.tm.analysis.eb950266": {
+      "message": "Calculating TM analysis…",
+      "description": "Generated interface text from src/features/projects/project-analysis-controller.js.",
+      "locations": [
+        "src/features/projects/project-analysis-controller.js:76"
       ]
     },
     "auto.cancel.77dfd213": {
@@ -13886,6 +13894,13 @@
         "src/app/application-validation-presentation-controller.js:79"
       ]
     },
+    "auto.dismiss.notification.dc83cd80": {
+      "message": "Dismiss notification",
+      "description": "Static aria-label attribute from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
     "auto.dismiss.validation.report.293e132e": {
       "message": "Dismiss validation report",
       "description": "Generated interface text from app.js.",
@@ -14662,6 +14677,7 @@
       "message": "empty targets",
       "description": "Generated interface text from src/features/projects/project-analysis-controller.js.",
       "locations": [
+        "src/features/projects/project-analysis-controller.js:116",
         "src/features/projects/project-analysis-controller.js:86"
       ]
     },
