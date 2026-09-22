@@ -4,10 +4,10 @@
   "identity": {
     "schemaVersion": 1,
     "version": "0.0.4-dev.20260922",
-    "buildId": "0.0.4-dev.20260922+source.69e9220d59cf",
+    "buildId": "0.0.4-dev.20260922+source.516207302177",
     "sourceKind": "working-tree-snapshot",
-    "baseCommit": "7d440b212f4854418627a57e77491e9b2d84c1b0",
-    "sourceSha256": "69e9220d59cfc2f2460e6e0169f24bfc47dd0ae23a886dd1b3c284df6f6128db",
+    "baseCommit": "03933782c6cab38c03eb5a5474cf0158a7a41223",
+    "sourceSha256": "516207302177de2848b0647bf71d090ad510e8005fc9bdc590adc350b0c71b27",
     "sourceFiles": [
       {
         "path": ".gitattributes",
@@ -381,8 +381,8 @@
       },
       {
         "path": "index.html",
-        "bytes": 96404,
-        "sha256": "e517e3479a9bf11b1fbdcc580e5645fd827cd8dadb4ab288026e771c216868f1"
+        "bytes": 96330,
+        "sha256": "b74838cf3228f365ced47880c84be015b64091ca24903ab099ec7d38d0e247a1"
       },
       {
         "path": "large-project-test.html",
@@ -3591,18 +3591,18 @@
   "artifacts": [
     {
       "name": "LoopCAT.Web.0.0.4-dev.20260922.zip",
-      "bytes": 6168654,
-      "sha256": "2adf4c2cb004cf1f68772201f1a0301caca68a552d43d4c368e416046af733dd"
+      "bytes": 6168580,
+      "sha256": "e125fd9f7270ae08b23e61f8b02e76f4c8ece3b0982fc8b53d62ab6bfe40e5b9"
     },
     {
       "name": "LoopCAT.Windows.Setup.0.0.4-dev.20260922.zip",
-      "bytes": 100502006,
-      "sha256": "66831a427d3b0b174003655d114eea497d4215fc2cfb267b5e9161ca68260432"
+      "bytes": 100502010,
+      "sha256": "c64e27919cf615e1337736b499b17030fa4ad299fe9bc4127f9af34974418e8f"
     },
     {
       "name": "LoopCAT.0.0.4-dev.20260922.Portable.zip",
-      "bytes": 100347533,
-      "sha256": "7aab6b2b31cb3b164b6b476c2a58b73444cc3ecce818f308d1255f690c09a78a"
+      "bytes": 100347532,
+      "sha256": "b0401160797d9c8a55431c73e061e74ce119367fec06cbe161ff0f723247cb1e"
     }
   ]
 }

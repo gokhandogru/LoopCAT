@@ -2,11 +2,11 @@
 
 This is an **unsigned development preview**, not a signed or production-qualified release.
 
-Build: `0.0.4-dev.20260922+source.69e9220d59cf`
+Build: `0.0.4-dev.20260922+source.516207302177`
 
-Base commit: `7d440b212f4854418627a57e77491e9b2d84c1b0`
+Base commit: `03933782c6cab38c03eb5a5474cf0158a7a41223`
 
-Source snapshot SHA-256: `69e9220d59cfc2f2460e6e0169f24bfc47dd0ae23a886dd1b3c284df6f6128db`
+Source snapshot SHA-256: `516207302177de2848b0647bf71d090ad510e8005fc9bdc590adc350b0c71b27`
 
 All three ZIPs were built from the same fingerprinted source snapshot rooted at the base commit. Each ZIP contains `build-info.json`; the desktop application also embeds it inside `resources/app.asar`. The [release manifest](./release.json) records the complete source fingerprint and ZIP hashes. A later download-only commit may publish these artifacts without changing their source snapshot.
 
