@@ -3,11 +3,11 @@
   "channel": "unsigned-development-preview",
   "identity": {
     "schemaVersion": 1,
-    "version": "0.0.4-dev.20260916.1",
-    "buildId": "0.0.4-dev.20260916.1+source.69d326343281",
+    "version": "0.0.4-dev.20260922",
+    "buildId": "0.0.4-dev.20260922+source.69e9220d59cf",
     "sourceKind": "working-tree-snapshot",
-    "baseCommit": "258d069878a32e2fd1e8f56de5483107b570c9b3",
-    "sourceSha256": "69d3263432815cf0ace6e1b52433e9c1f48951b294a269a6cc2883533c7b0447",
+    "baseCommit": "7d440b212f4854418627a57e77491e9b2d84c1b0",
+    "sourceSha256": "69e9220d59cfc2f2460e6e0169f24bfc47dd0ae23a886dd1b3c284df6f6128db",
     "sourceFiles": [
       {
         "path": ".gitattributes",
@@ -56,8 +56,8 @@
       },
       {
         "path": "README.md",
-        "bytes": 91586,
-        "sha256": "677349f236522d3f7e2befd139a4e486f76932869f33a2a729f895031346323c"
+        "bytes": 93560,
+        "sha256": "09d126e15729a017f1a67dad7ef7b7cc8048819f9c98b0415b96cc0489572aa7"
       },
       {
         "path": "ROADMAP.md",
@@ -91,8 +91,8 @@
       },
       {
         "path": "config/production-assets.js",
-        "bytes": 1269,
-        "sha256": "56f2195c053cb1fe91e88e79aa8d7a49d4101d414918472976d71b33bf75275e"
+        "bytes": 1267,
+        "sha256": "28d2041aa14d05d36fe5ac266e2ad01493bbfe65364039098b745999572a08f7"
       },
       {
         "path": "config/runtime-contract.json",
@@ -146,8 +146,8 @@
       },
       {
         "path": "docs/beginner-guide/index.html",
-        "bytes": 126244,
-        "sha256": "a987cc33c096b4ea263ecfdc0e38de0e1bcf72ca12dd66c286e6e1dbe1045f83"
+        "bytes": 126236,
+        "sha256": "7fc709688ecc47ef132a65c9512c1450e45f759fcfe750fe7147eb1b7058aa13"
       },
       {
         "path": "docs/brand-guidelines.md",
@@ -270,6 +270,11 @@
         "sha256": "d8495b95dc55aec6e9dff8b36f5262f7c6e74f116f16117dc9a011f1deedc15f"
       },
       {
+        "path": "docs/releases/0.0.4-dev.20260922.md",
+        "bytes": 891,
+        "sha256": "1712e2dc1007cf51df06df00bca61ba362b0fe175fd35b681543456ac8e41588"
+      },
+      {
         "path": "docs/reliability-implementation-status.md",
         "bytes": 12362,
         "sha256": "f6822f1d75ac77fe935269c377977d1a211153521fe60bb11a36fd5f8561fee3"
@@ -311,43 +316,43 @@
       },
       {
         "path": "i18n/locales/ca-ES.js",
-        "bytes": 133963,
-        "sha256": "7c312be21bac8c150daaeaa30e21cd4009d7e20703761b3fde2cc2b71cb0f378"
+        "bytes": 134110,
+        "sha256": "7d4d722b63fb855e8a95556ce252144a514c534d234e6595f1881a293356752f"
       },
       {
         "path": "i18n/locales/ca-ES.json",
-        "bytes": 146576,
-        "sha256": "8e9b1b2d8d9595f2354707c89aca1fe6e0f10a9366cf65d27b3d0a796c42e03e"
+        "bytes": 146735,
+        "sha256": "443391951836837970be52b95b81a5da57aff37ac63c67d486664c0db4cc2cfa"
       },
       {
         "path": "i18n/locales/en-US.js",
-        "bytes": 124477,
-        "sha256": "667400ae52c38957d0366dc8566caa4f8db3080c4a2e340f8505ee361ea63686"
+        "bytes": 124606,
+        "sha256": "8b3ab5aad5956d65ca2dbadd3920bb31b08194aa10d03e2fe5215cec01b54171"
       },
       {
         "path": "i18n/locales/en-US.json",
-        "bytes": 137086,
-        "sha256": "1d7d04ed07f6804dd526eab9ee004c597f231fbd464de3502643aae3c4b762e2"
+        "bytes": 137227,
+        "sha256": "7366836ba33d14e8ccd080ad73ca973be4bdbd28800b859576c4721a3ccdb16a"
       },
       {
         "path": "i18n/locales/tr-TR.js",
-        "bytes": 127855,
-        "sha256": "462bac6a716b28a5f2c27ed31bf01dd54d603715d1b88f1770b99438162878ca"
+        "bytes": 127994,
+        "sha256": "4324d459b3728b07c6b41576fd7fed90a8c89780b759784b57e3b22ca0f1bf48"
       },
       {
         "path": "i18n/locales/tr-TR.json",
-        "bytes": 140468,
-        "sha256": "2144d628eb60fa80a33a1566afb2a0266e963cd7ea709e403ff5fc6390c607d7"
+        "bytes": 140619,
+        "sha256": "0cde75ad0f8ffbfe93b0dde3510cd5400fbb3a8d5c6568aaded00ff76c4a6be2"
       },
       {
         "path": "i18n/source.en-US.js",
-        "bytes": 839700,
-        "sha256": "9733598495381fff09894a27454693402482288739c48d3a5fca1634bb4fe6c6"
+        "bytes": 840231,
+        "sha256": "7419cbf73554ba8caa663ba64023e04648c89a124ea987c323536f5490694968"
       },
       {
         "path": "i18n/source.en-US.json",
-        "bytes": 1257539,
-        "sha256": "ace99bf789624edf8dae42d7069e8fc05a930c2b13eafc4376b0dc5b644803d2"
+        "bytes": 1258190,
+        "sha256": "d42af891d2503d1f9beb904d498b68cbc758c69a4859ff360b88db7fd62067c0"
       },
       {
         "path": "icons/loopcat-icon.icns",
@@ -376,8 +381,8 @@
       },
       {
         "path": "index.html",
-        "bytes": 93687,
-        "sha256": "342a50dd559489d2bd74410d1a73af3cd242cbb78717fcbf389b54d1ed026b79"
+        "bytes": 96404,
+        "sha256": "e517e3479a9bf11b1fbdcc580e5645fd827cd8dadb4ab288026e771c216868f1"
       },
       {
         "path": "large-project-test.html",
@@ -396,8 +401,8 @@
       },
       {
         "path": "manifest.webmanifest",
-        "bytes": 645,
-        "sha256": "a28a8758377f3b178113ed7d8d9bc22c2b55de87ffec643bb933db34bea7299b"
+        "bytes": 643,
+        "sha256": "06b276dda66edf0c866e0d0e53beff479b660ba63f1b5ccd0bcf9c7333ba3dd2"
       },
       {
         "path": "offline-shell-test.html",
@@ -416,8 +421,8 @@
       },
       {
         "path": "package.json",
-        "bytes": 7545,
-        "sha256": "51d2035ef2b9bde02f38be2068de156ee4fb89638747f42132cba2f61ee05926"
+        "bytes": 7543,
+        "sha256": "6643999efaf194c7cf211e802979ff7436b5785ef60629ac0dd7fa662b9dc80b"
       },
       {
         "path": "pnpm-lock.yaml",
@@ -661,8 +666,8 @@
       },
       {
         "path": "scripts/verify-release.cjs",
-        "bytes": 1297411,
-        "sha256": "c66a8922afa60d088d02cc9914ce75cc4df5cefa5f957db088b75ba5a6408e8d"
+        "bytes": 1297803,
+        "sha256": "2ebe78d62947c7c84c750f6e9077218f3adf96f12bed988303242bd72621f118"
       },
       {
         "path": "scripts/verify-renderer-build.cjs",
@@ -721,8 +726,8 @@
       },
       {
         "path": "service-worker.js",
-        "bytes": 3454,
-        "sha256": "47d0e73061f0c471fd070967e8d2a01fa9735c7c4b4a48980b59799ba6bcb53e"
+        "bytes": 3453,
+        "sha256": "5249003819abd655d210c10a3088660b87810822144ca15838848b5bb16ec364"
       },
       {
         "path": "smoke-test.html",
@@ -856,8 +861,8 @@
       },
       {
         "path": "src/app/application-composition.js",
-        "bytes": 277991,
-        "sha256": "c198feca689e577dada41a1727d0613e4d10b2818224360df0af23eb256336d1"
+        "bytes": 278284,
+        "sha256": "3f088ff20de9c60ea5537b082f4b2f8761fb787e83ac61ff1dbd68b56676443d"
       },
       {
         "path": "src/app/application-date-time-service.js",
@@ -896,8 +901,8 @@
       },
       {
         "path": "src/app/application-save-status-controller.js",
-        "bytes": 4206,
-        "sha256": "41c31b5b9723243d82b2330f5597c30aeb3866384562fb2c67c70bc34fec752c"
+        "bytes": 5647,
+        "sha256": "d43fa81c62ba147886b87e611a468a62ac549c6854f5556d2b9403ed81575533"
       },
       {
         "path": "src/app/application-startup-controller.js",
@@ -2226,8 +2231,8 @@
       },
       {
         "path": "src/ui/components.css",
-        "bytes": 15266,
-        "sha256": "ffa5ffab958879a5eab2355dbc1517a517c51d1b6416bdde92e92564c75898ce"
+        "bytes": 15889,
+        "sha256": "4fd9ccda7b18496db1140b32c393dc9de71b45e4d802c49c286384e35ae3c7e5"
       },
       {
         "path": "src/ui/dialog-controller.js",
@@ -2566,8 +2571,8 @@
       },
       {
         "path": "tests/unit/application-save-status-controller.test.cjs",
-        "bytes": 14976,
-        "sha256": "4e6db52118dd701983f62e4fd7efd5fb50024971393bd50478a2b503169502b7"
+        "bytes": 15532,
+        "sha256": "b1931ebf84b055514523354ea3603c1238b22aef7a1ab5d5fe26979c79ec993a"
       },
       {
         "path": "tests/unit/application-startup-controller.test.cjs",
@@ -3581,23 +3586,23 @@
       }
     ]
   },
-  "releaseNotes": "docs/releases/0.0.4-dev.20260916.1.md",
+  "releaseNotes": "docs/releases/0.0.4-dev.20260922.md",
   "qualification": "Not production-qualified. Windows signing and clean-machine testing remain outstanding; no macOS or Linux downloads are included.",
   "artifacts": [
     {
-      "name": "LoopCAT.Web.0.0.4-dev.20260916.1.zip",
-      "bytes": 6161060,
-      "sha256": "b7cb6b4e7206d9594ca57360cd4b738fda8cb88fe5b79eea74ec2af1b4f2e4f7"
+      "name": "LoopCAT.Web.0.0.4-dev.20260922.zip",
+      "bytes": 6168654,
+      "sha256": "2adf4c2cb004cf1f68772201f1a0301caca68a552d43d4c368e416046af733dd"
     },
     {
-      "name": "LoopCAT.Windows.Setup.0.0.4-dev.20260916.1.zip",
-      "bytes": 100501028,
-      "sha256": "a9d37ce1d488e6430f22e343291579b6b57d96944a9c2ffc863290a643f9e04f"
+      "name": "LoopCAT.Windows.Setup.0.0.4-dev.20260922.zip",
+      "bytes": 100502006,
+      "sha256": "66831a427d3b0b174003655d114eea497d4215fc2cfb267b5e9161ca68260432"
     },
     {
-      "name": "LoopCAT.0.0.4-dev.20260916.1.Portable.zip",
-      "bytes": 100346469,
-      "sha256": "9a9a7a7bde341ca30978bfda427ae06a78d375bc4ebcb9853bca5444f94308ba"
+      "name": "LoopCAT.0.0.4-dev.20260922.Portable.zip",
+      "bytes": 100347533,
+      "sha256": "7aab6b2b31cb3b164b6b476c2a58b73444cc3ecce818f308d1255f690c09a78a"
     }
   ]
 }
