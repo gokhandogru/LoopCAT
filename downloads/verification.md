@@ -1,17 +1,18 @@
-# LoopCAT 0.0.4-dev.20260915.1 verification
+# LoopCAT 0.0.4-dev.20260923 verification
 
-Verified on 15 September 2026. Build ID: `0.0.4-dev.20260915.1+source.62d13afc27a4`.
+Verified on 23 September 2026. Build ID: `0.0.4-dev.20260923+source.2971757cfaa4`.
 
-The Windows installer, portable package, and web ZIP were built from the same source fingerprint at commit `ca89b2b56c2d2bee0285a29c26e04afd25546cf2`. See the [source and artifact manifest](release.json) and [release notes](../docs/releases/0.0.4-dev.20260915.1.md).
+All packages come from source commit `e4a2af79afd1d3663cf2768ac10a672fc1ad41c9`. The repository Web and Windows ZIPs are byte-for-byte copies of the verified GitHub Actions artifacts. See the [source and artifact manifest](release.json), [release notes](../docs/releases/0.0.4-dev.20260923.md), and [successful all-platform release run](https://github.com/gokhandogru/LoopCAT/actions/runs/35902477647).
 
 Checks passed:
 
-- All 1,510 unit tests, ESLint, configured Prettier checks, TypeScript, Stylelint, import boundaries, release contracts, and renderer graph verification.
-- Complete browser suite: reliability, distinct web/desktop security policies, offline shell, smoke, regression, translator workflow, workspace storage, package round trips, and large projects.
-- Extracted production web ZIP in real Google Chrome through both `file:` and HTTP URLs, using a directory containing spaces. The workflow covers DOCX import and translated export, TM analysis/matching, QA, UI project creation and import, typing, persisted confirmation, checkpoints, backup round trips, and regex search.
-- The same Chrome gate fails against the previous web ZIP with the exact archive-worker `SecurityError` reported by the user. Electron alone passes that old ZIP, demonstrating why the independent browser gate is necessary.
-- Static web ZIP payload, desktop wrapper, packaged ASAR payload, Electron security fuses, preview artifact selection, and SHA-256 checksums.
-- Packaged Windows startup smoke through the documented no-sandbox diagnostic mode on this restricted host. The release workflow requires normal packaged desktop smoke checks on native GitHub runners.
-- The updated Word beginner guide was rendered through Microsoft Word and all 12 pages visually checked; the HTML guide explains extracting the complete web ZIP and opening index.html.
+- All 1,517 unit tests, ESLint, configured Prettier checks, TypeScript, Stylelint, import boundaries, release contracts, and XLIFF 2.2 schema validation on Windows, macOS, and Linux.
+- Native-platform accessibility and full browser suites, including the app workflow, workspace storage, package round trips, and large projects. The local full browser suite also passed.
+- Packaged desktop smoke tests, ASAR payload checks, Electron security fuses, preview artifact selection, and SHA-256 checksums on all three desktop platforms.
+- Production Web ZIP payload and real Chrome direct-file and HTTP workflow smoke tests.
+- Arabic catalog validation for all 2,672 source messages and placeholders. The final local Arabic UI audit captured 97 states and passed 10 functional checks with zero reported errors or axe violations in the tested editor. It covers responsive layouts, 200% zoom, mixed-script editing, protected tags, persistence, Arabic guide, and DOCX export.
+- The all-platform bundle gate verified all nine application packages and their combined checksums.
 
-The repository mirror contains unsigned Windows and web packages. Native Windows, macOS, and Linux assets were built and checked on matching runners in [release run 34954939158](https://github.com/gokhandogru/LoopCAT/actions/runs/34954939158). All four platform jobs and the combined checksum bundle passed. These remain unsigned development previews; the checks do not constitute an all-browser or clean-machine qualification guarantee.
+Packages: Web ZIP; Windows x64 installer and portable EXEs plus ZIP wrappers; macOS Apple Silicon DMG and ZIP; Linux x64 AppImage and DEB. The repository mirror contains the Web and Windows ZIPs; all platforms are available on the GitHub prerelease.
+
+Desktop packages remain unsigned, and macOS packages are not notarized. Automated checks do not replace clean-machine, screen-reader, or all-browser qualification.
