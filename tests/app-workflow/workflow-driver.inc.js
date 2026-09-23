@@ -20,6 +20,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     if (!output) {
       output = document.createElement("pre");
       output.id = "appWorkflowTestResults";
+      output.setAttribute("data-i18n-skip", "");
       output.hidden = true;
       document.body.append(output);
     }
@@ -54,6 +55,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     if (!output) {
       output = document.createElement("pre");
       output.id = "appWorkflowTestResults";
+      output.setAttribute("data-i18n-skip", "");
       output.hidden = true;
       document.body.append(output);
     }
@@ -2426,7 +2428,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         reviewState: originalAiBatchAdaptFilters.reviewStateFilter
       });
       editorSessionStore.replaceProject(await updateProject({
-        ...editorSessionStore.getProject(),
+        ...(await storageApi.get("projects", project.id)),
         aiSettings: defaultAiSettings(aiBatchAdaptProjectSettingsSnapshot)
       }));
       editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((item) => (item.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : item)));
