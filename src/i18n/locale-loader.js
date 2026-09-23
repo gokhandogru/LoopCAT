@@ -1,7 +1,8 @@
 const BUNDLED_LOCALES = Object.freeze([
   Object.freeze({ locale: "en-US", label: "English (United States)", dir: "ltr" }),
   Object.freeze({ locale: "ca-ES", label: "Català (Espanya)", dir: "ltr" }),
-  Object.freeze({ locale: "tr-TR", label: "Türkçe (Türkiye)", dir: "ltr" })
+  Object.freeze({ locale: "tr-TR", label: "Türkçe (Türkiye)", dir: "ltr" }),
+  Object.freeze({ locale: "ar", label: "العربية", dir: "rtl" })
 ]);
 
 const DEFAULT_LOADERS = Object.freeze({
@@ -9,7 +10,9 @@ const DEFAULT_LOADERS = Object.freeze({
   // @ts-expect-error Generated locale catalogs are intentional side-effect scripts.
   "ca-ES": () => import("../../i18n/locales/ca-ES.js"),
   // @ts-expect-error Generated locale catalogs are intentional side-effect scripts.
-  "tr-TR": () => import("../../i18n/locales/tr-TR.js")
+  "tr-TR": () => import("../../i18n/locales/tr-TR.js"),
+  // @ts-expect-error Generated locale catalogs are intentional side-effect scripts.
+  ar: () => import("../../i18n/locales/ar.js")
 });
 
 function matchingLocale(value) {

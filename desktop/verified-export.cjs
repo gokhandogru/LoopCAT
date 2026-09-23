@@ -3,7 +3,7 @@ const { createReadStream } = require("node:fs");
 const path = require("node:path");
 const { createHash, randomUUID } = require("node:crypto");
 
-function createVerifiedExports({ dialog, windowFor }) {
+function createVerifiedExports({ dialog, windowFor, translate = (text) => text }) {
   const sessions = new Map();
   const choosing = new Set();
   async function hashFile(file) {
@@ -34,7 +34,7 @@ function createVerifiedExports({ dialog, windowFor }) {
     choosing.add(owner);
     try {
       const picked = await dialog.showSaveDialog(windowFor(owner), {
-        title: "Save and verify LoopCAT export",
+        title: translate("Save and verify LoopCAT export"),
         defaultPath: filename
       });
       if (picked.canceled || !picked.filePath) return { canceled: true };

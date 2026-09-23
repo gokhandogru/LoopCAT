@@ -15,6 +15,7 @@
  *     getProjectTerms: () => any[]
  *   },
  *   navigation: { select: (index: number) => Promise<any> },
+ *   localization?: { source: (text: string, values?: any) => string },
  *   targetProducer: { insertProtectedTag: (text: string) => any }
  * }} options
  */
@@ -24,6 +25,9 @@ export function createSegmentMarkupPresentationService(options) {
   const terms = options?.terms;
   const navigation = options?.navigation;
   const targetProducer = options?.targetProducer;
+  const source =
+    options?.localization?.source ||
+    ((text, values = {}) => text.replace(/\{(\w+)\}/g, (match, key) => values[key] ?? match));
 
   if (
     typeof ownerDocument?.createElement !== "function" ||
@@ -59,7 +63,8 @@ export function createSegmentMarkupPresentationService(options) {
       if (interactive) chip.type = "button";
       chip.className = `tag-chip tag-chip-${tag.type || "placeholder"}${interactive ? " tag-chip-action" : ""}`;
       chip.textContent = protectedTags.displayText(tag);
-      chip.title = interactive ? `Insert protected text: ${tag.text}` : `Protected text: ${tag.text}`;
+      chip.dir = "ltr";
+      chip.title = source(interactive ? "Insert protected text: {text}" : "Protected text: {text}", { text: tag.text });
       if (interactive) {
         chip.addEventListener("mousedown", (event) => event.preventDefault());
         chip.addEventListener("click", (event) => insertAfterSelection(container, tag.text, event));
@@ -104,7 +109,8 @@ export function createSegmentMarkupPresentationService(options) {
         chip.type = "button";
         chip.className = `tag-chip tag-chip-${marker.tag.type || "placeholder"} tag-chip-action`;
         chip.textContent = protectedTags.displayText(marker.tag);
-        chip.title = `Insert protected text: ${marker.tag.text}`;
+        chip.dir = "ltr";
+        chip.title = source("Insert protected text: {text}", { text: marker.tag.text });
         chip.addEventListener("mousedown", (event) => event.preventDefault());
         chip.addEventListener("click", (event) => insertAfterSelection(container, marker.tag.text, event));
         container.append(chip);
@@ -112,7 +118,10 @@ export function createSegmentMarkupPresentationService(options) {
         const mark = ownerDocument.createElement("mark");
         mark.className = "term-highlight";
         mark.textContent = text.slice(marker.index, marker.index + marker.length);
-        mark.title = `Termbase: ${marker.range.term.sourceTerm} -> ${marker.range.term.targetTerm}`;
+        mark.title = source("Termbase: {source} -> {target}", {
+          source: marker.range.term.sourceTerm,
+          target: marker.range.term.targetTerm
+        });
         container.append(mark);
       }
       offset = marker.index + marker.length;
@@ -130,7 +139,8 @@ export function createSegmentMarkupPresentationService(options) {
       chip.type = "button";
       chip.className = `tag-chip tag-chip-${tag.type || "placeholder"} tag-chip-action`;
       chip.textContent = protectedTags.displayText(tag);
-      chip.title = `Insert protected text: ${tag.text}`;
+      chip.dir = "ltr";
+      chip.title = source("Insert protected text: {text}", { text: tag.text });
       chip.addEventListener("mousedown", (event) => event.preventDefault());
       chip.addEventListener("click", (event) => insertAfterSelection(row, tag.text, event));
       tray.append(chip);

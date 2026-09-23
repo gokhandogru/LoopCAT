@@ -5,6 +5,8 @@
 })(function createLoopCatProductionAssets() {
   const runtimeAssets = Object.freeze([
     "index.html",
+    "docs/beginner-guide/index.html",
+    "docs/beginner-guide/ar.html",
     "styles.css",
     "liquid-glass/styles.css",
     "src/ui/tokens.css",
@@ -25,7 +27,6 @@
   const offlineAssets = Object.freeze([...runtimeAssets, "LICENSE", "NOTICE"]);
   const webDistributionAssets = Object.freeze([
     ...offlineAssets,
-    "docs/beginner-guide/index.html",
     "docs/beginner-guide/LoopCAT-Beginners-Guide.docx",
     "og.png",
     "package.json",
@@ -34,7 +35,7 @@
   ]);
 
   return Object.freeze({
-    appVersion: "0.0.4-dev.20260922",
+    appVersion: "0.0.4-dev.20260923",
     contractVersion: 1,
     runtimeAssets,
     offlineAssets,

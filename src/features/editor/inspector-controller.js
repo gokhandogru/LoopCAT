@@ -36,12 +36,13 @@ export function createInspectorController({ root, preferencesRepository }) {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
         const tabs = Array.from(root.querySelectorAll("[data-inspector-tab]"));
         const current = Math.max(0, tabs.indexOf(event.target.closest("[data-inspector-tab]")));
+        const rtl = root.ownerDocument?.documentElement?.dir === "rtl";
         const next =
           event.key === "Home"
             ? 0
             : event.key === "End"
               ? tabs.length - 1
-              : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+              : (current + (event.key === "ArrowRight" ? 1 : -1) * (rtl ? -1 : 1) + tabs.length) % tabs.length;
         event.preventDefault();
         activateFromButton(tabs[next], true);
       });

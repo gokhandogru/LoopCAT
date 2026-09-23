@@ -157,7 +157,7 @@ input[type="file"] {
   background: transparent;
   color: inherit;
   box-shadow: none;
-  text-align: left;
+  text-align: start;
   text-decoration: none;
   cursor: pointer;
 }
@@ -294,7 +294,7 @@ input[type="file"] {
 
 .workspace-recovery ul {
   margin: 8px 0 0;
-  padding-left: 18px;
+  padding-inline-start: 18px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -331,12 +331,12 @@ input[type="file"] {
 }
 
 .project-rail {
-  border-right: 1px solid var(--line);
+  border-inline-end: 1px solid var(--line);
   padding: 16px;
 }
 
 .sidebar {
-  border-left: 1px solid var(--line);
+  border-inline-start: 1px solid var(--line);
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -422,7 +422,7 @@ input[type="file"] {
 
 .project-item {
   width: 100%;
-  text-align: left;
+  text-align: start;
   min-height: 68px;
   display: block;
   padding: 10px;
@@ -622,7 +622,7 @@ input[type="file"] {
 }
 
 .validation-item {
-  border-left: 3px solid #c88a00;
+  border-inline-start: 3px solid #c88a00;
   padding: 4px 0 4px 8px;
   color: #4d3b12;
   font-size: 13px;
@@ -957,11 +957,11 @@ input[type="file"] {
 .project-tile footer button:first-of-type,
 .file-card footer button:first-of-type,
 .resource-card footer button:first-of-type {
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .file-card footer button:first-of-type {
-  margin-left: 0;
+  margin-inline-start: 0;
 }
 
 .resource-detail {
@@ -1115,7 +1115,7 @@ input[type="file"] {
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
   transform: rotate(45deg) translateY(-2px);
-  margin-left: 4px;
+  margin-inline-start: 4px;
   opacity: 0.72;
 }
 
@@ -1383,7 +1383,7 @@ input[type="file"] {
   background: #eef2f5;
   color: #344154;
   font-size: 12px;
-  text-align: left;
+  text-align: start;
   padding: 10px;
   border-bottom: 1px solid var(--line);
 }
@@ -1401,7 +1401,7 @@ input[type="file"] {
 .num-col {
   width: 52px;
   color: var(--muted);
-  text-align: right;
+  text-align: end;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2144,7 +2144,7 @@ input[type="file"] {
 }
 
 .quality-active-evidence ul {
-  padding-left: 17px;
+  padding-inline-start: 17px;
 }
 
 .quality-category-row {
@@ -2217,7 +2217,7 @@ input[type="file"] {
 
 .quality-risk-card {
   border: 1px solid #dce4ed;
-  border-left-width: 4px;
+  border-inline-start-width: 4px;
   border-radius: 6px;
   background: #fff;
   padding: 9px;
@@ -2237,19 +2237,19 @@ input[type="file"] {
 }
 
 .quality-risk-card.critical {
-  border-left-color: #b42318;
+  border-inline-start-color: #b42318;
 }
 
 .quality-risk-card.high {
-  border-left-color: #c45a14;
+  border-inline-start-color: #c45a14;
 }
 
 .quality-risk-card.medium {
-  border-left-color: #b8890d;
+  border-inline-start-color: #b8890d;
 }
 
 .quality-risk-card.low {
-  border-left-color: #2d6a9f;
+  border-inline-start-color: #2d6a9f;
 }
 
 .qa-summary {
@@ -2450,7 +2450,7 @@ input[type="file"] {
 
 .local-ai-provider-summary-head span {
   color: var(--muted);
-  text-align: right;
+  text-align: end;
 }
 
 .local-ai-provider-badges {
@@ -2545,7 +2545,7 @@ input[type="file"] {
   place-items: center;
   width: 18px;
   height: 18px;
-  margin-right: 6px;
+  margin-inline-end: 6px;
   border: 1px solid #cfd8e3;
   border-radius: 50%;
   color: var(--muted);
@@ -2657,7 +2657,7 @@ input[type="file"] {
 
 .ai-suggestion-card ul {
   margin: 6px 0 0;
-  padding-left: 18px;
+  padding-inline-start: 18px;
 }
 
 .ai-suggestion-card footer {
@@ -3008,8 +3008,8 @@ dialog::backdrop {
 }
 
 .opus-cat-help-note {
-  padding-left: 12px;
-  border-left: 3px solid var(--focus);
+  padding-inline-start: 12px;
+  border-inline-start: 3px solid var(--focus);
 }
 
 .project-storage-config,
@@ -3426,7 +3426,7 @@ dialog::backdrop {
     grid-column: 1 / -1;
     height: auto;
     max-height: 280px;
-    border-left: 0;
+    border-inline-start: 0;
     border-top: 1px solid var(--line);
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3496,7 +3496,7 @@ dialog::backdrop {
   }
 
   .project-rail {
-    border-right: 0;
+    border-inline-end: 0;
     border-bottom: 1px solid var(--line);
     max-height: 220px;
   }

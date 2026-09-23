@@ -319,7 +319,10 @@ export function createDeliveryExportController(options) {
       application.clearQaFilter();
       presentation.renderQaResults();
       const base = fileSafeName(session.getProject().name || "project");
-      const bytes = await formats.buildBilingualDocx(session.getProject(), session.getSegments(), { qaChecks });
+      const bytes = await formats.buildBilingualDocx(session.getProject(), session.getSegments(), {
+        qaChecks,
+        translate: localization.source
+      });
       download(
         `${base}_bilingual.docx`,
         bytes,

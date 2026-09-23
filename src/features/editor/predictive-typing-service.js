@@ -32,7 +32,7 @@ function targetWordSpans(value, locale) {
       .map((part) => ({ text: part.segment, start: part.index, end: part.index + part.segment.length }));
   } catch {
     const spans = [];
-    const pattern = /[\p{L}\p{N}_'-]+/gu;
+    const pattern = /[\p{L}\p{M}\p{N}_'-]+/gu;
     let match;
     while ((match = pattern.exec(text))) {
       spans.push({ text: match[0], start: match.index, end: match.index + match[0].length });
@@ -120,7 +120,7 @@ function graphemeSuffix(value, limit = 16) {
 
 export function caretPrefix(value, caret, _locale = "") {
   const before = String(value || "").slice(0, Math.max(0, Number(caret) || 0));
-  const spaced = before.match(/[\p{L}\p{N}_'-]+(?:\s+[\p{L}\p{N}_'-]+){0,2}$/u)?.[0] || "";
+  const spaced = before.match(/[\p{L}\p{M}\p{N}_'-]+(?:\s+[\p{L}\p{M}\p{N}_'-]+){0,2}$/u)?.[0] || "";
   if (spaced) return { text: spaced, start: before.length - spaced.length, end: before.length };
   const suffix = graphemeSuffix(before).match(/[^\s.,;:!?()[\]{}<>]+$/u)?.[0] || "";
   return { text: suffix, start: before.length - suffix.length, end: before.length };

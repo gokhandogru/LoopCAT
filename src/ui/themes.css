@@ -465,15 +465,15 @@
 }
 
 :root[data-theme="dark"] .liquid-glass-edition .quality-risk-card:is(.critical, .high) {
-  border-left-color: var(--color-danger);
+  border-inline-start-color: var(--color-danger);
 }
 
 :root[data-theme="dark"] .liquid-glass-edition .quality-risk-card.medium {
-  border-left-color: var(--color-warning);
+  border-inline-start-color: var(--color-warning);
 }
 
 :root[data-theme="dark"] .liquid-glass-edition .quality-risk-card.low {
-  border-left-color: var(--color-info);
+  border-inline-start-color: var(--color-info);
 }
 
 :root[data-theme="dark"] .liquid-glass-edition .tag-warning-row {

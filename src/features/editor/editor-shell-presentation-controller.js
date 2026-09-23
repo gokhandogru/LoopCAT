@@ -157,7 +157,7 @@ export function createEditorShellPresentationController(options) {
 
     const resourceSummary = resources.summary();
     elements.projectTitle.textContent = text.displaySafeText(session.getProject().name);
-    elements.projectMeta.textContent = `${language.display()} - ${localization.label("mainTm")}: ${text.displaySafeText(resourceSummary.mainTm, localization.label("none"))} - ${text.displaySafeText(resourceSummary.tmLabel)} - ${text.displaySafeText(resourceSummary.tbLabel)}`;
+    elements.projectMeta.textContent = `${language.display()} - ${localization.label("mainTm")}: ${text.displaySafeText(resourceSummary.mainTm, localization.label("none"))} - ${text.displaySafeText(localization.source(resourceSummary.tmLabel))} - ${text.displaySafeText(localization.source(resourceSummary.tbLabel))}`;
     elements.projectDomainEditInput.value = session.getProject().domain || "";
     elements.domainForm.classList.add("clean");
     elements.domainForm.classList.toggle("hidden", Boolean((session.getProject().domain || "").trim()));

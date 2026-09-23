@@ -1,4 +1,12 @@
-export function createInspectorToggleController({ element, state, layout, presentation, frame, selection }) {
+export function createInspectorToggleController({
+  element,
+  closeElement,
+  state,
+  layout,
+  presentation,
+  frame,
+  selection
+}) {
   if (!state?.getOpen || !state?.setOpen || !layout?.setOpen || !presentation?.renderEditor) {
     throw new TypeError("InspectorToggleController requires state, layout, and editor-presentation boundaries.");
   }
@@ -21,10 +29,14 @@ export function createInspectorToggleController({ element, state, layout, presen
       element.focus();
     }
   };
+  const closeClickListener = () => {
+    if (state.getOpen()) toggleClickListener();
+  };
 
   function mount() {
     if (mounted) return false;
     element?.addEventListener("click", toggleClickListener);
+    closeElement?.addEventListener("click", closeClickListener);
     mounted = true;
     return true;
   }
@@ -32,6 +44,7 @@ export function createInspectorToggleController({ element, state, layout, presen
   function unmount() {
     if (!mounted) return false;
     element?.removeEventListener("click", toggleClickListener);
+    closeElement?.removeEventListener("click", closeClickListener);
     mounted = false;
     return true;
   }

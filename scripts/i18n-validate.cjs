@@ -137,7 +137,10 @@ function validate() {
             return;
           }
           const target = messages[key];
-          if (locale.locale !== source.locale && !String(target || "").trim()) return;
+          if (locale.locale !== source.locale && !String(target || "").trim()) {
+            if (locale.locale === "ar") errors.push(`${name}:${key} has no Arabic translation.`);
+            return;
+          }
           const placeholders = samePlaceholders(sourceMessages[key].message, target);
           placeholders.missing.forEach((placeholder) =>
             errors.push(`${name}:${key} is missing placeholder {${placeholder}}.`)

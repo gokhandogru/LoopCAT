@@ -34,6 +34,7 @@ jobs:
             command: pnpm run dist:win
             artifact: LoopCAT-Windows
             uploadPath: |
+              dist/build-receipt.json
               dist/*.exe
               dist/*.zip
               dist/SHA256SUMS.txt
@@ -239,6 +240,7 @@ jobs:
         with:
           name: Static-Web-Bundle
           path: |
+            dist-web/build-receipt.json
             dist-web/*.zip
             dist-web/SHA256SUMS.txt
           if-no-files-found: error

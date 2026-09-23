@@ -272,7 +272,7 @@ test("ProjectHomePresentationController preserves summary order and safe project
   assert.equal(harness.elements.title.textContent, "safeText:Name <p>");
   assert.equal(
     harness.elements.meta.textContent,
-    "English → Turkish - safeText:Legal - label:mainTm: safeText:Main - safeText:2 TMs - safeText:1 TB"
+    "English → Turkish - safeText:Legal - label:mainTm: safeText:Main - safeText:source:2 TMs - safeText:source:1 TB"
   );
   assert.equal(harness.elements.stats.html.includes("<strong>75%</strong>"), true);
   assert.equal(harness.elements.stats.html.includes("<strong>2</strong>"), true);

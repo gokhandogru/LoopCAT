@@ -168,15 +168,15 @@ test("LanguageInputService preserves all escaped datalist shapes and absent-list
   assert.equal(replacements.length, 3);
   assert.match(
     replacements.find((entry) => entry[1] === "labels")[2],
-    /<option value="escaped:English \(en\)"><\/option>/
+    /<option value="escaped:localized:English \(en\)"><\/option>/
   );
   assert.match(
     replacements.find((entry) => entry[1] === "codes")[2],
-    /<option value="escaped:en" label="escaped:English"><\/option>/
+    /<option value="escaped:en" label="escaped:localized:English"><\/option>/
   );
   assert.match(
     replacements.find((entry) => entry[1] === "names")[2],
-    /<option value="escaped:English" label="escaped:en"><\/option>/
+    /<option value="escaped:localized:English" label="escaped:en"><\/option>/
   );
 
   const absent = createHarness(createLanguageInputService, { datalists: {} });

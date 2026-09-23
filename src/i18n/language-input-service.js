@@ -83,7 +83,7 @@ export function createLanguageInputService(options) {
     const clean = canonicalCode(code);
     if (!clean) return "";
     const configured = configuredName(clean);
-    if (configured) return localization.source(configured);
+    if (configured) return localization.source(clean.split("-")[0] === "pl" ? "Polish language" : configured);
     try {
       if (typeof intl.DisplayNames === "function") {
         const names = new intl.DisplayNames([getLocale() || getNavigatorLanguage() || "en"], { type: "language" });
@@ -106,7 +106,8 @@ export function createLanguageInputService(options) {
       .normalize("NFKD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "");
+      .replace(/[\p{M}\u0640]+/gu, "")
+      .replace(/[^\p{L}\p{N}]+/gu, "");
   }
 
   function catalog() {
@@ -147,10 +148,15 @@ export function createLanguageInputService(options) {
     const lookup = stableLookup(clean);
     const alias = aliases[lookup];
     if (alias) return canonicalCode(alias);
-    const match = catalog().find(
-      (item) =>
-        stableLookup(item.code) === lookup || stableLookup(item.name) === lookup || stableLookup(item.label) === lookup
-    );
+    const match =
+      lookup &&
+      catalog().find(
+        (item) =>
+          stableLookup(item.code) === lookup ||
+          stableLookup(item.name) === lookup ||
+          stableLookup(item.label) === lookup ||
+          stableLookup(nameForUi(item.code)) === lookup
+      );
     if (match) return match.code;
     return canonicalCode(clean);
   }
@@ -193,18 +199,22 @@ export function createLanguageInputService(options) {
   }
 
   function renderDatalists() {
+    const localized = catalog()
+      .map((item) => {
+        const name = nameForUi(item.code);
+        return { ...item, name, label: `${name} (${item.code})` };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, getLocale() || undefined));
     if (datalists.labels) {
       replaceSafeHtml(
         datalists.labels,
-        catalog()
-          .map((item) => `<option value="${escapeHtml(item.label)}"></option>`)
-          .join("")
+        localized.map((item) => `<option value="${escapeHtml(item.label)}"></option>`).join("")
       );
     }
     if (datalists.codes) {
       replaceSafeHtml(
         datalists.codes,
-        catalog()
+        localized
           .map((item) => `<option value="${escapeHtml(item.code)}" label="${escapeHtml(item.name)}"></option>`)
           .join("")
       );
@@ -212,7 +222,7 @@ export function createLanguageInputService(options) {
     if (datalists.names) {
       replaceSafeHtml(
         datalists.names,
-        catalog()
+        localized
           .map((item) => `<option value="${escapeHtml(item.name)}" label="${escapeHtml(item.code)}"></option>`)
           .join("")
       );

@@ -398,7 +398,7 @@ function looksHuman(value) {
   if (/\b(?:function|const|let|var|return|=>|querySelector|classList|dataset)\b/.test(text)) return false;
   if (/[\[\]{}()]/.test(text) && /(?:=>|=|;|::|\.map|\.filter|\.join|data-|class=|id=)/.test(text)) return false;
   if (/^\[[^\]]+\](?::(?:checked|disabled|focus))?$/i.test(text)) return false;
-  if (/^[.#]?[a-z0-9_-]+$/i.test(text) && /[-_]/.test(text) && !/\s/.test(text)) return false;
+  if (/^[.#]?[a-z0-9_-]+$/.test(text) && /[-_]/.test(text) && !/\s/.test(text)) return false;
   if (/^[a-z][a-z0-9]*(?:\.[A-Za-z0-9][A-Za-z0-9-]*){2,}$/.test(text)) return false;
   if (/^[a-z]+\/[a-z0-9.+-]+$/i.test(text)) return false;
   if (/^[a-z0-9_.-]+\.(js|css|html|json|xml|docx|tmx|tbx|xlf|xliff|txt|md|png|svg|ico)$/i.test(text)) return false;
@@ -425,7 +425,7 @@ function extractHtml(messagesByText) {
   for (const match of withoutScripts.matchAll(/>([^<>]+)</g)) {
     add(messagesByText, decodeHtml(match[1]), "Static interface text from index.html.", "index.html");
   }
-  for (const match of withoutScripts.matchAll(/\s(placeholder|title|aria-label)="([^"]+)"/g)) {
+  for (const match of withoutScripts.matchAll(/\s(placeholder|title|aria-label|label)="([^"]+)"/g)) {
     add(messagesByText, decodeHtml(match[2]), `Static ${match[1]} attribute from index.html.`, "index.html");
   }
 }
@@ -468,6 +468,9 @@ function existingMessages() {
 
 function main() {
   const messagesByText = new Map();
+  for (const entry of require("./i18n-ui-extract.cjs").collectUiMessages(root)) {
+    messagesByText.set(entry.message, { description: entry.description, locations: entry.locations });
+  }
   extractHtml(messagesByText);
   extractScript(messagesByText, appPath, "app.js");
   extractScript(
@@ -732,6 +735,7 @@ function main() {
     const key = existingByMessage.get(message) || `auto.${slug(message)}.${hash(message)}`;
     const existingEntry = messages[key] || {};
     messages[key] = {
+      ...(existingEntry.localizeValues?.length ? { localizeValues: existingEntry.localizeValues } : {}),
       message,
       description: existingEntry.description || info.description || "",
       locations: Array.from(new Set([...(existingEntry.locations || []), ...info.locations])).sort()

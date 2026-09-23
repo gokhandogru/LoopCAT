@@ -21,7 +21,8 @@ export function createWorkspaceLayoutController({
   preferencesRepository,
   collectionDocument,
   onCollectionPreferenceError,
-  onInspectorPreference
+  onInspectorPreference,
+  translate = (text) => text
 }) {
   if (!documentRoot || !workspace || !preferencesRepository) {
     throw new TypeError("WorkspaceLayoutController requires roots and PreferencesRepository.");
@@ -48,7 +49,7 @@ export function createWorkspaceLayoutController({
       inspectorResizer.setAttribute("aria-valuemin", String(MIN_INSPECTOR_WIDTH));
       inspectorResizer.setAttribute("aria-valuemax", String(MAX_INSPECTOR_WIDTH));
       inspectorResizer.setAttribute("aria-valuenow", String(inspectorWidth));
-      inspectorResizer.setAttribute("aria-valuetext", `${inspectorWidth} pixels wide`);
+      inspectorResizer.setAttribute("aria-valuetext", translate(`${inspectorWidth} pixels wide`));
     }
     onInspectorPreference?.(inspectorOpen);
   }
@@ -95,7 +96,7 @@ export function createWorkspaceLayoutController({
           ? MIN_INSPECTOR_WIDTH
           : event.key === "End"
             ? MAX_INSPECTOR_WIDTH
-            : inspectorWidth + (event.key === "ArrowLeft" ? 16 : -16);
+            : inspectorWidth + (event.key === "ArrowLeft" ? 16 : -16) * (documentRoot.dir === "rtl" ? -1 : 1);
       void setInspectorWidth(next);
     });
     inspectorResizer.addEventListener("pointerdown", (event) => {
@@ -105,7 +106,8 @@ export function createWorkspaceLayoutController({
       const startWidth = inspectorWidth;
       inspectorResizer.setPointerCapture?.(event.pointerId);
       const move = (moveEvent) => {
-        void setInspectorWidth(startWidth + startX - moveEvent.clientX, { persist: false });
+        const delta = (startX - moveEvent.clientX) * (documentRoot.dir === "rtl" ? -1 : 1);
+        void setInspectorWidth(startWidth + delta, { persist: false });
       };
       const finish = () => {
         inspectorResizer.removeEventListener("pointermove", move);

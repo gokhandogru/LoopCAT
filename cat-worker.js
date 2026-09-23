@@ -186,11 +186,15 @@ function scoreTmEntries(entries, options = {}) {
 }
 
 function numberList(text) {
-  return (String(text || "").match(/\d+(?:[.,]\d+)?/g) || []).sort().join("|");
+  const normalized = String(text || "")
+    .replace(/[\u0660-\u0669\u06f0-\u06f9]/g, (digit) => String(digit.charCodeAt(0) & 15))
+    .replace(/\u066b/g, ".").replace(/\u066c/g, ",");
+  return (normalized.match(/\d+(?:[.,]\d+)?/g) || []).sort().join("|");
 }
 
 function endingPunctuation(text) {
-  return (String(text || "").trim().match(/[.!?\u3002\uff01\uff1f\u2026]$/u) || [""])[0];
+  const normalized = String(text || "").trim().replace(/\u061f$/, "?").replace(/\u06d4$/, ".");
+  return (normalized.match(/[.!?\u3002\uff01\uff1f\u2026]$/u) || [""])[0];
 }
 
 function containsTerm(text, term) {

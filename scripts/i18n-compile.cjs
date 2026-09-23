@@ -38,6 +38,17 @@ function main() {
     .filter((name) => name.endsWith(".json"))
     .sort()
     .forEach((name) => writeLocaleJs(path.join(localeDir, name)));
+  const { UI_MESSAGES } = require("../desktop/ui-localization.cjs");
+  const source = readJson(sourcePath);
+  const keys = new Map(Object.entries(source.messages).map(([key, entry]) => [entry.message, key]));
+  const native = {};
+  for (const name of fs.readdirSync(localeDir).filter((name) => name.endsWith(".json"))) {
+    const locale = readJson(path.join(localeDir, name));
+    native[locale.locale] = Object.fromEntries(
+      UI_MESSAGES.map((message) => [message, locale.messages[keys.get(message)] || message])
+    );
+  }
+  fs.writeFileSync(path.join(root, "desktop", "ui-catalogs.json"), `${JSON.stringify(native, null, 2)}\n`);
 }
 
 main();

@@ -16,7 +16,7 @@ Use this page to distinguish current product documentation from dated research a
 
 ## Release Records And Evidence
 
-- [Current development preview: 0.0.4-dev.20260913](releases/0.0.4-dev.20260913.md) — authoritative identity, changes, installation guidance, and verification limits.
+- [Current development preview: 0.0.4-dev.20260923](releases/0.0.4-dev.20260923.md) — authoritative identity, changes, installation guidance, and verification limits.
 - [Historical LoopCAT 0.0.3 prerelease](releases/0.0.3-prerelease.md) — July tag and superseded August mirror history.
 - [Release smoke evidence template](release-smoke-evidence-template.md) — required automated, artifact, platform, storage, signing, upgrade, and release-decision evidence.
 - [`downloads/`](../downloads/) — current repository web and unsigned Windows ZIP mirror plus SHA-256 checksums.
@@ -34,3 +34,5 @@ The internal software review and planning prompt are available in the repository
 - [Completion audit — 24 August 2026, repository state updated 25 August](modernization-completion-audit-2026-08-24.md)
 
 The automated implementation checkpoint is on `main`. The complete modernization and production-release claims remain blocked by the manual assistive-technology/zoom/visual matrix, controlled reference-device profiling, signed/notarized and clean-machine platform evidence, and the explicit 750 KB minified stretch-target decision.
+
+- [Arabic localization](arabic-localization.md) — translation sources, RTL behavior, and automated verification.

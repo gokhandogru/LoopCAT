@@ -165,7 +165,7 @@ for (const marker of ["runAppWorkflowTest", "app-workflow-test", "_TEST_FLAG", "
 
 for (const entry of entries.keys()) {
   const allowedScript = entry === "scripts/opus-cat-web-bridge.cjs";
-  const allowedGuide = entry === "docs/beginner-guide/index.html" || entry === "docs/beginner-guide/LoopCAT-Beginners-Guide.docx";
+  const allowedGuide = ["docs/beginner-guide/index.html", "docs/beginner-guide/ar.html", "docs/beginner-guide/LoopCAT-Beginners-Guide.docx"].includes(entry);
   if (
     /^(desktop|dist|dist-web|test-artifacts)\//i.test(entry) ||
     (/^docs\//i.test(entry) && !allowedGuide) ||

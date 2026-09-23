@@ -100,6 +100,7 @@ export function createInlineTagEditor(textarea, { detectTags }) {
       fragment.append(doc.createTextNode(text.slice(cursor, tag.index)));
       const chip = doc.createElement("span");
       chip.className = "tag-chip target-protected-tag";
+      chip.dir = "ltr";
       chip.contentEditable = "false";
       chip.textContent = tag.label || tag.text;
       chip.title = tag.text;

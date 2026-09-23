@@ -198,8 +198,8 @@ test("ReportDocumentCompositionService preserves complete normal and anonymized 
   const normal = service.projectReportHtml(data);
   const anonymized = service.projectReportHtml(data, { anonymized: true });
 
-  assert.equal(hash(normal), "8d1bed58355b927fc9541e7fe10b467af5b71a17ef7f08c215481b985509195b");
-  assert.equal(hash(anonymized), "f098d2fefffb16bbd7feaa0a8cce379a6ec7c9a50a558ab9ca73e4257f5ecbff");
+  assert.equal(hash(normal), "04164535fea017832eb2222404e2b70f10480cf08a7d1f980d568a13cf6c46a9");
+  assert.equal(hash(anonymized), "806010870e1b58cd1cefcafbde420922b3a283f8ccc5ddfbf3dc23ac3dc79c26");
   assert.match(normal, /^<!doctype html>\n<html lang="ca-ES" dir="rtl">/);
   assert.match(normal, /Content-Security-Policy/);
   assert.doesNotMatch(normal, /secret-[\w-]+/);
@@ -214,7 +214,7 @@ test("ReportDocumentCompositionService preserves the complete Quality Passport a
   const { service } = await createHarness();
   const output = service.qualityPassportHtml(fixtureData());
 
-  assert.equal(hash(output), "b4a665f0416515db9d81ba1a41c0cb65c7b1404055f8e1b167228a745c6b0512");
+  assert.equal(hash(output), "422503b2c6bb051f4f2dc0bdac16159abd638f18ec49b044c95d809f9f18ee37");
   assert.match(output, /^<!doctype html>\n<html lang="ca-ES" dir="rtl">/);
   assert.match(output, /L:LoopCAT Quality Passport/);
   assert.match(output, /<td>#20<\/td>/);

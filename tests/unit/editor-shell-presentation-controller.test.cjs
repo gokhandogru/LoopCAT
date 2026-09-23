@@ -409,7 +409,7 @@ test("EditorShellPresentationController preserves safe project metadata and info
   assert.equal(harness.elements.projectTitle.textContent, "safeText:Project <name>");
   assert.equal(
     harness.elements.projectMeta.textContent,
-    "English → Turkish - label:mainTm: safeText:Main TM - safeText:2 TMs - safeText:1 TB"
+    "English → Turkish - label:mainTm: safeText:Main TM - safeText:source:2 TMs - safeText:source:1 TB"
   );
   assert.equal(harness.elements.projectDomainEditInput.value, "Legal");
   assert.equal(harness.elements.projectInfo.html.includes("safeHtml:Project <name>"), true);

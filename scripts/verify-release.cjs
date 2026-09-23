@@ -3871,7 +3871,7 @@ for (const snippet of [
   "if (part.length === 2 || /^\\d{3}$/.test(part)) return part.toUpperCase()",
   'new intl.DisplayNames([getLocale() || getNavigatorLanguage() || "en"], { type: "language" })',
   '.normalize("NFKD")',
-  '.replace(/[^a-z0-9]+/g, "")',
+  '.replace(/[^\\p{L}\\p{N}]+/gu, "")',
   "if (catalogCache) return catalogCache",
   "if (entryNameCache) return entryNameCache",
   "const parentheticalCode = clean.match",
@@ -4704,9 +4704,9 @@ for (const testName of [
   );
 }
 for (const hash of [
-  "8d1bed58355b927fc9541e7fe10b467af5b71a17ef7f08c215481b985509195b",
-  "f098d2fefffb16bbd7feaa0a8cce379a6ec7c9a50a558ab9ca73e4257f5ecbff",
-  "b4a665f0416515db9d81ba1a41c0cb65c7b1404055f8e1b167228a745c6b0512"
+  "04164535fea017832eb2222404e2b70f10480cf08a7d1f980d568a13cf6c46a9",
+  "806010870e1b58cd1cefcafbde420922b3a283f8ccc5ddfbf3dc23ac3dc79c26",
+  "422503b2c6bb051f4f2dc0bdac16159abd638f18ec49b044c95d809f9f18ee37"
 ]) {
   assertIncludes(
     reportDocumentCompositionServiceUnitTests,
@@ -11508,7 +11508,7 @@ for (const snippet of [
   ".filter((range) => !tagMarkers.some((tagMarker) => rangesOverlap(range, tagMarker)))",
   '(left, right) => left.index - right.index || (left.type === "tag" ? -1 : 1)',
   'mark.className = "term-highlight"',
-  "Termbase: ${marker.range.term.sourceTerm} -> ${marker.range.term.targetTerm}",
+  'source("Termbase: {source} -> {target}", {',
   'targetCell?.classList.toggle("has-target-preview", Boolean(tags.length))',
   'preview.classList.toggle("hidden", !tags.length)',
   'targetCell?.classList.add("editing")',
@@ -26564,9 +26564,8 @@ assertIncludes(
   '["server", "start", "--port", "1234", "--bind", "127.0.0.1", "--cors"]',
   "desktop/main.cjs must start LM Studio with fixed local server arguments."
 );
-assertIncludes(
-  desktopPreload,
-  'contextBridge.exposeInMainWorld("LoopCATDesktop"',
+assert(
+  /contextBridge\.exposeInMainWorld\(\s*"LoopCATDesktop"/.test(desktopPreload),
   "desktop/preload.cjs must expose a narrow desktop bridge namespace."
 );
 assertIncludes(

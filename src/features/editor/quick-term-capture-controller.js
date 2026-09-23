@@ -6,8 +6,8 @@ function requireElement(value, label) {
 function wordAtCaret(value, caret) {
   const text = String(value || "");
   const position = Math.max(0, Math.min(text.length, Number(caret) || 0));
-  const left = text.slice(0, position).match(/[\p{L}\p{N}_'-]+$/u)?.[0] || "";
-  const right = text.slice(position).match(/^[\p{L}\p{N}_'-]+/u)?.[0] || "";
+  const left = text.slice(0, position).match(/[\p{L}\p{M}\p{N}_'-]+$/u)?.[0] || "";
+  const right = text.slice(position).match(/^[\p{L}\p{M}\p{N}_'-]+/u)?.[0] || "";
   return left + right;
 }
 

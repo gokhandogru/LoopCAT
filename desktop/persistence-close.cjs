@@ -1,7 +1,10 @@
 const fs = require("node:fs/promises");
 const { randomUUID, createHash } = require("node:crypto");
 
-function attachPersistenceClose(window, { ipcMain, dialog, isAllowedRequest, timeoutMs = 15000 }) {
+function attachPersistenceClose(
+  window,
+  { ipcMain, dialog, isAllowedRequest, timeoutMs = 15000, translate = (text) => text }
+) {
   let permitted = false;
   let pending = null;
   let showingFailure = false;
@@ -10,10 +13,10 @@ function attachPersistenceClose(window, { ipcMain, dialog, isAllowedRequest, tim
     showingFailure = true;
     const choice = await dialog.showMessageBox(window, {
       type: "warning",
-      title: "Output is not fully saved",
-      message: "LoopCAT could not confirm that local saving finished.",
-      detail: "Retry saving, export the current targets, or explicitly exit. Cancel keeps the editor open.",
-      buttons: ["Retry", "Emergency Export", "Exit without saving", "Cancel"],
+      title: translate("Output is not fully saved"),
+      message: translate("LoopCAT could not confirm that local saving finished."),
+      detail: translate("Retry saving, export the current targets, or explicitly exit. Cancel keeps the editor open."),
+      buttons: ["Retry", "Emergency Export", "Exit without saving", "Cancel"].map(translate),
       defaultId: 0,
       cancelId: 3
     });
@@ -49,7 +52,7 @@ function attachPersistenceClose(window, { ipcMain, dialog, isAllowedRequest, tim
       try {
         if (typeof message.text !== "string") throw new Error("Emergency output is unavailable.");
         const picked = await dialog.showSaveDialog(window, {
-          title: "Save emergency bilingual output",
+          title: translate("Save emergency bilingual output"),
           defaultPath: "loopcat-emergency.txt"
         });
         if (picked.canceled || !picked.filePath) {
@@ -77,7 +80,7 @@ function attachPersistenceClose(window, { ipcMain, dialog, isAllowedRequest, tim
         await fs.rename(temporary, picked.filePath);
         await dialog.showMessageBox(window, {
           type: "info",
-          message: "Emergency export verified. The editor remains open."
+          message: translate("Emergency export verified. The editor remains open.")
         });
         window.webContents.send("loopcat:prepare-close", { id: randomUUID(), mode: "resume" });
       } catch {

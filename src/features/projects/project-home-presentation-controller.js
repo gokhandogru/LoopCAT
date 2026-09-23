@@ -74,7 +74,7 @@ export function createProjectHomePresentationController(options) {
     const sourceWords = total.words;
     const resourceSummary = resources.summary();
     elements.title.textContent = text.displaySafeText(session.getProject().name);
-    elements.meta.textContent = `${language.display()} - ${text.displaySafeText(session.getProject().domain || localization.label("noDomain"))} - ${localization.label("mainTm")}: ${text.displaySafeText(resourceSummary.mainTm, localization.label("none"))} - ${text.displaySafeText(resourceSummary.tmLabel)} - ${text.displaySafeText(resourceSummary.tbLabel)}`;
+    elements.meta.textContent = `${language.display()} - ${text.displaySafeText(session.getProject().domain || localization.label("noDomain"))} - ${localization.label("mainTm")}: ${text.displaySafeText(resourceSummary.mainTm, localization.label("none"))} - ${text.displaySafeText(localization.source(resourceSummary.tmLabel))} - ${text.displaySafeText(localization.source(resourceSummary.tbLabel))}`;
     presentation.replaceSafeHtml(
       elements.stats,
       `

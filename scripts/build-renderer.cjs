@@ -48,7 +48,14 @@ function productionSourcePlugin() {
         const messages = Object.fromEntries(
           Object.entries(catalog.messages || {})
             .filter(([key]) => !testOnlyMessageKeys.has(key))
-            .map(([key, value]) => [key, sourceFile ? String(value?.message || value || "") : value])
+            .map(([key, value]) => [
+              key,
+              sourceFile
+                ? value?.localizeValues?.length
+                  ? { message: String(value.message), localizeValues: value.localizeValues }
+                  : String(value?.message || value || "")
+                : value
+            ])
         );
         const method = sourceFile ? "registerSource" : "registerLocale";
         return {

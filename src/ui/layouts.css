@@ -3,6 +3,46 @@ body.liquid-glass-edition {
   overflow: hidden;
 }
 
+html[dir="rtl"] {
+  --font-sans: "Segoe UI", Tahoma, Arial, sans-serif;
+}
+
+html[dir="rtl"] .project-toolbar p,
+html[dir="rtl"] .project-toolbar h2 {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+
+html[dir="rtl"] .liquid-glass-edition .inspector-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+html[dir="rtl"] .liquid-glass-edition .inspector-tabs button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+  min-height: 36px;
+}
+
+html[dir="rtl"] .liquid-glass-edition .workspace-menu-panel,
+html[dir="rtl"] .liquid-glass-edition .segment-options-menu > .menu-panel {
+  right: auto;
+  left: var(--space-4);
+}
+
+html[dir="rtl"] :is(code, kbd, input[type="url"], input[type="password"]) {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.source-cell,
+.target-editor,
+.target-tag-preview {
+  text-align: start;
+  unicode-bidi: plaintext;
+}
+
 .liquid-glass-edition .app-shell {
   height: 100dvh;
   min-height: 0;
@@ -82,7 +122,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .project-rail,
 .liquid-glass-edition .sidebar {
   border: 0;
-  border-right: 1px solid var(--color-line);
+  border-inline-end: 1px solid var(--color-line);
   border-radius: 0;
   background: var(--color-surface-subtle);
   box-shadow: var(--elevation-none);
@@ -122,14 +162,27 @@ body.liquid-glass-edition {
   display: none;
 }
 
+.liquid-glass-edition .inspector-close {
+  display: none;
+}
+
+@media (max-width: 1099px) {
+  .liquid-glass-edition .inspector-close {
+    display: block;
+    margin-block-end: var(--space-2);
+    margin-inline-start: auto;
+    white-space: normal;
+  }
+}
+
 .liquid-glass-edition .sidebar {
   position: relative;
   grid-column: auto;
   display: flex;
   height: 100%;
   max-height: none;
-  border-right: 0;
-  border-left: 1px solid var(--color-line);
+  border-inline-end: 0;
+  border-inline-start: 1px solid var(--color-line);
 }
 
 .liquid-glass-edition .inspector-resizer {
@@ -137,7 +190,7 @@ body.liquid-glass-edition {
   z-index: 3;
   top: 0;
   bottom: 0;
-  left: -5px;
+  inset-inline-start: -5px;
   width: 10px;
   cursor: col-resize;
   touch-action: none;
@@ -147,7 +200,7 @@ body.liquid-glass-edition {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 4px;
+  inset-inline-start: 4px;
   width: 2px;
   background: transparent;
   content: "";
@@ -166,6 +219,17 @@ body.liquid-glass-edition {
   border-radius: 0;
   background: var(--color-surface);
   box-shadow: var(--elevation-none);
+}
+
+@media (max-height: 600px), (max-width: 799px) {
+  .liquid-glass-edition .editor-view {
+    overflow-y: auto;
+  }
+
+  .liquid-glass-edition .segment-grid-wrap {
+    flex-shrink: 0;
+    min-height: 240px;
+  }
 }
 
 .liquid-glass-edition .segment-controls {
@@ -428,10 +492,11 @@ body.liquid-glass-edition {
   .liquid-glass-edition .workspace:not(.projects-mode) .sidebar {
     position: absolute;
     z-index: 20;
-    inset: 0 0 0 auto;
+    inset-block: 0;
+    inset-inline: auto 0;
     display: block;
     width: min(360px, calc(100vw - var(--space-8)));
-    border-left: 1px solid var(--color-line);
+    border-inline-start: 1px solid var(--color-line);
     box-shadow: var(--elevation-transient);
   }
 
@@ -521,10 +586,11 @@ body.liquid-glass-edition {
   .liquid-glass-edition .workspace:not(.projects-mode) .sidebar {
     position: absolute;
     z-index: 20;
-    inset: 0 0 0 var(--space-4);
+    inset-block: 0;
+    inset-inline: var(--space-4) 0;
     display: block;
     width: auto;
-    border-left: 1px solid var(--color-line);
+    border-inline-start: 1px solid var(--color-line);
     box-shadow: var(--elevation-transient);
   }
 

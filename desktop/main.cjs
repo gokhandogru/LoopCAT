@@ -7,6 +7,8 @@ const { loadRuntimeSettings, saveRuntimeSettings } = require("./runtime-settings
 const { createProtectedCredentials } = require("./protected-credentials.cjs");
 const { attachPersistenceClose } = require("./persistence-close.cjs");
 const { createVerifiedExports } = require("./verified-export.cjs");
+const { createNativeLocalization } = require("./ui-localization.cjs");
+const nativeUi = createNativeLocalization(require("./ui-catalogs.json"));
 // A normal launch reads the atomically committed database. Reconstruction is
 // reserved for the renderer-crash route and explicit recovery operations.
 let journalRecoveryNeeded = false;
@@ -89,7 +91,11 @@ const ALLOWED_APP_FILES = new Set(LOOPCAT_RUNTIME_ASSETS);
 const DEVELOPMENT_RENDERER = path.join(APP_ROOT, ".cache", "renderer", "production");
 const DEVELOPMENT_FILES = new Map();
 if (app && !app.isPackaged && fs.existsSync(path.join(DEVELOPMENT_RENDERER, "assets.json"))) {
-  for (const name of [...JSON.parse(fs.readFileSync(path.join(DEVELOPMENT_RENDERER, "assets.json"), "utf8")), "index.html", "config/production-assets.js"]) {
+  for (const name of [
+    ...JSON.parse(fs.readFileSync(path.join(DEVELOPMENT_RENDERER, "assets.json"), "utf8")),
+    "index.html",
+    "config/production-assets.js"
+  ]) {
     DEVELOPMENT_FILES.set(name, path.join(DEVELOPMENT_RENDERER, name === "index.html" ? "desktop-index.html" : name));
     ALLOWED_APP_FILES.add(name);
   }
@@ -447,7 +453,7 @@ function createApplicationMenu() {
       submenu: [{ role: "minimize" }, { role: "zoom" }]
     }
   ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  Menu.setApplicationMenu(Menu.buildFromTemplate(nativeUi.menu(template)));
 }
 
 function isLoopcatUrl(url) {
@@ -504,6 +510,61 @@ function isExternalHttpsUrl(url) {
   } catch {
     return false;
   }
+}
+
+function isBundledGuideUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === `${APP_SCHEME}:` &&
+      parsed.hostname === APP_HOST &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.port &&
+      !parsed.search &&
+      ["/docs/beginner-guide/index.html", "/docs/beginner-guide/ar.html"].includes(parsed.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function openBundledGuide(url, parent) {
+  if (!isBundledGuideUrl(url)) return false;
+  const guide = new BrowserWindow({
+    width: 1100,
+    height: 850,
+    parent,
+    title: "LoopCAT",
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true }
+  });
+  const openLink = (target) => {
+    try {
+      const parsed = new URL(target);
+      if (
+        parsed.origin === "https://github.com" &&
+        !parsed.username &&
+        !parsed.password &&
+        !parsed.search &&
+        ["/gokhandogru/LoopCAT", "/gokhandogru/LoopCAT/releases"].includes(parsed.pathname)
+      ) {
+        void shell.openExternal(parsed.href);
+      }
+    } catch {
+      /* Ignore malformed links. */
+    }
+  };
+  guide.webContents.setWindowOpenHandler(({ url: target }) => {
+    openLink(target);
+    return { action: "deny" };
+  });
+  guide.webContents.on("will-navigate", (event, target) => {
+    if (isBundledGuideUrl(target)) return;
+    event.preventDefault();
+    openLink(target);
+  });
+  void guide.loadURL(url);
+  return true;
 }
 
 function lmStudioCliCandidates(platform = process.platform, env = process.env, homeDir = os.homedir()) {
@@ -630,15 +691,34 @@ function configureDesktopBridge() {
     journalRecoveryNeeded = false;
     return { needed };
   });
-  const exports = createVerifiedExports({ dialog: electronRuntime.dialog, windowFor: (sender) => BrowserWindow.fromWebContents(sender) });
-  for (const [channel, operation] of [["begin-export", "begin"], ["write-export-chunk", "write"], ["finish-export", "finish"], ["abort-export", "abort"]]) {
+  const exports = createVerifiedExports({
+    dialog: electronRuntime.dialog,
+    windowFor: (sender) => BrowserWindow.fromWebContents(sender),
+    translate: nativeUi.translate
+  });
+  ipcMain.handle("loopcat:set-ui-locale", (event, locale) => {
+    if (!isAllowedDesktopBridgeRequest(event) || typeof locale !== "string" || locale.length > 35) return { ok: false };
+    const resolved = nativeUi.setLocale(locale);
+    createApplicationMenu();
+    return { ok: true, locale: resolved };
+  });
+  for (const [channel, operation] of [
+    ["begin-export", "begin"],
+    ["write-export-chunk", "write"],
+    ["finish-export", "finish"],
+    ["abort-export", "abort"]
+  ]) {
     ipcMain.handle(`loopcat:${channel}`, (event, request) => {
       if (!isAllowedDesktopBridgeRequest(event)) throw new Error("Export request rejected.");
       return exports[operation](event.sender, operation === "abort" ? request.id : request);
     });
   }
-  const credentials = createProtectedCredentials({ directory: app.getPath("userData"), safeStorage: electronRuntime.safeStorage,
-    fetchImpl: (...args) => net.fetch(...args), isAllowedUrl: isAllowedNetworkRequest });
+  const credentials = createProtectedCredentials({
+    directory: app.getPath("userData"),
+    safeStorage: electronRuntime.safeStorage,
+    fetchImpl: (...args) => net.fetch(...args),
+    isAllowedUrl: isAllowedNetworkRequest
+  });
   ipcMain.handle("loopcat:save-credential", (event, request) => {
     if (!isAllowedDesktopBridgeRequest(event)) throw new Error("Credential request rejected.");
     return credentials.save(request);
@@ -1173,7 +1253,8 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
       result.collectionViewProbe.restored = editorWorkflow.viewsRestored;
       // Drive Chromium's native key handling as well as synthetic input events.
       // The hidden smoke window does not require taking focus from the user.
-      await mainWindow.webContents.executeJavaScript(`(async () => {
+      await mainWindow.webContents.executeJavaScript(
+        `(async () => {
         const field = document.querySelector("#segmentBody .target-editor");
         field.click();
         field.focus();
@@ -1186,15 +1267,21 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
         window.__desktopKeyProbe = [];
         for (const eventType of ["keydown", "beforeinput", "input"]) field.addEventListener(eventType,
           (event) => window.__desktopKeyProbe.push({ type: event.type, key: event.key, inputType: event.inputType }));
-      })()`, true);
+      })()`,
+        true
+      );
       mainWindow.webContents.debugger.attach("1.3");
       try {
         for (const type of ["keyDown", "keyUp"]) {
           await mainWindow.webContents.debugger.sendCommand("Input.dispatchKeyEvent", {
-            type, key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8
+            type,
+            key: "Backspace",
+            code: "Backspace",
+            windowsVirtualKeyCode: 8
           });
         }
-        result.nativeTagDeletionProbe = await mainWindow.webContents.executeJavaScript(`(async () => {
+        result.nativeTagDeletionProbe = await mainWindow.webContents.executeJavaScript(
+          `(async () => {
           const expected = ${JSON.stringify(editorWorkflow.tagEditingProbe.finalTarget)}.replace("<g id='friend'>", "");
           const deadline = Date.now() + 3000;
           while (Date.now() < deadline) {
@@ -1203,9 +1290,12 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
           }
           return { passed: false, value: document.querySelector("#segmentBody .target-editor").value,
             events: window.__desktopKeyProbe, activeElement: document.activeElement?.tagName };
-        })()`, true);
+        })()`,
+          true
+        );
         result.workflowProbe.nativeTagDeletionPassed = result.nativeTagDeletionProbe.passed;
-        result.tagSuggestionProbe = await mainWindow.webContents.executeJavaScript(`(async () => {
+        result.tagSuggestionProbe = await mainWindow.webContents.executeJavaScript(
+          `(async () => {
           const field = document.querySelector("#segmentBody .target-editor");
           field.setSelectionRange(4, 4);
           const before = field.value;
@@ -1225,19 +1315,25 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
             await new Promise(resolve => setTimeout(resolve, 25));
           }
           return { passed: false };
-        })()`, true);
+        })()`,
+          true
+        );
         await mainWindow.webContents.debugger.sendCommand("Input.insertText", { text: "TEST" });
-        result.nativeInlineTypingProbe = await mainWindow.webContents.executeJavaScript(`(() => {
+        result.nativeInlineTypingProbe = await mainWindow.webContents.executeJavaScript(
+          `(() => {
           const field = document.querySelector("#segmentBody .target-editor");
           const chips = Array.from(field.querySelectorAll(".target-protected-tag"));
           const greenChips = chips.length === 2 && chips.every(chip =>
             chip.contentEditable === "false" && getComputedStyle(chip).backgroundColor === "rgb(224, 244, 233)");
           return { passed: field.value === window.__inlineTagExpected && greenChips,
             value: field.value, expected: window.__inlineTagExpected, greenChips, events: window.__inlineDebug };
-        })()`, true);
+        })()`,
+          true
+        );
         result.workflowProbe.tagSuggestionCaretPassed = result.tagSuggestionProbe.passed;
         result.workflowProbe.nativeInlineTypingPassed = result.nativeInlineTypingProbe.passed;
-        result.inlineClipboardProbe = await mainWindow.webContents.executeJavaScript(`(() => {
+        result.inlineClipboardProbe = await mainWindow.webContents.executeJavaScript(
+          `(() => {
           const field = document.querySelector("#segmentBody .target-editor");
           const original = field.value;
           const token = "<g id='friend'>";
@@ -1252,19 +1348,27 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
           field.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: clipboard }));
           return { passed: copiedRawMarkup && cutWholeTag && field.value === original &&
             !field.querySelector("img") && !window.__unsafeInlinePaste, copiedRawMarkup, cutWholeTag };
-        })()`, true);
+        })()`,
+          true
+        );
         result.workflowProbe.inlineClipboardPassed = result.inlineClipboardProbe.passed;
         await mainWindow.webContents.debugger.sendCommand("Input.imeSetComposition", {
-          text: "ığ", selectionStart: 2, selectionEnd: 2
+          text: "ığ",
+          selectionStart: 2,
+          selectionEnd: 2
         });
-        result.inlineCompositionProbe = await mainWindow.webContents.executeJavaScript(`(() => {
+        result.inlineCompositionProbe = await mainWindow.webContents.executeJavaScript(
+          `(() => {
           const field = document.querySelector("#segmentBody .target-editor");
           return { passed: field.querySelectorAll('.target-protected-tag[contenteditable="false"]').length === 2 &&
             field.value.includes("<g id='friend'>ığTEST") };
-        })()`, true);
+        })()`,
+          true
+        );
         await mainWindow.webContents.debugger.sendCommand("Input.insertText", { text: "ığ" });
         result.workflowProbe.inlineCompositionPassed = result.inlineCompositionProbe.passed;
-        result.sourceTagSuggestionProbe = await mainWindow.webContents.executeJavaScript(`(async () => {
+        result.sourceTagSuggestionProbe = await mainWindow.webContents.executeJavaScript(
+          `(async () => {
           const field = document.querySelector("#segmentBody .target-editor");
           const before = field.value;
           field.setSelectionRange(before.length, before.length);
@@ -1279,15 +1383,23 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
             await new Promise(resolve => setTimeout(resolve, 25));
           }
           return { passed: false };
-        })()`, true);
+        })()`,
+          true
+        );
         result.workflowProbe.sourceTagSuggestionPassed = result.sourceTagSuggestionProbe.passed;
         for (const key of ["z", "y"]) {
-          for (const type of ["keyDown", "keyUp"]) await mainWindow.webContents.debugger.sendCommand("Input.dispatchKeyEvent", {
-            type, key: "z", code: "KeyZ", modifiers: key === "z" ? 2 : 10, windowsVirtualKeyCode: 90
-          });
+          for (const type of ["keyDown", "keyUp"])
+            await mainWindow.webContents.debugger.sendCommand("Input.dispatchKeyEvent", {
+              type,
+              key: "z",
+              code: "KeyZ",
+              modifiers: key === "z" ? 2 : 10,
+              windowsVirtualKeyCode: 90
+            });
           const expected = key === "z" ? result.sourceTagSuggestionProbe.before : result.sourceTagSuggestionProbe.after;
           result.workflowProbe[key === "z" ? "inlineUndoPassed" : "inlineRedoPassed"] =
-            await mainWindow.webContents.executeJavaScript(`(async () => {
+            await mainWindow.webContents.executeJavaScript(
+              `(async () => {
               const deadline = Date.now() + 3000;
               while (Date.now() < deadline) {
                 const stored = await window.CatHan.project.getProjectSegments(${JSON.stringify(result.confirmationProjectId)});
@@ -1298,17 +1410,22 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
                 await new Promise(resolve => setTimeout(resolve, 25));
               }
               return false;
-            })()`, true);
+            })()`,
+              true
+            );
         }
         if (process.env.LOOPCAT_DESKTOP_SMOKE_SCREENSHOT) {
-          await new Promise(resolve => { setTimeout(resolve, 300); });
+          await new Promise((resolve) => {
+            setTimeout(resolve, 300);
+          });
           const capture = await mainWindow.webContents.capturePage();
           fs.writeFileSync(process.env.LOOPCAT_DESKTOP_SMOKE_SCREENSHOT, capture.toPNG());
         }
       } finally {
         mainWindow.webContents.debugger.detach();
       }
-      await mainWindow.webContents.executeJavaScript(`(async () => {
+      await mainWindow.webContents.executeJavaScript(
+        `(async () => {
         document.querySelector("#projectsViewBtn").click();
         const deadline = Date.now() + 10000;
         while (document.querySelector("#projectsView").classList.contains("hidden")) {
@@ -1316,11 +1433,19 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
           await new Promise((resolve) => setTimeout(resolve, 50));
         }
         await window.CatHan.project.deleteProject(${JSON.stringify(result.confirmationProjectId)});
-      })()`, true);
+      })()`,
+        true
+      );
       const missing = [];
       if (!result.workflowProbe.tagSuggestionCaretPassed) missing.push("caret after suggested tag");
       if (!result.workflowProbe.nativeInlineTypingPassed) missing.push("green protected chips during native typing");
-      for (const probe of ["inlineClipboardPassed", "inlineCompositionPassed", "sourceTagSuggestionPassed", "inlineUndoPassed", "inlineRedoPassed"]) {
+      for (const probe of [
+        "inlineClipboardPassed",
+        "inlineCompositionPassed",
+        "sourceTagSuggestionPassed",
+        "inlineUndoPassed",
+        "inlineRedoPassed"
+      ]) {
         if (!result.workflowProbe[probe]) missing.push(probe);
       }
       for (const [key, label] of [
@@ -1351,9 +1476,12 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
       if (!result?.workflowProbe?.docxTargetExported) missing.push("DOCX target export");
       if (!result?.workflowProbe?.bilingualDocxGenerated) missing.push("bilingual DOCX generation");
       if (!result?.workflowProbe?.backupIncludesSavedTargets) missing.push("backup includes saved targets");
-      if (!result?.workflowProbe?.editorConfirmationPassed) missing.push("two typed segments confirm without save conflicts");
-      if (!result?.workflowProbe?.protectedTagEditingPassed) missing.push("active target tags stay immutable while whole tags can be moved");
-      if (!result?.workflowProbe?.nativeTagDeletionPassed) missing.push("native Backspace removes a whole protected tag");
+      if (!result?.workflowProbe?.editorConfirmationPassed)
+        missing.push("two typed segments confirm without save conflicts");
+      if (!result?.workflowProbe?.protectedTagEditingPassed)
+        missing.push("active target tags stay immutable while whole tags can be moved");
+      if (!result?.workflowProbe?.nativeTagDeletionPassed)
+        missing.push("native Backspace removes a whole protected tag");
       if (!result?.collectionViewProbe?.saved || !result?.collectionViewProbe?.restored)
         missing.push("card/list choices persist across reload for every collection scope");
       if (!result?.appShellAssetProbe?.index?.fetchOk) missing.push("packaged index.html fetch");
@@ -1549,7 +1677,7 @@ function buildSpellCheckerContextMenuTemplate(params = {}) {
     }
     template.push({ type: "separator" });
     template.push({
-      label: `Add "${String(params.misspelledWord).slice(0, 40)}" to dictionary`,
+      label: nativeUi.translate('Add "{word}" to dictionary', { word: String(params.misspelledWord).slice(0, 40) }),
       spellcheckAddWord: String(params.misspelledWord)
     });
     template.push({ type: "separator" });
@@ -1563,7 +1691,7 @@ function buildSpellCheckerContextMenuTemplate(params = {}) {
     { role: "paste" },
     { role: "selectAll" }
   );
-  return template;
+  return nativeUi.menu(template);
 }
 
 function attachSpellCheckerContextMenu(mainWindow) {
@@ -1621,6 +1749,7 @@ function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (openBundledGuide(url, mainWindow)) return { action: "deny" };
     openExternalUrl(url);
     return { action: "deny" };
   });
@@ -1631,7 +1760,13 @@ function createWindow() {
     openExternalUrl(url);
   });
   attachSpellCheckerContextMenu(mainWindow);
-  if (!DESKTOP_SMOKE_MODE) attachPersistenceClose(mainWindow, { ipcMain, dialog: electronRuntime.dialog, isAllowedRequest: isAllowedDesktopBridgeRequest });
+  if (!DESKTOP_SMOKE_MODE)
+    attachPersistenceClose(mainWindow, {
+      ipcMain,
+      dialog: electronRuntime.dialog,
+      isAllowedRequest: isAllowedDesktopBridgeRequest,
+      translate: nativeUi.translate
+    });
 
   if (DESKTOP_SMOKE_MODE) {
     attachDesktopSmokeProbe(mainWindow);
@@ -1646,7 +1781,10 @@ function createWindow() {
 }
 
 function boot() {
-  if (!app.requestSingleInstanceLock()) { app.quit(); return; }
+  if (!app.requestSingleInstanceLock()) {
+    app.quit();
+    return;
+  }
   app.on("second-instance", () => {
     const existing = BrowserWindow.getAllWindows()[0];
     if (existing?.isMinimized()) existing.restore();
@@ -1660,6 +1798,7 @@ function boot() {
     configureSpellChecker();
     configureSpellCheckerBridge();
     configureDesktopBridge();
+    nativeUi.setLocale(app.getLocale?.() || "en-US");
     createApplicationMenu();
     createWindow();
 
@@ -1725,6 +1864,7 @@ module.exports = {
   isLoopcatUrl,
   isLoopcatOrigin,
   isAllowedAppNavigationUrl,
+  isBundledGuideUrl,
   isExternalHttpsUrl,
   lmStudioCliCandidates,
   runLmStudioStartCommand,

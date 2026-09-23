@@ -10,6 +10,8 @@ test("locale loader resolves language fallbacks and loads only the active bundle
   const { createLocaleLoader, matchingLocale } = await moduleAt("src/i18n/locale-loader.js");
   assert.equal(matchingLocale("tr"), "tr-TR");
   assert.equal(matchingLocale("ca-FR"), "ca-ES");
+  assert.equal(matchingLocale("ar-EG"), "ar");
+  assert.equal(matchingLocale("ar-SA"), "ar");
   const registered = [];
   const loaded = [];
   const loader = createLocaleLoader({
@@ -26,5 +28,5 @@ test("locale loader resolves language fallbacks and loads only the active bundle
   });
   assert.equal(await loader.initialize(), "tr-TR");
   assert.deepEqual(loaded, ["tr-TR"]);
-  assert.deepEqual(registered, ["en-US", "ca-ES", "tr-TR"]);
+  assert.deepEqual(registered, ["en-US", "ca-ES", "tr-TR", "ar"]);
 });

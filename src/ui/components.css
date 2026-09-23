@@ -390,7 +390,7 @@
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  text-align: left;
+  text-align: start;
 }
 
 .liquid-glass-edition .command-item.active:not(:disabled),
@@ -582,7 +582,7 @@
 
 .liquid-glass-edition .ai-contextual-actions button {
   min-width: 0;
-  text-align: left;
+  text-align: start;
 }
 
 .liquid-glass-edition #contextualAiCancelBtn {

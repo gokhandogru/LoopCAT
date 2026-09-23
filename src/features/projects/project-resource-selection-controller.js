@@ -77,6 +77,13 @@ export function createProjectResourceSelectionController(options) {
   let accepted = false;
   let availableById = new Map();
 
+  function defaultResourceName(type) {
+    const translate =
+      localization.source || ((text, values = {}) => text.replace(/\{(\w+)\}/g, (_, key) => values[key] || ""));
+    const name = String(elements.projectNameInput?.value || "").trim() || translate("New project");
+    return translate(type === "tm" ? "{name} TM" : "{name} terminology", { name });
+  }
+
   function listen(target, type, listener) {
     if (!target?.addEventListener) return;
     target.addEventListener(type, listener);
@@ -219,7 +226,6 @@ export function createProjectResourceSelectionController(options) {
           : writable[0]?.resourceId || null
       };
     }
-    const base = projectBaseName(elements.projectNameInput?.value);
     const plan = {
       configured: false,
       reviewed: false,
@@ -229,8 +235,8 @@ export function createProjectResourceSelectionController(options) {
       activeTermBaseId: null
     };
     workingPlan = plan;
-    const tm = draftResource("tm", `${base} TM`);
-    const tb = draftResource("termbase", `${base} terminology`);
+    const tm = draftResource("tm", defaultResourceName("tm"));
+    const tb = draftResource("termbase", defaultResourceName("termbase"));
     plan.resourceLinks.push(linkFor(tm, "tm"), linkFor(tb, "termbase"));
     plan.activeTermBaseId = tb.id;
     return plan;
@@ -284,11 +290,13 @@ export function createProjectResourceSelectionController(options) {
       resource.name.toLocaleLowerCase().includes(elements.searchInput.value.trim().toLocaleLowerCase());
     if (!matchesSearch) return "";
     const escapedId = presentation.escapeHtml(id);
+    const countLabel = localization.label(type === "tm" ? "unitCount" : "termCount", { count });
+    const updatedLabel = localization.label("updatedAt", { date: updated });
     const controls =
       type === "tm"
         ? `<label><input type="radio" name="resourceMainTm" data-policy="main" data-resource-id="${escapedId}" ${link?.role === "main" ? "checked" : ""} ${selected ? "" : "disabled"}> Main</label><label><input type="checkbox" data-policy="lookup" data-resource-id="${escapedId}" ${link?.lookup !== false ? "checked" : ""} ${selected ? "" : "disabled"}> Lookup</label><label>Penalty <input type="number" min="0" max="30" value="${link?.penalty || 0}" data-policy="penalty" data-resource-id="${escapedId}" ${selected ? "" : "disabled"}></label>`
         : `<label><input type="checkbox" data-policy="lookup" data-resource-id="${escapedId}" ${link?.lookup !== false ? "checked" : ""} ${selected ? "" : "disabled"}> Lookup</label><label><input type="checkbox" data-policy="qa" data-resource-id="${escapedId}" ${link?.qa !== false ? "checked" : ""} ${selected ? "" : "disabled"}> QA</label><label><input type="checkbox" data-policy="contribute" data-resource-id="${escapedId}" ${link?.contribute ? "checked" : ""} ${selected ? "" : "disabled"}> Allow contribution</label><label><input type="radio" name="activeTermbase" data-policy="active" data-resource-id="${escapedId}" ${workingPlan?.activeTermBaseId === id ? "checked" : ""} ${selected && link?.contribute ? "" : "disabled"}> Active</label>`;
-    return `<div class="resource-policy-row" data-policy-row="${escapedId}"><div class="resource-policy-identity"><label><input type="checkbox" data-policy="selected" data-resource-type="${type}" data-resource-id="${escapedId}" data-resource-name="${presentation.escapeHtml(resource.name)}" ${selected ? "checked" : ""}> <strong>${presentation.displaySafeHtml(resource.name)}</strong></label><div class="resource-policy-meta"><span>${count} ${type === "tm" ? "units" : "terms"} · Updated ${presentation.escapeHtml(updated)}</span>${resource.draft ? '<span class="resource-policy-badge">New — created with project</span>' : ""}</div></div><div class="resource-policy-controls">${controls}${selected ? `<button type="button" data-policy="up" data-resource-id="${escapedId}" aria-label="Move ${presentation.escapeHtml(resource.name)} up">↑</button><button type="button" data-policy="down" data-resource-id="${escapedId}" aria-label="Move ${presentation.escapeHtml(resource.name)} down">↓</button>` : ""}</div></div>`;
+    return `<div class="resource-policy-row" data-policy-row="${escapedId}"><div class="resource-policy-identity"><label><input type="checkbox" data-policy="selected" data-resource-type="${type}" data-resource-id="${escapedId}" data-resource-name="${presentation.escapeHtml(resource.name)}" ${selected ? "checked" : ""}> <strong>${presentation.displaySafeHtml(resource.name)}</strong></label><div class="resource-policy-meta"><span>${presentation.escapeHtml(countLabel)} · ${presentation.escapeHtml(updatedLabel)}</span>${resource.draft ? '<span class="resource-policy-badge">New — created with project</span>' : ""}</div></div><div class="resource-policy-controls">${controls}${selected ? `<button type="button" data-policy="up" data-resource-id="${escapedId}" aria-label="Move ${presentation.escapeHtml(resource.name)} up">↑</button><button type="button" data-policy="down" data-resource-id="${escapedId}" aria-label="Move ${presentation.escapeHtml(resource.name)} down">↓</button>` : ""}</div></div>`;
   }
 
   function renderPolicies() {
@@ -348,7 +356,12 @@ export function createProjectResourceSelectionController(options) {
         ? "The language pair changed. Review Optional Resource Settings before saving."
         : plan
           ? "Resource choices are kept as a draft until you save the project."
-          : `If you continue unchanged, LoopCAT will create “${base} TM” and “${base} terminology”.`;
+          : localization.source
+            ? localization.source("If you continue unchanged, LoopCAT will create “{tm}” and “{tb}”.", {
+                tm: defaultResourceName("tm"),
+                tb: defaultResourceName("termbase")
+              })
+            : `If you continue unchanged, LoopCAT will create “${base} TM” and “${base} terminology”.`;
       elements.defaultNotice.classList?.toggle?.("validation-error", Boolean(incompatible));
     }
   }
@@ -504,7 +517,7 @@ export function createProjectResourceSelectionController(options) {
     if (link.type === "tm") {
       let remaining = selectedLinks("tm");
       if (!remaining.length) {
-        const resource = draftResource("tm", `${projectBaseName(elements.projectNameInput?.value)} TM`);
+        const resource = draftResource("tm", defaultResourceName("tm"));
         workingPlan.resourceLinks.push(linkFor(resource, "tm"));
         remaining = selectedLinks("tm");
       }

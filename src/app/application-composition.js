@@ -1627,6 +1627,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   let segmentNavigationController = null;
   const segmentMarkupPresentationService = appRuntime.featureFactories.createSegmentMarkupPresentationService({
     document,
+    localization: uiLocalizationService,
     protectedTags: protectedTagInspectionService,
     terms: {
       ranges: termRanges,
@@ -4874,6 +4875,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     resetButton: els.resetLayoutBtn,
     inspector: els.sidebar,
     inspectorResizer: els.inspectorResizer,
+    translate: uiLocalizationService.source,
     preferencesRepository: appRuntime.preferencesRepository,
     onInspectorPreference: (inspectorOpen) => {
       state.inspectorOpen = inspectorOpen;
@@ -4882,6 +4884,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   });
   const inspectorToggleController = appRuntime.featureFactories.createInspectorToggleController({
     element: els.inspectorToggleBtn,
+    closeElement: document.querySelector("#inspectorCloseBtn"),
     state: {
       getOpen: () => state.inspectorOpen,
       setOpen: (inspectorOpen) => {
@@ -6331,6 +6334,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     }
   });
   reliabilityControls.mount();
+  window.addEventListener("loopcat:localechange", () => languageInputService.renderDatalists());
   window.addEventListener("loopcat-catalog-ready", () => {
     const view = applicationStore.getState().navigation.view;
     if (view === "projects") void projectCollectionLoadController.load(false, { catalog: true }).catch(console.error);

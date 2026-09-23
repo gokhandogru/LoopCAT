@@ -116,9 +116,9 @@ export function createReportDocumentCompositionService(options) {
       .card strong { display: block; font-size: 22px; margin-bottom: 4px; }
       .muted { color: #657386; }
       table { width: 100%; border-collapse: collapse; font-size: 14px; }
-      th, td { border-bottom: 1px solid #e5eaf0; padding: 9px 8px; text-align: left; vertical-align: top; }
+      th, td { border-bottom: 1px solid #e5eaf0; padding: 9px 8px; text-align: start; vertical-align: top; }
       th { color: #405064; background: #f4f7f9; }
-      ul { margin: 0; padding-left: 20px; }
+      ul { margin: 0; padding-inline-start: 20px; }
       footer { padding: 18px 32px; color: #657386; font-size: 12px; border-top: 1px solid #e5eaf0; }
     </style>
   </head>
@@ -312,9 +312,9 @@ export function createReportDocumentCompositionService(options) {
       .card strong { display: block; font-size: 22px; margin-bottom: 4px; }
       .muted { color: #657386; }
       table { width: 100%; border-collapse: collapse; font-size: 14px; }
-      th, td { border-bottom: 1px solid #e5eaf0; padding: 9px 8px; text-align: left; vertical-align: top; }
+      th, td { border-bottom: 1px solid #e5eaf0; padding: 9px 8px; text-align: start; vertical-align: top; }
       th { color: #405064; background: #f4f7f9; }
-      ul { margin: 0; padding-left: 20px; }
+      ul { margin: 0; padding-inline-start: 20px; }
       footer { padding: 18px 32px; color: #657386; font-size: 12px; border-top: 1px solid #e5eaf0; }
     </style>
   </head>

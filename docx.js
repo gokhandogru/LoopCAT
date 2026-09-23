@@ -904,6 +904,7 @@ async function buildTargetDocx(project, segments) {
       const paragraph = paragraphs[paragraphIndex];
       if (!paragraph) return;
       replaceParagraphWithRuns(xml, paragraph, items.map((segment) => targetFor(segment, false)).join(" "), items[0]?.structure || {});
+      if (/^ar(?:-|$)/i.test(project.targetLang || "")) applyArabicParagraphProperties(xml, paragraph, project.targetLang);
     });
     entries.set(partPath, {
       name: partPath,
@@ -913,11 +914,45 @@ async function buildTargetDocx(project, segments) {
   return zipEntries(entries);
 }
 
-function tableCell(text, shade = "") {
+// Paragraph direction and proofing language are separate from the Unicode
+// direction of individual characters, so embedded Latin text remains intact.
+function applyArabicParagraphProperties(xml, paragraph, language) {
+  let properties = directChildByName(paragraph, "pPr");
+  if (!properties) {
+    properties = xml.createElementNS(WORD_NS, "w:pPr");
+    paragraph.insertBefore(properties, paragraph.firstChild);
+  }
+  let bidi = directChildByName(properties, "bidi");
+  if (!bidi) {
+    bidi = xml.createElementNS(WORD_NS, "w:bidi");
+    const afterBidi = new Set(["adjustRightInd", "snapToGrid", "spacing", "ind", "contextualSpacing", "mirrorIndents", "suppressOverlap", "jc", "textDirection", "textAlignment", "textboxTightWrap", "outlineLvl", "divId", "cnfStyle", "rPr", "sectPr", "pPrChange"]);
+    properties.insertBefore(bidi, Array.from(properties.children).find(child => afterBidi.has(child.localName)) || null);
+  }
+  bidi.setAttributeNS(WORD_NS, "w:val", "1");
+  const alignment = directChildByName(properties, "jc");
+  if (alignment?.getAttributeNS(WORD_NS, "val") === "left") alignment.setAttributeNS(WORD_NS, "w:val", "right");
+  for (const run of paragraph.getElementsByTagNameNS(WORD_NS, "r")) {
+    let rPr = directChildByName(run, "rPr");
+    if (!rPr) { rPr = xml.createElementNS(WORD_NS, "w:rPr"); run.insertBefore(rPr, run.firstChild); }
+    let lang = directChildByName(rPr, "lang");
+    if (!lang) {
+      lang = xml.createElementNS(WORD_NS, "w:lang");
+      rPr.insertBefore(lang, Array.from(rPr.children).find(child => ["eastAsianLayout", "specVanish", "oMath", "rPrChange"].includes(child.localName)) || null);
+    }
+    lang.setAttributeNS(WORD_NS, "w:bidi", language);
+  }
+}
+
+function documentParagraph(text, language = "") {
+  const rtl = /^(?:ar|he|fa|ur)(?:-|$)/i.test(language) || (!language && /^[^\p{L}]*\p{Script=Arabic}/u.test(text));
+  return `<w:p>${rtl ? '<w:pPr><w:bidi/></w:pPr>' : ''}<w:r>${rtl ? `<w:rPr><w:lang w:bidi="${xmlEscape(language || "ar")}"/></w:rPr>` : ''}<w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r></w:p>`;
+}
+
+function tableCell(text, shade = "", language = "") {
   const shading = shade ? `<w:shd w:fill="${shade}"/>` : "";
   return `<w:tc>
     <w:tcPr><w:tcW w:w="4500" w:type="dxa"/>${shading}</w:tcPr>
-    <w:p><w:r><w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r></w:p>
+    ${documentParagraph(text, language)}
   </w:tc>`;
 }
 
@@ -933,34 +968,35 @@ function countBy(values, getter) {
   }, {});
 }
 
-function summaryLine(label, counts) {
-  const parts = Object.entries(counts || {}).filter(([, count]) => count > 0).map(([key, count]) => `${key}: ${count}`);
-  return `${label}: ${parts.length ? parts.join(", ") : "none"}`;
+function summaryLine(label, counts, translate) {
+  const parts = Object.entries(counts || {}).filter(([, count]) => count > 0).map(([key, count]) => `${translate(key)}: ${count}`);
+  return `${translate(label)}: ${parts.length ? parts.join(", ") : translate("none")}`;
 }
 
-function reviewNotesForSegment(segment) {
+function reviewNotesForSegment(segment, translate) {
   const notes = [];
-  if (segment.reviewState) notes.push(`Review: ${segment.reviewState}`);
-  if (segment.reviewNote) notes.push(`Note: ${segment.reviewNote}`);
+  if (segment.reviewState) notes.push(`${translate("Review")}: ${translate(segment.reviewState)}`);
+  if (segment.reviewNote) notes.push(`${translate("Note")}: ${segment.reviewNote}`);
   (segment.comments || []).forEach((comment, index) => {
-    const state = comment.state ? ` (${comment.state})` : "";
-    if (comment.body) notes.push(`Comment ${index + 1}${state}: ${comment.body}`);
+    const state = comment.state ? ` (${translate(comment.state)})` : "";
+    if (comment.body) notes.push(`${translate("Comment")} ${index + 1}${state}: ${comment.body}`);
   });
   return notes;
 }
 
-function qaNotesForSegment(segment, qaChecks = []) {
+function qaNotesForSegment(segment, qaChecks, translate) {
   return (qaChecks || [])
     .filter((issue) => issue.segmentId === segment.id)
-    .map((issue) => `QA ${issue.severity || "note"} ${issue.type || "check"}: ${issue.message || ""}`);
+    .map((issue) => `${translate("QA")} ${translate(issue.severity || "note")} ${translate(issue.type || "check")}: ${translate(issue.message || "")}`);
 }
 
-function reviewerNotesForSegment(segment, qaChecks = []) {
-  const notes = [...reviewNotesForSegment(segment), ...qaNotesForSegment(segment, qaChecks)];
+function reviewerNotesForSegment(segment, qaChecks, translate) {
+  const notes = [...reviewNotesForSegment(segment, translate), ...qaNotesForSegment(segment, qaChecks, translate)];
   return notes.length ? notes.join("\n") : "";
 }
 
 function buildBilingualDocumentXml(project, segments, options = {}) {
+  const translate = options.translate || ((text, values = {}) => text.replace(/\{(\w+)\}/g, (match, key) => values[key] ?? match));
   const qaChecks = options.qaChecks || [];
   const qaBySeverity = countBy(qaChecks, (issue) => issue.severity);
   const qaByType = countBy(qaChecks, (issue) => issue.type);
@@ -968,17 +1004,17 @@ function buildBilingualDocumentXml(project, segments, options = {}) {
     sum + (segment.reviewState ? 1 : 0) + (segment.reviewNote ? 1 : 0) + (segment.comments || []).length, 0);
   const rows = [
     tableRow([
-      tableCell("Source", "E7F4F0"),
-      tableCell("Target", "E7F4F0"),
-      tableCell("Status", "E7F4F0"),
-      tableCell("Reviewer notes and QA", "E7F4F0")
+      tableCell(translate("Source"), "E7F4F0"),
+      tableCell(translate("Target"), "E7F4F0"),
+      tableCell(translate("Status"), "E7F4F0"),
+      tableCell(translate("Reviewer notes and QA"), "E7F4F0")
     ]),
     ...segments.map((segment, index) =>
       tableRow([
-        tableCell(`${index + 1}. ${segment.source}`),
-        tableCell(targetFor(segment, false)),
-        tableCell(segment.status),
-        tableCell(reviewerNotesForSegment(segment, qaChecks))
+        tableCell(`${index + 1}. ${segment.source}`, "", project.sourceLang),
+        tableCell(targetFor(segment, false), "", project.targetLang),
+        tableCell(translate(segment.status)),
+        tableCell(reviewerNotesForSegment(segment, qaChecks, translate))
       ])
     )
   ].join("");
@@ -986,11 +1022,11 @@ function buildBilingualDocumentXml(project, segments, options = {}) {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
-    <w:p><w:r><w:t>${xmlEscape(project.name || "Bilingual export")}</w:t></w:r></w:p>
+    ${documentParagraph(project.name || translate("Bilingual export"))}
     <w:p><w:r><w:t>${xmlEscape(`${project.sourceLang} -> ${project.targetLang}`)}</w:t></w:r></w:p>
-    <w:p><w:r><w:t>${xmlEscape(`Segments: ${segments.length}; review notes: ${reviewNoteCount}; QA issues: ${qaChecks.length}`)}</w:t></w:r></w:p>
-    <w:p><w:r><w:t>${xmlEscape(summaryLine("QA by severity", qaBySeverity))}</w:t></w:r></w:p>
-    <w:p><w:r><w:t>${xmlEscape(summaryLine("QA by type", qaByType))}</w:t></w:r></w:p>
+    ${documentParagraph(translate("Segments: {segments}; review notes: {notes}; QA issues: {issues}", { segments: segments.length, notes: reviewNoteCount, issues: qaChecks.length }))}
+    ${documentParagraph(summaryLine("QA by severity", qaBySeverity, translate))}
+    ${documentParagraph(summaryLine("QA by type", qaByType, translate))}
     <w:tbl>
       <w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="D8DEE6"/><w:left w:val="single" w:sz="4" w:space="0" w:color="D8DEE6"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="D8DEE6"/><w:right w:val="single" w:sz="4" w:space="0" w:color="D8DEE6"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="D8DEE6"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="D8DEE6"/></w:tblBorders></w:tblPr>
       ${rows}

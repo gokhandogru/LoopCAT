@@ -58,12 +58,13 @@ export function createCollectionViewController({ documentRoot, preferencesReposi
           if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
           event.preventDefault();
           const current = buttons.indexOf(button);
+          const rtl = button.ownerDocument?.documentElement?.dir === "rtl";
           const next =
             event.key === "Home"
               ? 0
               : event.key === "End"
                 ? buttons.length - 1
-                : (current + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length;
+                : (current + (event.key === "ArrowRight" ? 1 : -1) * (rtl ? -1 : 1) + buttons.length) % buttons.length;
           buttons[next].focus();
           void setView(scopeFor(group), buttons[next].dataset.viewMode).catch(onError);
         };

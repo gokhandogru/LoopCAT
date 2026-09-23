@@ -333,7 +333,7 @@ body.liquid-glass-edition {
   border-radius: 14px;
   background: transparent;
   box-shadow: none;
-  text-align: left;
+  text-align: start;
 }
 
 .liquid-glass-edition .project-item:hover {
@@ -609,7 +609,7 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition #nextOpenBtn {
-  margin-left: auto;
+  margin-inline-start: auto;
   border-color: rgba(11, 143, 131, 0.18);
   background: var(--glass-accent-soft);
   color: var(--glass-accent-strong);
@@ -742,7 +742,7 @@ body.liquid-glass-edition {
   height: 100%;
   padding: 12px;
   gap: 10px;
-  border-left: 1px solid var(--glass-line);
+  border-inline-start: 1px solid var(--glass-line);
   overflow-y: auto;
 }
 
@@ -1213,7 +1213,7 @@ body.liquid-glass-edition {
   }
 
   .liquid-glass-edition #nextOpenBtn {
-    margin-left: 0;
+    margin-inline-start: 0;
   }
 
   .liquid-glass-edition .segment-grid {

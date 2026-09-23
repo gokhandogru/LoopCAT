@@ -331,10 +331,11 @@ test("DeliveryExportController preserves project-wide bilingual validation, work
     [["tag:segment-1"], ["tag:segment-2"], ["tag:segment-3"], ["tag:segment-4"]]
   );
   assert.equal(typeof workerHarness.getWorkerInput().fallback, "function");
+  assert.equal(typeof firstCall(workerHarness.calls, "buildBilingualDocx")[3].translate, "function");
   assert.deepEqual(firstCall(workerHarness.calls, "buildBilingualDocx").slice(1), [
     workerHarness.project,
     workerHarness.segments,
-    { qaChecks: workerHarness.qaChecks }
+    { qaChecks: workerHarness.qaChecks, translate: firstCall(workerHarness.calls, "buildBilingualDocx")[3].translate }
   ]);
   assert.deepEqual(firstCall(workerHarness.calls, "download").slice(1), [
     "project-name_bilingual.docx",
