@@ -35,7 +35,7 @@
   ]);
 
   return Object.freeze({
-    appVersion: "0.0.4-dev.20260923",
+    appVersion: "0.0.4-dev.20260924",
     contractVersion: 1,
     runtimeAssets,
     offlineAssets,
