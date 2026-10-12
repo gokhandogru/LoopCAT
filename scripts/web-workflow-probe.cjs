@@ -51,7 +51,14 @@ async function webWorkflowProbe() {
   files.items.add(file);
   input.files = files.files;
   input.dispatchEvent(new Event("change", { bubbles: true }));
+  await wait(() => document.querySelector("#batchImportDialog")?.open, "batch import review");
+  const batchDialog = document.querySelector("#batchImportDialog");
+  const importReady = batchDialog.querySelector(".statistics-controls button");
+  await wait(() => !importReady.disabled, "batch file preflight");
+  importReady.click();
   await wait(() => document.querySelector(".file-card .file-open"), "file import");
+  await wait(() => !importReady.disabled, "batch import completion");
+  batchDialog.close();
   console.log("Web probe: UI import complete");
   document.querySelector(".file-card .file-open").click();
   await wait(() => document.querySelector("#segmentBody .target-editor"), "segment editor");

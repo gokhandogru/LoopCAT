@@ -21,7 +21,12 @@ function leverageBand(score) {
 function bestTmScore(segment, tmEntries) {
   if (!segment?.source || !tmEntries?.length) return 0;
   const similarity = window.CatHan.tm?.similarity || (() => 0);
-  return tmEntries.reduce((best, entry) => Math.max(best, similarity(segment.source, entry.source)), 0);
+  let best = 0;
+  for (const entry of tmEntries) {
+    best = Math.max(best, similarity(segment.source, entry.source));
+    if (best === 100) break;
+  }
+  return best;
 }
 
 const AI_RISK_ORDER = { low: 1, medium: 2, high: 3, critical: 4 };

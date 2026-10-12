@@ -193,6 +193,15 @@ test("worker and renderer produce identical complete match records", () => {
     JSON.parse(JSON.stringify(reply.result)),
     JSON.parse(JSON.stringify(core.scoreEntries(entries, options)))
   );
+  const retained = core.scoreEntries(entries, { ...options, limit: 1 });
+  assert.equal(retained.length, 1);
+  assert.deepEqual(retained[0].sourceDiff, core.scoreSource(retained[0].source, options.source).sourceDiff);
+  assert.deepEqual(core.scoreEntries(entries, { ...options, limit: 1, differences: false })[0].sourceDiff, []);
+  assert.deepEqual(
+    core.scoreEntries(entries, { ...options, limit: 1 }),
+    retained,
+    "warm segmentation cache preserves complete match records"
+  );
 });
 
 test("exclusive workload buckets reconcile with files and scope-local repetitions", async () => {

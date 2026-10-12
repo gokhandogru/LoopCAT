@@ -272,10 +272,36 @@
   function normalizeResourceText(value, locale = "en") {
     return value.normalize("NFC").toLocaleLowerCase(languageLocale(locale)).replaceAll("\u03C2", "\u03C3");
   }
+  // A batch repeatedly compares the same TM text. Cache only bounded, immutable
+  // segmentation results; never cache scores or project/resource eligibility.
+  const segmentationCache = new Map();
+  let segmentationWeight = 0;
+  function cachedSegmentation(value, locale, kind, create) {
+    if (value.length > 4096) return create();
+    const key = JSON.stringify([locale, kind, value]);
+    const cached = segmentationCache.get(key);
+    if (cached) {
+      segmentationCache.delete(key);
+      segmentationCache.set(key, cached);
+      return cached.result;
+    }
+    const result = create();
+    const weight = value.length + result.length + 1;
+    segmentationCache.set(key, { result, weight });
+    segmentationWeight += weight;
+    while (segmentationWeight > 262144 || segmentationCache.size > 4096) {
+      const oldest = segmentationCache.keys().next().value;
+      segmentationWeight -= segmentationCache.get(oldest).weight;
+      segmentationCache.delete(oldest);
+    }
+    return result;
+  }
   function resourceWords(value, locale = "en") {
-    return [...segmenter(locale, "word").segment(value)]
-      .filter((part) => part.isWordLike)
-      .map((part) => ({ text: part.segment, start: part.index, end: part.index + part.segment.length }));
+    return cachedSegmentation(value, locale, "word", () =>
+      [...segmenter(locale, "word").segment(value)]
+        .filter((part) => part.isWordLike)
+        .map((part) => ({ text: part.segment, start: part.index, end: part.index + part.segment.length }))
+    );
   }
   function containsTerm(text, term, locale) {
     const a = resourceWords(normalizeResourceText(text, locale), locale).map((x) => x.text),
@@ -286,14 +312,16 @@
     return normalizeResourceText(value, locale).replace(/\s+/gu, " ").trim();
   }
   function units(value, locale) {
-    return [...segmenter(locale, "grapheme").segment(value)].map((part) => part.segment);
+    return cachedSegmentation(value, locale, "grapheme", () =>
+      [...segmenter(locale, "grapheme").segment(value)].map((part) => part.segment)
+    );
   }
   function editDistance(left, right) {
     if (left.length > right.length) return editDistance(right, left);
     let previous = new Uint32Array(left.length + 1);
+    let current = new Uint32Array(left.length + 1);
     for (let i = 0; i <= left.length; i++) previous[i] = i;
     for (let j = 1; j <= right.length; j++) {
-      const current = new Uint32Array(left.length + 1);
       current[0] = j;
       for (let i = 1; i <= left.length; i++)
         current[i] = Math.min(
@@ -301,7 +329,7 @@
           previous[i] + 1,
           previous[i - 1] + (left[i - 1] === right[j - 1] ? 0 : 1)
         );
-      previous = current;
+      [previous, current] = [current, previous];
     }
     return previous[left.length];
   }
@@ -563,7 +591,7 @@
         locale,
         { ...entry, sourceDescriptor: descriptor },
         activeContext,
-        options.differences !== false
+        false
       );
       if (result.limited) searchComplete = false;
       if (result.rawScore < (options.minimumScore ?? 45)) continue;
@@ -645,7 +673,22 @@
           String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")) ||
           String(a.id || "").localeCompare(String(b.id || ""))
       )
-      .slice(0, options.limit ?? 6);
+      .slice(0, options.limit ?? 6)
+      .map((match) => {
+        // Only displayed matches need the word-level diff. Ranking every
+        // candidate first keeps scoring identical while avoiding discarded work.
+        const sourceDiff = options.differences === false ? [] : sourceDifference(match.source, source, locale);
+        return {
+          ...match,
+          sourceDiff,
+          sourceDifferences: sourceDiff
+            .filter((item) => item.kind !== "equal")
+            .map((item) => ({
+              source: item.kind === "added" ? item.text : "",
+              candidate: item.kind === "removed" ? item.text : ""
+            }))
+        };
+      });
   }
   function retrievalTokens(source) {
     const key = lexicalKey(source);

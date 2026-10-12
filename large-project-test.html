@@ -291,11 +291,12 @@
         }));
         const batchLookupStartedAt = Date.now();
         const batchMatches = await window.CatHan.tm.findTmMatchesBatch(batchOptions);
+        const batchLookupElapsedMs = Date.now() - batchLookupStartedAt;
+        assert(batchMatches.length === batchOptions.length, "batched TM lookup returns one result set per request");
+        assert(batchMatches.every((items) => items[0]?.score >= 95 && items[0]?.target), "batched TM lookup preserves high-confidence matches for every source");
         assert(
-          batchMatches.length === batchOptions.length &&
-            batchMatches.every((items) => items[0]?.score >= 95 && items[0]?.target) &&
-            Date.now() - batchLookupStartedAt < 30000,
-          "batched TM lookup resolves many segments through shared indexed reads"
+          batchLookupElapsedMs < 30000,
+          `batched TM lookup resolves many segments through shared indexed reads (${batchLookupElapsedMs} ms)`
         );
 
         const qaSegments = finalSegments.map((segment) => ({

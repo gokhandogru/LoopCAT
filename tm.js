@@ -262,7 +262,7 @@ function levenshtein(a, b) {
   return prev[b.length];
 }
 
-function similarity(source,candidate) { return globalThis.LoopCATLinguistics.scoreSource(String(candidate||''),String(source||'')).rawScore; }
+function similarity(source,candidate) { return globalThis.LoopCATLinguistics.scoreSource(String(candidate||''),String(source||''), "en", {}, {}, false).rawScore; }
 
 function similarityNormalized(a, b) {
   if (!a && !b) return 100;
