@@ -389,16 +389,24 @@
 
         const backupData = {
           app: "LoopCAT",
-          schemaVersion: window.CatHan.storage.constants.PROJECT_PACKAGE_SCHEMA_VERSION,
+          schemaVersion: window.CatHan.storage.constants.BACKUP_SCHEMA_VERSION,
           exportedAt: now,
           projects: [project],
           segments: finalSegments,
+          resources: [],
           tmEntries,
+          tmContributions: [],
           terms: termRecords,
+          termConcepts: [],
+          termDesignations: [],
+          trashEntries: [],
+          documentVersions: [],
+          versionSegments: [],
+          fileLifecycleReceipts: [],
           activityEvents: [activity]
         };
         const backupReport = window.CatHan.validation.validateBackupFile(backupData);
-        assert(backupReport.ok, "large project backup data validates");
+        assert(backupReport.ok, `large project backup data validates (${backupReport.errors.join("; ")})`);
         const backupRef = await workspace.exportFullBackup(backupData);
         const manifest = JSON.parse(readPath(root, workspace.MANIFEST_FILE));
         assert(backupRef.segmentCount === SEGMENT_COUNT && manifest.backups.length >= 1, "large project workspace backup records segment count");
