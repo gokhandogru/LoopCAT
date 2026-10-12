@@ -54375,6 +54375,216 @@
       "locations": [
         "app.js"
       ]
+    },
+    "workspace.toolbar.file.actions": {
+      "message": "File actions",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.project.details": {
+      "message": "Project details",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.search.tools": {
+      "message": "Search tools",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.project.statistics": {
+      "message": "Project statistics",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.file.statistics": {
+      "message": "File statistics",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.selected.segments.count": {
+      "message": "Selected segments: {count}",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.selected.files.count": {
+      "message": "Selected files: {count} / 50",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.select.segments.first": {
+      "message": "Select segments first.",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.select.a.file.first": {
+      "message": "Select a file first.",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.select.filtered.segments": {
+      "message": "Select filtered segments",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.clear.selection": {
+      "message": "Clear selection",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.project.trash": {
+      "message": "Project Trash",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.rename": {
+      "message": "Rename…",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.update.source.file": {
+      "message": "Update source file…",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.version.history": {
+      "message": "Version history…",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.move.to.trash": {
+      "message": "Move to Trash…",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.export.translation": {
+      "message": "Export translation…",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.selected.file.statistics": {
+      "message": "Selected file statistics",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.move.selected.to.trash": {
+      "message": "Move selected to Trash",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.clear.file.selection": {
+      "message": "Clear file selection",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.select.file": {
+      "message": "Select file",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.actions.for": {
+      "message": "Actions for",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.toolbar.selected.segments": {
+      "message": "Selected segments (0)",
+      "description": "Shared workspace toolbar and file actions.",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.statistics": {
+      "message": "Statistics",
+      "description": "Statistics command",
+      "locations": [
+        "src/ui/workspace-toolbar-controller.js"
+      ]
+    },
+    "workspace.command.select.segment.value": {
+      "message": "Select segment {value1}",
+      "description": "Workspace selection and file lifecycle commands.",
+      "locations": [
+        "src/app/application-command-catalog-service.js"
+      ]
+    },
+    "workspace.command.open.current.file": {
+      "message": "Open current file",
+      "description": "Workspace selection and file lifecycle commands.",
+      "locations": [
+        "src/app/application-command-catalog-service.js"
+      ]
+    },
+    "workspace.command.rename.current.file": {
+      "message": "Rename current file",
+      "description": "Workspace selection and file lifecycle commands.",
+      "locations": [
+        "src/app/application-command-catalog-service.js"
+      ]
+    },
+    "workspace.command.update.current.source.file": {
+      "message": "Update current source file",
+      "description": "Workspace selection and file lifecycle commands.",
+      "locations": [
+        "src/app/application-command-catalog-service.js"
+      ]
+    },
+    "workspace.command.current.file.version.history": {
+      "message": "Current file version history",
+      "description": "Workspace selection and file lifecycle commands.",
+      "locations": [
+        "src/app/application-command-catalog-service.js"
+      ]
+    },
+    "workspace.command.move.current.file.to.trash": {
+      "message": "Move current file to Trash",
+      "description": "Workspace selection and file lifecycle commands.",
+      "locations": [
+        "src/app/application-command-catalog-service.js"
+      ]
     }
   }
 }

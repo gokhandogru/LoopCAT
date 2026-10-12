@@ -10,6 +10,14 @@ export function createUndoStore(limit = 100) {
   }
 
   return Object.freeze({
+    invalidateAffected(projectId, ids) {
+      const affected = new Set(ids);
+      for (const map of [undoByProject, redoByProject])
+        map.set(
+          projectId || "workspace",
+          stack(map, projectId).filter((item) => !(item.command.affectedIds || []).some((id) => affected.has(id)))
+        );
+    },
     push(projectId, item) {
       const undo = stack(undoByProject, projectId);
       undo.push(item);

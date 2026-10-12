@@ -1,8 +1,8 @@
 (() => {
   const DB_NAME = "cathan-local-cat";
-  const DB_VERSION = 8;
-  const PROJECT_PACKAGE_SCHEMA_VERSION = 6;
-  const BACKUP_SCHEMA_VERSION = 7;
+  const DB_VERSION = 9;
+  const PROJECT_PACKAGE_SCHEMA_VERSION = 7;
+  const BACKUP_SCHEMA_VERSION = 8;
   const LOCAL_WORKSPACE_ID = "local-workspace";
   const LOCAL_USER_ID = "local-user";
   const APP_NAME = "LoopCAT";
@@ -42,7 +42,7 @@
     "id",
     "projectId",
     "documentId",
-    "segmentId",
+    "segmentId", "sourceVersionId", "previousVersionId", "previousSegmentId", "restoredFromVersionId",
     "workspaceId",
     "ownerId",
     "createdBy"
@@ -87,7 +87,7 @@
             summary.total += sign;
             summary.confirmed += sign * Number(record.status === "confirmed");
             summary.draft += sign * Number(record.status === "draft");
-            summary.words += sign * String(record.source || "").trim().split(/\s+/).filter(Boolean).length;
+            summary.words += sign * (globalThis.LoopCATLinguistics?.metricsForSegment(record,projects.get(record.projectId)?.sourceLang || "en").words ?? String(record.source || "").trim().split(/\s+/).filter(Boolean).length);
             summary.percent = summary.total ? Math.round(100 * summary.confirmed / summary.total) : 0;
           }
         }
@@ -200,7 +200,7 @@
     "termConcepts",
     "termDesignations",
     "activityEvents",
-    "trashEntries"
+    "trashEntries", "documentVersions", "versionSegments", "fileLifecycleReceipts"
   ];
   const writerId = makeId("writer");
   const ownedProjects = new Map();
@@ -605,6 +605,9 @@
   }
 
   function ensureStores(db) {
+    for (const name of ["documentVersions", "versionSegments", "fileLifecycleReceipts"]) {
+      if (!db.objectStoreNames.contains(name)) { const store = db.createObjectStore(name, {keyPath:"id"}); store.createIndex("projectId","projectId"); store.createIndex("documentId","documentId"); if(name === "versionSegments") store.createIndex("sourceVersionId","sourceVersionId"); }
+    }
     if (!db.objectStoreNames.contains("projects")) {
       const projects = db.createObjectStore("projects", { keyPath: "id" });
       projects.createIndex("updatedAt", "updatedAt");
@@ -1209,6 +1212,7 @@
       tx.objectStore("appMeta").put({ key: "schema", version: DB_VERSION });
     }
     if (oldVersion < 8) migrateToVersion8(db, tx);
+    if (oldVersion < 9) tx.objectStore("appMeta").put({ key: "schema", version: DB_VERSION });
   }
 
   function normalizedResourceText(value) {
@@ -1579,6 +1583,7 @@
 
   function isSourceJsonPath(path = []) {
     const segments = path.map((item) => String(item || "")).filter(Boolean);
+    if(segments.some((part,index)=>part==="sourceJson" && segments[index-1]==="localizationStructure"))return true;
     return segments.some((segment, index) => {
       if (segment !== "sourceJson" || index < 2 || segments[index - 2] !== "localizationStructures") return false;
       const prefix = segments.slice(0, index - 2);
@@ -1946,7 +1951,7 @@
       }
     }
     const db = await openDatabase();
-    const stores = [...new Set([...changes.map((change) => change.store), "journal", "appMeta", "ownershipLeases"])];
+    const stores = [...new Set([...changes.map((change) => change.store), ...(mutation.snapshots || []).map((guard)=>guard.store), "versionSegments", "journal", "appMeta", "ownershipLeases"])];
     const tx = strictTransaction(db, stores);
     const done = txDone(tx);
     const values = [];
@@ -1969,6 +1974,11 @@
       const catalog = await requestToPromise(meta.get(CATALOG_KEY));
       generation = (Number(current?.value) || 0) + 1;
       const expanded = [];
+      for (const guard of mutation.snapshots || []) {
+        const records = (await requestToPromise(tx.objectStore(guard.store).index(guard.index).getAll(guard.value))).filter((record)=>Object.entries(guard.where || {}).every(([key,value])=>record[key]===value));
+        const ordered = (rows)=>rows.slice().sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+        if (stableJson(ordered(records)) !== stableJson(ordered(guard.records))) throw new Error("The file changed after review. Review the operation again.");
+      }
       for (const guard of mutation.guards || []) {
         const records = await requestToPromise(tx.objectStore(guard.store).index(guard.index).getAll(guard.value));
         if (records.some((record) => languagePairOf(record) === guard.languagePair)) throw new Error("A resource with the same name and language pair already exists. The Trash item was preserved.");
@@ -1996,6 +2006,7 @@
           continue;
         }
         const previous = await requestToPromise(store.get(key));
+        if(change.store === "segments" && !change.delete && await requestToPromise(tx.objectStore("versionSegments").get(key))) throw new Error("This segment belongs to a historical source version. Reopen the current file.");
         if (change.assertValue && stableJson(previous) !== stableJson(change.assertValue)) throw new Error("A record changed before this operation. Existing work was preserved.");
         if (change.identicalOrInsert && previous) {
           assertNoGlobalResourceConflicts([change.value], [previous], "Shared resource");
@@ -2265,10 +2276,10 @@
   }
 
   async function moveProjectDocumentToTrash(project, documentId, trashEntry) {
-    const result = await commitMutation(null, null, { rebaseLocal: true, changes: [
+    const result = await commitMutation(null, null, { snapshots: [{store:"segments",index:"projectId",value:project.id,where:{documentId},records:trashEntry.payload.segments}], changes: [
       { store: "trashEntries", value: trashEntry },
       { store: "projects", value: project },
-      { store: "segments", projectId: project.id, where: { projectId: project.id, documentId } }
+      ...trashEntry.payload.segments.map(segment=>({store:"segments",key:segment.id,delete:true,expectedVersion:segment.storageVersion||0,projectId:project.id}))
     ] });
     Object.assign(project, result.values[1]);
     return trashEntry;
@@ -2278,7 +2289,19 @@
     const entry = await get("trashEntries", entryId);
     const existing = project && await get("projects", project.id);
     if (existing && entry?.entityType !== "document" && entry?.entityType !== "project-document") throw new Error("Project already exists. The Trash item was preserved.");
-    await commitMutation(null, null, { rebaseLocal: true, changes: [
+    const reordered=[];
+    if(existing) {
+      const current=await getAllByIndex("segments","projectId",project.id);
+      const incoming=new Set(segments.map(s=>s.id));let ordinal=0;
+      for(const document of project.documents || []) for(const row of [...current,...segments].filter(s=>s.documentId===document.id).sort((a,b)=>a.index-b.index)) {
+        if(incoming.has(row.id))row.index=ordinal;
+        else if(row.index!==ordinal)reordered.push({store:"segments",value:{...row,index:ordinal}});
+        ordinal++;
+      }
+      if(project.storageVersion!==existing.storageVersion)throw new Error("The project changed while restoring the file. Retry from Trash.");
+    }
+    await commitMutation(null, null, { changes: [
+      ...reordered,
       ...(project ? [{ store: "projects", value: { ...project, storageVersion: existing?.storageVersion || 0 }, insertOnly: !existing }] : []),
       ...segments.map((value) => ({ store: "segments", value: { ...value, storageVersion: 0 }, insertOnly: true })),
       ...activityEvents.map((value) => ({ store: "activityEvents", value: { ...value, storageVersion: 0 }, insertOnly: true })),
@@ -2352,6 +2375,30 @@
     return entry;
   }
 
+  function assertFileHistoryGraph(projects, segments, history) {
+    projectDocumentIdMap(projects, "Project history");
+    const trash=history.trashEntries || [];
+    const parents=new Map([...projects,...trash.filter(e=>e.entityType==="project").map(e=>e.payload?.project).filter(Boolean)].map(p=>[p.id,p]));
+    const versions=new Map((history.documentVersions || []).map(v=>[v.id,v]));
+    const liveIds=new Set([...segments,...trash.flatMap(e=>e.payload?.segments || [])].map(s=>s.id));
+    const counts=new Map();
+    const files=new Map();
+    for(const project of parents.values())for(const document of project.documents || [])files.set(project.id+"\u0000"+document.id,document);
+    for(const entry of trash)if(entry.entityType==="document" && entry.payload?.documentInfo)files.set(entry.projectId+"\u0000"+entry.entityId,entry.payload.documentInfo);
+    for(const version of versions.values()) {
+      if(!parents.has(version.projectId) || !version.documentId || version.documentInfo?.id!==version.documentId || !Number.isInteger(version.version) || version.version<1) throw new Error("Invalid historical file version.");
+      const head=files.get(version.projectId+"\u0000"+version.documentId);
+      if(head && (head.sourceVersionId===version.id || (head.sourceRevision && version.version>=head.sourceRevision)))throw new Error("A historical version conflicts with the current file head.");
+    }
+    for(const segment of history.versionSegments || []) {
+      const version=versions.get(segment.sourceVersionId);
+      if(!version || version.projectId!==segment.projectId || version.documentId!==segment.documentId || liveIds.has(segment.id)) throw new Error("Historical segments must belong to an archived version and remain separate from current segments.");
+      counts.set(version.id,(counts.get(version.id)||0)+1);
+    }
+    for(const version of versions.values()) if(version.segmentCount!==(counts.get(version.id)||0)) throw new Error("A historical file version is missing segments.");
+    for(const receipt of history.fileLifecycleReceipts || []) if(!parents.has(receipt.projectId)) throw new Error("A file action receipt belongs to an unknown project.");
+  }
+
   async function importProjectPackageRecords({
     project,
     segments = [],
@@ -2362,11 +2409,16 @@
     termConcepts = [],
     termDesignations = [],
     activityEvents = [],
-    replaceProjectId = ""
+    replaceProjectId = "",
+    documentVersions = [], versionSegments = [], fileLifecycleReceipts = [], trashEntries = []
   }) {
     const portableContext = createPortableSanitizerContext();
     const importedProject = sanitizePortableValue(project || {}, "", [], portableContext);
     const importedSegments = portableRecordArray(segments, "Project package segments", portableContext);
+    const historyRecords = Object.fromEntries(Object.entries({documentVersions,versionSegments,fileLifecycleReceipts,trashEntries}).map(([name,rows])=>[name,portableRecordArray(rows,name,portableContext)]));
+    assertFileHistoryGraph([importedProject],importedSegments,historyRecords);
+    const historyChanges=[];
+    for(const [store,rows] of Object.entries(historyRecords)) { assertUniqueRecordIds(rows,store); if(rows.some(row=>row.projectId!==importedProject.id)) throw new Error("Historical records belong to another project."); const existing = await getAllByIndex(store,"projectId",importedProject.id); if(replaceProjectId) for(const row of existing) historyChanges.push({store,key:row.id,delete:true,expectedVersion:row.storageVersion||0,projectId:replaceProjectId}); for(const row of rows) historyChanges.push({store,value:{...row,storageVersion:0},insertOnly:true}); }
     const importedResources = portableRecordArray(resources, "Project package resources", portableContext);
     const importedTmEntries = portableRecordArray(tmEntries, "Project package TM resources", portableContext);
     const importedTmContributions = portableRecordArray(
@@ -2457,6 +2509,7 @@
     const existingConceptRecords = byId(existingTermConcepts);
     const existingDesignationRecords = byId(existingTermDesignations);
     const changes = [
+      ...historyChanges,
       ...(replaceProjectId ? [
         { store: "segments", projectId: replaceProjectId, where: { projectId: replaceProjectId }, excludeIds: importedSegments.map((record) => record.id) },
         { store: "activityEvents", projectId: replaceProjectId, where: { projectId: replaceProjectId }, excludeIds: importedActivityEvents.map((record) => record.id) },
@@ -2617,7 +2670,7 @@
     const linkedResourceIds = new Set(
       (Array.isArray(project.resourceLinks) ? project.resourceLinks : []).map((link) => link.resourceId).filter(Boolean)
     );
-    const [segments, allResources, allTmEntries, allTerms, allConcepts, allDesignations, contributions, activityEvents, generation] = await Promise.all([
+    const [segments, allResources, allTmEntries, allTerms, allConcepts, allDesignations, contributions, activityEvents, generation, documentVersions, versionSegments, fileLifecycleReceipts, trashEntries] = await Promise.all([
       requestToPromise(tx.objectStore("segments").index("projectId").getAll(projectId)),
       requestToPromise(tx.objectStore("resources").getAll()),
       requestToPromise(tx.objectStore("tmEntries").index("languagePair").getAll(pair)),
@@ -2626,7 +2679,8 @@
       requestToPromise(tx.objectStore("termDesignations").getAll()),
       requestToPromise(tx.objectStore("tmContributions").index("projectId").getAll(projectId)),
       requestToPromise(tx.objectStore("activityEvents").index("projectId").getAll(projectId)),
-      requestToPromise(tx.objectStore("appMeta").get("committed-generation"))
+      requestToPromise(tx.objectStore("appMeta").get("committed-generation")),
+      ...["documentVersions","versionSegments","fileLifecycleReceipts","trashEntries"].map(name=>requestToPromise(tx.objectStore(name).index("projectId").getAll(projectId)))
     ]);
     await done;
     const legacyTmNames = new Set(
@@ -2657,6 +2711,7 @@
       termConcepts,
       termDesignations,
       activityEvents,
+      documentVersions, versionSegments, fileLifecycleReceipts, trashEntries,
       generation: generation?.value || 0
     };
   }
@@ -2699,6 +2754,9 @@
     const termDesignations = portableRecordArray(data.termDesignations || [], "Term designations", portableContext);
     const activityEvents = portableRecordArray(data.activityEvents, "Activity events", portableContext);
     const trashEntries = portableRecordArray(data.trashEntries || [], "Trash entries", portableContext);
+    const historical = Object.fromEntries(["documentVersions","versionSegments","fileLifecycleReceipts"].map(name=>[name,portableRecordArray(data[name] || [],name,portableContext)]));
+    for(const [name,rows] of Object.entries(historical)) assertUniqueRecordIds(rows,name);
+    assertFileHistoryGraph(projects,segments,{...historical,trashEntries});
     assertUniqueRecordIds(resources, "Resources");
     assertUniqueRecordIds(projects, "Projects");
     assertUniqueRecordIds(segments, "Segments");
@@ -2735,6 +2793,7 @@
       termDesignations,
       activityEvents,
       trashEntries,
+      ...historical,
       tmTokenIndex: [],
       termTokenIndex: [],
       appMeta: [
@@ -2803,6 +2862,8 @@
     const context = createPortableSanitizerContext();
     const counts = Object.fromEntries(AUTHORITATIVE_STORES.map((store) => [store, 0]));
     const projects = [];
+    const historyGraph={documentVersions:[],versionSegments:[],fileLifecycleReceipts:[],trashEntries:[]};
+    const currentSegmentIds=[];
     let metadata;
     let totalBytes = 0;
     const capacity = await globalThis.navigator?.storage?.estimate?.();
@@ -2819,6 +2880,11 @@
       if (!metadata || !AUTHORITATIVE_STORES.includes(store)) throw new Error("Backup metadata must precede its records.");
       const record = portableRecordArray([value], store, context)[0];
       assertUniqueRecordIds([record], store);
+      if(store==="segments")currentSegmentIds.push({id:record.id});
+      if(store==="documentVersions")historyGraph.documentVersions.push({id:record.id,projectId:record.projectId,documentId:record.documentId,version:record.version,documentInfo:{id:record.documentInfo?.id},segmentCount:record.segmentCount});
+      if(store==="versionSegments")historyGraph.versionSegments.push({id:record.id,projectId:record.projectId,documentId:record.documentId,sourceVersionId:record.sourceVersionId});
+      if(store==="fileLifecycleReceipts")historyGraph.fileLifecycleReceipts.push({projectId:record.projectId});
+      if(store==="trashEntries")historyGraph.trashEntries.push({entityType:record.entityType,payload:{project:record.payload?.project?{id:record.payload.project.id}:null,segments:(record.payload?.segments||[]).map(s=>({id:s.id}))}});
       if (store === "projects") {
         projectDocumentIdMap([record], "backup");
         assertProjectResourceLinks([record], "backup");
@@ -2834,6 +2900,7 @@
       counts[store]++;
     });
     if (!metadata) throw new Error("Backup metadata is missing.");
+    assertFileHistoryGraph(projects,currentSegmentIds,historyGraph);
     const projectMap = new Map(projects.map((project) => [project.id, project]));
     const hashes = [];
     for await (const row of stagingRows(id)) {
@@ -2963,6 +3030,14 @@
     });
   }
 
+  function addFileCopyIds(record, ids, create) {
+    const add=(id)=>{if(id && !ids.has(id))ids.set(id,create(id));};
+    for(const document of record.documents || [])add(document.sourceVersionId);
+    add(record.payload?.documentInfo?.sourceVersionId);
+    for(const row of record.payload?.segments || [])add(row.id);
+    for(const document of record.payload?.project?.documents || [])add(document.sourceVersionId);
+  }
+
   async function prepareStagedRestore(data, mode) {
     const original = await get("restoreStaging", data.archiveStagingId);
     if (!original?.verified || original.format !== 2) throw new Error("Restore staging is missing or unverified.");
@@ -2972,13 +3047,15 @@
     const hashes = [];
     for await (const row of stagingRows(original.id)) {
       ids.set(row.value.id, namespace + ":" + row.value.id);
+      addFileCopyIds(row.value,ids,id=>namespace+":"+id);
       hashes.push(await digestBlob(new Blob([JSON.stringify([row.store, row.value])])));
     }
     if (await digestBlob(new Blob(hashes)) !== original.digest) throw new Error("Restore staging integrity check failed.");
     function remap(value, key = "", path = []) {
+      if(["structure","docxStructure","localizationStructure","docxStructures","localizationStructures","sourceDescriptor"].includes(key))return value;
       if (isSourceJsonPath(path)) return value;
       if (typeof value === "string") {
-        if (((key === "id" && path.length === 1) || /^(projectId|segmentId|segmentIds|ownerProjectId|tmEntryId|termId|resourceId|activeTermBaseId|conceptId|designationId|contributionId|parentSegmentId|linkedSegmentId)$/.test(key)) && ids.has(value)) return ids.get(value);
+        if (((key === "id" && (path.length === 1 || path.includes("segments") || path.includes("project"))) || /^(projectId|segmentId|segmentIds|ownerProjectId|tmEntryId|termId|resourceId|activeTermBaseId|conceptId|designationId|contributionId|parentSegmentId|linkedSegmentId|sourceVersionId|previousVersionId|previousSegmentId|restoredFromVersionId|entryIds)$/.test(key)) && ids.has(value)) return ids.get(value);
         if (/^(tmName|mainTmName|tmNames|termBaseName|termBaseNames)$/.test(key)) return value + " (restored " + namespace.slice(-8) + ")";
         return value;
       }
@@ -3084,11 +3161,13 @@
     let records = JSON.parse(await staged.blob.text());
     if (staged.mode === "copy") {
       const ids = new Map(AUTHORITATIVE_STORES.flatMap((store) => records[store].map((record) => [record.id, makeId(store)])));
+      for(const store of AUTHORITATIVE_STORES)for(const record of records[store])addFileCopyIds(record,ids,()=>makeId("file-copy"));
       const suffix = " (restored " + makeId("copy").slice(-8) + ")";
       const remap = (value, key = "", path = []) => {
+        if(["structure","docxStructure","localizationStructure","docxStructures","localizationStructures","sourceDescriptor"].includes(key))return value;
         if (isSourceJsonPath(path)) return value;
         if (typeof value === "string") {
-          if (((key === "id" && path.length === 1) || /^(projectId|segmentId|segmentIds|ownerProjectId|tmEntryId|termId|resourceId|activeTermBaseId|conceptId|designationId|contributionId|parentSegmentId|linkedSegmentId)$/.test(key)) && ids.has(value)) return ids.get(value);
+          if (((key === "id" && (path.length === 1 || path.includes("segments") || path.includes("project"))) || /^(projectId|segmentId|segmentIds|ownerProjectId|tmEntryId|termId|resourceId|activeTermBaseId|conceptId|designationId|contributionId|parentSegmentId|linkedSegmentId|sourceVersionId|previousVersionId|previousSegmentId|restoredFromVersionId|entryIds)$/.test(key)) && ids.has(value)) return ids.get(value);
           if (/^(tmName|mainTmName|tmNames|termBaseName|termBaseNames)$/.test(key)) return value + suffix;
           return value;
         }

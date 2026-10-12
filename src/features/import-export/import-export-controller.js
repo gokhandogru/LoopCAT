@@ -22,6 +22,7 @@ function createElement(ownerDocument, tagName, { className = "", text = "" } = {
  *   hasProject?: () => boolean,
  *   runImportTask?: (label: string, action: () => Promise<unknown>) => Promise<unknown>,
  *   importProjectFile?: (file: File) => Promise<unknown>,
+ *   reviewProjectFiles?: (files: File[]) => Promise<unknown>,
  *   importProjectPackage?: (file: File) => Promise<unknown>,
  *   restoreBackup?: (file: File) => Promise<unknown>,
  *   importTmx?: (file: File) => Promise<unknown>,
@@ -151,6 +152,10 @@ export function createImportExportController(options) {
     const files = Array.from(projectFileImportInput.files || []);
     try {
       if (!hasProject() || typeof options?.importProjectFile !== "function") return;
+      if (options.reviewProjectFiles) {
+        await options.reviewProjectFiles(files);
+        return;
+      }
       for (const file of files) {
         await runImport("Project file import", () => options.importProjectFile(file));
       }

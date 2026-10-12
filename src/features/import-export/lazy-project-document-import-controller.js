@@ -8,6 +8,7 @@ const API_ORDER = Object.freeze([
   "hasDocumentNamed",
   "importDocx",
   "importFile",
+  "finishBatch",
   "importLocalization",
   "importXliff"
 ]);
@@ -56,6 +57,7 @@ export function createLazyProjectDocumentImportController(options, boundaries = 
   }
 
   return Object.freeze({
+    finishBatch: (...args) => invoke("finishBatch", args),
     confirmDuplicate: duplicatePolicy.confirmDuplicate,
     hasDocumentNamed: duplicatePolicy.hasDocumentNamed,
     importDocx: (...args) => invoke("importDocx", args),

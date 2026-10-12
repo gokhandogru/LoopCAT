@@ -1,6 +1,6 @@
 (() => {
 function wordCount(text) {
-  return String(text || "").trim().split(/\s+/).filter(Boolean).length;
+  return globalThis.LoopCATLinguistics.sourceMetrics(String(text || "")).words;
 }
 
 function normalize(text) {
@@ -74,7 +74,7 @@ function analyzeProject(project, segments = [], tmEntries = [], tmScores = null)
   };
 
   segments.forEach((segment, segmentIndex) => {
-    const words = wordCount(segment.source);
+    const words = globalThis.LoopCATLinguistics.metricsForSegment(segment, project?.sourceLang || "en").words;
     const key = normalize(segment.source);
     const sourceCount = bySource.get(key) || 0;
     bySource.set(key, sourceCount + 1);

@@ -107,20 +107,20 @@ export function createProjectHomePresentationController(options) {
           <h4>${text.displaySafeHtml(documentInfo.name)}</h4>
           <p>${text.escapeHtml((documentInfo.type || "file").toUpperCase())}</p>
         </div>
-        <span class="language-badge">${stats.percent}%</span>
       </header>
       <div class="project-stats">
         <div><strong>${stats.words}</strong><span>${localization.labelHtml("words")}</span></div>
         <div><strong>${stats.segments}</strong><span>${localization.labelHtml("segments")}</span></div>
       </div>
-      <div class="progress-bar"><div style="width:${stats.percent}%"></div></div>
+      <div class="file-progress"><span>${stats.percent}% ${localization.labelHtml("confirmed")}</span><div class="progress-bar"><div style="width:${stats.percent}%"></div></div><small>${localization.labelHtml("emptyDraftCount", { empty: stats.empty, draft: stats.draft })}</small></div>
       <footer>
-        <span>${localization.labelHtml("emptyDraftCount", { empty: stats.empty, draft: stats.draft })}</span>
         <div class="file-card-actions"></div>
       </footer>
     `
       );
       card.querySelector(".progress-bar > div").style.width = `${stats.percent}%`;
+      const filename = card.querySelector("h4");
+      if (filename) filename.title = text.displaySafeText(documentInfo.name);
       const deleteButton = dom.createElement("button");
       const fileLabel = text.displaySafeText(documentInfo.name, localization.source("file"));
       deleteButton.className = "danger-small";
@@ -129,12 +129,15 @@ export function createProjectHomePresentationController(options) {
       deleteButton.setAttribute("aria-label", localization.source("Delete file {value1}", { value1: fileLabel }));
       deleteButton.addEventListener("click", () => actions.deleteDocument(documentInfo));
       const openButton = dom.createElement("button");
-      openButton.className = "primary";
+      openButton.className = "file-open";
       openButton.type = "button";
       openButton.textContent = localization.source("Open");
       openButton.setAttribute("aria-label", localization.source("Open file {value1}", { value1: fileLabel }));
       openButton.addEventListener("click", () => actions.openDocument(documentInfo.id));
-      card.querySelector(".file-card-actions").append(deleteButton, openButton);
+      if (actions.mountMenu) {
+        card.querySelector(".file-card-actions").append(openButton);
+        actions.mountMenu(card.querySelector(".file-card-actions"), documentInfo);
+      } else card.querySelector(".file-card-actions").append(deleteButton, openButton);
       fragment.append(card);
     });
     elements.fileList.replaceChildren(fragment);

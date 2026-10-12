@@ -19,9 +19,16 @@ function loadWorker(setup = "") {
       }
     }
   };
-  vm.runInNewContext(setup + fs.readFileSync(path.join(root, "cat-worker.js"), "utf8"), context, {
-    filename: "cat-worker.js"
-  });
+  vm.runInNewContext(
+    setup +
+      ["linguistic-core.js", "statistics-core.js", "cat-worker.js"]
+        .map((name) => fs.readFileSync(path.join(root, name), "utf8"))
+        .join("\n"),
+    context,
+    {
+      filename: "cat-worker.js"
+    }
+  );
   return {
     request(data) {
       listener({ data });

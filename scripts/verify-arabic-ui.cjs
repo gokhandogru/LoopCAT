@@ -69,7 +69,7 @@ async function state(name, widths = [1440, 1024, 768]) {
       }
       for (const el of document.querySelectorAll('button,summary,label,h1,h2,h3,[role=tab],input,select')) {
         if (!visible(el)) continue;
-        if (!el.matches('input,select') && el.scrollWidth > el.clientWidth + 2 && el.clientWidth > 0) clipped.push({element:el.id || el.className || el.tagName,text:el.textContent.trim(),width:el.clientWidth,scroll:el.scrollWidth});
+        if (!(el.id==='projectTitle' && el.title===el.textContent && getComputedStyle(el).textOverflow==='ellipsis') && !el.matches('input,select') && el.scrollWidth > el.clientWidth + 2 && el.clientWidth > 0) clipped.push({element:el.id || el.className || el.tagName,text:el.textContent.trim(),width:el.clientWidth,scroll:el.scrollWidth});
         for(const attr of ['title','aria-label','placeholder']) {
           const text=el.getAttribute(attr); if(text && /[A-Za-z]{2}/.test(text)) texts.push({text,element:(el.id||el.tagName)+':'+attr});
         }
@@ -167,9 +167,9 @@ async function main() {
   await state("05-resources");
   await click("#projectsViewBtn");
   await click(".project-tile button.primary");
-  await until("document.querySelector('.file-card button.primary')", "project files");
+  await until("document.querySelector('.file-card .file-open')", "project files");
   await state("06-project-home");
-  await click(".file-card button.primary");
+  await click(".file-card .file-open");
   await until("document.querySelector('#segmentBody .target-editor')", "editor");
   await state("07-editor");
   for (const [id, name] of [

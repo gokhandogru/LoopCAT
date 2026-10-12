@@ -76,6 +76,18 @@ export function createTmMatchesController(options) {
       ...(hasResourceLinks ? { resourceLinks: tm.getLinks() || [] } : {}),
       ...(hasContext ? { context: tm.context(segment) || {} } : {})
     });
+    if (segment.previousTranslation?.target)
+      matches.push({
+        id: "previous-source-version",
+        source: segment.previousTranslation.source,
+        target: segment.previousTranslation.target,
+        score: 0,
+        effectiveScore: 0,
+        rawScore: 0,
+        tmName: localization.source("Previous source version — review before use"),
+        matchKind: "historical suggestion",
+        safeToApply: true
+      });
     if (session.getProject()?.id !== projectId || session.getActiveSegment()?.id !== segmentId) return;
     currentResults = matches.slice();
     resultContext = Object.freeze({ projectId, segmentId });
@@ -94,6 +106,9 @@ export function createTmMatchesController(options) {
         .map((difference) => `${difference.source || "∅"} → ${difference.candidate || "∅"}`)
         .join(", ");
       const details = [
+        match.adjustments?.length
+          ? `<p class="muted">Text ${Number(match.textScore)}% · ${text.escapeHtml(match.adjustments.map((item) => `${item.reason}: −${item.points}`).join("; "))} · Final ${Number(match.effectiveScore)}%</p>`
+          : "",
         match.penalty
           ? `<p class="muted">Raw ${match.rawScore}% − ${match.penalty} penalty = ${match.effectiveScore}%</p>`
           : "",
@@ -111,15 +126,17 @@ export function createTmMatchesController(options) {
         .join("\n      ");
       safeHtml.replace(
         card,
-        `<header><strong>${localization.labelHtml("matchPercent", { score: match.effectiveScore ?? match.score })}</strong><span>${matchKind}${text.escapeHtml(match.tmName || match.resourceName || "")}</span></header>
+        `<header><strong>${match.id === "previous-source-version" ? text.escapeHtml(localization.source("Previous translation")) : localization.labelHtml("matchPercent", { score: match.effectiveScore ?? match.score })}</strong><span>${matchKind}${text.escapeHtml(match.tmName || match.resourceName || "")}</span></header>
       <p>${text.escapeHtml(match.source)}</p>
       <p><strong>${text.escapeHtml(match.target)}</strong></p>
       ${details ? `${details}\n      ` : ""}${match.projectName ? `<p class="muted">${text.escapeHtml(match.projectName)}</p>` : ""}`
       );
       const button = dom.createElement("button");
       button.textContent = localization.label("insert");
+      button.disabled = match.safeToApply === false;
+      if (button.disabled) button.title = localization.source("Protected codes require manual review.");
       button.addEventListener("click", () =>
-        target.insert(match.target, {
+        target.insert(match.adaptedTarget || match.target, {
           channel: "match",
           resourceId: match.id || ""
         })

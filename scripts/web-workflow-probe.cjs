@@ -51,9 +51,9 @@ async function webWorkflowProbe() {
   files.items.add(file);
   input.files = files.files;
   input.dispatchEvent(new Event("change", { bubbles: true }));
-  await wait(() => document.querySelector(".file-card button.primary"), "file import");
+  await wait(() => document.querySelector(".file-card .file-open"), "file import");
   console.log("Web probe: UI import complete");
-  document.querySelector(".file-card button.primary").click();
+  document.querySelector(".file-card .file-open").click();
   await wait(() => document.querySelector("#segmentBody .target-editor"), "segment editor");
   const editor = document.querySelector("#segmentBody .target-editor");
   editor.focus();

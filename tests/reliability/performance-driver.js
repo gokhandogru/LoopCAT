@@ -65,7 +65,7 @@ export async function runPerformance(storage, output) {
     const doc = () => frame.contentDocument;
     const open = await wait(() => doc()?.querySelector(".project-tile button.primary"), "project listing");
     open.click();
-    (await wait(() => doc()?.querySelector(".file-card button.primary"), "project dashboard")).click();
+    (await wait(() => doc()?.querySelector(".file-card .file-open"), "project dashboard")).click();
     const field = await wait(
       () => doc()?.querySelector("#segmentBody .target-editor[contenteditable=true]"),
       "editable segment"

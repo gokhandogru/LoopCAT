@@ -4,8 +4,8 @@
   const PACKAGE_TYPE = "project-package";
   const PACKAGE_VERSION = 1;
   const MIN_SCHEMA_VERSION = 3;
-  const MAX_PACKAGE_SCHEMA_VERSION = 6;
-  const MAX_BACKUP_SCHEMA_VERSION = 7;
+  const MAX_PACKAGE_SCHEMA_VERSION = 7;
+  const MAX_BACKUP_SCHEMA_VERSION = 8;
   const PACKAGE_FORMAT = "loopcat-project-package";
   const CONTRACT_VERSION = "loopcat-package-v1";
   const STORAGE_MODES = new Set(["browser-cache", "workspace-folder"]);
@@ -437,6 +437,30 @@
     });
   }
 
+  function validateAnalysisMetadata(report, project) {
+    const snapshots = project.statisticsSnapshots;
+    if (snapshots !== undefined) {
+      const validCounts = (value) => isObject(value) && ["words", "segments", "characters", "charactersWithoutWhitespace", "tags"].every((key) => Number.isFinite(value[key]) && value[key] >= 0);
+      const validBuckets = (value) => Array.isArray(value) && value.length === 9 && value.every((row) => typeof row?.band === "string" && validCounts(row));
+      if (!Array.isArray(snapshots) || snapshots.length > 20 || JSON.stringify(snapshots).length > 10000000) {
+        add(report, "errors", "Statistics snapshots exceed the supported metadata limits.");
+      } else for (const snapshot of snapshots) {
+        if (!isObject(snapshot) || snapshot.schemaVersion !== 1 || typeof snapshot.id !== "string" || !isIsoDate(snapshot.createdAt) ||
+            !validCounts(snapshot.totals) || !validBuckets(snapshot.buckets) || !validBuckets(snapshot.estimatedBuckets) ||
+            !isObject(snapshot.options) || !isObject(snapshot.scope) || !Array.isArray(snapshot.rows) || !Array.isArray(snapshot.files) ||
+            !Array.isArray(snapshot.memories) || !Array.isArray(snapshot.limitations) ||
+            !Number.isFinite(snapshot.weightedWords) ||
+            snapshot.files.some((file) => !validCounts(file?.totals) || !validBuckets(file?.buckets)) ||
+            snapshot.rows.some((row) => !row || typeof row.segmentId !== "string" || !Array.isArray(row.adjustments)))
+          add(report, "errors", "A Statistics snapshot has an unsupported or invalid schema.");
+      }
+    }
+    const receipts = project.importReceipts;
+    if (receipts !== undefined && (!Array.isArray(receipts) || receipts.length > 1000 || JSON.stringify(receipts).length > 1000000 ||
+        receipts.some((r) => !isObject(r) || typeof r.importKey !== "string" || typeof r.documentId !== "string" || typeof r.name !== "string" || !/^[a-f0-9]{64}$/.test(r.fingerprint) || !isIsoDate(r.importedAt))))
+      add(report, "errors", "Import receipts have an invalid schema or exceed the metadata limit.");
+  }
+
   function validateProjectResourceLinks(
     report,
     project,
@@ -444,6 +468,7 @@
     missingBucket = "errors",
     issueBucket = "errors"
   ) {
+    validateAnalysisMetadata(report, project || {});
     if (project?.resourceLinks === undefined) {
       add(report, missingBucket, `${label} resource links are missing.`);
       return;

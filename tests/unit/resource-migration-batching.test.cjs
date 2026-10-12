@@ -123,7 +123,7 @@ test("legacy resource upgrade bounds reads and preserves every entry, token, and
     Blob,
     crypto
   });
-  for (const filename of ["tm.js", "termbase.js"]) {
+  for (const filename of ["linguistic-core.js", "tm.js", "termbase.js"]) {
     vm.runInContext(readFileSync(path.join(__dirname, "../..", filename), "utf8"), runtime);
   }
   const matches = await runtime.window.CatHan.tm.findTmMatches({

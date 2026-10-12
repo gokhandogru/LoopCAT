@@ -90,7 +90,7 @@ function testSourcePlugin() {
 
 function rendererIndex(entryMarkup, baseHref = "") {
   const source = fs.readFileSync(path.join(root, "index.html"), "utf8");
-  const firstScript = '    <script src="./storage.js"></script>';
+  const firstScript = '    <script src="./linguistic-core.js"></script>';
   const lastScript = '    <script src="./app.js"></script>';
   const start = source.indexOf(firstScript);
   const end = source.indexOf(lastScript, start);
@@ -174,7 +174,14 @@ async function main() {
     minify: true
   });
   const fileWorkerSources = {
-    "./cat-worker.js": fs.readFileSync(path.join(root, "cat-worker.js"), "utf8"),
+    "./cat-worker.js":
+      fs.readFileSync(path.join(root, "linguistic-core.js"), "utf8") +
+      "\n" +
+      fs.readFileSync(path.join(root, "statistics-core.js"), "utf8") +
+      "\n" +
+      fs.readFileSync(path.join(root, "source-update-core.js"), "utf8") +
+      "\n" +
+      fs.readFileSync(path.join(root, "cat-worker.js"), "utf8"),
     "./regex-worker.js": fs.readFileSync(path.join(root, "regex-worker.js"), "utf8"),
     "./archive-worker.js": fs.readFileSync(path.join(productionDir, "archive-worker.js"), "utf8")
   };

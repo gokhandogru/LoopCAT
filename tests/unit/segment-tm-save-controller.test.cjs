@@ -82,6 +82,7 @@ test("SegmentTmSaveController preserves the exact TM payload, repository result,
   assert.equal(result, harness.savedEntry);
   assert.deepEqual(harness.calls.find(([name]) => name === "saveEntry")[1], {
     source: " Source ",
+    sourceDescriptor: { version: 1, codes: [] },
     target: " Target ",
     sourceLang: "en",
     targetLang: "tr",

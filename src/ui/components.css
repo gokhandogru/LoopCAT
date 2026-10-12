@@ -631,3 +631,117 @@
     grid-template-columns: 1fr;
   }
 }
+/* Scoped workload analysis and reviewed batch import. */
+.statistics-dialog {
+  width: min(1040px, calc(100vw - 40px));
+  max-height: calc(100dvh - 40px);
+  padding: 24px;
+  overflow: auto;
+  color: inherit;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line, #c9d9d3);
+  border-radius: 16px;
+}
+
+.statistics-heading,
+.statistics-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-block: 12px;
+}
+
+.statistics-heading h2 {
+  margin-inline-end: auto;
+}
+.statistics-dialog > footer {
+  position: sticky;
+  bottom: -24px;
+  padding-block: 12px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-line);
+}
+.statistics-dialog label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px;
+}
+.statistics-dialog input[type="number"] {
+  width: 80px;
+}
+.statistics-dialog fieldset {
+  margin-block: 16px;
+  border: 1px solid var(--color-line, #c9d9d3);
+}
+.statistics-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-block: 16px;
+}
+.statistics-dialog table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.statistics-dialog td,
+.statistics-dialog th {
+  padding: 10px;
+  text-align: start;
+  border-bottom: 1px solid var(--color-line, #c9d9d3);
+}
+.statistics-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-block: 24px;
+}
+.statistics-cards strong {
+  display: block;
+  font-size: 28px;
+}
+.statistics-cards span {
+  display: block;
+  margin-block-start: 4px;
+}
+.segment-select {
+  display: block;
+  margin: 0 auto 4px;
+}
+.file-action-menu {
+  position: relative;
+  min-width: 140px;
+}
+.file-action-menu[open] {
+  padding: 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+.file-action-menu button {
+  display: block;
+  width: 100%;
+  margin-block: 4px;
+  text-align: start;
+}
+.file-update-row {
+  padding: 12px;
+  margin-block: 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.statistics-controls[hidden] {
+  display: none;
+}
+
+@media (width <= 640px) {
+  .statistics-dialog {
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+    padding: 16px;
+  }
+}

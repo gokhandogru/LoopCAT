@@ -1,3 +1,6 @@
+import "../../linguistic-core.js";
+import "../../statistics-core.js";
+import "../../source-update-core.js";
 import "../../storage.js";
 import "../features/import-export/install-archive-adapter.js";
 import "../../workspace-storage.js";

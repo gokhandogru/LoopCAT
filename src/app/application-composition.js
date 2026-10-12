@@ -1,3 +1,10 @@
+import { createFileLifecycleService } from "../features/projects/file-lifecycle-service.js";
+import { createFileManagementController } from "../features/projects/file-management-controller.js";
+import { createWorkspaceToolbarController } from "../ui/workspace-toolbar-controller.js";
+import { linguistics } from "../features/linguistics/core.js";
+import { createBatchImportController } from "../features/import-export/batch-import-controller.js";
+import { createStatisticsController } from "../features/statistics/statistics-controller.js";
+import { createSegmentSelectionStore } from "../features/editor/segment-selection-store.js";
 /* eslint-disable no-use-before-define -- Composition preserves call-time adapters to later checked boundaries. */
 /* eslint-disable no-unused-vars -- The isolated workflow driver consumes test-only lexical bindings at build time. */
 import { createReliabilityControls } from "./reliability-controls.js";
@@ -1517,7 +1524,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     tm: {
       listByIndex: getAllByIndex,
       listLinked: async (project) => {
-        const names = [...new Set(projectResourceContextService.tmNames(project))];
+        const names = [
+          ...new Set(projectResourceContextService.lookupTmLinks(project).map((link) => link.cachedName || link.name))
+        ];
         const records = await Promise.all(names.map((name) => getAllByIndex("tmEntries", "tmName", name)));
         return records.flat().filter((entry) => entry.languagePair === `${project.sourceLang}::${project.targetLang}`);
       }
@@ -1528,7 +1537,13 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       buildAsync: async (project, segments, entries, signal) => {
         const scores = await workerClient.analyzeTm({
           sources: segments.map((segment) => segment.source),
-          entries: entries.map((entry) => entry.source),
+          entries,
+          segments,
+          options: {
+            sourceLang: project.sourceLang,
+            targetLang: project.targetLang,
+            resourceLinks: projectResourceContextService.lookupTmLinks(project)
+          },
           signal
         });
         return analyzeProject(project, segments, [], scores);
@@ -1644,8 +1659,11 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     localization: uiLocalizationService,
     quality: qualityPresentationService
   });
+  const segmentSelection = createSegmentSelectionStore();
   const segmentRowPresentationService = appRuntime.featureFactories.createSegmentRowPresentationService({
     template: els.rowTemplate,
+    selection: segmentSelection,
+    visibleIds: () => segmentFilterService.visibleIndexes().map((i) => editorSessionStore.getSegments()[i].id),
     body: els.segmentBody,
     session: { getSegments: editorSessionStore.getSegments },
     application: { getActiveIndex: () => applicationStore.getState().navigation.activeIndex },
@@ -1669,6 +1687,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   });
 
   const segmentProgressService = appRuntime.featureFactories.createSegmentProgressService({
+    getSourceLanguage: () => editorSessionStore.getProject()?.sourceLang || "en",
     getSegments: () => editorSessionStore.getSegments(),
     getProjectId: () => editorSessionStore.getProject()?.id || "",
     getCachedSummary: () => editorSessionStore.getProgressSummary(),
@@ -1914,6 +1933,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     presentation: { replaceSafeHtml },
     actions: {
       deleteDocument: projectDeletionController.deleteDocument,
+      mountMenu: (root, file) => fileManagementController.mountMenu(root, file, { selectable: true, omit: ["open"] }),
       openDocument: (documentId) => projectDocumentOpenController.open(documentId)
     }
   });
@@ -2231,6 +2251,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
         const segments = editorSessionStore.getSegments().filter((item) => item.documentId === segment.documentId);
         const index = segments.findIndex((item) => item.id === segment.id);
         return {
+          ...linguistics.contextFor(segment, editorSessionStore.getSegments()),
           documentKey: tmDocumentContextKey(segment, index),
           previousSource: segments[index - 1]?.source || "",
           nextSource: segments[index + 1]?.source || "",
@@ -2625,6 +2646,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
         const index = segments.findIndex((item) => item.id === segment.id);
         return commandPersistence.run([segment], () =>
           restoreSegmentWithMainTm(editorSessionStore.getProject(), segment, {
+            ...linguistics.contextFor(segment, editorSessionStore.getSegments()),
             documentKey: tmDocumentContextKey(segment, index),
             previousSource: segments[index - 1]?.source || "",
             nextSource: segments[index + 1]?.source || ""
@@ -3256,6 +3278,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
         const segments = editorSessionStore.getSegments().filter((item) => item.documentId === segment.documentId);
         const index = segments.findIndex((item) => item.id === segment.id);
         return {
+          ...linguistics.contextFor(segment, editorSessionStore.getSegments()),
           documentKey: tmDocumentContextKey(segment, index),
           previousSource: segments[index - 1]?.source || "",
           nextSource: segments[index + 1]?.source || "",
@@ -5511,6 +5534,22 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     confirm: uiLocalizationService.confirm
   });
+  const batchImportController = createBatchImportController({
+    document,
+    session: editorSessionStore,
+    translate: uiLocalizationService.source,
+    accept: els.projectFileImportInput.accept,
+    encodingOptions: () =>
+      encodingApi.TEXT_ENCODING_OPTIONS || [...els.fileEncodingSelect.options].map((o) => [o.value, o.textContent]),
+    confirm: uiLocalizationService.confirm,
+    flush: () => autosaveService.flush(),
+    runTask: fileImportService.runTask,
+    importFile: projectDocumentImportController.importFile,
+    finishBatch: projectDocumentImportController.finishBatch,
+    showDialog: (dialog, initialFocus) =>
+      focusController.showModal(dialog, { initialFocus, returnTarget: document.activeElement }),
+    openStatistics: () => window.dispatchEvent(new CustomEvent("loopcat:statistics"))
+  });
   importExportController = appRuntime?.featureFactories?.createImportExportController?.({
     elements: {
       projectFileImportButton: els.projectFileImportBtn,
@@ -5546,7 +5585,11 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     hasProject: () => Boolean(editorSessionStore.getProject()),
     runImportTask: fileImportService.runTask,
-    importProjectFile: projectDocumentImportController.importFile,
+    reviewProjectFiles: batchImportController.review,
+    importProjectFile: async (file) => {
+      await autosaveService.flush();
+      return projectDocumentImportController.importFile(file);
+    },
     importProjectPackage: async (file) => {
       await autosaveService.flush();
       return projectImportRestoreController.importProjectPackage(file);
@@ -5562,7 +5605,13 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     exportTargetDocx: deliveryExportController.exportTargetDocx,
     exportBilingualDocx: deliveryExportController.exportBilingualDocx,
     exportTargetText: deliveryExportController.exportTargetText,
-    exportLocalization: deliveryExportController.exportLocalization,
+    exportLocalization: () => {
+      const documentId = applicationStore.getState().navigation.documentId;
+      const file = editorSessionStore.getProject()?.documents?.find((d) => d.id === documentId);
+      return file?.type === "docx"
+        ? deliveryExportController.exportTargetDocx(documentId)
+        : deliveryExportController.exportLocalization(documentId);
+    },
     exportXliff12: deliveryExportController.exportXliff12,
     exportXliff22: deliveryExportController.exportXliff22,
     exportProjectReport: reportExportController.exportProjectReport,
@@ -6280,6 +6329,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     selection: { getActiveSegment: applicationActiveSegmentService.get },
     ai: { getState: () => state.localAi },
     features: {
+      fileAction: (action) =>
+        window.dispatchEvent(new window.CustomEvent("loopcat:file-action", { detail: { action } })),
+      statistics: () => window.dispatchEvent(new window.CustomEvent("loopcat:statistics")),
       history: applicationCommandHistoryController,
       trash: applicationTrashController,
       confirmation: segmentConfirmationController,
@@ -6333,6 +6385,202 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       backup: workspaceBackupExportController.exportBackup
     }
   });
+  const toolbarSlots = createWorkspaceToolbarController({
+    document,
+    translate: uiLocalizationService.source,
+    getProject: () => editorSessionStore.getProject()
+  });
+  const statisticsController = createStatisticsController({
+    hosts: toolbarSlots,
+    document,
+    session: editorSessionStore,
+    selection: segmentSelection,
+    translate: uiLocalizationService.source,
+    getDocumentId: () => applicationStore.getState().navigation.documentId,
+    getVisibleSegments: () =>
+      segmentFilterService
+        .visibleIndexes()
+        .map((i) => editorSessionStore.getSegments()[i])
+        .filter(Boolean),
+    refreshRows: () => segmentGridPresentationController.render({ preserveScroll: true }),
+    mountFileActions: (root, file) => fileManagementController.mountMenu(root, file),
+    openSegment: async (id) => {
+      const i = editorSessionStore.getSegments().findIndex((s) => s.id === id);
+      if (i < 0) {
+        const historical = await storageApi.get("versionSegments", id);
+        if (historical?.projectId === editorSessionStore.getProject()?.id)
+          return fileManagementController.inspectHistoricalSegment(historical);
+        throw new Error("This report segment is no longer available in the project.");
+      }
+      editorFilterStore.update({ query: "", status: "all", reviewState: "", aiState: "" });
+      els.segmentSearchInput.value = "";
+      els.segmentStatusFilter.value = "all";
+      if (els.reviewStateFilter) els.reviewStateFilter.value = "";
+      if (els.aiSegmentFilter) els.aiSegmentFilter.value = "";
+      await projectDocumentOpenController.open(editorSessionStore.getSegments()[i].documentId);
+      await segmentNavigationController.select(i);
+      targetEditController.focusActive();
+    },
+    flush: () => autosaveService.flush(),
+    listResources: () => getAll("resources"),
+    listEntries: (project) =>
+      getAllByIndex("tmEntries", "languagePair", project.sourceLang + "::" + project.targetLang),
+    analyze: (request, signal, onProgress) => workerClient.analyzeTm({ request, signal, onProgress }),
+    showDialog: (dialog, initialFocus) =>
+      focusController.showModal(dialog, { initialFocus, returnTarget: document.activeElement }),
+    download: applicationDownloadController.download,
+    save: async (snapshot) => {
+      const project = editorSessionStore.getProject();
+      if (project.id !== snapshot.projectId) throw new Error("Project changed.");
+      const reports = project.statisticsSnapshots || [];
+      if (reports.some((report) => report.id === snapshot.id)) return;
+      if (reports.length >= 20 || JSON.stringify([...reports, snapshot]).length > 10000000)
+        throw new Error("Snapshot storage limit reached. Export or delete a saved snapshot first.");
+      const updated = await updateProject({ ...project, statisticsSnapshots: [...reports, snapshot] });
+      editorSessionStore.replaceProject(updated);
+      workspaceDirtyStateController.mark(project.id);
+    },
+    removeSnapshot: async (id) => {
+      const project = editorSessionStore.getProject();
+      const updated = await updateProject({
+        ...project,
+        statisticsSnapshots: (project.statisticsSnapshots || []).filter((r) => r.id !== id)
+      });
+      editorSessionStore.replaceProject(updated);
+      workspaceDirtyStateController.mark(project.id);
+    }
+  });
+  const fileLifecycleService = createFileLifecycleService({
+    storage: storageApi,
+    compare: (previous, incoming, locale, signal) =>
+      workerClient.analyzeTm({ sourceUpdate: { previous, incoming, locale }, signal }),
+    prepare: async (file, settings) => {
+      fileImportService.assertSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);
+      const ext = file.name.split(".").pop().toLowerCase();
+      const parsed =
+        ext === "docx"
+          ? await extractDocxSegments(file)
+          : XLIFF_DOCUMENT_TYPES.has(ext)
+            ? await parseXliffFile(file, { encoding: settings.encoding })
+            : await parseLocalizationFile(file, { encoding: settings.encoding });
+      return {
+        ...parsed,
+        documentType: parsed.documentType || ext,
+        importOptions: { encoding: settings.encoding || "auto" }
+      };
+    },
+    validate: async (prepared, segments) => {
+      if (prepared.documentType === "docx") await buildTargetDocx({ docxStructure: prepared.structure }, segments);
+      else if (XLIFF_DOCUMENT_TYPES.has(prepared.documentType))
+        await buildTargetXliff(editorSessionStore.getProject(), segments, prepared.structure);
+      else await buildLocalizationFile(prepared.documentType, segments, prepared.structure);
+    }
+  });
+  const refreshFileLifecycle = async (projectId) => {
+    if (editorSessionStore.getProject()?.id !== projectId) return;
+    const oldSegmentIds = editorSessionStore.getSegments().map((s) => s.id);
+    const oldProject = editorSessionStore.getProject(),
+      oldId = applicationStore.getState().navigation.documentId;
+    const project = await storageApi.get("projects", projectId);
+    editorSessionStore.replaceProject(project);
+    editorSessionStore.replaceSegments(segmentTargetStateService.prepareHistories(await getProjectSegments(projectId)));
+    const currentIds = new Set(editorSessionStore.getSegments().map((s) => s.id));
+    appRuntime.commands.undoStore.invalidateAffected(
+      projectId,
+      oldSegmentIds.filter((id) => !currentIds.has(id))
+    );
+    editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((p) => (p.id === projectId ? project : p)));
+    segmentSelection.sync(projectId, editorSessionStore.getSegments());
+    segmentFilterService.invalidate();
+    workspaceDirtyStateController.mark(projectId);
+    await projectSummaryController.refresh();
+    if (oldId && !project.documents.some((d) => d.id === oldId)) {
+      const oldIndex = oldProject.documents.findIndex((d) => d.id === oldId);
+      const next = project.documents[Math.min(oldIndex, project.documents.length - 1)];
+      if (next) await projectDocumentOpenController.open(next.id);
+      else {
+        applicationNavigation.selectDocument({ documentId: "" });
+        applicationNavigation.selectSegment({ activeIndex: -1, segmentId: "" });
+        projectHomeController.show();
+      }
+    }
+    applicationAggregatePresentationController.render();
+    fileManagementController.refresh();
+    await editorContextController.refresh();
+  };
+  const fileManagementController = createFileManagementController({
+    hosts: toolbarSlots,
+    document,
+    session: editorSessionStore,
+    service: fileLifecycleService,
+    translate: uiLocalizationService.source,
+    accept: els.projectFileImportInput.accept,
+    encodingOptions: () => encodingApi.TEXT_ENCODING_OPTIONS,
+    showDialog: (dialog) =>
+      focusController.showModal(dialog, {
+        initialFocus: dialog.querySelector("button"),
+        returnTarget: document.activeElement
+      }),
+    flush: () => autosaveService.flush(),
+    refresh: refreshFileLifecycle,
+    render: () => applicationAggregatePresentationController.render(),
+    openDocument: (id) => projectDocumentOpenController.open(id),
+    statistics: (ids) => statisticsController.open("files", ids),
+    getDocumentId: () => applicationStore.getState().navigation.documentId,
+    exportFile: (file) =>
+      file.type === "docx"
+        ? deliveryExportController.exportTargetDocx(file.id)
+        : deliveryExportController.exportLocalization(file.id),
+    trash: appRuntime.trashRepository,
+    moveTrash: (projectId, ids) => {
+      let entryIds = [];
+      return appRuntime.commands.bus.execute({
+        id: "trash-files",
+        label: "Move files to Trash",
+        undoLabel: "Restore files from Trash",
+        projectId,
+        scope: "document",
+        affectedIds: ids,
+        execute: async () => {
+          const requestId = crypto.randomUUID();
+          const project = await fileLifecycleService.trash(projectId, ids, requestId);
+          entryIds = (await storageApi.get("fileLifecycleReceipts", requestId)).entryIds;
+          return { project, recoveryToken: requestId };
+        },
+        undo: async () => {
+          const project = await fileLifecycleService.restoreTrash(entryIds);
+          await refreshFileLifecycle(projectId);
+          return { project };
+        }
+      });
+    },
+    restoreMany: (ids) => fileLifecycleService.restoreTrash(ids)
+  });
+  editorSessionStore.subscribe(() => fileManagementController.refresh());
+  applicationStore.subscribe(() => {
+    fileManagementController.refresh();
+    statisticsController.refreshControls();
+  });
+  window.addEventListener("loopcat-files-purged", (event) =>
+    appRuntime.commands.undoStore.invalidateAffected(event.detail.projectId, event.detail.ids)
+  );
+  window.addEventListener("loopcat:file-action", (event) => {
+    const detail = event.detail || {};
+    const project = editorSessionStore.getProject();
+    const file = project?.documents?.find(
+      (d) => d.id === (detail.documentId || applicationStore.getState().navigation.documentId)
+    );
+    if (detail.action === "project-trash") void fileManagementController.projectTrash();
+    else if (file)
+      void fileManagementController
+        .dispatch(detail.action, project.id, file)
+        .catch((error) => applicationSaveStatusController.set(error.message, "dirty"));
+    else applicationSaveStatusController.set("Select a file first.", "dirty");
+  });
+  window.addEventListener(
+    "loopcat:statistics",
+    () => void statisticsController.open().catch((error) => applicationSaveStatusController.set(error.message, "dirty"))
+  );
   reliabilityControls.mount();
   window.addEventListener("loopcat:localechange", () => languageInputService.renderDatalists());
   window.addEventListener("loopcat-catalog-ready", () => {

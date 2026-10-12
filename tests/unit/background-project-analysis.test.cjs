@@ -17,7 +17,8 @@ test("Background TM scores preserve exhaustive analysis, including repetitions a
       }
     }
   });
-  vm.runInContext(fs.readFileSync(path.resolve(__dirname, "../../cat-worker.js"), "utf8"), context);
+  for (const name of ["linguistic-core.js", "statistics-core.js", "cat-worker.js"])
+    vm.runInContext(fs.readFileSync(path.resolve(__dirname, "../..", name), "utf8"), context);
   context.window = { CatHan: { tm: { normalizeText: context.normalizeText, similarity: context.similarity } } };
   vm.runInContext(fs.readFileSync(path.resolve(__dirname, "../../analysis.js"), "utf8"), context);
   const entries = ["Good morning", "A small example", "Numbers 42", "!!!"].map((source) => ({ source }));

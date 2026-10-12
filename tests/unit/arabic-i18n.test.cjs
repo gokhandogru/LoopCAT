@@ -194,7 +194,8 @@ test("Main-thread and worker QA recognize Arabic digits and punctuation without 
   const context = vm.createContext({ window: { CatHan: {} }, self: { addEventListener() {} } });
   vm.runInContext(fs.readFileSync(path.join(root, "qa.js"), "utf8"), context);
   const main = context.window.CatHan.qa.runQaChecks;
-  vm.runInContext(fs.readFileSync(path.join(root, "cat-worker.js"), "utf8"), context);
+  for (const name of ["linguistic-core.js", "statistics-core.js", "cat-worker.js"])
+    vm.runInContext(fs.readFileSync(path.resolve(__dirname, "../..", name), "utf8"), context);
   const worker = context.runQaChecks;
   for (const run of [main, worker]) {
     for (const target of ["هل السعر ١٢٣٫٤٥؟", "هل السعر ۱۲۳٫۴۵؟"]) {

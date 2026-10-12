@@ -96,6 +96,11 @@ export function createProjectImportRestoreController(options) {
     await persistence.importProjectPackageRecords({
       project: prepared.project,
       segments: prepared.segments || [],
+      ...Object.fromEntries(
+        ["documentVersions", "versionSegments", "fileLifecycleReceipts", "trashEntries"]
+          .filter((name) => Array.isArray(prepared[name]))
+          .map((name) => [name, prepared[name]])
+      ),
       tmEntries: resourceRecords.tmEntries || [],
       terms: resourceRecords.terms || [],
       ...(Object.hasOwn(resourceRecords, "resources") ? { resources: resourceRecords.resources || [] } : {}),

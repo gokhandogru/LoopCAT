@@ -17,7 +17,7 @@ Required fields:
 - `app`: Must be `"LoopCAT"` for new exports. Older `"CatHan"` packages may be imported as legacy packages.
 - `type`: Must be `"project-package"`.
 - `version`: Package contract version. Current value: `1`.
-- `schemaVersion`: Project-package schema version. Current version: `6`. Current accepted range for package import: `3` through `6`; packages from newer schemas must be opened with a newer LoopCAT build. This contract is validated independently from the workspace-manifest version and from any future local-only storage schema.
+- `schemaVersion`: Project-package schema version. Current version: `7`. Current accepted range for package import: `3` through `7`; packages from newer schemas must be opened with a newer LoopCAT build. This contract is validated independently from the workspace-manifest version and from any future local-only storage schema.
 - `exportedAt`: ISO timestamp for package creation.
 - `packageMetadata`: Metadata about the package and storage mode.
 - `project`: Project metadata and settings.
@@ -226,3 +226,7 @@ New exports must always use:
 - `preserved`: Positive confirmation of preserved content.
 
 The validation report is advisory for exports and blocking for imports when `errors` is not empty.
+
+## October 2026 file history extension
+
+Schema 7 preserves document versions, archived source/target segments, file Trash and source-update receipts. Workspace backups use schema 8 and IndexedDB uses schema 9. Historical segments remain separate from live project scope; restoring a previous version creates a new head. Earlier package schemas remain importable.

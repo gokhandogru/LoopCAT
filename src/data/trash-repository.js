@@ -106,6 +106,18 @@ export function createTrashRepository(storageRepository) {
       const localizationStructure = nextProject.localizationStructures[documentId];
       delete nextProject.docxStructures[documentId];
       delete nextProject.localizationStructures[documentId];
+      if (
+        nextProject.legacyDocxDocumentId === documentId ||
+        project.documents.find((d) => d.type === "docx")?.id === documentId
+      ) {
+        delete nextProject.docxStructure;
+        delete nextProject.legacyDocxDocumentId;
+        const remaining = nextProject.documents.find((d) => d.type === "docx" && nextProject.docxStructures[d.id]);
+        if (remaining) {
+          nextProject.docxStructure = nextProject.docxStructures[remaining.id];
+          nextProject.legacyDocxDocumentId = remaining.id;
+        }
+      }
       const entry = {
         id: trashId(),
         entityType: "document",
@@ -113,7 +125,13 @@ export function createTrashRepository(storageRepository) {
         projectId: project.id,
         label: String(documentInfo.name || "File"),
         deletedAt: new Date().toISOString(),
-        payload: { documentInfo, segments, docxStructure, localizationStructure }
+        payload: {
+          documentInfo,
+          segments,
+          docxStructure,
+          localizationStructure,
+          ordinal: project.documents.findIndex((d) => d.id === documentId)
+        }
       };
       await storageRepository.moveProjectDocumentToTrash(nextProject, documentId, entry);
       return { entry, project: nextProject };
@@ -162,7 +180,11 @@ export function createTrashRepository(storageRepository) {
         const payload = entry.payload || {};
         const restoredProject = {
           ...project,
-          documents: [...(project.documents || []), payload.documentInfo],
+          documents: (() => {
+            const docs = [...(project.documents || [])];
+            docs.splice(Math.min(payload.ordinal ?? docs.length, docs.length), 0, payload.documentInfo);
+            return docs;
+          })(),
           docxStructures: { ...(project.docxStructures || {}) },
           localizationStructures: { ...(project.localizationStructures || {}) },
           updatedAt: new Date().toISOString()
@@ -170,6 +192,14 @@ export function createTrashRepository(storageRepository) {
         if (payload.docxStructure !== undefined) restoredProject.docxStructures[entry.entityId] = payload.docxStructure;
         if (payload.localizationStructure !== undefined) {
           restoredProject.localizationStructures[entry.entityId] = payload.localizationStructure;
+        }
+        restoredProject.sourceFileName = restoredProject.documents[0]?.name || "";
+        const firstDocx = restoredProject.documents.find(
+          (d) => d.type === "docx" && restoredProject.docxStructures[d.id]
+        );
+        if (firstDocx) {
+          restoredProject.docxStructure = restoredProject.docxStructures[firstDocx.id];
+          restoredProject.legacyDocxDocumentId = firstDocx.id;
         }
         await storageRepository.restoreTrashRecords({
           entryId,
@@ -185,11 +215,49 @@ export function createTrashRepository(storageRepository) {
       throw new Error(`Unsupported Trash item type: ${entry.entityType}`);
     },
     async emptyEntry(entryId) {
+      const entry = await storageRepository.get("trashEntries", entryId);
+      if (entry && storageRepository.commitMutation && ["project", "document"].includes(entry.entityType)) {
+        const changes = [];
+        for (const store of ["documentVersions", "versionSegments", "fileLifecycleReceipts"]) {
+          const records = await storageRepository.getAllByIndex(store, "projectId", entry.projectId);
+          for (const record of records)
+            if (
+              entry.entityType === "project" ||
+              record.documentId === entry.entityId ||
+              record.documentIds?.includes(entry.entityId)
+            )
+              changes.push({
+                store,
+                key: record.id,
+                delete: true,
+                expectedVersion: record.storageVersion || 0,
+                projectId: entry.projectId
+              });
+        }
+        changes.push({
+          store: "trashEntries",
+          key: entryId,
+          delete: true,
+          expectedVersion: entry.storageVersion || 0,
+          projectId: entry.projectId
+        });
+        await storageRepository.commitMutation(null, null, { changes });
+        if (globalThis.window?.dispatchEvent && typeof CustomEvent === "function")
+          window.dispatchEvent(
+            new CustomEvent("loopcat-files-purged", {
+              detail: {
+                projectId: entry.projectId,
+                ids: [entry.entityId, ...(entry.payload?.segments || []).map((s) => s.id), ...changes.map((c) => c.key)]
+              }
+            })
+          );
+        return;
+      }
       await storageRepository.deleteByKey("trashEntries", entryId);
     },
     async emptyAll() {
       const entries = await list();
-      await Promise.all(entries.map((entry) => storageRepository.deleteByKey("trashEntries", entry.id)));
+      for (const entry of entries) await this.emptyEntry(entry.id);
       return entries.length;
     }
   });

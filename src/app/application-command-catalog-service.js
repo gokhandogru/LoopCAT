@@ -348,6 +348,33 @@ export function createApplicationCommandCatalogService({
       "replace-target": "replace-target",
       "review-comment": "review-comment"
     };
+    if (features.statistics)
+      commands.push({
+        id: "statistics",
+        label: "Statistics",
+        keywords: ["words", "analysis", "fuzzy", "repetitions"],
+        enabled: Boolean(session.getProject()),
+        run: features.statistics
+      });
+    if (features.fileAction)
+      for (const [action, label] of [
+        ["open", "Open current file"],
+        ["export", "Export current file"],
+        ["rename", "Rename current file"],
+        ["update", "Update current source file"],
+        ["history", "Current file version history"],
+        ["trash", "Move current file to Trash"],
+        ["project-trash", "Project Trash"]
+      ])
+        commands.push({
+          id: "file-" + action,
+          label,
+          keywords: ["files", "manage"],
+          enabled:
+            Boolean(session.getProject()) &&
+            (action === "project-trash" || Boolean(application.getState().navigation?.documentId)),
+          run: () => features.fileAction(action)
+        });
     return commands.map((entry) => ({
       ...entry,
       shortcut: shortcutLabel(shortcutIds[entry.id]),

@@ -76,17 +76,16 @@ export function createDeliveryExportController(options) {
   validateDeliveryExportControllerOptions(options);
   const canRun = createDeliveryCanRun({ delivery, status });
 
-  function selectedDocumentForTypes(supportedTypes, selectedTypeMessage, missingMessage) {
+  function selectedDocumentForTypes(supportedTypes, selectedTypeMessage, missingMessage, explicitDocumentId) {
     const projectDocuments = documents.list();
-    const selected = application.getDocumentId()
-      ? projectDocuments.find((item) => item.id === application.getDocumentId())
-      : null;
+    const selectedId = explicitDocumentId || application.getDocumentId();
+    const selected = selectedId ? projectDocuments.find((item) => item.id === selectedId) : null;
     if (selected) {
       if (supportedTypes.has(documents.type(selected))) return selected;
       status.set(selectedTypeMessage, "dirty");
       return null;
     }
-    const documentInfo = projectDocuments.find((item) => supportedTypes.has(documents.type(item)));
+    const documentInfo = null;
     if (!documentInfo) status.set(missingMessage, "dirty");
     return documentInfo || null;
   }
@@ -241,14 +240,15 @@ export function createDeliveryExportController(options) {
     }
   }
 
-  async function exportTargetDocx() {
+  async function exportTargetDocx(explicitDocumentId) {
     if (!session.getProject()) return;
     try {
       await autosave.flush();
       const documentInfo = selectedDocumentForTypes(
         new Set(["docx"]),
         "The selected file is not a DOCX document.",
-        "Select a DOCX document to export."
+        "Select a DOCX document to export.",
+        explicitDocumentId
       );
       if (!documentInfo) return;
       const segments = session.getSegments().filter((segment) => segment.documentId === documentInfo.id);
@@ -351,14 +351,15 @@ export function createDeliveryExportController(options) {
     }
   }
 
-  async function exportLocalization() {
+  async function exportLocalization(explicitDocumentId) {
     try {
       if (!session.getProject()) return;
       await autosave.flush();
       const documentInfo = selectedDocumentForTypes(
         formats.localizationTypes,
         "The selected file is not exportable from Other formats.",
-        "Select a document from Other formats to export."
+        "Select a document from Other formats to export.",
+        explicitDocumentId
       );
       if (!documentInfo) return;
       const documentType = documents.type(documentInfo);

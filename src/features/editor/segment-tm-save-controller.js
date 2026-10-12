@@ -1,3 +1,4 @@
+import { linguistics } from "../linguistics/core.js";
 /**
  * Owns direct segment-to-translation-memory persistence and the active-segment
  * save action. Segment selection, TM naming/repository work, match refresh,
@@ -40,6 +41,7 @@ export function createSegmentTmSaveController(options) {
     const resourceId = tm.mainLink?.(project)?.resourceId || "";
     const entry = await tm.saveEntry({
       source: segment.source,
+      sourceDescriptor: linguistics.descriptorFor(segment),
       target: segment.target,
       sourceLang: project.sourceLang,
       targetLang: project.targetLang,

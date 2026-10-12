@@ -65,7 +65,7 @@ test("R11 v6 upgrade retains target, history, stable IDs and original reconstruc
 test("R11 v7 commits records, monotonic storage versions and journal in one transaction", async () => {
   const storage = loadStorage();
   const db = await storage.openDatabase();
-  assert.equal(db.version, 8);
+  assert.equal(db.version, 9);
   const first = await storage.put("segments", { id: "s", projectId: "p", target: "first", revision: 1 });
   const result = await storage.commitMutation(first.storageVersion, null, {
     changes: [{ store: "segments", value: { ...first, target: "second", revision: 2 } }]
@@ -239,7 +239,7 @@ test("R15 a failed database open can be retried without deleting data", async ()
     }
   });
   await assert.rejects(storage.openDatabase(), /temporary failure/);
-  assert.equal((await storage.openDatabase()).version, 8);
+  assert.equal((await storage.openDatabase()).version, 9);
   (await storage.openDatabase()).close();
 });
 

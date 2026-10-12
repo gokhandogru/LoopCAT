@@ -1180,8 +1180,8 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
           const projectApi = window.CatHan.project;
           const projectId = ${JSON.stringify(result.confirmationProjectId)};
           projectTile().querySelector("button.primary").click();
-          await waitFor(() => document.querySelector(".file-card button.primary"), "confirmation file");
-          document.querySelector(".file-card button.primary").click();
+          await waitFor(() => document.querySelector(".file-card .file-open"), "confirmation file");
+          document.querySelector(".file-card .file-open").click();
           await waitFor(() => document.querySelectorAll("#segmentBody .target-editor").length === 2, "confirmation editor");
           const targets = ["Bir <g id='friend'>arkadaşım</g> var.", "Arkadaşlarım var."];
           for (let index = 0; index < targets.length; index++) {

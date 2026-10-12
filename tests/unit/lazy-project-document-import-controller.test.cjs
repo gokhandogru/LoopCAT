@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, "../..");
 const moduleAt = (relativePath) => import(pathToFileURL(path.join(root, relativePath)).href);
 
 const apiOrder = [
+  "finishBatch",
   "confirmDuplicate",
   "hasDocumentNamed",
   "importDocx",

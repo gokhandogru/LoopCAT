@@ -2018,8 +2018,8 @@ for (const boundary of [
 }
 assert(
   (appJs.match(/createProjectSummaryController\(/g) || []).length === 1 &&
-    (appJs.match(/\bprojectSummaryController\.refresh\b/g) || []).length === 7,
-  "app.js must compose one project-summary controller and wire all seven refresh consumers directly."
+    (appJs.match(/\bprojectSummaryController\.refresh\b/g) || []).length === 8,
+  "app.js must compose one project-summary controller and wire all eight refresh consumers directly."
 );
 assert(
   (appJs.match(/\beditorSessionStore\.markProjectSummaryDirty\b/g) || []).length === 1 &&
@@ -2250,7 +2250,7 @@ for (const boundary of [
 }
 assert(
   (appJs.match(/createProjectDocumentOpenController\(/g) || []).length === 1 &&
-    (appJs.match(/\bprojectDocumentOpenController\.open\b/g) || []).length === 1 &&
+    (appJs.match(/\bprojectDocumentOpenController\.open\b/g) || []).length === 4 &&
     (appWorkflowDriverJs.match(/\bprojectDocumentOpenController\.open\b/g) || []).length === 13,
   "app.js must compose one project-document-open controller and the application and all thirteen workflow consumers must call it directly."
 );
@@ -2588,9 +2588,11 @@ assert(
       "local-ai-terms",
       "local-ai-terms-batch",
       "local-ai-project-brief",
-      "openai-ai"
+      "openai-ai",
+      "statistics",
+      "file-"
     ]),
-  "ApplicationCommandCatalogService must retain all 43 command IDs in exact order."
+  "ApplicationCommandCatalogService must retain all static and generated command ID prefixes in exact order."
 );
 for (const boundary of [
   "let applicationCommandCatalogService;",
@@ -2827,7 +2829,7 @@ for (const [method, appCount, workflowCount] of [
   ["clearMemory", 0, 1],
   ["hasUnsaved", 1, 0],
   ["ids", 2, 0],
-  ["mark", 38, 6],
+  ["mark", 41, 6],
   ["markProjects", 2, 0],
   ["markProjectsUsingResource", 6, 1],
   ["prune", 1, 1],
@@ -3452,7 +3454,7 @@ for (const boundary of [
 for (const [method, appCount, workflowCount] of [
   ["links", 4, 0],
   ["mainTm", 4, 12],
-  ["tmNames", 11, 0],
+  ["tmNames", 10, 0],
   ["termBaseNames", 12, 2],
   ["primaryTermBase", 6, 15],
   ["summary", 4, 1]
@@ -6294,8 +6296,9 @@ for (const consumer of ["textEncodingInputService.renderOptions()"]) {
   assertIncludes(appJs, consumer, `text-encoding input consumers must call the checked service directly: ${consumer}`);
 }
 for (const consumer of [
-  "formats.parseLocalization(file, formats.decodingOptions())",
-  "formats.parseXliff(file, formats.decodingOptions())"
+  "formats.parseLocalization(",
+  "formats.parseXliff(",
+  "importContext?.encoding ? { encoding: importContext.encoding } : formats.decodingOptions()"
 ]) {
   assertIncludes(
     projectDocumentImportControllerJs,
@@ -7285,7 +7288,7 @@ assert(
   "SegmentGridPresentationController must follow virtual feature creation and precede all direct controller consumers."
 );
 assert(
-  (appJs.match(/\bsegmentGridPresentationController\.render\b/g) || []).length === 19 &&
+  (appJs.match(/\bsegmentGridPresentationController\.render\b/g) || []).length === 20 &&
     (appWorkflowDriverJs.match(/\bsegmentGridPresentationController\.render\b/g) || []).length === 15 &&
     (appJs.match(/\bsegmentGridPresentationController\.scheduleRowUpdate\b/g) || []).length === 1 &&
     (appJs.match(/\bsegmentGridPresentationController\.cancelRowUpdate\b/g) || []).length === 1,
@@ -7574,8 +7577,8 @@ assert(
 
 assertIncludes(
   storageJs,
-  "const DB_VERSION = 8;",
-  "storage.js local database schema must be version 8 after the additive recovery and stable-resource migrations."
+  "const DB_VERSION = 9;",
+  "storage.js local database schema must be version 9 after the additive recovery and stable-resource migrations."
 );
 assertIncludes(
   validationJs,
@@ -7584,13 +7587,13 @@ assertIncludes(
 );
 assertIncludes(
   validationJs,
-  "const MAX_PACKAGE_SCHEMA_VERSION = 6;",
-  "validation.js must identify package schema version 6 as the current maximum."
+  "const MAX_PACKAGE_SCHEMA_VERSION = 7;",
+  "validation.js must identify package schema version 7 as the current maximum."
 );
 assertIncludes(
   validationJs,
-  "const MAX_BACKUP_SCHEMA_VERSION = 7;",
-  "validation.js must accept schema-7 resource backups while preserving legacy Trash data."
+  "const MAX_BACKUP_SCHEMA_VERSION = 8;",
+  "validation.js must accept schema-8 history backups while preserving legacy Trash data."
 );
 assertIncludes(
   workspaceStorageJs,
@@ -7601,11 +7604,11 @@ assert(
   !appJs.includes("storageConstants?.SCHEMA_VERSION ||"),
   "app.js must not use a stale numeric schema fallback when writing packages or backups."
 );
-assertIncludes(packageFormatDocs, "Current version: `6`", "Project-package documentation must name schema version 6.");
+assertIncludes(packageFormatDocs, "Current version: `7`", "Project-package documentation must name schema version 7.");
 assertIncludes(
   packageFormatDocs,
-  "`3` through `6`",
-  "Project-package documentation must describe the accepted schema range 3 through 6."
+  "`3` through `7`",
+  "Project-package documentation must describe the accepted schema range 3 through 7."
 );
 assert(
   modernizationFixture.schemaVersion === 5,
@@ -8256,7 +8259,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "TM threshold cancellation restores focus to the visible Segment tools control",
+  "TM threshold cancellation restores focus to the visible Segment tools or overflow control",
   "the app workflow must characterize TM prompt cancellation and focus return to the visible menu trigger."
 );
 assertIncludes(
@@ -10050,7 +10053,7 @@ assert(
 );
 assert(
   (applicationEventWiringControllerJs.match(/\blifecycles\.projectHome\.mount\b/g) || []).length === 1 &&
-    (appJs.match(/\bprojectHomeController\.show\b/g) || []).length === 1 &&
+    (appJs.match(/\bprojectHomeController\.show\b/g) || []).length === 2 &&
     (appWorkflowDriverJs.match(/\bprojectHomeController\.show\b/g) || []).length === 1,
   "ApplicationEventWiringController and direct application/workflow consumers must retain checked project-home controller calls."
 );
@@ -10339,12 +10342,14 @@ for (const snippet of [
   "ApplicationMenuController requires a document root and menu selector policy.",
   "function closeOpenMenus(except = null)",
   "documentRoot.querySelectorAll(selectors.openMenus).forEach((menu) => {",
-  'if (menu !== except) menu.removeAttribute("open")',
+  "if (menu !== except && !menu.contains?.(except))",
   "if (mounted) return false",
   "documentRoot.querySelectorAll(selectors.menus).forEach((menu) => {",
-  "if (!menu.open) return",
+  "if (!menu.open) {",
+  "hide(menu)",
+  "observer.observe(documentRoot.documentElement, { childList: true, subtree: true })",
   "closeOpenMenus(menu)",
-  'if (event.target.closest(selectors.buttons)) menu.removeAttribute("open")',
+  "if (event.target.closest(selectors.buttons)) {",
   'menu.addEventListener("toggle", toggleListener)',
   'menu.addEventListener("click", clickListener)',
   "if (event.target.closest(selectors.menus)) return",
@@ -12125,10 +12130,10 @@ assertIncludes(
 );
 for (const snippet of [
   "const sourceWordCounts = new WeakMap()",
-  'return (text || "").trim().split(/\\s+/).filter(Boolean).length',
+  "linguistics.metricsForSegment(segment, language).words",
   'if (!segment || typeof segment !== "object") return 0',
-  "if (cached?.source === source) return cached.count",
-  "sourceWordCounts.set(segment, { source, count })",
+  "cached.language === language && cached.descriptor === descriptor",
+  "sourceWordCounts.set(segment, { source, count, language, descriptor })",
   "for (const segment of segments)",
   'if (segment.status === "confirmed") confirmed += 1',
   'if (segment.status === "draft") draft += 1',
@@ -12717,7 +12722,7 @@ for (const snippet of [
   'text.escapeHtml(match.tmName || match.resourceName || "")',
   'match.projectName ? `<p class="muted">${text.escapeHtml(match.projectName)}</p>` : ""',
   'button.textContent = localization.label("insert")',
-  "target.insert(match.target, {",
+  "target.insert(match.adaptedTarget || match.target, {",
   'channel: "match"',
   'resourceId: match.id || ""',
   "root.replaceChildren(fragment)",
@@ -13485,12 +13490,12 @@ for (const removedHelper of [
   );
 }
 assert(
-  (appJs.match(/\bfileImportService\.assertSize\b/g) || []).length === 3 &&
+  (appJs.match(/\bfileImportService\.assertSize\b/g) || []).length === 4 &&
     (appJs.match(/\bfileImportService\.readText\b/g) || []).length === 2 &&
     (appJs.match(/\bfileImportService\.progressDetail\b/g) || []).length === 2 &&
     (appJs.match(/\bfileImportService\.errorReport\b/g) || []).length === 2 &&
     (appJs.match(/\bfileImportService\.parseJson\b/g) || []).length === 1 &&
-    (appJs.match(/\bfileImportService\.runTask\b/g) || []).length === 3 &&
+    (appJs.match(/\bfileImportService\.runTask\b/g) || []).length === 4 &&
     (appWorkflowDriverJs.match(/\bfileImportService\.readText\b/g) || []).length === 2 &&
     (appWorkflowDriverJs.match(/\bfileImportService\.errorReport\b/g) || []).length === 4 &&
     (appWorkflowDriverJs.match(/\bfileImportService\.runTask\b/g) || []).length === 15,
@@ -14589,7 +14594,8 @@ for (const boundary of [
   "lower: applicationTextSafetyService.stableLower",
   "safe: applicationTextSafetyService.displaySafeText",
   "confirm: uiLocalizationService.confirm",
-  "importProjectFile: projectDocumentImportController.importFile"
+  "importProjectFile: async (file) => {",
+  "return projectDocumentImportController.importFile(file)"
 ]) {
   assertIncludes(appJs, boundary, `project-document import composition must inject the checked ${boundary} boundary.`);
 }
@@ -14608,7 +14614,7 @@ for (const removedHelper of [
   );
 }
 assert(
-  (appJs.match(/\bprojectDocumentImportController\.importFile\b/g) || []).length === 1 &&
+  (appJs.match(/\bprojectDocumentImportController\.importFile\b/g) || []).length === 2 &&
     (appWorkflowDriverJs.match(/\bprojectDocumentImportController\.importFile\b/g) || []).length === 2 &&
     (appWorkflowDriverJs.match(/\bprojectDocumentImportController\.importDocx\b/g) || []).length === 2 &&
     (appWorkflowDriverJs.match(/\bprojectDocumentImportController\.importXliff\b/g) || []).length === 1 &&
@@ -15036,9 +15042,9 @@ for (const directConsumer of [
   );
 }
 assert(
-  appJs.split("segmentNavigationController.select(").length - 1 === 7 &&
+  appJs.split("segmentNavigationController.select(").length - 1 === 8 &&
     segmentRowPresentationServiceJs.includes('row.addEventListener("click", () => navigation.select(index))'),
-  "all seven remaining application selection adapters and the checked row listener must route to SegmentNavigationController."
+  "all eight application selection adapters and the checked row listener must route to SegmentNavigationController."
 );
 assert(
   appWorkflowDriverJs.split("segmentNavigationController.select(").length - 1 === 24,
@@ -21508,7 +21514,7 @@ for (const workflowConsumer of [
   );
 }
 assert(
-  (appJs.match(/\bapplicationDownloadController\.download\b/g) || []).length === 8 &&
+  (appJs.match(/\bapplicationDownloadController\.download\b/g) || []).length === 9 &&
     (appWorkflowDriverJs.match(/\bapplicationDownloadController\.download\b/g) || []).length === 3,
   "all application and workflow browser-download consumers must call ApplicationDownloadController directly or through the exact argument-order adapter."
 );
@@ -22037,7 +22043,7 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `aggregate-presentation composition must retain the checked ${boundary} boundary.`);
 }
 assert(
-  (appJs.match(/\bapplicationAggregatePresentationController\.render\b/g) || []).length === 17,
+  (appJs.match(/\bapplicationAggregatePresentationController\.render\b/g) || []).length === 19,
   "all characterized application aggregate-presentation consumers must call ApplicationAggregatePresentationController.render directly."
 );
 assert(
@@ -22796,7 +22802,7 @@ assertIncludes(
   functionBody(
     projectDocumentImportControllerJs,
     "async function importXliff(file)",
-    "async function importFile(file)"
+    "async function importFile(file, importOptions = {})"
   ),
   'files.assertSize(file, "Project file", files.maxBytes);',
   "the checked direct XLIFF import method must reject oversized project files before parsing."
@@ -24810,7 +24816,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "schema 8 adds durable shared resources while portable schemas remain versioned independently",
+  "schema 9 preserves shared resources and file history while portable schemas remain versioned independently",
   "app workflow test must verify the split storage/package schema contract."
 );
 assertIncludes(

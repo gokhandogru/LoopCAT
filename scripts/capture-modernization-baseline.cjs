@@ -507,7 +507,7 @@ app
       true
     );
     await waitFor(
-      "!document.querySelector('#projectHomeView').classList.contains('hidden') && document.querySelector('.file-card button.primary')",
+      "!document.querySelector('#projectHomeView').classList.contains('hidden') && document.querySelector('.file-card .file-open')",
       "project dashboard"
     );
     await captureState("02", "project-dashboard");
@@ -556,7 +556,7 @@ app
     await captureState("06", "opus-cat-help-dialog");
     await windowRef.webContents.executeJavaScript("document.querySelector('#opusCatHelpDialog').close()", true);
 
-    await windowRef.webContents.executeJavaScript("document.querySelector('.file-card button.primary').click()", true);
+    await windowRef.webContents.executeJavaScript("document.querySelector('.file-card .file-open').click()", true);
     await waitFor(
       "!document.querySelector('#editorView').classList.contains('hidden') && document.querySelector('#segmentBody .target-editor')",
       "translation editor"

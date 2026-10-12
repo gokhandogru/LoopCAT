@@ -49,7 +49,8 @@ async function harness(t) {
       return storage.get(store, id);
     }
   };
-  for (const file of ["tm.js", "project.js"]) vm.runInContext(readFileSync(path.join(root, file), "utf8"), runtime);
+  for (const file of ["linguistic-core.js", "tm.js", "project.js"])
+    vm.runInContext(readFileSync(path.join(root, file), "utf8"), runtime);
   const project = await storage.put("projects", {
     id: "p",
     name: "Test project",

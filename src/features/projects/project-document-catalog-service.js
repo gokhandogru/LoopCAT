@@ -35,6 +35,7 @@ export function createProjectDocumentCatalogService(options) {
       const id = documentInfo?.id || "";
       if (!id || map.has(id)) return;
       map.set(id, {
+        ...documentInfo,
         id,
         name: documentInfo.name || getProject()?.sourceFileName || "Document",
         type: normalizeType(documentInfo.type || "docx") || "docx"

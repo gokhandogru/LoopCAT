@@ -97,7 +97,7 @@ writeJson(path.join(downloadsDirectory, "release.json"), {
   identity,
   releaseNotes: `docs/releases/${version}.md`,
   qualification:
-    "Not production-qualified. Windows signing and clean-machine testing remain outstanding; no macOS or Linux downloads are included.",
+    "Not production-qualified. Signing and clean-machine testing remain outstanding. This repository directory mirrors Windows and web; macOS and Linux packages are available in the matching GitHub release.",
   artifacts: artifacts.map(({ name }) => ({ name, ...fileRecord(path.join(downloadsDirectory, name)) }))
 });
 
@@ -119,6 +119,8 @@ ${artifacts.map((artifact) => `| ${artifact.label} | [\`${artifact.name}\`](./${
 | SHA-256 checksums | [\`${checksumName}\`](./${checksumName}) |
 
 The Windows installer and portable application are unsigned. Windows may show an unknown-publisher or SmartScreen warning. Verify these ZIP files against the checksum list in this directory and proceed only if you trust the [LoopCAT repository](https://github.com/gokhandogru/LoopCAT).
+
+For macOS and Linux packages, use the [matching all-platform release](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-${version}).
 
 The older \`draft-0.0.3\` tag points to July commit \`6f9754d\`. Its historical assets are not this preview; do not mix ZIPs or checksum lists. Prior untagged 0.0.3 mirror files have been superseded here without changing that historical tag.
 

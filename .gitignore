@@ -12,3 +12,6 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 dist-web-arabic/
+
+/output/
+/tmp/

@@ -67,7 +67,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(Boolean(document.querySelector('link[rel="manifest"]')), "installable app manifest linked");
     const workflowDatabase = await storageApi.openDatabase();
     assert(
-      workflowDatabase.version === 8 &&
+      workflowDatabase.version === 9 &&
+        workflowDatabase.objectStoreNames.contains("documentVersions") &&
+        workflowDatabase.objectStoreNames.contains("versionSegments") &&
+        workflowDatabase.objectStoreNames.contains("fileLifecycleReceipts") &&
         workflowDatabase.objectStoreNames.contains("trashEntries") &&
         workflowDatabase.objectStoreNames.contains("journal") &&
         workflowDatabase.objectStoreNames.contains("checkpoints") &&
@@ -75,9 +78,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         workflowDatabase.objectStoreNames.contains("tmContributions") &&
         workflowDatabase.objectStoreNames.contains("termConcepts") &&
         workflowDatabase.objectStoreNames.contains("termDesignations") &&
-        storageConstants.PROJECT_PACKAGE_SCHEMA_VERSION === 6 &&
-        storageConstants.BACKUP_SCHEMA_VERSION === 7,
-      "schema 8 adds durable shared resources while portable schemas remain versioned independently"
+        storageConstants.PROJECT_PACKAGE_SCHEMA_VERSION === 7 &&
+        storageConstants.BACKUP_SCHEMA_VERSION === 8,
+      "schema 9 preserves shared resources and file history while portable schemas remain versioned independently"
     );
     const productionMockAiSelector = "#mock" + "AiSuggestionBtn";
     assert(!document.querySelector(productionMockAiSelector), "production UI does not expose mock AI suggestions");
@@ -743,24 +746,41 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     editorShellPresentationController.render();
     const segmentIndex = editorSessionStore.getSegments().findIndex((segment) => segment.documentId === documentInfo.id);
     const projectToolbarBounds = document.querySelector(".project-toolbar")?.getBoundingClientRect();
-    const toolbarActionsBounds = document.querySelector(".project-toolbar .toolbar-actions")?.getBoundingClientRect();
+    const toolbarActionsBounds = document.querySelector("#editorView .segment-controls")?.getBoundingClientRect();
     const progressBounds = document.querySelector(".progress-wrap")?.getBoundingClientRect();
     assert(
       Boolean(projectToolbarBounds && toolbarActionsBounds && progressBounds) &&
-        toolbarActionsBounds.bottom <= projectToolbarBounds.bottom + 1 &&
+        projectToolbarBounds.bottom <= toolbarActionsBounds.top + 1 &&
         toolbarActionsBounds.bottom <= progressBounds.top + 1,
       "responsive editor toolbar keeps every action above the progress panel"
     );
-    const editorAreaBounds = document.querySelector(".editor-area")?.getBoundingClientRect();
+    async function openMenuAncestors(menu) {
+      const ancestors = [];
+      for (let parent = menu.parentElement?.closest("details.menu"); parent; parent = parent.parentElement?.closest("details.menu")) {
+        ancestors.unshift(parent);
+      }
+      for (const parent of ancestors) {
+        parent.open = true;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      return ancestors;
+    }
     const editorImportMenu = document.querySelector("#editorImportMenu");
+    const importAncestors = await openMenuAncestors(editorImportMenu);
     editorImportMenu.open = true;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     const editorImportPanelBounds = editorImportMenu.querySelector(":scope > .menu-panel")?.getBoundingClientRect();
     editorImportMenu.open = false;
+    importAncestors.forEach((menu) => { menu.open = false; });
     assert(
-      Boolean(editorAreaBounds && editorImportPanelBounds) &&
-        editorImportPanelBounds.left >= editorAreaBounds.left - 1 &&
-        editorImportPanelBounds.right <= editorAreaBounds.right + 1,
-      "editor Import menu opens fully inside the rounded editor surface"
+      Boolean(editorImportPanelBounds?.width && editorImportPanelBounds?.height) &&
+        editorImportPanelBounds.left >= -1 &&
+        editorImportPanelBounds.right <= window.innerWidth + 1 &&
+        editorImportPanelBounds.top >= -1 &&
+        editorImportPanelBounds.bottom <= window.innerHeight + 1,
+      "nested editor Import menu opens fully inside the viewport"
     );
     assert(
       document.querySelectorAll("#newProjectBtn").length === 1 && !document.querySelector("#newProjectFromDashboardBtn"),
@@ -797,13 +817,16 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       ["segmentFiltersMenu", els.reviewStateFilter]
     ]) {
       const menu = document.getElementById(menuId);
+      const ancestors = await openMenuAncestors(menu);
       const opener = menu.querySelector("summary");
       opener.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
       await new Promise((resolve) => requestAnimationFrame(resolve));
       control.focus();
       assert(menu.open && document.activeElement === control, `${menuId} exposes its controls to keyboard focus`);
       control.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
       assert(!menu.open && document.activeElement === opener, `${menuId} closes with Escape and restores focus`);
+      ancestors.forEach((ancestor) => { ancestor.open = false; });
     }
     els.confirmBtn.focus();
     paletteController?.open?.();
@@ -3265,9 +3288,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const canceledPretranslation = tmPretranslationController.pretranslate();
       await applicationImportProgressController.yieldToUi();
       els.tmPretranslateDialog.close("cancel");
+      const closedToolsOverflow = els.segmentToolsMenuSummary.closest("#editorOverflowMenu:not([open])");
+      const expectedToolsReturn = closedToolsOverflow?.querySelector(":scope > summary") || els.segmentToolsMenuSummary;
+      const canceledResult = await canceledPretranslation;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
       assert(
-        (await canceledPretranslation) === null && document.activeElement === els.segmentToolsMenuSummary,
-        "TM threshold cancellation restores focus to the visible Segment tools control"
+        canceledResult === null && document.activeElement === expectedToolsReturn &&
+          expectedToolsReturn.getClientRects().length > 0,
+        "TM threshold cancellation restores focus to the visible Segment tools or overflow control"
       );
       segmentTargetStateService.setHiddenField(pretranslateSegment, PRETRANSLATE_SAVE_FAILURE_TEST_FLAG, true);
       await runTmPretranslationFromDialog();
@@ -4287,7 +4315,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       } finally {
         Reflect.deleteProperty(state, OPENAI_KEY_STORAGE_FAILURE_TEST_FLAG);
       }
-      els.focusModeBtn.focus();
+      els.confirmBtn.focus();
       applicationValidationPresentationController.render({
         ok: true,
         errors: [],
@@ -4317,7 +4345,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       assert(
           !importExportController?.getState?.().validationVisible &&
           state.lastValidationReport === null &&
-          document.activeElement === els.focusModeBtn,
+          document.activeElement === els.confirmBtn,
         "checked import/export controller restores validation focus after dismissal"
       );
       const originalValidationAlert = window.alert;

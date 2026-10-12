@@ -144,6 +144,11 @@ export function createProjectExportBuildService(options) {
         portableContext
       ),
       segments: portable.sanitize(projectSegments, "", [], portableContext),
+      ...Object.fromEntries(
+        ["documentVersions", "versionSegments", "fileLifecycleReceipts", "trashEntries"]
+          .filter((name) => Array.isArray(committed?.[name]))
+          .map((name) => [name, portable.sanitize(committed[name], "", [], portableContext)])
+      ),
       resources: portable.sanitize(
         {
           tmEntries: scopedTm,

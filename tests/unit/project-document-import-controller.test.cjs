@@ -285,7 +285,14 @@ test("ProjectDocumentImportController preserves DOCX metadata and the complete s
   const append = harness.calls.find(([name]) => name === "append");
   assert.deepEqual(append[1].documents, [
     { id: "old", name: "Existing.HTML", type: "html" },
-    { id: "doc-uuid-1", name: "incoming.docx", type: "docx" }
+    {
+      id: "doc-uuid-1",
+      name: "incoming.docx",
+      type: "docx",
+      sourceRevision: 1,
+      originalFilename: "incoming.docx",
+      importOptions: { encoding: "windows-1254" }
+    }
   ]);
   assert.equal(append[1].sourceFileName, "incoming.docx");
   assert.strictEqual(append[1].docxStructure, append[1].docxStructures["doc-uuid-1"]);
@@ -516,6 +523,44 @@ test("ProjectDocumentImportController preserves completed effects and late failu
   assert.equal(context.read().project.saved, true);
 });
 
+test("batch receipts commit with the document, retry idempotently and refresh once", async () => {
+  const { createProjectDocumentImportController } = await loadFactory();
+  const harness = createHarness(createProjectDocumentImportController);
+  const batch = { id: "batch", projectId: "project-1", committed: [], canceled: () => false };
+  const options = { batch, rowId: "row", fingerprint: "a".repeat(64), encoding: "auto", acceptDuplicate: true };
+  await harness.controller.importFile(harness.file, options);
+  const receipt = harness.read().project.importReceipts[0];
+  assert.equal(receipt.importKey, "batch:row");
+  assert.equal(receipt.documentId, batch.committed[0].documentId);
+  assert.equal(harness.calls.filter(([name]) => name === "getProjectSegments").length, 0);
+  await harness.controller.importFile(harness.file, options);
+  assert.equal(harness.calls.filter(([name]) => name === "append").length, 1);
+  await assert.rejects(
+    harness.controller.importFile(harness.file, { ...options, encoding: "utf-16le" }),
+    /Retry input differs/
+  );
+  await harness.controller.finishBatch(batch);
+  assert.equal(harness.calls.filter(([name]) => name === "getProjectSegments").length, 1);
+});
+
+test("cancel before commit does not append a document or receipt", async () => {
+  const { createProjectDocumentImportController } = await loadFactory();
+  const harness = createHarness(createProjectDocumentImportController);
+  await assert.rejects(
+    harness.controller.importFile(harness.file, {
+      batch: { id: "b", projectId: "project-1", committed: [], canceled: () => true },
+      rowId: "r",
+      acceptDuplicate: true
+    }),
+    { name: "AbortError" }
+  );
+  assert.equal(
+    harness.calls.some(([name]) => name === "append"),
+    false
+  );
+  assert.equal(harness.read().project.importReceipts, undefined);
+});
+
 test("ProjectDocumentImportController validates boundaries and exposes an immutable API", async () => {
   const { createProjectDocumentImportController } = await loadFactory();
   assert.throws(() => createProjectDocumentImportController(), /requires checked session/);
@@ -525,6 +570,7 @@ test("ProjectDocumentImportController validates boundaries and exposes an immuta
     /requires checked session/
   );
   assert.deepEqual(Object.keys(harness.controller), [
+    "finishBatch",
     "confirmDuplicate",
     "hasDocumentNamed",
     "importDocx",

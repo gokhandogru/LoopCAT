@@ -336,7 +336,7 @@ test("ProjectHomePresentationController preserves button labels, action order, a
   );
   assert.deepEqual(
     [openButton.className, openButton.type, openButton.textContent, openButton.attributes["aria-label"]],
-    ["primary", "button", "source:Open", "source:Open file {value1}:safeText:Document"]
+    ["file-open", "button", "source:Open", "source:Open file {value1}:safeText:Document"]
   );
   assert.deepEqual(harness.cards[0].actions.children, [deleteButton, openButton]);
   assert.equal(deleteButton.click(), deleteResult);

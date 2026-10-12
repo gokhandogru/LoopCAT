@@ -178,7 +178,7 @@ export function createTmPretranslationController(options) {
       const proposals = [];
       for (const segment of candidates) {
         const match = matchesBySource.get(lookupKeyBySegment.get(segment.id));
-        if (!match || match.score < matchThreshold || !match.target?.trim()) continue;
+        if (!match || match.score < matchThreshold || !match.target?.trim() || match.safeToApply === false) continue;
         proposals.push({ segment, match });
       }
       if (!proposals.length) {
@@ -205,7 +205,7 @@ export function createTmPretranslationController(options) {
         restorePatches: (patches, context) => restoration.restorePatches(patches, { ...context, activeSegmentId }),
         applyFirst: async () => {
           for (const { segment, match } of proposals) {
-            mutation.applyTarget(segment, match.target, "draft", "pretranslate");
+            mutation.applyTarget(segment, match.adaptedTarget || match.target, "draft", "pretranslate");
             segment.tmPretranslation = {
               score: Math.max(0, Math.min(100, Math.round(Number(match.score || 0)))),
               tmName: String(match.tmName || "").trim(),

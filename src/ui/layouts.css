@@ -609,3 +609,382 @@ html[dir="rtl"] :is(code, kbd, input[type="url"], input[type="password"]) {
     justify-content: flex-start;
   }
 }
+/* Coordinated work surfaces: compact controls, stable slots, logical spacing. */
+.action-group,
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.selection-bar {
+  flex-wrap: wrap;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+.selection-bar[hidden],
+.action-group[hidden],
+.editor-secondary[hidden],
+#editorOverflowMenu[hidden] {
+  display: none;
+}
+.liquid-glass-edition
+  :is(.action-group, .selection-bar, .file-card-actions, .statistics-controls, .resource-card footer)
+  :is(button, summary),
+.liquid-glass-edition .coordinated-editor :is(button, summary, select, input:not([type="checkbox"])) {
+  min-height: 36px;
+  height: 36px;
+  padding: 6px 10px;
+  font-size: var(--font-size-sm);
+  line-height: 22px;
+  white-space: nowrap;
+}
+.liquid-glass-edition .menu-panel {
+  z-index: 1000;
+  padding: 6px;
+  min-width: 200px;
+  max-width: calc(100vw - 16px);
+  overflow: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-transient);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.liquid-glass-edition .menu-panel :is(button, summary) {
+  width: 100%;
+  height: auto;
+  min-height: 36px;
+  text-align: start;
+  white-space: normal;
+  border-color: transparent;
+  background: transparent;
+}
+.liquid-glass-edition .menu-panel :is(button, summary):hover {
+  background: var(--color-surface-subtle);
+}
+.liquid-glass-edition .menu-panel .menu-danger {
+  margin-block-start: 6px;
+  border-block-start: 1px solid var(--color-line);
+  border-radius: 0;
+  color: var(--color-danger);
+}
+.liquid-glass-edition .file-action-menu,
+.liquid-glass-edition .file-action-menu[open] {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.liquid-glass-edition .file-action-menu button {
+  margin: 0;
+}
+.liquid-glass-edition .coordinated-editor {
+  container-type: inline-size;
+  container-name: editor;
+}
+.liquid-glass-edition .coordinated-editor .project-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  min-width: 0;
+}
+.editor-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 1 290px;
+}
+.editor-heading {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 6px;
+}
+.liquid-glass-edition .editor-heading #projectTitle {
+  grid-column: 1 / -1;
+  font-size: 15px;
+  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+}
+.editor-language-pair {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.liquid-glass-edition #editorProjectDetails > summary {
+  height: 20px;
+  min-height: 20px;
+  line-height: 18px;
+  padding: 0 4px;
+  font-size: 11px;
+  border: 0;
+}
+.editor-file-context {
+  display: flex;
+  flex: 1 1 290px;
+  min-width: 0;
+  gap: 6px;
+  align-items: center;
+}
+.liquid-glass-edition .coordinated-editor #documentFilter {
+  width: 100%;
+  min-width: 120px;
+  max-width: none;
+  flex: 1 1 220px;
+  text-overflow: ellipsis;
+}
+.editor-context-actions {
+  flex: 0 0 auto;
+}
+.liquid-glass-edition .coordinated-editor .segment-controls {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  min-width: 0;
+}
+.editor-search {
+  display: flex;
+  flex: 1 1 240px;
+  min-width: 150px;
+  gap: 4px;
+}
+.liquid-glass-edition .coordinated-editor #segmentSearchInput {
+  min-width: 0;
+  width: 100%;
+  flex: 1;
+}
+.liquid-glass-edition .coordinated-editor #segmentStatusFilter {
+  min-width: 110px;
+  max-width: 160px;
+}
+.editor-confirm-actions {
+  margin-inline-start: auto;
+}
+.liquid-glass-edition .coordinated-editor #nextOpenBtn {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-line);
+}
+.liquid-glass-edition .coordinated-editor .progress-wrap {
+  padding: 4px 12px 6px;
+  min-height: 30px;
+}
+.liquid-glass-edition .coordinated-editor .progress-label {
+  font-size: 11px;
+  line-height: 16px;
+  margin: 0 0 3px;
+}
+.liquid-glass-edition .coordinated-editor .progress-bar {
+  height: 3px;
+}
+.coordinated-editor .progress-wrap.has-selection > :is(.progress-label, .progress-bar) {
+  display: none;
+}
+.liquid-glass-edition .coordinated-editor .selection-bar button {
+  height: 24px;
+  min-height: 24px;
+  line-height: 18px;
+  padding: 2px 8px;
+}
+.liquid-glass-edition #editorFileActions,
+.liquid-glass-edition #fileManagementToolbar {
+  margin: 0;
+}
+.liquid-glass-edition .file-list-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+}
+.file-list-header h3 {
+  margin-inline-end: auto;
+}
+.file-list-header > .selection-bar {
+  flex-basis: 100%;
+  border-block-start: 1px solid var(--color-line);
+  padding-block-start: 8px;
+}
+.liquid-glass-edition .file-card {
+  position: relative;
+  padding-inline-start: 44px;
+}
+.file-card > .file-selection {
+  position: absolute;
+  inset-inline-start: 14px;
+  inset-block-start: 20px;
+  margin: 0;
+}
+.liquid-glass-edition .file-card h4 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-progress {
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.file-progress .progress-bar {
+  height: 4px;
+  margin-block: 5px;
+}
+.file-progress small {
+  font-size: 11px;
+}
+.liquid-glass-edition .file-card-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+}
+.liquid-glass-edition .file-card-actions > :is(button, details) {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+}
+:root[data-files-view="list"] .liquid-glass-edition .file-card {
+  grid-template-columns: 24px minmax(0, 1fr) 160px 145px auto;
+  min-height: 80px;
+  padding: 10px 14px;
+  gap: 14px;
+}
+:root[data-files-view="list"] .liquid-glass-edition .file-card > .file-selection {
+  position: static;
+  grid-column: 1;
+  grid-row: 1;
+}
+:root[data-files-view="list"] .liquid-glass-edition .file-card > header {
+  grid-column: 2;
+  margin: 0;
+}
+:root[data-files-view="list"] .liquid-glass-edition .file-card > .project-stats {
+  grid-column: 3;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+:root[data-files-view="list"] .liquid-glass-edition .file-card > .file-progress {
+  grid-column: 4;
+  grid-row: 1;
+}
+:root[data-files-view="list"] .liquid-glass-edition .file-card > footer {
+  grid-column: 5;
+  margin: 0;
+}
+:root[data-files-view="list"] .liquid-glass-edition .file-card .project-stats strong {
+  font-size: 15px;
+}
+:root[data-files-view="list"] .liquid-glass-edition .file-card .project-stats span {
+  font-size: 11px;
+}
+@container editor (width < 1100px) {
+  .liquid-glass-edition .coordinated-editor .project-toolbar {
+    flex-wrap: wrap;
+  }
+  .editor-identity {
+    flex: 1 1 220px;
+  }
+  .editor-file-context {
+    flex: 1 1 300px;
+  }
+  .editor-context-actions {
+    margin-inline-start: auto;
+  }
+}
+@container editor (width < 760px) {
+  .liquid-glass-edition .coordinated-editor .project-toolbar {
+    gap: 6px;
+  }
+  .editor-identity {
+    flex-basis: 100%;
+  }
+  .editor-file-context {
+    flex-basis: 100%;
+  }
+  .editor-context-actions {
+    margin-inline-start: 0;
+  }
+  .liquid-glass-edition .coordinated-editor .segment-controls {
+    flex-wrap: wrap;
+  }
+  .editor-search {
+    flex-basis: 100%;
+  }
+}
+@media (width < 1000px) {
+  :root[data-files-view="list"] .liquid-glass-edition .file-card {
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+  }
+  :root[data-files-view="list"] .liquid-glass-edition .file-card > .project-stats {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  :root[data-files-view="list"] .liquid-glass-edition .file-card > .file-progress {
+    grid-column: 2;
+    grid-row: 3;
+  }
+  :root[data-files-view="list"] .liquid-glass-edition .file-card > footer {
+    grid-column: 3;
+    grid-row: 1 / 4;
+  }
+}
+.liquid-glass-edition :is(.resource-card-actions, .trash-item-actions, dialog footer) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.liquid-glass-edition :is(.resource-card-actions, .trash-item-actions, dialog footer) :is(button, summary) {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: var(--font-size-sm);
+}
+.liquid-glass-edition .resource-card-actions > :is(button, details) {
+  flex: 0 0 auto;
+  width: auto;
+}
+.liquid-glass-edition #editorViewMenu button[aria-pressed="true"],
+.liquid-glass-edition #editorViewMenu button[aria-expanded="true"] {
+  background: var(--color-accent-soft);
+}
+.liquid-glass-edition #focusModeBtn::after {
+  content: "Ctrl/⌘+Shift+F";
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.liquid-glass-edition :is(#projectHomeDeleteBtn, #projectSettingsBtn) {
+  text-align: start;
+}
+.liquid-glass-edition #projectHomeDeleteBtn {
+  color: var(--color-danger);
+  border-block-start: 1px solid var(--color-line);
+  border-radius: 0;
+}
+/* Theme-safe surfaces for coordinated controls, including native form controls. */
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  .coordinated-editor
+  :is(button:not(.primary), summary, select, input:not([type="checkbox"])) {
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  border-color: var(--color-control-line);
+  box-shadow: none;
+}
+:root[data-theme="dark"] .liquid-glass-edition .coordinated-editor .menu-panel :is(button, summary) {
+  background: transparent;
+}

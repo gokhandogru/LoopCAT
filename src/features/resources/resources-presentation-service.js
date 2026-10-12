@@ -192,7 +192,7 @@ export function createResourcesPresentationService(options) {
       exportButton.dataset.resourceKey = resource.key;
       exportButton.dataset.resourceId = resource.id || "";
       const openButton = ownerDocument.createElement("button");
-      openButton.className = "primary";
+      openButton.className = "resource-open";
       openButton.type = "button";
       openButton.textContent = localization.source("Open");
       openButton.setAttribute("aria-label", localization.source("Open resource {value1}", { value1: resourceLabel }));
@@ -200,13 +200,22 @@ export function createResourcesPresentationService(options) {
       openButton.dataset.resourceType = type;
       openButton.dataset.resourceKey = resource.key;
       openButton.dataset.resourceId = resource.id || "";
-      if (resource.archived) card.querySelector(".resource-card-actions").append(archiveButton);
-      else if (!resource.id)
-        card.querySelector(".resource-card-actions").append(legacyDeleteButton, exportButton, openButton);
-      else
-        card
-          .querySelector(".resource-card-actions")
-          .append(renameButton, duplicateButton, archiveButton, exportButton, openButton);
+      const actions = card.querySelector(".resource-card-actions");
+      if (resource.archived) actions.append(archiveButton);
+      else {
+        const menu = ownerDocument.createElement("details");
+        menu.className = "menu action-menu";
+        const summary = ownerDocument.createElement("summary");
+        summary.textContent = localization.source("Actions");
+        summary.setAttribute("aria-label", `${localization.source("Actions for")} ${resourceLabel}`);
+        const panel = ownerDocument.createElement("div");
+        panel.className = "menu-panel";
+        (resource.id ? archiveButton : legacyDeleteButton).classList?.add("menu-danger");
+        if (resource.id) panel.append(exportButton, renameButton, duplicateButton, archiveButton);
+        else panel.append(exportButton, legacyDeleteButton);
+        menu.append(summary, panel);
+        actions.append(openButton, menu);
+      }
       fragment.append(card);
     });
     dashboard.replaceChildren(fragment);

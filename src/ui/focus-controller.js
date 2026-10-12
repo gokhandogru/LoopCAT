@@ -66,12 +66,20 @@
       returnTargets.delete(surface);
       if (options.restore === false) return;
       if (returnTarget?.isConnected && typeof returnTarget.focus === "function") {
-        returnTarget.focus({ preventScroll: true });
-        queueMicrotask(() => {
-          if (document.activeElement !== returnTarget && returnTarget.isConnected) {
-            returnTarget.focus({ preventScroll: true });
+        const restore = () => {
+          if (!returnTarget.isConnected) return;
+          returnTarget.focus({ preventScroll: true });
+          if (document.activeElement === returnTarget) return;
+          // Responsive overflow menus can hide the original dialog opener.
+          // Return to its nearest visible menu trigger without reopening menus.
+          for (let menu = returnTarget.closest?.("details"); menu; menu = menu.parentElement?.closest("details")) {
+            const trigger = menu.querySelector(":scope > summary");
+            trigger?.focus({ preventScroll: true });
+            if (document.activeElement === trigger) return;
           }
-        });
+        };
+        restore();
+        queueMicrotask(restore);
       }
     }
 

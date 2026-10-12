@@ -4,7 +4,16 @@ const CHUNK = 4 * 1024 * 1024;
 const MAX_RECORD = 64 * 1024 * 1024;
 const LIMIT = 32 * 1024 * 1024 * 1024;
 const RESOURCE_STORES = ["resources", "tmEntries", "tmContributions", "terms", "termConcepts", "termDesignations"];
-const STORES = ["projects", "segments", ...RESOURCE_STORES, "activityEvents", "trashEntries"];
+const STORES = [
+  "projects",
+  "segments",
+  ...RESOURCE_STORES,
+  "activityEvents",
+  "trashEntries",
+  "documentVersions",
+  "versionSegments",
+  "fileLifecycleReceipts"
+];
 const RECORD_STORES = new Set(["metadata", ...STORES]);
 const encoder = new TextEncoder();
 
@@ -13,9 +22,23 @@ async function* objectRecords(value) {
     yield* value.archiveSource.records();
     return;
   }
-  const excluded = new Set(value.project ? ["segments", "activityEvents", "resources"] : STORES);
+  const excluded = new Set(
+    value.project
+      ? [
+          "segments",
+          "activityEvents",
+          "resources",
+          "documentVersions",
+          "versionSegments",
+          "fileLifecycleReceipts",
+          "trashEntries"
+        ]
+      : STORES
+  );
   yield { store: "metadata", value: Object.fromEntries(Object.entries(value).filter(([key]) => !excluded.has(key))) };
-  for (const store of value.project ? ["segments", "activityEvents"] : STORES) {
+  for (const store of value.project
+    ? ["segments", "activityEvents", "documentVersions", "versionSegments", "fileLifecycleReceipts", "trashEntries"]
+    : STORES) {
     for (const record of value[store] || []) yield { store, value: record };
   }
   if (value.project)

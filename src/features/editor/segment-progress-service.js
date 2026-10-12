@@ -1,3 +1,5 @@
+import { linguistics } from "../linguistics/core.js";
+
 /**
  * Owns cached source word counts and derived project/editor progress policy.
  * Segment mutation, project-summary persistence, and DOM presentation remain
@@ -6,6 +8,7 @@
  * @param {{
  *   getSegments: () => any[],
  *   getProjectId: () => string,
+ *   getSourceLanguage?: () => string,
  *   getCachedSummary: () => any,
  *   replaceCachedSummary: (summary: any) => any
  * }} options
@@ -27,16 +30,19 @@ export function createSegmentProgressService(options) {
   const sourceWordCounts = new WeakMap();
 
   function wordCount(text) {
-    return (text || "").trim().split(/\s+/).filter(Boolean).length;
+    return linguistics.sourceMetrics(typeof text === "string" ? text : text?.trim?.() || "").words;
   }
 
   function sourceWordCount(segment) {
     if (!segment || typeof segment !== "object") return 0;
     const source = segment.source || "";
     const cached = sourceWordCounts.get(segment);
-    if (cached?.source === source) return cached.count;
-    const count = wordCount(source);
-    sourceWordCounts.set(segment, { source, count });
+    const language = options.getSourceLanguage?.() || segment.sourceLang || "en";
+    const descriptor = JSON.stringify(linguistics.descriptorFor(segment));
+    if (cached?.source === source && cached.language === language && cached.descriptor === descriptor)
+      return cached.count;
+    const count = linguistics.metricsForSegment(segment, language).words;
+    sourceWordCounts.set(segment, { source, count, language, descriptor });
     return count;
   }
 

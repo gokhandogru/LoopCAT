@@ -338,17 +338,14 @@ app
         "document.querySelector('.project-tile button.primary').click()",
         true
       );
-      await waitFor("document.querySelector('.file-card button.primary')", "accessibility project dashboard");
+      await waitFor("document.querySelector('.file-card .file-open')", "accessibility project dashboard");
       await audit("Project dashboard populated");
-      await windowRef.webContents.executeJavaScript(
-        "document.querySelector('.file-card button.primary').click()",
-        true
-      );
+      await windowRef.webContents.executeJavaScript("document.querySelector('.file-card .file-open').click()", true);
       await waitFor("document.querySelector('#segmentBody .target-editor')", "accessibility translation editor");
       await audit("Editor with segments, status badges, and matches");
       await windowRef.webContents.executeJavaScript(
         `(() => {
-          const returnTarget = document.querySelector("#focusModeBtn");
+          const returnTarget = document.querySelector("#confirmBtn");
           const input = document.querySelector("#projectPackageImportInput");
           returnTarget.focus();
           Object.defineProperty(input, "files", {
@@ -373,7 +370,7 @@ app
         true
       );
       await waitFor(
-        "document.querySelector('#validationReportPanel').classList.contains('hidden') && document.activeElement === document.querySelector('#focusModeBtn')",
+        "document.querySelector('#validationReportPanel').classList.contains('hidden') && document.activeElement === document.querySelector('#confirmBtn')",
         "accessible import validation focus return"
       );
       await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorTabReview').click()", true);

@@ -138,6 +138,67 @@ export function createProjectPackagePortabilityService(options) {
             .getMany(storeName, records.map((record) => record.id).filter(Boolean))
             .then((values) => values.filter(Boolean))
         : storage.getAll(storeName);
+    pkg = { ...pkg };
+    const historyNames = ["documentVersions", "versionSegments", "fileLifecycleReceipts", "trashEntries"];
+    const historicalMap = new Map();
+    if (importAsCopy) {
+      for (const name of historyNames)
+        for (const row of pkg[name] || []) if (row.id) historicalMap.set(row.id, ids.make(name));
+      for (const entry of pkg.trashEntries || []) {
+        for (const row of entry.payload?.segments || []) if (row.id) historicalMap.set(row.id, ids.make("segment"));
+        const versionId = entry.payload?.documentInfo?.sourceVersionId;
+        if (versionId && !historicalMap.has(versionId)) historicalMap.set(versionId, ids.make("version"));
+      }
+      for (const d of pkg.project.documents || [])
+        if (d.sourceVersionId && !historicalMap.has(d.sourceVersionId))
+          historicalMap.set(d.sourceVersionId, ids.make("version"));
+    }
+    const remapHistory = (value) => {
+      if (Array.isArray(value)) return value.map(remapHistory);
+      if (!value || typeof value !== "object") return value;
+      return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [
+          key,
+          [
+            "structure",
+            "docxStructures",
+            "localizationStructures",
+            "docxStructure",
+            "localizationStructure",
+            "sourceDescriptor"
+          ].includes(key)
+            ? item
+            : typeof item === "string" &&
+                [
+                  "id",
+                  "segmentId",
+                  "sourceVersionId",
+                  "previousVersionId",
+                  "previousSegmentId",
+                  "restoredFromVersionId"
+                ].includes(key)
+              ? historicalMap.get(item) || item
+              : remapHistory(item)
+        ])
+      );
+    };
+    if (importAsCopy) pkg = remapHistory(pkg);
+    const assignHistoryProject = (projectId) => {
+      for (const name of historyNames)
+        if (Array.isArray(pkg[name]))
+          pkg[name] = pkg[name].map((row) => ({
+            ...row,
+            projectId,
+            ...(name === "trashEntries" && row.payload?.segments
+              ? {
+                  payload: {
+                    ...row.payload,
+                    segments: row.payload.segments.map((segment) => ({ ...segment, projectId }))
+                  }
+                }
+              : {})
+          }));
+    };
     const packagedResources = pkg.resources || {};
     const modernResourceGraph = ["resources", "tmContributions", "termConcepts", "termDesignations"].some((field) =>
       Object.hasOwn(packagedResources, field)
@@ -173,6 +234,7 @@ export function createProjectPackagePortabilityService(options) {
         ...remapRecordId(event, "activity", activityIds, reservedActivityIds, importAsCopy),
         projectId: project.id
       }));
+      assignHistoryProject(project.id);
       return {
         ...pkg,
         project,
@@ -323,6 +385,7 @@ export function createProjectPackagePortabilityService(options) {
         resourceId: resourceIdMap.get(contribution.resourceId) || contribution.resourceId
       })
     );
+    assignHistoryProject(project.id);
     return {
       ...pkg,
       project,

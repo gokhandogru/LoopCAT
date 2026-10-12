@@ -3,7 +3,7 @@ const { bulkPut, commitMutation, countByIndex, deleteByKey, deleteStoresWhereAto
 const LOCAL_WORKSPACE_ID = constants?.LOCAL_WORKSPACE_ID || "local-workspace";
 const LOCAL_USER_ID = constants?.LOCAL_USER_ID || "local-user";
 const TM_INDEX_META_PREFIX = "tm-token-index:";
-const MAX_INDEX_TOKENS = 24;
+const MAX_INDEX_TOKENS = 96;
 const MAX_INDEX_CANDIDATES = 600;
 const RESOURCE_IMPORT_CHUNK_SIZE = 1000;
 const SENSITIVE_TEXT_VALUE_PATTERN = /(sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._~+/=-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|npm_[A-Za-z0-9_]{8,}|(?:session|cookie)[=:][A-Za-z0-9._~+/=-]{8,})/i;
@@ -125,7 +125,7 @@ function tmIndexMetaKey(languagePair) {
 }
 
 function entryTokens(entry) {
-  return tokens(entry.source).slice(0, MAX_INDEX_TOKENS);
+  return globalThis.LoopCATLinguistics.retrievalTokens(entry.source).slice(0, MAX_INDEX_TOKENS);
 }
 
 function indexRecordsForEntry(entry) {
@@ -156,6 +156,7 @@ async function writeIndexMeta(languagePair, entries) {
     entryCount: entries.length,
     latestEntryUpdatedAt: latestEntryTimestamp(entries),
     dirty: false,
+    matchingVersion: globalThis.LoopCATLinguistics.MATCHING_VERSION,
     updatedAt: new Date().toISOString()
   });
 }
@@ -168,6 +169,7 @@ async function writeIndexMetaClean(languagePair) {
     key: tmIndexMetaKey(languagePair),
     languagePair,
     dirty: false,
+    matchingVersion: globalThis.LoopCATLinguistics.MATCHING_VERSION,
     updatedAt: new Date().toISOString()
   });
 }
@@ -234,7 +236,7 @@ async function rebuildAllTmIndexes(options = {}) {
 
 async function ensureTmIndex(languagePair) {
   const meta = await get("appMeta", tmIndexMetaKey(languagePair));
-  if (meta && !meta.dirty) return;
+  if (meta && !meta.dirty && meta.matchingVersion === globalThis.LoopCATLinguistics.MATCHING_VERSION) return;
   await rebuildTmIndex(languagePair);
 }
 
@@ -260,11 +262,7 @@ function levenshtein(a, b) {
   return prev[b.length];
 }
 
-function similarity(source, candidate) {
-  const a = normalizeText(source);
-  const b = normalizeText(candidate);
-  return similarityNormalized(a, b);
-}
+function similarity(source,candidate) { return globalThis.LoopCATLinguistics.scoreSource(String(candidate||''),String(source||'')).rawScore; }
 
 function similarityNormalized(a, b) {
   if (!a && !b) return 100;
@@ -367,7 +365,7 @@ async function matchingTmResourceId(input = {}) {
 async function saveTmEntry(input = {}) {
   const { source, target, sourceLang, targetLang, projectName, tmName } = input || {};
   const resourceId = await matchingTmResourceId(input);
-  const candidate = tmEntryRecord({ source, target, sourceLang, targetLang, projectName, tmName, resourceId });
+  const candidate = tmEntryRecord({ ...input, source, target, sourceLang, targetLang, projectName, tmName, resourceId });
   const languagePair = candidate.languagePair;
   await ensureTmIndex(languagePair);
   let existingCandidates;
@@ -443,6 +441,8 @@ async function commitSegmentWithMainTm(project, segment, context) {
   const existingEntry = candidates.find((entry) => normalizeText(entry.source) === normalizedSource && normalizeText(entry.target) === normalizedTarget);
   const entry = tmEntryRecord({
     source: segment.source,
+    sourceDescriptor: globalThis.LoopCATLinguistics.descriptorFor(segment),
+    previousBoundary: context.previousBoundary === true, nextBoundary: context.nextBoundary === true,
     target: segment.target,
     sourceLang: project.sourceLang,
     targetLang: project.targetLang,
@@ -651,103 +651,7 @@ function resourceNameSet(names, legacyName) {
   return new Set([...(Array.isArray(names) ? names : []), legacyName].map((name) => String(name || "").trim()).filter(Boolean));
 }
 
-function scoreTmEntries(entries, options = {}) {
-  const { source, sourceLang, targetLang, tmName, tmNames, limit = 6, context = {} } = options || {};
-  if (
-    Object.prototype.hasOwnProperty.call(options, "resourceLinks") &&
-    !(options.resourceLinks || []).some((link) => link?.type === "tm" && link.lookup !== false)
-  ) return [];
-  const sourceText = cleanText(source);
-  const normalizedSource = normalizeText(sourceText);
-  if (!normalizedSource) return [];
-  const sourceTokens = tokensFromNormalized(normalizedSource);
-  const languagePair = languagePairFromFields(sourceLang, targetLang);
-  const allowedNames = resourceNameSet(tmNames, tmName);
-  const links = resourceLinkMap(options);
-  const byKey = new Map();
-  (entries || []).forEach((entry) => {
-    if (languagePair && languagePairOf(entry) !== languagePair) return;
-    const link = links.get(entry.resourceId || entry.tmName);
-    if (links.size && !link) return;
-    if (!links.size && allowedNames.size && !allowedNames.has(entry.tmName)) return;
-    const normalizedCandidate = normalizeText(entry.source);
-    const candidateTokens = tokensFromNormalized(normalizedCandidate);
-    const overlapRatio = tokenOverlapTokens(sourceTokens, candidateTokens);
-    const characterScore = similarityNormalized(normalizedSource, normalizedCandidate);
-    if (
-      normalizedCandidate !== normalizedSource &&
-      overlapRatio < 0.15 &&
-      characterScore < 45
-    ) return;
-    const overlapScore = Math.round(overlapRatio * 100);
-    const orderScore = Math.round(orderedTokenSimilarity(sourceTokens, candidateTokens) * 100);
-    let rawScore;
-    let matchKind;
-    if (cleanText(entry.source) === sourceText && contextMatches(entry, context)) {
-      rawScore = 101;
-      matchKind = "context-exact";
-    } else if (cleanText(entry.source) === sourceText) {
-      rawScore = 100;
-      matchKind = "exact";
-    } else if (normalizedCandidate === normalizedSource) {
-      rawScore = 99;
-      matchKind = "normalized-exact";
-    } else {
-      const combined = Math.round(characterScore * 0.55 + overlapScore * 0.3 + orderScore * 0.15);
-      rawScore = Math.min(98, overlapScore ? combined : Math.max(combined, characterScore - 3));
-      matchKind = "fuzzy";
-    }
-    if (rawScore < 45) return;
-    const penalty = link?.penalty || 0;
-    const effectiveScore = Math.max(0, Math.min(101, rawScore - penalty));
-    const scored = {
-      ...entry,
-      score: effectiveScore,
-      rawScore,
-      penalty,
-      effectiveScore,
-      matchKind,
-      resourceId: entry.resourceId || link?.resourceId || "",
-      resourceName: entry.tmName || link?.cachedName || link?.name || "",
-      resourcePriority: link?.priority ?? 999,
-      sameDomainProvenance: Boolean(
-        cleanText(context.domain) && normalizeText(entry.domain) === normalizeText(context.domain)
-      ),
-      sourceDifferences: sourceDifferences(sourceText, entry.source),
-      provenance: [{
-        resourceId: entry.resourceId || link?.resourceId || "",
-        resourceName: entry.tmName || link?.cachedName || link?.name || "",
-        projectName: entry.projectName || "",
-        domain: entry.domain || "",
-        updatedAt: entry.updatedAt || ""
-      }]
-    };
-    const adaptation = adaptedMatch(sourceText, entry);
-    if (adaptation) {
-      scored.adaptedTarget = adaptation.target;
-      scored.adaptation = adaptation;
-    }
-    const key = [languagePairOf(entry), normalizedCandidate, normalizeText(entry.target)].join("::");
-    const existing = byKey.get(key);
-    if (existing) {
-      const combined = [...(existing.provenance || []), ...scored.provenance]
-        .filter((item, index, all) => all.findIndex((candidate) => candidate.resourceId === item.resourceId) === index);
-      existing.provenance = combined;
-    }
-    if (!existing || scored.effectiveScore > existing.effectiveScore || new Date(scored.updatedAt) > new Date(existing.updatedAt)) {
-      if (existing) scored.provenance = existing.provenance;
-      byKey.set(key, scored);
-    }
-  });
-  return Array.from(byKey.values())
-    .sort((a, b) =>
-      b.effectiveScore - a.effectiveScore ||
-      a.resourcePriority - b.resourcePriority ||
-      Number(b.sameDomainProvenance) - Number(a.sameDomainProvenance) ||
-      new Date(b.updatedAt) - new Date(a.updatedAt)
-    )
-    .slice(0, limit);
-}
+function scoreTmEntries(entries, options = {}) { return globalThis.LoopCATLinguistics.scoreEntries(entries, options); }
 
 async function getTmMatchCandidates(options = {}) {
   const { source, sourceLang, targetLang, tmName, tmNames, resourceLinks = [] } = options || {};
@@ -757,7 +661,7 @@ async function getTmMatchCandidates(options = {}) {
   ) return [];
   const languagePair = languagePairFromFields(sourceLang, targetLang);
   if (!languagePair || !normalizeText(source)) return [];
-  const sourceTokens = tokens(source).slice(0, MAX_INDEX_TOKENS);
+  const sourceTokens = globalThis.LoopCATLinguistics.retrievalTokens(source).slice(0, MAX_INDEX_TOKENS);
   if (!sourceTokens.length) {
     return getAllByIndex("tmEntries", "languagePair", languagePair);
   }
@@ -768,7 +672,7 @@ async function getTmMatchCandidates(options = {}) {
   const tokenRows = await Promise.all(sourceTokens.map((token) => getAllByIndex("tmTokenIndex", "languagePairToken", [languagePair, token])));
   tokenRows.flat().forEach((record) => {
     if (allowedResourceIds.size ? !allowedResourceIds.has(record.resourceId) : allowedNames.size && !allowedNames.has(record.tmName)) return;
-    candidateHits.set(record.tmEntryId, (candidateHits.get(record.tmEntryId) || 0) + 1);
+    candidateHits.set(record.tmEntryId, (candidateHits.get(record.tmEntryId) || 0) + (record.token?.startsWith("=") ? 100000 : 1));
   });
   const candidateIds = Array.from(candidateHits.entries())
     .sort((a, b) => b[1] - a[1])
@@ -801,7 +705,7 @@ async function getTmMatchCandidateBatches(optionsList = []) {
     const languagePair = languagePairFromFields(options?.sourceLang, options?.targetLang);
     if (!source || !languagePair) return;
     if (!groups.has(languagePair)) groups.set(languagePair, []);
-    groups.get(languagePair).push({ index, options: options || {}, sourceTokens: tokens(source).slice(0, MAX_INDEX_TOKENS) });
+    groups.get(languagePair).push({ index, options: options || {}, sourceTokens: globalThis.LoopCATLinguistics.retrievalTokens(source).slice(0, MAX_INDEX_TOKENS) });
   });
 
   await Promise.all(Array.from(groups, async ([languagePair, group]) => {
@@ -836,7 +740,7 @@ async function getTmMatchCandidateBatches(optionsList = []) {
       request.sourceTokens.forEach((token) => {
         (rowsByToken.get(token) || []).forEach((record) => {
           if (allowedResourceIds.size ? !allowedResourceIds.has(record.resourceId) : allowedNames.size && !allowedNames.has(record.tmName)) return;
-          candidateHits.set(record.tmEntryId, (candidateHits.get(record.tmEntryId) || 0) + 1);
+          candidateHits.set(record.tmEntryId, (candidateHits.get(record.tmEntryId) || 0) + (token.startsWith("=") ? 100000 : 1));
         });
       });
       const ids = Array.from(candidateHits.entries())

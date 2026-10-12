@@ -1,3 +1,6 @@
+if (!globalThis.LoopCATSourceUpdate && typeof importScripts === "function") { if(!globalThis.LoopCATLinguistics) importScripts("./linguistic-core.js"); importScripts("./source-update-core.js"); }
+if (!globalThis.LoopCATLinguistics) importScripts('./linguistic-core.js');
+if (!globalThis.LoopCATStatistics) importScripts('./statistics-core.js');
 function normalizeText(text) {
   return String(text ?? "")
     .normalize("NFKC")
@@ -66,11 +69,7 @@ function levenshtein(a, b) {
   return prev[b.length];
 }
 
-function similarity(source, candidate) {
-  const a = normalizeText(source);
-  const b = normalizeText(candidate);
-  return similarityNormalized(a, b);
-}
+function similarity(source,candidate) { return globalThis.LoopCATLinguistics.scoreSource(String(candidate||''),String(source||'')).rawScore; }
 
 function similarityNormalized(a, b) {
   if (!a && !b) return 100;
@@ -105,85 +104,7 @@ function contextMatches(entry, context = {}) {
   return Boolean(documentKey && documentKey === cleanText(entry.documentKey) || previousMatch && nextMatch || previousMatch && !next || nextMatch && !previous);
 }
 
-function scoreTmEntries(entries, options = {}) {
-  const { source, sourceLang, targetLang, tmName, tmNames, limit = 6, context = {} } = options || {};
-  if (
-    Object.prototype.hasOwnProperty.call(options, "resourceLinks") &&
-    !(options.resourceLinks || []).some((link) => link?.type === "tm" && link.lookup !== false)
-  ) return [];
-  const sourceText = cleanText(source);
-  const normalizedSource = normalizeText(sourceText);
-  if (!normalizedSource) return [];
-  const sourceTokens = tokensFromNormalized(normalizedSource);
-  const languagePair = languagePairFromFields(sourceLang, targetLang);
-  const allowedNames = resourceNameSet(tmNames, tmName);
-  const links = new Map((options.resourceLinks || []).filter((link) => link?.type === "tm" && link.lookup !== false).map((link, index) => [link.resourceId || link.name, { ...link, priority: Number(link.priority) || index, penalty: Math.max(0, Math.min(30, Number(link.penalty) || 0)) }]));
-  const byKey = new Map();
-  (entries || []).forEach((entry) => {
-    if (languagePair && languagePairOf(entry) !== languagePair) return;
-    const link = links.get(entry.resourceId || entry.tmName);
-    if (links.size && !link) return;
-    if (!links.size && allowedNames.size && !allowedNames.has(entry.tmName)) return;
-    const normalizedCandidate = normalizeText(entry.source);
-    const candidateTokens = tokensFromNormalized(normalizedCandidate);
-    const overlapRatio = tokenOverlapTokens(sourceTokens, candidateTokens);
-    const characterScore = similarityNormalized(normalizedSource, normalizedCandidate);
-    if (
-      normalizedCandidate !== normalizedSource &&
-      overlapRatio < 0.15 &&
-      characterScore < 45
-    ) return;
-    const overlapScore = Math.round(overlapRatio * 100);
-    const orderScore = Math.round(orderedTokenSimilarity(sourceTokens, candidateTokens) * 100);
-    let rawScore;
-    let matchKind;
-    if (sourceText === cleanText(entry.source) && contextMatches(entry, context)) { rawScore = 101; matchKind = "context-exact"; }
-    else if (sourceText === cleanText(entry.source)) { rawScore = 100; matchKind = "exact"; }
-    else if (normalizedCandidate === normalizedSource) { rawScore = 99; matchKind = "normalized-exact"; }
-    else {
-      const combined = Math.round(characterScore * 0.55 + overlapScore * 0.3 + orderScore * 0.15);
-      rawScore = Math.min(98, overlapScore ? combined : Math.max(combined, characterScore - 3));
-      matchKind = "fuzzy";
-    }
-    if (rawScore < 45) return;
-    const penalty = link?.penalty || 0;
-    const effectiveScore = Math.max(0, Math.min(101, rawScore - penalty));
-    const scored = {
-      ...entry,
-      score: effectiveScore,
-      rawScore,
-      penalty,
-      effectiveScore,
-      matchKind,
-      resourcePriority: link?.priority ?? 999,
-      sameDomainProvenance: Boolean(
-        cleanText(context.domain) && normalizeText(entry.domain) === normalizeText(context.domain)
-      ),
-      provenance: [{
-        resourceId: entry.resourceId || "",
-        resourceName: entry.tmName || "",
-        projectName: entry.projectName || "",
-        domain: entry.domain || "",
-        updatedAt: entry.updatedAt || ""
-      }]
-    };
-    const key = [languagePairOf(entry), normalizedCandidate, normalizeText(entry.target)].join("::");
-    const existing = byKey.get(key);
-    if (existing) existing.provenance.push(...scored.provenance.filter((item) => !existing.provenance.some((known) => known.resourceId === item.resourceId)));
-    if (!existing || scored.effectiveScore > existing.effectiveScore || new Date(scored.updatedAt) > new Date(existing.updatedAt)) {
-      if (existing) scored.provenance = existing.provenance;
-      byKey.set(key, scored);
-    }
-  });
-  return Array.from(byKey.values())
-    .sort((a, b) =>
-      b.effectiveScore - a.effectiveScore ||
-      a.resourcePriority - b.resourcePriority ||
-      Number(b.sameDomainProvenance) - Number(a.sameDomainProvenance) ||
-      new Date(b.updatedAt) - new Date(a.updatedAt)
-    )
-    .slice(0, limit);
-}
+function scoreTmEntries(entries, options = {}) { return globalThis.LoopCATLinguistics.scoreEntries(entries, options); }
 
 function numberList(text) {
   const normalized = String(text || "")
@@ -378,23 +299,16 @@ function runQaChecks(segments, terms = []) {
 self.addEventListener("message", (event) => {
   const { id, type, payload } = event.data || {};
   try {
+    if (type === "source-update") { const result=globalThis.LoopCATSourceUpdate.compareSourceUpdate(payload.previous,payload.incoming,payload.locale); self.postMessage({id,ok:true,result}); return; }
+    if (type === "statistics") {
+      globalThis.LoopCATStatistics.analyze(payload, progress => self.postMessage({id, progress})).then(result => self.postMessage({id,ok:true,result})).catch(error => self.postMessage({id,ok:false,error:error.message})); return;
+    }
     if (type === "tm-analysis") {
-      const sources = new Set(payload.entries.map(normalizeText));
-      const scores = new Map();
-      const result = payload.sources.map((source) => {
-        if (!source) return 0;
-        const normalized = normalizeText(source);
-        if (scores.has(normalized)) return scores.get(normalized);
-        let best = sources.has(normalized) ? 100 : 0;
-        if (best < 100) for (const candidate of sources) {
-          best = Math.max(best, similarityNormalized(normalized, candidate));
-          if (best === 100) break;
-        }
-        scores.set(normalized, best);
-        return best;
+      const result=payload.sources.map((source,index)=>{
+        if(payload.options) return scoreTmEntries(payload.entries,{...payload.options,source,context:globalThis.LoopCATLinguistics.contextFor(payload.segments[index],payload.segments),limit:1,differences:false})[0]?.score || 0;
+        return payload.entries.reduce((best,entry)=>Math.max(best,similarity(source,entry)),0);
       });
-      self.postMessage({ id, ok: true, result });
-      return;
+      self.postMessage({id,ok:true,result}); return;
     }
     if (type === "tm-match") {
       self.postMessage({ id, ok: true, result: scoreTmEntries(payload.entries, payload.options) });

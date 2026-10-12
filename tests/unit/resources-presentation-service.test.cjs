@@ -179,7 +179,9 @@ test("ResourcesPresentationService preserves safe resource cards, metadata, and 
   assert.match(html.find((entry) => entry.element === card).markup, /safeHtml:<unsafe>/);
   assert.match(html.find((entry) => entry.element === card).markup, /escaped:pair:en->tr/);
   assert.match(html.find((entry) => entry.element === card).markup, /labelHtml:updatedAt:date:2026-08-14/);
-  const [deleteButton, exportButton, openButton] = card.querySelector(".resource-card-actions").children;
+  const [openButton, menu] = card.querySelector(".resource-card-actions").children;
+  const [exportButton, deleteButton] = menu.children[1].children;
+  assert.equal(menu.className, "menu action-menu");
   assert.deepEqual(
     [deleteButton.dataset.resourceAction, exportButton.dataset.resourceAction, openButton.dataset.resourceAction],
     ["delete-resource", "export", "open"]
@@ -187,8 +189,8 @@ test("ResourcesPresentationService preserves safe resource cards, metadata, and 
   assert.equal(deleteButton.dataset.resourceKey, resource.key);
   assert.equal(exportButton.dataset.resourceType, "tm");
   assert.equal(openButton.getAttribute("aria-label"), "source:Open resource safeText:<unsafe>");
-  assert.equal(deleteButton.className, "danger-small");
-  assert.equal(openButton.className, "primary");
+  assert.equal(deleteButton.className, "danger-small menu-danger");
+  assert.equal(openButton.className, "resource-open");
 });
 
 test("ResourcesPresentationService preserves TM detail visibility, counts, rows, escaping, and batched replacement", async () => {

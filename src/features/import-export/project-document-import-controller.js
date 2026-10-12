@@ -67,6 +67,52 @@ export function createProjectDocumentImportController(options) {
 
   validateProjectDocumentImportControllerOptions(options);
   const { confirmDuplicate, hasDocumentNamed } = createProjectDocumentDuplicatePolicy({ catalog, text, confirm });
+  let importContext = null;
+
+  function append(project, segments, documentOptions) {
+    project = {
+      ...project,
+      documents: project.documents.map((document) =>
+        document.id === documentOptions.documentId
+          ? {
+              ...document,
+              sourceRevision: 1,
+              originalFilename: document.name,
+              importOptions: { encoding: importContext?.encoding || formats.decodingOptions()?.encoding || "auto" }
+            }
+          : document
+      )
+    };
+    if (importContext) {
+      const current = session.getProject();
+      if (current?.id !== importContext.projectId || current?.storageVersion !== importContext.version)
+        throw new Error("Project changed during import. Retry after reviewing the project.");
+      if (importContext.batch?.canceled()) throw new DOMException("Import canceled before saving.", "AbortError");
+      if (importContext.batch) {
+        const receipt = {
+          importKey: `${importContext.batch.id}:${importContext.rowId}`,
+          batchId: importContext.batch.id,
+          name: importContext.file.name,
+          fingerprint: importContext.fingerprint,
+          encoding: importContext.encoding,
+          allowLanguageMismatch: !!importContext.allowLanguageMismatch,
+          documentId: documentOptions.documentId,
+          importedAt: new Date().toISOString()
+        };
+        project = { ...project, importReceipts: [...(project.importReceipts || []).slice(-999), receipt] };
+      }
+    }
+    return repository.append(project, segments, documentOptions);
+  }
+
+  async function finishBatch(batch) {
+    if (!batch.committed.length || session.getProject()?.id !== batch.projectId) return;
+    const first = batch.committed[0];
+    await replaceImportedProject({ project: session.getProject() }, first.documentId, first.file);
+    workspace.markDirty();
+    presentation.renderAll();
+    await presentation.refreshEditorContext();
+  }
 
   function segmentDetail(count) {
     return `${count} segment${count === 1 ? "" : "s"}`;
@@ -93,6 +139,12 @@ export function createProjectDocumentImportController(options) {
   }
 
   async function finishImport({ file, importResult, documentId: importedDocumentId, complete }) {
+    if (importContext?.batch) {
+      session.replaceProject(importResult.project);
+      importContext.batch.committed.push({ documentId: importedDocumentId, file });
+      workspace.markDirty();
+      return;
+    }
     await replaceImportedProject(importResult, importedDocumentId, file);
     const { activityContext, message } = complete();
     const activityLogged = await activity.log(
@@ -121,7 +173,7 @@ export function createProjectDocumentImportController(options) {
       ...(session.getProject().docxStructures || {}),
       [importedDocumentId]: result.structure
     };
-    const importResult = await repository.append(
+    const importResult = await append(
       {
         ...session.getProject(),
         sourceFileName: result.fileName,
@@ -157,7 +209,10 @@ export function createProjectDocumentImportController(options) {
   async function importLocalization(file) {
     files.assertSize(file, "Project file", files.maxBytes);
     await progress.report("Parsing project file", file);
-    const result = await formats.parseLocalization(file, formats.decodingOptions());
+    const result = await formats.parseLocalization(
+      file,
+      importContext?.encoding ? { encoding: importContext.encoding } : formats.decodingOptions()
+    );
     await progress.report("Saving imported segments", file, segmentDetail(result.segments.length));
     const importedDocumentId = documentId();
     const documents = [
@@ -167,11 +222,11 @@ export function createProjectDocumentImportController(options) {
     const localizationStructures = result.structure
       ? { ...(session.getProject().localizationStructures || {}), [importedDocumentId]: result.structure }
       : session.getProject().localizationStructures;
-    const importResult = await repository.append(
-      { ...session.getProject(), documents, localizationStructures },
-      result.segments,
-      { documentId: importedDocumentId, documentName: result.fileName, documentType: result.documentType }
-    );
+    const importResult = await append({ ...session.getProject(), documents, localizationStructures }, result.segments, {
+      documentId: importedDocumentId,
+      documentName: result.fileName,
+      documentType: result.documentType
+    });
     await finishImport({
       file,
       importResult,
@@ -195,7 +250,25 @@ export function createProjectDocumentImportController(options) {
   async function importXliff(file) {
     files.assertSize(file, "Project file", files.maxBytes);
     await progress.report("Parsing XLIFF", file);
-    const result = await formats.parseXliff(file, formats.decodingOptions());
+    const result = await formats.parseXliff(
+      file,
+      importContext?.encoding ? { encoding: importContext.encoding } : formats.decodingOptions()
+    );
+    const project = session.getProject();
+    const metadata = [result.structure, ...result.segments.map((segment) => segment.structure)].filter(Boolean);
+    if (
+      !importContext?.allowLanguageMismatch &&
+      metadata.some(
+        (info) =>
+          (info.sourceLang && info.sourceLang.toLowerCase() !== project.sourceLang.toLowerCase()) ||
+          (info.targetLang && info.targetLang.toLowerCase() !== project.targetLang.toLowerCase())
+      )
+    ) {
+      const error = Object.assign(new Error("The XLIFF language pair differs from this project."), {
+        code: "LANGUAGE_MISMATCH"
+      });
+      throw error;
+    }
     await progress.report("Saving imported segments", file, segmentDetail(result.segments.length));
     const importedDocumentId = documentId();
     const documents = [
@@ -206,11 +279,11 @@ export function createProjectDocumentImportController(options) {
       ...(session.getProject().localizationStructures || {}),
       [importedDocumentId]: result.structure
     };
-    const importResult = await repository.append(
-      { ...session.getProject(), documents, localizationStructures },
-      result.segments,
-      { documentId: importedDocumentId, documentName: result.fileName, documentType: result.documentType }
-    );
+    const importResult = await append({ ...session.getProject(), documents, localizationStructures }, result.segments, {
+      documentId: importedDocumentId,
+      documentName: result.fileName,
+      documentType: result.documentType
+    });
     await finishImport({
       file,
       importResult,
@@ -230,26 +303,52 @@ export function createProjectDocumentImportController(options) {
     });
   }
 
-  async function importFile(file) {
+  async function importFile(file, importOptions = {}) {
     if (!session.getProject() || !file) return;
     files.assertSize(file, "Project file", files.maxBytes);
-    if (!confirmDuplicate(file)) {
+    if (!importOptions.acceptDuplicate && !confirmDuplicate(file)) {
       status.set("Import canceled", "saved");
       return false;
     }
-    const extension = file.name.split(".").pop().toLowerCase();
-    if (extension === "docx") {
-      await importDocx(file);
+    const receipt =
+      importOptions.batch &&
+      (session.getProject().importReceipts || []).find(
+        (item) => item.importKey === `${importOptions.batch.id}:${importOptions.rowId}`
+      );
+    if (receipt) {
+      if (
+        receipt.fingerprint !== importOptions.fingerprint ||
+        receipt.encoding !== importOptions.encoding ||
+        receipt.name !== file.name ||
+        !!receipt.allowLanguageMismatch !== !!importOptions.allowLanguageMismatch
+      )
+        throw new Error("Retry input differs from the committed import receipt.");
       return;
     }
-    if (formats.isXliffType(extension)) {
-      await importXliff(file);
-      return;
+    importContext = {
+      ...importOptions,
+      file,
+      projectId: session.getProject().id,
+      version: session.getProject().storageVersion
+    };
+    try {
+      const extension = file.name.split(".").pop().toLowerCase();
+      if (extension === "docx") {
+        await importDocx(file);
+        return;
+      }
+      if (formats.isXliffType(extension)) {
+        await importXliff(file);
+        return;
+      }
+      await importLocalization(file);
+    } finally {
+      importContext = null;
     }
-    await importLocalization(file);
   }
 
   return Object.freeze({
+    finishBatch,
     confirmDuplicate,
     hasDocumentNamed,
     importDocx,

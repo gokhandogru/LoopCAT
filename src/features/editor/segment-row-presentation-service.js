@@ -6,6 +6,8 @@ import { createInlineTagEditor } from "./inline-tag-editor.js";
  * behind injected application boundaries.
  *
  * @param {{
+ *   selection?: any,
+ *   visibleIds?: () => string[],
  *   template: { content: { firstElementChild: { cloneNode: (deep: boolean) => any } } },
  *   body: { querySelector: (selector: string) => any },
  *   session: { getSegments: () => any[] },
@@ -63,6 +65,27 @@ export function createSegmentRowPresentationService(options) {
     row.classList.toggle("active", index === application.getActiveIndex());
     row.classList.toggle("tag-warning-row", protectedTags.hasIssue(segment));
     row.querySelector(".num-col").textContent = String(index + 1);
+    if (options.selection && row.ownerDocument) {
+      const checkbox = row.ownerDocument.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = options.selection.has(segment.id);
+      checkbox.className = "segment-select";
+      checkbox.setAttribute("aria-label", localization.source("Select segment {value1}", { value1: index + 1 }));
+      checkbox.addEventListener("click", (event) => {
+        event.stopPropagation();
+        options.selection.toggle(
+          segment.id,
+          checkbox.checked,
+          event.shiftKey,
+          options.visibleIds?.() || session.getSegments().map((s) => s.id)
+        );
+        for (const input of row.parentNode.querySelectorAll(".segment-select")) {
+          const selected = session.getSegments()[Number(input.closest("tr").dataset.index)];
+          input.checked = options.selection.has(selected.id);
+        }
+      });
+      row.querySelector(".num-col").prepend(checkbox);
+    }
     const sourceCell = row.querySelector(".source-cell");
     sourceCell.textContent = "";
     sourceCell.dir = "auto";

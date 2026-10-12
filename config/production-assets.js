@@ -21,6 +21,9 @@
     "icons/loopcat-loopbird-mono.svg",
     "icons/loopcat-icon.png",
     "cat-worker.js",
+    "linguistic-core.js",
+    "statistics-core.js",
+    "source-update-core.js",
     "regex-worker.js",
     "app.js"
   ]);
@@ -35,7 +38,7 @@
   ]);
 
   return Object.freeze({
-    appVersion: "0.0.4-dev.20260924",
+    appVersion: "0.0.4-dev.20261012.1",
     contractVersion: 1,
     runtimeAssets,
     offlineAssets,

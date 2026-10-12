@@ -6,6 +6,7 @@ export function createStorageRepository(storageApi) {
     getAllByIndex: storageApi.getAllByIndex.bind(storageApi),
     deleteByKey: storageApi.deleteByKey.bind(storageApi),
     put: storageApi.put.bind(storageApi),
+    commitMutation: storageApi.commitMutation?.bind(storageApi),
     bulkPut: storageApi.bulkPut.bind(storageApi),
     writeAtomically: storageApi.writeStoresAtomically.bind(storageApi),
     replaceAtomically: storageApi.replaceStoresAtomically.bind(storageApi),
