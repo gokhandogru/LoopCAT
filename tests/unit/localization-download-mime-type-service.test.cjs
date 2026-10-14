@@ -61,7 +61,7 @@ test("LocalizationDownloadMimeTypeService preserves every non-XLIFF format mappi
     [["md"], "text/markdown"],
     [["csv"], "text/csv"],
     [["tsv"], "text/tab-separated-values"],
-    [["xml", "dita", "txml", "ttx", "xini", "resx", "wix", "ts", "icml"], "application/xml"],
+    [["xml", "tmx", "dita", "txml", "ttx", "xini", "resx", "wix", "ts", "icml"], "application/xml"],
     [["idml"], "application/vnd.adobe.indesign-idml-package"],
     [
       ["docm", "dotx", "dotm", "xlsx", "xlsm", "xltx", "xltm", "pptx", "pptm", "ppsx", "ppsm", "potx", "potm"],

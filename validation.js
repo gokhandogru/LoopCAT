@@ -88,6 +88,7 @@
     tab: "\t"
   };
   const LOCALIZATION_TYPES = new Set([
+    "tmx",
     "docm",
     "dotx",
     "dotm",
@@ -150,6 +151,15 @@
   }
 
   const RECONSTRUCTION_SEGMENT_REQUIREMENTS = {
+    tmx: {
+      label: "TMX",
+      issue: "translation unit or language variant mapping data",
+      valid: (segment) => structureFormat(segment) === "tmx" &&
+        Number.isInteger(segment.structure.unitIndex) && segment.structure.unitIndex >= 0 &&
+        Number.isInteger(segment.structure.sourceVariantIndex) && segment.structure.sourceVariantIndex >= 0 &&
+        Number.isInteger(segment.structure.targetVariantIndex) && segment.structure.targetVariantIndex >= -1 &&
+        Array.isArray(segment.structure.inlineCodes)
+    },
     xlf: {
       label: "XLIFF",
       issue: "file, unit, or segment mapping data",
@@ -1420,6 +1430,7 @@
     return [
       "docx",
       "bilingual-docx",
+      "tmx",
       "docm",
       "dotx",
       "dotm",
@@ -1595,7 +1606,7 @@
     );
   }
 
-  const EMPTY_TARGET_INTERCHANGE_FORMATS = new Set(["xlf", "xliff", "sdlxliff", "po", "pot", "ttx", "txml"]);
+  const EMPTY_TARGET_INTERCHANGE_FORMATS = new Set(["xlf", "xliff", "sdlxliff", "tmx", "po", "pot", "ttx", "txml"]);
   const REVIEW_EXPORT_FORMATS = new Set(["project", "project-report", "quality-passport", "bilingual-docx"]);
 
   function deliveryExportPolicy({ format = "project", structure = null } = {}) {
@@ -1757,6 +1768,11 @@
           "errors",
           `${documentInfo.name || "Current file"} original localization structure metadata is missing.`
         );
+    }
+    if (documentType === "tmx" && localizationStructure &&
+        (localizationStructure.format !== "tmx" || !localizationStructure.source ||
+         !localizationStructure.sourceLang || !localizationStructure.targetLang)) {
+      add(report, "errors", "TMX reconstruction source data or language pair is missing.");
     }
     if (
       (format === "idml" || documentType === "idml") &&

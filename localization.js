@@ -319,6 +319,16 @@ function segmentStructureFormat(segment) {
 }
 
 const LOCALIZATION_RECONSTRUCTION_REQUIREMENTS = {
+  tmx: {
+    label: "TMX",
+    issue: "translation unit or language variant mapping data",
+    hasOriginal: (structure) => structure?.format === "tmx" && Boolean(structure.source && structure.sourceLang && structure.targetLang),
+    validSegment: (segment) => segmentStructureFormat(segment) === "tmx" &&
+      Number.isInteger(segment.structure.unitIndex) && segment.structure.unitIndex >= 0 &&
+      Number.isInteger(segment.structure.sourceVariantIndex) && segment.structure.sourceVariantIndex >= 0 &&
+      Number.isInteger(segment.structure.targetVariantIndex) && segment.structure.targetVariantIndex >= -1 &&
+      Array.isArray(segment.structure.inlineCodes)
+  },
   po: {
     label: "PO",
     issue: "msgstr line mapping data",
@@ -2140,6 +2150,125 @@ function buildBilingualXml(segments, structure = null) {
   return new XMLSerializer().serializeToString(doc);
 }
 
+function tmxChildren(element, name) {
+  return Array.from(element?.children || []).filter((child) => localNameLower(child) === name);
+}
+
+function tmxDocument(text) {
+  const doc = parseXmlDocument(text, "TMX");
+  if (localNameLower(doc.documentElement) !== "tmx" || !childElementByLocalName(doc.documentElement, "body")) {
+    throw new Error("The TMX file must contain a tmx root and a body.");
+  }
+  return doc;
+}
+
+function tmxLanguage(value) {
+  return String(value || "").trim().replaceAll("_", "-").toLowerCase();
+}
+
+function tmxVariantIndex(variants, language, excluded = -1) {
+  const expected = tmxLanguage(language);
+  const candidates = variants.map((variant, index) => ({
+    index,
+    language: tmxLanguage(variant.getAttribute("xml:lang") || variant.getAttribute("lang"))
+  })).filter((item) => item.index !== excluded);
+  const exact = candidates.filter((item) => item.language === expected);
+  const matches = exact.length ? exact : candidates.filter((item) => item.language.split("-")[0] === expected.split("-")[0]);
+  if (matches.length > 1) throw new Error(`TMX contains ambiguous language variants for ${language}. Choose a project language with an exact locale match.`);
+  return matches[0]?.index ?? -1;
+}
+
+// Keep native inline code payloads intact, while exposing ordinary text and hi
+// contents for editing. Only these original XML tokens are reconstructed as XML.
+function tmxContent(element, codes) {
+  const serializer = new XMLSerializer();
+  return Array.from(element?.childNodes || []).map((node) => {
+    if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE) return node.nodeValue || "";
+    if (node.nodeType === Node.ELEMENT_NODE && localNameLower(node) === "hi") {
+      const open = serializer.serializeToString(node.cloneNode(false)).replace(/\/>$/, ">");
+      const close = `</${node.nodeName}>`;
+      codes.push(open, close);
+      return open + tmxContent(node, codes) + close;
+    }
+    const code = serializer.serializeToString(node);
+    codes.push(code);
+    return code;
+  }).join("");
+}
+
+function parseTmxDocument(text, options) {
+  const { sourceLang, targetLang, importedTranslationStatus = "draft" } = options;
+  if (!tmxLanguage(sourceLang) || !tmxLanguage(targetLang) || tmxLanguage(sourceLang) === tmxLanguage(targetLang)) {
+    throw new Error("TMX document import requires distinct project source and target languages.");
+  }
+  if (!["draft", "confirmed"].includes(importedTranslationStatus)) throw new Error("Choose Draft or Confirmed for imported TMX translations.");
+  const doc = tmxDocument(text);
+  const units = tmxChildren(childElementByLocalName(doc.documentElement, "body"), "tu");
+  const segments = [];
+  units.forEach((unit, unitIndex) => {
+    const variants = tmxChildren(unit, "tuv");
+    const sourceVariantIndex = tmxVariantIndex(variants, sourceLang);
+    if (sourceVariantIndex < 0) throw new Error(`TMX unit ${unitIndex + 1} has no source variant matching ${sourceLang}. Check the project language pair.`);
+    const sourceElement = childElementByLocalName(variants[sourceVariantIndex], "seg");
+    if (!sourceElement) throw new Error(`TMX unit ${unitIndex + 1} is missing its source seg element.`);
+    const targetVariantIndex = tmxVariantIndex(variants, targetLang, sourceVariantIndex);
+    const inlineCodes = [];
+    const source = tmxContent(sourceElement, inlineCodes);
+    const target = tmxContent(childElementByLocalName(variants[targetVariantIndex], "seg"), inlineCodes);
+    if (!source.trim()) return;
+    segments.push({
+      text: source,
+      target,
+      status: target.trim() ? importedTranslationStatus : "empty",
+      tags: detectTags(source),
+      structure: {
+        format: "tmx", unitIndex, sourceVariantIndex, targetVariantIndex,
+        key: unit.getAttribute("tuid") || `tmx-${unitIndex + 1}`,
+        inlineCodes: [...new Set(inlineCodes)]
+      }
+    });
+  });
+  if (!segments.length) throw new Error("No translatable TMX source segments were found.");
+  return { segments, structure: { format: "tmx", source: text, sourceLang, targetLang } };
+}
+
+function buildTmxDocument(segments, structure) {
+  const doc = tmxDocument(structure.source);
+  const units = tmxChildren(childElementByLocalName(doc.documentElement, "body"), "tu");
+  const seen = new Set();
+  for (const segment of segments) {
+    const mapping = segment.structure;
+    const unit = units[mapping.unitIndex];
+    const variants = tmxChildren(unit, "tuv");
+    if (!unit || !variants[mapping.sourceVariantIndex] || seen.has(mapping.unitIndex) ||
+        mapping.sourceVariantIndex === mapping.targetVariantIndex ||
+        (mapping.targetVariantIndex >= 0 && !variants[mapping.targetVariantIndex])) {
+      throw new Error("TMX translation unit or language variant mapping is invalid.");
+    }
+    seen.add(mapping.unitIndex);
+    let targetVariant = variants[mapping.targetVariantIndex];
+    const create = (name) => doc.createElementNS(unit.namespaceURI, unit.prefix ? `${unit.prefix}:${name}` : name);
+    if (!targetVariant) {
+      targetVariant = create("tuv");
+      targetVariant.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:lang", structure.targetLang);
+      unit.appendChild(targetVariant);
+    }
+    let targetElement = childElementByLocalName(targetVariant, "seg");
+    if (!targetElement) {
+      targetElement = create("seg");
+      targetVariant.appendChild(targetElement);
+    }
+    const codes = [...new Set(mapping.inlineCodes)].filter(Boolean).sort((a, b) => b.length - a.length);
+    const pattern = codes.length ? new RegExp(`(${codes.map((code) => code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "g") : null;
+    const value = targetText(segment);
+    const content = pattern ? value.split(pattern).map((part) => codes.includes(part) ? part : escapeXml(part)).join("") : escapeXml(value);
+    const fragment = parseXmlDocument(`<wrapper>${content}</wrapper>`, "TMX target inline content");
+    targetElement.replaceChildren(...Array.from(fragment.documentElement.childNodes, (node) => doc.importNode(node, true)));
+  }
+  // XMLSerializer emits Unicode; do not retain a legacy encoding declaration.
+  return new XMLSerializer().serializeToString(doc).replace(/^<\?xml[^?]*\?>\s*/i, "");
+}
+
 function splitTextBlocks(text) {
   const lines = String(text || "").replace(/^\uFEFF/, "").replace(/\r/g, "").split("\n");
   const blocks = [];
@@ -2703,7 +2832,12 @@ async function parseLocalizationFile(file, options = {}) {
   }
   let segments;
   let structure = null;
-  if (ext === "po" || ext === "pot") {
+  if (ext === "tmx") {
+    const tmx = parseTmxDocument(text, options);
+    segments = tmx.segments;
+    structure = tmx.structure;
+  }
+  else if (ext === "po" || ext === "pot") {
     const po = parsePo(text);
     segments = po.segments;
     structure = po.structure;
@@ -2828,7 +2962,8 @@ function buildLocalizationFile(format, segments, structure = null) {
   const segmentList = localizationSegmentArray(segments);
   assertLocalizationReconstruction(normalizedFormat, segmentList, structure);
   let output;
-  if (normalizedFormat === "po" || normalizedFormat === "pot") output = buildPo(segmentList, structure);
+  if (normalizedFormat === "tmx") output = buildTmxDocument(segmentList, structure);
+  else if (normalizedFormat === "po" || normalizedFormat === "pot") output = buildPo(segmentList, structure);
   else if (normalizedFormat === "srt") output = buildSrt(segmentList, structure);
   else if (normalizedFormat === "vtt" || normalizedFormat === "sbv") output = buildSubtitleText(segmentList, structure, normalizedFormat);
   else if (normalizedFormat === "json") output = buildJson(segmentList, structure);

@@ -139,6 +139,10 @@ jobs:
       - name: Run browser test suite
         run: ${{ matrix.browserCommand }}
 
+      - name: Verify TMX project document workflow
+        if: matrix.signingPlatform == 'win'
+        run: pnpm run verify:tmx
+
       - name: Verify desktop wrapper
         run: pnpm run verify:desktop-wrapper
 

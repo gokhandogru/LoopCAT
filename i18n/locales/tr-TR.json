@@ -2704,6 +2704,9 @@
     "workspace.command.rename.current.file": "Geçerli dosyayı yeniden adlandır",
     "workspace.command.update.current.source.file": "Geçerli kaynak dosyayı güncelle",
     "workspace.command.current.file.version.history": "Geçerli dosyanın sürüm geçmişi",
-    "workspace.command.move.current.file.to.trash": "Geçerli dosyayı çöp kutusuna taşı"
+    "workspace.command.move.current.file.to.trash": "Geçerli dosyayı çöp kutusuna taşı",
+    "tmx.import.existingTranslations": "Mevcut çeviriler",
+    "tmx.import.help": "TMX içe aktarımında projenin dil çifti kullanılır. Mevcut çeviriler için Taslak veya Onaylandı durumunu seçin; çevirisi olmayan hedefler boş kalır.",
+    "tmx.import.confirm": "Mevcut TMX çevirileri onaylanmış olarak içe aktarılsın mı? Taslak olarak tutmak için İptal seçeneğini seçin. Boş hedefler boş kalır."
   }
 }

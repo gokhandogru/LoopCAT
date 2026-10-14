@@ -2704,6 +2704,9 @@
     "workspace.command.rename.current.file": "إعادة تسمية الملف الحالي",
     "workspace.command.update.current.source.file": "تحديث الملف المصدر الحالي",
     "workspace.command.current.file.version.history": "سجل إصدارات الملف الحالي",
-    "workspace.command.move.current.file.to.trash": "نقل الملف الحالي إلى سلة المحذوفات"
+    "workspace.command.move.current.file.to.trash": "نقل الملف الحالي إلى سلة المحذوفات",
+    "tmx.import.existingTranslations": "الترجمات الموجودة",
+    "tmx.import.help": "يستخدم TMX زوج لغات المشروع. اختر مسودة أو مؤكدة للترجمات الموجودة؛ وتبقى المقاطع التي لا تتوفر لها ترجمة فارغة.",
+    "tmx.import.confirm": "هل تريد استيراد ترجمات TMX الموجودة بوصفها مؤكدة؟ اختر إلغاء للاحتفاظ بها كمسودات. تبقى المقاطع المستهدفة الفارغة فارغة."
   }
 }

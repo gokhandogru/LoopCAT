@@ -1,6 +1,6 @@
 {
   "name": "loopcat",
-  "version": "0.0.4-dev.20261012.1",
+  "version": "0.0.4-dev.20261014.1",
   "description": "The local-first translation workspace for professional editing, review, resources, and optional AI.",
   "homepage": "https://github.com/gokhandogru/LoopCAT",
   "private": true,
@@ -23,6 +23,7 @@
     "verify:quality": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm stylelint && pnpm test:unit && pnpm verify:imports",
     "verify:a11y": "pnpm build:renderer && node scripts/verify-accessibility.cjs",
     "verify:statistics": "node scripts/build-renderer.cjs && node scripts/verify-statistics-workflow.cjs",
+    "verify:tmx": "node scripts/build-renderer.cjs && node scripts/verify-tmx-workflow.cjs",
     "verify:visual": "pnpm verify:baseline",
     "verify:renderer": "node scripts/build-renderer.cjs && node scripts/verify-renderer-build.cjs",
     "verify:release": "node scripts/verify-release.cjs",

@@ -2703,6 +2703,9 @@
     "workspace.command.rename.current.file": "Rename current file",
     "workspace.command.update.current.source.file": "Update current source file",
     "workspace.command.current.file.version.history": "Current file version history",
-    "workspace.command.move.current.file.to.trash": "Move current file to Trash"
+    "workspace.command.move.current.file.to.trash": "Move current file to Trash",
+    "tmx.import.existingTranslations": "Existing translations",
+    "tmx.import.help": "TMX uses the project language pair. Choose Draft or Confirmed for existing translations; missing translations stay empty.",
+    "tmx.import.confirm": "Import existing TMX translations as confirmed? Choose Cancel to keep them as drafts. Empty targets remain empty."
   }
 }

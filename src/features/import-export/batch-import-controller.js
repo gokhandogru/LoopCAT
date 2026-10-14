@@ -30,6 +30,13 @@ export function createBatchImportController(options) {
     "Up to 50 mixed-format files, 100 MiB combined. Imported files are retained if another file fails.",
     dialog
   );
+  const tmxHelp = node(
+    "p",
+    "TMX uses the project language pair. Choose Draft or Confirmed for existing translations; missing translations stay empty.",
+    dialog
+  );
+  tmxHelp.id = "tmxImportHelp";
+  tmxHelp.hidden = true;
   const summary = node("p", "", dialog);
   summary.setAttribute("role", "status");
   summary.setAttribute("aria-live", "polite");
@@ -80,7 +87,16 @@ export function createBatchImportController(options) {
     queue.replaceChildren();
     const table = node("table", "", queue),
       header = node("tr", "", node("thead", "", table));
-    for (const title of ["Import", "File", "Format / size", "Encoding", "Result"])
+    const hasTmx = rows.some((row) => row.extension === "tmx");
+    tmxHelp.hidden = !hasTmx;
+    for (const title of [
+      "Import",
+      "File",
+      "Format / size",
+      "Encoding",
+      ...(hasTmx ? ["Existing translations"] : []),
+      "Result"
+    ])
       node("th", title, header).scope = "col";
     const body = node("tbody", "", table);
     for (const row of rows) {
@@ -107,6 +123,25 @@ export function createBatchImportController(options) {
         row.encoding = select.value;
         row.state = "ready";
       });
+      if (hasTmx) {
+        const cell = node("td", "", tr);
+        if (row.extension === "tmx") {
+          const translationStatus = node("select", "", cell);
+          translationStatus.setAttribute("aria-label", t("Existing translations") + ": " + row.file.name);
+          translationStatus.setAttribute("aria-describedby", tmxHelp.id);
+          translationStatus.disabled = running || row.state === "imported" || row.state === "unsupported";
+          for (const [value, label] of [
+            ["draft", "Draft"],
+            ["confirmed", "Confirmed"]
+          ]) {
+            node("option", label, translationStatus).value = value;
+          }
+          translationStatus.value = row.importedTranslationStatus;
+          translationStatus.addEventListener("change", () => {
+            row.importedTranslationStatus = translationStatus.value;
+          });
+        } else cell.textContent = "—";
+      }
       node("td", row.message || row.state, tr);
     }
   }
@@ -156,6 +191,7 @@ export function createBatchImportController(options) {
                 rowId: row.id,
                 fingerprint,
                 encoding: row.encoding,
+                ...(row.extension === "tmx" ? { importedTranslationStatus: row.importedTranslationStatus } : {}),
                 acceptDuplicate: true,
                 allowLanguageMismatch: row.allowLanguageMismatch
               });
@@ -228,6 +264,7 @@ export function createBatchImportController(options) {
         extension,
         id: crypto.randomUUID(),
         encoding: "auto",
+        importedTranslationStatus: "draft",
         include: supported && !duplicate,
         state: supported ? "ready" : "unsupported",
         allowLanguageMismatch: false,

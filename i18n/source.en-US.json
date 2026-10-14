@@ -54585,6 +54585,27 @@
       "locations": [
         "src/app/application-command-catalog-service.js"
       ]
+    },
+    "tmx.import.existingTranslations": {
+      "message": "Existing translations",
+      "description": "TMX project document import",
+      "locations": [
+        "src/features/import-export/batch-import-controller.js"
+      ]
+    },
+    "tmx.import.help": {
+      "message": "TMX uses the project language pair. Choose Draft or Confirmed for existing translations; missing translations stay empty.",
+      "description": "TMX project document import",
+      "locations": [
+        "src/features/import-export/batch-import-controller.js"
+      ]
+    },
+    "tmx.import.confirm": {
+      "message": "Import existing TMX translations as confirmed? Choose Cancel to keep them as drafts. Empty targets remain empty.",
+      "description": "TMX project document import",
+      "locations": [
+        "src/features/import-export/project-document-import-controller.js"
+      ]
     }
   }
 }

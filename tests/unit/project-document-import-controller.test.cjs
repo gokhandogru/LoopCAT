@@ -561,6 +561,64 @@ test("cancel before commit does not append a document or receipt", async () => {
   assert.equal(harness.read().project.importReceipts, undefined);
 });
 
+test("TMX imports pass the project pair and status choice and retain them on retry", async () => {
+  const { createProjectDocumentImportController } = await loadFactory();
+  for (const importedTranslationStatus of ["draft", "confirmed"]) {
+    const harness = createHarness(createProjectDocumentImportController, {
+      file: { name: "bilingual.TMX", size: 40 },
+      project: { id: "project-1", sourceLang: "en-GB", targetLang: "tr-TR", documents: [] },
+      localizationResult: {
+        fileName: "bilingual.TMX",
+        documentType: "tmx",
+        segments: [{ text: "Hello", target: "Merhaba", status: importedTranslationStatus }],
+        structure: { format: "tmx", source: "original XML" }
+      }
+    });
+    const batch = { id: "batch", projectId: "project-1", committed: [], canceled: () => false };
+    const settings = { batch, rowId: "row", fingerprint: "hash", encoding: "utf-16le", importedTranslationStatus };
+    await harness.controller.importFile(harness.file, settings);
+    assert.deepEqual(harness.calls.find(([name]) => name === "parseLocalization")[2], {
+      sourceLang: "en-GB",
+      targetLang: "tr-TR",
+      encoding: "utf-16le",
+      importedTranslationStatus
+    });
+    const saved = harness.read().project;
+    assert.equal(saved.documents[0].importOptions.importedTranslationStatus, importedTranslationStatus);
+    assert.equal(saved.importReceipts[0].importedTranslationStatus, importedTranslationStatus);
+    assert.equal(
+      harness.calls.some(([name]) => name === "confirm"),
+      false
+    );
+    await harness.controller.importFile(harness.file, settings);
+    assert.equal(harness.calls.filter(([name]) => name === "append").length, 1);
+    await assert.rejects(
+      harness.controller.importFile(harness.file, {
+        ...settings,
+        importedTranslationStatus: importedTranslationStatus === "draft" ? "confirmed" : "draft"
+      }),
+      /differs from the committed/
+    );
+  }
+});
+
+test("direct TMX imports offer confirmed or draft status before parsing", async () => {
+  const { createProjectDocumentImportController } = await loadFactory();
+  for (const confirmResult of [true, false]) {
+    const harness = createHarness(createProjectDocumentImportController, {
+      file: { name: "bilingual.tmx", size: 40 },
+      confirmResult,
+      catalog: []
+    });
+    await harness.controller.importFile(harness.file);
+    assert.match(harness.calls.find(([name]) => name === "confirm")[1], /existing TMX translations as confirmed/);
+    assert.equal(
+      harness.calls.find(([name]) => name === "parseLocalization")[2].importedTranslationStatus,
+      confirmResult ? "confirmed" : "draft"
+    );
+  }
+});
+
 test("ProjectDocumentImportController validates boundaries and exposes an immutable API", async () => {
   const { createProjectDocumentImportController } = await loadFactory();
   assert.throws(() => createProjectDocumentImportController(), /requires checked session/);

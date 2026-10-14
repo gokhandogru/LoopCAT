@@ -148,8 +148,8 @@ export function createImportExportController(options) {
     }
   }
 
-  async function importManyProjectFiles() {
-    const files = Array.from(projectFileImportInput.files || []);
+  async function importManyProjectFiles(input = projectFileImportInput) {
+    const files = Array.from(input.files || []);
     try {
       if (!hasProject() || typeof options?.importProjectFile !== "function") return;
       if (options.reviewProjectFiles) {
@@ -162,7 +162,7 @@ export function createImportExportController(options) {
     } catch (error) {
       reportError(error, { phase: "import-project-files" });
     } finally {
-      projectFileImportInput.value = "";
+      input.value = "";
     }
   }
 
@@ -274,11 +274,7 @@ export function createImportExportController(options) {
       "change",
       () => void importSingle(docxInput, "Project file import", options.importProjectFile, true)
     );
-    listen(
-      localizationInput,
-      "change",
-      () => void importSingle(localizationInput, "Project file import", options.importProjectFile, true)
-    );
+    listen(localizationInput, "change", () => void importManyProjectFiles(localizationInput));
     listen(projectFileImportInput, "change", () => void importManyProjectFiles());
     listen(
       projectPackageImportInput,

@@ -295,6 +295,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   const STORAGE_HIGH_USAGE_RATIO = 0.9;
   const XLIFF_DOCUMENT_TYPES = new Set(["xlf", "xliff", "sdlxliff"]);
   const LOCALIZATION_EXPORT_TYPES = new Set([
+    "tmx",
     "docm",
     "dotx",
     "dotm",
@@ -6457,16 +6458,24 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     prepare: async (file, settings) => {
       fileImportService.assertSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);
       const ext = file.name.split(".").pop().toLowerCase();
+      const importOptions = {
+        encoding: settings.encoding || "auto",
+        ...(ext === "tmx" ? { importedTranslationStatus: settings.importedTranslationStatus || "draft" } : {})
+      };
       const parsed =
         ext === "docx"
           ? await extractDocxSegments(file)
           : XLIFF_DOCUMENT_TYPES.has(ext)
             ? await parseXliffFile(file, { encoding: settings.encoding })
-            : await parseLocalizationFile(file, { encoding: settings.encoding });
+            : await parseLocalizationFile(file, {
+                ...importOptions,
+                sourceLang: editorSessionStore.getProject().sourceLang,
+                targetLang: editorSessionStore.getProject().targetLang
+              });
       return {
         ...parsed,
         documentType: parsed.documentType || ext,
-        importOptions: { encoding: settings.encoding || "auto" }
+        importOptions
       };
     },
     validate: async (prepared, segments) => {

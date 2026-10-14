@@ -2704,6 +2704,9 @@
     "workspace.command.rename.current.file": "Canviar el nom del fitxer actual",
     "workspace.command.update.current.source.file": "Actualitzar el fitxer d’origen actual",
     "workspace.command.current.file.version.history": "Historial de versions del fitxer actual",
-    "workspace.command.move.current.file.to.trash": "Moure el fitxer actual a la paperera"
+    "workspace.command.move.current.file.to.trash": "Moure el fitxer actual a la paperera",
+    "tmx.import.existingTranslations": "Traduccions existents",
+    "tmx.import.help": "La importació TMX utilitza el parell de llengües del projecte. Trieu Esborrany o Confirmat per a les traduccions existents; els segments sense traducció queden buits.",
+    "tmx.import.confirm": "Voleu importar les traduccions TMX existents com a confirmades? Trieu Cancel·la per mantenir-les com a esborranys. Els segments de destinació buits continuaran buits."
   }
 }

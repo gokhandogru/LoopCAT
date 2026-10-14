@@ -78,7 +78,12 @@ export function createProjectDocumentImportController(options) {
               ...document,
               sourceRevision: 1,
               originalFilename: document.name,
-              importOptions: { encoding: importContext?.encoding || formats.decodingOptions()?.encoding || "auto" }
+              importOptions: {
+                encoding: importContext?.encoding || formats.decodingOptions()?.encoding || "auto",
+                ...(document.type === "tmx"
+                  ? { importedTranslationStatus: importContext?.importedTranslationStatus || "draft" }
+                  : {})
+              }
             }
           : document
       )
@@ -96,6 +101,9 @@ export function createProjectDocumentImportController(options) {
           fingerprint: importContext.fingerprint,
           encoding: importContext.encoding,
           allowLanguageMismatch: !!importContext.allowLanguageMismatch,
+          ...(documentOptions.documentType === "tmx"
+            ? { importedTranslationStatus: importContext.importedTranslationStatus || "draft" }
+            : {}),
           documentId: documentOptions.documentId,
           importedAt: new Date().toISOString()
         };
@@ -209,10 +217,18 @@ export function createProjectDocumentImportController(options) {
   async function importLocalization(file) {
     files.assertSize(file, "Project file", files.maxBytes);
     await progress.report("Parsing project file", file);
-    const result = await formats.parseLocalization(
-      file,
-      importContext?.encoding ? { encoding: importContext.encoding } : formats.decodingOptions()
-    );
+    const decodingOptions = importContext?.encoding ? { encoding: importContext.encoding } : formats.decodingOptions();
+    const isTmx = /\.tmx$/i.test(file.name);
+    const result = await formats.parseLocalization(file, {
+      ...decodingOptions,
+      ...(isTmx
+        ? {
+            sourceLang: session.getProject().sourceLang,
+            targetLang: session.getProject().targetLang,
+            importedTranslationStatus: importContext?.importedTranslationStatus || "draft"
+          }
+        : {})
+    });
     await progress.report("Saving imported segments", file, segmentDetail(result.segments.length));
     const importedDocumentId = documentId();
     const documents = [
@@ -320,7 +336,9 @@ export function createProjectDocumentImportController(options) {
         receipt.fingerprint !== importOptions.fingerprint ||
         receipt.encoding !== importOptions.encoding ||
         receipt.name !== file.name ||
-        !!receipt.allowLanguageMismatch !== !!importOptions.allowLanguageMismatch
+        !!receipt.allowLanguageMismatch !== !!importOptions.allowLanguageMismatch ||
+        (/\.tmx$/i.test(file.name) &&
+          (receipt.importedTranslationStatus || "draft") !== (importOptions.importedTranslationStatus || "draft"))
       )
         throw new Error("Retry input differs from the committed import receipt.");
       return;
@@ -333,6 +351,13 @@ export function createProjectDocumentImportController(options) {
     };
     try {
       const extension = file.name.split(".").pop().toLowerCase();
+      if (extension === "tmx" && !importContext.importedTranslationStatus) {
+        importContext.importedTranslationStatus = confirm(
+          "Import existing TMX translations as confirmed? Choose Cancel to keep them as drafts. Empty targets remain empty."
+        )
+          ? "confirmed"
+          : "draft";
+      }
       if (extension === "docx") {
         await importDocx(file);
         return;

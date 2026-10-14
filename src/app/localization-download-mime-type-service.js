@@ -16,7 +16,7 @@ export function createLocalizationDownloadMimeTypeService(dependencies = {}) {
     if (value === "md") return "text/markdown";
     if (value === "csv") return "text/csv";
     if (value === "tsv") return "text/tab-separated-values";
-    if (["xml", "dita", "txml", "ttx", "xini", "resx", "wix", "ts", "icml"].includes(value)) {
+    if (["xml", "tmx", "dita", "txml", "ttx", "xini", "resx", "wix", "ts", "icml"].includes(value)) {
       return "application/xml";
     }
     if (value === "idml") return "application/vnd.adobe.indesign-idml-package";
