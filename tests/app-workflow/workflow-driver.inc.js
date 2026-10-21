@@ -14,6 +14,15 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     runtimeConfig: localAiRuntimeConfig
   } = aiRuntimeSettingsService;
   const { renderProvider: renderLocalAiProviderControls } = aiProviderFormController;
+  // Exercise the real asynchronous dialog using each case's existing answer
+  // stub and disclosure assertions. This driver is absent from production.
+  const aiConsentObserver = new MutationObserver(() => {
+    const dialog = document.querySelector("#aiConsentDialog[open]");
+    if (!dialog) return;
+    const accepted = window.confirm(dialog.querySelector("#aiConsentDescription").textContent);
+    dialog.querySelectorAll("button")[accepted ? 1 : 0].click();
+  });
+  aiConsentObserver.observe(document.body, { childList: true });
   const out = [];
   const publishProgress = () => {
     let output = document.querySelector("#appWorkflowTestResults");
@@ -6561,5 +6570,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     publish(true);
   } catch (error) {
     publish(false, error);
+  } finally {
+    aiConsentObserver.disconnect();
   }
 } : async function runAppWorkflowTestDisabled() {};
