@@ -181,6 +181,8 @@ async function main() {
       "\n" +
       fs.readFileSync(path.join(root, "source-update-core.js"), "utf8") +
       "\n" +
+      fs.readFileSync(path.join(root, "protected-tags.js"), "utf8") +
+      "\n" +
       fs.readFileSync(path.join(root, "cat-worker.js"), "utf8"),
     "./regex-worker.js": fs.readFileSync(path.join(root, "regex-worker.js"), "utf8"),
     "./archive-worker.js": fs.readFileSync(path.join(productionDir, "archive-worker.js"), "utf8")

@@ -14,7 +14,7 @@ import { validateAiTerminologyExtractionControllerOptions } from "./ai-command-c
  *   termbase: { getSelectedName: () => string, saveCandidates: (terms: any[], termBaseName: string) => Promise<{ savedTerms: any[], duplicateCount: number }> },
  *   settings: { persist: () => Promise<any>, runtimeConfig: (settings: any) => any, assertReady: (settings: any, config: any, action: string) => void },
  *   providers: { get: (settings: any) => any, sharesExternally: (settings: any) => boolean },
- *   consent: { externalShare: (details: object) => boolean },
+ *   consent: { externalShare: (details: object) => boolean | Promise<boolean> },
  *   domain: { extractSegmentTerms: (options: object) => Promise<any> },
  *   lifecycle: { isRunning: () => boolean, isPromptBusy: () => boolean, sync: (state: { running: boolean, promptBusy: boolean, abortController: AbortController | null, progress?: any }) => void, createAbortController?: () => AbortController },
  *   presentation: { renderCommandCentre: () => void, renderAiProgress: () => void, renderOutput: (text: string, options?: object) => void, refreshProjectTerms: () => Promise<unknown>, refreshTerms: () => Promise<unknown> },
@@ -135,11 +135,11 @@ export function createAiTerminologyExtractionController(options) {
     const termBaseName = termbase.getSelectedName();
     if (
       providers.sharesExternally(settings) &&
-      !consent.externalShare({
+      !(await consent.externalShare({
         provider: provider.name || settings.providerId,
         includesSourceText: true,
         contextLabels: ["current target draft", "configured provider URL", `termbase ${termBaseName}`]
-      })
+      }))
     ) {
       status.set("AI term extraction canceled", "dirty");
       return false;
@@ -227,7 +227,7 @@ export function createAiTerminologyExtractionController(options) {
     const termBaseName = termbase.getSelectedName();
     if (
       providers.sharesExternally(settings) &&
-      !consent.externalShare({
+      !(await consent.externalShare({
         provider: provider.name || settings.providerId,
         includesSourceText: true,
         contextLabels: [
@@ -235,7 +235,7 @@ export function createAiTerminologyExtractionController(options) {
           "configured provider URL",
           `termbase ${termBaseName}`
         ]
-      })
+      }))
     ) {
       status.set("Batch AI term extraction canceled", "dirty");
       return false;

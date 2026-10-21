@@ -3,7 +3,7 @@
  * warning policy. Detection implementation, DOM construction, editing,
  * commands, and persistence remain behind injected boundaries.
  *
- * @param {{ detectTags: (text: string) => any[] }} options
+ * @param {{ detectTags: (text: string, context?: any) => any[] }} options
  */
 export function createProtectedTagInspectionService(options) {
   const detectTags = options?.detectTags;
@@ -12,8 +12,11 @@ export function createProtectedTagInspectionService(options) {
   }
 
   function sourceTags(segment) {
+    const detected = detectTags(segment?.source || "", segment?.structure);
+    // PO flags determine the placeholder dialect. Re-detect persisted entries
+    // so older heuristic matches cannot survive a corrected format policy.
+    if (segment?.structure?.format === "po") return detected;
     const stored = Array.isArray(segment?.tags) ? segment.tags.filter((tag) => tag?.text || tag?.label) : [];
-    const detected = detectTags(segment?.source || "");
     if (!stored.length) return detected;
     if (!detected.length) return stored;
     const storedCounts = new Map();
@@ -39,17 +42,23 @@ export function createProtectedTagInspectionService(options) {
 
   function missing(segment) {
     const target = segment.target || "";
+    const targetCounts = segment?.structure?.format === "po" ? new Map() : null;
+    if (targetCounts) {
+      targetTags(segment).forEach((tag) => {
+        targetCounts.set(tag.text, (targetCounts.get(tag.text) || 0) + 1);
+      });
+    }
     const seen = new Map();
     return sourceTags(segment).filter((tag) => {
       const used = seen.get(tag.text) || 0;
-      const occurrences = target.split(tag.text).length - 1;
+      const occurrences = targetCounts ? targetCounts.get(tag.text) || 0 : target.split(tag.text).length - 1;
       seen.set(tag.text, used + 1);
       return occurrences <= used;
     });
   }
 
   function targetTags(segment) {
-    return detectTags(segment.target || "");
+    return detectTags(segment.target || "", segment?.structure);
   }
 
   function hasIssue(segment) {

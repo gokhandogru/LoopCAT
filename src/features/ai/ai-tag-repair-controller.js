@@ -13,7 +13,7 @@ import { validateAiTagRepairControllerOptions } from "./ai-command-controller-co
  *   scope: { getVisibleSegments: () => any[], getDocumentSegments: () => any[], isLocked: (segment: any) => boolean, getTags: (segment: any) => any[], getMissingTags: (segment: any) => any[], tagText: (tag: any) => string },
  *   settings: { persist: () => Promise<any>, runtimeConfig: (settings: any) => any, assertReady: (settings: any, config: any, action: string) => void },
  *   providers: { get: (settings: any) => any, sharesExternally: (settings: any) => boolean },
- *   consent: { externalShare: (details: object) => boolean },
+ *   consent: { externalShare: (details: object) => boolean | Promise<boolean> },
  *   domain: { repairSegmentTags: (options: object) => Promise<any> },
  *   lifecycle: { isRunning: () => boolean, isPromptBusy: () => boolean, sync: (state: { running: boolean, promptBusy: boolean, abortController: AbortController | null, progress?: any }) => void, createAbortController?: () => AbortController },
  *   suggestions: { append: (segment: any, suggestion: object) => Promise<any>, normalize: (suggestion: object) => any, nextId: () => string },
@@ -150,11 +150,11 @@ export function createAiTagRepairController(options) {
     }
     if (
       providers.sharesExternally(settings) &&
-      !consent.externalShare({
+      !(await consent.externalShare({
         provider: provider.name || settings.providerId,
         includesSourceText: true,
         contextLabels: ["target text", "protected tags and placeholders", "configured provider URL"]
-      })
+      }))
     ) {
       status.set("AI tag repair canceled", "dirty");
       return false;
@@ -288,7 +288,7 @@ export function createAiTagRepairController(options) {
     }
     if (
       providers.sharesExternally(settings) &&
-      !consent.externalShare({
+      !(await consent.externalShare({
         provider: provider.name || settings.providerId,
         includesSourceText: true,
         contextLabels: [
@@ -296,7 +296,7 @@ export function createAiTagRepairController(options) {
           "protected tags and placeholders",
           "configured provider URL"
         ]
-      })
+      }))
     ) {
       status.set("Batch AI tag repair canceled", "dirty");
       return false;

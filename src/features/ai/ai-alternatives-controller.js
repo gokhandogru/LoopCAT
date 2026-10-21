@@ -13,7 +13,7 @@ import { validateAiAlternativesControllerOptions } from "./ai-command-controller
  *   scope: { getVisibleSegments: () => any[], getDocumentSegments: () => any[], isLocked: (segment: any) => boolean, getTags: (segment: any) => any[] },
  *   settings: { persist: () => Promise<any>, runtimeConfig: (settings: any) => any, assertReady: (settings: any, config: any, action: string) => void },
  *   providers: { get: (settings: any) => any, sharesExternally: (settings: any) => boolean },
- *   consent: { externalShare: (details: object) => boolean },
+ *   consent: { externalShare: (details: object) => boolean | Promise<boolean> },
  *   context: { activeTerms: (project: any, segment: any) => Promise<any[]>, batchTerms: (segment: any) => Promise<any[]> },
  *   domain: { suggestSegmentVariants: (options: object) => Promise<any> },
  *   lifecycle: { isRunning: () => boolean, isPromptBusy: () => boolean, sync: (state: { running: boolean, promptBusy: boolean, abortController: AbortController | null, progress?: any }) => void, createAbortController?: () => AbortController },
@@ -161,11 +161,11 @@ export function createAiAlternativesController(options) {
     }
     if (
       providers.sharesExternally(settings) &&
-      !consent.externalShare({
+      !(await consent.externalShare({
         provider: provider.name || settings.providerId,
         includesSourceText: true,
         contextLabels: ["current target draft", "configured provider URL", "project glossary hints"]
-      })
+      }))
     ) {
       status.set("AI alternatives canceled", "dirty");
       return false;
@@ -307,7 +307,7 @@ export function createAiAlternativesController(options) {
     }
     if (
       providers.sharesExternally(settings) &&
-      !consent.externalShare({
+      !(await consent.externalShare({
         provider: provider.name || settings.providerId,
         includesSourceText: true,
         contextLabels: [
@@ -317,7 +317,7 @@ export function createAiAlternativesController(options) {
           "protected tags and placeholders",
           "configured provider URL"
         ]
-      })
+      }))
     ) {
       status.set("Batch AI alternatives canceled", "dirty");
       return false;

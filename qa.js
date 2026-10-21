@@ -90,8 +90,8 @@ function issue({ type, severity, segment, index, message, messageValues, fixHint
 }
 
 function segmentTags(segment) {
-  if (segment?.tags?.length) return segment.tags;
-  return window.CatHan.docx?.detectProtectedTags?.(segment?.source || "") || [];
+  if (segment?.structure?.format !== "po" && segment?.tags?.length) return segment.tags;
+  return window.CatHan.docx?.detectProtectedTags?.(segment?.source || "", segment?.structure) || [];
 }
 
 function tagDisplayText(tag) {
@@ -100,12 +100,19 @@ function tagDisplayText(tag) {
 
 function defaultMissingTags(segment) {
   const target = String(segment?.target || "");
+  const targetCounts = segment?.structure?.format === "po" ? new Map() : null;
+  if (targetCounts) {
+    const tags = window.CatHan.docx?.detectProtectedTags?.(target, segment?.structure) || [];
+    tags.forEach((tag) => {
+      targetCounts.set(tag.text, (targetCounts.get(tag.text) || 0) + 1);
+    });
+  }
   const seen = new Map();
   return segmentTags(segment).filter((tag) => {
     const text = String(tag?.text || "");
     if (!text) return false;
     const used = seen.get(text) || 0;
-    const occurrences = target.split(text).length - 1;
+    const occurrences = targetCounts ? targetCounts.get(text) || 0 : target.split(text).length - 1;
     seen.set(text, used + 1);
     return occurrences <= used;
   });

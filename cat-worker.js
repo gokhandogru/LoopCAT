@@ -1,6 +1,7 @@
 if (!globalThis.LoopCATSourceUpdate && typeof importScripts === "function") { if(!globalThis.LoopCATLinguistics) importScripts("./linguistic-core.js"); importScripts("./source-update-core.js"); }
 if (!globalThis.LoopCATLinguistics) importScripts('./linguistic-core.js');
 if (!globalThis.LoopCATStatistics) importScripts('./statistics-core.js');
+if (!globalThis.CatHan?.protectedTags && typeof importScripts === "function") importScripts('./protected-tags.js');
 function normalizeText(text) {
   return String(text ?? "")
     .normalize("NFKC")
@@ -180,12 +181,19 @@ function termConceptGroups(terms) {
 
 function missingTags(segment) {
   const target = segment.target || "";
+  const detect = globalThis.CatHan?.protectedTags?.detectProtectedTags;
+  const isPo = segment.structure?.format === "po" && typeof detect === "function";
+  const tags = isPo ? detect(segment.source || "", segment.structure) : segment.tags || [];
+  const targetCounts = new Map();
+  if (isPo) detect(target, segment.structure).forEach((tag) => {
+    targetCounts.set(tag.text, (targetCounts.get(tag.text) || 0) + 1);
+  });
   const seen = new Map();
-  return (segment.tags || []).filter((tag) => {
+  return tags.filter((tag) => {
     const text = String(tag?.text || "");
     if (!text) return false;
     const used = seen.get(text) || 0;
-    const occurrences = target.split(text).length - 1;
+    const occurrences = isPo ? targetCounts.get(text) || 0 : target.split(text).length - 1;
     seen.set(text, used + 1);
     return occurrences <= used;
   });

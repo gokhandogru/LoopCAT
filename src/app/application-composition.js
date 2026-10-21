@@ -1,3 +1,4 @@
+import { createAiConsentDialog } from "../ui/ai-consent-dialog.js";
 import { createFileLifecycleService } from "../features/projects/file-lifecycle-service.js";
 import { createFileManagementController } from "../features/projects/file-management-controller.js";
 import { createWorkspaceToolbarController } from "../ui/workspace-toolbar-controller.js";
@@ -3432,7 +3433,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     filters: { getVisibleIndexes: segmentFilterService.visibleIndexes }
   });
   const externalAiConsentService = appRuntime.featureFactories.createExternalAiConsentService({
-    confirm: uiLocalizationService.confirm
+    confirm: createAiConsentDialog({ document, focusController, translate: uiLocalizationService.source })
   });
   const aiProviderPresentationService = appRuntime.featureFactories.createAiProviderPresentationService({
     providers: {

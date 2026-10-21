@@ -745,3 +745,585 @@
     padding: 16px;
   }
 }
+
+/* The analysis workspace has its own layout; other import/file dialogs share
+   the legacy statistics-dialog class above. */
+#statisticsDialog {
+  width: min(1000px, calc(100vw - 48px));
+  max-width: calc(100vw - 48px);
+  height: auto;
+  max-height: min(920px, calc(100dvh - 48px));
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+}
+
+#statisticsDialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+#statisticsDialog .statistics-heading {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-line);
+}
+
+#statisticsDialog .statistics-heading-copy {
+  min-width: 0;
+}
+
+#statisticsDialog h2 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+  letter-spacing: -0.025em;
+}
+
+#statisticsDialog .statistics-project-summary {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+#statisticsDialog .statistics-heading > button {
+  flex: 0 0 auto;
+}
+
+#statisticsDialog .statistics-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-4) var(--space-6);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+#statisticsDialog .statistics-scope-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+#statisticsDialog label {
+  margin: 0;
+  gap: var(--space-2);
+}
+
+#statisticsDialog .statistics-scope-bar label {
+  font-weight: 600;
+}
+
+#statisticsDialog .statistics-scope-bar select {
+  min-width: 160px;
+  font-weight: 400;
+}
+
+#statisticsDialog .statistics-scope-summary {
+  margin-inline-start: auto;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+#statisticsDialog .statistics-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+#statisticsDialog .statistics-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-4) var(--space-6);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+
+#statisticsDialog .statistics-metric.is-primary {
+  border-color: color-mix(in srgb, var(--color-accent) 20%, var(--color-line));
+  background: var(--color-accent-soft);
+}
+
+#statisticsDialog .statistics-metric > span {
+  font-weight: 600;
+}
+
+#statisticsDialog .statistics-metric strong {
+  max-width: 100%;
+  font-size: clamp(1.4rem, 2.6vw, 1.875rem);
+  line-height: 1.3;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+
+#statisticsDialog .statistics-metric.is-primary strong {
+  color: var(--color-accent-hover);
+}
+
+#statisticsDialog .statistics-metric small {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+#statisticsDialog .statistics-metric.is-primary small {
+  color: var(--color-accent-hover);
+}
+
+#statisticsDialog h3 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-tight);
+  font-weight: 650;
+}
+
+#statisticsDialog .statistics-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+#statisticsDialog .statistics-section-heading h3 {
+  margin: 0;
+}
+
+#statisticsDialog .statistics-quote {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+#statisticsDialog .statistics-quote-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-6);
+}
+
+#statisticsDialog .statistics-quote-controls label {
+  flex-wrap: wrap;
+  font-weight: 500;
+}
+
+#statisticsDialog #statisticsRate {
+  width: 108px;
+}
+
+#statisticsDialog #statisticsCurrency {
+  width: 84px;
+}
+
+#statisticsDialog .statistics-muted {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+#statisticsDialog .statistics-quote-controls > .statistics-muted {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+#statisticsDialog .statistics-table-wrap {
+  margin: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+#statisticsDialog table {
+  font-variant-numeric: tabular-nums;
+}
+
+#statisticsDialog th,
+#statisticsDialog td {
+  padding: var(--space-2) var(--space-4);
+  vertical-align: middle;
+}
+
+#statisticsDialog th {
+  padding-block: var(--space-3);
+  color: var(--color-text-muted);
+  background: var(--color-surface-subtle);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+#statisticsDialog .numeric {
+  text-align: end;
+  white-space: nowrap;
+}
+
+#statisticsDialog tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+#statisticsDialog tbody tr:hover {
+  background: color-mix(in srgb, var(--color-surface-subtle) 60%, var(--color-surface));
+}
+
+#statisticsDialog tfoot td {
+  padding-block: var(--space-3);
+  border-top: 1px solid var(--color-line);
+  border-bottom: 0;
+  background: var(--color-surface-subtle);
+  font-weight: 650;
+}
+
+#statisticsDialog .statistics-weight-input {
+  width: 72px;
+  min-height: 32px;
+  padding: var(--space-1) var(--space-2);
+  text-align: end;
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+#statisticsDialog .statistics-band-button {
+  min-height: 32px;
+  margin-inline: calc(-1 * var(--space-2));
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text);
+  text-align: start;
+  font-size: inherit;
+  font-weight: 500;
+}
+
+#statisticsDialog .statistics-band-button:hover {
+  border-color: var(--color-line);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-hover);
+}
+
+#statisticsDialog .statistics-band-button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+#statisticsDialog .statistics-disclosure {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+#statisticsDialog .statistics-disclosure > summary {
+  min-height: 44px;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#statisticsDialog .statistics-disclosure[open] {
+  padding-bottom: var(--space-4);
+}
+
+#statisticsDialog .statistics-disclosure[open] > summary {
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+}
+
+#statisticsDialog .statistics-disclosure > :not(summary) {
+  margin-inline: var(--space-4);
+}
+
+#statisticsDialog .statistics-disclosure + .statistics-disclosure {
+  margin-top: var(--space-3);
+}
+
+#statisticsDialog .statistics-body > .statistics-disclosure + .statistics-disclosure {
+  margin-top: calc(-1 * var(--space-1));
+}
+
+#statisticsDialog .statistics-file-detail {
+  border-top: 1px solid var(--color-line);
+}
+
+#statisticsDialog .statistics-file-detail:first-of-type {
+  border-top: 0;
+}
+
+#statisticsDialog .statistics-file-detail > summary {
+  padding: var(--space-3) 0;
+  border: 0;
+  background: transparent;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+#statisticsDialog .statistics-file-detail > summary > .numeric {
+  float: inline-end;
+  margin-inline-start: var(--space-3);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+#statisticsDialog .statistics-file-detail .statistics-table-wrap {
+  margin-bottom: var(--space-3);
+}
+
+#statisticsDialog fieldset {
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+}
+
+#statisticsDialog legend {
+  padding-inline: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+#statisticsDialog .statistics-file-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+#statisticsDialog .statistics-file-choices label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#statisticsDialog .statistics-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-6);
+}
+
+#statisticsDialog .statistics-settings-grid label {
+  align-items: flex-start;
+}
+
+#statisticsDialog input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 16px;
+  min-height: 16px;
+  margin-top: 2px;
+  accent-color: var(--color-accent);
+}
+
+#statisticsDialog .statistics-tm-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding-block: var(--space-2);
+}
+
+#statisticsDialog .statistics-tm-choice + .statistics-tm-choice {
+  border-top: 1px solid var(--color-line);
+}
+
+#statisticsDialog .statistics-tm-choice > label:first-child {
+  flex: 1 1 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#statisticsDialog .statistics-notice {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-inline-start: 3px solid var(--color-warning);
+  border-radius: var(--radius-sm);
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface));
+}
+
+#statisticsDialog .statistics-drilldown {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+
+#statisticsDialog .statistics-drilldown-row {
+  margin-block: var(--space-2);
+  padding-block: var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+  overflow-wrap: anywhere;
+}
+
+#statisticsDialog .statistics-drilldown-row button {
+  max-width: 100%;
+  white-space: normal;
+  text-align: start;
+}
+
+#statisticsDialog .statistics-saved-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding-block: var(--space-2);
+}
+
+#statisticsDialog .statistics-saved-row + .statistics-saved-row {
+  border-top: 1px solid var(--color-line);
+}
+
+#statisticsDialog .statistics-saved-row > button:first-child {
+  flex: 1 1 240px;
+  min-width: 0;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#statisticsDialog .statistics-saved-row > button:last-child {
+  flex: 0 0 auto;
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+#statisticsDialog .statistics-saved-row > button:last-child:hover {
+  border-color: var(--color-line);
+  color: var(--color-danger);
+  background: var(--color-surface-subtle);
+}
+
+#statisticsDialog .statistics-footer {
+  position: static;
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+#statisticsDialog .statistics-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+#statisticsDialog .statistics-status:empty {
+  display: none;
+}
+
+#statisticsDialog .statistics-footer-secondary,
+#statisticsDialog .statistics-footer-primary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+#statisticsDialog .statistics-footer-primary {
+  justify-content: flex-end;
+}
+
+#statisticsDialog .statistics-footer select {
+  width: auto;
+  min-height: 36px;
+  padding-block: var(--space-1);
+  font-size: var(--font-size-sm);
+}
+
+#statisticsDialog [hidden] {
+  display: none;
+}
+
+@media (width <= 700px) {
+  #statisticsDialog {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  #statisticsDialog .statistics-heading,
+  #statisticsDialog .statistics-body,
+  #statisticsDialog .statistics-footer {
+    padding: var(--space-4);
+  }
+
+  #statisticsDialog .statistics-metrics {
+    gap: var(--space-2);
+  }
+
+  #statisticsDialog .statistics-metric {
+    padding: var(--space-3);
+  }
+
+  #statisticsDialog .statistics-settings-grid,
+  #statisticsDialog .statistics-file-choices {
+    grid-template-columns: 1fr;
+  }
+
+  #statisticsDialog .statistics-scope-summary {
+    flex-basis: 100%;
+    margin-inline-start: 0;
+  }
+
+  #statisticsDialog .statistics-breakdown th,
+  #statisticsDialog .statistics-breakdown td {
+    padding-inline: var(--space-2);
+  }
+}
+
+@media (width <= 480px) {
+  #statisticsDialog {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  #statisticsDialog .statistics-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #statisticsDialog .statistics-metric.is-primary {
+    grid-column: 1 / -1;
+  }
+
+  #statisticsDialog .statistics-footer {
+    grid-template-columns: 1fr;
+  }
+
+  #statisticsDialog .statistics-footer-secondary,
+  #statisticsDialog .statistics-footer-primary {
+    justify-content: flex-start;
+  }
+}

@@ -6,7 +6,7 @@ import { evaluateRegex } from "./regex-worker-client.js";
  * remain behind injected boundaries.
  *
  * @param {{
- *   detectTags: (text: string) => any[],
+ *   detectTags: (text: string, context?: any) => any[],
  *   normalizeCase: (value: unknown) => string
  * }} options
  */
@@ -53,7 +53,9 @@ export function createProtectedTextReplacementService(options) {
 
   function replace(text, findText, replacement, replaceOptions = {}) {
     const source = String(text || "");
-    const protectedTokens = detectTags(source).sort((a, b) => a.index - b.index || b.text.length - a.text.length);
+    const protectedTokens = detectTags(source, replaceOptions.context).sort(
+      (a, b) => a.index - b.index || b.text.length - a.text.length
+    );
     let cursor = 0;
     let count = 0;
     let output = "";
@@ -79,7 +81,9 @@ export function createProtectedTextReplacementService(options) {
         {
           id: "target",
           text,
-          tokens: detectTags(text).sort((a, b) => a.index - b.index || b.text.length - a.text.length)
+          tokens: detectTags(text, replaceOptions.context).sort(
+            (a, b) => a.index - b.index || b.text.length - a.text.length
+          )
         }
       ]
     });
@@ -94,7 +98,9 @@ export function createProtectedTextReplacementService(options) {
       records: texts.map((text, id) => ({
         id,
         text,
-        tokens: detectTags(text).sort((a, b) => a.index - b.index || b.text.length - a.text.length)
+        tokens: detectTags(text, replaceOptions.contexts?.[id] ?? replaceOptions.context).sort(
+          (a, b) => a.index - b.index || b.text.length - a.text.length
+        )
       }))
     });
   }

@@ -102,3 +102,49 @@ test("ProtectedTagInspectionService validates its boundary and exposes an immuta
   const { service } = createHarness(createProtectedTagInspectionService);
   assert.equal(Object.isFrozen(service), true);
 });
+
+test("ProtectedTagInspectionService replaces stale PO tags using the same dialect for source and target", async () => {
+  const { createProtectedTagInspectionService } = await moduleAt(
+    "src/features/editor/protected-tag-inspection-service.js"
+  );
+  const structure = { format: "po", formatFlags: [] };
+  const segment = {
+    source: "%0 bites %1's bait",
+    target: "%0 muerde el anzuelo de %1",
+    structure,
+    tags: [{ text: "%0 b", index: 0 }]
+  };
+  const calls = [];
+  const service = createProtectedTagInspectionService({
+    detectTags(text, context) {
+      calls.push({ text, context });
+      return [];
+    }
+  });
+  assert.deepEqual(service.sourceTags(segment), []);
+  assert.deepEqual(service.targetTags(segment), []);
+  assert.equal(service.hasIssue(segment), false);
+  assert.ok(calls.some(({ text }) => text === segment.source));
+  assert.ok(calls.some(({ text }) => text === segment.target));
+  assert.ok(calls.every(({ context }) => context === structure));
+  assert.deepEqual(segment.tags, [{ text: "%0 b", index: 0 }]);
+});
+
+test("ProtectedTagInspectionService counts complete PO tokens and preserves repeated missing placeholders", async () => {
+  const { createProtectedTagInspectionService } = await moduleAt(
+    "src/features/editor/protected-tag-inspection-service.js"
+  );
+  const structure = { format: "po", formatFlags: ["qt-format"] };
+  const source = "%1 %1 %10";
+  const sourceTags = [{ text: "%1" }, { text: "%1" }, { text: "%10" }];
+  const service = createProtectedTagInspectionService({
+    detectTags(text, context) {
+      assert.equal(context, structure);
+      if (text === source) return sourceTags;
+      return Array.from(text.matchAll(/%\d+/g), ([text]) => ({ text }));
+    }
+  });
+  assert.deepEqual(service.missing({ source, target: "%10", structure }), sourceTags.slice(0, 2));
+  assert.deepEqual(service.missing({ source, target: "%10 %1", structure }), [sourceTags[1]]);
+  assert.deepEqual(service.missing({ source, target: "%10 %1 %1", structure }), []);
+});

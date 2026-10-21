@@ -287,8 +287,8 @@ function readPackageText(entries, path) {
   return entry ? localizationTextDecoder.decode(entry.data) : "";
 }
 
-function detectTags(text) {
-  return window.CatHan.docx?.detectProtectedTags ? window.CatHan.docx.detectProtectedTags(text) : [];
+function detectTags(text, context) {
+  return window.CatHan.docx?.detectProtectedTags ? window.CatHan.docx.detectProtectedTags(text, context) : [];
 }
 
 function targetText(segment) {
@@ -590,7 +590,7 @@ function parsePo(text) {
   let current = null;
   let active = null;
   const ensureCurrent = (index) => {
-    current = current || { startLine: index, msgstrs: {}, msgstrRanges: {} };
+    current = current || { startLine: index, msgstrs: {}, msgstrRanges: {}, formatFlags: [] };
     current.msgstrs = current.msgstrs || {};
     current.msgstrRanges = current.msgstrRanges || {};
     return current;
@@ -652,12 +652,31 @@ function parsePo(text) {
       flush(index - 1);
       return;
     }
-    if (line.startsWith("#")) return;
+    if (line.startsWith("#~")) {
+      // Obsolete entries and their flags must never affect a following active entry.
+      flush(index - 1);
+      return;
+    }
+    if (line.startsWith("#")) {
+      // Comments can begin a new entry even when the file omits a blank separator.
+      if (current && (current.msgstrStart !== undefined || Object.keys(current.msgstrRanges).length)) {
+        flush(index - 1);
+      }
+      if (line.startsWith("#,")) {
+        const unit = ensureCurrent(index);
+        const flags = line.slice(2).split(",").map((flag) => flag.trim()).filter(Boolean);
+        unit.formatFlags = [...new Set([...unit.formatFlags, ...flags])];
+      }
+      active = null;
+      return;
+    }
     if (line.startsWith("msgctxt ")) {
+      if (current?.msgidStart !== undefined) flush(index - 1);
       setActiveValue("msgctxt", poFieldValue(line, "msgctxt"), index);
       return;
     }
     if (line.startsWith("msgid ")) {
+      if (current?.msgidStart !== undefined) flush(index - 1);
       setActiveValue("msgid", poFieldValue(line, "msgid"), index);
       return;
     }
@@ -693,6 +712,7 @@ function parsePo(text) {
             key: `${key}-plural-${pluralIndex}`,
             structure: {
               format: "po",
+              formatFlags: [...unit.formatFlags],
               key: `${key}-plural-${pluralIndex}`,
               lineStart: unit.startLine,
               lineEnd: unit.endLine,
@@ -710,6 +730,7 @@ function parsePo(text) {
       key,
       structure: {
         format: "po",
+        formatFlags: [...unit.formatFlags],
         key,
         lineStart: unit.startLine,
         lineEnd: unit.endLine,
@@ -2945,7 +2966,7 @@ async function parseLocalizationFile(file, options = {}) {
   } else throw new Error(`Unsupported localization format: .${ext}`);
   segments = segments.map((segment) => ({
     ...segment,
-    tags: segment.tags || detectTags(segment.text)
+    tags: segment.tags || detectTags(segment.text, segment.structure)
   }));
   structure = withSourceEncoding(structure, decoded);
   return {

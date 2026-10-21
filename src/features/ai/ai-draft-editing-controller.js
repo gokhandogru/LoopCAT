@@ -94,7 +94,7 @@ const OPERATIONS = Object.freeze({
  *   scope: { getVisibleSegments: () => any[], getDocumentSegments: () => any[], isLocked: (segment: any) => boolean, getTags: (segment: any) => any[] },
  *   settings: { persist: () => Promise<any>, runtimeConfig: (settings: any) => any, assertReady: (settings: any, config: any, action: string) => void },
  *   providers: { get: (settings: any) => any, sharesExternally: (settings: any) => boolean },
- *   consent: { externalShare: (details: object) => boolean },
+ *   consent: { externalShare: (details: object) => boolean | Promise<boolean> },
  *   context: { termsForSegment: (segment: any) => Promise<any[]>, tmMatchesForSegment: (segment: any) => Promise<any[]> },
  *   domain: { polish: (options: object) => Promise<any>, adapt: (options: object) => Promise<any> },
  *   lifecycle: { isRunning: () => boolean, isPromptBusy: () => boolean, sync: (state: { running: boolean, promptBusy: boolean, abortController: AbortController | null, progress?: any }) => void, createAbortController?: () => AbortController },
@@ -257,11 +257,11 @@ export function createAiDraftEditingController(options) {
     }
     if (
       providers.sharesExternally(settings) &&
-      !consent.externalShare({
+      !(await consent.externalShare({
         provider: provider.name || settings.providerId,
         includesSourceText: true,
         contextLabels: definition.activeConsentLabels
-      })
+      }))
     ) {
       status.set(definition.activeCanceled, "dirty");
       return false;
@@ -390,11 +390,11 @@ export function createAiDraftEditingController(options) {
     }
     if (
       providers.sharesExternally(settings) &&
-      !consent.externalShare({
+      !(await consent.externalShare({
         provider: provider.name || settings.providerId,
         includesSourceText: true,
         contextLabels: definition.batchConsentLabels(candidateSelection.candidates.length)
-      })
+      }))
     ) {
       status.set(definition.batchCanceled, "dirty");
       return false;

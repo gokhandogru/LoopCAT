@@ -1,13 +1,16 @@
 import "../../../statistics-core.js";
 import "../linguistics/core.js";
+import { withStatisticsPricing } from "./statistics-pricing.js";
 
 /** @param {any} options */
 export function createStatisticsController(options) {
-  const { document: doc, session, selection, translate: t } = options;
+  const { document: doc, session, selection, translate } = options;
+  const t = (text, values = {}) =>
+    String(translate(text, values)).replace(/\{(\w+)\}/g, (match, key) => values[key] ?? match);
   const domain = globalThis.LoopCATStatistics;
   const labels = {
-    context: "Context",
-    exact: "100%",
+    context: "Context matches",
+    exact: "100% matches",
     repetition: "Repetitions",
     "95-99": "95–99%",
     "85-94": "85–94%",
@@ -34,28 +37,27 @@ export function createStatisticsController(options) {
   doc.body.append(dialog);
   const header = node("header", "", dialog);
   header.className = "statistics-heading";
-  node("h2", "Statistics", header).id = "statisticsTitle";
+  const headingCopy = node("div", "", header);
+  headingCopy.className = "statistics-heading-copy";
+  node("h2", "Statistics", headingCopy).id = "statisticsTitle";
+  const projectSummary = node("p", "", headingCopy);
+  projectSummary.className = "statistics-project-summary";
   dialog.setAttribute("aria-labelledby", "statisticsTitle");
-  let advanced = false,
-    snapshot = null,
+  let snapshot = null,
     abort = null,
     openSelection = [],
     resources = [],
     links = [],
     changed = true,
     timer = null,
-    run = 0;
-  let view, advancedArea;
-  function toggleView() {
-    advanced = !advanced;
-    view.textContent = t(advanced ? "Simple" : "Advanced");
-    advancedArea.hidden = !advanced;
-    render();
-  }
-  view = button("Advanced", header, toggleView);
+    run = 0,
+    historical = false,
+    pricingInvalid = false;
   const close = button("Close", header, () => dialog.close());
-  const controls = node("div", "", dialog);
-  controls.className = "statistics-controls";
+  const bodyArea = node("div", "", dialog);
+  bodyArea.className = "statistics-body";
+  const controls = node("div", "", bodyArea);
+  controls.className = "statistics-scope-bar";
   const scopeLabel = node("label", "Scope ", controls),
     scopeSelect = node("select", "", scopeLabel);
   for (const [value, text] of [
@@ -67,14 +69,29 @@ export function createStatisticsController(options) {
     const item = node("option", text, scopeSelect);
     item.value = value;
   }
-  const scopeSummary = node("p", "", dialog);
-  const fileChoices = node("fieldset", "", dialog);
+  const scopeSummary = node("span", "", controls);
+  scopeSummary.className = "statistics-scope-summary";
+  const fileChoices = node("fieldset", "", bodyArea);
+  fileChoices.className = "statistics-file-choices";
   node("legend", "Files to analyze", fileChoices);
   fileChoices.hidden = true;
-  advancedArea = node("section", "", dialog);
-  advancedArea.hidden = true;
-  const settings = node("details", "", advancedArea);
-  node("summary", "Analysis settings", settings);
+  const results = node("section", "", bodyArea);
+  const drilldown = node("section", "", bodyArea);
+  drilldown.className = "statistics-drilldown";
+  drilldown.hidden = true;
+  const disclosure = (label) => {
+    const section = node("details", "", bodyArea);
+    section.className = "statistics-disclosure";
+    node("summary", label, section);
+    return section;
+  };
+  const fileSection = disclosure("File breakdown");
+  const fileDetails = node("div", "", fileSection);
+  const memorySection = disclosure("TM contributions");
+  const memoryDetails = node("div", "", memorySection);
+  const settings = disclosure("Analysis settings");
+  const settingsGrid = node("div", "", settings);
+  settingsGrid.className = "statistics-settings-grid";
   const checks = {};
   for (const [name, label, value] of [
     ["remaining", "Remaining unconfirmed work", false],
@@ -82,10 +99,9 @@ export function createStatisticsController(options) {
     ["crossFileRepetitions", "Cross-file repetitions", true],
     ["repetitionsFirst", "Repetitions before exact matches", false],
     ["internalFuzzy", "Estimate internal fuzzy reuse", false],
-    ["exhaustive", "Complete TM search (slower for large memories)", false],
-    ["weighted", "Show weighted words", false]
+    ["exhaustive", "Complete TM search (slower for large memories)", false]
   ]) {
-    const labelNode = node("label", "", settings),
+    const labelNode = node("label", "", settingsGrid),
       input = node("input", "", labelNode);
     input.type = "checkbox";
     input.checked = value;
@@ -94,71 +110,90 @@ export function createStatisticsController(options) {
     input.addEventListener("change", dirty);
   }
   const tmChoices = node("fieldset", "", settings);
-  node("legend", "Translation memories — report-only overrides", tmChoices);
-  const weights = node("fieldset", "", settings);
-  node("legend", "Weights (% payable; default 100%)", weights);
+  node("legend", "Translation memories for this analysis", tmChoices);
   const weightInputs = {};
   for (const band of domain.bands) {
-    const label = node("label", labels[band] + " ", weights),
-      input = node("input", "", label);
+    const input = node("input");
     input.type = "number";
+    input.className = "statistics-weight-input";
+    input.dataset.band = band;
     input.min = "0";
     input.max = "100";
+    input.step = "0.1";
     input.value = "100";
-    input.setAttribute("aria-label", t(labels[band] + " weight"));
-    input.addEventListener("change", dirty);
+    input.setAttribute("aria-label", t("Payable percentage: {category}", { category: t(labels[band]) }));
+    input.addEventListener("input", reprice);
     weightInputs[band] = input;
   }
-  const rateLabel = node("label", "Price per weighted word ", settings),
+  const quote = node("div");
+  quote.className = "statistics-quote";
+  const quoteControls = node("div", "", quote);
+  quoteControls.className = "statistics-quote-controls";
+  const rateLabel = node("label", "Rate per word", quoteControls),
     rate = node("input", "", rateLabel);
+  rate.id = "statisticsRate";
   rate.type = "number";
   rate.min = "0";
-  rate.step = "0.001";
-  rate.value = "0";
-  rate.addEventListener("change", dirty);
-  const currencyLabel = node("label", "Currency ", settings),
+  rate.step = "any";
+  rate.placeholder = "0.00";
+  rate.addEventListener("input", reprice);
+  const currencyLabel = node("label", "Currency", quoteControls),
     currency = node("input", "", currencyLabel);
+  currency.id = "statisticsCurrency";
   currency.value = "EUR";
   currency.maxLength = 8;
-  currency.addEventListener("change", dirty);
-  const meta = node("p", "", dialog);
+  currency.addEventListener("input", reprice);
+  node("p", "Weighted words apply the payable percentages below. No discounts are assumed.", quote).className =
+    "statistics-muted";
+  const saved = disclosure("Saved snapshots");
+  const savedList = node("div", "", saved);
+  const actions = node("footer", "", dialog);
+  actions.className = "statistics-footer";
+  const meta = node("p", "", actions);
+  meta.className = "statistics-status";
   meta.setAttribute("role", "status");
   meta.setAttribute("aria-live", "polite");
-  const results = node("section", "", dialog),
-    details = node("section", "", advancedArea);
-  dialog.insertBefore(results, advancedArea);
-  const actions = node("footer", "", dialog);
-  actions.className = "statistics-controls";
-  const calculateButton = button("Calculate", actions, calculate);
-  const cancel = button("Cancel calculation", actions, () => {
+  const secondaryActions = node("div", "", actions);
+  secondaryActions.className = "statistics-footer-secondary";
+  const primaryActions = node("div", "", actions);
+  primaryActions.className = "statistics-footer-primary";
+  const calculateButton = button("Calculate", primaryActions, calculate);
+  calculateButton.className = "primary";
+  const cancel = button("Cancel calculation", primaryActions, () => {
     run++;
     abort?.abort();
     abort = null;
     calculateButton.disabled = false;
     cancel.hidden = true;
     meta.textContent = t("Calculation canceled. Previous results retained.");
+    render();
   });
   cancel.hidden = true;
-  const saveButton = button("Save snapshot", actions, async () => {
-    if (!snapshot || changed) throw Error(t("Calculate current settings before saving a snapshot."));
+  const saveButton = button("Save snapshot", secondaryActions, async () => {
+    if (!snapshot || changed || pricingInvalid || abort)
+      throw Error(t("Calculate current settings before saving a snapshot."));
     if (!snapshot.complete)
       throw Error(t("Complete the analysis before saving a quote snapshot. Partial reports can be exported."));
     await options.save(snapshot);
     await renderSaved();
     meta.textContent = t("Snapshot saved. Later TM changes will not change this report.");
   });
-  for (const format of ["csv", "html", "json"])
-    button("Export " + format.toUpperCase(), actions, () => {
-      if (!snapshot) throw Error(t("Calculate statistics first."));
-      options.download(
-        `LoopCAT-Statistics-${snapshot.id}.${format}`,
-        domain.exportReport(snapshot, format),
-        format === "json" ? "application/json" : format === "html" ? "text/html" : "text/csv"
-      );
-    });
-  const saved = node("details", "", dialog);
-  node("summary", "Saved snapshots", saved);
-  const savedList = node("div", "", saved);
+  const exportFormat = node("select", "", secondaryActions);
+  exportFormat.id = "statisticsExportFormat";
+  exportFormat.setAttribute("aria-label", t("Export format"));
+  for (const format of ["csv", "html", "json"]) {
+    const option = node("option", format.toUpperCase(), exportFormat);
+    option.value = format;
+  }
+  const exportButton = button("Export", secondaryActions, () => {
+    if (!snapshot) throw Error(t("Calculate statistics first."));
+    const format = exportFormat.value;
+    options.download(
+      `LoopCAT-Statistics-${snapshot.id}.${format}`,
+      domain.exportReport(snapshot, format),
+      format === "json" ? "application/json" : format === "html" ? "text/html" : "text/csv"
+    );
+  });
   function fail(error) {
     meta.textContent = String(error?.message || error);
   }
@@ -171,6 +206,8 @@ export function createStatisticsController(options) {
     cancel.hidden = true;
     meta.textContent = t("Settings changed. Calculate again.");
     saveButton.disabled = true;
+    updateScopeSummary();
+    render();
   }
   function scope() {
     if (scopeSelect.value === "segments") return { kind: "segments", segmentIds: openSelection };
@@ -189,7 +226,19 @@ export function createStatisticsController(options) {
   });
   function updateScopeSummary() {
     const p = session.getProject();
-    scopeSummary.textContent = `${p?.name || ""} · ${p?.sourceLang || ""} → ${p?.targetLang || ""} · ${scopeSelect.value === "segments" ? openSelection.length + " " + t("selected segments") : t("Source content in the chosen scope")}`;
+    projectSummary.textContent = `${p?.name || ""} · ${p?.sourceLang || ""} → ${p?.targetLang || ""}`;
+    const scopeNotes = [];
+    if (scopeSelect.value === "file") {
+      const file = p?.documents?.find((item) => item.id === options.getDocumentId());
+      if (file) scopeNotes.push(file.name);
+    } else if (scopeSelect.value === "files") {
+      scopeNotes.push(t("{count} selected files", { count: fileChoices.querySelectorAll("input:checked").length }));
+    } else if (scopeSelect.value === "segments") {
+      scopeNotes.push(t("{count} selected segments", { count: openSelection.length }));
+    }
+    if (checks.remaining.checked) scopeNotes.push(t("Unconfirmed only"));
+    if (checks.excludeLocked.checked) scopeNotes.push(t("Locked content excluded"));
+    scopeSummary.textContent = scopeNotes.join(" · ");
     if (scopeSelect.value === "segments") {
       const visible = new Set(options.getVisibleSegments().map((s) => s.id));
       const hidden = openSelection.filter((id) => !visible.has(id)).length;
@@ -199,41 +248,126 @@ export function createStatisticsController(options) {
   function settingsValue() {
     return {
       ...Object.fromEntries(Object.entries(checks).map(([key, input]) => [key, input.checked])),
-      weights: Object.fromEntries(
-        Object.entries(weightInputs).map(([key, input]) => [key, Math.max(0, Math.min(100, Number(input.value)))])
-      ),
-      rate: Math.max(0, Number(rate.value)),
-      currency: currency.value
+      weighted: true,
+      ...pricingValue()
     };
+  }
+  function pricingValue() {
+    if (rate.validity.badInput || (rate.value && !rate.validity.valid))
+      throw Error(t("Enter a valid, nonnegative word rate."));
+    const weights = {};
+    for (const [band, input] of Object.entries(weightInputs)) {
+      if (!input.value.trim() || !input.validity.valid)
+        throw Error(t("Payable percentages must be between 0 and 100."));
+      weights[band] = Number(input.value);
+    }
+    return { weights, rate: Number(rate.value || 0), currency: currency.value.trim(), rateProvided: rate.value !== "" };
+  }
+  function setAvailability() {
+    saveButton.disabled = !snapshot || changed || pricingInvalid || !snapshot.complete || !!abort;
+    exportButton.disabled = !snapshot || pricingInvalid || (!!changed && !historical) || !!abort;
+    // Pending analysis settings must not trap an invalid rate in a disabled
+    // field. Keep pricing correctable while retaining the previous estimate.
+    const disabled = historical || !!abort;
+    rate.disabled = disabled;
+    currency.disabled = disabled;
+    Object.values(weightInputs).forEach((input) => {
+      input.disabled = disabled;
+    });
+  }
+  function reprice() {
+    if (!snapshot || changed || abort) return;
+    try {
+      snapshot = withStatisticsPricing(snapshot, pricingValue(), `analysis-${crypto.randomUUID()}`);
+      pricingInvalid = false;
+      updatePricingDisplay();
+      setAvailability();
+      meta.textContent = t("Estimate updated. Analysis counts unchanged.");
+    } catch (error) {
+      pricingInvalid = true;
+      setAvailability();
+      fail(error);
+    }
+  }
+  const number = (value, digits = 0) => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: digits });
+  function dateLabel(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? ""
+      : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  }
+  function money(value, code) {
+    try {
+      return new Intl.NumberFormat(undefined, { style: "currency", currency: code }).format(value);
+    } catch {
+      return `${number(value, 2)} ${code || ""}`.trim();
+    }
+  }
+  function updatePricingDisplay() {
+    if (!snapshot) return;
+    const weighted = results.querySelector('[data-metric="weighted"]');
+    const cost = results.querySelector('[data-metric="cost"]');
+    if (weighted) weighted.textContent = number(snapshot.weightedWords, 2);
+    const provided = snapshot.options.rateProvided ?? snapshot.options.rate > 0;
+    if (cost)
+      cost.textContent = provided
+        ? money(snapshot.weightedWords * snapshot.options.rate, snapshot.options.currency)
+        : "—";
+    const costNote = results.querySelector('[data-note="cost"]');
+    if (costNote)
+      costNote.textContent = t(
+        !provided
+          ? "Enter a word rate below"
+          : !snapshot.complete
+            ? "Provisional · analysis incomplete"
+            : "Weighted words × rate per word"
+      );
+    results.querySelectorAll("[data-weighted-band]").forEach((cell) => {
+      const band = cell.dataset.weightedBand;
+      const words = snapshot.buckets.find((bucket) => bucket.band === band)?.words || 0;
+      cell.textContent = number((words * (snapshot.options.weights?.[band] ?? 100)) / 100, 2);
+    });
   }
   function table(parent, columns, rows) {
     const wrap = node("div", "", parent);
     wrap.className = "statistics-table-wrap";
     const tableNode = node("table", "", wrap);
     const head = node("tr", "", node("thead", "", tableNode));
-    columns.forEach((text) => {
-      node("th", text, head).scope = "col";
+    columns.forEach((text, index) => {
+      const cell = node("th", text, head);
+      cell.scope = "col";
+      if (index) cell.className = "numeric";
     });
     const body = node("tbody", "", tableNode);
     rows.forEach((cells) => {
       const row = node("tr", "", body);
-      cells.forEach((value) => node("td", String(value), row));
+      cells.forEach((value, index) => {
+        const cell = node("td", String(value), row);
+        if (index) cell.className = "numeric";
+      });
     });
     return body;
   }
   function showRows(band) {
-    details.replaceChildren();
-    node("h3", labels[band], details);
+    drilldown.replaceChildren();
+    drilldown.hidden = false;
+    const heading = node("div", "", drilldown);
+    heading.className = "statistics-section-heading";
+    node("h3", labels[band], heading);
+    button("Close details", heading, () => {
+      drilldown.hidden = true;
+    });
     const matching = snapshot.rows.filter((row) => row.band === band);
-    node("p", `${matching.length} segments`, details);
+    node("p", t("{count} segments", { count: number(matching.length) }), drilldown).className = "statistics-muted";
     // Paginate segment drilldown; never put a huge project into the DOM.
     let page = 0;
-    const area = node("div", "", details),
-      nav = node("div", "", details);
+    const area = node("div", "", drilldown),
+      nav = node("div", "", drilldown);
     const draw = () => {
       area.replaceChildren();
       for (const row of matching.slice(page * 50, page * 50 + 50)) {
         const item = node("div", "", area);
+        item.className = "statistics-drilldown-row";
         button(
           `${snapshot.files.find((f) => f.id === row.documentId)?.name || "Document"} · ${(row.index ?? 0) + 1} · ${row.words} words`,
           item,
@@ -242,11 +376,7 @@ export function createStatisticsController(options) {
             return options.openSegment(row.segmentId);
           }
         );
-        node(
-          "p",
-          `${row.rawScore}% → ${row.score}% · ${row.resourceName} · ${(row.adjustments || []).map((a) => a.reason + " −" + a.points).join("; ")} · ${row.compatibility || ""}`,
-          item
-        );
+        if (row.resourceName) node("p", `${row.resourceName} · ${row.score}%`, item).className = "statistics-muted";
       }
       nav.replaceChildren();
       if (page)
@@ -261,116 +391,124 @@ export function createStatisticsController(options) {
         });
     };
     draw();
-    advanced = true;
-    advancedArea.hidden = false;
-    view.textContent = t("Simple");
+    drilldown.scrollIntoView({ block: "nearest" });
   }
   function render() {
     results.replaceChildren();
-    details.replaceChildren();
-    saveButton.disabled = !snapshot || changed;
+    fileDetails.replaceChildren();
+    memoryDetails.replaceChildren();
+    drilldown.hidden = true;
+    setAvailability();
+    fileSection.hidden = !snapshot?.files.length;
+    memorySection.hidden = !snapshot?.memories.length;
     if (!snapshot) return;
-    node("p", `${t("Report scope")}: ${snapshot.scope.kind} · ${snapshot.createdAt}`, results);
+    if (changed) {
+      const originalScope =
+        snapshot.scope.kind === "project"
+          ? t("Project")
+          : snapshot.scope.kind === "segments"
+            ? t("Selected segments")
+            : snapshot.files.map((file) => file.name).join(", ");
+      node(
+        "p",
+        `${t(historical ? "Saved snapshot" : "Previous calculation")} · ${originalScope} · ${dateLabel(snapshot.createdAt)}. ${t("Calculate to analyze the current scope and settings.")}`,
+        results
+      ).className = "statistics-notice";
+    }
+    if (!snapshot.complete) {
+      node(
+        "p",
+        "Analysis incomplete. Counts and cost are provisional; complete the analysis before quoting.",
+        results
+      ).className = "statistics-notice";
+    }
     const totals = node("div", "", results);
-    totals.className = "statistics-cards";
-    for (const [name, value] of [
-      [snapshot.countingComplete ? "Source words" : "Known source words", snapshot.totals.words],
-      ["Segments", snapshot.totals.segments],
-      ["Files", snapshot.files.length]
+    totals.className = "statistics-metrics";
+    for (const [key, label, value, note] of [
+      [
+        "source",
+        snapshot.countingComplete ? "Source words" : "Known source words",
+        number(snapshot.totals.words),
+        t("{segments} segments · {files} files", {
+          segments: number(snapshot.totals.segments),
+          files: number(snapshot.files.length)
+        })
+      ],
+      ["weighted", "Weighted words", number(snapshot.weightedWords, 2), t("After match discounts")],
+      ["cost", "Estimated cost", "—", ""]
     ]) {
       const card = node("div", "", totals);
-      node("strong", Number(value).toLocaleString(), card);
-      node("span", name, card);
+      card.className = `statistics-metric${key === "source" ? " is-primary" : ""}`;
+      node("span", label, card);
+      node("strong", value, card).dataset.metric = key;
+      const metricNote = node("small", note, card);
+      metricNote.dataset.note = key;
+      metricNote.dir = "auto";
     }
-    if (snapshot.options.weighted) {
-      node(
-        "p",
-        `${t("Weighted words")}: ${snapshot.weightedWords.toFixed(2)} · ${t("Estimated cost")}: ${(snapshot.weightedWords * (snapshot.options.rate || 0)).toFixed(2)} ${snapshot.options.currency || ""}`,
-        results
-      );
-    }
-    const list = advanced
-      ? snapshot.buckets
-      : [
-          {
-            band: "exact",
-            words: snapshot.buckets
-              .filter((b) => ["context", "exact"].includes(b.band))
-              .reduce((n, b) => n + b.words, 0)
-          },
-          {
-            band: "fuzzy",
-            words: snapshot.buckets.filter((b) => b.band.includes("-")).reduce((n, b) => n + b.words, 0)
-          },
-          ...snapshot.buckets.filter((b) => ["repetition", "new", "incomplete"].includes(b.band))
-        ];
-    const body = table(
-      results,
-      advanced
-        ? ["Category", "Source words", "Segments", "Characters", "Tags", "%"]
-        : ["Category", "Source words", "%"],
-      list.map((b) => [
-        b.band === "fuzzy" ? "Fuzzy matches" : labels[b.band],
-        b.words,
-        ...(advanced ? [b.segments, b.characters, b.tags] : []),
-        snapshot.totals.words ? ((b.words / snapshot.totals.words) * 100).toFixed(1) : "0.0"
-      ])
+    results.append(quote);
+    const breakdown = node("section", "", results);
+    breakdown.className = "statistics-breakdown";
+    node("h3", "Match breakdown", breakdown);
+    const list = snapshot.buckets.filter(
+      (bucket) => bucket.words > 0 || bucket.segments > 0 || ["exact", "repetition", "new"].includes(bucket.band)
     );
-    if (advanced)
-      [...body.children].forEach((row, index) => {
-        const cell = row.firstChild;
+    const body = table(
+      breakdown,
+      ["Category", "Source words", "Payable %", "Weighted words"],
+      list.map((b) => [labels[b.band], number(b.words), "", ""])
+    );
+    [...body.children].forEach((row, index) => {
+      const bucket = list[index];
+      const cell = row.firstChild;
+      if (bucket.segments) {
         cell.textContent = "";
-        button(labels[list[index].band], cell, () => showRows(list[index].band));
-      });
-    if (!advanced) {
-      const expand = node("details", "", results);
-      node("summary", "Fuzzy match bands", expand);
+        button(labels[bucket.band], cell, () => showRows(bucket.band)).className = "statistics-band-button";
+      }
+      row.children[2].append(weightInputs[bucket.band]);
+      row.children[3].dataset.weightedBand = bucket.band;
+    });
+    updatePricingDisplay();
+    for (const file of snapshot.files) {
+      const exp = node("details", "", fileDetails);
+      exp.className = "statistics-file-detail";
+      const summary = node("summary", "", exp);
+      node("span", file.name, summary);
+      node("span", t("{count} words", { count: number(file.totals.words) }), summary).className = "numeric";
+      const current = session.getProject()?.documents?.find((d) => d.id === file.id);
+      if (current && !changed) options.mountFileActions?.(exp, current);
       table(
-        expand,
+        exp,
         ["Category", "Source words"],
-        snapshot.buckets.filter((b) => b.band.includes("-")).map((b) => [labels[b.band], b.words])
+        file.buckets.filter((b) => b.words || b.segments).map((b) => [labels[b.band], number(b.words)])
       );
     }
-    if (advanced) {
-      node("h3", "Files", details);
+    if (snapshot.memories.length) {
+      node("p", "Each segment is counted once, using its best match.", memoryDetails).className = "statistics-muted";
       table(
-        details,
-        ["File", "Source words", "Segments", "Characters", "Tags"],
-        snapshot.files.map((f) => [f.name, f.totals.words, f.totals.segments, f.totals.characters, f.totals.tags])
+        memoryDetails,
+        ["Translation memory", "Source words", "Segments"],
+        snapshot.memories.map((m) => [m.name, number(m.words), number(m.segments)])
       );
-      for (const file of snapshot.files) {
-        const exp = node("details", "", details);
-        node("summary", file.name, exp);
-        const current = session.getProject()?.documents?.find((d) => d.id === file.id);
-        if (current && !changed) options.mountFileActions?.(exp, current);
-        table(
-          exp,
-          ["Category", "Source words"],
-          file.buckets.map((b) => [labels[b.band], b.words])
-        );
-      }
-      node("h3", "TM contributions — best result counted once", details);
+    }
+    if (snapshot.options.internalFuzzy) {
+      const internal = node("details", "", results);
+      internal.className = "statistics-disclosure";
+      node("summary", "Estimated internal fuzzy reuse", internal);
       table(
-        details,
-        ["TM", "Penalty", "Source words", "Segments"],
-        snapshot.memories.map((m) => [m.name, m.penalty, m.words, m.segments])
+        internal,
+        ["Category", "Estimated words"],
+        snapshot.estimatedBuckets.map((b) => [labels[b.band], b.words])
       );
+    }
+    for (const limitation of snapshot.limitations) node("p", limitation, results).className = "statistics-muted";
+    if (!snapshot.memories.length)
+      node("p", "No TM selected. Counts include source words and repetitions.", results).className = "statistics-muted";
+    if (snapshot.excludedSegments)
       node(
         "p",
-        `${snapshot.excludedSegments} excluded · ${snapshot.countingVersion} · ${snapshot.matchingVersion} · ${snapshot.runtimeVersion}`,
-        details
-      );
-      if (snapshot.options.internalFuzzy) {
-        node("h3", "Estimated internal fuzzy reuse", details);
-        table(
-          details,
-          ["Category", "Estimated words"],
-          snapshot.estimatedBuckets.map((b) => [labels[b.band], b.words])
-        );
-      }
-    }
-    for (const limitation of snapshot.limitations) node("p", limitation, results);
-    if (!snapshot.memories.length) node("p", "No TM selected. Source counts and repetitions are available.", results);
+        t("{count} segments excluded by analysis settings.", { count: number(snapshot.excludedSegments) }),
+        results
+      ).className = "statistics-muted";
   }
   async function calculate() {
     const current = ++run;
@@ -379,6 +517,8 @@ export function createStatisticsController(options) {
     const signal = abort.signal;
     cancel.hidden = false;
     calculateButton.disabled = true;
+    setAvailability();
+    meta.textContent = t("Analyzing…");
     try {
       await options.flush();
       const project = structuredClone(session.getProject()),
@@ -386,8 +526,14 @@ export function createStatisticsController(options) {
       const selectedLinks = [...tmChoices.querySelectorAll("input[data-tm]:checked")].map((input) => ({
         ...links.find((l) => l.resourceId === input.dataset.tm),
         lookup: true,
-        penalty: Math.max(0, Math.min(30, Number(input.parentElement.querySelector("input[data-penalty]").value) || 0)),
-        priority: Math.max(0, Number(input.parentElement.querySelector("input[data-priority]").value) || 0)
+        penalty: Math.max(
+          0,
+          Math.min(30, Number(input.closest(".statistics-tm-choice").querySelector("input[data-penalty]").value) || 0)
+        ),
+        priority: Math.max(
+          0,
+          Number(input.closest(".statistics-tm-choice").querySelector("input[data-priority]").value) || 0
+        )
       }));
       resources = await options.listResources();
       const ids = new Set(selectedLinks.map((l) => l.resourceId));
@@ -409,12 +555,14 @@ export function createStatisticsController(options) {
         if (current === run) meta.textContent = `${t("Analyzing")} ${progress.scanned}/${progress.total}`;
       });
       if (signal.aborted || current !== run || session.getProject()?.id !== project.id) return;
-      snapshot = value;
+      snapshot = withStatisticsPricing(value, request.options);
+      historical = false;
+      pricingInvalid = false;
       const latestResources = await options.listResources();
       if (signal.aborted || current !== run) return;
       changed = domain.fingerprint(session.getProject(), session.getSegments(), latestResources) !== value.generation;
       render();
-      meta.textContent = `${value.createdAt} · ${t(changed ? "Out of date — project or TM changed. Calculate again." : value.complete ? "Complete" : "Incomplete analysis")}`;
+      meta.textContent = `${t(changed ? "Out of date — calculate again." : value.complete ? "Complete" : "Incomplete analysis")} · ${dateLabel(value.createdAt)}`;
     } catch (error) {
       if (current === run && error.name !== "AbortError") fail(error);
     } finally {
@@ -422,16 +570,36 @@ export function createStatisticsController(options) {
         calculateButton.disabled = false;
         cancel.hidden = true;
         abort = null;
+        setAvailability();
       }
     }
   }
   function renderSaved() {
     savedList.replaceChildren();
-    for (const report of session.getProject()?.statisticsSnapshots || []) {
+    const reports = session.getProject()?.statisticsSnapshots || [];
+    saved.hidden = !reports.length;
+    for (const report of [...reports].reverse()) {
       const row = node("div", "", savedList);
-      button(report.createdAt, row, () => {
+      row.className = "statistics-saved-row";
+      const hasRate = report.options.rateProvided ?? report.options.rate > 0;
+      const reportLabel = hasRate
+        ? `${number(report.weightedWords, 2)} ${t("weighted words")} · ${money(report.weightedWords * report.options.rate, report.options.currency)}`
+        : `${number(report.totals.words)} ${t("source words")}`;
+      button(`${dateLabel(report.createdAt)} · ${reportLabel}`, row, () => {
+        run++;
+        abort?.abort();
+        abort = null;
+        calculateButton.disabled = false;
+        cancel.hidden = true;
         snapshot = report;
         changed = true;
+        historical = true;
+        pricingInvalid = false;
+        rate.value = (report.options.rateProvided ?? report.options.rate > 0) ? String(report.options.rate || 0) : "";
+        currency.value = report.options.currency || "";
+        for (const [band, input] of Object.entries(weightInputs))
+          input.value = String(report.options.weights?.[band] ?? 100);
+        for (const [key, input] of Object.entries(checks)) input.checked = Boolean(report.options[key]);
         render();
         meta.textContent = t("Saved snapshot — original calculation and settings.");
       });
@@ -445,6 +613,8 @@ export function createStatisticsController(options) {
     if (!session.getProject()) return;
     if (snapshot?.projectId !== session.getProject().id) snapshot = null;
     changed = true;
+    historical = false;
+    pricingInvalid = false;
     render();
     openSelection = selection.ids();
     scopeSelect.value = kind;
@@ -464,16 +634,19 @@ export function createStatisticsController(options) {
     fileChoices.hidden = kind !== "files";
     links = (session.getProject().resourceLinks || []).filter((l) => l.type === "tm");
     tmChoices.replaceChildren();
-    node("legend", "Translation memories — report-only overrides", tmChoices);
+    node("legend", "Translation memories for this analysis", tmChoices);
+    tmChoices.hidden = !links.length;
     for (const link of links) {
-      const label = node("label", "", tmChoices),
+      const row = node("div", "", tmChoices);
+      row.className = "statistics-tm-choice";
+      const label = node("label", "", row),
         input = node("input", "", label);
       input.type = "checkbox";
       input.dataset.tm = link.resourceId;
       input.checked = link.lookup !== false;
       label.append(doc.createTextNode(link.cachedName || link.name));
       input.addEventListener("change", dirty);
-      const penalty = node("input", "", label);
+      const penalty = node("input", "", node("label", "Penalty", row));
       penalty.type = "number";
       penalty.min = "0";
       penalty.max = "30";
@@ -481,7 +654,7 @@ export function createStatisticsController(options) {
       penalty.dataset.penalty = link.resourceId;
       penalty.setAttribute("aria-label", t("TM penalty"));
       penalty.addEventListener("change", dirty);
-      const priority = node("input", "", label);
+      const priority = node("input", "", node("label", "Priority", row));
       priority.type = "number";
       priority.min = "0";
       priority.value = String(link.priority || 0);
@@ -506,7 +679,7 @@ export function createStatisticsController(options) {
       }
       if (domain.fingerprint(session.getProject(), session.getSegments(), latest) !== snapshot.generation) {
         changed = true;
-        saveButton.disabled = true;
+        render();
         meta.textContent = t("Out of date — project or TM changed. Calculate again.");
       }
     }, 2000);

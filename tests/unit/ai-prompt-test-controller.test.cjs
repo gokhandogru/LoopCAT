@@ -97,7 +97,7 @@ function createHarness(createController, overrides = {}) {
     consent: {
       externalShare: (details) => {
         consentDetails.push(details);
-        return overrides.consent !== false;
+        return overrides.consentResult ?? overrides.consent !== false;
       }
     },
     lifecycle: {
@@ -250,4 +250,30 @@ test("AI prompt provider failure remains visible and always releases prompt-busy
       ["renderCommandCentre", false]
     ]
   );
+});
+
+test("hosted prompt waits for asynchronous consent and never sends on cancellation", async () => {
+  const { createAiPromptTestController } = await loadFactory();
+  for (const accepted of [false, true]) {
+    let resolveConsent;
+    const consentResult = new Promise((resolve) => {
+      resolveConsent = resolve;
+    });
+    const harness = createHarness(createAiPromptTestController, { sharesExternally: true, consentResult });
+    const request = harness.controller.testPrompt();
+    await new Promise((resolve) => {
+      setImmediate(resolve);
+    });
+    assert.equal(harness.consentDetails.length, 1);
+    assert.equal(
+      harness.calls.some(([name]) => name === "translate"),
+      false
+    );
+    resolveConsent(accepted);
+    await request;
+    assert.equal(
+      harness.calls.some(([name]) => name === "translate"),
+      accepted
+    );
+  }
 });

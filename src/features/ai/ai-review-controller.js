@@ -17,7 +17,7 @@ const RISK_ORDER = { none: 0, low: 1, medium: 2, high: 3, critical: 4 };
  *   scope: { getVisibleSegments: () => any[], getDocumentSegments: () => any[], isLocked: (segment: any) => boolean },
  *   settings: { persist: () => Promise<any>, runtimeConfig: (settings: any) => any, assertReady: (settings: any, config: any, action: string) => void },
  *   providers: { get: (settings: any) => any, sharesExternally: (settings: any) => boolean },
- *   consent: { externalShare: (details: object) => boolean },
+ *   consent: { externalShare: (details: object) => boolean | Promise<boolean> },
  *   context: { findTerms: (options: object) => Promise<any[]>, getTermBaseNames: () => string[] },
  *   domain: { reviewSegment: (options: object) => Promise<any>, parseRisk: (text: string) => any },
  *   lifecycle: { isRunning: () => boolean, isPromptBusy: () => boolean, sync: (state: { running: boolean, promptBusy: boolean, abortController: AbortController | null, progress?: any }) => void, createAbortController?: () => AbortController },
@@ -233,11 +233,11 @@ export function createAiReviewController(options) {
     }
     if (
       providers.sharesExternally(settings) &&
-      !consent.externalShare({
+      !(await consent.externalShare({
         provider: provider.name || settings.providerId,
         includesSourceText: true,
         contextLabels: ["target text", "configured provider URL", "project glossary hints"]
-      })
+      }))
     ) {
       status.set("AI review canceled", "dirty");
       return false;
@@ -338,11 +338,11 @@ export function createAiReviewController(options) {
     }
     if (
       providers.sharesExternally(settings) &&
-      !consent.externalShare({
+      !(await consent.externalShare({
         provider: provider.name || settings.providerId,
         includesSourceText: true,
         contextLabels: ["target text", "configured provider URL", "batch review text", "project glossary hints"]
-      })
+      }))
     ) {
       status.set("Batch AI QA canceled", "dirty");
       return false;

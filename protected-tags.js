@@ -90,13 +90,51 @@ function overlaps(item, selected) {
   });
 }
 
-function detectProtectedTags(text) {
+// A percent sign is also ordinary punctuation (Turkish writes 1% as %1).
+// Only an explicit format declaration can make a numeric/space printf form
+// or a Qt numbered argument unambiguous. Never infer a dialect from language.
+const C_PERCENT_PATTERN = /%%|%(?:[1-9]\d*\$)?[-+#0 'I]*(?:\d+|\*(?:[1-9]\d*\$)?)?(?:\.(?:\d*|\*(?:[1-9]\d*\$)?))?(?:hh|ll|[hljztL])?[diouxXfFeEgGaAcspnbB]/g;
+const OBJC_PERCENT_PATTERN = /%%|%(?:[1-9]\d*\$)?[-+#0 ']*(?:\d+|\*(?:[1-9]\d*\$)?)?(?:\.(?:\d*|\*(?:[1-9]\d*\$)?))?(?:hh|ll|[hljztL])?[diouxXfFeEgGaAcspnbB@]/g;
+const PYTHON_PERCENT_PATTERN = /%%|%(?:\([^()\r\n]+\))?[#0 +\-]*(?:\d+|\*)?(?:\.(?:\d+|\*))?[hlL]?[diouxXeEfFgGcrsa]/g;
+const QT_PERCENT_PATTERN = /%L?[1-9]\d?(?!\d)/g;
+const QT_PLURAL_PERCENT_PATTERN = /%L?n/g;
+// In PO without metadata, keep common %s/%d, explicit positional %1$s and named
+// %(name)s tokens. Widths, precision, spaces and bare %number stay editable.
+const CONSERVATIVE_PERCENT_PATTERN = /%%|%(?:[1-9]\d*\$[-+#0]*(?:\d+|\*)?(?:\.\d+)?(?:hh|ll|[hljztL])?[diouxXfFeEgGaAcspnbB@]|[-+#]*(?:hh|ll|[hljztL])?[diouxXfFeEgGaAcspnbB@](?![\p{L}\p{N}_]))/gu;
+// Other formats retain complete printf tokens, with no whitespace-consuming
+// flags or partial-word matches. Bare percent-number forms are still text.
+const GENERIC_PERCENT_PATTERN = /%%|%(?:[1-9]\d*\$)?[-+#0]*(?:\d+|\*)?(?:\.\d+)?(?:hh|ll|[hljztL])?[diouxXfFeEgGaAcspnbB@](?![\p{L}\p{N}_])/gu;
+const NAMED_PERCENT_PATTERN = /%%|%\([^()\r\n]+\)[#0 +\-]*(?:\d+|\*)?(?:\.(?:\d+|\*))?[hlL]?[diouxXeEfFgGcrsa]/g;
+
+function percentPatterns(context) {
+  const flags = new Set(Array.isArray(context?.formatFlags) ? context.formatFlags : []);
+  const declared = [...flags].filter((flag) => /-format$/.test(flag) && !/^(?:no-|possible-)/.test(flag));
+  const grammars = [
+    ["c-format", C_PERCENT_PATTERN],
+    ["objc-format", OBJC_PERCENT_PATTERN],
+    ["python-format", PYTHON_PERCENT_PATTERN],
+    ["qt-format", QT_PERCENT_PATTERN],
+    ["qt-plural-format", QT_PLURAL_PERCENT_PATTERN]
+  ];
+  if (declared.length) {
+    // An unsupported dialect is not evidence for treating it as printf.
+    return grammars.filter(([flag]) => flags.has(flag) && !flags.has(`no-${flag}`)).map(([, pattern]) => pattern);
+  }
+  return [
+    ...(!flags.has("no-c-format") && !flags.has("no-objc-format")
+      ? [context?.format === "po" ? CONSERVATIVE_PERCENT_PATTERN : GENERIC_PERCENT_PATTERN]
+      : []),
+    ...(!flags.has("no-python-format") ? [NAMED_PERCENT_PATTERN] : [])
+  ];
+}
+
+function detectProtectedTags(text, context = {}) {
+  text = String(text || "");
   const patterns = [
     { type: "tag", pattern: /<\/?[A-Za-z][A-Za-z0-9:-]*(?:\s+(?:"[^"]*"|'[^']*'|[^'">])*)?>/g },
-    { type: "placeholder", pattern: /%(\d+\$)?[-+#0 ]*(\d+|\*)?(\.\d+)?[bcdeEfFgGosxX@]/g },
-    { type: "placeholder", pattern: /%\([A-Za-z0-9_.:-]+\)[#0 +\-]*(\d+)?(\.\d+)?[sdif]/g },
+    ...percentPatterns(context).map((pattern) => ({ type: "placeholder", pattern })),
     { type: "placeholder", pattern: /&(?:[A-Za-z][A-Za-z0-9]+|#\d+|#x[A-Fa-f0-9]+);/g },
-    { type: "variable", pattern: /\$[A-Za-z_][A-Za-z0-9_.-]*/g },
+    { type: "variable", pattern: /(?<![%\d])\$[A-Za-z_][A-Za-z0-9_.-]*/g },
     { type: "variable", pattern: /:[A-Za-z_][A-Za-z0-9_-]*/g },
     { type: "placeholder", pattern: /\[[A-Z][A-Z0-9_.:-]+\]/g }
   ];
@@ -107,6 +145,8 @@ function detectProtectedTags(text) {
   ];
   patterns.forEach(({ pattern, type }) => {
     for (const match of String(text || "").matchAll(pattern)) {
+      // Consuming the escape prevents the second % in %%s becoming a token.
+      if (match[0] === "%%") continue;
       addProtectedToken(found, match[0], match.index || 0, type);
     }
   });
@@ -128,6 +168,7 @@ function detectProtectedTags(text) {
   })));
 }
 
-window.CatHan = window.CatHan || {};
-window.CatHan.protectedTags = { detectProtectedTags };
+const host = typeof window !== "undefined" ? window : globalThis;
+host.CatHan = host.CatHan || {};
+host.CatHan.protectedTags = { detectProtectedTags };
 })();

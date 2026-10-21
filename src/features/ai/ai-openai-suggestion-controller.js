@@ -14,7 +14,7 @@ import { validateAiOpenAiSuggestionControllerOptions } from "./ai-openai-suggest
  *   settings: { normalize: (settings: any) => any },
  *   provider: { isOpenAi: (settings: any) => boolean, appearsOffline: () => boolean, request: (options: object) => Promise<any> },
  *   keys: { readStored: () => string, snapshot: () => any, save: (value: string, remember: boolean) => void, restore: (snapshot: any) => unknown },
- *   consent: { externalShare: (details: object) => boolean },
+ *   consent: { externalShare: (details: object) => boolean | Promise<boolean> },
  *   persistence: { updateProject: (project: any) => Promise<any> },
  *   context: { forSegment: (segment: any, settings: any) => Promise<[any[], any[]]> },
  *   suggestions: { append: (segment: any, suggestion: any) => Promise<any> },
@@ -128,11 +128,11 @@ export function createAiOpenAiSuggestionController(options) {
       aiSettings.styleGuide ? "style instructions" : ""
     ].filter(Boolean);
     if (
-      !consent.externalShare({
+      !(await consent.externalShare({
         provider: "OpenAI",
         includesSourceText: true,
         contextLabels
-      })
+      }))
     ) {
       status.set("OpenAI suggestion canceled", "dirty");
       return undefined;

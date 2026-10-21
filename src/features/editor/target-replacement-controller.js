@@ -126,7 +126,7 @@ export function createTargetReplacementController(options) {
               input.map((item) => item.target),
               findText,
               replacement,
-              replaceOptions
+              { ...replaceOptions, contexts: input.map(({ segment }) => segment.structure) }
             )
           : null;
       if (batch) {
@@ -144,7 +144,10 @@ export function createTargetReplacementController(options) {
           if (!segment) continue;
           const originalTarget = segment.target || "";
           const revision = segment.revision;
-          const result = await transform.replace(originalTarget, findText, replacement, replaceOptions);
+          const result = await transform.replace(originalTarget, findText, replacement, {
+            ...replaceOptions,
+            context: segment.structure
+          });
           if (!result.count || result.text === originalTarget) continue;
           proposals.push({ segment, text: result.text, count: result.count, originalTarget, revision });
           replacementCount += result.count;

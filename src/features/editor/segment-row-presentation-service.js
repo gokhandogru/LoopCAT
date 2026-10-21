@@ -91,7 +91,7 @@ export function createSegmentRowPresentationService(options) {
     sourceCell.dir = "auto";
     markup.appendSource(sourceCell, segment);
     const textarea = createInlineTagEditor(row.querySelector("textarea"), {
-      detectTags: (target) => protectedTags.targetTags?.({ target }) || []
+      detectTags: (target) => protectedTags.targetTags?.({ ...(session.getSegments()[index] || segment), target }) || []
     });
     textarea.dir = "auto";
     textarea.setAttribute(

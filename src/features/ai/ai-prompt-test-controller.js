@@ -9,7 +9,7 @@
  *   settings: { persist: () => Promise<any>, runtimeConfig: (settings: any) => any, assertReady: (settings: any, config: any, action: string) => void },
  *   prompt: { getMode: () => string, getSampleText: () => string, createRequest: (settings: any, mode: string) => any, getModeLabel: (mode: string) => string, getContextLabels: (mode: string) => string[], hasProjectBriefSamples: () => boolean },
  *   providers: { get: (settings: any) => any, sharesExternally: (settings: any) => boolean },
- *   consent: { externalShare: (details: object) => boolean },
+ *   consent: { externalShare: (details: object) => boolean | Promise<boolean> },
  *   lifecycle: { isRunning: () => boolean, isPromptBusy: () => boolean, sync: (state: { promptBusy: boolean }) => void },
  *   output: { set: (value: string) => void },
  *   presentation: { renderCommandCentre: () => void, renderOutput: (text: string, options?: object) => void },
@@ -89,7 +89,7 @@ export function createAiPromptTestController(options) {
       return undefined;
     }
     if (providers.sharesExternally(settings)) {
-      const ok = consent.externalShare({
+      const ok = await consent.externalShare({
         provider: providers.get(settings)?.name || settings.providerId,
         includesSourceText: mode !== "project-brief" || prompt.hasProjectBriefSamples(),
         contextLabels: prompt.getContextLabels(mode)

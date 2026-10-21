@@ -96,7 +96,7 @@ function createHarness(createSegmentRowPresentationService, overrides = {}) {
         cloneNode(deep) {
           calls.push(["cloneNode", deep]);
           if (overrides.cloneError) throw overrides.cloneError;
-          const parts = createRow();
+          const parts = overrides.createRow?.() || createRow();
           rows.push(parts);
           return parts.row;
         }
@@ -128,6 +128,7 @@ function createHarness(createSegmentRowPresentationService, overrides = {}) {
       }
     },
     protectedTags: {
+      targetTags: overrides.targetTags,
       hasIssue(segment) {
         calls.push(["hasIssue", segment]);
         if (overrides.issueError) throw overrides.issueError;
@@ -266,6 +267,64 @@ test("SegmentRowPresentationService reads live segment and active state for ever
   assert.equal(second.classList.contains("tag-warning-row"), true);
   assert.equal(harness.calls.filter(([name]) => name === "getSegments").length, 2);
   assert.equal(harness.calls.filter(([name]) => name === "cloneNode").length, 2);
+});
+
+test("SegmentRowPresentationService retains live PO metadata when the inline editor detects target tags", async () => {
+  const { createSegmentRowPresentationService } = await moduleAt(
+    "src/features/editor/segment-row-presentation-service.js"
+  );
+  const detected = [];
+  const structure = { format: "po", formatFlags: ["qt-format"] };
+  const segment = { id: "po", source: "%1 item", target: "%1 öge", structure };
+  function node(tagName) {
+    const element = fakeElement(tagName);
+    element.nodeType = 1;
+    element.nodeName = tagName.toUpperCase();
+    element.childNodes = [];
+    element.append = (...children) => element.childNodes.push(...children);
+    element.replaceChildren = (fragment) => {
+      element.childNodes = fragment.childNodes;
+    };
+    Object.defineProperty(element, "firstChild", { get: () => element.childNodes[0] });
+    return element;
+  }
+  const doc = {
+    defaultView: {},
+    activeElement: null,
+    createRange() {},
+    getSelection: () => null,
+    createElement: node,
+    createDocumentFragment: () => node("fragment"),
+    createTextNode: (nodeValue) => ({ nodeType: 3, nodeValue })
+  };
+  let editor;
+  const harness = createHarness(createSegmentRowPresentationService, {
+    segments: [segment],
+    targetTags(value) {
+      detected.push(value);
+      return [];
+    },
+    createRow() {
+      const parts = createRow();
+      parts.textarea.ownerDocument = doc;
+      parts.textarea.replaceWith = (replacement) => {
+        editor = replacement;
+      };
+      return parts;
+    }
+  });
+  harness.service.create(0);
+  assert.ok(detected.some((value) => value.target === segment.target));
+  assert.ok(detected.every((value) => value.structure === structure && value.source === segment.source));
+
+  const updated = { ...segment, source: "Updated %1", structure: { format: "po", formatFlags: [] } };
+  harness.state.segments[0] = updated;
+  detected.length = 0;
+  editor.value = "%1 edited";
+  assert.ok(detected.length > 0);
+  assert.ok(detected.every((value) => value.target === "%1 edited" && value.structure === updated.structure));
+  assert.ok(detected.every((value) => value.source === updated.source));
+  assert.equal(updated.target, segment.target);
 });
 
 test("SegmentRowPresentationService preserves live update lookup, classes, and preview-before-status order", async () => {

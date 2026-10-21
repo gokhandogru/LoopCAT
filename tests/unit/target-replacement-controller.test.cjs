@@ -75,6 +75,7 @@ function createHarness(createTargetReplacementController, overrides = {}) {
       }
     },
     transform: {
+      ...(overrides.replaceMany ? { replaceMany: overrides.replaceMany } : {}),
       replace(target, findText, replacement, options) {
         calls.push(["replace", target, findText, replacement, options]);
         if (overrides.transformError) throw overrides.transformError;
@@ -248,6 +249,46 @@ test("project-wide replacement preserves counts, filter options, and tag-QA warn
     regex: true,
     caseSensitive: false
   });
+});
+
+test("target replacement passes each segment format context to individual replacements", async () => {
+  const { createTargetReplacementController } = await loadFactory();
+  const harness = createHarness(createTargetReplacementController);
+  harness.segments[0].structure = { format: "po", formatFlags: ["qt-format"] };
+  harness.segments[1].structure = { format: "po", formatFlags: ["no-c-format"] };
+
+  await harness.controller.replace("all");
+
+  const replacements = harness.calls.filter(([name]) => name === "replace");
+  assert.equal(replacements[0][4].context, harness.segments[0].structure);
+  assert.equal(replacements[1][4].context, harness.segments[1].structure);
+  assert.equal(replacements[0][4].regex, false);
+  assert.equal(replacements[1][4].caseSensitive, true);
+});
+
+test("target replacement passes ordered segment contexts to regex batches", async () => {
+  const { createTargetReplacementController } = await loadFactory();
+  let batchOptions;
+  const harness = createHarness(createTargetReplacementController, {
+    regex: true,
+    replaceMany: (targets, find, replacement, options) => {
+      batchOptions = options;
+      return Promise.resolve(targets.map((target) => ({ text: target.replace(find, replacement), count: 1 })));
+    }
+  });
+  harness.segments[0].structure = { format: "po", formatFlags: ["qt-format"] };
+  harness.segments[1].structure = { format: "po", formatFlags: ["python-format"] };
+
+  assert.deepEqual(await harness.controller.replace("all"), { segmentCount: 2, replacementCount: 2 });
+  assert.deepEqual(batchOptions, {
+    regex: true,
+    caseSensitive: true,
+    contexts: harness.segments.map((segment) => segment.structure)
+  });
+  assert.equal(
+    harness.calls.some(([name]) => name === "replace"),
+    false
+  );
 });
 
 test("empty, unmatched, invalid, and projectless replacements stop before persistence", async () => {

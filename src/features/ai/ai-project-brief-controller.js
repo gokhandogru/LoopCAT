@@ -11,7 +11,7 @@ import { validateAiProjectBriefControllerOptions } from "./ai-project-brief-cont
  *   editorSessionStore: { getProject: () => any, getProjects: () => any[], replaceProject: (project: any) => void, replaceProjects: (projects: any[]) => void },
  *   settings: { persist: () => Promise<any>, runtimeConfig: (settings: any) => any, assertReady: (settings: any, config: any, action: string) => void, normalizeProjectAiSettings: (settings: any) => any },
  *   providers: { get: (settings: any) => any, sharesExternally: (settings: any) => boolean },
- *   consent: { externalShare: (details: object) => boolean },
+ *   consent: { externalShare: (details: object) => boolean | Promise<boolean> },
  *   context: { getSampleSegments: () => any[], getDocuments: () => any[], getTerms: (project: any) => Promise<any[]> },
  *   domain: { generateProjectBrief: (options: object) => Promise<any> },
  *   lifecycle: { isRunning: () => boolean, isPromptBusy: () => boolean, sync: (state: { promptBusy: boolean }) => void },
@@ -77,7 +77,7 @@ export function createAiProjectBriefController(options) {
     const sampleSegments = context.getSampleSegments();
     if (
       providers.sharesExternally(settings) &&
-      !consent.externalShare({
+      !(await consent.externalShare({
         provider: provider.name || settings.providerId,
         includesSourceText: sampleSegments.length > 0,
         contextLabels: [
@@ -87,7 +87,7 @@ export function createAiProjectBriefController(options) {
           "termbase hints",
           "configured provider URL"
         ]
-      })
+      }))
     ) {
       status.set("AI project brief canceled", "dirty");
       return false;

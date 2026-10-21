@@ -1,7 +1,9 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const test = require("node:test");
+const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "../..");
 const moduleAt = (relativePath) => import(pathToFileURL(path.join(root, relativePath)).href);
@@ -19,6 +21,38 @@ function createHarness(createProtectedTextReplacementService, detectedByText = {
     }
   });
   return { calls, service };
+}
+
+function createFormatAwareService(createProtectedTextReplacementService) {
+  const context = { window: {} };
+  vm.runInNewContext(fs.readFileSync(path.join(root, "protected-tags.js"), "utf8"), context);
+  return createProtectedTextReplacementService({
+    detectTags: context.window.CatHan.protectedTags.detectProtectedTags,
+    normalizeCase: (value) => String(value || "").toLowerCase()
+  });
+}
+
+function installRegexWorker(testContext) {
+  const workerSource = fs.readFileSync(path.join(root, "regex-worker.js"), "utf8");
+  const originalWorker = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  testContext.after(() => {
+    if (originalWorker) Object.defineProperty(globalThis, "Worker", originalWorker);
+    else delete globalThis.Worker;
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else delete globalThis.window;
+  });
+  globalThis.window = { CatHan: {} };
+  globalThis.Worker = class {
+    constructor() {
+      this.self = { postMessage: (data) => this.onmessage({ data: structuredClone(data) }) };
+      vm.runInNewContext(workerSource, { self: this.self });
+    }
+    postMessage(data) {
+      this.self.onmessage({ data });
+    }
+    terminate() {}
+  };
 }
 
 test("ProtectedTextReplacementService preserves coercion and empty-find no-op behavior", async () => {
@@ -119,4 +153,62 @@ test("ProtectedTextReplacementService validates boundaries and exposes an immuta
   );
   const { service } = createHarness(createProtectedTextReplacementService);
   assert.equal(Object.isFrozen(service), true);
+});
+
+test("ProtectedTextReplacementService uses PO format context while keeping ambiguous percentages editable", async () => {
+  const { createProtectedTextReplacementService } = await moduleAt(
+    "src/features/editor/protected-text-replacement-service.js"
+  );
+  const service = createFormatAwareService(createProtectedTextReplacementService);
+  const cases = [
+    ["qt-format", "%1 1", "1", "%1 x"],
+    ["c-format", "%02d 02", "02", "%02d x"],
+    ["python-format", "%(name)08.2f name", "name", "%(name)08.2f x"]
+  ];
+  for (const [flag, text, find, expected] of cases) {
+    assert.deepEqual(service.replace(text, find, "x", { context: { format: "po", formatFlags: [flag] } }), {
+      text: expected,
+      count: 1
+    });
+  }
+  assert.deepEqual(service.replace("%1 indirim ve %1,5 artış", "1", "2", { context: { format: "po" } }), {
+    text: "%2 indirim ve %2,5 artış",
+    count: 2
+  });
+  assert.deepEqual(service.replace("%0 bites", "bites", "eats"), { text: "%0 eats", count: 1 });
+});
+
+test("ProtectedTextReplacementService passes PO context through asynchronous regex replacement", async (t) => {
+  installRegexWorker(t);
+  const { createProtectedTextReplacementService } = await moduleAt(
+    "src/features/editor/protected-text-replacement-service.js"
+  );
+  const service = createFormatAwareService(createProtectedTextReplacementService);
+  const result = await service.replaceAsync("%1 1", "1", "2", {
+    regex: true,
+    context: { format: "po", formatFlags: ["qt-format"] }
+  });
+  assert.deepEqual(result, { id: "target", text: "%1 2", count: 1 });
+});
+
+test("ProtectedTextReplacementService keeps per-entry format contexts aligned in mixed regex batches", async (t) => {
+  installRegexWorker(t);
+  const { createProtectedTextReplacementService } = await moduleAt(
+    "src/features/editor/protected-text-replacement-service.js"
+  );
+  const service = createFormatAwareService(createProtectedTextReplacementService);
+  const contexts = ["qt-format", "c-format", "python-format", "no-c-format"].map((flag) => ({
+    format: "po",
+    formatFlags: [flag]
+  }));
+  const result = await service.replaceMany(["%1 1", "%02d 02", "%(name)s name", "%1 1"], "1|02|name", "x", {
+    regex: true,
+    contexts
+  });
+  assert.deepEqual(result, [
+    { id: 0, text: "%1 x", count: 1 },
+    { id: 1, text: "%02d x", count: 1 },
+    { id: 2, text: "%(name)s x", count: 1 },
+    { id: 3, text: "%x x", count: 2 }
+  ]);
 });

@@ -10,7 +10,7 @@ import { validateAiPretranslationControllerOptions } from "./ai-command-controll
  *   editorSessionStore: { getProject: () => any, getSegments: () => any[], replaceSegments: (segments: any[]) => void },
  *   settings: { persist: () => Promise<any>, runtimeConfig: (settings: any) => any, assertReady: (settings: any, config: any, action: string) => void, projectDefaults: (project: any) => any },
  *   providers: { get: (settings: any) => any, sharesExternally: (settings: any) => boolean },
- *   consent: { externalShare: (details: object) => boolean, overwrite: () => boolean },
+ *   consent: { externalShare: (details: object) => boolean | Promise<boolean>, overwrite: () => boolean },
  *   scope: { getSegments: (settings: any) => any[], getOptions: (settings: any) => { selectedSegmentIds: string[], visibleSegmentIds: string[] } },
  *   domain: { selectSegments: (segments: any[], options: object) => { candidates: any[], skipped: any[] }, pretranslateSegments: (options: object) => Promise<any> },
  *   context: { glossaryTermsForSegment: (segment: any) => Promise<any[]> | any[], tmMatchesForSegment: (segment: any) => Promise<any[]> | any[], surroundingSegmentsForSegment: (segment: any, options?: object) => any[] },
@@ -123,7 +123,7 @@ export function createAiPretranslationController(options) {
         projectSettings.useTmContext !== false ? "TM matches" : "",
         projectSettings.useTermbaseContext !== false ? "termbase hints" : ""
       ].filter(Boolean);
-      const accepted = consent.externalShare({
+      const accepted = await consent.externalShare({
         provider: provider.name || configuredSettings.providerId,
         includesSourceText: true,
         contextLabels

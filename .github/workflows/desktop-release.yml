@@ -143,6 +143,10 @@ jobs:
         if: matrix.signingPlatform == 'win'
         run: pnpm run verify:tmx
 
+      - name: Verify AI consent and immediate keyboard input
+        if: matrix.signingPlatform == 'win'
+        run: pnpm run verify:ai-consent
+
       - name: Verify desktop wrapper
         run: pnpm run verify:desktop-wrapper
 

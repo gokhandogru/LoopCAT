@@ -11438,7 +11438,7 @@ assertIncludes(
 );
 for (const snippet of [
   "const stored = Array.isArray(segment?.tags)",
-  'const detected = detectTags(segment?.source || "")',
+  'const detected = detectTags(segment?.source || "", segment?.structure)',
   "if (!stored.length) return detected",
   "if (!detected.length) return stored",
   "const storedCounts = new Map()",
@@ -11446,8 +11446,8 @@ for (const snippet of [
   "if (count > (storedCounts.get(text) || 0)) merged.push(tag)",
   'return tag?.label || tag?.text || ""',
   "const seen = new Map()",
-  "const occurrences = target.split(tag.text).length - 1",
-  'return detectTags(segment.target || "")',
+  "const occurrences = targetCounts ? targetCounts.get(tag.text) || 0 : target.split(tag.text).length - 1",
+  'return detectTags(segment.target || "", segment?.structure)',
   'return Boolean((segment.target || "").trim() && missing(segment).length)',
   "return Object.freeze({ sourceTags, displayText, missing, targetTags, hasIssue })"
 ]) {
@@ -11898,7 +11898,7 @@ for (const snippet of [
   "const needle = replaceOptions.caseSensitive ? find : normalizeCase(find)",
   "const haystack = replaceOptions.caseSensitive ? source : normalizeCase(source)",
   "cursor = index + find.length",
-  "detectTags(source).sort((a, b) => a.index - b.index || b.text.length - a.text.length)",
+  "detectTags(source, replaceOptions.context).sort(",
   "if (token.index < cursor) return",
   "output += chunk.text + token.text",
   "return { text: output + tail.text, count: count + tail.count }",
@@ -15179,7 +15179,7 @@ for (const boundary of [
   "elements.findInput.focus()",
   "const findText = elements.findInput.value",
   "const indexes = filters.getIndexes(scope)",
-  "await transform.replace(originalTarget, findText, replacement, replaceOptions)",
+  "await transform.replace(originalTarget, findText, replacement, {",
   "await persistence.flush(editorSessionStore.getProject().id)",
   "const command = commands.create({",
   "await persistence.save(updated)",
@@ -17224,7 +17224,7 @@ for (const boundary of [
   'if (!String(segment.source || "").trim())',
   "if (provider.appearsOffline())",
   'const apiKey = String(secrets.openAiKey || "").trim() || keys.readStored()',
-  "!consent.externalShare({",
+  "!(await consent.externalShare({",
   "const previousProject = structuredClone(project)",
   "const previousKey = keys.snapshot()",
   "const savedProject = await persistence.updateProject({ ...project, aiSettings })",
@@ -19358,7 +19358,7 @@ for (const testName of [
 }
 assertIncludes(
   protectedTagsJs,
-  "window.CatHan.protectedTags = { detectProtectedTags };",
+  "host.CatHan.protectedTags = { detectProtectedTags };",
   "the extracted protected-tag detector must retain its synchronous compatibility boundary."
 );
 assertIncludes(
@@ -26235,7 +26235,7 @@ assertIncludes(
   "The direct-OpenAI controller must ask for action-time confirmation that names optional local context before sending source text."
 );
 assert(
-  openAiSuggestionFunction.indexOf("!consent.externalShare({") < openAiSuggestionFunction.indexOf("keys.save(apiKey"),
+  openAiSuggestionFunction.indexOf("!(await consent.externalShare({") < openAiSuggestionFunction.indexOf("keys.save(apiKey"),
   "The direct-OpenAI controller must not save keys before action-time source-sharing confirmation."
 );
 assertIncludes(
