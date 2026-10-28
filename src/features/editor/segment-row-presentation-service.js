@@ -121,6 +121,7 @@ export function createSegmentRowPresentationService(options) {
     row.classList.toggle("tag-warning-row", protectedTags.hasIssue(segment));
     markup.renderTargetPreview(row, segment);
     status.render(row, segment);
+    markup.renderTagTray(row, segment);
   }
 
   return Object.freeze({ create, update });

@@ -349,7 +349,8 @@ test("SegmentRowPresentationService preserves live update lookup, classes, and p
     ["getActiveIndex"],
     ["hasIssue", segment],
     ["renderTargetPreview", row, segment],
-    ["renderStatus", row, segment]
+    ["renderStatus", row, segment],
+    ["renderTagTray", row, segment]
   ]);
 });
 

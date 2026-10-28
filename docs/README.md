@@ -17,7 +17,7 @@ Use this page to distinguish current product documentation from dated research a
 
 ## Release Records And Evidence
 
-- [Current development preview: 0.0.4-dev.20261014.1](releases/0.0.4-dev.20261014.1.md) — authoritative identity, changes, installation guidance, and verification limits.
+- [Current development preview: 0.0.4-dev.20261028.1](releases/0.0.4-dev.20261028.1.md) — changes, installation guidance, and verification limits.
 - [Historical LoopCAT 0.0.3 prerelease](releases/0.0.3-prerelease.md) — July tag and superseded August mirror history.
 - [Release smoke evidence template](release-smoke-evidence-template.md) — required automated, artifact, platform, storage, signing, upgrade, and release-decision evidence.
 - [`downloads/`](../downloads/) — current repository web and unsigned Windows ZIP mirror plus SHA-256 checksums.

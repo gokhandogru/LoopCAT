@@ -83,15 +83,22 @@ export function createLanguageInputService(options) {
     const clean = canonicalCode(code);
     if (!clean) return "";
     const configured = configuredName(clean);
-    if (configured) return localization.source(clean.split("-")[0] === "pl" ? "Polish language" : configured);
+    const translated = configured
+      ? localization.source(clean.split("-")[0] === "pl" ? "Polish language" : configured)
+      : "";
+    const locale = getLocale() || getNavigatorLanguage() || "en";
+    if (configured && (translated !== configured || /^en(?:-|$)/i.test(locale))) return translated;
     try {
       if (typeof intl.DisplayNames === "function") {
-        const names = new intl.DisplayNames([getLocale() || getNavigatorLanguage() || "en"], { type: "language" });
+        const names = new intl.DisplayNames([locale], { type: "language" });
+        const language = clean.split("-")[0];
+        const baseName = names.of(language);
         const label = names.of(clean);
-        if (label && label !== clean) return label;
+        // Some ICU versions recognize a region but not the language; don't display raw codes as names.
+        if (baseName && baseName.toLowerCase() !== language.toLowerCase() && label && label !== clean) return label;
       }
     } catch {}
-    return clean;
+    return translated || clean;
   }
 
   function optionValue(code) {

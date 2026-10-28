@@ -98,6 +98,7 @@ function fixture() {
     segment.revision = 0;
     delete segment.comments;
   });
+  data.segments[5].source = "First <b>bold</b> then <b>again</b>.";
   data.tmEntries = pairs.map(([source, target], index) => ({
     ...data.tmEntries[0],
     id: `qa-tm-${index}`,
@@ -234,6 +235,187 @@ app.whenReady().then(async () => {
       "document.querySelectorAll('#tmMatches .match-card').length >= 3 && document.querySelectorAll('#termSuggestions .term-card').length >= 3",
       "TM and TB results"
     );
+    for (const [locale, label, direction] of [
+      ["ca-ES", "Coincidències", "ltr"],
+      ["es-ES", "Coincidencias", "ltr"],
+      ["tr-TR", "Eşleşmeler", "ltr"],
+      ["ar", "التطابقات", "rtl"]
+    ]) {
+      await run((value) => {
+        const select = document.querySelector("#uiLocaleSelect");
+        select.value = value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      }, locale);
+      await wait(
+        `document.documentElement.lang === ${JSON.stringify(locale)} && document.querySelector('#inspectorTabMatches').textContent.trim() === ${JSON.stringify(label)}`,
+        "locale " + locale
+      );
+      for (const width of [1911, 1280]) {
+        win.setContentSize(width, 1007);
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        const state = await run(() => {
+          const visible = (element) => {
+            const r = element.getBoundingClientRect();
+            return (
+              element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && r.width > 0 && r.height > 0
+            );
+          };
+          const selector =
+            "#editorInspector button, #editorInspector h2, #editorInspector .match-diff-legend, #editorInspector [role=tab], #segmentSearchInput";
+          return {
+            direction: document.documentElement.dir,
+            width: document.documentElement.scrollWidth,
+            viewport: innerWidth,
+            clipped: [...document.querySelectorAll(selector)]
+              .filter(
+                (element) =>
+                  visible(element) && element.clientWidth > 0 && element.scrollWidth > element.clientWidth + 2
+              )
+              .map((element) => ({
+                text: element.textContent.trim(),
+                id: element.id,
+                width: element.clientWidth,
+                scroll: element.scrollWidth
+              })),
+            wrappedTabs: [...document.querySelectorAll("#editorInspector [role=tab]")]
+              .filter((element) => {
+                const range = document.createRange();
+                range.selectNodeContents(element);
+                return [...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0).length > 1;
+              })
+              .map((element) => element.textContent.trim()),
+            sourceDirection: getComputedStyle(document.querySelector("#tmMatches .match-source")).direction,
+            targetDirection: getComputedStyle(document.querySelector("#tmMatches .match-target")).direction,
+            statusTextFits: (() => {
+              const select = document.querySelector("#segmentStatusFilter");
+              const style = getComputedStyle(select);
+              const canvas = document.createElement("canvas");
+              const context = canvas.getContext("2d");
+              context.font = style.font;
+              const textWidth = context.measureText(select.selectedOptions[0].textContent.trim()).width;
+              return textWidth + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + 16 <= select.clientWidth;
+            })(),
+            search: document.querySelector("#segmentSearchInput").getAttribute("placeholder")
+          };
+        });
+        if (
+          state.direction !== direction ||
+          state.width > state.viewport + 1 ||
+          state.clipped.length ||
+          (locale !== "ar" && state.wrappedTabs.length) ||
+          state.sourceDirection !== "ltr" ||
+          state.targetDirection !== "ltr" ||
+          (locale === "es-ES" && !state.statusTextFits) ||
+          !state.search ||
+          state.search === "Find in source or target"
+        )
+          throw Error(locale + " UI layout issue: " + JSON.stringify(state));
+        await capture("locale-" + locale + "-" + width);
+      }
+      results.push({ check: "Localized editor layout " + locale, passed: true });
+    }
+    await run(() => {
+      const select = document.querySelector("#uiLocaleSelect");
+      select.value = "en-US";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await wait(
+      "document.documentElement.lang === 'en-US' && document.querySelector('#inspectorTabMatches').textContent.trim() === 'Matches'",
+      "restore English"
+    );
+    win.setContentSize(1911, 1007);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const fuzzyDiff = await run(() => {
+      const matches = [...document.querySelectorAll("#tmMatches .match-card")];
+      const exact = matches.find((row) => row.querySelector(".match-score")?.textContent === "100%");
+      const fuzzy = matches.find((row) => row.textContent.includes("I have a good friend."));
+      const source = fuzzy?.querySelector(".match-source");
+      return {
+        exactHasDiff: !!exact?.querySelector(".match-diff-added, .match-diff-removed"),
+        removed: source?.querySelector("del")?.textContent,
+        added: source?.querySelector("ins")?.textContent,
+        before:
+          source &&
+          [...source.childNodes]
+            .filter((node) => node.nodeName !== "INS")
+            .map((node) => node.textContent)
+            .join(""),
+        after:
+          source &&
+          [...source.childNodes]
+            .filter((node) => node.nodeName !== "DEL")
+            .map((node) => node.textContent)
+            .join(""),
+        legend: getComputedStyle(document.querySelector(".match-diff-legend")).display,
+        removedLabel: source?.querySelector("del")?.getAttribute("title"),
+        addedLabel: source?.querySelector("ins")?.getAttribute("title")
+      };
+    });
+    if (
+      fuzzyDiff.exactHasDiff ||
+      fuzzyDiff.before !== "I have a good friend." ||
+      fuzzyDiff.after !== "I have a friend." ||
+      !fuzzyDiff.removed?.includes("good") ||
+      fuzzyDiff.legend === "none" ||
+      !fuzzyDiff.removedLabel
+    )
+      throw Error("Incorrect fuzzy source diff: " + JSON.stringify(fuzzyDiff));
+    results.push({
+      check: "TM fuzzy source differences show removals and additions with accessible labels",
+      passed: true
+    });
+    const replacement = await run(() => {
+      const source = [...document.querySelectorAll("#tmMatches .match-card .match-source")].find((el) =>
+        el.textContent.includes("manya")
+      );
+      return (
+        source && {
+          removed: [...source.querySelectorAll("del")].map((el) => el.textContent).join(" "),
+          added: [...source.querySelectorAll("ins")].map((el) => el.textContent).join(" "),
+          before: [...source.childNodes]
+            .filter((node) => node.nodeName !== "INS")
+            .map((node) => node.textContent)
+            .join(""),
+          after: [...source.childNodes]
+            .filter((node) => node.nodeName !== "DEL")
+            .map((node) => node.textContent)
+            .join("")
+        }
+      );
+    });
+    if (
+      !replacement ||
+      replacement.before !== "I have many friends." ||
+      replacement.after !== "I have a friend." ||
+      !replacement.removed.includes("many") ||
+      !replacement.added.includes("friend")
+    )
+      throw Error("Incorrect replacement: " + JSON.stringify(replacement));
+    await evaluate("document.documentElement.dataset.theme = 'dark'");
+    const darkDiff = await run(() => {
+      const removed = document.querySelector(".match-source .match-diff-removed");
+      const added = document.querySelector(".match-source .match-diff-added");
+      const a = getComputedStyle(removed),
+        b = getComputedStyle(added);
+      return {
+        removed: a.color,
+        added: b.color,
+        removedDecoration: a.textDecorationLine,
+        addedDecoration: b.textDecorationLine
+      };
+    });
+    if (
+      darkDiff.removed === darkDiff.added ||
+      !darkDiff.removedDecoration.includes("line-through") ||
+      !darkDiff.addedDecoration.includes("underline")
+    )
+      throw Error("Dark theme diff indistinguishable: " + JSON.stringify(darkDiff));
+    await capture("matches-dark");
+    await evaluate("document.documentElement.removeAttribute('data-theme')");
+    results.push({
+      check: "Replacement retains both versions and dark theme preserves visual distinctions",
+      passed: true
+    });
     await inspectLayout("wide layout");
     await capture("matches-wide");
 
@@ -341,6 +523,55 @@ app.whenReady().then(async () => {
     if (!/Trash\s*\([1-9]/.test(trashState)) throw Error("Term delete missing Trash: " + trashState);
     results.push({ check: "Delete removes match and retains recovery in Trash", passed: true });
 
+    const sourcePoint = await run(() => {
+      const cell = document.querySelector('#segmentBody tr[data-index="1"] .source-cell');
+      const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        const start = node.textContent.indexOf("many");
+        if (start < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, start);
+        range.setEnd(node, start + 4);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        const rect = range.getBoundingClientRect();
+        return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) };
+      }
+      throw Error("Selected source fixture not found");
+    });
+    win.webContents.sendInputEvent({ type: "mouseDown", button: "right", ...sourcePoint });
+    win.webContents.sendInputEvent({ type: "mouseUp", button: "right", ...sourcePoint });
+    await menuAction("Add to active termbase");
+    await wait("document.querySelector('#quickTermCaptureDialog').open", "source term capture");
+    const captured = await run(() => ({
+      source: document.querySelector("#quickTermSourceInput").value,
+      target: document.querySelector("#quickTermTargetInput").value,
+      active: document.querySelector("#segmentBody tr.active")?.dataset.index,
+      destination: document.querySelector("#quickTermCaptureMessage").textContent
+    }));
+    if (
+      captured.source !== "many" ||
+      captured.target !== "" ||
+      captured.active !== "1" ||
+      !captured.destination.includes("My Project terminology")
+    )
+      throw Error("Incorrect source capture: " + JSON.stringify(captured));
+    await run(() => {
+      document.querySelector("#quickTermTargetInput").value = "çok";
+      document.querySelector("#quickTermCaptureForm").requestSubmit();
+    });
+    await wait("!document.querySelector('#quickTermCaptureDialog').open", "source term saved");
+    const savedSource = await run(async () =>
+      (await window.CatHan.storage.getAll("terms")).find(
+        (term) => term.sourceTerm === "many" && term.targetTerm === "çok"
+      )
+    );
+    if (!savedSource || savedSource.termBaseName !== "My Project terminology")
+      throw Error("Term missing from active termbase: " + JSON.stringify(savedSource));
+    results.push({ check: "Selected source right-click saves to active termbase from another segment", passed: true });
+
     win.setContentSize(1280, 800);
     await new Promise((resolve) => setTimeout(resolve, 100));
     await inspectLayout("compact layout");
@@ -364,6 +595,80 @@ app.whenReady().then(async () => {
       passed: true,
       violations: axe.violations.map((v) => ({ id: v.id, impact: v.impact }))
     });
+    await clickPoint('#segmentBody tr[data-index="5"] .target-editor');
+    const tagCount = () => "document.querySelectorAll('#segmentBody tr[data-index=\"5\"] .tag-tray button').length";
+    await wait(tagCount() + " === 4", "four repeated tag suggestions");
+    for (const remaining of [3, 2, 1, 0]) {
+      await clickPoint('#segmentBody tr[data-index="5"] .tag-tray button');
+      await wait(tagCount() + " === " + remaining, "remaining tag suggestions " + remaining);
+      if (remaining === 3) {
+        const checkTagStyles = async (theme) => {
+          await run((selectedTheme) => {
+            if (selectedTheme === "dark") document.documentElement.dataset.theme = "dark";
+            else document.documentElement.removeAttribute("data-theme");
+          }, theme);
+          win.webContents.sendInputEvent({ type: "mouseMove", x: 5, y: 5 });
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          const styles = await run(() => {
+            const row = document.querySelector('#segmentBody tr[data-index="5"]');
+            const nodes = [
+              row.querySelector(".source-cell button.tag-chip-action"),
+              row.querySelector(".target-editor .target-protected-tag"),
+              row.querySelector(".tag-tray button.tag-chip-action")
+            ];
+            if (nodes.some((node) => !node)) throw Error("Missing tag in one of the three locations");
+            return nodes.map((node) => {
+              const css = getComputedStyle(node);
+              return {
+                color: css.color,
+                background: css.backgroundColor,
+                border: css.borderTopColor,
+                radius: css.borderTopLeftRadius,
+                themebg: css.getPropertyValue("--color-tag-background"),
+                themeborder: css.getPropertyValue("--color-tag-border"),
+                size: css.fontSize,
+                family: css.fontFamily,
+                weight: css.fontWeight,
+                height: node.getBoundingClientRect().height
+              };
+            });
+          });
+          if (
+            styles.some((style) => {
+              const { height, ...rest } = style;
+              const { height: firstHeight, ...first } = styles[0];
+              return JSON.stringify(rest) !== JSON.stringify(first) || Math.abs(height - firstHeight) > 1;
+            })
+          )
+            throw Error(theme + " tag styles differ: " + JSON.stringify(styles));
+        };
+        await checkTagStyles("light");
+        await capture("tag-design-light");
+        await checkTagStyles("dark");
+        await capture("tag-design-dark");
+        await evaluate("document.documentElement.removeAttribute('data-theme')");
+        results.push({
+          check: "Source, target and suggestion tags share appearance in light and dark themes",
+          passed: true
+        });
+      }
+    }
+    if (await evaluate("!!document.querySelector('#segmentBody tr[data-index=\"5\"] .tag-tray')"))
+      throw Error("Empty tag tray remains");
+    const tagTarget = await evaluate(
+      "document.querySelector('#segmentBody tr[data-index=\"5\"] .target-editor').value"
+    );
+    if ((tagTarget.match(/<b>/g) || []).length !== 2 || (tagTarget.match(/<\/b>/g) || []).length !== 2)
+      throw Error("Repeated tags not inserted: " + tagTarget);
+    await clickPoint('#segmentBody tr[data-index="5"] .target-editor');
+    win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Z", modifiers: ["control"] });
+    win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Z", modifiers: ["control"] });
+    await wait(tagCount() + " === 1", "undo restores missing tag suggestion");
+    results.push({
+      check: "Tag suggestions disappear per insertion, respect repeated tags and return on undo",
+      passed: true
+    });
+
     if (errors.length) throw Error("Renderer console errors: " + JSON.stringify(errors));
     console.log(JSON.stringify({ passed: true, output, results }, null, 2));
   } catch (error) {

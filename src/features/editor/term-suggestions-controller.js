@@ -102,6 +102,10 @@ export function createTermSuggestionsController(options) {
       function isCurrent() {
         return session.getProject()?.id === projectId && session.getActiveSegment()?.id === segmentId;
       }
+      for (const selector of [".term-source", ".term-target"]) {
+        const element = card.querySelector?.(selector);
+        if (element) element.dir = "auto";
+      }
       function insert() {
         if (!isCurrent() || forbidden || typeof target?.insert !== "function") return;
         return target.insert(term.targetTerm, {

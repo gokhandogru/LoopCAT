@@ -285,7 +285,10 @@ test("TmMatchesController preserves ordered safe match cards, fallbacks, and one
   assert.equal(harness.cards().length, 2);
   assert.match(harness.cards()[0].safeHtml, /class="match-score">97%/);
   assert.match(harness.cards()[0].safeHtml, /E\[Main <TM>\]/);
-  assert.match(harness.cards()[0].safeHtml, /E\[Source <one>\]/);
+  assert.match(harness.cards()[0].safeHtml, /E\[Source \]/);
+  assert.match(harness.cards()[0].safeHtml, /match-diff-removed/);
+  assert.match(harness.cards()[0].safeHtml, /E\[<one>\]/);
+  assert.match(harness.cards()[0].safeHtml, /match-diff-added/);
   assert.match(harness.cards()[0].safeHtml, /E\[Target & one\]/);
   assert.doesNotMatch(harness.cards()[0].safeHtml, /Project > one/);
   assert.match(harness.cards()[1].safeHtml, /82%/);

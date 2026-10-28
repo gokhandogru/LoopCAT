@@ -24,6 +24,13 @@
   --color-warning: #ffd28a;
   --color-warning-soft: #49351a;
   --color-danger: #ffabb3;
+  --color-diff-removed: #ffb8b8;
+  --color-diff-removed-bg: #4a252d;
+  --color-diff-added: #a0e2ba;
+  --color-diff-added-bg: #15392c;
+  --color-tag-border: #458f73;
+  --color-tag-background: #193e30;
+  --color-tag-text: #a9efd0;
   --color-danger-soft: #4a252d;
   --color-info: #aad6ff;
   --color-info-soft: #173a59;

@@ -1187,3 +1187,121 @@ html[dir="rtl"] :is(code, kbd, input[type="url"], input[type="password"]) {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* TM source differences: strike out TM-only text and underline current-only text. */
+.liquid-glass-edition .compact-match-row .match-diff-removed {
+  color: var(--color-diff-removed);
+  background: var(--color-diff-removed-bg);
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+.liquid-glass-edition .compact-match-row .match-diff-added {
+  color: var(--color-diff-added);
+  background: var(--color-diff-added-bg);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+@media (forced-colors: active) {
+  .liquid-glass-edition .compact-match-row .match-diff-added,
+  .liquid-glass-edition .compact-match-row .match-diff-removed {
+    color: CanvasText;
+    background: Canvas;
+  }
+}
+
+.liquid-glass-edition
+  .tm-panel:not(:has(.match-source .match-diff-added, .match-source .match-diff-removed))
+  .match-diff-legend {
+  display: none;
+}
+.liquid-glass-edition .tm-panel .match-diff-legend {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px 6px;
+  margin-inline-start: 5px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+.liquid-glass-edition .tm-panel .match-diff-legend .match-diff-removed {
+  color: var(--color-diff-removed);
+  background: var(--color-diff-removed-bg);
+  text-decoration: line-through;
+}
+.liquid-glass-edition .tm-panel .match-diff-legend .match-diff-added {
+  color: var(--color-diff-added);
+  background: var(--color-diff-added-bg);
+  text-decoration: underline;
+}
+@media (forced-colors: active) {
+  .liquid-glass-edition .tm-panel .match-diff-legend .match-diff-added,
+  .liquid-glass-edition .tm-panel .match-diff-legend .match-diff-removed {
+    color: CanvasText;
+    background: Canvas;
+  }
+}
+
+.liquid-glass-edition .compact-match-row .match-diff-removed + .match-diff-added {
+  margin-inline-start: 2px;
+}
+
+/* The same protected-token appearance across the source, target and tray. */
+.liquid-glass-edition
+  :is(.source-cell button.tag-chip-action, .tag-tray button.tag-chip-action, .target-editor .target-protected-tag),
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(.source-cell button.tag-chip-action, .tag-tray button.tag-chip-action, .target-editor .target-protected-tag) {
+  min-height: 18px;
+  height: auto;
+  padding: 1px 4px;
+  margin-inline: 1px;
+  border: 1px solid var(--color-tag-border);
+  border-radius: 5px;
+  background: var(--color-tag-background);
+  color: var(--color-tag-text);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.2;
+  vertical-align: baseline;
+  box-shadow: none;
+}
+.liquid-glass-edition :is(.source-cell button.tag-chip-action, .tag-tray button.tag-chip-action):hover,
+:root[data-theme="dark"]
+  .liquid-glass-edition
+  :is(.source-cell button.tag-chip-action, .tag-tray button.tag-chip-action):hover {
+  border-color: var(--color-tag-text);
+  background: var(--color-tag-background);
+  color: var(--color-tag-text);
+}
+@media (forced-colors: active) {
+  .liquid-glass-edition
+    :is(.source-cell button.tag-chip-action, .tag-tray button.tag-chip-action, .target-editor .target-protected-tag),
+  :root[data-theme="dark"]
+    .liquid-glass-edition
+    :is(.source-cell button.tag-chip-action, .tag-tray button.tag-chip-action, .target-editor .target-protected-tag) {
+    border-color: ButtonText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+/* Longer translated tab labels need more space without widening the inspector. */
+html[lang^="ca"] .liquid-glass-edition .inspector-tabs,
+html[lang^="es"] .liquid-glass-edition .inspector-tabs {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr) minmax(0, 0.95fr) minmax(0, 0.45fr) minmax(0, 1.3fr);
+}
+html[lang^="tr"] .liquid-glass-edition .inspector-tabs {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.4fr) minmax(0, 0.9fr);
+}
+html[lang^="ca"] .liquid-glass-edition .inspector-tabs button,
+html[lang^="es"] .liquid-glass-edition .inspector-tabs button,
+html[lang^="tr"] .liquid-glass-edition .inspector-tabs button {
+  height: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
+html[lang^="es"] .liquid-glass-edition .coordinated-editor #segmentStatusFilter {
+  flex: 0 0 160px;
+}

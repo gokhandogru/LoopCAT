@@ -22,7 +22,7 @@ pnpm verify:arabic
 pnpm dist:web
 ```
 
-Arabic validation rejects missing or blank entries and changed placeholders. Existing locales continue to use English fallback for new untranslated messages.
+Catalog validation rejects missing or blank entries and changed placeholders for all bundled UI locales. Technical identifiers, product names, format names and keyboard shortcuts are intentionally preserved.
 
 ## Writing conventions
 

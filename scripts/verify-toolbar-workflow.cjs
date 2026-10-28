@@ -188,7 +188,7 @@ app
         throw Error("Nested menu closed its parent");
       await evaluate("document.body.click();document.querySelector('#inspectorToggleBtn').click()");
       await capture("inspector-closed");
-      for (const locale of ["tr-TR", "ca-ES", "ar"]) {
+      for (const locale of ["tr-TR", "ca-ES", "es-ES", "ar"]) {
         await evaluate(
           "document.querySelector('#uiLocaleSelect').value=" +
             JSON.stringify(locale) +

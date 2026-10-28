@@ -138,7 +138,7 @@ function validate() {
           }
           const target = messages[key];
           if (locale.locale !== source.locale && !String(target || "").trim()) {
-            if (locale.locale === "ar") errors.push(`${name}:${key} has no Arabic translation.`);
+            errors.push(`${name}:${key} has no ${locale.locale} translation.`);
             return;
           }
           const placeholders = samePlaceholders(sourceMessages[key].message, target);

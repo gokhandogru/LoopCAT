@@ -1299,6 +1299,11 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
           const field = document.querySelector("#segmentBody .target-editor");
           field.setSelectionRange(4, 4);
           const before = field.value;
+          const suggestionDeadline = Date.now() + 3000;
+          while (!field.closest("tr").querySelector(".tag-tray button")) {
+            if (Date.now() >= suggestionDeadline) throw new Error("Missing tag suggestion did not appear after deletion");
+            await new Promise(resolve => setTimeout(resolve, 25));
+          }
           field.closest("tr").querySelector(".tag-tray button").click();
           const token = "<g id='friend'>";
           const expected = before.slice(0, 4) + token + before.slice(4);

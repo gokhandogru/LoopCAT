@@ -1,3 +1,4 @@
+import { installSourceTermContextMenu } from "../features/editor/source-term-context-menu.js";
 import { createMatchContextMenu } from "../ui/match-context-menu.js";
 import { createAiConsentDialog } from "../ui/ai-consent-dialog.js";
 import { createFileLifecycleService } from "../features/projects/file-lifecycle-service.js";
@@ -3136,6 +3137,19 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     preferences: appRuntime.preferencesRepository
   });
   quickTermCaptureController.mount();
+  installSourceTermContextMenu({
+    body: els.segmentBody,
+    window,
+    contextMenu: matchContextMenu,
+    session: {
+      getProject: editorSessionStore.getProject,
+      getSegments: editorSessionStore.getSegments,
+      getActiveSegment: applicationActiveSegmentService.get
+    },
+    navigation: { select: (index) => segmentNavigationController.select(index) },
+    capture: quickTermCaptureController,
+    localization: uiLocalizationService
+  });
   const targetProducerController = appRuntime.featureFactories.createTargetProducerController({
     copySourceElement: els.copySourceBtn,
     editorSessionStore,

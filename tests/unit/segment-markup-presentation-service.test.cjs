@@ -51,7 +51,11 @@ function fakeElement(ownerDocument, tagName = "div") {
       }
     },
     querySelector(selector) {
-      return queries.get(selector) || null;
+      return (
+        queries.get(selector) ||
+        (selector === ".tag-tray" ? element.children.find((child) => child.className === "tag-tray") : null) ||
+        null
+      );
     },
     setQuery(selector, value) {
       queries.set(selector, value);
@@ -73,6 +77,11 @@ function fakeElement(ownerDocument, tagName = "div") {
     dispatch(type, event = {}) {
       for (const listener of listeners.get(type) || []) listener.call(element, event);
       if (type === "click") element.onclick?.call(element, event);
+    },
+    remove() {
+      if (element.parentElement)
+        element.parentElement.children = element.parentElement.children.filter((child) => child !== element);
+      element.parentElement = null;
     },
     focus() {
       element.focused = true;
@@ -122,6 +131,10 @@ function createHarness(createSegmentMarkupPresentationService, overrides = {}) {
         calls.push(["sourceTags", segment]);
         if (overrides.sourceTagsError) throw overrides.sourceTagsError;
         return sourceTags;
+      },
+      missing(segment) {
+        calls.push(["missing", segment]);
+        return overrides.missing ? overrides.missing(segment) : sourceTags;
       },
       targetTags(segment) {
         calls.push(["targetTags", segment]);
@@ -315,7 +328,40 @@ test("SegmentMarkupPresentationService preserves tag tray guard, order, identity
   assert.equal(focusPreserved, true);
 
   const empty = createHarness(createSegmentMarkupPresentationService);
-  assert.equal(empty.service.renderTagTray({ querySelector: () => assert.fail("target queried") }, {}), undefined);
+  assert.equal(empty.service.renderTagTray({ querySelector: () => fakeElement(empty.document) }, {}), undefined);
+});
+
+test("Tag tray reconciles missing repeated tags and restores suggestions after removal", async () => {
+  const { createSegmentMarkupPresentationService } = await moduleAt(
+    "src/features/editor/segment-markup-presentation-service.js"
+  );
+  const { createProtectedTagInspectionService } = await moduleAt(
+    "src/features/editor/protected-tag-inspection-service.js"
+  );
+  const allTags = [{ text: "<b>" }, { text: "</b>" }, { text: "<b>" }, { text: "</b>" }];
+  const inspection = createProtectedTagInspectionService({ detectTags: () => allTags });
+  const { document, service } = createHarness(createSegmentMarkupPresentationService, {
+    missing: (segment) => inspection.missing(segment)
+  });
+  const row = fakeElement(document, "tr");
+  const cell = fakeElement(document);
+  row.setQuery(".target-cell", cell);
+  const segment = { source: "<b>x</b><b>y</b>", target: "" };
+  const labels = () => cell.children[0]?.children.map((chip) => chip.textContent) || [];
+  service.renderTagTray(row, segment);
+  assert.deepEqual(labels(), ["<b>", "</b>", "<b>", "</b>"]);
+  const originalTray = cell.children[0];
+  service.renderTagTray(row, segment);
+  assert.equal(cell.children[0], originalTray, "unchanged suggestions preserve focus");
+  segment.target = "<b>";
+  service.renderTagTray(row, segment);
+  assert.deepEqual(labels(), ["</b>", "<b>", "</b>"]);
+  segment.target = "<b></b><b></b>";
+  service.renderTagTray(row, segment);
+  assert.equal(cell.children.length, 0, "the empty tray is removed entirely");
+  segment.target = "<b></b><b>";
+  service.renderTagTray(row, segment);
+  assert.deepEqual(labels(), ["</b>"], "removed tags become available again");
 });
 
 test("SegmentMarkupPresentationService preserves target preview tag DOM, classes, and editing focus", async () => {
@@ -420,7 +466,7 @@ test("SegmentMarkupPresentationService preserves source failure boundaries and e
 
   const makeValidOptions = () => ({
     document: { createElement() {}, createTextNode() {} },
-    protectedTags: { displayText() {}, sourceTags() {}, targetTags() {} },
+    protectedTags: { displayText() {}, sourceTags() {}, targetTags() {}, missing() {} },
     terms: { ranges() {}, getProjectTerms() {} },
     navigation: { select() {} },
     targetProducer: { insertProtectedTag() {} }
@@ -430,6 +476,7 @@ test("SegmentMarkupPresentationService preserves source failure boundaries and e
     (options) => (options.document.createTextNode = null),
     (options) => (options.protectedTags.displayText = null),
     (options) => (options.protectedTags.sourceTags = null),
+    (options) => (options.protectedTags.missing = null),
     (options) => (options.protectedTags.targetTags = null),
     (options) => (options.terms.ranges = null),
     (options) => (options.terms.getProjectTerms = null),

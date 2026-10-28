@@ -330,7 +330,7 @@ async function main() {
       const residual = item.text
         .replace(/https?:\/\/\S+|(?:GET|POST)\s+\/\S+|antioch-review\.html|0\.0\.4-dev\.\d+|gpt-[\w.-]+/g, "")
         .replace(
-          /LoopCAT|OpenAI|Anthropic(?: Claude)?|DeepSeek|Google Gemini|Cohere Command|Mistral AI|xAI Grok|Perplexity Sonar|Sonar|Groq|Together AI|OpenRouter|Hugging Face(?: Inference Providers)?|DeepInfra|Fireworks AI|Ollama(?: Cloud)?|OPUS-CAT(?: MT)?|OPUS-MT|LM Studio|Azure|Node\.js|PowerShell|Codex|Gokhan Dogru|LinkedIn: gokhan-dogru-localization|Antioch TM|translategemma|default|API|CORS|URL|JSON|HTML|TMX|MiB|MB|GB|Ctrl\/Cmd\+Enter|Alt\+Enter|\b(?:en|ar|ca|de|es|fr|tr)\b/g,
+          /LoopCAT|OpenAI|Anthropic(?: Claude)?|DeepSeek|Google Gemini|Cohere Command|Mistral AI|xAI Grok|Perplexity Sonar|Sonar|Groq|Together AI|OpenRouter|Hugging Face(?: Inference Providers)?|DeepInfra|Fireworks AI|Ollama(?: Cloud)?|OPUS-CAT(?: MT)?|OPUS-MT|LM Studio|Azure|Node\.js|PowerShell|Codex|Gokhan Dogru|LinkedIn: gokhan-dogru-localization|Antioch TM|translategemma|default|API|CORS|URL|JSON|HTML|TMX|KiB|MiB|KB|MB|GB|Ctrl\/Cmd\+Enter|Alt\+Enter|\b(?:en|ar|ca|de|es|fr|tr)\b/g,
           ""
         );
       if (/[A-Za-z]{2}/.test(residual)) report.errors.push(`${s.name}: untranslated ${item.element}: ${item.text}`);

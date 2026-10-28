@@ -1,3 +1,5 @@
+import { diffMatchSource } from "./match-source-diff.js";
+
 /**
  * Owns active-segment TM-match lookup, stale-result suppression, localized safe
  * presentation, and target-insertion intent. Session records, TM selection and
@@ -108,12 +110,26 @@ export function createTmMatchesController(options) {
         match.safeToApply === false ? "Protected codes require manual review." : "Double-click or press Enter to insert"
       );
       const translatedTarget = match.adaptedTarget || match.target;
+      const sourceDiff = diffMatchSource(match.source, segment.source, session.getProject()?.sourceLang);
+      const diffHtml = sourceDiff
+        .map((part) => {
+          const escaped = text.escapeHtml(part.text);
+          if (part.kind === "equal") return escaped;
+          const label = localization.source(part.kind === "removed" ? "Only in TM source" : "Only in current source");
+          const tag = part.kind === "removed" ? "del" : "ins";
+          return `<${tag} class="match-diff-${part.kind}" title="${text.escapeHtml(label)}" aria-label="${text.escapeHtml(label + ": " + part.text)}">${escaped}</${tag}>`;
+        })
+        .join("");
       safeHtml.replace(
         card,
         `<header class="match-meta"><strong class="match-score">${match.id === "previous-source-version" ? text.escapeHtml(localization.source("Previous translation")) : `${Number(match.effectiveScore ?? match.score)}%`}</strong><span class="match-resource">${text.escapeHtml(match.tmName || match.resourceName || "")}</span></header>
-      <p class="match-source" dir="auto">${text.escapeHtml(match.source)}</p>
+      <p class="match-source" dir="auto">${diffHtml}</p>
       <p class="match-target" dir="auto"><strong>${text.escapeHtml(translatedTarget)}</strong></p>${match.safeToApply === false ? `<span class="match-warning">${text.escapeHtml(localization.source("Protected codes require manual review."))}</span>` : ""}${match.adaptedTarget ? `<span class="match-warning">${text.escapeHtml(localization.source("Adapted preview"))}</span>` : ""}`
       );
+      for (const selector of [".match-source", ".match-target"]) {
+        const element = card.querySelector?.(selector);
+        if (element) element.dir = "auto";
+      }
       function insert() {
         if (
           match.safeToApply === false ||

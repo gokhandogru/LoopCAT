@@ -3871,7 +3871,7 @@ for (const snippet of [
   "intl.getCanonicalLocales(clean)[0] || clean",
   "if (index === 0) return part.toLowerCase()",
   "if (part.length === 2 || /^\\d{3}$/.test(part)) return part.toUpperCase()",
-  'new intl.DisplayNames([getLocale() || getNavigatorLanguage() || "en"], { type: "language" })',
+  'new intl.DisplayNames([locale], { type: "language" })',
   '.normalize("NFKD")',
   '.replace(/[^\\p{L}\\p{N}]+/gu, "")',
   "if (catalogCache) return catalogCache",
@@ -11558,7 +11558,7 @@ assert(
 );
 for (const [method, count] of [
   ["appendSource", 1],
-  ["renderTagTray", 1],
+  ["renderTagTray", 2],
   ["renderTargetPreview", 2]
 ]) {
   assert(
@@ -15044,9 +15044,9 @@ for (const directConsumer of [
   );
 }
 assert(
-  appJs.split("segmentNavigationController.select(").length - 1 === 8 &&
+  appJs.split("segmentNavigationController.select(").length - 1 === 9 &&
     segmentRowPresentationServiceJs.includes('row.addEventListener("click", () => navigation.select(index))'),
-  "all eight application selection adapters and the checked row listener must route to SegmentNavigationController."
+  "all nine application selection adapters and the checked row listener must route to SegmentNavigationController."
 );
 assert(
   appWorkflowDriverJs.split("segmentNavigationController.select(").length - 1 === 24,
@@ -22129,8 +22129,8 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `application active-segment composition and consumers must retain ${boundary}.`);
 }
 assert(
-  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 31,
-  "all 31 application active-segment consumers must call ApplicationActiveSegmentService directly."
+  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 32,
+  "all 32 application active-segment consumers must call ApplicationActiveSegmentService directly."
 );
 assert(
   (appWorkflowDriverJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 9,

@@ -54671,6 +54671,264 @@
       "locations": [
         "src/features/editor/term-form-controller.js:123"
       ]
+    },
+    "auto.add.to.active.termbase.95dcb425": {
+      "message": "Add to active termbase",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/source-term-context-menu.js:34"
+      ]
+    },
+    "editor.term.capture.context.changed": {
+      "message": "The active project or termbase changed. Reopen term capture.",
+      "description": "Term capture project or destination changed.",
+      "locations": [
+        "src/features/editor/quick-term-capture-controller.js"
+      ]
+    },
+    "editor.diff.tm_only": {
+      "message": "TM only",
+      "description": "Fuzzy match source differences.",
+      "locations": [
+        "src/features/editor/tm-matches-controller.js",
+        "index.html"
+      ]
+    },
+    "editor.diff.current_only": {
+      "message": "Current only",
+      "description": "Fuzzy match source differences.",
+      "locations": [
+        "src/features/editor/tm-matches-controller.js",
+        "index.html"
+      ]
+    },
+    "editor.diff.tm_source": {
+      "message": "Only in TM source",
+      "description": "Fuzzy match source differences.",
+      "locations": [
+        "src/features/editor/tm-matches-controller.js",
+        "index.html"
+      ]
+    },
+    "editor.diff.current_source": {
+      "message": "Only in current source",
+      "description": "Fuzzy match source differences.",
+      "locations": [
+        "src/features/editor/tm-matches-controller.js",
+        "index.html"
+      ]
+    },
+    "editor.diff.legend": {
+      "message": "Source differences",
+      "description": "Fuzzy match source differences.",
+      "locations": [
+        "src/features/editor/tm-matches-controller.js",
+        "index.html"
+      ]
+    },
+    "auto.apply.source.update.44a76625": {
+      "message": "Apply source update",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/projects/file-management-controller.js:172"
+      ]
+    },
+    "auto.cancel.calculation.8210fb12": {
+      "message": "Cancel calculation",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/statistics/statistics-controller.js:162"
+      ]
+    },
+    "auto.context.matches.3bc3112b": {
+      "message": "Context matches",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/statistics/statistics-controller.js:12"
+      ]
+    },
+    "auto.continue.2e026239": {
+      "message": "Continue",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/ui/ai-consent-dialog.js:29"
+      ]
+    },
+    "auto.currency.must.be.text.421de536": {
+      "message": "Currency must be text.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/statistics/statistics-pricing.js:29"
+      ]
+    },
+    "auto.documentversions.60aa633e": {
+      "message": "documentVersions",
+      "description": "Generated interface text from src/features/import-export/project-export-build-service.js.",
+      "locations": [
+        "src/features/import-export/project-export-build-service.js:148",
+        "src/features/import-export/project-import-restore-controller.js:100",
+        "src/features/import-export/project-package-portability-service.js:142"
+      ]
+    },
+    "auto.filelifecyclereceipts.92bb481f": {
+      "message": "fileLifecycleReceipts",
+      "description": "Generated interface text from src/features/import-export/project-export-build-service.js.",
+      "locations": [
+        "src/features/import-export/project-export-build-service.js:148",
+        "src/features/import-export/project-import-restore-controller.js:100",
+        "src/features/import-export/project-package-portability-service.js:142"
+      ]
+    },
+    "auto.input.140f86aa": {
+      "message": "input",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/projects/file-management-controller.js:89"
+      ]
+    },
+    "auto.keep.current.for.all.conflicts.90ee76be": {
+      "message": "Keep current for all conflicts",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/projects/file-management-controller.js:154"
+      ]
+    },
+    "auto.move.files.to.trash.fb362af0": {
+      "message": "Move files to Trash",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/app/application-composition.js:6586"
+      ]
+    },
+    "auto.project.changed.5cd39cfd": {
+      "message": "Project changed.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/app/application-composition.js:6473"
+      ]
+    },
+    "auto.project.changed.during.import.retry.after..df4ee8e6": {
+      "message": "Project changed during import. Retry after reviewing the project.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/import-export/project-document-import-controller.js:94"
+      ]
+    },
+    "auto.rate.provided.must.be.true.or.false.9f75a8ee": {
+      "message": "Rate provided must be true or false.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/statistics/statistics-pricing.js:31"
+      ]
+    },
+    "auto.removed.69992f17": {
+      "message": "removed",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/tm-matches-controller.js:118"
+      ]
+    },
+    "auto.restore.files.from.trash.395afdbf": {
+      "message": "Restore files from Trash",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/app/application-composition.js:6587"
+      ]
+    },
+    "auto.retry.input.differs.from.the.committed.imp.e56685fd": {
+      "message": "Retry input differs from the committed import receipt.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/import-export/project-document-import-controller.js:343"
+      ]
+    },
+    "auto.segment.6a80eba8": {
+      "message": "segment",
+      "description": "Generated interface text from src/features/import-export/project-package-portability-service.js.",
+      "locations": [
+        "src/features/import-export/project-package-portability-service.js:148"
+      ]
+    },
+    "auto.select.at.most.50.files.per.batch.a12eb383": {
+      "message": "Select at most 50 files per batch.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/import-export/batch-import-controller.js:5"
+      ]
+    },
+    "auto.snapshot.storage.limit.reached.export.or.d.6dfa7328": {
+      "message": "Snapshot storage limit reached. Export or delete a saved snapshot first.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/app/application-composition.js:6477"
+      ]
+    },
+    "auto.the.combined.batch.size.must.not.exceed.10.35afc8bd": {
+      "message": "The combined batch size must not exceed 100 MiB.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/import-export/batch-import-controller.js:10"
+      ]
+    },
+    "auto.the.xliff.language.pair.differs.from.this..eb628b8e": {
+      "message": "The XLIFF language pair differs from this project.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/import-export/project-document-import-controller.js:283"
+      ]
+    },
+    "auto.this.report.segment.is.no.longer.available.6f308a2e": {
+      "message": "This report segment is no longer available in the project.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/app/application-composition.js:6452"
+      ]
+    },
+    "auto.trashentries.df50cd86": {
+      "message": "trashEntries",
+      "description": "Generated interface text from src/features/import-export/project-export-build-service.js.",
+      "locations": [
+        "src/features/import-export/project-export-build-service.js:148",
+        "src/features/import-export/project-import-restore-controller.js:100",
+        "src/features/import-export/project-package-portability-service.js:142"
+      ]
+    },
+    "auto.use.incoming.for.all.conflicts.1057dd7d": {
+      "message": "Use incoming for all conflicts",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/projects/file-management-controller.js:160"
+      ]
+    },
+    "auto.value1.must.be.a.finite.nonnegative.number.902fb897": {
+      "message": "{value1} must be a finite, nonnegative number.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/statistics/statistics-pricing.js:7"
+      ]
+    },
+    "auto.value1.must.be.a.number.between.0.and.valu.62e6ad7b": {
+      "message": "{value1} must be a number between 0 and {value2}.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/statistics/statistics-pricing.js:8"
+      ]
+    },
+    "auto.value1.value2.import.this.file.with.the.ex.7a66c9fd": {
+      "message": "{value1}: {value2} Import this file with the existing project languages?",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/import-export/batch-import-controller.js:208"
+      ]
+    },
+    "auto.versionsegments.6935f0cc": {
+      "message": "versionSegments",
+      "description": "Generated interface text from src/features/import-export/project-export-build-service.js.",
+      "locations": [
+        "src/features/import-export/project-export-build-service.js:148",
+        "src/features/import-export/project-import-restore-controller.js:100",
+        "src/features/import-export/project-package-portability-service.js:142"
+      ]
     }
   }
 }

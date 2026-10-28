@@ -196,3 +196,30 @@ test("LanguageInputService validates boundaries and exposes an immutable API", a
   const { service } = createHarness(createLanguageInputService);
   assert.equal(Object.isFrozen(service), true);
 });
+
+test("LanguageInputService localizes untranslated configured names using CLDR without inventing unknown names", async () => {
+  const { createLanguageInputService } = await moduleAt("src/i18n/language-input-service.js");
+  let locale = "tr-TR";
+  const service = createLanguageInputService({
+    entries: [
+      ["ace-ID", "Acehnese"],
+      ["aig-AG", "Antigua and Barbuda Creole English"],
+      ["ca-ES", "Catalan"]
+    ],
+    aliases: {},
+    redact: String,
+    localization: { source: (value) => value },
+    getLocale: () => locale,
+    getNavigatorLanguage: () => "en-US",
+    intl: Intl,
+    escapeHtml: String,
+    replaceSafeHtml() {}
+  });
+  assert.match(service.nameForUi("ace-ID"), /Açece/i);
+  assert.equal(service.nameForUi("aig-AG"), "Antigua and Barbuda Creole English");
+  assert.equal(service.normalizeInput(service.optionValue("ace-ID")), "ace-ID");
+  locale = "ca-ES";
+  assert.match(service.nameForUi("ace-ID"), /atjeh/i);
+  locale = "en-US";
+  assert.equal(service.nameForUi("ace-ID"), "Acehnese");
+});

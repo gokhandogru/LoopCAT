@@ -34,6 +34,7 @@ export function createQuickTermCaptureController(options) {
   let mounted = false;
   let busy = false;
   let rememberedLoaded = false;
+  let captureContext = null;
 
   async function loadRemembered() {
     if (rememberedLoaded) return;
@@ -96,11 +97,16 @@ export function createQuickTermCaptureController(options) {
     });
   }
 
-  async function open() {
+  async function open(captureOptions = {}) {
     await loadRemembered().catch(() => {});
     const project = session.getProject();
     const segment = session.getSegment();
     if (!project || !segment) return false;
+    if (
+      (captureOptions.projectId && captureOptions.projectId !== project.id) ||
+      (captureOptions.segmentId && captureOptions.segmentId !== segment.id)
+    )
+      return false;
     const active = activeLink(project);
     if (!active) {
       options.status?.set?.(
@@ -119,15 +125,29 @@ export function createQuickTermCaptureController(options) {
             editor?.value || segment.target,
             Number.isFinite(selectionStart) ? selectionStart : String(segment.target || "").length
           );
-    const selectedSource = String(options.selection?.sourceText?.() || "").trim();
+    const selectedSource = String(captureOptions.sourceText ?? options.selection?.sourceText?.() ?? "").trim();
+    const targetText = captureOptions.targetText ?? selectedTarget;
+    captureContext = {
+      projectId: project.id,
+      termBaseId: active.resourceId,
+      activeOnly: Boolean(captureOptions.activeOnly)
+    };
     sourceInput.value = selectedSource;
-    targetInput.value = selectedTarget;
+    targetInput.value = targetText;
     form.reset?.();
     sourceInput.value = selectedSource;
-    targetInput.value = selectedTarget;
+    targetInput.value = targetText;
     if (elements.message) elements.message.textContent = `Active termbase: ${active.cachedName || active.name}`;
     renderExtras(project);
-    await options.dialogLifecycle?.open?.("quick-term-capture", { initialFocus: sourceInput, returnTarget: editor });
+    if (captureOptions.activeOnly) {
+      extrasRoot.querySelectorAll?.("[data-extra-termbase]").forEach((input) => {
+        input.checked = false;
+      });
+    }
+    await options.dialogLifecycle?.open?.("quick-term-capture", {
+      initialFocus: captureOptions.sourceText ? targetInput : sourceInput,
+      returnTarget: editor
+    });
     if (!options.dialogLifecycle?.open) dialog.showModal?.();
     return true;
   }
@@ -140,6 +160,10 @@ export function createQuickTermCaptureController(options) {
     const project = session.getProject();
     const active = activeLink(project);
     if (!project || !active || busy) return false;
+    if (!captureContext || captureContext.projectId !== project.id || captureContext.termBaseId !== active.resourceId) {
+      options.status?.set?.("The active project or termbase changed. Reopen term capture.", "dirty");
+      return false;
+    }
     if (!sourceInput.value.trim() || !targetInput.value.trim()) {
       form.reportValidity?.();
       return false;
@@ -148,8 +172,10 @@ export function createQuickTermCaptureController(options) {
     elements.submit?.setAttribute?.("aria-busy", "true");
     try {
       const extraTermBaseIds = selectedExtraIds();
-      rememberedExtras.set(project.id, new Set(extraTermBaseIds));
-      persistRemembered();
+      if (!captureContext.activeOnly) {
+        rememberedExtras.set(project.id, new Set(extraTermBaseIds));
+        persistRemembered();
+      }
       const result = await repository.savePair({
         projectId: project.id,
         activeTermBaseId: active.resourceId,

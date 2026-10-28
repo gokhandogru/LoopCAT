@@ -8,6 +8,7 @@
  *   protectedTags: {
  *     displayText: (tag: any) => string,
  *     sourceTags: (segment: any) => any[],
+ *     missing: (segment: any) => any[],
  *     targetTags: (segment: any) => any[]
  *   },
  *   terms: {
@@ -34,6 +35,7 @@ export function createSegmentMarkupPresentationService(options) {
     typeof ownerDocument?.createTextNode !== "function" ||
     typeof protectedTags?.displayText !== "function" ||
     typeof protectedTags?.sourceTags !== "function" ||
+    typeof protectedTags?.missing !== "function" ||
     typeof protectedTags?.targetTags !== "function" ||
     typeof terms?.ranges !== "function" ||
     typeof terms?.getProjectTerms !== "function" ||
@@ -130,10 +132,17 @@ export function createSegmentMarkupPresentationService(options) {
   }
 
   function renderTagTray(row, segment) {
-    const tags = protectedTags.sourceTags(segment);
+    const tags = protectedTags.missing(segment);
+    const targetCell = row.querySelector(".target-cell");
+    if (!targetCell) return;
+    const existing = targetCell.querySelector(".tag-tray");
+    const signature = JSON.stringify(tags.map((tag) => [tag.text, tag.label, tag.type]));
+    if (existing?.dataset.tagSignature === signature) return;
+    existing?.remove();
     if (!tags.length) return;
     const tray = ownerDocument.createElement("div");
     tray.className = "tag-tray";
+    tray.dataset.tagSignature = signature;
     tags.forEach((tag) => {
       const chip = ownerDocument.createElement("button");
       chip.type = "button";
@@ -145,7 +154,6 @@ export function createSegmentMarkupPresentationService(options) {
       chip.addEventListener("click", (event) => insertAfterSelection(row, tag.text, event));
       tray.append(chip);
     });
-    const targetCell = row.querySelector(".target-cell");
     targetCell.append(tray);
   }
 
