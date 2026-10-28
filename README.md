@@ -32,7 +32,7 @@ The detailed distinction between shipped behavior, release blockers, near-term p
 ## New in the October 14 preview
 
 - **TMX translation files:** import TMX into a project through Import files or Other formats. Existing translations populate the target side; choose Draft or Confirmed per file. Empty targets remain empty. The project language pair selects the variants, with exact locale matches preferred.
-- **Complete TMX document workflow:** export edited TMX, update the source file, preserve version history, and retain bilingual text and status through project packages, backups and reopening. Import controls support English, Turkish, Catalan and Arabic.
+- **Complete TMX document workflow:** export edited TMX, update the source file, preserve version history, and retain bilingual text and status through project packages, backups and reopening. Import controls support English, Spanish, Turkish, Catalan and Arabic.
 
 ### Included from the October 12 preview
 
@@ -40,7 +40,7 @@ The detailed distinction between shipped behavior, release blockers, near-term p
 - **Statistics:** analyze a project, file, selected files, or selected segments in a separate window. Simple and Advanced views show source words, repetitions, exact/context/fuzzy TM matches, per-file and TM breakdowns, and exportable reports with saved baselines.
 - **Tag-aware matching:** count linguistic text separately from protected markup and apply explained formatting penalties. Unknown or incompatible tags block unsafe automatic insertion; vendor-specific memoQ/Trados percentage parity is not claimed.
 - **File management:** rename, update a source file, inspect and restore version history, export, or move files to Project Trash. Source replacement previews changes and preserves historical translations for recovery.
-- **Compact workspace:** coordinated editor rows keep search, Next unconfirmed and Confirm accessible; shared overlay menus, contextual selection, leading file checkboxes, aligned list columns, and wider file context work across supported themes and RTL layouts. New toolbar labels are available in English, Turkish, Catalan and Arabic.
+- **Compact workspace:** coordinated editor rows keep search, Next unconfirmed and Confirm accessible; shared overlay menus, contextual selection, leading file checkboxes, aligned list columns, and wider file context work across supported themes and RTL layouts. Toolbar labels are available in English, Spanish, Turkish, Catalan and Arabic.
 
 See the [release notes](docs/releases/0.0.4-dev.20261028.1.md), [Statistics implementation](docs/statistics-implementation-2026-10-11.md), and [UI verification](docs/workspace-ui-verification-20261012.md).
 
@@ -102,7 +102,7 @@ The following capabilities are implemented in the current codebase and covered b
 
 - Edit target segments in a CAT-style grid.
 - Use native browser/Electron spellcheck in target segment editors, with the desktop wrapper syncing spellcheck to the active project target language where the runtime supports it.
-- Choose the LoopCAT interface language from the Workspace menu, including built-in Arabic, Catalan, English, and Turkish, import custom UI translation JSON, and export the English UI source catalog for translators.
+- Choose the LoopCAT interface language from the Workspace menu, including built-in Arabic, Catalan, English, Spanish (Spain), and Turkish, import custom UI translation JSON, and export the English UI source catalog for translators.
 - Use System, Light, or Dark themes, Balanced or Compact density, Focus mode, and a remembered 280–420 px contextual inspector that becomes an overlay on narrower screens.
 - Open the fuzzy, grouped command palette with browser-safe `F2` or `Ctrl/Cmd+Shift+P`, navigate it with the keyboard, and reuse recent commands without adding permanent editor clutter.
 - Use the [keyboard-first translation workflow](docs/keyboard-shortcuts.md), including `Tab` predictive completion, `Alt+Insert` Quick Insert for full resource alternatives, `Ctrl/Cmd+Shift+G` term capture, `Ctrl/Cmd+Enter` confirmation, segment navigation, protected-tag insertion, search, review, QA, and structural commands. Without a visible completion, `Tab` still opens Quick Insert.
