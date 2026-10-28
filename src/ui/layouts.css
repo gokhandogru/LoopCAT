@@ -988,3 +988,202 @@ html[dir="rtl"] :is(code, kbd, input[type="url"], input[type="password"]) {
 :root[data-theme="dark"] .liquid-glass-edition .coordinated-editor .menu-panel :is(button, summary) {
   background: transparent;
 }
+
+/* Keep both match groups in view; each list scrolls only when it needs to. */
+.liquid-glass-edition .sidebar:has(#inspectorTabMatches[aria-selected="true"]) {
+  gap: 6px;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.liquid-glass-edition .sidebar .inspector-tabs {
+  flex-shrink: 0;
+}
+
+.liquid-glass-edition .sidebar [data-inspector-section="matches"] {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.liquid-glass-edition .sidebar .tm-panel {
+  flex: 3 1 0;
+}
+
+.liquid-glass-edition .sidebar .tb-panel {
+  flex: 2 1 0;
+}
+
+.liquid-glass-edition .sidebar [data-inspector-section="matches"].collapsed {
+  flex: 0 0 auto;
+}
+
+.liquid-glass-edition .sidebar [data-inspector-section="matches"].inspector-section-hidden {
+  display: none;
+}
+
+.liquid-glass-edition .sidebar [data-inspector-section="matches"] > .panel-header {
+  flex: 0 0 auto;
+  min-height: 32px;
+  margin: 0;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.liquid-glass-edition .sidebar [data-inspector-section="matches"] .panel-toggle {
+  min-height: 28px;
+  width: 24px;
+  min-width: 24px;
+}
+
+.liquid-glass-edition .sidebar [data-inspector-section="matches"] .panel-content {
+  min-height: 0;
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.liquid-glass-edition .sidebar [data-inspector-section="matches"].collapsed .panel-content {
+  display: none;
+}
+
+.liquid-glass-edition #tmMatches,
+.liquid-glass-edition #termSuggestions {
+  gap: 0;
+  align-content: start;
+  color: var(--color-text);
+}
+
+.liquid-glass-edition #tmMatches.muted,
+.liquid-glass-edition #termSuggestions.muted {
+  padding: 8px 10px;
+  color: var(--color-text-muted);
+}
+
+.liquid-glass-edition .sidebar .compact-match-row {
+  min-width: 0;
+  padding: 7px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--color-line);
+  border-radius: 0;
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  cursor: default;
+}
+
+.liquid-glass-edition .sidebar .compact-match-row:last-child {
+  border-bottom: 0;
+}
+
+.liquid-glass-edition .sidebar .compact-match-row:hover {
+  background: var(--color-surface-subtle);
+}
+
+.liquid-glass-edition .sidebar .compact-match-row:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+  background: var(--color-accent-soft);
+}
+
+.liquid-glass-edition .compact-match-row .match-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 3px;
+  font-size: var(--font-size-xs);
+}
+
+.liquid-glass-edition .compact-match-row .match-score {
+  flex: 0 0 auto;
+  color: var(--color-accent-hover);
+  font-variant-numeric: tabular-nums;
+}
+
+.liquid-glass-edition .compact-match-row .match-resource {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.liquid-glass-edition .compact-match-row .match-source,
+.liquid-glass-edition .compact-match-row .match-target {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.liquid-glass-edition .compact-match-row .term-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  margin: 0;
+  color: var(--color-text);
+  font-size: inherit;
+  overflow-wrap: anywhere;
+}
+
+.liquid-glass-edition .compact-match-row .term-target,
+.liquid-glass-edition .compact-match-row .match-target {
+  font-weight: 600;
+}
+
+.liquid-glass-edition .compact-match-row .term-warning,
+.liquid-glass-edition .compact-match-row .match-warning {
+  margin: 2px 0 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-xs);
+}
+
+.liquid-glass-edition .match-context-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 160px;
+  max-width: calc(100vw - 16px);
+  padding: 4px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  box-shadow: var(--elevation-transient);
+}
+
+.liquid-glass-edition .match-context-menu button {
+  display: block;
+  width: 100%;
+  min-height: 32px;
+  margin: 0;
+  padding: 4px 10px;
+  border: 0;
+  text-align: start;
+}
+
+.liquid-glass-edition .term-edit-dialog {
+  width: min(440px, calc(100vw - 32px));
+  padding: 20px;
+  color: var(--color-text);
+}
+
+.liquid-glass-edition .term-edit-dialog .term-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin: 0;
+}
+
+.liquid-glass-edition .term-edit-dialog label:not(.checkbox-row) {
+  display: grid;
+  gap: 4px;
+}
+
+.liquid-glass-edition .term-edit-dialog .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

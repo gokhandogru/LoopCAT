@@ -2707,6 +2707,15 @@
     "workspace.command.move.current.file.to.trash": "Moure el fitxer actual a la paperera",
     "tmx.import.existingTranslations": "Traduccions existents",
     "tmx.import.help": "La importació TMX utilitza el parell de llengües del projecte. Trieu Esborrany o Confirmat per a les traduccions existents; els segments sense traducció queden buits.",
-    "tmx.import.confirm": "Voleu importar les traduccions TMX existents com a confirmades? Trieu Cancel·la per mantenir-les com a esborranys. Els segments de destinació buits continuaran buits."
+    "tmx.import.confirm": "Voleu importar les traduccions TMX existents com a confirmades? Trieu Cancel·la per mantenir-les com a esborranys. Els segments de destinació buits continuaran buits.",
+    "auto.double.click.or.press.enter.to.insert.ff85c9b5": "Feu doble clic o premeu Retorn per inserir",
+    "auto.double.click.or.press.enter.to.insert.righ.21b9a7fd": "Feu doble clic o premeu Retorn per inserir. Feu clic amb el botó dret per veure les accions del terme.",
+    "auto.edit.term.418c6fe5": "Edita el terme",
+    "auto.match.action.failed.a798ce4f": "Ha fallat l’acció sobre la coincidència",
+    "auto.previous.source.version.review.before.use.0484f93c": "Versió anterior del text d’origen: reviseu-la abans d’utilitzar-la",
+    "auto.previous.translation.4be7337d": "Traducció anterior",
+    "auto.protected.codes.require.manual.review.50af2401": "Cal revisar manualment els codis protegits.",
+    "auto.save.changes.179359b3": "Desa els canvis",
+    "auto.the.active.project.changed.reopen.the.term.84e15a0f": "El projecte actiu ha canviat. Torneu a obrir el terme per editar-lo."
   }
 }

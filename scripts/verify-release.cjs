@@ -12717,12 +12717,12 @@ for (const snippet of [
   "session.getProject()?.id !== projectId || session.getActiveSegment()?.id !== segmentId",
   'root.classList.toggle("muted", !matches.length)',
   'root.textContent = localization.source("No TM matches.")',
-  'card.className = "match-card"',
-  'localization.labelHtml("matchPercent", { score: match.effectiveScore ?? match.score })',
+  'card.className = "match-card compact-match-row"',
+  "Number(match.effectiveScore ?? match.score)",
   'text.escapeHtml(match.tmName || match.resourceName || "")',
-  'match.projectName ? `<p class="muted">${text.escapeHtml(match.projectName)}</p>` : ""',
-  'button.textContent = localization.label("insert")',
-  "target.insert(match.adaptedTarget || match.target, {",
+  'card.addEventListener("dblclick", insert)',
+  'card.addEventListener("keydown", (event) => {',
+  "target.insert(translatedTarget, {",
   'channel: "match"',
   'resourceId: match.id || ""',
   "root.replaceChildren(fragment)",
@@ -12741,8 +12741,8 @@ assert(
     !tmMatchesControllerJs.includes("targetProducerController") &&
     !tmMatchesControllerJs.includes("findProjectTmMatches") &&
     !tmMatchesControllerJs.includes("projectTmNames") &&
-    !tmMatchesControllerJs.includes("button.type"),
-  "the checked TM-matches controller must use injected boundaries and preserve the omitted button type."
+    !tmMatchesControllerJs.includes('dom.createElement("button")'),
+  "the checked TM-matches controller must use injected boundaries and compact rows without visible action buttons."
 );
 for (const boundary of [
   "appRuntime.featureFactories.createTmMatchesController({",
@@ -12818,13 +12818,13 @@ for (const snippet of [
   "session.getProject()?.id !== projectId || session.getActiveSegment()?.id !== segmentId",
   'root.classList.toggle("muted", !suggestions.length)',
   'root.textContent = localization.source("No terms found in this segment.")',
-  'card.className = `term-card${term.isForbidden ? " forbidden-term-card" : ""}`',
-  'localization.labelHtml(term.isForbidden ? "forbidden" : "approved")',
+  'card.className = `term-card compact-match-row${forbidden ? " forbidden-term-card" : ""}`',
+  'localization.labelHtml("forbidden")',
   'text.escapeHtml(term.termBaseName || "")',
-  'term.notes ? `<p>${text.escapeHtml(term.notes)}</p>` : ""',
-  'if (!term.isForbidden && typeof target?.insert === "function")',
+  'card.addEventListener("contextmenu", openMenu)',
+  'if (!isCurrent() || forbidden || typeof target?.insert !== "function") return',
   "target.insert(term.targetTerm, {",
-  'button.textContent = localization.source("Delete")',
+  'label: localization.source("Delete")',
   "await mutation.deleteTerm(term, {",
   "refreshResourceView: false",
   "refreshSuggestions: true",
@@ -12844,8 +12844,8 @@ assert(
     !termSuggestionsControllerJs.includes("resourceMutationController") &&
     !termSuggestionsControllerJs.includes("findTerms") &&
     !termSuggestionsControllerJs.includes("projectTermBaseNames") &&
-    !termSuggestionsControllerJs.includes("button.type"),
-  "the checked term-suggestions controller must use injected boundaries and preserve the omitted button type."
+    !termSuggestionsControllerJs.includes('dom.createElement("button")'),
+  "the checked term-suggestions controller must use injected boundaries and offer actions through a context menu."
 );
 for (const boundary of [
   "appRuntime.featureFactories.createTermSuggestionsController({",
@@ -12857,7 +12857,9 @@ for (const boundary of [
   "localization: uiLocalizationService",
   "text: { escapeHtml: applicationTextSafetyService.escapeHtml }",
   "safeHtml: { replace: replaceSafeHtml }",
-  "mutation: { deleteTerm: (...args) => resourceMutationController.deleteTerm(...args) }",
+  "deleteTerm: (...args) => resourceMutationController.deleteTerm(...args)",
+  "editTerm: (term) => termFormController.edit(term)",
+  "contextMenu: matchContextMenu",
   "target: { insert: (...args) => targetProducerController.insertTermTarget(...args) }",
   "createElement: (tagName) => document.createElement(tagName)",
   "createFragment: () => document.createDocumentFragment()"
@@ -12908,7 +12910,7 @@ for (const snippet of [
   'throw new TypeError("TermFormController requires form elements and a project session boundary.")',
   'throw new TypeError("TermFormController requires termbase resource and repository boundaries.")',
   'throw new TypeError("TermFormController requires presentation, status, logger, and test-hook boundaries.")',
-  "if (!session.getProject() || !elements.source.value.trim() || !elements.target.value.trim()) return null",
+  "if (busy || !session.getProject() || !elements.source.value.trim() || !elements.target.value.trim()) return null",
   "const termBaseName = elements.termbase.value || resources.primaryName()",
   "testHooks.beforeSave()",
   "const term = await repository.save({",
@@ -12932,7 +12934,7 @@ for (const snippet of [
   "await save()",
   'elements.form.addEventListener("submit", handleSubmit)',
   'elements.form.removeEventListener("submit", handleSubmit)',
-  "return Object.freeze({ mount, save, unmount })"
+  "return Object.freeze({ mount, save, edit, cancel, unmount })"
 ]) {
   assertIncludes(
     termFormControllerJs,

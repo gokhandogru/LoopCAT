@@ -2706,6 +2706,15 @@
     "workspace.command.move.current.file.to.trash": "Move current file to Trash",
     "tmx.import.existingTranslations": "Existing translations",
     "tmx.import.help": "TMX uses the project language pair. Choose Draft or Confirmed for existing translations; missing translations stay empty.",
-    "tmx.import.confirm": "Import existing TMX translations as confirmed? Choose Cancel to keep them as drafts. Empty targets remain empty."
+    "tmx.import.confirm": "Import existing TMX translations as confirmed? Choose Cancel to keep them as drafts. Empty targets remain empty.",
+    "auto.double.click.or.press.enter.to.insert.ff85c9b5": "Double-click or press Enter to insert",
+    "auto.double.click.or.press.enter.to.insert.righ.21b9a7fd": "Double-click or press Enter to insert. Right-click for term actions.",
+    "auto.edit.term.418c6fe5": "Edit term",
+    "auto.match.action.failed.a798ce4f": "Match action failed",
+    "auto.previous.source.version.review.before.use.0484f93c": "Previous source version — review before use",
+    "auto.previous.translation.4be7337d": "Previous translation",
+    "auto.protected.codes.require.manual.review.50af2401": "Protected codes require manual review.",
+    "auto.save.changes.179359b3": "Save changes",
+    "auto.the.active.project.changed.reopen.the.term.84e15a0f": "The active project changed. Reopen the term to edit it."
   }
 }

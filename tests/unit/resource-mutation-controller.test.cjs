@@ -165,7 +165,8 @@ test("ResourceMutationController preserves TM and term patch, dirtiness, refresh
     sourceTerm: "source",
     targetTerm: "target",
     notes: "note",
-    isForbidden: true
+    isForbidden: true,
+    status: "forbidden"
   });
   assert.deepEqual(names(termHarness.calls).slice(-3), ["refreshResources", "refreshProjectTerms", "set"]);
 });
@@ -257,4 +258,47 @@ test("ResourceMutationController preserves whole-resource descriptor, affected I
     () => createResourceMutationController(),
     /requires session, repository, resource, command, Trash, presentation, and status/
   );
+});
+
+test("ResourceMutationController keeps forbidden flags and designation status consistent when editing terms", async () => {
+  const { createResourceMutationController } = await moduleAt("src/features/resources/resource-mutation-controller.js");
+  for (const [beforeStatus, beforeForbidden, checked, expectedStatus] of [
+    ["preferred", false, true, "forbidden"],
+    ["forbidden", true, false, "preferred"],
+    ["admitted", false, false, "admitted"],
+    ["admitted", false, true, "forbidden"]
+  ]) {
+    const harness = createHarness(createResourceMutationController);
+    const original = {
+      id: "term-existing",
+      resourceId: "original-resource",
+      sourceLang: "en",
+      targetLang: "tr",
+      termBaseName: "Original TB",
+      sourceTerm: "friend",
+      targetTerm: "arkadaş",
+      status: beforeStatus,
+      isForbidden: beforeForbidden,
+      forbidden: beforeForbidden,
+      definition: "Preserved definition"
+    };
+    assert.equal(
+      await harness.controller.saveTerm(original, {
+        sourceTerm: "friend",
+        targetTerm: "dost",
+        notes: "Revised",
+        isForbidden: checked
+      }),
+      true
+    );
+    const updated = firstCall(harness.calls, "updateTerm")[1];
+    assert.equal(updated.id, original.id);
+    assert.equal(updated.resourceId, original.resourceId);
+    assert.equal(updated.definition, original.definition);
+    assert.equal(updated.status, expectedStatus);
+    assert.equal(updated.isForbidden, checked);
+    assert.equal(updated.forbidden, checked);
+    assert.equal(original.status, beforeStatus);
+    assert.equal(original.isForbidden, beforeForbidden);
+  }
 });

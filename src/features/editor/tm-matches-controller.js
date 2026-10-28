@@ -99,61 +99,41 @@ export function createTmMatchesController(options) {
     const fragment = dom.createFragment();
     matches.forEach((match) => {
       const card = dom.createElement("article");
-      card.className = "match-card";
-      const matchKind = match.matchKind ? `${text.escapeHtml(match.matchKind)} · ` : "";
-      const sourceDifferenceSummary = (match.sourceDifferences || [])
-        .slice(0, 6)
-        .map((difference) => `${difference.source || "∅"} → ${difference.candidate || "∅"}`)
-        .join(", ");
-      const details = [
-        match.adjustments?.length
-          ? `<p class="muted">Text ${Number(match.textScore)}% · ${text.escapeHtml(match.adjustments.map((item) => `${item.reason}: −${item.points}`).join("; "))} · Final ${Number(match.effectiveScore)}%</p>`
-          : "",
-        match.penalty
-          ? `<p class="muted">Raw ${match.rawScore}% − ${match.penalty} penalty = ${match.effectiveScore}%</p>`
-          : "",
-        match.adaptedTarget
-          ? `<p class="adapted-match-preview"><span class="language-badge">Adapted preview</span> <strong>${text.escapeHtml(match.adaptedTarget)}</strong></p>`
-          : "",
-        match.provenance?.length > 1
-          ? `<p class="muted">Also found in ${match.provenance.length - 1} other resource${match.provenance.length === 2 ? "" : "s"}</p>`
-          : "",
-        sourceDifferenceSummary
-          ? `<p class="muted">Source differences: ${text.escapeHtml(sourceDifferenceSummary)}</p>`
-          : ""
-      ]
-        .filter(Boolean)
-        .join("\n      ");
+      card.className = "match-card compact-match-row";
+      card.tabIndex = 0;
+      card.setAttribute("data-match-id", String(match.id || ""));
+      card.setAttribute("role", "button");
+      card.setAttribute("aria-disabled", String(match.safeToApply === false));
+      card.title = localization.source(
+        match.safeToApply === false ? "Protected codes require manual review." : "Double-click or press Enter to insert"
+      );
+      const translatedTarget = match.adaptedTarget || match.target;
       safeHtml.replace(
         card,
-        `<header><strong>${match.id === "previous-source-version" ? text.escapeHtml(localization.source("Previous translation")) : localization.labelHtml("matchPercent", { score: match.effectiveScore ?? match.score })}</strong><span>${matchKind}${text.escapeHtml(match.tmName || match.resourceName || "")}</span></header>
-      <p>${text.escapeHtml(match.source)}</p>
-      <p><strong>${text.escapeHtml(match.target)}</strong></p>
-      ${details ? `${details}\n      ` : ""}${match.projectName ? `<p class="muted">${text.escapeHtml(match.projectName)}</p>` : ""}`
+        `<header class="match-meta"><strong class="match-score">${match.id === "previous-source-version" ? text.escapeHtml(localization.source("Previous translation")) : `${Number(match.effectiveScore ?? match.score)}%`}</strong><span class="match-resource">${text.escapeHtml(match.tmName || match.resourceName || "")}</span></header>
+      <p class="match-source" dir="auto">${text.escapeHtml(match.source)}</p>
+      <p class="match-target" dir="auto"><strong>${text.escapeHtml(translatedTarget)}</strong></p>${match.safeToApply === false ? `<span class="match-warning">${text.escapeHtml(localization.source("Protected codes require manual review."))}</span>` : ""}${match.adaptedTarget ? `<span class="match-warning">${text.escapeHtml(localization.source("Adapted preview"))}</span>` : ""}`
       );
-      const button = dom.createElement("button");
-      button.textContent = localization.label("insert");
-      button.disabled = match.safeToApply === false;
-      if (button.disabled) button.title = localization.source("Protected codes require manual review.");
-      button.addEventListener("click", () =>
-        target.insert(match.adaptedTarget || match.target, {
+      function insert() {
+        if (
+          match.safeToApply === false ||
+          session.getProject()?.id !== projectId ||
+          session.getActiveSegment()?.id !== segmentId
+        )
+          return;
+        return target.insert(translatedTarget, {
           channel: "match",
-          resourceId: match.id || ""
-        })
-      );
-      card.append(button);
-      if (match.adaptedTarget) {
-        const adaptedButton = dom.createElement("button");
-        adaptedButton.textContent = localization.source("Insert adapted");
-        adaptedButton.addEventListener("click", () =>
-          target.insert(match.adaptedTarget, {
-            channel: "match",
-            resourceId: match.id || "",
-            adapted: true
-          })
-        );
-        card.append(adaptedButton);
+          resourceId: match.id || "",
+          ...(match.adaptedTarget ? { adapted: true } : {})
+        });
       }
+      card.addEventListener("dblclick", insert);
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.repeat) {
+          event.preventDefault();
+          insert();
+        }
+      });
       fragment.append(card);
     });
     root.replaceChildren(fragment);

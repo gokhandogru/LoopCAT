@@ -2707,6 +2707,15 @@
     "workspace.command.move.current.file.to.trash": "Geçerli dosyayı çöp kutusuna taşı",
     "tmx.import.existingTranslations": "Mevcut çeviriler",
     "tmx.import.help": "TMX içe aktarımında projenin dil çifti kullanılır. Mevcut çeviriler için Taslak veya Onaylandı durumunu seçin; çevirisi olmayan hedefler boş kalır.",
-    "tmx.import.confirm": "Mevcut TMX çevirileri onaylanmış olarak içe aktarılsın mı? Taslak olarak tutmak için İptal seçeneğini seçin. Boş hedefler boş kalır."
+    "tmx.import.confirm": "Mevcut TMX çevirileri onaylanmış olarak içe aktarılsın mı? Taslak olarak tutmak için İptal seçeneğini seçin. Boş hedefler boş kalır.",
+    "auto.double.click.or.press.enter.to.insert.ff85c9b5": "Eklemek için çift tıklayın veya Enter tuşuna basın",
+    "auto.double.click.or.press.enter.to.insert.righ.21b9a7fd": "Eklemek için çift tıklayın veya Enter tuşuna basın. Terim işlemleri için sağ tıklayın.",
+    "auto.edit.term.418c6fe5": "Terimi düzenle",
+    "auto.match.action.failed.a798ce4f": "Eşleşme işlemi başarısız oldu",
+    "auto.previous.source.version.review.before.use.0484f93c": "Önceki kaynak sürümü — kullanmadan önce gözden geçirin",
+    "auto.previous.translation.4be7337d": "Önceki çeviri",
+    "auto.protected.codes.require.manual.review.50af2401": "Korumalı kodların elle gözden geçirilmesi gerekiyor.",
+    "auto.save.changes.179359b3": "Değişiklikleri kaydet",
+    "auto.the.active.project.changed.reopen.the.term.84e15a0f": "Etkin proje değişti. Terimi düzenlemek için yeniden açın."
   }
 }

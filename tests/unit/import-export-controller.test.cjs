@@ -403,3 +403,42 @@ test("ImportExportController owns validation timeout and reports rejected action
   });
   assert.deepEqual(failures, [["Backup failed", "export-backup"]]);
 });
+
+test("ImportExportController works without the removed sidebar resource file controls", async () => {
+  const { createImportExportController } = await moduleAt("src/features/import-export/import-export-controller.js");
+  const ownerDocument = fakeDocument();
+  const elements = importExportElements(ownerDocument);
+  for (const key of ["tmxImportInput", "tbxImportInput", "termListImportInput", "tmxExportButton", "tbxExportButton"]) {
+    elements[key] = null;
+  }
+  const calls = [];
+  const controller = createController(createImportExportController, elements, {
+    exportTargetText: () => calls.push("export-target"),
+    importProjectFile: (file) => calls.push(file.name)
+  });
+  assert.equal(controller.mount(), true);
+  controller.renderBusy(true);
+  assert.equal(controller.getState().busy, true);
+  for (const control of [
+    elements.projectFileImportInput,
+    elements.resourceTmxImportInput,
+    elements.resourceTbxImportInput,
+    elements.resourceTermListImportInput
+  ]) {
+    assert.equal(control.disabled, true);
+    assert.equal(control.getAttribute("aria-busy"), "true");
+  }
+  controller.renderBusy(false);
+  assert.equal(elements.resourceTmxImportInput.disabled, false);
+  assert.equal(elements.projectFileImportInput.disabled, false);
+  elements.exportTargetTextButton.click();
+  elements.projectFileImportInput.files = [{ name: "translation.txt" }];
+  elements.projectFileImportInput.dispatch("change");
+  await new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+  assert.deepEqual(calls, ["export-target", "translation.txt"]);
+  assert.equal(controller.unmount(), true);
+  elements.exportTargetTextButton.click();
+  assert.equal(calls.length, 2);
+});

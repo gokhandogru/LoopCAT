@@ -60,9 +60,9 @@ export function createImportExportController(options) {
   const localizationInput = requireElement(elements.localizationInput, "the localization-file input");
   const projectPackageImportInput = requireElement(elements.projectPackageImportInput, "the project-package input");
   const backupImportInput = requireElement(elements.backupImportInput, "the backup input");
-  const tmxImportInput = requireElement(elements.tmxImportInput, "the project TMX input");
-  const tbxImportInput = requireElement(elements.tbxImportInput, "the project TBX input");
-  const termListImportInput = requireElement(elements.termListImportInput, "the project term-list input");
+  const tmxImportInput = elements.tmxImportInput;
+  const tbxImportInput = elements.tbxImportInput;
+  const termListImportInput = elements.termListImportInput;
   const projectPackageExportButton = requireElement(
     elements.projectPackageExportButton,
     "the project-package export button"
@@ -82,8 +82,8 @@ export function createImportExportController(options) {
     elements.exportAnonymizedReportButton,
     "the anonymized-report button"
   );
-  const tmxExportButton = requireElement(elements.tmxExportButton, "the TMX export button");
-  const tbxExportButton = requireElement(elements.tbxExportButton, "the TBX export button");
+  const tmxExportButton = elements.tmxExportButton;
+  const tbxExportButton = elements.tbxExportButton;
   const backupExportButton = requireElement(elements.backupExportButton, "the browser-backup export button");
   const validationPanel = requireElement(elements.validationPanel, "the validation panel");
   const validationMeta = requireElement(elements.validationMeta, "the validation summary");
@@ -118,6 +118,7 @@ export function createImportExportController(options) {
   let currentState = Object.freeze({ busy: false, validationVisible: false, validationCount: 0 });
 
   function listen(target, eventType, listener) {
+    if (!target?.addEventListener) return;
     target.addEventListener(eventType, listener);
     listeners.push({ target, eventType, listener });
   }

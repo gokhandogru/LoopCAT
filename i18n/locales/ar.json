@@ -2707,6 +2707,15 @@
     "workspace.command.move.current.file.to.trash": "نقل الملف الحالي إلى سلة المحذوفات",
     "tmx.import.existingTranslations": "الترجمات الموجودة",
     "tmx.import.help": "يستخدم TMX زوج لغات المشروع. اختر مسودة أو مؤكدة للترجمات الموجودة؛ وتبقى المقاطع التي لا تتوفر لها ترجمة فارغة.",
-    "tmx.import.confirm": "هل تريد استيراد ترجمات TMX الموجودة بوصفها مؤكدة؟ اختر إلغاء للاحتفاظ بها كمسودات. تبقى المقاطع المستهدفة الفارغة فارغة."
+    "tmx.import.confirm": "هل تريد استيراد ترجمات TMX الموجودة بوصفها مؤكدة؟ اختر إلغاء للاحتفاظ بها كمسودات. تبقى المقاطع المستهدفة الفارغة فارغة.",
+    "auto.double.click.or.press.enter.to.insert.ff85c9b5": "انقر نقرًا مزدوجًا أو اضغط على Enter للإدراج",
+    "auto.double.click.or.press.enter.to.insert.righ.21b9a7fd": "انقر نقرًا مزدوجًا أو اضغط على Enter للإدراج. انقر بزر الفأرة الأيمن لعرض إجراءات المصطلح.",
+    "auto.edit.term.418c6fe5": "تحرير المصطلح",
+    "auto.match.action.failed.a798ce4f": "تعذّر تنفيذ إجراء المطابقة",
+    "auto.previous.source.version.review.before.use.0484f93c": "الإصدار السابق من النص المصدر — راجعه قبل الاستخدام",
+    "auto.previous.translation.4be7337d": "الترجمة السابقة",
+    "auto.protected.codes.require.manual.review.50af2401": "تتطلب الرموز المحمية مراجعة يدوية.",
+    "auto.save.changes.179359b3": "حفظ التغييرات",
+    "auto.the.active.project.changed.reopen.the.term.84e15a0f": "تغيّر المشروع النشط. أعد فتح المصطلح لتحريره."
   }
 }

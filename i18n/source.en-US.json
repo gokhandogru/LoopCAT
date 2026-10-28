@@ -54606,6 +54606,71 @@
       "locations": [
         "src/features/import-export/project-document-import-controller.js"
       ]
+    },
+    "auto.double.click.or.press.enter.to.insert.ff85c9b5": {
+      "message": "Double-click or press Enter to insert",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/tm-matches-controller.js:108"
+      ]
+    },
+    "auto.double.click.or.press.enter.to.insert.righ.21b9a7fd": {
+      "message": "Double-click or press Enter to insert. Right-click for term actions.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/term-suggestions-controller.js:95"
+      ]
+    },
+    "auto.edit.term.418c6fe5": {
+      "message": "Edit term",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "index.html",
+        "src/features/editor/term-suggestions-controller.js:121"
+      ]
+    },
+    "auto.match.action.failed.a798ce4f": {
+      "message": "Match action failed",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/app/application-composition.js:2281"
+      ]
+    },
+    "auto.previous.source.version.review.before.use.0484f93c": {
+      "message": "Previous source version — review before use",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/tm-matches-controller.js:87"
+      ]
+    },
+    "auto.previous.translation.4be7337d": {
+      "message": "Previous translation",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/tm-matches-controller.js:113"
+      ]
+    },
+    "auto.protected.codes.require.manual.review.50af2401": {
+      "message": "Protected codes require manual review.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/tm-matches-controller.js:108",
+        "src/features/editor/tm-matches-controller.js:115"
+      ]
+    },
+    "auto.save.changes.179359b3": {
+      "message": "Save changes",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.the.active.project.changed.reopen.the.term.84e15a0f": {
+      "message": "The active project changed. Reopen the term to edit it.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/term-form-controller.js:123"
+      ]
     }
   }
 }

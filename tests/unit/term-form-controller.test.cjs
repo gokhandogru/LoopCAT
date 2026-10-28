@@ -61,6 +61,11 @@ function createHarness(createTermFormController, overrides = {}) {
       }
     },
     repository: {
+      update(term, values) {
+        calls.push(["updateTerm", structuredClone(term), structuredClone(values)]);
+        if (overrides.updateError) throw overrides.updateError;
+        return overrides.updatePromise || Promise.resolve(overrides.updateResult ?? true);
+      },
       save(term) {
         calls.push(["saveTerm", structuredClone(term)]);
         if (overrides.saveError) throw overrides.saveError;
@@ -68,6 +73,12 @@ function createHarness(createTermFormController, overrides = {}) {
       }
     },
     presentation: {
+      openEditor(term) {
+        calls.push(["openEditor", term.id]);
+      },
+      closeEditor() {
+        calls.push(["closeEditor"]);
+      },
       renderTermbaseSelect() {
         calls.push(["renderTermbaseSelect"]);
         if (overrides.renderError) throw overrides.renderError;
@@ -375,4 +386,122 @@ test("TermFormController validates boundaries, preserves status failures, and ex
   const statusError = new Error("status failed");
   const failing = createHarness(createTermFormController, { beforeSaveError: new Error("save failed"), statusError });
   await assert.rejects(failing.controller.save(), statusError);
+});
+
+test("TermFormController edits the original term without adding a duplicate or losing metadata", async () => {
+  const { createTermFormController } = await loadFactory();
+  const harness = createHarness(createTermFormController);
+  const original = {
+    id: "term-existing",
+    resourceId: "tb-reference",
+    termBaseName: "Reference terms",
+    sourceTerm: "friend",
+    targetTerm: "arkadaş",
+    notes: "Existing note",
+    sourceLang: "en",
+    targetLang: "tr",
+    status: "preferred",
+    definition: "An existing definition",
+    isForbidden: false
+  };
+  assert.equal(harness.controller.edit(original), true);
+  assert.equal(harness.elements.source.value, "friend");
+  assert.equal(harness.elements.target.value, "arkadaş");
+  assert.equal(harness.elements.notes.value, "Existing note");
+  assert.equal(harness.elements.termbase.value, "Reference terms");
+  assert.equal(harness.elements.termbase.disabled, true);
+  assert.equal(harness.elements.forbidden.checked, false);
+  assert.deepEqual(harness.calls.at(-1), ["openEditor", "term-existing"]);
+  harness.elements.target.value = "dost";
+  harness.elements.notes.value = "Updated note";
+  harness.elements.forbidden.checked = true;
+  // Changing the selected termbase must never move an existing record.
+  harness.elements.termbase.value = "Another TB";
+  const saved = await harness.controller.save();
+  assert.equal(saved.id, "term-existing");
+  assert.equal(saved.resourceId, "tb-reference");
+  assert.equal(saved.definition, "An existing definition");
+  assert.equal(saved.targetTerm, "dost");
+  assert.equal(
+    harness.calls.some(([name]) => name === "saveTerm"),
+    false
+  );
+  assert.deepEqual(
+    harness.calls.find(([name]) => name === "updateTerm"),
+    ["updateTerm", original, { sourceTerm: "friend", targetTerm: "dost", notes: "Updated note", isForbidden: true }]
+  );
+  assert.equal(harness.elements.termbase.disabled, false);
+  assert.equal(harness.elements.target.value, "");
+  assert.ok(harness.calls.some(([name]) => name === "closeEditor"));
+  assert.ok(harness.calls.some(([name]) => name === "refreshSuggestions"));
+});
+
+test("TermFormController retains an edited term and its fields when persistence fails", async () => {
+  const { createTermFormController } = await loadFactory();
+  for (const options of [{ updateResult: false }, { updateError: new Error("Cannot update") }]) {
+    const harness = createHarness(createTermFormController, options);
+    harness.controller.edit({
+      id: "existing",
+      termBaseName: "Reference terms",
+      sourceTerm: "friend",
+      targetTerm: "arkadaş",
+      status: "forbidden"
+    });
+    assert.equal(harness.elements.forbidden.checked, true);
+    harness.elements.target.value = "dost";
+    assert.equal(await harness.controller.save(), null);
+    assert.equal(harness.elements.target.value, "dost");
+    assert.equal(harness.elements.termbase.disabled, true);
+    assert.equal(
+      harness.calls.some(([name]) => name === "closeEditor"),
+      false
+    );
+    assert.equal(
+      harness.calls.some(([name]) => name === "reset"),
+      false
+    );
+  }
+});
+
+test("TermFormController cancels editing without saving and will not update after a project switch", async () => {
+  const { createTermFormController } = await loadFactory();
+  const harness = createHarness(createTermFormController);
+  const term = { id: "existing", sourceTerm: "friend", targetTerm: "arkadaş", termBaseName: "Original TB" };
+  harness.controller.edit(term);
+  harness.setProject({ id: "p2", sourceLang: "fr", targetLang: "tr" });
+  assert.equal(await harness.controller.save(), null);
+  assert.equal(
+    harness.calls.some(([name]) => name === "updateTerm"),
+    false
+  );
+  assert.match(harness.calls.at(-1)[1], /active project changed/);
+  assert.equal(harness.controller.cancel(), true);
+  assert.equal(harness.elements.source.value, "");
+  assert.equal(harness.elements.termbase.disabled, false);
+  assert.equal(
+    harness.calls.some(([name]) => name === "saveTerm"),
+    false
+  );
+  assert.deepEqual(harness.calls.at(-1), ["closeEditor"]);
+});
+
+test("TermFormController suppresses duplicate saves and cancel while an edit is being saved", async () => {
+  const { createTermFormController } = await loadFactory();
+  let resolveUpdate;
+  const harness = createHarness(createTermFormController, {
+    updatePromise: new Promise((resolve) => {
+      resolveUpdate = resolve;
+    })
+  });
+  harness.elements.submit = { disabled: false };
+  harness.controller.edit({ id: "existing", sourceTerm: "friend", targetTerm: "arkadaş" });
+  const pending = harness.controller.save();
+  assert.equal(harness.elements.submit.disabled, true);
+  assert.equal(await harness.controller.save(), null);
+  assert.equal(harness.controller.cancel(), false);
+  assert.equal(harness.controller.edit({ id: "other" }), false);
+  assert.equal(harness.calls.filter(([name]) => name === "updateTerm").length, 1);
+  resolveUpdate(true);
+  assert.equal((await pending).id, "existing");
+  assert.equal(harness.elements.submit.disabled, false);
 });

@@ -71,7 +71,8 @@
     "dist:linux": "node scripts/build-desktop.cjs --linux AppImage deb",
     "verify:repository-downloads": "node scripts/verify-repository-downloads.cjs",
     "verify:arabic": "pnpm i18n:validate && pnpm build:renderer && node scripts/verify-arabic-ui.cjs",
-    "verify:ai-consent": "node scripts/verify-ai-consent-input.cjs"
+    "verify:ai-consent": "node scripts/verify-ai-consent-input.cjs",
+    "verify:matches": "node scripts/build-renderer.cjs && node scripts/verify-matches-sidebar.cjs"
   },
   "keywords": [
     "cat-tool",

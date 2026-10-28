@@ -13,7 +13,8 @@
  *   },
  *   text: { escapeHtml: (value: unknown) => string },
  *   safeHtml: { replace: (element: any, html: string) => unknown },
- *   mutation: { deleteTerm: (term: any, options: object) => Promise<unknown> | unknown },
+ *   mutation: { deleteTerm: (term: any, options: object) => Promise<unknown> | unknown, editTerm?: (term: any) => unknown },
+ *   contextMenu?: { open: (options: { event: any, anchor: any, items: any[] }) => unknown },
  *   target?: { insert: (target: string, options?: object) => Promise<unknown> | unknown },
  *   dom: { createElement: (tagName: string) => any, createFragment: () => any }
  * }} options
@@ -27,6 +28,7 @@ export function createTermSuggestionsController(options) {
   const safeHtml = options?.safeHtml;
   const mutation = options?.mutation;
   const target = options?.target;
+  const contextMenu = options?.contextMenu;
   const dom = options?.dom;
   if (
     !root?.classList ||
@@ -84,33 +86,61 @@ export function createTermSuggestionsController(options) {
     const fragment = dom.createFragment();
     suggestions.forEach((term) => {
       const card = dom.createElement("article");
-      card.className = `term-card${term.isForbidden ? " forbidden-term-card" : ""}`;
+      const forbidden = Boolean(term.isForbidden || term.status === "forbidden");
+      card.className = `term-card compact-match-row${forbidden ? " forbidden-term-card" : ""}`;
+      card.tabIndex = 0;
+      card.setAttribute("data-term-id", String(term.id || ""));
+      card.setAttribute("role", "button");
+      card.setAttribute("aria-disabled", String(forbidden || typeof target?.insert !== "function"));
+      if (contextMenu) card.setAttribute("aria-haspopup", "menu");
+      card.title = localization.source("Double-click or press Enter to insert. Right-click for term actions.");
       safeHtml.replace(
         card,
-        `<header><strong>${text.escapeHtml(term.sourceTerm)}</strong><span>${text.escapeHtml(term.targetTerm)}</span><span>${localization.labelHtml(term.isForbidden ? "forbidden" : "approved")}</span><span>${text.escapeHtml(term.termBaseName || "")}</span></header>
-      ${term.notes ? `<p>${text.escapeHtml(term.notes)}</p>` : ""}`
+        `<div class="term-pair"><span class="term-source" dir="auto">${text.escapeHtml(term.sourceTerm)}</span><strong class="term-target" dir="auto">${text.escapeHtml(term.targetTerm)}</strong></div>
+      <div class="match-meta"><span class="match-resource">${text.escapeHtml(term.termBaseName || "")}</span>${forbidden ? `<span class="term-warning">${localization.labelHtml("forbidden")}</span>` : ""}</div>`
       );
-      if (!term.isForbidden && typeof target?.insert === "function") {
-        const insertButton = dom.createElement("button");
-        insertButton.type = "button";
-        insertButton.textContent = localization.source("Insert");
-        insertButton.addEventListener("click", () =>
-          target.insert(term.targetTerm, {
-            resourceId: term.id || "",
-            sourceTerm: term.sourceTerm || ""
-          })
-        );
-        card.append(insertButton);
+      function isCurrent() {
+        return session.getProject()?.id === projectId && session.getActiveSegment()?.id === segmentId;
       }
-      const button = dom.createElement("button");
-      button.textContent = localization.source("Delete");
-      button.addEventListener("click", async () => {
-        await mutation.deleteTerm(term, {
-          refreshResourceView: false,
-          refreshSuggestions: true
+      function insert() {
+        if (!isCurrent() || forbidden || typeof target?.insert !== "function") return;
+        return target.insert(term.targetTerm, {
+          resourceId: term.id || "",
+          sourceTerm: term.sourceTerm || ""
         });
+      }
+      function openMenu(event) {
+        if (!isCurrent() || typeof contextMenu?.open !== "function") return;
+        event.preventDefault();
+        const items = [
+          {
+            label: localization.source("Insert"),
+            disabled: forbidden || typeof target?.insert !== "function",
+            action: insert
+          },
+          ...(typeof mutation.editTerm === "function"
+            ? [{ label: localization.source("Edit term"), action: () => isCurrent() && mutation.editTerm(term) }]
+            : []),
+          {
+            label: localization.source("Delete"),
+            action: async () => {
+              if (!isCurrent()) return;
+              await mutation.deleteTerm(term, { refreshResourceView: false, refreshSuggestions: true });
+            }
+          }
+        ];
+        return contextMenu.open({ event, anchor: card, items });
+      }
+      card.addEventListener("dblclick", insert);
+      card.addEventListener("contextmenu", openMenu);
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.repeat) {
+          event.preventDefault();
+          insert();
+        } else if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+          openMenu(event);
+        }
       });
-      card.append(button);
       fragment.append(card);
     });
     root.replaceChildren(fragment);

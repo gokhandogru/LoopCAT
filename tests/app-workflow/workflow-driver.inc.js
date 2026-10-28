@@ -5707,8 +5707,10 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     );
     workspaceDirtyStateController.clearAll();
     const suggestionCard = Array.from(els.termSuggestions.querySelectorAll(".term-card")).find((card) => card.textContent.includes("Hello"));
-    const suggestionDeleteButton = suggestionCard?.querySelector("button");
-    assert(Boolean(suggestionDeleteButton), "term suggestion delete button renders");
+    assert(Boolean(suggestionCard), "term suggestion card renders");
+    suggestionCard.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    const suggestionDeleteButton = Array.from(document.querySelectorAll('.match-context-menu [role="menuitem"]')).find((button) => button.textContent === uiLocalizationService.source("Delete"));
+    assert(Boolean(suggestionDeleteButton), "term suggestion context menu offers deletion");
     suggestionDeleteButton.click();
     await waitFor(() => state.workspaceDirtyProjectIds.has(project.id), "term suggestion delete dirty marker");
     assert(state.workspaceDirtyProjectIds.has(project.id), "term suggestion delete marks linked project package dirty");

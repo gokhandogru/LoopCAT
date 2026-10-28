@@ -18,6 +18,10 @@ function createNode(tagName, calls) {
     textContent: "",
     children: [],
     listeners: new Map(),
+    attributes: {},
+    setAttribute(name, value) {
+      this.attributes[name] = value;
+    },
     classes,
     classList: {
       add(name) {
@@ -279,20 +283,19 @@ test("TmMatchesController preserves ordered safe match cards, fallbacks, and one
   assert.equal(await harness.controller.refresh(), undefined);
   assert.equal(harness.root.classes.has("muted"), false);
   assert.equal(harness.cards().length, 2);
-  assert.equal(
-    harness.cards()[0].safeHtml,
-    '<header><strong>H:matchPercent:{"score":97}</strong><span>E[Main <TM>]</span></header>\n      <p>E[Source <one>]</p>\n      <p><strong>E[Target & one]</strong></p>\n      <p class="muted">E[Project > one]</p>'
-  );
-  assert.equal(
-    harness.cards()[1].safeHtml,
-    '<header><strong>H:matchPercent:{"score":82}</strong><span>E[]</span></header>\n      <p>E[Second]</p>\n      <p><strong>E[İkinci]</strong></p>\n      '
+  assert.match(harness.cards()[0].safeHtml, /class="match-score">97%/);
+  assert.match(harness.cards()[0].safeHtml, /E\[Main <TM>\]/);
+  assert.match(harness.cards()[0].safeHtml, /E\[Source <one>\]/);
+  assert.match(harness.cards()[0].safeHtml, /E\[Target & one\]/);
+  assert.doesNotMatch(harness.cards()[0].safeHtml, /Project > one/);
+  assert.match(harness.cards()[1].safeHtml, /82%/);
+  assert.deepEqual(
+    harness.cards().map((card) => card.children.length),
+    [0, 0]
   );
   assert.deepEqual(
-    harness.cards().map((card) => [card.className, card.children[0].type, card.children[0].textContent]),
-    [
-      ["match-card", "", "L:insert"],
-      ["match-card", "", "L:insert"]
-    ]
+    harness.cards().map((card) => card.tabIndex),
+    [0, 0]
   );
   assert.equal(harness.calls.filter(([name]) => name === "replaceChildren").length, 1);
   assert.deepEqual(harness.controller.getResults(), [
@@ -316,8 +319,8 @@ test("TmMatchesController preserves synchronous target insertion provenance, ID 
   ];
   const harness = createHarness(createTmMatchesController, { matches });
   await harness.controller.refresh();
-  assert.equal(harness.cards()[0].children[0].listeners.get("click")(), harness.insertionResult);
-  assert.equal(harness.cards()[1].children[0].listeners.get("click")(), harness.insertionResult);
+  assert.equal(harness.cards()[0].listeners.get("dblclick")(), harness.insertionResult);
+  assert.equal(harness.cards()[1].listeners.get("dblclick")(), harness.insertionResult);
   assert.deepEqual(
     harness.calls.filter(([name]) => name === "insert"),
     [
@@ -329,7 +332,7 @@ test("TmMatchesController preserves synchronous target insertion provenance, ID 
   const insertError = new Error("insert failed");
   const failing = createHarness(createTmMatchesController, { matches: [matches[0]], insertError });
   await failing.controller.refresh();
-  assert.throws(() => failing.cards()[0].children[0].listeners.get("click")(), insertError);
+  assert.throws(() => failing.cards()[0].listeners.get("dblclick")(), insertError);
 });
 
 test("TmMatchesController validates boundaries, propagates rendering failures, and exposes an immutable API", async () => {
@@ -363,4 +366,42 @@ test("TmMatchesController validates boundaries, propagates rendering failures, a
     failing.calls.some(([name]) => name === "replaceChildren"),
     false
   );
+});
+
+test("TmMatchesController keyboard insertion uses the displayed adaptation and blocks unsafe or stale matches", async () => {
+  const { createTmMatchesController } = await loadFactory();
+  const harness = createHarness(createTmMatchesController, {
+    matches: [
+      { id: "m1", source: "One", target: "Old", adaptedTarget: "New", score: 90 },
+      { id: "m2", source: "Unsafe", target: "Blocked", safeToApply: false, score: 99 }
+    ]
+  });
+  await harness.controller.refresh();
+  assert.match(harness.cards()[0].safeHtml, /E\[New\]/);
+  assert.doesNotMatch(harness.cards()[0].safeHtml, /E\[Old\]/);
+  let prevented = 0;
+  const keydown = harness.cards()[0].listeners.get("keydown");
+  keydown({
+    key: "Enter",
+    preventDefault() {
+      prevented++;
+    }
+  });
+  keydown({
+    key: "Enter",
+    repeat: true,
+    preventDefault() {
+      prevented++;
+    }
+  });
+  assert.equal(prevented, 1);
+  assert.deepEqual(
+    harness.calls.filter(([name]) => name === "insert"),
+    [["insert", "New", { channel: "match", resourceId: "m1", adapted: true }]]
+  );
+  harness.cards()[1].listeners.get("dblclick")();
+  assert.equal(harness.cards()[1].attributes["aria-disabled"], "true");
+  harness.setSegment({ id: "another" });
+  harness.cards()[0].listeners.get("dblclick")();
+  assert.equal(harness.calls.filter(([name]) => name === "insert").length, 1);
 });

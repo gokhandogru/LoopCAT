@@ -69,12 +69,15 @@ export function createResourceMutationController(options) {
   async function saveTerm(term, values) {
     try {
       testHooks.beforeSaveTerm?.(term);
+      const isForbidden = Boolean(values.isForbidden);
       await repositories.updateTerm({
         ...term,
         sourceTerm: values.sourceTerm,
         targetTerm: values.targetTerm,
         notes: values.notes,
-        isForbidden: values.isForbidden
+        isForbidden,
+        status: isForbidden ? "forbidden" : term.status === "admitted" ? "admitted" : "preferred",
+        ...(Object.hasOwn(term, "forbidden") ? { forbidden: isForbidden } : {})
       });
       resources.markProjectsUsingDirty("termbase", term.termBaseName, term.sourceLang, term.targetLang);
       await resources.refresh();

@@ -18,6 +18,10 @@ function createNode(tagName, calls) {
     textContent: "",
     children: [],
     listeners: new Map(),
+    attributes: {},
+    setAttribute(name, value) {
+      this.attributes[name] = value;
+    },
     classes,
     classList: {
       add(name) {
@@ -104,7 +108,16 @@ function createHarness(createTermSuggestionsController, overrides = {}) {
         element.safeHtml = html;
       }
     },
+    contextMenu: {
+      open(options) {
+        calls.push(["openMenu", options]);
+        return options;
+      }
+    },
     mutation: {
+      editTerm(term) {
+        calls.push(["editTerm", term]);
+      },
       deleteTerm(term, options) {
         calls.push(["deleteTerm", term, structuredClone(options)]);
         if (overrides.deleteError) throw overrides.deleteError;
@@ -280,20 +293,18 @@ test("TermSuggestionsController preserves ordered approved and forbidden safe ca
   assert.equal(await harness.controller.refresh(), undefined);
   assert.equal(harness.root.classes.has("muted"), false);
   assert.equal(harness.cards().length, 2);
-  assert.equal(
-    harness.cards()[0].safeHtml,
-    "<header><strong>E[Open <file>]</strong><span>E[Dosya & aç]</span><span>H:approved</span><span>E[Main <TB>]</span></header>\n      <p>E[Use > menu]</p>"
-  );
-  assert.equal(
-    harness.cards()[1].safeHtml,
-    "<header><strong>E[Never]</strong><span>E[Asla]</span><span>H:forbidden</span><span>E[]</span></header>\n      "
+  assert.match(harness.cards()[0].safeHtml, /E\[Open <file>\]/);
+  assert.match(harness.cards()[0].safeHtml, /E\[Dosya & aç\]/);
+  assert.match(harness.cards()[0].safeHtml, /E\[Main <TB>\]/);
+  assert.doesNotMatch(harness.cards()[0].safeHtml, /H:approved|Use > menu/);
+  assert.match(harness.cards()[1].safeHtml, /H:forbidden/);
+  assert.deepEqual(
+    harness.cards().map((card) => card.children.length),
+    [0, 0]
   );
   assert.deepEqual(
-    harness.cards().map((card) => [card.className, card.children[0].type, card.children[0].textContent]),
-    [
-      ["term-card", "", "S:Delete"],
-      ["term-card forbidden-term-card", "", "S:Delete"]
-    ]
+    harness.cards().map((card) => card.tabIndex),
+    [0, 0]
   );
   assert.equal(harness.calls.filter(([name]) => name === "replaceChildren").length, 1);
   assert.deepEqual(harness.controller.getResults(), suggestions);
@@ -310,10 +321,12 @@ test("TermSuggestionsController offers insertion only for approved terms", async
   await harness.controller.refresh();
 
   assert.deepEqual(
-    harness.cards().map((card) => card.children.map((button) => button.textContent)),
-    [["S:Insert", "S:Delete"], ["S:Delete"]]
+    harness.cards().map((card) => card.children.length),
+    [0, 0]
   );
-  assert.equal(harness.cards()[0].children[0].listeners.get("click")(), undefined);
+  assert.equal(harness.cards()[0].listeners.get("dblclick")(), undefined);
+  assert.equal(harness.cards()[1].listeners.get("dblclick")(), undefined);
+  assert.equal(harness.calls.filter(([name]) => name === "insertTerm").length, 1);
   assert.deepEqual(
     harness.calls.find(([name]) => name === "insertTerm"),
     ["insertTerm", "Aç", { resourceId: "t1", sourceTerm: "Open" }]
@@ -331,7 +344,8 @@ test("TermSuggestionsController preserves awaited deletion identity, options, un
     })
   });
   await harness.controller.refresh();
-  const action = harness.cards()[0].children[0].listeners.get("click")();
+  const menu = harness.cards()[0].listeners.get("contextmenu")({ preventDefault() {} });
+  const action = menu.items.find((item) => item.label === "S:Delete").action();
   assert.deepEqual(
     harness.calls.find(([name]) => name === "deleteTerm"),
     ["deleteTerm", term, { refreshResourceView: false, refreshSuggestions: true }]
@@ -351,7 +365,8 @@ test("TermSuggestionsController preserves awaited deletion identity, options, un
     deleteError
   });
   await failing.controller.refresh();
-  await assert.rejects(failing.cards()[0].children[0].listeners.get("click")(), deleteError);
+  const failingMenu = failing.cards()[0].listeners.get("contextmenu")({ preventDefault() {} });
+  await assert.rejects(failingMenu.items.find((item) => item.label === "S:Delete").action(), deleteError);
 });
 
 test("TermSuggestionsController validates boundaries, propagates rendering failures, and exposes an immutable API", async () => {
@@ -388,4 +403,49 @@ test("TermSuggestionsController validates boundaries, propagates rendering failu
     failing.calls.some(([name]) => name === "replaceChildren"),
     false
   );
+});
+
+test("TermSuggestionsController supports keyboard insertion and contextual editing without stale actions", async () => {
+  const { createTermSuggestionsController } = await loadFactory();
+  const term = { id: "t1", sourceTerm: "Open", targetTerm: "Aç" };
+  const harness = createHarness(createTermSuggestionsController, { suggestions: [term], withTarget: true });
+  await harness.controller.refresh();
+  const card = harness.cards()[0];
+  assert.equal(card.attributes["aria-haspopup"], "menu");
+  let prevented = 0;
+  const preventDefault = () => {
+    prevented++;
+  };
+  card.listeners.get("keydown")({ key: "Enter", preventDefault });
+  card.listeners.get("keydown")({ key: "Enter", repeat: true, preventDefault });
+  card.listeners.get("keydown")({ key: "F10", shiftKey: true, preventDefault });
+  const menu = harness.calls.find(([name]) => name === "openMenu")[1];
+  assert.deepEqual(
+    menu.items.map((item) => item.label),
+    ["S:Insert", "S:Edit term", "S:Delete"]
+  );
+  menu.items[1].action();
+  assert.deepEqual(
+    harness.calls.find(([name]) => name === "editTerm"),
+    ["editTerm", term]
+  );
+  assert.equal(prevented, 2);
+  harness.setSegment({ id: "another" });
+  await menu.items[2].action();
+  card.listeners.get("dblclick")();
+  assert.equal(harness.calls.filter(([name]) => name === "deleteTerm").length, 0);
+  assert.equal(harness.calls.filter(([name]) => name === "insertTerm").length, 1);
+});
+
+test("TermSuggestionsController disables forbidden insertion in the context menu too", async () => {
+  const { createTermSuggestionsController } = await loadFactory();
+  const harness = createHarness(createTermSuggestionsController, {
+    suggestions: [{ sourceTerm: "Never", targetTerm: "Asla", status: "forbidden" }],
+    withTarget: true
+  });
+  await harness.controller.refresh();
+  const menu = harness.cards()[0].listeners.get("contextmenu")({ preventDefault() {} });
+  assert.equal(menu.items[0].disabled, true);
+  menu.items[0].action();
+  assert.equal(harness.calls.filter(([name]) => name === "insertTerm").length, 0);
 });

@@ -1,3 +1,4 @@
+import { createMatchContextMenu } from "../ui/match-context-menu.js";
 import { createAiConsentDialog } from "../ui/ai-consent-dialog.js";
 import { createFileLifecycleService } from "../features/projects/file-lifecycle-service.js";
 import { createFileManagementController } from "../features/projects/file-management-controller.js";
@@ -2272,6 +2273,12 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     }
   });
 
+  const matchContextMenu = createMatchContextMenu({
+    document,
+    window,
+    onError: (error) => applicationSaveStatusController.set(error?.message || "Match action failed", "dirty")
+  });
+
   const termSuggestionsController = appRuntime.featureFactories.createTermSuggestionsController({
     root: els.termSuggestions,
     session: {
@@ -2286,7 +2293,11 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     localization: uiLocalizationService,
     text: { escapeHtml: applicationTextSafetyService.escapeHtml },
     safeHtml: { replace: replaceSafeHtml },
-    mutation: { deleteTerm: (...args) => resourceMutationController.deleteTerm(...args) },
+    contextMenu: matchContextMenu,
+    mutation: {
+      deleteTerm: (...args) => resourceMutationController.deleteTerm(...args),
+      editTerm: (term) => termFormController.edit(term)
+    },
     target: { insert: (...args) => targetProducerController.insertTermTarget(...args) },
     dom: {
       createElement: (tagName) => document.createElement(tagName),
@@ -2301,7 +2312,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       target: els.targetTermInput,
       notes: els.termNotesInput,
       termbase: els.termBaseSelect,
-      forbidden: els.termForbiddenInput
+      forbidden: els.termForbiddenInput,
+      submit: document.querySelector("#termSaveBtn"),
+      cancel: document.querySelector("#termCancelBtn")
     },
     session: { getProject: editorSessionStore.getProject },
     resources: {
@@ -2309,6 +2322,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       markProjectsUsingDirty: workspaceDirtyStateController.markProjectsUsingResource
     },
     repository: {
+      update: (term, values) => resourceMutationController.saveTerm(term, values),
       save: async (term) => {
         const project = editorSessionStore.getProject();
         const activeTermBaseId = project?.activeTermBaseId || null;
@@ -2327,6 +2341,8 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       }
     },
     presentation: {
+      openEditor: () => dialogLifecycleController.open("term-edit", { initialFocus: els.sourceTermInput }),
+      closeEditor: () => dialogLifecycleController.close("term-edit"),
       renderTermbaseSelect: termbaseSelectPresentationController.render,
       refreshProjectTerms: projectTermRefreshController.refresh,
       refreshSuggestions: termSuggestionsController.refresh
@@ -2340,6 +2356,13 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
         }
       }
     }
+  });
+
+  dialogLifecycleController.register({
+    id: "term-edit",
+    dialog: document.querySelector("#termEditDialog"),
+    initialFocus: els.sourceTermInput,
+    onClose: () => termFormController.cancel()
   });
 
   const projectDomainController = appRuntime.featureFactories.createProjectDomainController({

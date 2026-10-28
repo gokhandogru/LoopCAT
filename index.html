@@ -792,18 +792,6 @@
                 </button>
                 <h2>TM Matches</h2>
               </div>
-              <div class="mini-actions">
-                <details class="menu resource-mini-menu">
-                  <summary>Files</summary>
-                  <div class="menu-panel">
-                    <label class="menu-item">
-                      Import TMX
-                      <input id="tmxImportInput" type="file" accept=".tmx,application/xml,text/xml" />
-                    </label>
-                    <button id="tmxExportBtn" type="button">Export TMX</button>
-                  </div>
-                </details>
-              </div>
             </div>
             <div class="panel-content">
               <div id="tmMatches" class="result-list muted">No active segment.</div>
@@ -831,40 +819,9 @@
                 </button>
                 <h2>Termbases</h2>
               </div>
-              <div class="mini-actions">
-                <details class="menu resource-mini-menu">
-                  <summary>Files</summary>
-                  <div class="menu-panel">
-                    <label class="menu-item">
-                      Import TBX
-                      <input id="tbxImportInput" type="file" accept=".tbx,application/xml,text/xml" />
-                    </label>
-                    <label class="menu-item">
-                      Import CSV/TSV/XLSX
-                      <input
-                        id="termListImportInput"
-                        type="file"
-                        accept=".csv,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                      />
-                    </label>
-                    <button id="tbxExportBtn" type="button">Export TBX</button>
-                  </div>
-                </details>
-              </div>
             </div>
             <div class="panel-content">
               <div id="termSuggestions" class="result-list muted">No terms yet.</div>
-              <form id="termForm" class="term-form">
-                <select id="termBaseSelect" aria-label="Termbase"></select>
-                <input id="sourceTermInput" placeholder="Source term" aria-label="Source term" />
-                <input id="targetTermInput" placeholder="Target term" aria-label="Target term" />
-                <input id="termNotesInput" placeholder="Notes" aria-label="Term notes" />
-                <label class="checkbox-row term-forbidden-row">
-                  <input id="termForbiddenInput" type="checkbox" />
-                  Forbidden target
-                </label>
-                <button type="submit">Add term</button>
-              </form>
             </div>
           </section>
 
@@ -1537,6 +1494,23 @@
       aria-label="Translation suggestions"
     ></div>
     <div id="predictiveTypingAnnouncer" class="sr-only" role="status" aria-live="polite"></div>
+
+    <dialog id="termEditDialog" class="term-edit-dialog" aria-labelledby="termEditTitle">
+      <h2 id="termEditTitle">Edit term</h2>
+      <form id="termForm" class="term-form">
+        <label>Termbase<select id="termBaseSelect" aria-label="Termbase"></select></label>
+        <label>Source term<input id="sourceTermInput" aria-label="Source term" required /></label>
+        <label>Target term<input id="targetTermInput" aria-label="Target term" required /></label>
+        <label>Notes<input id="termNotesInput" aria-label="Term notes" /></label>
+        <label class="checkbox-row term-forbidden-row">
+          <input id="termForbiddenInput" type="checkbox" /> Forbidden target
+        </label>
+        <div class="dialog-actions">
+          <button id="termCancelBtn" type="button">Cancel</button>
+          <button id="termSaveBtn" type="submit" class="primary">Save changes</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog id="quickTermCaptureDialog" class="quick-term-capture-dialog" aria-labelledby="quickTermCaptureTitle">
       <form id="quickTermCaptureForm" class="dialog-card" method="dialog">
