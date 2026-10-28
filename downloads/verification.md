@@ -1,17 +1,16 @@
-# LoopCAT 0.0.4-dev.20261021.1 verification
+# LoopCAT 0.0.4-dev.20261028.1 verification
 
-Verified on 21 October 2026. Build ID: `0.0.4-dev.20261021.1+source.5a76fed8ef8d`. Source commit: `1aa1cfc5ded46e8aee35b0c9643a55afde8399b5`.
+Verified on 28 October 2026. Source commit: `7c1e6c382ee37ccafbdc30e1d8f71f5029e3b8a1`.
 
-The Windows and web repository ZIPs are byte-for-byte copies of the verified GitHub Actions artifacts. Their build receipts match the same source fingerprint. See the [manifest](release.json), [release notes](../docs/releases/0.0.4-dev.20261021.1.md), [all-platform release](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20261021.1), and [successful release run](https://github.com/gokhandogru/LoopCAT/actions/runs/39586253860).
+The Windows and web repository ZIPs are byte-for-byte copies of the verified GitHub Actions artifacts. Their build receipts match the same source fingerprint. See the [manifest](release.json), [release notes](../docs/releases/0.0.4-dev.20261028.1.md), [all-platform release](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20261028.1), and [successful release run](https://github.com/gokhandogru/LoopCAT/actions/runs/40686994118).
 
 Verification:
 
-- All 1,576 unit tests, lint, formatting, type checks, styles, import boundaries, accessibility checks, full browser suites and release-contract checks passed on the native Windows, macOS and Linux runners.
-- The Windows AI consent regression passed acceptance, cancellation, Escape, duplicate-request prevention, focus restoration and immediate keyboard input in segment and terminology fields. The application workflow also exercises the new dialog and verifies that cancellation prevents sending text and saving changed credentials/settings.
-- The focused Statistics regression passed locally: 20-file analysis, weighted pricing, report persistence, CSV/HTML/JSON exports, project-package roundtrip, incomplete-result handling, corrupt-file isolation, immutable baselines, scope changes, dark theme and narrow RTL layout.
-- Packaged desktop launch tests, artifact contents, Electron security fuses, preview artifact selection and checksums passed on all three desktop platforms. The Windows TMX workflow also passed.
+- Static quality gates, unit tests, accessibility checks, browser workflows and release-contract checks passed on the Windows, macOS and Linux runners.
+- Packaged desktop launch tests, artifact contents, Electron security fuses, preview artifact selection and checksums passed on all three desktop platforms.
 - The web ZIP passed payload checks and direct-file/HTTP workflow smoke tests.
-- All nine native/web application packages passed the combined release-bundle gate. The additional Linux ZIP contains byte-for-byte copies of the AppImage and DEB; both extracted payload hashes were verified. The public checksum list covers all ten packages.
+- The all-platform release-bundle gate passed. The additional Linux ZIP contains byte-for-byte copies of the verified AppImage and DEB; both extracted payload hashes were checked. The public checksum list covers all ten packages.
+- The localized editor and toolbar checks covered Spanish, Catalan, Turkish and Arabic. Spanish catalog tests checked locale selection, placeholders and plural forms.
 
 Packages: web ZIP; Windows x64 installer and portable EXEs plus ZIP wrappers; macOS Apple Silicon DMG and ZIP; Linux x64 AppImage, DEB and a ZIP containing both.
 
