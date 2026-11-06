@@ -411,6 +411,24 @@ async function confirmSegmentWithMainTm(project, segment, context = {}) {
   return result;
 }
 
+async function updateConfirmedSegmentWithMainTm(project, segment, context = {}) {
+  const snapshot = structuredClone(segment);
+  const result = await serializeConfirmation(async () => {
+    if (snapshot.status !== "confirmed" || snapshot.projectId !== project?.id) {
+      throw new Error("Only confirmed segments from this project can update the TM.");
+    }
+    const link = (project.resourceLinks || []).find((item) => item.type === "tm" && item.role === "main");
+    const resource = link?.resourceId ? await get("resources", link.resourceId) : null;
+    if (!resource || resource.type !== "tm") throw new Error("Choose a main translation memory in project settings.");
+    if (languagePairOf(resource) !== languagePairFromFields(project.sourceLang, project.targetLang)) {
+      throw new Error("The main translation memory languages do not match this project.");
+    }
+    return commitSegmentWithMainTm(project, snapshot, { ...context, bulkUpdate: true });
+  });
+  acknowledgeSegmentCommit(segment, result.segment);
+  return result;
+}
+
 function serializeConfirmation(action) {
   // Two rapid confirmations can both read the same resource/contribution
   // versions before either commits. Keep their read/modify/write phases ordered.
@@ -474,7 +492,7 @@ async function commitSegmentWithMainTm(project, segment, context) {
     updatedAt: now,
     createdAt: existingContribution?.createdAt || now
   };
-  const segmentRecord = { ...segment, updatedAt: now };
+  const segmentRecord = context.bulkUpdate ? { ...segment } : { ...segment, updatedAt: now };
   const indexRecords = existingEntry ? [] : indexRecordsForEntry(entry);
   const changes = [
     { store: "segments", value: segmentRecord },
@@ -496,9 +514,9 @@ async function commitSegmentWithMainTm(project, segment, context) {
       );
     }
   }
-  const committed = await commitMutation(null, null, { changes, rebaseLocal: true });
+  const committed = await commitMutation(null, null, { changes, rebaseLocal: !context.bulkUpdate });
   const savedSegment = committed.values[0] || segmentRecord;
-  return { segment: savedSegment, entry: committed.values[1] || entry, contribution: committed.values[2] || contribution };
+  return { segment: savedSegment, entry: committed.values[1] || entry, contribution: committed.values[2] || contribution, created: !existingEntry };
 }
 
 async function restoreSegmentWithMainTm(project, segment, context = {}) {
@@ -819,6 +837,7 @@ async function listTmEntries(options = {}) {
   rebuildTmIndex,
   rebuildAllTmIndexes,
   saveTmEntry,
+  updateConfirmedSegmentWithMainTm,
     confirmSegmentWithMainTm,
     restoreSegmentWithMainTm,
   importTmEntries,

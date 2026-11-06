@@ -9,6 +9,33 @@ const { IDBFactory, IDBKeyRange } = require("fake-indexeddb");
 const root = path.resolve(__dirname, "../..");
 const load = (file) => import(pathToFileURL(path.join(root, file)).href);
 
+test("bulk confirmed TM update is idempotent, preserves status and locks, and rejects incompatible resources", async (t) => {
+  const h = await harness(t);
+  await h.storage.put("resources", {
+    ...(await h.storage.get("resources", "main")),
+    sourceLang: "en",
+    targetLang: "tr"
+  });
+  const segment = h.segments[0];
+  Object.assign(segment, { target: "Arkadaş", status: "confirmed", locked: true });
+  Object.assign(segment, await h.storage.put("segments", segment));
+  const first = await h.tm.updateConfirmedSegmentWithMainTm(h.project, segment);
+  assert.equal(first.created, true);
+  const second = await h.tm.updateConfirmedSegmentWithMainTm(h.project, segment);
+  assert.equal(second.created, false);
+  assert.equal((await h.storage.getAll("tmEntries")).length, 1);
+  assert.equal((await h.storage.getAll("tmContributions")).length, 1);
+  assert.equal(segment.status, "confirmed");
+  assert.equal(segment.locked, true);
+  assert.equal(segment.target, "Arkadaş");
+  const stale = structuredClone(segment);
+  Object.assign(segment, await h.storage.put("segments", { ...segment, target: "Yeni" }));
+  await assert.rejects(h.tm.updateConfirmedSegmentWithMainTm(h.project, stale));
+  assert.equal((await h.storage.get("segments", segment.id)).target, "Yeni");
+  await h.storage.put("resources", { ...(await h.storage.get("resources", "main")), targetLang: "de" });
+  await assert.rejects(h.tm.updateConfirmedSegmentWithMainTm(h.project, segment), /languages/);
+});
+
 function deferred() {
   let resolve;
   let reject;

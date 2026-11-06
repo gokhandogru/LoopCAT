@@ -551,6 +551,7 @@
                   <div class="menu-panel">
                     <button id="saveTmBtn" type="button">Save target to TM</button>
                     <button id="pretranslateBtn" type="button">Pretranslate from TM</button>
+                    <button id="tmBulkUpdateBtn" type="button">Update TM from confirmed segments…</button>
                     <button id="copySourceBtn" type="button" title="Ctrl/Cmd+Shift+S">Copy source</button>
                     <button
                       id="splitSegmentBtn"
@@ -1726,6 +1727,24 @@
           <button class="primary" type="submit" value="apply">Pretranslate</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="tmBulkUpdateDialog" aria-labelledby="tmBulkUpdateTitle">
+      <section class="dialog-card">
+        <h2 id="tmBulkUpdateTitle">Update TM from confirmed segments</h2>
+        <p class="muted">Save confirmed translations to the project main TM. Segment text, status, and locks are preserved. Empty segments and segments with missing protected tags are skipped.</p>
+        <label for="tmBulkUpdateScope">Scope</label>
+        <select id="tmBulkUpdateScope">
+          <option value="document">Active document</option>
+          <option value="project">Entire project</option>
+        </select>
+        <p id="tmBulkUpdateSummary"></p>
+        <p id="tmBulkUpdateReport" role="status" aria-live="polite"></p>
+        <div class="dialog-actions">
+          <button id="tmBulkUpdateClose" type="button">Close</button>
+          <button id="tmBulkUpdateApply" type="button" class="primary">Update TM</button>
+        </div>
+      </section>
     </dialog>
 
     <dialog id="trashDialog" aria-labelledby="trashDialogTitle">

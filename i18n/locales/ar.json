@@ -2751,6 +2751,21 @@
     "auto.value1.must.be.a.finite.nonnegative.number.902fb897": "يجب أن تكون {value1} عددًا محدودًا غير سالب.",
     "auto.value1.must.be.a.number.between.0.and.valu.62e6ad7b": "يجب أن تكون {value1} عددًا بين 0 و{value2}.",
     "auto.value1.value2.import.this.file.with.the.ex.7a66c9fd": "{value1}: {value2} هل تريد استيراد هذا الملف باستخدام لغات المشروع الحالية؟",
-    "auto.versionsegments.6935f0cc": "versionSegments"
+    "auto.versionsegments.6935f0cc": "versionSegments",
+    "auto.active.document.9794cbe6": "المستند النشط",
+    "auto.added.added.already.present.existing.skipp.3b60d611": "المضافة: {added}. الموجودة مسبقًا: {existing}. المتجاوزة: {skipped}. الفاشلة: {failed}.",
+    "auto.canceled.completed.updates.were.kept.you.c.caa1d111": "أُلغي التحديث. تم الاحتفاظ بالتحديثات المكتملة؛ يمكنك تشغيل هذا الإجراء مجددًا بأمان.",
+    "auto.choose.a.main.translation.memory.in.projec.152f6ad9": "اختر ذاكرة ترجمة رئيسية في إعدادات المشروع.",
+    "auto.destination.name.eligible.segments.count.6e327d71": "الوجهة: {name}. المقاطع المؤهلة: {count}.",
+    "auto.entire.project.a2b798fc": "المشروع بأكمله",
+    "auto.save.confirmed.translations.to.the.project.6292a9db": "احفظ الترجمات المؤكدة في ذاكرة الترجمة الرئيسية للمشروع. يتم الحفاظ على نص المقاطع وحالتها وأقفالها. يتم تجاوز المقاطع الفارغة والمقاطع التي تفتقر إلى وسوم محمية.",
+    "auto.stopped.after.a.save.failure.completed.upd.66c5c878": "توقف التحديث بعد فشل الحفظ. تم الاحتفاظ بالتحديثات المكتملة؛ أعد المحاولة بعد حل الخطأ.",
+    "auto.tm.saved.but.the.resource.view.could.not.r.17c55474": "تم حفظ ذاكرة الترجمة، لكن تعذر تحديث عرض الموارد. أعد فتحه لرؤية التغييرات.",
+    "auto.tm.update.failed.0a59226a": "فشل تحديث ذاكرة الترجمة.",
+    "auto.update.tm.39479fb9": "تحديث ذاكرة الترجمة",
+    "auto.update.tm.from.confirmed.segments.7ff42257": "تحديث ذاكرة الترجمة من المقاطع المؤكدة",
+    "auto.update.tm.from.confirmed.segments.897e1823": "تحديث ذاكرة الترجمة من المقاطع المؤكدة…",
+    "auto.updating.tm.done.of.total.segments.process.741ec960": "جارٍ تحديث ذاكرة الترجمة: تمت معالجة {done} من {total} مقطعًا.",
+    "auto.main.tm.languages.mismatch.0e97e5f5": "لغات ذاكرة الترجمة الرئيسية لا تتطابق مع لغات هذا المشروع."
   }
 }

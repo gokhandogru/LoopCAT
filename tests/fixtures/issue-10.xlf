@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:1.2" version="1.2"><file original="Tutorials" source-language="en" target-language="de" datatype="plaintext"><body><trans-unit id="0"><source>Walk</source><target state="needs-translation"></target></trans-unit>
+<trans-unit id="1"><source>Leave</source><target state="needs-translation"></target></trans-unit>
+<trans-unit id="2"><source>Take</source><target state="translated">Nehmen</target></trans-unit>
+<trans-unit id="3"><source>Hit</source><target state="translated">Schlagen</target></trans-unit>
+<trans-unit id="4"><source>Attack</source><target state="translated">Angreifen</target></trans-unit>
+<trans-unit id="5"><source>Sleep</source><target state="translated">Schlafen</target></trans-unit>
+<trans-unit id="6"><source>Fly</source><target state="needs-translation"></target></trans-unit>
+<trans-unit id="7"><source>Press the action key to fly</source><target state="translated">Fliege mit der Aktionstaste</target></trans-unit>
+<trans-unit id="8"><source>Sleeping recovers your mana</source><target state="needs-translation"></target></trans-unit></body></file></xliff>

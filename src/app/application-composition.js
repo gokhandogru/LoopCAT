@@ -1,6 +1,7 @@
 import { installSourceTermContextMenu } from "../features/editor/source-term-context-menu.js";
 import { createMatchContextMenu } from "../ui/match-context-menu.js";
 import { createAiConsentDialog } from "../ui/ai-consent-dialog.js";
+import { createTmBulkUpdateController } from "../features/editor/tm-bulk-update-controller.js";
 import { createFileLifecycleService } from "../features/projects/file-lifecycle-service.js";
 import { createFileManagementController } from "../features/projects/file-management-controller.js";
 import { createWorkspaceToolbarController } from "../ui/workspace-toolbar-controller.js";
@@ -3373,6 +3374,43 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     logger: console
   });
   tmPretranslationController.mount();
+  const tmBulkUpdateController = createTmBulkUpdateController({
+    document,
+    session: editorSessionStore,
+    localization: uiLocalizationService,
+    lifecycle: dialogLifecycleController,
+    getDocumentId: () => applicationStore.getState().navigation.documentId,
+    flush: autosaveService.flush,
+    missingTags: protectedTagInspectionService.missing,
+    validate: async (project) => {
+      const link = project.resourceLinks?.find((item) => item.type === "tm" && item.role === "main");
+      const resource = link?.resourceId ? await storageApi.get("resources", link.resourceId) : null;
+      if (!resource || resource.type !== "tm") throw new Error("Choose a main translation memory in project settings.");
+      const language = (value) =>
+        String(value || "")
+          .trim()
+          .toLowerCase()
+          .replace(/_/g, "-");
+      if (
+        !language(resource.sourceLang) ||
+        !language(resource.targetLang) ||
+        language(resource.sourceLang) !== language(project.sourceLang) ||
+        language(resource.targetLang) !== language(project.targetLang)
+      ) {
+        throw new Error("The main translation memory languages do not match this project.");
+      }
+    },
+    save: (project, segment, context) =>
+      commandPersistence.run([segment], () =>
+        compatibilityModules.tm.updateConfirmedSegmentWithMainTm(project, segment, context)
+      ),
+    yieldToUi: applicationImportProgressController.yieldToUi,
+    markDirty: workspaceDirtyStateController.mark,
+    refresh: async () => {
+      await editorContextController.refresh();
+      await resourceCatalogRefreshController.refresh();
+    }
+  });
   const aiCredentialStorageService = appRuntime.featureFactories.createAiCredentialStorageService({
     secure: window.LoopCATDesktop?.saveCredential ? window.LoopCATDesktop : undefined,
     sessionOnly: true,

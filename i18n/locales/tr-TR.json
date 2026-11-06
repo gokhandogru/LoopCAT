@@ -2751,6 +2751,21 @@
     "auto.value1.must.be.a.finite.nonnegative.number.902fb897": "{value1} sonlu ve negatif olmayan bir sayı olmalıdır.",
     "auto.value1.must.be.a.number.between.0.and.valu.62e6ad7b": "{value1}, 0 ile {value2} arasında bir sayı olmalıdır.",
     "auto.value1.value2.import.this.file.with.the.ex.7a66c9fd": "{value1}: {value2} Bu dosya mevcut proje dilleriyle içe aktarılsın mı?",
-    "auto.versionsegments.6935f0cc": "versionSegments"
+    "auto.versionsegments.6935f0cc": "versionSegments",
+    "auto.active.document.9794cbe6": "Etkin belge",
+    "auto.added.added.already.present.existing.skipp.3b60d611": "Eklenen: {added}. Zaten mevcut: {existing}. Atlanan: {skipped}. Başarısız: {failed}.",
+    "auto.canceled.completed.updates.were.kept.you.c.caa1d111": "İptal edildi. Tamamlanan güncellemeler korundu; bu işlemi güvenle yeniden çalıştırabilirsiniz.",
+    "auto.choose.a.main.translation.memory.in.projec.152f6ad9": "Proje ayarlarından bir ana çeviri belleği seçin.",
+    "auto.destination.name.eligible.segments.count.6e327d71": "Hedef bellek: {name}. Uygun segment sayısı: {count}.",
+    "auto.entire.project.a2b798fc": "Tüm proje",
+    "auto.save.confirmed.translations.to.the.project.6292a9db": "Onaylı çevirileri projenin ana çeviri belleğine kaydeder. Segment metni, durumu ve kilitleri korunur. Boş segmentler ve korumalı etiketleri eksik olan segmentler atlanır.",
+    "auto.stopped.after.a.save.failure.completed.upd.66c5c878": "Kaydetme hatası nedeniyle durduruldu. Tamamlanan güncellemeler korundu; hatayı giderdikten sonra yeniden deneyin.",
+    "auto.tm.saved.but.the.resource.view.could.not.r.17c55474": "Çeviri belleği kaydedildi ancak kaynak görünümü yenilenemedi. Değişiklikleri görmek için görünümü yeniden açın.",
+    "auto.tm.update.failed.0a59226a": "Çeviri belleği güncellenemedi.",
+    "auto.update.tm.39479fb9": "Çeviri belleğini güncelle",
+    "auto.update.tm.from.confirmed.segments.7ff42257": "Onaylı segmentlerden çeviri belleğini güncelle",
+    "auto.update.tm.from.confirmed.segments.897e1823": "Onaylı segmentlerden çeviri belleğini güncelle…",
+    "auto.updating.tm.done.of.total.segments.process.741ec960": "Çeviri belleği güncelleniyor: {total} segmentten {done} tanesi işlendi.",
+    "auto.main.tm.languages.mismatch.0e97e5f5": "Ana çeviri belleğinin dilleri bu projeyle eşleşmiyor."
   }
 }

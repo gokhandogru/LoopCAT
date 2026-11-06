@@ -2750,6 +2750,21 @@
     "auto.value1.must.be.a.finite.nonnegative.number.902fb897": "{value1} must be a finite, nonnegative number.",
     "auto.value1.must.be.a.number.between.0.and.valu.62e6ad7b": "{value1} must be a number between 0 and {value2}.",
     "auto.value1.value2.import.this.file.with.the.ex.7a66c9fd": "{value1}: {value2} Import this file with the existing project languages?",
-    "auto.versionsegments.6935f0cc": "versionSegments"
+    "auto.versionsegments.6935f0cc": "versionSegments",
+    "auto.active.document.9794cbe6": "Active document",
+    "auto.added.added.already.present.existing.skipp.3b60d611": "Added: {added}. Already present: {existing}. Skipped: {skipped}. Failed: {failed}.",
+    "auto.canceled.completed.updates.were.kept.you.c.caa1d111": "Canceled. Completed updates were kept; you can safely run this action again.",
+    "auto.choose.a.main.translation.memory.in.projec.152f6ad9": "Choose a main translation memory in project settings.",
+    "auto.destination.name.eligible.segments.count.6e327d71": "Destination: {name}. Eligible segments: {count}.",
+    "auto.entire.project.a2b798fc": "Entire project",
+    "auto.save.confirmed.translations.to.the.project.6292a9db": "Save confirmed translations to the project main TM. Segment text, status, and locks are preserved. Empty segments and segments with missing protected tags are skipped.",
+    "auto.stopped.after.a.save.failure.completed.upd.66c5c878": "Stopped after a save failure. Completed updates were kept; retry after resolving the error.",
+    "auto.tm.saved.but.the.resource.view.could.not.r.17c55474": "TM saved, but the resource view could not refresh. Reopen it to see the changes.",
+    "auto.tm.update.failed.0a59226a": "TM update failed.",
+    "auto.update.tm.39479fb9": "Update TM",
+    "auto.update.tm.from.confirmed.segments.7ff42257": "Update TM from confirmed segments",
+    "auto.update.tm.from.confirmed.segments.897e1823": "Update TM from confirmed segments…",
+    "auto.updating.tm.done.of.total.segments.process.741ec960": "Updating TM: {done} of {total} segments processed.",
+    "auto.main.tm.languages.mismatch.0e97e5f5": "The main translation memory languages do not match this project."
   }
 }

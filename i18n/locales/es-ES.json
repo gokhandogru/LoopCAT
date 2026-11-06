@@ -2751,6 +2751,21 @@
     "auto.value1.must.be.a.finite.nonnegative.number.902fb897": "{value1} debe ser un número finito no negativo.",
     "auto.value1.must.be.a.number.between.0.and.valu.62e6ad7b": "{value1} debe ser un número entre 0 y {value2}.",
     "auto.value1.value2.import.this.file.with.the.ex.7a66c9fd": "{value1}: {value2} ¿Quieres importar este archivo con los idiomas existentes del proyecto?",
-    "auto.versionsegments.6935f0cc": "versionSegments"
+    "auto.versionsegments.6935f0cc": "versionSegments",
+    "auto.active.document.9794cbe6": "Documento activo",
+    "auto.added.added.already.present.existing.skipp.3b60d611": "Añadidos: {added}. Ya existentes: {existing}. Omitidos: {skipped}. Fallidos: {failed}.",
+    "auto.canceled.completed.updates.were.kept.you.c.caa1d111": "Se ha cancelado. Se han conservado las actualizaciones completadas; puedes volver a ejecutar esta acción de forma segura.",
+    "auto.choose.a.main.translation.memory.in.projec.152f6ad9": "Selecciona una memoria de traducción principal en la configuración del proyecto.",
+    "auto.destination.name.eligible.segments.count.6e327d71": "Destino: {name}. Segmentos aptos: {count}.",
+    "auto.entire.project.a2b798fc": "Todo el proyecto",
+    "auto.save.confirmed.translations.to.the.project.6292a9db": "Guarda las traducciones confirmadas en la TM principal del proyecto. Se conservan el texto, el estado y los bloqueos de los segmentos. Se omiten los segmentos vacíos y aquellos a los que les faltan etiquetas protegidas.",
+    "auto.stopped.after.a.save.failure.completed.upd.66c5c878": "Se ha detenido tras un error al guardar. Se han conservado las actualizaciones completadas; vuelve a intentarlo después de resolver el error.",
+    "auto.tm.saved.but.the.resource.view.could.not.r.17c55474": "Se ha guardado la TM, pero no se ha podido actualizar la vista de recursos. Vuelve a abrirla para ver los cambios.",
+    "auto.tm.update.failed.0a59226a": "No se ha podido actualizar la TM.",
+    "auto.update.tm.39479fb9": "Actualizar TM",
+    "auto.update.tm.from.confirmed.segments.7ff42257": "Actualizar TM a partir de segmentos confirmados",
+    "auto.update.tm.from.confirmed.segments.897e1823": "Actualizar TM a partir de segmentos confirmados…",
+    "auto.updating.tm.done.of.total.segments.process.741ec960": "Actualizando TM: {done} de {total} segmentos procesados.",
+    "auto.main.tm.languages.mismatch.0e97e5f5": "Los idiomas de la memoria de traducción principal no coinciden con los de este proyecto."
   }
 }

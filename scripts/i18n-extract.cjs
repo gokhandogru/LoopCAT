@@ -472,6 +472,11 @@ function main() {
     messagesByText.set(entry.message, { description: entry.description, locations: entry.locations });
   }
   extractHtml(messagesByText);
+  extractScript(
+    messagesByText,
+    path.join(root, "src/features/editor/tm-bulk-update-controller.js"),
+    "src/features/editor/tm-bulk-update-controller.js"
+  );
   extractScript(messagesByText, appPath, "app.js");
   extractScript(
     messagesByText,

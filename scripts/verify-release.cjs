@@ -2829,7 +2829,7 @@ for (const [method, appCount, workflowCount] of [
   ["clearMemory", 0, 1],
   ["hasUnsaved", 1, 0],
   ["ids", 2, 0],
-  ["mark", 41, 6],
+  ["mark", 42, 6],
   ["markProjects", 2, 0],
   ["markProjectsUsingResource", 6, 1],
   ["prune", 1, 1],
@@ -5248,9 +5248,9 @@ for (const boundary of [
 }
 assert(
   (appJs.match(/createResourceCatalogRefreshController\(/g) || []).length === 1 &&
-    (appJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 11 &&
+    (appJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 12 &&
     (appWorkflowDriverJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 4,
-  "app.js must compose one resource-catalog refresh controller and all ten application and four workflow consumers must call it directly."
+  "app.js must compose one resource-catalog refresh controller and retain its twelve application references and four workflow references."
 );
 assert(
   !/async\s+function\s+refreshResources\b/.test(appJs) && !/\brefreshResources\s*\(/.test(appWorkflowDriverJs),

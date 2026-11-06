@@ -2751,6 +2751,21 @@
     "auto.value1.must.be.a.finite.nonnegative.number.902fb897": "{value1} ha de ser un nombre finit no negatiu.",
     "auto.value1.must.be.a.number.between.0.and.valu.62e6ad7b": "{value1} ha de ser un nombre entre 0 i {value2}.",
     "auto.value1.value2.import.this.file.with.the.ex.7a66c9fd": "{value1}: {value2} Voleu importar aquest fitxer amb les llengües actuals del projecte?",
-    "auto.versionsegments.6935f0cc": "versionSegments"
+    "auto.versionsegments.6935f0cc": "versionSegments",
+    "auto.active.document.9794cbe6": "Document actiu",
+    "auto.added.added.already.present.existing.skipp.3b60d611": "Afegits: {added}. Ja existents: {existing}. Omesos: {skipped}. Fallits: {failed}.",
+    "auto.canceled.completed.updates.were.kept.you.c.caa1d111": "S'ha cancel·lat. S'han conservat les actualitzacions completades; podeu tornar a executar aquesta acció amb seguretat.",
+    "auto.choose.a.main.translation.memory.in.projec.152f6ad9": "Trieu una memòria de traducció principal a la configuració del projecte.",
+    "auto.destination.name.eligible.segments.count.6e327d71": "Destinació: {name}. Segments aptes: {count}.",
+    "auto.entire.project.a2b798fc": "Tot el projecte",
+    "auto.save.confirmed.translations.to.the.project.6292a9db": "Desa les traduccions confirmades a la TM principal del projecte. Es conserven el text, l'estat i els bloquejos dels segments. S'ometen els segments buits i aquells als quals falten etiquetes protegides.",
+    "auto.stopped.after.a.save.failure.completed.upd.66c5c878": "S'ha aturat després d'un error en desar. S'han conservat les actualitzacions completades; torneu-ho a provar després de resoldre l'error.",
+    "auto.tm.saved.but.the.resource.view.could.not.r.17c55474": "S'ha desat la TM, però no s'ha pogut actualitzar la vista de recursos. Torneu-la a obrir per veure els canvis.",
+    "auto.tm.update.failed.0a59226a": "No s'ha pogut actualitzar la TM.",
+    "auto.update.tm.39479fb9": "Actualitzar la TM",
+    "auto.update.tm.from.confirmed.segments.7ff42257": "Actualitzar la TM a partir dels segments confirmats",
+    "auto.update.tm.from.confirmed.segments.897e1823": "Actualitzar la TM a partir dels segments confirmats…",
+    "auto.updating.tm.done.of.total.segments.process.741ec960": "S'està actualitzant la TM: {done} de {total} segments processats.",
+    "auto.main.tm.languages.mismatch.0e97e5f5": "Les llengües de la memòria de traducció principal no coincideixen amb les del projecte."
   }
 }

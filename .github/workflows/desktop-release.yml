@@ -147,6 +147,10 @@ jobs:
         if: matrix.signingPlatform == 'win'
         run: pnpm run verify:ai-consent
 
+      - name: Verify bulk TM updates from confirmed segments
+        if: matrix.signingPlatform == 'win'
+        run: pnpm run verify:tm-bulk-update
+
       - name: Verify desktop wrapper
         run: pnpm run verify:desktop-wrapper
 

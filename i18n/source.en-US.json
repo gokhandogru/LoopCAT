@@ -54929,6 +54929,112 @@
         "src/features/import-export/project-import-restore-controller.js:100",
         "src/features/import-export/project-package-portability-service.js:142"
       ]
+    },
+    "auto.active.document.9794cbe6": {
+      "message": "Active document",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.added.added.already.present.existing.skipp.3b60d611": {
+      "message": "Added: {added}. Already present: {existing}. Skipped: {skipped}. Failed: {failed}.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/tm-bulk-update-controller.js:82"
+      ]
+    },
+    "auto.canceled.completed.updates.were.kept.you.c.caa1d111": {
+      "message": "Canceled. Completed updates were kept; you can safely run this action again.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/tm-bulk-update-controller.js:87"
+      ]
+    },
+    "auto.choose.a.main.translation.memory.in.projec.152f6ad9": {
+      "message": "Choose a main translation memory in project settings.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/app/application-composition.js:3388",
+        "src/features/editor/tm-bulk-update-controller.js:45"
+      ]
+    },
+    "auto.destination.name.eligible.segments.count.6e327d71": {
+      "message": "Destination: {name}. Eligible segments: {count}.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/tm-bulk-update-controller.js:27"
+      ]
+    },
+    "auto.entire.project.a2b798fc": {
+      "message": "Entire project",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.save.confirmed.translations.to.the.project.6292a9db": {
+      "message": "Save confirmed translations to the project main TM. Segment text, status, and locks are preserved. Empty segments and segments with missing protected tags are skipped.",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.stopped.after.a.save.failure.completed.upd.66c5c878": {
+      "message": "Stopped after a save failure. Completed updates were kept; retry after resolving the error.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/tm-bulk-update-controller.js:92"
+      ]
+    },
+    "auto.tm.saved.but.the.resource.view.could.not.r.17c55474": {
+      "message": "TM saved, but the resource view could not refresh. Reopen it to see the changes.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/tm-bulk-update-controller.js:105"
+      ]
+    },
+    "auto.tm.update.failed.0a59226a": {
+      "message": "TM update failed.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/tm-bulk-update-controller.js:96"
+      ]
+    },
+    "auto.update.tm.39479fb9": {
+      "message": "Update TM",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.update.tm.from.confirmed.segments.7ff42257": {
+      "message": "Update TM from confirmed segments",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.update.tm.from.confirmed.segments.897e1823": {
+      "message": "Update TM from confirmed segments…",
+      "description": "Static interface text from index.html.",
+      "locations": [
+        "index.html"
+      ]
+    },
+    "auto.updating.tm.done.of.total.segments.process.741ec960": {
+      "message": "Updating TM: {done} of {total} segments processed.",
+      "description": "Interface message; preserve placeholders and technical names.",
+      "locations": [
+        "src/features/editor/tm-bulk-update-controller.js:75"
+      ]
+    },
+    "auto.main.tm.languages.mismatch.0e97e5f5": {
+      "message": "The main translation memory languages do not match this project.",
+      "description": "TM bulk update language validation.",
+      "locations": [
+        "src/app/application-composition.js"
+      ]
     }
   }
 }
