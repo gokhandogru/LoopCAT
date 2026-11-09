@@ -12,7 +12,9 @@ Full guide: https://github.com/gokhandogru/LoopCAT/blob/main/docs/macos-installa
 
 1. CHOOSE THE RIGHT MAC DOWNLOAD
 Open Apple menu > About This Mac.
-- If it shows an Apple chip (for example M1, M2, M3 or M4), choose arm64.
+- The 0.0.4-dev.20261109.1 release offers universal packages for both Apple
+  Silicon and Intel. Choose a file labelled universal.
+- For older releases, Apple Silicon can also use a file labelled arm64.
 - If it shows an Intel processor, choose an explicitly labelled x64/x86_64
   macOS package, or a universal package that includes Intel support.
 - The 0.0.4-dev.20261106.1 preview's Mac downloads are ARM64 only. They do not
