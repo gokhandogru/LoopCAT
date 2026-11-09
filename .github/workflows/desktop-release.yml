@@ -45,12 +45,13 @@ jobs:
             browserCommand: pnpm run verify:browser-runner
             desktopSmokeCommand: pnpm run verify:desktop-smoke
             downloadArtifactCommand: pnpm run verify:download-artifacts -- mac
-            platformSignatureCommand: pnpm run verify:platform-signatures -- mac
+            platformSignatureCommand: pnpm run verify:platform-signatures -- mac --require-universal
             command: pnpm run dist:mac
             artifact: LoopCAT-macOS
             uploadPath: |
               dist/*.dmg
               dist/*.zip
+              dist/LoopCAT-macOS-INSTALL.txt
               dist/SHA256SUMS.txt
           - name: Linux
             os: ubuntu-latest
@@ -75,6 +76,7 @@ jobs:
       APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
       APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
       APPLE_KEYCHAIN: ${{ secrets.APPLE_KEYCHAIN }}
       APPLE_KEYCHAIN_PROFILE: ${{ secrets.APPLE_KEYCHAIN_PROFILE }}
@@ -143,6 +145,10 @@ jobs:
         if: matrix.signingPlatform == 'win'
         run: pnpm run verify:tmx
 
+      - name: Verify macOS controls and responsive layouts
+        if: matrix.signingPlatform == 'mac'
+        run: node scripts/verify-platform-layout.cjs
+
       - name: Verify AI consent and immediate keyboard input
         if: matrix.signingPlatform == 'win'
         run: pnpm run verify:ai-consent
@@ -159,7 +165,12 @@ jobs:
         run: pnpm run verify:signing-env -- ${{ matrix.signingPlatform }}
 
       - name: Build desktop artifact
+        if: matrix.signingPlatform != 'mac' || github.event_name != 'workflow_dispatch' || inputs.release_profile != 'preview'
         run: ${{ matrix.command }}
+
+      - name: Build ad-hoc signed universal macOS preview
+        if: matrix.signingPlatform == 'mac' && github.event_name == 'workflow_dispatch' && inputs.release_profile == 'preview'
+        run: pnpm run dist:mac:preview
 
       - name: Prepare Linux packaged sandbox
         if: matrix.signingPlatform == 'linux'
@@ -184,9 +195,17 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || inputs.release_profile == 'production'
         run: ${{ matrix.platformSignatureCommand }}
 
+      - name: Verify macOS preview signatures and universal architectures
+        if: matrix.signingPlatform == 'mac' && github.event_name == 'workflow_dispatch' && inputs.release_profile == 'preview'
+        run: pnpm run verify:platform-signatures -- mac --allow-adhoc --require-universal
+
       - name: Verify preview artifact selection
         if: github.event_name == 'workflow_dispatch' && inputs.release_profile == 'preview'
         run: ${{ matrix.platformSignatureCommand }} --artifact-selection-only
+
+      - name: Include macOS installation guide
+        if: matrix.signingPlatform == 'mac'
+        run: node -e "require('node:fs').copyFileSync('downloads/LoopCAT-macOS-INSTALL.txt', 'dist/LoopCAT-macOS-INSTALL.txt')"
 
       - name: Generate checksums
         run: pnpm run checksums
@@ -257,10 +276,56 @@ jobs:
             dist-web/SHA256SUMS.txt
           if-no-files-found: error
 
+  macos-native-smoke:
+    name: Smoke test macOS (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Download the macOS release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: LoopCAT-macOS
+          path: dist
+
+      - name: Verify downloaded checksums
+        run: node scripts/verify-checksums.cjs
+
+      - name: Extract the exact distributed app
+        shell: bash
+        run: |
+          shopt -s nullglob
+          archives=(dist/*.zip)
+          test "${#archives[@]}" -eq 1
+          mkdir -p dist/mac-universal
+          ditto -x -k "${archives[0]}" dist/mac-universal
+
+      - name: Verify preview archive signatures and architectures
+        if: github.event_name == 'workflow_dispatch' && inputs.release_profile == 'preview'
+        run: node scripts/verify-platform-signatures.cjs mac --allow-adhoc --require-universal
+
+      - name: Verify production archive signatures and architectures
+        if: github.event_name != 'workflow_dispatch' || inputs.release_profile == 'production'
+        run: node scripts/verify-platform-signatures.cjs mac --require-universal
+
+      - name: Launch the distributed app on the native architecture
+        run: node scripts/verify-packaged-desktop-smoke.cjs
+
   release-bundle:
     name: Verify all-platform release bundle
     runs-on: ubuntu-latest
-    needs: [build, web]
+    needs: [build, web, macos-native-smoke]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -313,5 +378,6 @@ jobs:
             release-dist/**/*.zip
             release-dist/**/*.AppImage
             release-dist/**/*.deb
+            release-dist/**/LoopCAT-macOS-INSTALL.txt
             release-dist/SHA256SUMS.txt
           if-no-files-found: error

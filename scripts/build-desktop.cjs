@@ -21,6 +21,7 @@ const optionalSigningEnvironmentNames = [
   "APPLE_API_KEY_ID",
   "APPLE_API_ISSUER",
   "APPLE_ID",
+  "APPLE_TEAM_ID",
   "APPLE_APP_SPECIFIC_PASSWORD",
   "APPLE_KEYCHAIN",
   "APPLE_KEYCHAIN_PROFILE"

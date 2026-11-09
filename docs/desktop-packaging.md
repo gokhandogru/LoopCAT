@@ -208,6 +208,19 @@ pnpm run dist:linux
 
 Run each platform command on the matching operating system. The build wrapper refuses macOS packaging outside macOS, Linux packaging outside Linux, and Windows packaging outside Windows before it cleans `dist/`, so a wrong-host probe cannot disturb a valid release folder.
 
+`dist:mac` builds a **universal** DMG and ZIP containing both Apple silicon (`arm64`) and Intel (`x86_64`) code. Older published downloads can still be ARM64-only; check the asset name and the [macOS installation guide](macos-installation.md).
+
+For a development preview without an Apple Developer ID certificate, run on macOS:
+
+```bash
+pnpm run dist:mac:preview
+pnpm run verify:platform-signatures -- mac --allow-adhoc --require-universal
+```
+
+The preview command explicitly signs the complete app ad hoc after Electron fuse changes. It retains hardened runtime with the JIT and library-validation entitlements needed by an ad-hoc Electron app. Fuse signature reset also prevents unsigned local packaging from leaving stale signatures after the binary changes. An ad-hoc signature checks bundle integrity; it does not establish developer identity, notarize the app, or remove Gatekeeper warnings. The preview flag must not be used as evidence of production signing.
+
+The desktop workflow verifies the app inside both the DMG and ZIP, checks both architecture slices in the launcher and Electron framework, and launches the distributed ZIP on native Apple silicon and Intel runners. It includes `LoopCAT-macOS-INSTALL.txt` beside the Mac downloads. These are CI requirements for new builds, not a claim that older published assets have been rebuilt or tested.
+
 Artifacts are written to `dist/`.
 
 The GitHub Actions workflow in `.github/workflows/desktop-release.yml` builds the same desktop artifacts on Windows, macOS, and Linux when run manually or when a `v*` tag is pushed. Each platform job uploads only public download files plus its platform checksum file; the standard Windows build recreates installer and portable ZIP wrappers from the just-built executables. Unpacked app folders and builder debug sidecars are retained only inside the job workspace for verification. The final `release-bundle` job downloads all platform artifacts, runs `pnpm run verify:download-bundle -- --dist release-dist`, removes nested platform checksum sidecars while generating a combined `SHA256SUMS.txt`, verifies the combined file, and uploads the `LoopCAT-All-Platforms` artifact for publication.
@@ -277,7 +290,7 @@ macOS release requirements:
 
 - enroll the publisher in the Apple Developer Program;
 - sign with a Developer ID Application certificate through `CSC_LINK` plus `CSC_KEY_PASSWORD`;
-- notarize the `.dmg` and `.zip` artifacts with one complete Electron Builder notarization credential set: `APPLE_API_KEY` plus `APPLE_API_KEY_ID` plus `APPLE_API_ISSUER`, `APPLE_ID` plus `APPLE_APP_SPECIFIC_PASSWORD`, or `APPLE_KEYCHAIN` plus `APPLE_KEYCHAIN_PROFILE`;
+- notarize the `.dmg` and `.zip` artifacts with one complete Electron Builder notarization credential set: `APPLE_API_KEY` plus `APPLE_API_KEY_ID` plus `APPLE_API_ISSUER`, `APPLE_ID` plus `APPLE_APP_SPECIFIC_PASSWORD` plus `APPLE_TEAM_ID`, or `APPLE_KEYCHAIN` plus `APPLE_KEYCHAIN_PROFILE`;
 - staple notarization tickets before upload;
 - verify Gatekeeper launch on a clean macOS machine without developer overrides;
 - confirm the app can still write browser-profile storage and user-selected workspace folders after signing.

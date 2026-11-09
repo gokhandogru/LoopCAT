@@ -746,7 +746,8 @@ html[dir="rtl"] :is(code, kbd, input[type="url"], input[type="password"]) {
 }
 .liquid-glass-edition .coordinated-editor .segment-controls {
   display: flex;
-  flex-wrap: nowrap;
+  /* Font metrics and translated labels vary; wrap when content needs room. */
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
@@ -764,6 +765,7 @@ html[dir="rtl"] :is(code, kbd, input[type="url"], input[type="password"]) {
   flex: 1;
 }
 .liquid-glass-edition .coordinated-editor #segmentStatusFilter {
+  flex: 0 0 150px;
   min-width: 110px;
   max-width: 160px;
 }
@@ -980,7 +982,7 @@ html[dir="rtl"] :is(code, kbd, input[type="url"], input[type="password"]) {
   .liquid-glass-edition
   .coordinated-editor
   :is(button:not(.primary), summary, select, input:not([type="checkbox"])) {
-  background: var(--color-surface-subtle);
+  background-color: var(--color-surface-subtle);
   color: var(--color-text);
   border-color: var(--color-control-line);
   box-shadow: none;
@@ -1304,4 +1306,43 @@ html[lang^="tr"] .liquid-glass-edition .inspector-tabs button {
 
 html[lang^="es"] .liquid-glass-edition .coordinated-editor #segmentStatusFilter {
   flex: 0 0 160px;
+}
+
+/* Native macOS popup buttons ignore some shared control geometry. Keep the
+   native select interaction, but draw a consistent closed control and arrow.
+   Reserve arrow space after the toolbar/dark-theme padding and backgrounds. */
+.liquid-glass-edition select:not([multiple]):not([size]) {
+  appearance: none;
+  padding-inline-end: 30px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    right 15px center,
+    right 10px center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.liquid-glass-edition select:not([multiple]):not([size]):dir(rtl) {
+  background-position:
+    left 10px center,
+    left 15px center;
+}
+
+.liquid-glass-edition .dialog-actions {
+  flex-wrap: wrap;
+}
+
+.liquid-glass-edition .dialog-actions > button {
+  max-width: 100%;
+  white-space: normal;
+}
+
+@media (forced-colors: active) {
+  .liquid-glass-edition select:not([multiple]):not([size]) {
+    appearance: auto;
+    background-image: none;
+    padding-inline-end: 10px;
+  }
 }

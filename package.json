@@ -68,7 +68,8 @@
     "dist:html": "node scripts/build-web.cjs",
     "dist": "node scripts/build-desktop.cjs",
     "dist:win": "node scripts/build-desktop.cjs --win nsis portable",
-    "dist:mac": "node scripts/build-desktop.cjs --mac dmg zip",
+    "dist:mac": "node scripts/build-desktop.cjs --mac dmg zip --universal",
+    "dist:mac:preview": "node scripts/build-desktop.cjs --mac dmg zip --universal -c.mac.identity=- -c.mac.notarize=false -c.mac.entitlements=config/entitlements.mac-preview.plist -c.mac.entitlementsInherit=config/entitlements.mac-preview.plist",
     "dist:linux": "node scripts/build-desktop.cjs --linux AppImage deb",
     "verify:repository-downloads": "node scripts/verify-repository-downloads.cjs",
     "verify:arabic": "pnpm i18n:validate && pnpm build:renderer && node scripts/verify-arabic-ui.cjs",
@@ -109,6 +110,7 @@
     "asar": true,
     "npmRebuild": false,
     "electronFuses": {
+      "resetAdHocDarwinSignature": true,
       "runAsNode": false,
       "enableNodeOptionsEnvironmentVariable": false,
       "enableNodeCliInspectArguments": false,

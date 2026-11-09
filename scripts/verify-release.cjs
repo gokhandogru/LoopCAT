@@ -17678,8 +17678,8 @@ assert(
   "package.json dist:win script must use the desktop build wrapper."
 );
 assert(
-  packageJson.scripts?.["dist:mac"] === "node scripts/build-desktop.cjs --mac dmg zip",
-  "package.json dist:mac script must use the desktop build wrapper."
+  packageJson.scripts?.["dist:mac"] === "node scripts/build-desktop.cjs --mac dmg zip --universal",
+  "package.json dist:mac script must build a universal app using the desktop build wrapper."
 );
 assert(
   packageJson.scripts?.["dist:linux"] === "node scripts/build-desktop.cjs --linux AppImage deb",
@@ -17691,7 +17691,7 @@ assert(packageJson.engines?.node === ">=24 <25", "package.json must require the 
 assert(nodeVersionFile === "24", ".node-version must select Node 24 LTS.");
 const releaseWorkflowNodeVersions = [...desktopWorkflow.matchAll(/node-version:\s*([0-9]+)/g)].map((match) => match[1]);
 assert(
-  releaseWorkflowNodeVersions.length === 3 && releaseWorkflowNodeVersions.every((version) => version === "24"),
+  releaseWorkflowNodeVersions.length === 4 && releaseWorkflowNodeVersions.every((version) => version === "24"),
   "Every desktop release workflow job must run on Node 24 LTS."
 );
 assert(
@@ -28495,7 +28495,7 @@ assertIncludes(
 );
 assertIncludes(
   desktopWorkflow,
-  "needs: [build, web]",
+  "needs: [build, web, macos-native-smoke]",
   "Desktop release bundle job must run only after all platform builds and the static HTML build finish."
 );
 assertIncludes(

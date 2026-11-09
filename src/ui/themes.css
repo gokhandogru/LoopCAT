@@ -204,7 +204,7 @@
   .liquid-glass-edition
   :is(input, select, textarea, .target-cell :is(textarea, .target-editor)) {
   border-color: var(--color-control-line);
-  background: var(--color-input);
+  background-color: var(--color-input);
   color: var(--color-text);
   caret-color: var(--color-focus);
   accent-color: var(--color-accent);
@@ -223,7 +223,7 @@
   .liquid-glass-edition
   :is(input, select, textarea, .target-cell :is(textarea, .target-editor)):focus {
   border-color: var(--color-focus);
-  background: var(--color-input);
+  background-color: var(--color-input);
 }
 
 :root[data-theme="dark"]
@@ -284,7 +284,7 @@
   .liquid-glass-edition
   :is(button, input, select, textarea, .primary, #confirmBtn, #newProjectBtn, #replaceAllBtn, #nextOpenBtn):disabled {
   border-color: var(--color-line);
-  background: var(--color-surface-subtle);
+  background-color: var(--color-surface-subtle);
   color: var(--color-disabled);
   opacity: 1;
   box-shadow: none;
