@@ -1305,7 +1305,9 @@ html[lang^="tr"] .liquid-glass-edition .inspector-tabs button {
 }
 
 html[lang^="es"] .liquid-glass-edition .coordinated-editor #segmentStatusFilter {
-  flex: 0 0 160px;
+  /* Leave room for wider macOS system-font labels and the select arrow. */
+  flex: 0 0 176px;
+  max-width: 176px;
 }
 
 /* Native macOS popup buttons ignore some shared control geometry. Keep the

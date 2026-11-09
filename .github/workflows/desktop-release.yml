@@ -220,6 +220,14 @@ jobs:
           path: ${{ matrix.uploadPath }}
           if-no-files-found: error
 
+      - name: Preserve macOS layout evidence
+        if: always() && matrix.signingPlatform == 'mac'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-layout-evidence
+          path: test-artifacts/platform-layout/
+          if-no-files-found: ignore
+
   web:
     name: Build static HTML
     runs-on: ubuntu-latest
