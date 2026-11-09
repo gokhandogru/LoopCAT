@@ -7,6 +7,12 @@ body {
   line-height: var(--line-height-body);
 }
 
+/* Use the app's button/search geometry instead of platform-specific bevels. */
+.liquid-glass-edition button,
+.liquid-glass-edition input[type="search"] {
+  appearance: none;
+}
+
 .liquid-glass-edition [hidden] {
   display: none !important;
 }

@@ -19,7 +19,7 @@ const groupsByPlatform = {
       label: "macOS notarization credentials",
       alternatives: [
         ["APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"],
-        ["APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD"],
+        ["APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_TEAM_ID"],
         ["APPLE_KEYCHAIN", "APPLE_KEYCHAIN_PROFILE"]
       ]
     }

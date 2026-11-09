@@ -12,6 +12,7 @@ const signingEnvNames = [
   "APPLE_API_KEY_ID",
   "APPLE_API_ISSUER",
   "APPLE_ID",
+  "APPLE_TEAM_ID",
   "APPLE_APP_SPECIFIC_PASSWORD",
   "APPLE_KEYCHAIN",
   "APPLE_KEYCHAIN_PROFILE"
@@ -127,6 +128,30 @@ expectPass(
   "APPLE_API_KEY + APPLE_API_KEY_ID + APPLE_API_ISSUER"
 );
 expectPass("linux", {}, "Linux checksum-based release gate", "passed for linux");
+
+expectFail(
+  "mac",
+  {
+    CSC_LINK: "selftest-cert",
+    CSC_KEY_PASSWORD: "selftest-password",
+    APPLE_ID: "selftest@example.invalid",
+    APPLE_APP_SPECIFIC_PASSWORD: "selftest-password"
+  },
+  "macOS Apple ID notarization requires team ID",
+  "APPLE_TEAM_ID"
+);
+expectPass(
+  "mac",
+  {
+    CSC_LINK: "selftest-cert",
+    CSC_KEY_PASSWORD: "selftest-password",
+    APPLE_ID: "selftest@example.invalid",
+    APPLE_APP_SPECIFIC_PASSWORD: "selftest-password",
+    APPLE_TEAM_ID: "SELFTESTID"
+  },
+  "macOS Apple ID notarization with team ID",
+  "APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID"
+);
 
 const secretLeakResult = run("win", {
   WIN_CSC_LINK: "selftest-secret-link",

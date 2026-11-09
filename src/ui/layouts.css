@@ -746,7 +746,8 @@ html[dir="rtl"] :is(code, kbd, input[type="url"], input[type="password"]) {
 }
 .liquid-glass-edition .coordinated-editor .segment-controls {
   display: flex;
-  flex-wrap: nowrap;
+  /* Font metrics and translated labels vary; wrap when content needs room. */
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
@@ -764,6 +765,7 @@ html[dir="rtl"] :is(code, kbd, input[type="url"], input[type="password"]) {
   flex: 1;
 }
 .liquid-glass-edition .coordinated-editor #segmentStatusFilter {
+  flex: 0 0 150px;
   min-width: 110px;
   max-width: 160px;
 }
@@ -980,7 +982,7 @@ html[dir="rtl"] :is(code, kbd, input[type="url"], input[type="password"]) {
   .liquid-glass-edition
   .coordinated-editor
   :is(button:not(.primary), summary, select, input:not([type="checkbox"])) {
-  background: var(--color-surface-subtle);
+  background-color: var(--color-surface-subtle);
   color: var(--color-text);
   border-color: var(--color-control-line);
   box-shadow: none;
@@ -1285,23 +1287,62 @@ html[dir="rtl"] :is(code, kbd, input[type="url"], input[type="password"]) {
     color: CanvasText;
   }
 }
-/* Longer translated tab labels need more space without widening the inspector. */
+/* Keep longer translated labels whole across two rows, including wider Mac fonts. */
 html[lang^="ca"] .liquid-glass-edition .inspector-tabs,
-html[lang^="es"] .liquid-glass-edition .inspector-tabs {
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr) minmax(0, 0.95fr) minmax(0, 0.45fr) minmax(0, 1.3fr);
-}
+html[lang^="es"] .liquid-glass-edition .inspector-tabs,
 html[lang^="tr"] .liquid-glass-edition .inspector-tabs {
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.4fr) minmax(0, 0.9fr);
+  grid-template-columns: repeat(3, minmax(max-content, 1fr));
 }
 html[lang^="ca"] .liquid-glass-edition .inspector-tabs button,
 html[lang^="es"] .liquid-glass-edition .inspector-tabs button,
 html[lang^="tr"] .liquid-glass-edition .inspector-tabs button {
   height: auto;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow-wrap: normal;
   line-height: 1.2;
 }
 
 html[lang^="es"] .liquid-glass-edition .coordinated-editor #segmentStatusFilter {
-  flex: 0 0 160px;
+  /* Leave room for wider macOS system-font labels and the select arrow. */
+  flex: 0 0 176px;
+  max-width: 176px;
+}
+
+/* Native macOS popup buttons ignore some shared control geometry. Keep the
+   native select interaction, but draw a consistent closed control and arrow.
+   Reserve arrow space after the toolbar/dark-theme padding and backgrounds. */
+.liquid-glass-edition select:not([multiple]):not([size]) {
+  appearance: none;
+  padding-inline-end: 30px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    right 15px center,
+    right 10px center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.liquid-glass-edition select:not([multiple]):not([size]):dir(rtl) {
+  background-position:
+    left 10px center,
+    left 15px center;
+}
+
+.liquid-glass-edition .dialog-actions {
+  flex-wrap: wrap;
+}
+
+.liquid-glass-edition .dialog-actions > button {
+  max-width: 100%;
+  white-space: normal;
+}
+
+@media (forced-colors: active) {
+  .liquid-glass-edition select:not([multiple]):not([size]) {
+    appearance: auto;
+    background-image: none;
+    padding-inline-end: 10px;
+  }
 }
