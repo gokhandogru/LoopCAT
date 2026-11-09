@@ -122,6 +122,8 @@ The Windows installer and portable application are unsigned. Windows may show an
 
 For macOS and Linux packages, use the [matching all-platform release](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-${version}).
 
+**macOS: read before opening.** Save [LoopCAT-macOS-INSTALL.txt](./LoopCAT-macOS-INSTALL.txt) beside your download, or read the [full installation guide](../docs/macos-installation.md). Check the Mac package's architecture: older previews are ARM64-only, while explicitly labelled universal packages support Apple Silicon and Intel. Development previews are not Developer ID-signed or notarized. The guide covers checksum verification, **Privacy & Security → Open Anyway**, and troubleshooting older bundles with an invalid signature.
+
 The older \`draft-0.0.3\` tag points to July commit \`6f9754d\`. Its historical assets are not this preview; do not mix ZIPs or checksum lists. Prior untagged 0.0.3 mirror files have been superseded here without changing that historical tag.
 
 For installation and checksum instructions, see the [main README](../README.md). The authoritative release notes are [LoopCAT ${version}](../docs/releases/${version}.md). After preparing downloads, run \`pnpm run verify:repository-downloads\` to detect changed sources, mixed builds, modified ZIPs, incorrect checksums, or leftover older downloads.
