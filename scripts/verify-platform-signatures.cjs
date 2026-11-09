@@ -224,7 +224,7 @@ function verifyMacApp(appPath, labelPrefix = relative(appPath)) {
       path.join(appPath, "Contents", "MacOS", productName),
       path.join(appPath, "Contents", "Frameworks", "Electron Framework.framework", "Versions", "A", "Electron Framework")
     ]) {
-      run("lipo", ["-verify_arch", "x86_64", "arm64", executable], `${labelPrefix} universal architecture verification`);
+      run("lipo", [executable, "-verify_arch", "x86_64", "arm64"], `${labelPrefix} universal architecture verification`);
     }
   }
   // Preview builds still need a valid signature. They cannot satisfy Gatekeeper's
