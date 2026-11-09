@@ -1287,20 +1287,18 @@ html[dir="rtl"] :is(code, kbd, input[type="url"], input[type="password"]) {
     color: CanvasText;
   }
 }
-/* Longer translated tab labels need more space without widening the inspector. */
+/* Keep longer translated labels whole across two rows, including wider Mac fonts. */
 html[lang^="ca"] .liquid-glass-edition .inspector-tabs,
-html[lang^="es"] .liquid-glass-edition .inspector-tabs {
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr) minmax(0, 0.95fr) minmax(0, 0.45fr) minmax(0, 1.3fr);
-}
+html[lang^="es"] .liquid-glass-edition .inspector-tabs,
 html[lang^="tr"] .liquid-glass-edition .inspector-tabs {
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 0.4fr) minmax(0, 0.9fr);
+  grid-template-columns: repeat(3, minmax(max-content, 1fr));
 }
 html[lang^="ca"] .liquid-glass-edition .inspector-tabs button,
 html[lang^="es"] .liquid-glass-edition .inspector-tabs button,
 html[lang^="tr"] .liquid-glass-edition .inspector-tabs button {
   height: auto;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow-wrap: normal;
   line-height: 1.2;
 }
 

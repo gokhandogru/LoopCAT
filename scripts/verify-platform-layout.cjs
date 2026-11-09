@@ -77,12 +77,30 @@ function inspect() {
       hasIndicator: style.appearance !== "none" || style.backgroundImage !== "none"
     };
   });
+  // A label can fit its box while still splitting words across lines.
+  const splitTabWords = [];
+  for (const tab of document.querySelectorAll(".inspector-tabs button")) {
+    if (!visible(tab)) continue;
+    const walker = document.createTreeWalker(tab, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      for (const word of node.textContent.matchAll(/\S+/gu)) {
+        const range = document.createRange();
+        range.setStart(node, word.index);
+        range.setEnd(node, word.index + word[0].length);
+        const lines = new Set(
+          [...range.getClientRects()].filter((rect) => rect.width > 0).map((rect) => Math.round(rect.top))
+        );
+        if (lines.size > 1) splitTabWords.push({ id: tab.id, word: word[0] });
+      }
+    }
+  }
   return {
     viewport: [innerWidth, innerHeight],
     documentWidth: document.documentElement.scrollWidth,
     containers,
     clipped,
-    selects
+    selects,
+    splitTabWords
   };
 }
 app.whenReady().then(async () => {
@@ -164,6 +182,7 @@ app.whenReady().then(async () => {
               state.documentWidth <= width + 1 &&
               state.containers.every((item) => item.overflow <= 2 && item.right <= width + 1 && item.left >= -1) &&
               !state.clipped.length &&
+              !state.splitTabWords.length &&
               state.selects.every((item) => item.hasIndicator) &&
               status.labelWidth + status.padding <= status.width + 1;
             results.push({ locale, font, theme, passed, ...state });

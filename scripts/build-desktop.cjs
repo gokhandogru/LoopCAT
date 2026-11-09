@@ -2,6 +2,7 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { writeReceipt } = require("./repository-build-identity.cjs");
+const { requestedPlatforms } = require("./desktop-build-platforms.cjs");
 
 const root = path.resolve(__dirname, "..");
 const distDir = path.join(root, "dist");
@@ -30,21 +31,6 @@ for (const name of optionalSigningEnvironmentNames) {
   if (typeof env[name] === "string" && !env[name].trim()) delete env[name];
 }
 const builderSidecarPattern = /^builder-(?:debug|effective-config)\.ya?ml$/i;
-
-function requestedPlatforms(args) {
-  const platforms = new Set();
-  for (const arg of args) {
-    if (arg === "--mac" || arg === "--macos" || arg === "-m") platforms.add("darwin");
-    if (arg === "--linux" || arg === "-l") platforms.add("linux");
-    if (arg === "--win" || arg === "--windows" || arg === "-w") platforms.add("win32");
-    if (/^-[^-]/.test(arg)) {
-      if (arg.includes("m")) platforms.add("darwin");
-      if (arg.includes("l")) platforms.add("linux");
-      if (arg.includes("w")) platforms.add("win32");
-    }
-  }
-  return platforms;
-}
 
 function assertPlatformBuildHost(args) {
   const platforms = requestedPlatforms(args);
