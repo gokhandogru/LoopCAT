@@ -1,0 +1,94 @@
+LoopCAT for macOS - installation and first launch
+Updated: 9 November 2026
+
+READ BEFORE OPENING
+LoopCAT development previews are not signed with an Apple Developer ID and are
+not notarized by Apple. A local/ad-hoc signature does not change this. Only
+continue if you trust LoopCAT and have verified the download. These steps do
+not require disabling Gatekeeper or System Integrity Protection.
+
+Official downloads: https://github.com/gokhandogru/LoopCAT/releases
+Full guide: https://github.com/gokhandogru/LoopCAT/blob/main/docs/macos-installation.md
+
+1. CHOOSE THE RIGHT MAC DOWNLOAD
+Open Apple menu > About This Mac.
+- If it shows an Apple chip (for example M1, M2, M3 or M4), choose arm64.
+- If it shows an Intel processor, choose an explicitly labelled x64/x86_64
+  macOS package, or a universal package that includes Intel support.
+- The 0.0.4-dev.20261106.1 preview's Mac downloads are ARM64 only. They do not
+  run on Intel Macs. If a release has no Intel package, use the web edition
+  or wait for an Intel build. Re-signing cannot change an app's architecture.
+Choose a .dmg or -mac.zip asset, not GitHub's Source code archive.
+
+2. VERIFY AND INSTALL
+Download SHA256SUMS.txt from the SAME release as your DMG/ZIP. In Terminal,
+type "shasum -a 256 " (without quotes, keeping the final space), drag the
+downloaded DMG/ZIP onto Terminal, and press Return. Compare all 64 characters
+with the checksum for that exact filename. Stop if they differ. A matching
+checksum checks file integrity; it does not replace a trusted publisher.
+
+Open the DMG and drag LoopCAT.app into Applications, then eject the DMG.
+For a ZIP, extract it and move LoopCAT.app into Applications. Open the copy
+in Applications, not the one inside the mounted disk image. The commands
+below assume its location is /Applications/LoopCAT.app.
+
+3. ALLOW THIS APP TO OPEN
+Try opening LoopCAT once. If macOS says the developer cannot be verified or
+Apple cannot check the app, dismiss the message. Open System Settings >
+Privacy & Security, find the blocked LoopCAT entry under Security, and use
+Open Anyway (some versions show Open first). Confirm and authenticate if
+asked. The option is normally available for about an hour after the attempt.
+On older macOS versions the pane is called Security & Privacy.
+
+If macOS explicitly says the app contains malware or will damage your Mac,
+STOP and report it. Do not use the commands below to bypass that warning.
+An organization-managed Mac may require help from your IT administrator.
+
+4. OPTIONAL TROUBLESHOOTING FOR A VERIFIED PREVIEW
+First try a fresh download and repeat the checksum check. Close LoopCAT.
+
+If the trusted app is still blocked by its downloaded-file quarantine, the
+following removes ONLY that attribute from ONLY this app bundle:
+
+  xattr -dr com.apple.quarantine "/Applications/LoopCAT.app"
+
+This bypasses the quarantine check for this copy; it does not make the app
+Apple-approved. Do not clear every extended attribute with xattr -cr.
+
+If a legacy preview says "quit unexpectedly" or "damaged", inspect its
+signature before considering a repair:
+
+  codesign --verify --deep --strict --verbose=2 "/Applications/LoopCAT.app"
+
+If this reports an invalid or missing signature, and you have already
+verified the original download, this temporary local repair may help:
+
+  codesign --force --deep --sign - "/Applications/LoopCAT.app"
+  codesign --verify --deep --strict --verbose=2 "/Applications/LoopCAT.app"
+
+Only try opening the app if the second command succeeds. This replaces
+signatures locally; it is NOT notarization and does not fix every crash.
+It is for an older unsigned preview, not a future Developer ID-signed build.
+If macOS requests Command Line Tools, they are Apple's developer tools;
+you can decline and report the problem instead. If a command fails or says
+permission denied, stop and report its output; do not add sudo or disable
+system-wide security. A newer corrected package is preferable to repair.
+
+5. IF IT STILL FAILS
+Report the release, exact downloaded filename, Mac chip, macOS version,
+warning text and any command errors at:
+https://github.com/gokhandogru/LoopCAT/issues
+
+Optional diagnostics (these do not modify the app):
+  sw_vers
+  file "/Applications/LoopCAT.app/Contents/MacOS/LoopCAT"
+  codesign --verify --deep --strict --verbose=2 "/Applications/LoopCAT.app"
+
+For a crash, open Console > Crash Reports and find the latest LoopCAT report.
+Share its Exception Type and Termination Reason, removing personal paths or
+project content. For UI problems, include a screenshot, window size, display
+scaling, app zoom, theme and interface language, hiding translation content.
+
+Apple's instructions:
+https://support.apple.com/en-gb/102445
+https://support.apple.com/en-us/116943

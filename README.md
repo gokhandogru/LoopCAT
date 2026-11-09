@@ -57,6 +57,8 @@ Use the versioned application packages in the [current GitHub prerelease](https:
 
 The desktop packages are currently unsigned, and the macOS packages are not notarized. Windows may display an unknown-publisher or SmartScreen warning, and macOS may require an explicit Open action in Privacy & Security. LoopCAT does not bypass operating-system warnings; verify the checksum from the same release and proceed only if you trust this repository.
 
+**Installing on a Mac?** Read the [macOS installation and troubleshooting guide](docs/macos-installation.md), or save [`LoopCAT-macOS-INSTALL.txt`](downloads/LoopCAT-macOS-INSTALL.txt) beside your installer. The linked preview packages are **Apple Silicon / ARM64 only**; Intel Macs need an explicitly labelled Intel build. The guide explains **Open Anyway**, checksum verification, and temporary repair of older previews with an invalid signature.
+
 ### Verify the download and build identity
 
 Keep the three ZIPs, their checksum list, and `release.json` from the same repository checkpoint. On Windows, run `Get-FileHash -Algorithm SHA256 -LiteralPath 'path-to-downloaded.zip'` and compare the full hash with the matching filename in the checksum list. On Linux use `sha256sum -c LoopCAT.VERSION.SHA256SUMS.txt`, or on macOS use `shasum -a 256 -c LoopCAT.VERSION.SHA256SUMS.txt`, replacing `VERSION` with the downloaded preview version.
