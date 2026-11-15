@@ -4,6 +4,8 @@
 
 [Download the plain-text installation guide](../downloads/LoopCAT-macOS-INSTALL.txt) to keep these instructions beside the installer.
 
+**Current release:** `0.0.4-dev.20261109.1 provides universal DMG and ZIP packages for Apple Silicon and Intel.
+
 ## Choose the correct architecture
 
 Open **Apple menu → About This Mac**. An Apple chip means Apple Silicon; an Intel processor means an Intel Mac. See [Apple's identification guide](https://support.apple.com/en-us/116943).
